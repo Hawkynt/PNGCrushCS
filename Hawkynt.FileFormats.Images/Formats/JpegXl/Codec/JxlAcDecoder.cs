@@ -302,13 +302,19 @@ internal static class JxlAcDecoder {
     const int log2CoveredBlocks = 0;
     const int size = coveredBlocks * 64; // = 64 for DCT8
 
-    // (1) Predicted nzeros from top + left. libjxl `PredictFromTopAndLeft`
-    //     in entropy_coder.h: clamp top and left to <=32, average them.
-    //     For (bx=0, by=0) returns 32 (no neighbours).
-    var top = by > 0 ? rowNzeros[(by - 1) * blocksWide + bx] : 32;
-    var left = bx > 0 ? rowNzeros[by * blocksWide + (bx - 1)] : 32;
-    var predicted = (top + left + 1) >> 1;
-    if (predicted > 32) predicted = 32;
+    // (1) Predicted nzeros from the blocks above and to the left, per libjxl
+    //     `PredictFromTopAndLeft` in entropy_coder.h. The average is only taken
+    //     when both neighbours exist: down the first column the block above is
+    //     the whole prediction, along the first row the block to the left is,
+    //     and only the very first block of the group falls back to 32. This
+    //     used to average whichever neighbour existed against that 32 and then
+    //     clamp the result, so three of the four cases predicted a number the
+    //     encoder never predicted, read the count of non-zero coefficients from
+    //     the wrong histogram, and lost the stream at the first block that had
+    //     any. A flat picture hid it: where every block's count is zero, every
+    //     histogram answers zero without spending a bit, so the wrong one
+    //     answers the same as the right one.
+    var predicted = _PredictNonZeros(rowNzeros, blocksWide, bx, by);
 
     // (2) block context (qf and dc both 0 for first wave).
     var blockCtx = contextMap.GetContext(channel, strategy, qfIndex: 0);
@@ -359,6 +365,19 @@ internal static class JxlAcDecoder {
       throw new System.IO.InvalidDataException(
         $"Invalid AC: nzeros at end of block is {nzeros}, should be 0. " +
         $"Block ({bx},{by}), channel {channel}.");
+  }
+
+  /// <summary>
+  /// libjxl <c>PredictFromTopAndLeft</c>: the count of non-zero coefficients a
+  /// block is expected to hold, from the blocks above and to its left.
+  /// </summary>
+  private static int _PredictNonZeros(int[] rowNzeros, int blocksWide, int bx, int by) {
+    if (bx == 0)
+      return by > 0 ? rowNzeros[(by - 1) * blocksWide] : 32;
+    if (by == 0)
+      return rowNzeros[bx - 1];
+
+    return (rowNzeros[(by - 1) * blocksWide + bx] + rowNzeros[by * blocksWide + bx - 1] + 1) / 2;
   }
 
   // -------------------------------------------------------------------------
