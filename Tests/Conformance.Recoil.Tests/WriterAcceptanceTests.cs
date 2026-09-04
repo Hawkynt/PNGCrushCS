@@ -40,6 +40,12 @@ public sealed class WriterAcceptanceTests {
   /// </remarks>
   private static readonly Dictionary<ImageFormat, string> _NotJudgeable = new() {
     [ImageFormat.Ccitt] = "a bare fax stream states no page size, so a decoder picks its own and the sizes never match",
+    [ImageFormat.Aseprite] =
+      "the only tool here that knows .ase cannot read one. Handed the sprite it wrote itself, or the "
+      + "one this writes, ImageMagick returns the same fully transparent canvas of zeroes in both "
+      + "cases, so its verdict is about its own reader. What the writer is measured by instead is "
+      + "AsepriteTests: a sprite ImageMagick wrote from a known picture decodes back to that picture "
+      + "exactly, and what this writes reads back with the same indices and palette",
     [ImageFormat.SunIcon] = "the reference tool reads .icon as the Microsoft one, which is a different format",
     [ImageFormat.Analyze] = "the reference tool reads .hdr as Radiance, which is a different format",
     [ImageFormat.Envi] = "the reference tool reads .hdr as Radiance, which is a different format",

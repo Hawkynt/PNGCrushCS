@@ -52,6 +52,15 @@
     </None>
   </ItemGroup>
 
+  <!-- An Aseprite sprite written by ImageMagick, and the picture ImageMagick was given to write it
+       from. The second is the reference because ImageMagick cannot read the sprite back. -->
+  <ItemGroup>
+    <None Include="Formats\Aseprite\Fixtures\*">
+      <Link>Fixtures\Aseprite\%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
   <ItemGroup>
     <Using Include="NUnit.Framework" />
   </ItemGroup>
