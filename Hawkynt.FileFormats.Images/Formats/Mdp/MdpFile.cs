@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using FileFormat.Core;
 using FileFormat.Mda;
 
@@ -43,7 +43,7 @@ public enum MdpPageFormat : byte {
 /// </remarks>
 [FormatDetectionPriority(100)]
 [FormatMagicBytes([0x2E, 0x4D, 0x44, 0x50])]
-public readonly record struct MdpFile : IImageFormatReader<MdpFile>, IImageToRawImage<MdpFile>, IImageFormatWriter<MdpFile> {
+public readonly record struct MdpFile : IImageFormatReader<MdpFile>, IImageToRawImage<MdpFile>, IImageFromRawImage<MdpFile>, IImageFormatWriter<MdpFile> {
 
   static string IImageFormatMetadata<MdpFile>.PrimaryExtension => ".mdp";
   static string[] IImageFormatMetadata<MdpFile>.FileExtensions => [".mdp"];
@@ -78,6 +78,40 @@ public readonly record struct MdpFile : IImageFormatReader<MdpFile>, IImageToRaw
   public static RawImage ToRawImage(MdpFile file) {
     Validate(file, nameof(file));
     return MdaFile.ToRawImage(_AsMda(file));
+  }
+
+  /// <summary>MicroDesign's most common output resolution, used when the caller states none.</summary>
+  public const MdpResolution DefaultResolution = MdpResolution.Dpi300;
+
+  /// <summary>Bytes of page RAM one <see cref="PageRamBlocks"/> unit accounts for.</summary>
+  private const int _PAGE_RAM_BLOCK_BYTES = 16 * 1024;
+
+  /// <summary>Creates an MDP file from pixels alone, for callers that have only a picture.</summary>
+  /// <remarks>
+  /// The raster is the whole of what MDP shares with MDA, which registers a writer on exactly this
+  /// signature; the three page-layout bytes are what MDP adds and what a picture cannot state. Not
+  /// having a value for them is why this format was read-only, which made a working encoder
+  /// unreachable through the registry over three bytes of stationery metadata.
+  /// <para/>
+  /// So they are defaulted rather than demanded: 300 dpi, the page shape the pixels are closest to,
+  /// a RAM figure counted off the raster, and MDA's own placeholder serial. Any caller that knows
+  /// better calls the overload below and states them.
+  /// </remarks>
+  public static MdpFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    var area = MdaFile.FromRawImage(image);
+    return new MdpFile {
+      Width = area.Width,
+      Height = area.Height,
+      SerialNumber = MdaFile.DefaultSerialNumber,
+      Resolution = DefaultResolution,
+      PageFormat = image.Width > image.Height ? MdpPageFormat.A4Landscape : MdpPageFormat.A4Portrait,
+      PageRamBlocks = (byte)Math.Min(
+        byte.MaxValue,
+        (area.RasterData.Length + _PAGE_RAM_BLOCK_BYTES - 1) / _PAGE_RAM_BLOCK_BYTES),
+      RasterData = area.RasterData,
+    };
   }
 
   /// <summary>

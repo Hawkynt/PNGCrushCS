@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using FileFormat.Core;
@@ -9,6 +9,8 @@ namespace FileFormat.Ani;
 /// <summary>In-memory representation of an ANI animated cursor file.</summary>
 [FormatMimeType("application/x-navi-animation", "image/x-ani")]
 public sealed class AniFile : IImageFormatReader<AniFile>, IImageToRawImage<AniFile>, IImageFromRawImage<AniFile>, IImageFormatWriter<AniFile>, IMultiImageFileFormat<AniFile> {
+
+  static FormatCapability IImageFormatMetadata<AniFile>.Capabilities => FormatCapability.HasDedicatedOptimizer;
 
   public required AniHeader Header { get; init; }
   public IReadOnlyList<IcoFile> Frames { get; init; } = [];

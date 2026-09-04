@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using FileFormat.Core;
@@ -18,6 +18,7 @@ using Optimizer.Ico;
 using Optimizer.Jpeg;
 using Optimizer.Pcx;
 using Optimizer.Png;
+using Optimizer.Sgi;
 using Optimizer.Tga;
 using Optimizer.Tiff;
 using Optimizer.WebP;
@@ -218,6 +219,15 @@ public sealed partial class ImageOptimizer {
           var opts = _options.AniOptions ?? new();
           var optimizer = AniOptimizer.FromFile(_inputFile, opts);
           var result = await optimizer.OptimizeAsync(ct, p);
+          return result.FileContents;
+        }));
+        break;
+      case ImageFormat.Sgi:
+        // No progress callback: this optimizer's OptimizeAsync takes only a cancellation token.
+        candidates.Add(new(ImageFormat.Sgi, ".sgi", async (ct, _) => {
+          var opts = _options.SgiOptions ?? new();
+          var optimizer = SgiOptimizer.FromFile(_inputFile, opts);
+          var result = await optimizer.OptimizeAsync(ct);
           return result.FileContents;
         }));
         break;

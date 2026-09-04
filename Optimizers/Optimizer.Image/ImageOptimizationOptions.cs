@@ -1,4 +1,4 @@
-using Optimizer.Ani;
+﻿using Optimizer.Ani;
 using Optimizer.Bmp;
 using Optimizer.Cur;
 using Optimizer.Gif;
@@ -6,6 +6,7 @@ using Optimizer.Ico;
 using Optimizer.Jpeg;
 using Optimizer.Pcx;
 using Optimizer.Png;
+using Optimizer.Sgi;
 using Optimizer.Tga;
 using Optimizer.Tiff;
 using Optimizer.WebP;
@@ -24,6 +25,7 @@ public sealed record ImageOptimizationOptions(
   TiffOptimizationOptions? TiffOptions = null,
   BmpOptimizationOptions? BmpOptions = null,
   TgaOptimizationOptions? TgaOptions = null,
+  SgiOptimizationOptions? SgiOptions = null,
   PcxOptimizationOptions? PcxOptions = null,
   JpegOptimizationOptions? JpegOptions = null,
   IcoOptimizationOptions? IcoOptions = null,

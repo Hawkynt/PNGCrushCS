@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 
 namespace FileFormat.Analyze;
@@ -16,13 +16,14 @@ public static class AnalyzeReader {
 
     var hdrBytes = File.ReadAllBytes(file.FullName);
 
-    // Derive .img path by replacing extension
+    // Analyze is normally a pair, .hdr beside .img, but it is also written as one file with the
+    // voxels straight after the header — which is what ToBytes here produces. Substituting an empty
+    // array when the sibling is absent threw the second form's pixels away and returned a picture
+    // that stated a size and carried nothing, so converting it indexed off the end of the buffer.
     var imgPath = Path.ChangeExtension(file.FullName, ".img");
-    byte[] imgBytes;
-    if (File.Exists(imgPath))
-      imgBytes = File.ReadAllBytes(imgPath);
-    else
-      imgBytes = [];
+    var imgBytes = File.Exists(imgPath)
+      ? File.ReadAllBytes(imgPath)
+      : hdrBytes.Length > HEADER_SIZE ? hdrBytes[HEADER_SIZE..] : [];
 
     return _Parse(hdrBytes, imgBytes);
   }

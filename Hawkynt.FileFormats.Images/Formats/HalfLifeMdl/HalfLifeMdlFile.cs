@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using FileFormat.Core;
 
 namespace FileFormat.HalfLifeMdl;
@@ -18,12 +18,20 @@ public readonly record struct HalfLifeMdlFile : IImageFormatReader<HalfLifeMdlFi
   public int Height { get; init; }
   public byte[] PixelData { get; init; }
 
+  /// <remarks>
+  /// This model of the texture is header plus indices; the 768-byte colour table a texture carries
+  /// inside a whole .mdl is not part of what gets extracted here, so the ramp from
+  /// <see cref="IndexedPalette"/> stands in and the picture is at least drawable. Reading the real
+  /// table needs a sample of the extracted layout to pin where it sits.
+  /// </remarks>
   public static RawImage ToRawImage(HalfLifeMdlFile file) {
     return new() {
       Width = file.Width,
       Height = file.Height,
       Format = PixelFormat.Indexed8,
       PixelData = file.PixelData[..],
+      Palette = IndexedPalette.GrayRamp(256),
+      PaletteCount = 256,
     };
   }
 
