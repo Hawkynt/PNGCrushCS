@@ -98,7 +98,7 @@ public sealed class Ffv1Encoder : IVideoCodecEncoder<Ffv1Encoder> {
     };
   }
 
-  public static string CodecName => "FFV1 (RFC 9043, version 3, range coder)";
+  public static string CodecName => "FFV1 (RFC 9043)";
 
   public static CodecTag Codec => _FFV1;
 

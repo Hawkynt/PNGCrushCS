@@ -2,9 +2,9 @@
 
 Every codec below was investigated and not implemented **from files and published descriptions
 alone**. That is a result rather than a gap, and it is written down here so the work is not repeated
-by somebody who assumes it was never attempted. The running count lives in `codec-coverage.md`,
-which is where it is kept correct; one section here sometimes covers several of the decoders counted
-there, so the two are not the same number and were never meant to be.
+by somebody who assumes it was never attempted. The package's own support tables live in `README.md`,
+which is where the counts are kept correct; one section here sometimes covers several of the codecs
+listed there, so the two are not the same number and were never meant to be.
 
 ## Fourteen of these are now decoded, and their sections below are kept anyway
 
@@ -12,7 +12,7 @@ Escape 124, MSZH, LOCO, Canopus Lossless, Matrox M101, VBLE, MidiVid Archive, MS
 RemotelyAnywhere Screen Capture, MSCC, MWSC, RSCC, Screenpresso and WinCAM Motion Video all decode
 now. None of them was closed by finding a description that had been missed: each was adapted from
 FFmpeg's own decoder, which is LGPL-2.1-or-later and so usable by this LGPL-3.0-or-later package
-with its authorship kept. `codec-coverage.md`'s licence section says which and on what terms.
+with its authorship kept. `README.md`'s licence section says which and on what terms.
 
 Their sections are kept rather than deleted because what those sections establish is still true and
 still useful: the skip-count coding Escape 124's own published description names without stating,
@@ -65,7 +65,7 @@ author too. RSCC alone reaches Escape 124 and SpeedHQ's place — a real sample 
 packet framing fully recovered and verified against it, and a delta-record scheme whose destination
 coordinates are pinned down and whose remaining fields resist every reading tried.
 
-None of them had anything committed. The running count lives in `codec-coverage.md` for the same
+None of them had anything committed. The running count lives in `README.md` for the same
 reason it is not repeated here: a number written in two places drifts apart at the first merge, and
 this file has already had that happen to it.
 
@@ -381,7 +381,7 @@ container.
 # DV, where the two tables that matter live only in a standard nobody gives away
 
 DV (`dvvideo` — IEC 61834 and SMPTE 314M, what a MiniDV camcorder, a DVCAM deck or a DVCPRO deck all
-write) went into `codec-coverage.md`'s "what is left" list with a note that it looked like the cheap
+write) went into the "what is left" list below with a note that it looked like the cheap
 one of the professional formats: intra-only, and "a format with a published standard behind it," unlike
 the reverse-engineered game and screen-capture codecs beside it there. That note was wrong, or at least
 not the whole truth, and this is the correction.
@@ -1100,7 +1100,7 @@ the single-bit-flip guessing that this investigation's evidence explicitly canno
 # Canopus HQ, HQA and HQX, where the vendor's own papers say nothing about the bitstream
 
 Canopus HQ (`CUVC`) and its alpha-carrying sibling HQA share one ffmpeg decoder, `hq_hqa`; their
-successor HQX (`CHQX`) is a second. Both were investigated on the strength of what `codec-coverage.md`
+successor HQX (`CHQX`) is a second. Both were investigated on the strength of what the coverage notes
 said about this whole family — "documented on MultimediaWiki" — and both stop at the same place MSS1
 and MSS2 do above: the one detailed technical description of either bitstream is, by its own author's
 account, notes from reverse engineering, and nothing independent of that exists to build from instead.
@@ -1202,7 +1202,7 @@ do.
 
 # Mandsoft Screen Capture Codec (MSCC), where neither a description nor a single file exists
 
-MSCC was investigated as the first of the screen-capture codecs `codec-coverage.md` still listed as
+MSCC was investigated as the first of the screen-capture codecs still listed as
 left. It stops before the others do, on the plainest evidence in this file: there is nothing to read.
 
 No MultimediaWiki page exists for it under any name tried — `MSCC`, `Mandsoft Screen Capture Codec` and
@@ -2976,3 +2976,319 @@ A description of FMVC's two LZ77 variants — the match and literal coding, the 
 — from a source that is not an implementation and does not postdate ffmpeg's own decoder by five years:
 Fox Magic's own documentation, or a reverse-engineering write-up that says plainly how it was produced
 and from what, the way this project would need for LOCO, VBLE or Canopus Lossless above.
+
+
+---
+
+## What is left, by family
+
+Grouping matters because codecs within a family share a bitstream ancestor, and one decoder usually
+opens several names. The families are roughly in descending order of what they buy.
+
+**Modern standards** — `av1`, `vvc`, `dirac`, `snow`, `cavs`, `apv`. HEVC is decoded for intra
+pictures; its predicted and bidirectional slices are written but refused, for the reason given in
+`README.md`. AV1 still pays twice — a correct one
+would close a video codec and a still-image format together — but the AVIF reader's own decoder has
+now been examined against the reference and is not a candidate for repair. It reads
+equal-probability literal bits where AV1 uses context-indexed CDFs and carries none of the normative
+default tables, so it desynchronises at the first partition decision: on a 32x32 still it returns a
+flat 130 across the plane where the reference has structure, 1024 samples of 1024 wrong. That path
+now refuses. A real AV1 decoder has to be built from the specification, and that is a job on the
+scale of this package's H.265 work rather than a gap to be filled in passing.
+
+**Windows Media before VC-1** — `wmv1`, `wmv2`, `msmpeg4v1`, `msmpeg4` (that is version 3), `msp2`,
+`mss1`, `mss2`, `msa1`, `mts2`. Version 2 is done. Versions 1 and 3 are argued in `README.md` to be
+out of reach on evidence: version 3 chooses per picture between ten tables that are Microsoft's own
+and published nowhere, and version 1 has no encoder in existence to derive its tables from or to
+check a guess against. WMV1, WMV2, MSS1 and MSS2 are now argued the same way in
+`codec-investigations.md`, each with its own section. WMV1 and WMV2 stop on the strength of a real
+encoder that turns out not to matter: their run-level, DC and motion-vector tables are version 3's
+own, tied to it by two identical escape constants in the one document that gives either version's
+syntax, and the only macroblocks a corpus can locate without those tables are exactly the ones with no
+coded codeword in them to learn the tables from; WMV2 adds a private macroblock-type table of its own
+on top of that. MSS1 and MSS2 stop somewhere else: no independent description of their arithmetic
+coder exists, the one detailed write-up tracks libavcodec's own function names down to a shared
+spelling mistake, and MSS2 additionally embeds Windows Media Video 9 rectangles located by the very
+structure that coder would decode. What is left of this family is `msmpeg4v1`, `msmpeg4` (version 3),
+`msp2`, `msa1` and `mts2`.
+
+**On2 and RealVideo** — `vp4`, `vp5`, `vp6`, `vp7`, `rv30`, `rv40`, `rv60`. VP3 shares almost all of
+its structure with Theora, which is done and exact, so it is the cheapest of these by a wide margin.
+VP4, VP6 and VP7 are the three already investigated, and none is implemented, for three different
+reasons. VP4 shares almost all of its structure with VP3 too, and its two independent published
+sources, plus this project's own verified parse against the real bitstream and against On2's own
+`vp4vfw.dll` run directly, confirm all of it except one family of tables: the motion-vector Huffman
+codes, printed nowhere and stored in the codec's own binary as branches rather than as a table a file
+could be searched for. VP6's specification is public and every table in it was transcribed and checked
+back against the document, but the coefficient decode still diverges eight binary decisions into the
+first block of the first key frame. VP7's own document is thorough enough to name the two reference
+decoder files it declines to print — the dequantisation tables (`quant_common.c`) and the interframe
+motion-vector census (`findnearmv.c`) — and a real key frame's flat first macroblock shows exactly why
+that gap matters: this project's own reimplementation of everything else the document does print,
+checked bit for bit against real files with an independent second decoder, reproduces the wrong DC
+value at two different quantiser indices, by an amount no adjustment of VP8's own published tables
+accounts for. How far each got, and everything ruled out, are in `codec-investigations.md`, so none of
+the three searches need be repeated from the start. VP5 is behind VP6's same wall with no published
+specification at all.
+
+**Sorenson** — nothing is left of this group, and neither member is implemented. Both are argued in
+`codec-investigations.md`. `svq1`'s codebook is not carried in the stream at all, and the one technical
+document on the format cites FFmpeg's own source for the tables rather than printing them. `svq3`
+shares this package's own H.264 decoder everywhere the two coincide, but its departures from H.264 —
+its entropy code chief among them — have no description independent of the one implementation that
+reverse-engineered it, confirmed by the format's own recorded history as well as by the page's own
+citation.
+
+**Lossless RGB and YUV** — nothing is left of this group unattempted: every name in it is now either
+decoded or argued in `codec-investigations.md`. Ut Video, MagicYUV, ZeroCodec, LCL ZLIB, AASC and
+Creative YUV came out
+of it and reached exact equality, and MSZH came out of it into `codec-investigations.md`. AASC's own
+row-and-column bookkeeping — a coding this project found no independent description narrower than "the
+same shape as Microsoft RLE" — needed measuring against a real file to settle at all: the wiki page names
+the escapes but neither states that a twenty-four-bit run is counted in bytes of a three-times-wide row
+rather than in pixels, nor that every frame's row cursor opens one row past the picture and reaches the
+real bottom row only via that frame's own first escape. That is the
+standard for every one of them: max delta 0 or it is wrong. `v210`, `r210`, `r10k` and `y41p` carry no
+compression at all, only a fixed packing of samples into words or byte groups, so there was nothing for
+a decoder to get wrong except the layout, and the two RGB ones decode straight into a ten-bit RGB pixel
+format with no reduction to eight bits standing in the way of the comparison at all. None of the four
+layouts is written down anywhere this project found; all were recovered by sweeping every reading
+against ffmpeg's own encoder fed known or pseudo-random samples, and r210 and r10k turned out to
+disagree with each other about which ten bits are which despite the family resemblance their names
+suggest, while y41p's rows turned out to be coded bottom row first — found only once random content,
+which has no row in common with the wrong one, turned a sweep that looked like it matched nothing at
+all into an exact match once the row order was reversed. `012v` is done as well, and it is the cheapest
+of the group for a reason its own name states backwards: its sixteen-byte group is `v210`'s own, sample
+for sample and bit for bit, and the whole of the difference is that a row is as long as the packet's own
+length divided by the height rather than padded out to a multiple of 128. What that codec's
+investigation had stopped on turned out not to be about it at all — the "transparency is not implemented"
+message its reference decoder logs belongs to the sibling four-character code `a12v`, which the same
+implementation serves and whose alpha channel it drops; patching nothing but the tag bytes of the real
+sample makes the message appear on byte-identical picture data, and the unpatched file decodes without
+it. So the oracle is sound here where it would not be for `a12v`, which is not claimed. `cljr` is done too, and it is the one lossy
+format in this group: the quantisation is the encoder's, so a decoder reading the coded bits has
+nothing left to round, but the encoder dithers, which means a coded word is not a plain quantisation of
+the source and the sweep that recovered its bit layout had to be checked against another decoder's
+reading of the same bits rather than against the picture that went in. This is the densest source of
+verifiable wins in the list — but not a uniformly cheap one. `lagarith`, which is arithmetic coding over
+the same kind of prediction, also came out of it and is now in `codec-investigations.md` instead, and
+`loco` has now joined it there on the cleanest provenance evidence this project has found anywhere: its
+MultimediaWiki page opens by stating that it is based on a description by the same person ffmpeg's own
+commit message credits the decoder to, and its edit history puts it eleven months after that decoder
+landed. The page is the implementation written up afterwards, which is the one thing this project
+cannot build from.
+
+`cllc` has now joined it there — not on a paraphrase to be ruled out but on the absence of any
+description whatever: its MultimediaWiki page has carried three bullet points and no bitstream fact
+since 2009, and its own edit history shows the note calling the codec undiscovered being stripped once
+a decoder existed elsewhere rather than replaced by anything describing one. Three real recordings
+covering RGB, ARGB and YUY2 do exist, and the frames are far too large for the missing-tables argument
+to apply, so what stops it is only that the sole descriptions in existence are implementations.
+
+`m101` is there too — the one member of the group that is a plain packing like `v210` and `y41p` rather than a
+coding, and which stops anyway because the sweep that recovers a packing needs either an encoder to
+feed known content through or a real file to sweep against, and it has neither: no wiki page exists at
+all, ffmpeg carries no encoder, and no sample turned up in `samples.ffmpeg.org`, in ffmpeg's own
+test-suite server or at fourcc.org.
+
+`dxtory` is there as well, and it stops twice over: its MultimediaWiki page's whole technical content is one sentence
+naming a sixteen-byte header and YV12 blocks and saying nothing whatever about the compression, so it
+would not reach a first sample even if believed entirely — and that page's single revision and
+ffmpeg's own decoder are the same person's work on the same December morning in 2011, seven hours
+apart.
+
+`vble` is there on the most direct evidence of the group. Its one technical source does not merely
+trace back to an implementation, it quotes one: the whole of MultimediaWiki's `VBLE` page is a
+sentence naming the codec's author, a claim that it uses "standard median prediction," a two-line
+sketch of the frame, and then one literal C conditional expression — ternary, operator precedence and
+all — printed where a rule in words should be. A specification does not carry a line of C. The page
+has a single revision, and the same reverse engineer LOCO's own entry turns on wrote every byte of it.
+
+`hymt` is there too, and is the narrowest miss in this package: HuffYUV itself is decoded here exactly, and
+the multithreaded fork changes exactly one thing — a slice table for thread partitioning — which is
+exactly the one thing no published source states. Its wiki page is two sentences and is still filed
+under undiscovered codecs; the fork's own changelog records only that v613 renamed the four-character
+code; the sole complete description is the fork's GPL v2+ source, which this package could not
+transcribe on licence grounds even if it transcribed implementations; and no HYMT sample exists
+anywhere searched.
+
+`mvha` is there too, and its only description — the MidiVid page's archival section — was written the day after
+ffmpeg's own decoder was authored, and which even taken at face value states a frame header and then
+stops: no tree construction, no bit order, no prediction seeding, no strides, and no sample of the
+codec exists anywhere to settle any of them against.
+
+`sheervideo` is there too — the one codec in that file whose documentation passes the provenance test outright
+and stops anyway. Its bitstream write-up predates ffmpeg's decoder by three years and is by a different
+person, and the vendor itself edited the same page; what it never prints is the dozen VLC codesets and
+the per-format seed predictors its own pseudocode indexes, and because those codes are static rather
+than transmitted, no packet of any of the thirteen real files carries them. That is SVQ1's wall rather
+than Indeo's: not a frame too small to hold a table, but a table no frame was ever going to hold.
+
+`ylc` is there last, and it is the closest call of the group: clean provenance — its description predates ffmpeg's
+decoder by four years and is by a different person — a real sample at samples.ffmpeg.org, a frame header
+given to the byte and a prediction rule stated exactly, and then one clause of its own pseudocode that
+outputs a "predefined YUYV quad from the constant table" and never prints the table. Two hundred and
+twenty-five quads that are constant rather than transmitted are in the binary and in no file, which is
+SheerVideo's and SVQ1's wall rather than anything about this codec's own difficulty.
+
+**Screen capture** — `tdsc` and `vmnc` are what remains of this group unattempted. Mostly DEFLATE over
+a framebuffer with a delta scheme on top, so also lossless and also absolutely measurable. `flashsv` and
+`flashsv2` came out of this group and reached exact equality; see `README.md`. Six more —
+`mscc`, `mwsc`, `rasc`, `rscc`, `screenpresso` and `wcmv` — decode now, not because a description
+turned up but because FFmpeg's own decoders for them are licence-compatible with this package; see
+the licence section below. `fmvc`, `g2m`, `scpr` and `tscc2` remain in
+`codec-investigations.md`: none of those four carries an independent bitstream description this project
+could confirm, and the six now decoded stopped on the same wall — four of them (`mscc`, `wcmv`,
+`rasc` and `screenpresso`) carry no sample corpus at all,
+`mwsc` and `scpr` carry exactly one file each, and `rscc` alone reached a real recovered packet framing
+and a delta record's destination coordinates before the two remaining fields resisted every reading
+tried. `fmvc` is the one of the four with two real recordings and a page detailed enough to look
+buildable — tile sizes, header layout, byte counts — and it stops on both walls at once: every
+technical fact on that page was added in September 2022, five years and seven months after ffmpeg's
+own decoder, and even taken at face value the page names the compression only as "two types, both
+based on LZ77 scheme" without stating a match length, a literal flag or a window size for either.
+
+**Professional and intermediate** — `pixlet`, `prores_raw`,
+`aic`, `media100`. `prosumer` came out of this group into `codec-investigations.md`: its whole published
+bitstream description is one sentence, added to MultimediaWiki in September 2022 — four years after
+ffmpeg's own decoder — and that sentence's last clause depends on a codebook it does not print, which
+is SVQ1's wall on a smaller format. `hap` came out of this group and reached exact equality — DXT/BC
+texture blocks in a small chunked header, published in full by its own authors, which is what made it
+the cheapest of the group rather than merely the best documented. `cfhd` came out of it too, and is the
+one member of this group whose free standard, SMPTE ST 2073-1, turned out to state everything a decoder
+needs — the tag-value framing, the wavelet transform, the codebook, all of it. It is lossy rather than
+exact; see `README.md`. `hq_hqa` and `hqx` looked well
+documented too,
+on the strength of a MultimediaWiki page each, and turned out not to be: neither Canopus's nor Grass
+Valley's own white papers state a bitstream fact, and the one detailed technical description of either
+is a reverse engineer's own account of decompiling the codec rather than anything published; they are
+counted with the not-implementable codecs above, on the same footing as MSS1 and MSS2. `speedhq` got
+further than either — a real encoder to build a corpus with, and a MultimediaWiki page whose vendor is
+credited with helping write it — and its field, slice and DC layers, and most of its AC coefficients,
+check out exactly against this package's own ISO/IEC 13818-2 tables; what stops it is a small, uncounted
+number of AC codewords the page's prose says are "moved around" without saying to where, printed
+nowhere except inside that same page's verbatim copy of `libavcodec/speedhq.c`'s own arrays, which this
+project does not use. It is counted with the not-implementable codecs above too, closer to Escape 124's
+shape than to Canopus's.
+
+The screen-capture family below this section is where most of that documentation argument was made,
+and six of its members now decode from licence-compatible references instead. What the argument
+established still stands for the rest: ScreenPressor clears only a one-file corpus, too thin a base
+to build a table from on this project's own standard, and its only detailed technical trace besides
+is a second author's open-source rebuild of the vendor's code rather than anything the vendor
+published; Go2Meeting and TSCC2 each have a real sample corpus and a genuinely detailed
+MultimediaWiki page, but each page is either unconfirmed or confirmed to be its own decoder's
+author's reverse-engineering notes restated, the same shape MSS2's and Canopus's pages already
+turned out to be. `dvvideo` looked
+like the cheapest of these on the same promise — a published standard behind it — but the standard, IEC
+61834 and SMPTE 314M, is not free, and the investigation recorded in `codec-investigations.md` found no
+independent source for its entropy table or a confirmed shuffle table either; it too is counted with
+the not-implementable codecs above rather than left in this list.
+
+**Game and FMV codecs** — the largest group, around 45 names, of which `roqvideo`, `interplayvideo`,
+`idcinvideo`, `vqavideo`, `eacmv`, `cdxl`, `iff` (IFF ANIM's Byte Vertical Delta, method 5), `bfi`,
+`vmdvideo` and `escape130` are
+now done and `escape124`, `smackvid`, `eatgq`,
+`eatqi` and `eamad` are investigated and not implementable (`codec-investigations.md`):
+`binkvideo`, the `xan_*` pair and many more. `eatgv` is investigated and
+partially recovered rather than either done or closed — see `codec-investigations.md`, which records
+a container and picture header confirmed to the byte, a published one-byte literal-run formula
+measured and corrected, and where the next statement's own bit layout stops matching the file, the
+same shape TrueMotion 2's own section there is in. Almost none of what is left has a published
+specification; most are described on MultimediaWiki from reverse engineering. Their value is
+preservation rather than reach, and each is
+small.
+
+**Everything else** — `indeo2`, `mdec`, `mimic`, `amv`, `mxpeg`, `sp5x`,
+`truemotion2` and the remainder. `cljr` came out of this group and reached exact equality; it is the
+one lossy packing among the fixed layouts, measured against ffmpeg's own decode rather than the
+source because its encoder dithers. `asv1` came out of the group too, on a genuine specification —
+Michael Niedermayer's asv1.txt prints every field, both variable-length code tables and the
+dequantisation formula in full — with two of its own diagrams settled by measurement rather than read
+literally; see `README.md`. Sharing its transform with this library's MPEG-1, H.263 and H.261
+decoders, its bar is the same one theirs is: at most one level of difference against ffmpeg's decode
+on any sample, flat across every one of 325 measured frames rather than growing. `asv2` came out of
+the group as well, from the same document,
+with one gap the document itself leaves as an
+ellipsis: its level table prints magnitudes one to seven and the boundary magnitude thirty-one in full
+and states nothing between them. Every printed value, both signs of the boundary included, fits one
+formula — a nested code whose offset bits read as a magnitude least significant bit first — and that
+formula's answer for the twenty-three unstated magnitudes was checked against a real file encoded fine
+enough to need the whole range before being counted rather than shipped on the strength of the pattern
+alone; see `README.md`. TrueMotion 2 is the partial case: it is self-describing and about two thirds
+recovered, with the evidence in `codec-investigations.md`, and it was deliberately not shipped
+half-working because a wrong block type in a still passage is indistinguishable from the codec working.
+
+
+---
+
+# Licence-compatible reference sources for blocked codecs
+
+`codec-investigations.md` deliberately treats implementation-only knowledge as unavailable because copying
+an implementation without establishing its licence would turn a reverse-engineering problem into a
+provenance problem. That is the right default, but it is stricter than necessary where the implementation
+itself is distributed under terms compatible with this package's LGPL-3.0-or-later licence.
+
+This file records sources that clear that additional gate. It is a source-provenance map, not a claim
+that each codec is small or mechanically portable: the resulting C# still has to fit this package's
+managed-code model and be verified against real streams before the corresponding negative result can be
+removed from `codec-investigations.md`.
+
+## Directly useful sources
+
+| Codec | Compatible reference | Licence in source | What it unlocks | Suggested scope |
+| --- | --- | --- | --- | --- |
+| MSZH | [FFmpeg `libavcodec/lcldec.c`](https://github.com/FFmpeg/FFmpeg/blob/master/libavcodec/lcldec.c) and [`lcl.h`](https://github.com/FFmpeg/FFmpeg/blob/master/libavcodec/lcl.h), Roberto Togni | LGPL-2.1-or-later | The unpublished literal/back-reference coder, raw-frame fallback and two-section packet form | Port the coder into the already implemented LCL wrapper; start with independently verified RGB24 |
+| Escape 124 | [FFmpeg `libavcodec/escape124.c`](https://github.com/FFmpeg/FFmpeg/blob/master/libavcodec/escape124.c), Eli Friedman | LGPL-2.1-or-later | The exact skip-count code that the published prose only calls “Rice decoding” | Reuse the existing ARMovie/RPL framing work and port the skip decoder plus codebook walk |
+| Microsoft Screen 1 | [FFmpeg `libavcodec/mss1.c`](https://github.com/FFmpeg/FFmpeg/blob/master/libavcodec/mss1.c) plus shared `mss12.*`, Konstantin Shishkov | LGPL-2.1-or-later | Arithmetic coder, model updates and tile reconstruction omitted from Microsoft's public API documentation | Port the self-contained MSS1 arithmetic path before considering MSS2 |
+| Microsoft Screen 2 | [FFmpeg `libavcodec/mss2.c`](https://github.com/FFmpeg/FFmpeg/blob/master/libavcodec/mss2.c) plus shared `mss12.*` | LGPL-2.1-or-later | The implementation-defined screen-coding layer and its VC-1-derived pieces | Larger port; share the MSS1 infrastructure rather than duplicating it |
+| Lagarith | [FFmpeg `libavcodec/lagarith.c`](https://github.com/FFmpeg/FFmpeg/blob/master/libavcodec/lagarith.c), Nathan Caldwell | LGPL-2.1-or-later | A complete integer decoder that avoids having to reproduce the original encoder's floating-point probability construction | Port decode semantics, then compare packed native output against real Lagarith files; do not require reproducing the original encoder |
+| Canopus HQ/HQA | [FFmpeg `libavcodec/hq_hqa.c`](https://github.com/FFmpeg/FFmpeg/blob/master/libavcodec/hq_hqa.c) plus `hq_common.*` / `hq_hqadata.h` | LGPL-2.1-or-later | Quantisation, VLC and transform tables absent from vendor white papers | Treat HQ and HQA together around shared tables and transform code |
+| Canopus HQX | [FFmpeg `libavcodec/hqx.c`](https://github.com/FFmpeg/FFmpeg/blob/master/libavcodec/hqx.c) | LGPL-2.1-or-later | HQX VLC/tables and reconstruction rules absent from public vendor material | Separate decoder, but share Canopus colour/transform helpers where representations match |
+| VP7 | [FFmpeg `libavcodec/vp8.c`](https://github.com/FFmpeg/FFmpeg/blob/master/libavcodec/vp8.c) and its VP7/VP8 data helpers | LGPL-2.1-or-later | The dequantisation and motion-vector state that On2's VP7 document names but does not print | Extract VP7-only constants and behaviour instead of importing the VP8 decoder wholesale |
+
+## Especially small unblock: Escape 124 skip counts
+
+The missing Escape 124 value is not a generic Rice code. FFmpeg's LGPL decoder makes it a three-tier
+prefix value:
+
+1. Read one bit. Zero means a skip count of zero.
+2. For one, add a three-bit value. Any result below eight is final.
+3. At eight, add a seven-bit value. Any result below 135 is final.
+4. At 135, add a twelve-bit value.
+
+That is at most 23 bits and exactly fills the narrow hole recorded in `codec-investigations.md`; the
+remaining Escape 124 structures in FFmpeg are likewise in the same LGPL source file. The important
+porting detail is that FFmpeg declares the bit reader little-endian for this codec, so translating the
+steps without translating bit order would produce a plausible-looking but wrong decoder.
+
+## Why MSZH is the first conversion
+
+MSZH has the lowest integration cost because this package already contains `LclHeader` and a verified
+LCL ZLIB decoder. FFmpeg's compatible source supplies only the piece that was missing:
+
+- a mask byte controls eight commands, most-significant mask bit first;
+- a zero mask bit copies four literal bytes;
+- a one mask bit reads a little-endian 16-bit descriptor, using eleven bits of backward distance and
+  five bits of length, with the length measured in four-byte groups;
+- overlapping back-references are legal;
+- the multithread flag splits a packet into two independently compressed, equally sized output halves;
+- an RGB24 packet whose byte length already equals the padded frame size is raw data even when the
+  stream's compression field says MSZH.
+
+`MszhVideoDecoder` is the first implementation produced from this map. Its source comment preserves the
+upstream author and licence provenance and deliberately exposes RGB24 first, because that packing was
+already independently measured by the sibling LCL ZLIB work.
+
+## Licence rule used here
+
+The package declares `LGPL-3.0-or-later`. Code under LGPL-2.1-or-later can be redistributed under a
+later LGPL version, including LGPL-3.0, while retaining the upstream copyright and licence provenance.
+MIT, BSD, ISC, zlib and public-domain sources are also normally usable with their required notices.
+GPL-only code is deliberately excluded from this map: algorithms and factual format knowledge may be
+reimplemented independently, but GPL-only source is not a direct conversion source for this LGPL
+library.
+
+For every port, keep the upstream copyright/source notice near the adapted code, keep the implementation
+small enough that its provenance is obvious in review, and verify the result against real bitstreams
+rather than treating licence compatibility as evidence of correctness.

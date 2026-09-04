@@ -10,17 +10,19 @@ namespace FileFormat.Registry.Generator;
 
 /// <summary>
 /// Emits the video registry: a <c>VideoFormat</c> enum over the discovered container readers and a
-/// <c>VideoFormatRegistration.RegisterAll()</c> that registers every container and every codec
-/// decoder by static-interface dispatch.
+/// <c>VideoFormatRegistration.RegisterAll()</c> that registers every container, every codec decoder
+/// and every codec encoder by static-interface dispatch.
 /// </summary>
 /// <remarks>
 /// A generator of its own rather than more branches inside <see cref="ImageFormatGenerator"/>,
 /// because what it discovers is disjoint: no type is both an image format and a container, and the
 /// two registries have nothing in common but the namespace they are emitted into.
 /// <para/>
-/// Containers and decoders are registered separately and never reference each other. That is the
-/// whole point of the split — a codec added later is discovered and registered without a container
-/// being recompiled to mention it, and a container added later serves every codec already here.
+/// Containers, decoders and encoders are registered separately and never reference each other. That
+/// is the whole point of the split — a codec added later is discovered and registered without a
+/// container being recompiled to mention it, and a container added later serves every codec already
+/// here. Decoders and encoders go into two tables rather than one because they are looked up by
+/// different things: a decoder by a whole stream description, an encoder by the code to write.
 /// <para/>
 /// Emits nothing at all when a compilation holds neither, so that a project which only reads images
 /// does not acquire an empty video registry it would then have to supply the plumbing for.
@@ -293,6 +295,16 @@ public sealed class VideoFormatGenerator : IIncrementalGenerator {
         continue;
 
       sb.Append("    _RegisterDecoder<").Append(codec.FullTypeName).AppendLine(">();");
+    }
+
+    sb.AppendLine();
+    sb.AppendLine("    // Encoder registrations — the other direction, in a table of its own because an");
+    sb.AppendLine("    // encoder is chosen by the code a caller wants written and not by a stream description.");
+    foreach (var codec in discovery.Codecs) {
+      if (!codec.HasEncoder)
+        continue;
+
+      sb.Append("    _RegisterEncoder<").Append(codec.FullTypeName).AppendLine(">();");
     }
 
     sb.AppendLine("  }");

@@ -25,6 +25,7 @@ public static class VideoFormatRegistry {
   private static readonly Dictionary<string, List<VideoFormat>> _candidatesByExtension = new(StringComparer.OrdinalIgnoreCase);
   private static readonly Dictionary<string, VideoFormat> _byMimeType = new(StringComparer.OrdinalIgnoreCase);
   private static readonly List<VideoCodecEntry> _codecs = [];
+  private static readonly List<VideoCodecEncoderEntry> _encoders = [];
   private static VideoFormatEntry[] _detectionOrder = [];
 
   static VideoFormatRegistry() => VideoFormatRegistration.Initialize();
@@ -51,6 +52,8 @@ public static class VideoFormatRegistry {
 
   internal static void RegisterCodec(VideoCodecEntry entry) => _codecs.Add(entry);
 
+  internal static void RegisterEncoder(VideoCodecEncoderEntry entry) => _encoders.Add(entry);
+
   /// <summary>Sorts the containers into the order detection tries them. Called once, after registration.</summary>
   internal static void BuildDetectionOrder()
     => _detectionOrder = _byFormat.Values
@@ -67,6 +70,15 @@ public static class VideoFormatRegistry {
 
   /// <summary>Every registered codec, in registration order.</summary>
   public static IEnumerable<VideoCodecEntry> AllCodecs => _codecs;
+
+  /// <summary>Every registered encoder, in registration order.</summary>
+  /// <remarks>
+  /// A table of its own, and shorter than <see cref="AllCodecs"/>: a decoder exists for every codec
+  /// a file may already be coded with, while an encoder exists only where writing the codec is both
+  /// tractable and worth doing. A codec that both reads and writes appears in both tables under one
+  /// <see cref="VideoCodecEntry.CodecName"/>.
+  /// </remarks>
+  public static IEnumerable<VideoCodecEncoderEntry> AllEncoders => _encoders;
 
   /// <summary>The entry for a container, or <c>null</c> when nothing registered it.</summary>
   public static VideoFormatEntry? GetEntry(VideoFormat format) => _byFormat.GetValueOrDefault(format);
@@ -201,6 +213,51 @@ public static class VideoFormatRegistry {
     throw new NotSupportedException(
       $"Stream {stream.Index} is coded as {named}, "
       + $"which no registered codec decodes. Decoders present: {string.Join(", ", _codecs.Select(c => c.CodecName))}.");
+  }
+
+  // ============================================================================================
+  // Encode
+  // ============================================================================================
+
+  /// <summary>Whether any registered encoder writes the code a stream description names.</summary>
+  public static bool CanEncode(MediaStreamInfo stream) {
+    ArgumentNullException.ThrowIfNull(stream);
+
+    return _EncoderFor(stream) != null;
+  }
+
+  /// <summary>
+  /// Builds an encoder producing the stream described, or refuses the code by name.
+  /// </summary>
+  /// <remarks>
+  /// Chosen by the stream's own <see cref="MediaStreamInfo.Codec"/> — what the caller is asking to
+  /// have written — and not by the whole description the way a decoder is chosen. Anything else the
+  /// description says that the codec cannot write is the codec's own refusal, thrown from here as
+  /// the encoder is built, so a size or a depth it will not write is named rather than discovered on
+  /// the first frame.
+  /// </remarks>
+  /// <exception cref="NotSupportedException">
+  /// No registered encoder writes this code. The message names the four-character code and every
+  /// code that is written, so a refusal says which encoder is missing rather than only that one is.
+  /// </exception>
+  public static IVideoPacketEncoder CreateEncoder(MediaStreamInfo stream) {
+    ArgumentNullException.ThrowIfNull(stream);
+
+    var encoder = _EncoderFor(stream);
+    if (encoder != null)
+      return encoder.CreateEncoder(stream);
+
+    throw new NotSupportedException(
+      $"Stream {stream.Index} asks to be written as '{stream.Codec}' (0x{stream.Codec.Value:X8}), "
+      + $"which no registered encoder writes. Encoders present: {string.Join(", ", _encoders.Select(e => $"{e.CodecName} ('{e.Codec}')"))}.");
+  }
+
+  private static VideoCodecEncoderEntry? _EncoderFor(MediaStreamInfo stream) {
+    foreach (var encoder in _encoders)
+      if (stream.Codec.EqualsIgnoringCase(encoder.Codec))
+        return encoder;
+
+    return null;
   }
 
   // ============================================================================================

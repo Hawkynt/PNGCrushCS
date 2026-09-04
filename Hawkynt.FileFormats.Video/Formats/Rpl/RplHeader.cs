@@ -15,7 +15,7 @@ namespace FileFormat.Rpl;
 /// value means — <c>"130        video format"</c> — so a field is read by taking the token before the
 /// first run of whitespace and discarding the rest of the line. The layout, field order and the "number
 /// of chunks names the highest index rather than a count" quirk below are recorded against real bytes
-/// in this package's <c>undecodable-codecs.md</c>, from the Escape 124 investigation that mapped this
+/// in this package's <c>codec-investigations.md</c>, from the Escape 124 investigation that mapped this
 /// container before any codec riding on it was implemented.
 /// </remarks>
 public readonly record struct RplHeader(

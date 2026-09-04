@@ -24,7 +24,7 @@
 | **`FileFormat.Core`** | Library | Shared `RawImage`, format contracts, metadata, detection primitives, and pixel conversion infrastructure. |
 | **`Optimizer.*`** | Libraries | Per-format optimization engines. Package docs: [PNG](Optimizers/Optimizer.Png/ReadMe.md), [GIF](Optimizers/Optimizer.Gif/ReadMe.md), [TIFF](Optimizers/Optimizer.Tiff/ReadMe.md). |
 
-The complete image-format cross-reference lives in [`Formats.md`](Formats.md). Video container/codec details live in [`Hawkynt.FileFormats.Video/codec-coverage.md`](Hawkynt.FileFormats.Video/codec-coverage.md).
+The complete image-format cross-reference lives in [`Formats.md`](Formats.md). Video container and codec support lives in [`Hawkynt.FileFormats.Video/README.md`](Hawkynt.FileFormats.Video/README.md).
 
 ## 🖼️ Viewer
 
@@ -164,7 +164,7 @@ Capability claims are kept next to the implementation evidence instead of duplic
 
 - [`Hawkynt.FileFormats.Images/README.md`](Hawkynt.FileFormats.Images/README.md) is the public image read/write capability matrix.
 - [`Hawkynt.FileFormats.Images/MODERN_FORMAT_CONFORMANCE.md`](Hawkynt.FileFormats.Images/MODERN_FORMAT_CONFORMANCE.md) records interoperability evidence and the exact implemented scope for modern codecs such as WebP, AVIF, HEIF, JPEG XL, JPEG 2000, and JPEG XR.
-- [`Hawkynt.FileFormats.Video/codec-coverage.md`](Hawkynt.FileFormats.Video/codec-coverage.md) records video codec/container coverage.
+- [`Hawkynt.FileFormats.Video/README.md`](Hawkynt.FileFormats.Video/README.md) records video container and codec support; [`codec-notes.md`](Hawkynt.FileFormats.Video/codec-notes.md) how each was measured and [`codec-investigations.md`](Hawkynt.FileFormats.Video/codec-investigations.md) what stopped the ones that are not decoded.
 - [`Formats.md`](Formats.md) is the human-readable image cross-reference; runtime source-generated registry enumeration remains authoritative when that table temporarily lags the code.
 
 A capability is promoted only when its syntax and behavior have evidence beyond the project's own writer reading its own output. Unsupported profiles stay unadvertised rather than being represented as successful decode/write support.

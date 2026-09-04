@@ -14,7 +14,7 @@ namespace FileFormat.Rpl.Tests;
 /// </summary>
 /// <remarks>
 /// This is the same container Escape 124's own investigation mapped and recorded in
-/// <c>undecodable-codecs.md</c> before any codec riding it was implemented, and the fixtures here are
+/// <c>codec-investigations.md</c> before any codec riding it was implemented, and the fixtures here are
 /// built to the same layout that was measured against real files there: text header, chunk data, then
 /// a text catalogue naming every chunk's own file offset and byte sizes.
 /// </remarks>

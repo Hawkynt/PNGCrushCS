@@ -41,7 +41,7 @@ public sealed class MotionJpegVideoEncoder : IVideoCodecEncoder<MotionJpegVideoE
     };
   }
 
-  public static string CodecName => "Motion JPEG (baseline JPEG, independent frames)";
+  public static string CodecName => "Motion JPEG";
 
   public static CodecTag Codec => _codec;
 

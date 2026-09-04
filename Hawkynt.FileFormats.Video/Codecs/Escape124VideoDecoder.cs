@@ -12,7 +12,7 @@ namespace FileFormat.Codecs;
 /// distributed there under LGPL-2.1-or-later. This C# adaptation is distributed with this project
 /// under LGPL-3.0-or-later.
 /// <para/>
-/// This closes the specific gap recorded in <c>undecodable-codecs.md</c>: the skip count is not a
+/// This closes the specific gap recorded in <c>codec-investigations.md</c>: the skip count is not a
 /// conventional Rice code. It is a tiered little-endian code: one bit, then three further bits when
 /// that bit is one, then seven more only when the first tier saturates, and finally twelve more when
 /// the second tier saturates. The rest of the decoder follows the same compatible reference rather

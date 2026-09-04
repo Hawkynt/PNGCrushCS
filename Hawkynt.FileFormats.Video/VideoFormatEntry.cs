@@ -67,3 +67,28 @@ public sealed record VideoCodecEntry(
   string CodecName,
   Func<MediaStreamInfo, bool> Accepts,
   Func<MediaStreamInfo, IVideoFrameDecoder> CreateDecoder);
+
+/// <summary>
+/// One registered encoder: what it is called, the code it writes, and how to build an encoder that
+/// produces that codec's packets.
+/// </summary>
+/// <remarks>
+/// The mirror of <see cref="VideoCodecEntry"/> and a separate table from it, because the two answer
+/// different questions. A decoder is chosen by what a stream <i>says it is</i>, so it is asked
+/// whether it accepts a whole stream description; an encoder is chosen by what a caller <i>wants
+/// written</i>, which is one four-character code. A codec with both has a row in each table under
+/// the same <see cref="CodecName"/>, and that shared name is what joins them.
+/// <para/>
+/// <see cref="Codec"/> is the one code the encoder writes, not every code it would answer to when
+/// reading. HuffYUV writes <c>HFYU</c> and FFVHUFF <c>FFVH</c>, and the same encoder produces either
+/// on request; the table names the one it writes when nothing is asked for.
+/// </remarks>
+/// <param name="CodecName">The codec's name as a person would say it, spelt exactly as the decoder
+/// of the same codec spells it.</param>
+/// <param name="Codec">The code a container names this codec by in its stream headers.</param>
+/// <param name="CreateEncoder">Builds an encoder producing the stream described; throws
+/// <see cref="NotSupportedException"/> for a stream this codec cannot be asked to write.</param>
+public sealed record VideoCodecEncoderEntry(
+  string CodecName,
+  CodecTag Codec,
+  Func<MediaStreamInfo, IVideoPacketEncoder> CreateEncoder);
