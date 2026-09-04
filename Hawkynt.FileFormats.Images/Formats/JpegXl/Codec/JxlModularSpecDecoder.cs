@@ -219,7 +219,7 @@ internal static class JxlModularSpecDecoder {
     // Step 2: Read GroupHeader (use_global_tree, wp_header, transforms).
     // ---------------------------------------------------------------
     var useGlobalTree = reader.ReadBool();
-    _ReadWpHeader(reader);
+    var wpHeader = _ReadWpHeader(reader);
     var transforms = JxlModularTransforms.ReadAll(reader);
     channels = _ApplyTransformMetaOrSkeleton(channels, transforms);
 
@@ -257,7 +257,7 @@ internal static class JxlModularSpecDecoder {
         continue;
       }
 
-      _DecodeChannelPixels(channel, maTree, entropy, channelIndex: idx, bitDepth);
+      _DecodeChannelPixels(channel, maTree, entropy, channelIndex: idx, bitDepth, wpHeader);
       ++idx;
     }
 
@@ -278,23 +278,9 @@ internal static class JxlModularSpecDecoder {
     // For the skeleton we no-op when transforms is empty (the only path
     // exercised by the included unit tests).
     // ---------------------------------------------------------------
-    // Populate palette data from the decoded palette LUT channel for any
-    // Palette transforms in the chain. libjxl `InvPalette` reads the palette
-    // values from the meta channel that MetaApply inserted at index 0; we
-    // copy them into the transform descriptor so the existing InvertPalette
-    // implementation can consume them.
-    foreach (var t in transforms) {
-      if (t.Type != JxlModularTransformType.Palette) continue;
-      // Palette LUT is the FIRST channel (libjxl puts it at index 0 during
-      // MetaApply). Width = nb_colors + nb_deltas, height = nb_c.
-      if (channels.Length == 0) continue;
-      var lut = channels[0];
-      if (lut.Width <= 0 || lut.Height <= 0) continue;
-      var data = new int[lut.Width * lut.Height];
-      Array.Copy(lut.Pixels, data, Math.Min(lut.Pixels.Length, data.Length));
-      t.PaletteData = data;
-    }
-
+    // Each Palette transform's lookup table is taken as the reverse pass reaches
+    // it, in JxlModularTransforms.InvertAll, because only the transform being
+    // inverted owns channels[0] at that moment.
     channels = _InvertTransformChainOrSkeleton(channels, transforms);
 
     return new JxlModularImage { Channels = channels };
@@ -334,16 +320,33 @@ internal static class JxlModularSpecDecoder {
   /// skeleton currently doesn't handle. Reading them here only keeps the bit
   /// position aligned with the encoder.
   /// </summary>
-  private static void _ReadWpHeader(JxlBitReader reader) {
-    var wpAllDefault = reader.ReadBool();
-    if (wpAllDefault)
-      return;
-    // 7 context coefficients × 5 bits each
-    for (var i = 0; i < 7; ++i)
-      reader.ReadBits(5);
-    // 4 mixing weights × 4 bits each
-    for (var i = 0; i < 4; ++i)
-      reader.ReadBits(4);
+  /// <summary>
+  /// Read the weighted predictor's parameters from a modular group header
+  /// (libjxl <c>weighted::Header::VisitFields</c>).
+  /// </summary>
+  /// <remarks>
+  /// These bits were read and dropped, and the predictor ran on the defaults
+  /// whatever the header said. A group that tunes them then decoded to a picture
+  /// a little way off the encoded one — near enough to pass every check that
+  /// looks at the bitstream, because the bits themselves were consumed correctly.
+  /// </remarks>
+  private static JxlWpHeader _ReadWpHeader(JxlBitReader reader) {
+    if (reader.ReadBool())
+      return JxlWpHeader.Default;
+
+    return new JxlWpHeader {
+      P1C = (int)reader.ReadBits(5),
+      P2C = (int)reader.ReadBits(5),
+      P3Ca = (int)reader.ReadBits(5),
+      P3Cb = (int)reader.ReadBits(5),
+      P3Cc = (int)reader.ReadBits(5),
+      P3Cd = (int)reader.ReadBits(5),
+      P3Ce = (int)reader.ReadBits(5),
+      W0 = reader.ReadBits(4),
+      W1 = reader.ReadBits(4),
+      W2 = reader.ReadBits(4),
+      W3 = reader.ReadBits(4),
+    };
   }
 
   /// <summary>
@@ -465,7 +468,8 @@ internal static class JxlModularSpecDecoder {
     JxlMaTree maTree,
     JxlEntropyDecoder entropy,
     int channelIndex,
-    int bitDepth
+    int bitDepth,
+    JxlWpHeader wpHeader
   ) {
     var width = channel.Width;
     var height = channel.Height;
@@ -484,9 +488,13 @@ internal static class JxlModularSpecDecoder {
     // touch neither, we skip the WP entirely.
     JxlWeightedPredictor? wp = null;
     if (_TreeUsesWeightedPredictor(maTree))
-      wp = new JxlWeightedPredictor(width, maxError: 1 << bitDepth);
+      wp = new JxlWeightedPredictor(width, maxError: 1 << bitDepth, wpHeader);
 
     for (var y = 0; y < height; ++y) {
+      // libjxl InitPropsRow: the local gradient p[9] restarts at zero every row,
+      // because p[8] reads it back from the pixel before and there is none here.
+      properties[9] = 0;
+
       for (var x = 0; x < width; ++x) {
         // Neighborhood snapshot — see libjxl context_predict.h::PixelNeighbors.
         var w  = x > 0          ? pixels[y * width + x - 1]                 : (y > 0 ? pixels[(y - 1) * width + x] : 0);
@@ -495,6 +503,8 @@ internal static class JxlModularSpecDecoder {
         var ne = (x + 1 < width && y > 0) ? pixels[(y - 1) * width + x + 1] : n;
         var nn = y > 1          ? pixels[(y - 2) * width + x]               : n;
         var ww = x > 1          ? pixels[y * width + x - 2]                 : w;
+        // The second pixel along the row above, which only Average4 reads.
+        var nee = (x + 2 < width && y > 0) ? pixels[(y - 1) * width + x + 2] : ne;
 
         // libjxl computes the WP property INSIDE Predict, so to get a valid
         // property[15] for the MA-tree split we need to call WP first.
@@ -513,7 +523,7 @@ internal static class JxlModularSpecDecoder {
         // we computed above; everything else is a pure neighbourhood function.
         var predicted = leaf.LeafPredictor == (int)JxlSpecPredictor.WeightedPredictor
           ? wpPredicted
-          : _ApplyLeafPredictor(leaf.LeafPredictor, x, y, w, n, nw, ne, nn, ww, bitDepth);
+          : _ApplyLeafPredictor(leaf.LeafPredictor, w, n, nw, ne, nn, ww, nee);
 
         // Decode residual for this leaf's context.
         var token = entropy.ReadInt(leaf.LeafContext);
@@ -564,23 +574,34 @@ internal static class JxlModularSpecDecoder {
   /// <c>InitPropsRow + PrecomputeReferences</c> in encoding.cc.
   /// </summary>
   /// <remarks>
-  /// Spec §H.4 enumerates 16 base properties + reference-channel deltas. The
-  /// skeleton wires the channel-static and immediate-neighborhood subset:
+  /// The order is the bitstream's, not a choice: an MA tree splits on a property
+  /// by number, so a vector that carries the right values in the wrong slots
+  /// sends pixels down the wrong branch and reads them from the wrong context.
+  /// Per ISO/IEC 18181-1 §H.4 and libjxl <c>context_predict.h::Predict</c>:
   /// <list type="bullet">
   ///   <item>p[0] = channel index (static)</item>
-  ///   <item>p[1] = group index   (static; 0 in single-group test fixtures)</item>
+  ///   <item>p[1] = stream index (static)</item>
   ///   <item>p[2] = y</item>
   ///   <item>p[3] = x</item>
-  ///   <item>p[4] = |W|</item>
-  ///   <item>p[5] = |N|</item>
-  ///   <item>p[6] = W</item>
-  ///   <item>p[7] = N</item>
-  ///   <item>p[8] = W - NW</item>
-  ///   <item>p[9] = N - NW</item>
-  ///   <item>p[10] = W + N - NW</item>
-  ///   <item>p[11] = NW - NN  (libjxl gradient-context proxy)</item>
-  ///   <item>p[12..15] = 0   (TODO: WP error sums + reference-channel deltas)</item>
+  ///   <item>p[4] = |N|</item>
+  ///   <item>p[5] = |W|</item>
+  ///   <item>p[6] = N</item>
+  ///   <item>p[7] = W</item>
+  ///   <item>p[8] = W - (the previous pixel's p[9])</item>
+  ///   <item>p[9] = W + N - NW</item>
+  ///   <item>p[10] = W - NW</item>
+  ///   <item>p[11] = NW - N</item>
+  ///   <item>p[12] = N - NE</item>
+  ///   <item>p[13] = N - NN</item>
+  ///   <item>p[14] = W - WW</item>
+  ///   <item>p[15] = the weighted predictor's error property</item>
   /// </list>
+  ///
+  /// <para>p[8] and p[9] are one property read twice: p[9] holds a local gradient
+  /// that p[8] subtracts from the pixel to its left, so p[8] has to be taken
+  /// before p[9] is written and p[9] has to start each row at zero. Everything
+  /// from p[4] to p[14] was in the wrong slot here, which cost nothing on a tree
+  /// that splits only on the first four and everything on one that does not.</para>
   /// </remarks>
   private static void _ComputeProperties(
     int[] properties,
@@ -595,25 +616,24 @@ internal static class JxlModularSpecDecoder {
     int ww
   ) {
     properties[0] = channelIndex;
-    properties[1] = 0; // group index — modular sub-codec is whole-image in our test fixtures
+    // The stream index. Every image this decodes is one modular stream, so it is
+    // zero; a frame split into groups would number them here.
+    properties[1] = 0;
     properties[2] = y;
     properties[3] = x;
-    properties[4] = Math.Abs(w);
-    properties[5] = Math.Abs(n);
-    properties[6] = w;
-    properties[7] = n;
-    properties[8] = w - nw;
-    properties[9] = n - nw;
-    properties[10] = w + n - nw;
-    properties[11] = nw - nn;
-    // properties[12..14] are reference-channel deltas (libjxl §H.4 properties
-    // 16..16+kExtraPropsPerChannel*N). Stubbed at zero — the existing fixtures
-    // don't hit that path.
-    properties[12] = 0;
-    properties[13] = 0;
-    properties[14] = 0;
-    // properties[15] = WP property; set by the caller before this function
-    // returns so the MA tree's split-on-WP-error feature works.
+    properties[4] = Math.Abs(n);
+    properties[5] = Math.Abs(w);
+    properties[6] = n;
+    properties[7] = w;
+    properties[8] = w - properties[9];
+    properties[9] = w + n - nw;
+    properties[10] = w - nw;
+    properties[11] = nw - n;
+    properties[12] = n - ne;
+    properties[13] = n - nn;
+    properties[14] = w - ww;
+    // properties[15] = the weighted predictor's error, set by the caller before
+    // this runs so a tree that splits on it sees the value.
   }
 
   /// <summary>
@@ -659,17 +679,25 @@ internal static class JxlModularSpecDecoder {
   ///   <item>13 (W+E)/2 — only useful for non-zero residuals</item>
   /// </list>
   /// </remarks>
+  /// <summary>
+  /// The predictor a leaf names, per libjxl <c>context_predict.h::PredictOne</c>.
+  /// </summary>
+  /// <remarks>
+  /// Averages one and four were both wrong. Ten averaged four neighbours where
+  /// the format averages the two to the left and above-left, and thirteen stood
+  /// in an invented half-sum for a six-term weighted average that reaches two
+  /// pixels along the row above — a neighbour this decoder did not even read.
+  /// Both are exact formulas in the specification, not choices.
+  /// </remarks>
   private static int _ApplyLeafPredictor(
     int predictor,
-    int x,
-    int y,
     int w,
     int n,
     int nw,
     int ne,
     int nn,
     int ww,
-    int bitDepth
+    int nee
   ) =>
     predictor switch {
       0 => 0,
@@ -677,15 +705,15 @@ internal static class JxlModularSpecDecoder {
       2 => n,
       3 => (w + n) / 2,
       4 => _SelectPredictor(n, w, nw),
-      5 => _ClampedGradient(n, w, nw),                      // libjxl `ClampedGradient(top, left, topleft)`
+      5 => _ClampedGradient(n, w, nw),
       // 6 (WeightedPredictor) handled by caller — needs JxlWeightedPredictor instance.
       7 => ne,
       8 => nw,
       9 => ww,
-      10 => (w + nw + n + ne + 2) / 4,
-      11 => (n + nw) / 2,
+      10 => (w + nw) / 2,
+      11 => (nw + n) / 2,
       12 => (n + ne) / 2,
-      13 => (w + (n - nw)) / 2,                             // approximation of "average W+E"
+      13 => (6 * n - 2 * nn + 7 * w + ww + nee + 3 * ne + 8) / 16,
       _ => 0,
     };
 

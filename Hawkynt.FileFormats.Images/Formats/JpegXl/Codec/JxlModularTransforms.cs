@@ -146,6 +146,8 @@ internal static class JxlModularTransforms {
     var current = channels;
     for (var i = transforms.Length - 1; i >= 0; --i) {
       var t = transforms[i];
+      if (t.Type == JxlModularTransformType.Palette)
+        _CapturePaletteLut(current, t);
       current = t.Type switch {
         JxlModularTransformType.Rct => InvertRct(current, t),
         JxlModularTransformType.Palette => InvertPalette(current, t),
@@ -154,6 +156,34 @@ internal static class JxlModularTransforms {
       };
     }
     return current;
+  }
+
+  /// <summary>
+  /// Take a Palette transform's lookup table from the meta channel that
+  /// <c>MetaApply</c> pushed in front of the channel list.
+  /// </summary>
+  /// <remarks>
+  /// Only the transform being inverted right now owns <c>channels[0]</c>. Each
+  /// palette in the chain inserted its own meta channel at the front on the way
+  /// in, so the last one encoded sits outermost and the earlier ones surface one
+  /// at a time as the reverse pass strips them off. Reading every table up front
+  /// gave every palette in a multi-palette chain the outermost one's table; a
+  /// file with two palettes then failed the size check in
+  /// <see cref="InvertPalette"/> and the whole frame was refused.
+  /// </remarks>
+  private static void _CapturePaletteLut(JxlChannel[] channels, JxlModularTransform t) {
+    if (t.PaletteData.Length != 0)
+      return;
+    if (channels.Length == 0)
+      return;
+
+    var lut = channels[0];
+    if (lut.Width <= 0 || lut.Height <= 0)
+      return;
+
+    var data = new int[lut.Width * lut.Height];
+    Array.Copy(lut.Pixels, data, Math.Min(lut.Pixels.Length, data.Length));
+    t.PaletteData = data;
   }
 
   // =====================================================================================
