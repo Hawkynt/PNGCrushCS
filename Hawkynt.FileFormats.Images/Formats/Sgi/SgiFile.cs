@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using FileFormat.Core;
 
 namespace FileFormat.Sgi;
@@ -12,6 +12,7 @@ public readonly record struct SgiFile : IImageFormatReader<SgiFile>, IImageToRaw
   static string[] IImageFormatMetadata<SgiFile>.FileExtensions => [".sgi", ".rgb", ".bw", ".iris", ".rgba", ".inta"];
   static SgiFile IImageFormatReader<SgiFile>.FromSpan(ReadOnlySpan<byte> data) => SgiReader.FromSpan(data);
   static byte[] IImageFormatWriter<SgiFile>.ToBytes(SgiFile file) => SgiWriter.ToBytes(file);
+  static FormatCapability IImageFormatMetadata<SgiFile>.Capabilities => FormatCapability.HasDedicatedOptimizer;
   public int Width { get; init; }
   public int Height { get; init; }
   public int Channels { get; init; }

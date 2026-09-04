@@ -1,4 +1,4 @@
-﻿# Hawkynt.FileFormats.Images
+# Hawkynt.FileFormats.Images
 
 [![NuGet](https://img.shields.io/nuget/v/Hawkynt.FileFormats.Images.svg)](https://www.nuget.org/packages/Hawkynt.FileFormats.Images/)
 [![NuGet downloads](https://img.shields.io/nuget/dt/Hawkynt.FileFormats.Images.svg)](https://www.nuget.org/packages/Hawkynt.FileFormats.Images/)
@@ -62,7 +62,7 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | AmstradMode5 | `.cm5` | ✅ | ✅ | — | — | — |
 | Analyze | `.hdr`, `.img` | ✅ | ✅ | — | — | — |
 | AndrewToolkit | `.atk` | ✅ | ✅ | — | — | — |
-| Ani | `.ani` | ✅ | ✅ | — | ✅ | — |
+| Ani | `.ani` | ✅ | ✅ | — | ✅ | ✅ |
 | AnimatorCompressor | `.kpr` | ✅ | ✅ | — | — | — |
 | Anime4Ever | `.a4r` | ✅ | ✅ | — | — | — |
 | AnimPainter | `.anp` | ✅ | ✅ | — | — | — |
@@ -747,7 +747,7 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | SevenuP | `.sev` | ✅ | ✅ | — | — | — |
 | Sf3 | `.sf3` | ✅ | ✅ | — | — | — |
 | Sff | `.sff` | ✅ | ✅ | — | — | — |
-| Sgi | `.sgi`, `.rgb`, `.bw`, `.iris`, `.rgba`, `.inta` | ✅ | ✅ | — | — | — |
+| Sgi | `.sgi`, `.rgb`, `.bw`, `.iris`, `.rgba`, `.inta` | ✅ | ✅ | — | — | ✅ |
 | ShapeTableFileType | `.shp` | ✅ | ✅ | — | — | — |
 | SharpX68k | `.x68`, `.x68k` | ✅ | ✅ | — | — | — |
 | ShfXlEdit | `.shx` | ✅ | ✅ | — | — | — |
@@ -860,7 +860,7 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | Wad3 | `.wad` | ✅ | ✅ | — | — | — |
 | Wal | `.wal` | ✅ | ✅ | — | — | — |
 | Wbmp | `.wbmp`, `.wbm`, `.wap` | ✅ | ✅ | — | — | — |
-| WebP | `.webp`, `.wep` | ✅ | ✅ | — | ✅ | — |
+| WebP | `.webp`, `.wep` | ✅ | ✅ | — | ✅ | ✅ |
 | WebShots | `.wb1`, `.wbc`, `.wbp`, `.wbz` | ✅ | ✅ | — | — | — |
 | WigmoreArtist | `.wig` | ✅ | ✅ | — | — | — |
 | WinFax | `.fxs`, `.fxo`, `.fxr`, `.fxd`, `.fxm` | ✅ | ✅ | — | — | — |
