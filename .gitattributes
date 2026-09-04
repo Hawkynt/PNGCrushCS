@@ -1,1 +1,11 @@
 Hawkynt.FileFormats.Images/README.md text eol=crlf
+
+# Reference decodes stored beside the files they belong to. A PPM is a short
+# ASCII header in front of raw samples, and one whose samples happen to contain
+# no zero byte reads as text, so a checkout that converts line endings rewrites
+# the picture. Naming them binary is what stops that: the flat-colour JPEG XL
+# fixture reached Windows CI three bytes out of step and failed there alone.
+*.ppm binary
+*.pgm binary
+*.pbm binary
+*.pnm binary
