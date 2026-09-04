@@ -51,15 +51,6 @@ internal sealed class JxlWeightedPredictor {
   /// <summary>libjxl <c>weighted::kPredictionRound</c> = (1 &lt;&lt; 3) &gt;&gt; 1 - 1 = 3.</summary>
   internal const int PredictionRound = ((1 << PredExtraBits) >> 1) - 1;
 
-  // libjxl `weighted::Header` defaults from `Header::VisitFields`:
-  private const int DefaultP1C = 16;
-  private const int DefaultP2C = 10;
-  private const int DefaultP3Ca = 7;
-  private const int DefaultP3Cb = 7;
-  private const int DefaultP3Cc = 7;
-  private const int DefaultP3Cd = 0;
-  private const int DefaultP3Ce = 0;
-  private static readonly int[] _DefaultMaxWeights = { 0xd, 0xc, 0xc, 0xc };
 
   // libjxl `divlookup`: (1 << 24) / (i + 1) for i in 0..63. Used by
   // ErrorWeight / WeightedAverage to approximate division.
@@ -100,29 +91,34 @@ internal sealed class JxlWeightedPredictor {
 
   /// <summary>
   /// Construct a WP with the requested image width and a (currently advisory)
-  /// max-error cap. The header parameters use libjxl's default preset (the
-  /// <see cref="JxlWeightedPredictor"/> assumes the bitstream said
-  /// <c>all_default = true</c>).
+  /// max-error cap, predicting with the parameters libjxl defaults to.
   /// </summary>
   /// <param name="width">Channel width in pixels. Must be positive.</param>
   /// <param name="maxError">Reserved: max allowed absolute error per the
   /// spec's safety bounds. Currently retained but not enforced — added to
   /// the constructor signature to match the caller's contract.</param>
-  public JxlWeightedPredictor(int width, int maxError) {
+  public JxlWeightedPredictor(int width, int maxError)
+    : this(width, maxError, JxlWpHeader.Default) { }
+
+  /// <summary>
+  /// Construct a WP predicting with the parameters a group header stated.
+  /// </summary>
+  /// <param name="width">Channel width in pixels. Must be positive.</param>
+  /// <param name="maxError">Reserved, as above.</param>
+  /// <param name="header">The parameters read from the modular group header.</param>
+  public JxlWeightedPredictor(int width, int maxError, JxlWpHeader header) {
     if (width <= 0)
       throw new ArgumentOutOfRangeException(nameof(width), "Must be positive.");
     _width = width;
     _maxError = maxError;
-    _p1C = DefaultP1C;
-    _p2C = DefaultP2C;
-    _p3Ca = DefaultP3Ca;
-    _p3Cb = DefaultP3Cb;
-    _p3Cc = DefaultP3Cc;
-    _p3Cd = DefaultP3Cd;
-    _p3Ce = DefaultP3Ce;
-    _maxWeights = new uint[NumSubPredictors];
-    for (var i = 0; i < NumSubPredictors; ++i)
-      _maxWeights[i] = (uint)_DefaultMaxWeights[i];
+    _p1C = header.P1C;
+    _p2C = header.P2C;
+    _p3Ca = header.P3Ca;
+    _p3Cb = header.P3Cb;
+    _p3Cc = header.P3Cc;
+    _p3Cd = header.P3Cd;
+    _p3Ce = header.P3Ce;
+    _maxWeights = new[] { header.W0, header.W1, header.W2, header.W3 };
 
     var rowLen = (width + 2) * 2;
     _error = new long[rowLen];

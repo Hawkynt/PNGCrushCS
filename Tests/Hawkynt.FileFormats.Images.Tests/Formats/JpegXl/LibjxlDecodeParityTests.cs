@@ -10,16 +10,16 @@ namespace FileFormat.JpegXl.Tests;
 /// </summary>
 /// <remarks>
 /// Both fixtures are the same 64x48 picture encoded losslessly by <c>cjxl</c>,
-/// once at effort 1 and once at effort 9, and <c>cjxl_lossless_effort1.ppm</c> is
-/// <c>djxl</c>'s own decode of the first. The pair is here because they used to
-/// come out on opposite sides of the only line that matters: the effort-1 file
-/// decoded sample for sample, and the effort-9 file decoded to a picture that
-/// differed from libjxl's in 1,383 of its 3,072 pixels and was handed back anyway.
-/// A caller had no way to tell the two apart.
+/// once at effort 1 and once at effort 9, each with <c>djxl</c>'s own decode
+/// beside it. The pair is here because they used to come out on opposite sides
+/// of the only line that matters: the effort-1 file decoded sample for sample,
+/// and the effort-9 file decoded to a picture that differed from libjxl's in
+/// 1,383 of its 3,072 pixels and was handed back anyway. A caller had no way to
+/// tell the two apart.
 ///
-/// So the guarantee under test is not "these files decode" — one of them still
-/// does not. It is that a file either decodes to what libjxl decodes it to, or is
-/// refused.
+/// Both decode exactly now. What is under test stays the guarantee rather than
+/// the count that happens to satisfy it today: a file decodes to what libjxl
+/// decodes it to, or it is refused.
 /// </remarks>
 [TestFixture]
 public sealed class LibjxlDecodeParityTests {
@@ -30,10 +30,19 @@ public sealed class LibjxlDecodeParityTests {
     return File.ReadAllBytes(path);
   }
 
-  [Test]
-  public void EffortOneLosslessFileDecodesToWhatLibjxlDecodesItTo() {
-    var file = JpegXlReader.FromBytes(_Fixture("cjxl_lossless_effort1.jxl"));
-    var (width, height, expected) = _ReadPpm(_Fixture("cjxl_lossless_effort1.ppm"));
+  /// <param name="name">
+  /// <c>cjxl_flat_tuned_predictor</c> states weighted-predictor parameters of its
+  /// own instead of taking the defaults, which is the case that used to be read
+  /// past and predicted with the defaults anyway; <c>cjxl_palette_effort7</c>
+  /// carries a palette transform, which used to be refused outright.
+  /// </param>
+  [TestCase("cjxl_lossless_effort1")]
+  [TestCase("cjxl_lossless_effort9")]
+  [TestCase("cjxl_flat_tuned_predictor")]
+  [TestCase("cjxl_palette_effort7")]
+  public void ALosslessFileDecodesToWhatLibjxlDecodesItTo(string name) {
+    var file = JpegXlReader.FromBytes(_Fixture(name + ".jxl"));
+    var (width, height, expected) = _ReadPpm(_Fixture(name + ".ppm"));
 
     Assert.Multiple(() => {
       Assert.That(file.Width, Is.EqualTo(width));
@@ -44,13 +53,7 @@ public sealed class LibjxlDecodeParityTests {
     Assert.That(file.PixelData.Length, Is.EqualTo(expected.Length));
     for (var i = 0; i < expected.Length; ++i)
       if (file.PixelData[i] != expected[i])
-        Assert.Fail($"Sample {i} is {file.PixelData[i]}, libjxl decodes it to {expected[i]}.");
-  }
-
-  [Test]
-  public void EffortNineLosslessFileIsRefusedRatherThanDecodedWrongly() {
-    var data = _Fixture("cjxl_lossless_effort9.jxl");
-    Assert.Throws<NotSupportedException>(() => JpegXlReader.FromBytes(data));
+        Assert.Fail($"{name}: sample {i} is {file.PixelData[i]}, libjxl decodes it to {expected[i]}.");
   }
 
   private static (int Width, int Height, byte[] Pixels) _ReadPpm(byte[] ppm) {
