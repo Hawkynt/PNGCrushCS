@@ -124,8 +124,10 @@ public sealed class CcittFile :
 
   public static CcittFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
-    if (image.Format != Core.PixelFormat.Indexed1)
-      throw new ArgumentException("RawImage must use PixelFormat.Indexed1.", nameof(image));
+    // Reduced rather than refused. A fax is one bit a pixel and always will be, so demanding the
+    // caller arrive already at Indexed1 turned every ordinary picture into an exception and left
+    // the format writable in name only.
+    image = image.EnsureFormat(Core.PixelFormat.Indexed1);
 
     return new() {
       Width = image.Width,

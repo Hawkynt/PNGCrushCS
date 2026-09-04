@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using FileFormat.Core;
 
 namespace FileFormat.Neochrome;
@@ -85,7 +85,20 @@ public readonly record struct NeochromeFile : IImageFormatReader<NeochromeFile>,
 
   public static NeochromeFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
-    image = image.EnsureFormat(PixelFormat.Indexed8);
+
+    // Reduce to what the geometry holds before deciding the mode. EnsureFormat(Indexed8) only makes
+    // the picture indexed and leaves 256 colours in it, so every full-colour source fell past all
+    // four arms below into the refusal — the writer took nothing but an already-reduced picture.
+    // A source already inside the limit comes back untouched, so a two-colour 640x400 still picks
+    // high resolution rather than the virtual canvas.
+    image = image.EnsureIndexedAtMost((image.Width, image.Height) switch {
+      (320, 200) => 16,
+      (640, 200) => 4,
+      (640, 400) => 16,
+      _ => throw new ArgumentException(
+        "NEOchrome supports 320x200/16-colour, 640x200/4-colour, 640x400/2-colour, or 640x400/16-colour virtual-canvas images.",
+        nameof(image)),
+    });
 
     var (flag, resolution, planes) = (image.Width, image.Height, image.PaletteCount) switch {
       (320, 200, <= 16) => ((short)0, (short)0, 4),

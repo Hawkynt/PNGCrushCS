@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using FileFormat.Core;
 
 namespace FileFormat.HighresMedium;
@@ -99,7 +99,12 @@ public readonly record struct HighresMediumFile : IImageFormatReader<HighresMedi
     // Converted rather than refused. Every other writer here takes whatever picture it is
     // handed and does what the format needs; one that insists the caller reduce first pushes
     // that work onto anything converting between formats, which is most of what this is for.
-    image = image.EnsureAnyFormat(PixelFormat.Rgb24, PixelFormat.Indexed8, PixelFormat.Indexed1);
+    // EnsureAnyFormat left an Rgb24 picture exactly as it was, so the colour test further down
+    // refused it for having more than four; reducing to the four this mode holds is the conversion
+    // the comment above always described.
+    image = image.Format == PixelFormat.Indexed1 && image.PaletteCount <= ColorCount
+      ? image
+      : image.EnsureIndexedAtMost(ColorCount);
     if (image.Width != ImageWidth)
       throw new ArgumentException($"Highres Medium images must be exactly {ImageWidth} pixels wide.", nameof(image));
     if (image.Height != ImageHeight)

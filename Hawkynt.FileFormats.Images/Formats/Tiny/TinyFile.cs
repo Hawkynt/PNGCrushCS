@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using FileFormat.Core;
 
 namespace FileFormat.Tiny;
@@ -76,7 +76,16 @@ public readonly record struct TinyFile : IImageFormatReader<TinyFile>, IImageToR
   /// <summary>Creates a non-animated Tiny Stuff picture from an indexed Atari ST screen geometry.</summary>
   public static TinyFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
-    image = image.EnsureFormat(PixelFormat.Indexed8);
+
+    // Reduce to the colours the Atari ST resolution holds, not merely to Indexed8 — that left 256
+    // in place and the palette check further down then refused every full-colour picture.
+    image = image.EnsureIndexedAtMost((image.Width, image.Height) switch {
+      (320, 200) => 16,
+      (640, 200) => 4,
+      (640, 400) => 2,
+      _ => throw new ArgumentException(
+        "Tiny Stuff supports only 320x200, 640x200, and 640x400 Atari ST screen geometries.", nameof(image)),
+    });
 
     var resolution = (image.Width, image.Height) switch {
       (320, 200) => TinyResolution.Low,
