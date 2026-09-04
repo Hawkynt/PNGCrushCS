@@ -259,7 +259,7 @@ internal static class JxlAcDecoder {
         // Only the block a transform starts at is read. The rest of the
         // rectangle it covers is stepped over, which is what libjxl's
         // IsFirstBlock check amounts to.
-        if (!_IsTransformOrigin(strategies, bx, by, strategy)) {
+        if (!JxlAcStrategyGeometry.IsTransformOrigin(strategies, bx, by)) {
           bx += wide;
           continue;
         }
@@ -337,6 +337,11 @@ internal static class JxlAcDecoder {
 
     // (4) Store the count over every block the transform covers, so the
     //     neighbours that predict from it see the same number.
+    // Plain 8x8 keeps the table this decoder has always used, which is the
+    // scan transposed the way the inverse transform here expects to read it.
+    // The computed order is the format's own arrangement and is applied only to
+    // the larger transforms, where nothing was applied at all before.
+    var order = coveredBlocks == 1 ? null : JxlNaturalCoeffOrder.For(strategy);
     var stored = (nzeros + coveredBlocks - 1) >> log2CoveredBlocks;
     var wide = JxlAcStrategyGeometry.BlocksWide(strategy);
     var high = JxlAcStrategyGeometry.BlocksHigh(strategy);
@@ -365,11 +370,9 @@ internal static class JxlAcDecoder {
       // position so the downstream IDCT (which expects natural order) sees
       // coefficients at the correct frequency positions. For DCT8 the
       // permutation is the JPEG zigzag (precomputed in Dct8NaturalOrder).
-      // The coefficient's place inside the block comes from the scan order the
-      // frame states. Only the plain 8x8 order is applied here; a larger
-      // transform's coefficients land in scan order, which is the right count
-      // of them in the wrong arrangement, and the picture is refused for it.
-      outBlock[coveredBlocks == 1 ? Dct8NaturalOrder[k] : k] += (short)coeff;
+      // Where the coefficient belongs, from the order the transform states.
+      var at = order is null ? Dct8NaturalOrder[k] : order[k];
+      outBlock[at] += (short)coeff;
 
       prev = uCoeff != 0 ? 1 : 0;
       nzeros -= prev;
@@ -379,27 +382,6 @@ internal static class JxlAcDecoder {
       throw new System.IO.InvalidDataException(
         $"Invalid AC: nzeros at end of block is {nzeros}, should be 0. " +
         $"Block ({bx},{by}), channel {channel}.");
-  }
-
-  /// <summary>
-  /// Whether a block is where its transform starts, rather than one it covers.
-  /// </summary>
-  /// <remarks>
-  /// A transform's rectangle carries the same strategy in every block, so the
-  /// origin is the top-left one: a block whose neighbour above or to the left
-  /// states the same strategy and lies inside the same rectangle is covered by
-  /// it. Blocks are visited in raster order, so checking those two is enough.
-  /// </remarks>
-  private static bool _IsTransformOrigin(JxlAcStrategyType[][] strategies, int bx, int by, JxlAcStrategyType strategy) {
-    var wide = JxlAcStrategyGeometry.BlocksWide(strategy);
-    var high = JxlAcStrategyGeometry.BlocksHigh(strategy);
-    if (wide == 1 && high == 1)
-      return true;
-
-    if (bx > 0 && strategies[by][bx - 1] == strategy)
-      return false;
-
-    return by <= 0 || strategies[by - 1][bx] != strategy;
   }
 
   /// <summary>

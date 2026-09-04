@@ -63,4 +63,25 @@ internal static class JxlAcStrategyGeometry {
     => IsCovered(strategy) ? 0 : _Log2Blocks[(int)strategy];
 
   public static int CoveredBlocks(JxlAcStrategyType strategy) => 1 << Log2Blocks(strategy);
+
+  /// <summary>
+  /// Whether a block is where its transform starts rather than one it covers.
+  /// </summary>
+  /// <remarks>
+  /// Every block of a transform's rectangle carries the same strategy, so the
+  /// origin is the one with no neighbour above or to the left carrying it.
+  /// Blocks are visited in raster order, so those two are the only ones that
+  /// need looking at.
+  /// </remarks>
+  public static bool IsTransformOrigin(JxlAcStrategyType[][] strategies, int bx, int by) {
+    var strategy = strategies[by][bx];
+    if (IsCovered(strategy))
+      return false;
+    if (BlocksWide(strategy) == 1 && BlocksHigh(strategy) == 1)
+      return true;
+    if (bx > 0 && strategies[by][bx - 1] == strategy)
+      return false;
+
+    return by <= 0 || strategies[by - 1][bx] != strategy;
+  }
 }
