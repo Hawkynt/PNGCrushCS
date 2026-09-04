@@ -235,6 +235,10 @@ public static class VideoFormatRegistry {
   /// description says that the codec cannot write is the codec's own refusal, thrown from here as
   /// the encoder is built, so a size or a depth it will not write is named rather than discovered on
   /// the first frame.
+  /// <para/>
+  /// A description naming no codec at all asks for the uncompressed one, whose code is zero — which
+  /// is what <see cref="CanDecode"/> does with the same description, since a Windows bitmap's
+  /// compression field is zero for the same reason.
   /// </remarks>
   /// <exception cref="NotSupportedException">
   /// No registered encoder writes this code. The message names the four-character code and every

@@ -36,6 +36,60 @@ public sealed class VideoFormatRegistryTests {
 
   [Test]
   [Category("Unit")]
+  public void EveryEncoderIsRegisteredUnderItsDecodersOwnName() {
+    var encoders = VideoFormatRegistry.AllEncoders.ToList();
+    var decoders = VideoFormatRegistry.AllCodecs.Select(c => c.CodecName).ToHashSet(StringComparer.Ordinal);
+
+    Assert.That(encoders, Is.Not.Empty);
+    Assert.Multiple(() => {
+      // The shared name is what joins the two tables; a codec that spelt itself differently in each
+      // direction would be two codecs to anything reading the registry, this package's own README
+      // check included.
+      foreach (var encoder in encoders)
+        Assert.That(decoders, Does.Contain(encoder.CodecName), $"'{encoder.CodecName}' encodes but no decoder answers to that name");
+
+      Assert.That(encoders.Select(e => e.Codec).ToList(), Is.Unique, "two encoders claim the same four-character code");
+    });
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void AnEncoderIsBuiltForACodeSomethingWrites() {
+    var stream = new MediaStreamInfo {
+      Index = 0,
+      Kind = MediaStreamKind.Video,
+      Codec = CodecTag.FromCharacters("v210"),
+      Width = 12,
+      Height = 4,
+    };
+
+    Assert.Multiple(() => {
+      Assert.That(VideoFormatRegistry.CanEncode(stream), Is.True);
+      Assert.That(VideoFormatRegistry.CreateEncoder(stream), Is.InstanceOf<IVideoPacketEncoder>());
+    });
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void ACodeNothingWritesIsRefusedByName() {
+    var stream = new MediaStreamInfo {
+      Index = 3,
+      Kind = MediaStreamKind.Video,
+      Codec = CodecTag.FromCharacters("apcn"),
+      Width = 176,
+      Height = 144,
+    };
+
+    Assert.That(VideoFormatRegistry.CanEncode(stream), Is.False);
+    var failure = Assert.Throws<NotSupportedException>(() => VideoFormatRegistry.CreateEncoder(stream));
+    Assert.Multiple(() => {
+      Assert.That(failure!.Message, Does.Contain("apcn"));
+      Assert.That(failure.Message, Does.Contain("Encoders present"));
+    });
+  }
+
+  [Test]
+  [Category("Unit")]
   public void ACodecIsFoundForAProResStream() {
     // The registry chooses a codec from the stream's tag alone, without building one, which is what
     // lets a caller ask whether a file can be decoded before committing to decoding it.
