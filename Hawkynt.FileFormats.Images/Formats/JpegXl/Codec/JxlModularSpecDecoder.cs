@@ -233,43 +233,43 @@ internal static class JxlModularSpecDecoder {
     // the bitstream out of alignment.
     // ---------------------------------------------------------------
     JxlMaTree maTree;
-    JxlEntropyDecoder? entropy;
+    JxlEntropyDecoder entropy;
     if (useGlobalTree && globalTree is not null && globalEntropy is not null) {
       maTree = globalTree;
       entropy = globalEntropy;
     } else {
       maTree = _ReadMaTreeOrSkeleton(reader);
       var numContexts = Math.Max(1, maTree.LeafCount);
-      try {
-        entropy = JxlEntropyDecoder.Read(reader, numContexts, disallowLz77: false);
-      } catch (InvalidDataException) {
-        entropy = null;
-      } catch (InvalidOperationException) {
-        entropy = null;
-      }
+      entropy = JxlEntropyDecoder.Read(reader, numContexts, disallowLz77: false);
     }
 
     // ---------------------------------------------------------------
-    // Step 5 + 6: For each channel, decode every pixel. If the residual
-    // entropy block failed to set up, channels stay zero-initialised.
+    // Step 5 + 6: For each channel, decode every pixel.
+    //
+    // A channel that cannot be decoded ends the frame. This used to swallow the
+    // failure and leave the remaining channels at their zero fill, which handed
+    // back a picture built partly from decoded samples and partly from nothing.
     // ---------------------------------------------------------------
-    if (entropy is not null) {
-      var idx = 0;
-      foreach (var channel in channels) {
-        if (channel.Width == 0 || channel.Height == 0) {
-          ++idx; continue;
-        }
-        try {
-          _DecodeChannelPixels(channel, maTree, entropy, channelIndex: idx, bitDepth);
-        } catch (InvalidDataException) {
-          break;
-        } catch (InvalidOperationException) {
-          break;
-        }
+    var idx = 0;
+    foreach (var channel in channels) {
+      if (channel.Width == 0 || channel.Height == 0) {
         ++idx;
+        continue;
       }
-      _ = entropy.CheckFinalState();
+
+      _DecodeChannelPixels(channel, maTree, entropy, channelIndex: idx, bitDepth);
+      ++idx;
     }
+
+    // The arithmetic decoder returns to its initial state only when every token
+    // this frame contained was read exactly as it was written. Anything else
+    // means the reader and the encoder disagreed somewhere and the samples
+    // already decoded cannot be trusted, however plausible they look: measured
+    // against libjxl, every sample-exact decode passes this check and every
+    // decode that differed from libjxl's failed it.
+    if (!entropy.CheckFinalState())
+      throw new InvalidDataException(
+        "The modular bitstream did not end in the arithmetic decoder's initial state, so the decoded samples do not match what was encoded.");
 
     // ---------------------------------------------------------------
     // Step 7: Invert transform chain in REVERSE order.

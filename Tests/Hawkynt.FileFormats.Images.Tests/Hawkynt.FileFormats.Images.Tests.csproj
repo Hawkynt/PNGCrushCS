@@ -44,6 +44,12 @@
       <Link>Fixtures\%(Filename)%(Extension)</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+    <!-- djxl's own decode of a fixture beside it, so a decode can be compared against libjxl
+         rather than against this package's other half. -->
+    <None Include="Formats\JpegXl\Fixtures\*.ppm">
+      <Link>Fixtures\%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
 
   <ItemGroup>

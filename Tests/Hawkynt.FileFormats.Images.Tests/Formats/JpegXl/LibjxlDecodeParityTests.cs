@@ -1,0 +1,77 @@
+using System;
+using System.IO;
+using NUnit.Framework;
+
+namespace FileFormat.JpegXl.Tests;
+
+/// <summary>
+/// What this reader returns for files libjxl wrote, checked against what libjxl
+/// returns for the same files.
+/// </summary>
+/// <remarks>
+/// Both fixtures are the same 64x48 picture encoded losslessly by <c>cjxl</c>,
+/// once at effort 1 and once at effort 9, and <c>cjxl_lossless_effort1.ppm</c> is
+/// <c>djxl</c>'s own decode of the first. The pair is here because they used to
+/// come out on opposite sides of the only line that matters: the effort-1 file
+/// decoded sample for sample, and the effort-9 file decoded to a picture that
+/// differed from libjxl's in 1,383 of its 3,072 pixels and was handed back anyway.
+/// A caller had no way to tell the two apart.
+///
+/// So the guarantee under test is not "these files decode" — one of them still
+/// does not. It is that a file either decodes to what libjxl decodes it to, or is
+/// refused.
+/// </remarks>
+[TestFixture]
+public sealed class LibjxlDecodeParityTests {
+
+  private static byte[] _Fixture(string name) {
+    var path = Path.Combine(TestContext.CurrentContext.TestDirectory, "Fixtures", name);
+    Assert.That(File.Exists(path), Is.True, $"Test fixture missing: {path}");
+    return File.ReadAllBytes(path);
+  }
+
+  [Test]
+  public void EffortOneLosslessFileDecodesToWhatLibjxlDecodesItTo() {
+    var file = JpegXlReader.FromBytes(_Fixture("cjxl_lossless_effort1.jxl"));
+    var (width, height, expected) = _ReadPpm(_Fixture("cjxl_lossless_effort1.ppm"));
+
+    Assert.Multiple(() => {
+      Assert.That(file.Width, Is.EqualTo(width));
+      Assert.That(file.Height, Is.EqualTo(height));
+      Assert.That(file.ComponentCount, Is.EqualTo(3));
+    });
+
+    Assert.That(file.PixelData.Length, Is.EqualTo(expected.Length));
+    for (var i = 0; i < expected.Length; ++i)
+      if (file.PixelData[i] != expected[i])
+        Assert.Fail($"Sample {i} is {file.PixelData[i]}, libjxl decodes it to {expected[i]}.");
+  }
+
+  [Test]
+  public void EffortNineLosslessFileIsRefusedRatherThanDecodedWrongly() {
+    var data = _Fixture("cjxl_lossless_effort9.jxl");
+    Assert.Throws<NotSupportedException>(() => JpegXlReader.FromBytes(data));
+  }
+
+  private static (int Width, int Height, byte[] Pixels) _ReadPpm(byte[] ppm) {
+    var at = 0;
+    string Token() {
+      while (at < ppm.Length && char.IsWhiteSpace((char)ppm[at]))
+        ++at;
+      var start = at;
+      while (at < ppm.Length && !char.IsWhiteSpace((char)ppm[at]))
+        ++at;
+      return System.Text.Encoding.ASCII.GetString(ppm, start, at - start);
+    }
+
+    Assert.That(Token(), Is.EqualTo("P6"));
+    var width = int.Parse(Token());
+    var height = int.Parse(Token());
+    Assert.That(Token(), Is.EqualTo("255"));
+    ++at; // the single whitespace byte that ends the header
+
+    var pixels = new byte[width * height * 3];
+    Array.Copy(ppm, at, pixels, 0, pixels.Length);
+    return (width, height, pixels);
+  }
+}

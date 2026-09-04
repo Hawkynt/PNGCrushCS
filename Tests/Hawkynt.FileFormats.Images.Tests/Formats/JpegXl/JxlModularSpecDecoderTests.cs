@@ -74,7 +74,15 @@ public sealed class JxlModularSpecDecoderTests {
   }
 
   // -------------------------------------------------------------
-  // Empty-section integration tests.
+  // Non-conformant-section tests.
+  //
+  // These fixtures are hand-built and, as the comment below has always said,
+  // are not spec-conformant modular sections. They used to assert that the
+  // decoder returned a correctly-shaped image for them anyway. That is the
+  // behaviour this file now tests against: a section the decoder cannot follow
+  // has to be refused, because the alternative is a picture assembled from
+  // whatever the fallbacks happened to leave in the buffers. Measured against
+  // libjxl, that alternative was wrong for real files as well as these.
   //
   // The skeleton recognises a 1-bit "transforms all_default = 1" prefix on
   // the modular section, then synthesises a trivial 1-leaf MA tree
@@ -128,52 +136,36 @@ public sealed class JxlModularSpecDecoderTests {
   }
 
   [Test]
-  public void Decode_EmptySection_1x1_1Channel_HandlesGracefully() {
-    // The hand-crafted prefix doesn't represent a spec-conformant modular
-    // section under the current decoder. The decoder is now resilient:
-    // it falls back to a trivial MA tree and zero-filled residuals rather
-    // than throwing. Verify shape invariants on the resulting image.
+  public void Decode_NonConformantSection_1x1_1Channel_IsRefused() {
     var bits = BuildEmptyModularSectionBits();
     var reader = new JxlBitReader(bits, 0);
-    var image = JxlModularSpecDecoder.Decode(reader, width: 1, height: 1, numChannels: 1, bitDepth: 8);
-    Assert.That(image, Is.Not.Null);
-    Assert.That(image.Channels.Length, Is.EqualTo(1));
-    Assert.That(image.Channels[0].Width, Is.EqualTo(1));
-    Assert.That(image.Channels[0].Height, Is.EqualTo(1));
+    Assert.Throws<InvalidDataException>(() =>
+      JxlModularSpecDecoder.Decode(reader, width: 1, height: 1, numChannels: 1, bitDepth: 8));
   }
 
   [Test]
-  public void Decode_EmptySection_RespectsNumChannels() {
-    // Channel count must be honoured at channel-array allocation time.
+  public void Decode_NonConformantSection_IsRefusedWhateverTheChannelCount() {
     var bits = BuildEmptyModularSectionBits();
     var reader = new JxlBitReader(bits, 0);
-    var image = JxlModularSpecDecoder.Decode(reader, width: 2, height: 2, numChannels: 3, bitDepth: 8);
-    Assert.That(image.Channels.Length, Is.EqualTo(3));
-    foreach (var ch in image.Channels) {
-      Assert.That(ch.Width, Is.EqualTo(2));
-      Assert.That(ch.Height, Is.EqualTo(2));
-    }
+    Assert.Throws<InvalidDataException>(() =>
+      JxlModularSpecDecoder.Decode(reader, width: 2, height: 2, numChannels: 3, bitDepth: 8));
   }
 
   [Test]
-  public void Decode_EmptySection_RespectsLargerDimensions() {
+  public void Decode_NonConformantSection_IsRefusedWhateverTheDimensions() {
     var bits = BuildEmptyModularSectionBits();
     var reader = new JxlBitReader(bits, 0);
-    var image = JxlModularSpecDecoder.Decode(reader, width: 8, height: 5, numChannels: 1, bitDepth: 8);
-    Assert.That(image.Channels.Length, Is.EqualTo(1));
-    Assert.That(image.Channels[0].Width, Is.EqualTo(8));
-    Assert.That(image.Channels[0].Height, Is.EqualTo(5));
-    Assert.That(image.Channels[0].Pixels.Length, Is.EqualTo(40));
+    Assert.Throws<InvalidDataException>(() =>
+      JxlModularSpecDecoder.Decode(reader, width: 8, height: 5, numChannels: 1, bitDepth: 8));
   }
 
   [Test]
-  public void Decode_AllZeroBits_HandlesGracefully() {
-    // 16 zero bytes. With the resilient fallback the decoder produces a
-    // valid-shape image rather than throwing.
+  public void Decode_AllZeroBits_IsRefused() {
+    // Sixteen zero bytes carry no section at all, so the reader runs out of bits
+    // rather than reaching the end-of-stream check.
     var bits = new byte[16];
     var reader = new JxlBitReader(bits, 0);
-    var image = JxlModularSpecDecoder.Decode(reader, width: 1, height: 1, numChannels: 1, bitDepth: 8);
-    Assert.That(image, Is.Not.Null);
-    Assert.That(image.Channels.Length, Is.EqualTo(1));
+    Assert.Throws<InvalidOperationException>(() =>
+      JxlModularSpecDecoder.Decode(reader, width: 1, height: 1, numChannels: 1, bitDepth: 8));
   }
 }
