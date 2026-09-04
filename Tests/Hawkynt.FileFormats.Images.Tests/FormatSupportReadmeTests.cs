@@ -1,7 +1,9 @@
-using System;
+﻿using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Text.RegularExpressions;
 using FileFormat.Core;
 using Hawkynt.FileFormats.Images;
 
@@ -43,6 +45,62 @@ public sealed class FormatSupportReadmeTests {
         $"The image package format table has drifted from FormatRegistry. Regenerate it with {_UPDATE_ENVIRONMENT_VARIABLE}=1 or replace the marked region with:\n\n{expected}");
       Assert.That(readme, Does.Contain(_WRITE_COVERAGE_TEXT),
         "The README must not carry a second hand-maintained read/write capability count.");
+    });
+  }
+
+  private const string _READ_ONLY_HEADING = "### Registered but read-only";
+
+  /// <summary>
+  /// The one capability list in the README that is still written by hand must name every read-only
+  /// format and no others, and count them correctly.
+  /// </summary>
+  /// <remarks>
+  /// The matrix above it regenerates, so it cannot drift; this paragraph is where the reason each
+  /// format has no writer is recorded, and a reason cannot be generated. That makes it the one place
+  /// left where the README can quietly stop being true — and it had: it said 36 while the registry
+  /// held a different number, so a format could lose or gain a writer and the prose would go on
+  /// describing the old set.
+  /// <para/>
+  /// The names are checked, not the reasons. Whoever registers or unregisters a writer has to come
+  /// here and say why, which is the whole point of the paragraph existing beside a generated table.
+  /// </remarks>
+  [Test]
+  [Category("Unit")]
+  public void PackageReadme_ReadOnlyParagraph_NamesEveryFormatWithoutAWriter() {
+    var readme = File.ReadAllText(_FindPackageReadme()).ReplaceLineEndings("\n");
+
+    var start = readme.IndexOf(_READ_ONLY_HEADING, StringComparison.Ordinal);
+    Assert.That(start, Is.GreaterThanOrEqualTo(0), $"the README no longer has a '{_READ_ONLY_HEADING}' section");
+
+    var end = readme.IndexOf(_NEXT_HEADING, start, StringComparison.Ordinal);
+    Assert.That(end, Is.GreaterThan(start), "the read-only section is not followed by the quick-start heading");
+    var paragraph = readme[start..end];
+
+    var readOnly = FormatRegistry.AllFormats
+      .Where(static entry => !entry.SupportsWrite)
+      .Select(static entry => entry.Name)
+      .OrderBy(static name => name, StringComparer.Ordinal)
+      .ToList();
+
+    // Whole-word so that a format named inside a longer one does not count as mentioned.
+    var mentioned = new HashSet<string>(
+      Regex.Matches(paragraph, @"\b[A-Za-z][A-Za-z0-9]*\b").Select(static match => match.Value),
+      StringComparer.Ordinal);
+
+    var unnamed = readOnly.Where(name => !mentioned.Contains(name)).ToList();
+    var stillNamed = FormatRegistry.AllFormats
+      .Where(entry => entry.SupportsWrite && mentioned.Contains(entry.Name))
+      .Select(static entry => entry.Name)
+      .OrderBy(static name => name, StringComparer.Ordinal)
+      .ToList();
+
+    Assert.Multiple(() => {
+      Assert.That(unnamed, Is.Empty,
+        "these formats have no writer and the read-only section does not say why: " + string.Join(", ", unnamed));
+      Assert.That(stillNamed, Is.Empty,
+        "these formats gained a writer and the read-only section still lists them: " + string.Join(", ", stillNamed));
+      Assert.That(paragraph, Does.Contain($"These {readOnly.Count} entries"),
+        $"the read-only section must open with the count the registry holds, which is {readOnly.Count}");
     });
   }
 
