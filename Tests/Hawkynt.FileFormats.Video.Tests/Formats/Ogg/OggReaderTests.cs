@@ -675,6 +675,43 @@ public sealed class OggReaderTests {
     });
   }
 
+  [Test]
+  [Category("Unit")]
+  public void TheCommentHeadersDateIsReadAsTheCreationTime() {
+    var file = _WithComment("DATE=2019-04-02T11:30:00+02:00");
+
+    Assert.That(OggContainer.Metadata(OggReader.FromBytes(file)).CreationTime,
+      Is.EqualTo(new DateTimeOffset(2019, 4, 2, 11, 30, 0, TimeSpan.FromHours(2))));
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void ADateFieldStatingSomethingElseStaysTheAnnotationItAlsoIs() {
+    // Vorbis's DATE field is defined as ISO 8601 and files put other things in it. What cannot be
+    // read as an instant is not turned into one; it is still reported under its own name.
+    var file = _WithComment("DATE=whenever it was");
+
+    var metadata = OggContainer.Metadata(OggReader.FromBytes(file));
+
+    Assert.Multiple(() => {
+      Assert.That(metadata.CreationTime, Is.Null);
+      Assert.That(metadata.TextEntries.Select(e => (e.Keyword, e.Text)), Does.Contain(("DATE", "whenever it was")));
+    });
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void ADateWithNoTimeOfDayIsReadTheSameWhereverItIsOpened() {
+    var file = _WithComment("DATE=2019-04-02");
+
+    Assert.That(OggContainer.Metadata(OggReader.FromBytes(file)).CreationTime,
+      Is.EqualTo(new DateTimeOffset(2019, 4, 2, 0, 0, 0, TimeSpan.Zero)));
+  }
+
+  private static byte[] _WithComment(params string[] tags) => OggTestContainer.Build(
+    new() { Serial = 1, Sequence = 0, Granule = 0, BeginOfStream = true, Packets = [OggTestContainer.TheoraIdentification()] },
+    new() { Serial = 1, Sequence = 1, Granule = 0, Packets = [OggTestContainer.TheoraComment("Lavf60", tags), OggTestContainer.TheoraSetup()] });
+
   // ------------------------------------------------------------------------------------------
   // The registry
   // ------------------------------------------------------------------------------------------
