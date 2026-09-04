@@ -4,7 +4,6 @@
     <SupportedOSPlatform>windows</SupportedOSPlatform>
 
     <Description>TIFF optimization engine with compression method selection, predictor optimization, and color mode reduction.</Description>
-    <PackageReadmeFile>ReadMe.md</PackageReadmeFile>
     <PackageProjectUrl>https://github.com/Hawkynt/PNGCrushCS</PackageProjectUrl>
     <PackageTags>TiffOptimizer;ImageCrush;Hawkynt</PackageTags>
     <RepositoryUrl>https://github.com/Hawkynt/PNGCrushCS</RepositoryUrl>
@@ -13,7 +12,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <None Include="ReadMe.md" Pack="true" PackagePath="\" />
     <InternalsVisibleTo Include="Optimizer.Tiff.Tests" />
   </ItemGroup>
 
