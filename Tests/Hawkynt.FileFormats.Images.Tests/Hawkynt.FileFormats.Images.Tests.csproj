@@ -69,6 +69,14 @@
     </None>
   </ItemGroup>
 
+  <!-- A CR3 built to the layout ExifTool reads, carrying a preview and a thumbnail. -->
+  <ItemGroup>
+    <None Include="Formats\Cr3\Fixtures\*">
+      <Link>Fixtures\Cr3\%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
   <ItemGroup>
     <Using Include="NUnit.Framework" />
   </ItemGroup>
