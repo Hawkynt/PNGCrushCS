@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using FileFormat.Core;
 
 namespace FileFormat.Bsave;
@@ -316,13 +316,6 @@ public readonly record struct BsaveFile : IImageFormatReader<BsaveFile>, IImageT
   private static BsaveFile _ToCga80x100x1024(RawImage image) {
     const int width = 80;
     const int height = 100;
-    // Reduced rather than refused: asking the caller to hand over an already-indexed picture
-    // makes converting into this format someone else's problem, which is the one thing a
-    // converter cannot delegate.
-    image = image.EnsureIndexedAtMost(16);
-      throw new ArgumentException(
-        $"BSAVE 80x100x1024 supports at most 1024 palette entries, got {image.PaletteCount}.", nameof(image));
-
     // Read indices natively at their declared bit-depth so Indexed16 inputs preserve the high pattern
     // bits. For Indexed8 inputs (≤256 colours) only pattern=0 is reachable; for Indexed16 inputs the
     // full 10-bit (pattern × 256 + fg × 16 + bg) space round-trips losslessly.
@@ -348,8 +341,12 @@ public readonly record struct BsaveFile : IImageFormatReader<BsaveFile>, IImageT
   private static int[] _RequireIndices16(RawImage image, int maxPalette, string modeName) {
     // Reduced rather than refused: asking the caller to hand over an already-indexed picture
     // makes converting into this format someone else's problem, which is the one thing a
-    // converter cannot delegate.
-    image = image.EnsureIndexedAtMost(16);
+    // converter cannot delegate. An Indexed16 source already inside the limit is taken as it
+    // stands — reducing it would throw away the high pattern bits this mode exists to carry.
+    if (image.Format != PixelFormat.Indexed16 || image.PaletteCount > maxPalette)
+      image = image.EnsureIndexedAtMost(Math.Min(maxPalette, 256));
+
+    if (image.PaletteCount > maxPalette)
       throw new ArgumentException(
         $"BSAVE {modeName} supports at most {maxPalette} palette entries, got {image.PaletteCount}.", nameof(image));
 
@@ -419,25 +416,6 @@ public readonly record struct BsaveFile : IImageFormatReader<BsaveFile>, IImageT
     };
   }
 
-  /// <summary>Like <see cref="_RequireIndexed"/> but allows up to 1024 palette entries — needed for the Reenigne mode.
-  /// Source must already be byte-per-pixel (the dialog produces Indexed8 even when palette is large).</summary>
-  private static byte[] _RequireIndexedLarge(RawImage image, int maxPalette, string modeName) {
-    // Reduced rather than refused: asking the caller to hand over an already-indexed picture
-    // makes converting into this format someone else's problem, which is the one thing a
-    // converter cannot delegate.
-    image = image.EnsureIndexedAtMost(16);
-      throw new ArgumentException(
-        $"BSAVE {modeName} supports at most {maxPalette} palette entries, got {image.PaletteCount}.", nameof(image));
-
-    var src = image.PixelData ?? [];
-    return image.Format switch {
-      PixelFormat.Indexed8 => src,
-      PixelFormat.Indexed4 => _UnpackIndexed4(src, image.Width, image.Height),
-      PixelFormat.Indexed1 => _UnpackIndexed1(src, image.Width, image.Height),
-      _ => throw new ArgumentException($"Unexpected indexed format {image.Format}.", nameof(image)),
-    };
-  }
-
   /// <summary>Converts the source to a flat Indexed8 byte array, validating that the palette fits in the target mode.
   /// Unpacks sub-byte indexed formats (Indexed1/Indexed4) inline rather than going through
   /// <see cref="PixelConverter"/> — that path can dispatch back through registered format writers and recurse.</summary>
@@ -445,7 +423,7 @@ public readonly record struct BsaveFile : IImageFormatReader<BsaveFile>, IImageT
     // Reduced rather than refused: asking the caller to hand over an already-indexed picture
     // makes converting into this format someone else's problem, which is the one thing a
     // converter cannot delegate.
-    image = image.EnsureIndexedAtMost(16);
+    image = image.EnsureIndexedAtMost(maxPalette);
     if (image.PaletteCount > maxPalette)
       throw new ArgumentException(
         $"BSAVE {modeName} supports at most {maxPalette} palette entries, got {image.PaletteCount}.",
