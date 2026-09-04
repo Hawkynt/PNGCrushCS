@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using FileFormat.Core;
 
 namespace FileFormat.MicroDesignCut;
@@ -11,7 +11,8 @@ namespace FileFormat.MicroDesignCut;
 /// </remarks>
 [FormatDetectionPriority(999)]
 public readonly record struct MicroDesignCutFile
-  : IImageFormatReader<MicroDesignCutFile>, IImageToRawImage<MicroDesignCutFile>, IImageFormatWriter<MicroDesignCutFile> {
+  : IImageFormatReader<MicroDesignCutFile>, IImageToRawImage<MicroDesignCutFile>,
+    IImageFromRawImage<MicroDesignCutFile>, IImageFormatWriter<MicroDesignCutFile> {
 
   /// <summary>Number of bytes in the two-word CUT header.</summary>
   public const int HeaderSize = 4;
@@ -65,6 +66,26 @@ public readonly record struct MicroDesignCutFile
         .CopyTo(compact.AsSpan(y * compactStride, compactStride));
 
     return MonochromePage.Decode(compact, file.Width, file.Height, inkIsWhite: true);
+  }
+
+  /// <summary>The height code this writer stores for a given pixel height.</summary>
+  /// <remarks>
+  /// Decoding halves with integer division, so two codes give every height and neither is more
+  /// correct than the other. Refusing to pick one left a complete encoder unreachable through the
+  /// registry, which is a worse answer than picking the even one and saying so: 2h-2 decodes to h
+  /// for every height from one upward, and a caller that needs the odd code passes it to the
+  /// overload below.
+  /// </remarks>
+  public static ushort HeightCodeFor(int height) {
+    ArgumentOutOfRangeException.ThrowIfLessThan(height, 1);
+    ArgumentOutOfRangeException.ThrowIfGreaterThan(height, (ushort.MaxValue + 2) / 2);
+    return checked((ushort)(height * 2 - 2));
+  }
+
+  /// <summary>Creates a CUT bitmap from pixels alone, choosing the height code.</summary>
+  public static MicroDesignCutFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+    return FromRawImage(image, HeightCodeFor(image.Height));
   }
 
   /// <summary>

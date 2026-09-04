@@ -13,6 +13,18 @@ public static class BsaveWriter {
 
   internal static byte[] _Assemble(byte[] pixelData, BsaveMode mode) {
     var (segment, offset) = _GetSegmentOffset(mode);
+
+    // BSAVE states its payload in a 16-bit field, so a block over 64 KiB cannot be described at all.
+    // The cast used to wrap silently: EGA SCREEN 9 is 112000 bytes, which was written to the header
+    // as 46464, and the reader rejected the file for stating a length the file does not carry. A
+    // header that lies is worse than a refusal, because it turns a writable-format claim into a file
+    // nothing opens.
+    if (pixelData.Length > ushort.MaxValue)
+      throw new ArgumentException(
+        $"A BSAVE block states its length in 16 bits, so it cannot describe {pixelData.Length} bytes. "
+        + $"{mode} needs more than the {ushort.MaxValue} a single block holds.",
+        nameof(pixelData));
+
     var length = (ushort)pixelData.Length;
 
     var header = new BsaveHeader(

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using FileFormat.Core;
@@ -32,7 +32,7 @@ public sealed class WebPFile :
 
   public static string PrimaryExtension => ".webp";
   public static string[] FileExtensions => [".webp", ".wep"];
-  static FormatCapability IImageFormatMetadata<WebPFile>.Capabilities => FormatCapability.MultiImage;
+  static FormatCapability IImageFormatMetadata<WebPFile>.Capabilities => FormatCapability.MultiImage | FormatCapability.HasDedicatedOptimizer;
   static WebPFile IImageFormatReader<WebPFile>.FromSpan(ReadOnlySpan<byte> data) => WebPReader.FromSpan(data);
 
   public static bool? MatchesSignature(ReadOnlySpan<byte> header)

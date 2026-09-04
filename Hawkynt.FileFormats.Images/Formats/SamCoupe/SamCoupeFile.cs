@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using FileFormat.Core;
 
 namespace FileFormat.SamCoupe;
@@ -69,11 +69,14 @@ public readonly record struct SamCoupeFile : IImageFormatReader<SamCoupeFile>, I
         pixels[y * width + baseX + 3] = (byte)(b & 0x03);
       }
 
+    // The raw screen dump holds pixels only; the SAM's palette sat in hardware registers that were
+    // never part of the file, so the ramp stands in and the picture converts instead of throwing.
     return new() {
       Width = width,
       Height = height,
       Format = PixelFormat.Indexed8,
       PixelData = pixels,
+      Palette = IndexedPalette.GrayRamp(4),
       PaletteCount = 4,
     };
   }
@@ -91,11 +94,14 @@ public readonly record struct SamCoupeFile : IImageFormatReader<SamCoupeFile>, I
         pixels[y * width + baseX + 1] = (byte)(b & 0x0F);
       }
 
+    // The raw screen dump holds pixels only; the SAM's palette sat in hardware registers that were
+    // never part of the file, so the ramp stands in and the picture converts instead of throwing.
     return new() {
       Width = width,
       Height = height,
       Format = PixelFormat.Indexed8,
       PixelData = pixels,
+      Palette = IndexedPalette.GrayRamp(16),
       PaletteCount = 16,
     };
   }

@@ -62,7 +62,7 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | AmstradMode5 | `.cm5` | ✅ | ✅ | — | — | — |
 | Analyze | `.hdr`, `.img` | ✅ | ✅ | — | — | — |
 | AndrewToolkit | `.atk` | ✅ | ✅ | — | — | — |
-| Ani | `.ani` | ✅ | ✅ | — | ✅ | — |
+| Ani | `.ani` | ✅ | ✅ | — | ✅ | ✅ |
 | AnimatorCompressor | `.kpr` | ✅ | ✅ | — | — | — |
 | Anime4Ever | `.a4r` | ✅ | ✅ | — | — | — |
 | AnimPainter | `.anp` | ✅ | ✅ | — | — | — |
@@ -482,7 +482,7 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | Jpeg | `.jpg`, `.jpeg`, `.jpe`, `.jfif`, `.jps`, `.thm`, `.j`, `.jif`, `.fsy`, `.mph`, `.ncy`, `.frm` | ✅ | ✅ | — | — | ✅ |
 | Jpeg2000 | `.jp2`, `.j2k`, `.j2c`, `.jpx`, `.jpc`, `.jpf`, `.jpt`, `.jpm` | ✅ | ✅ | — | — | — |
 | JpegLs | `.jls` | ✅ | ✅ | — | — | — |
-| JpegXl | `.jxl` | ✅ | ✅ | — | — | — |
+| JpegXl | `.jxl` | ✅ | — | — | — | — |
 | JpegXr | `.jxr`, `.wdp`, `.hdp` | ✅ | ✅ | — | — | — |
 | JupiterAce | `.jac`, `.ace` | ✅ | ✅ | — | — | — |
 | Kitty | `.kty`, `.kt4` | ✅ | ✅ | — | — | — |
@@ -523,12 +523,12 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | McPainter | `.mcp` | ✅ | ✅ | — | — | — |
 | Mcs | `.mcs` | ✅ | ✅ | — | — | — |
 | Mda | `.mda` | ✅ | ✅ | — | — | — |
-| Mdp | `.mdp` | ✅ | — | — | — | — |
+| Mdp | `.mdp` | ✅ | ✅ | — | — | — |
 | MegaluxFrame | `.frm` | ✅ | ✅ | — | — | — |
 | MegaPaint | `.bld` | ✅ | ✅ | — | — | — |
 | MetaImage | `.mha`, `.mhd` | ✅ | ✅ | — | — | — |
 | MgrBitmap | `.mgr` | ✅ | ✅ | — | — | — |
-| MicroDesignCut | `.cut` | ✅ | — | — | — | — |
+| MicroDesignCut | `.cut` | ✅ | ✅ | — | — | — |
 | MicroDesignGrf | `.grf` | ✅ | ✅ | — | — | — |
 | MicroDynamicsMars | `.pbt` | ✅ | ✅ | — | — | — |
 | MicroIllustrator | `.mil` | ✅ | ✅ | — | — | — |
@@ -747,7 +747,7 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | SevenuP | `.sev` | ✅ | ✅ | — | — | — |
 | Sf3 | `.sf3` | ✅ | ✅ | — | — | — |
 | Sff | `.sff` | ✅ | ✅ | — | — | — |
-| Sgi | `.sgi`, `.rgb`, `.bw`, `.iris`, `.rgba`, `.inta` | ✅ | ✅ | — | — | — |
+| Sgi | `.sgi`, `.rgb`, `.bw`, `.iris`, `.rgba`, `.inta` | ✅ | ✅ | — | — | ✅ |
 | ShapeTableFileType | `.shp` | ✅ | ✅ | — | — | — |
 | SharpX68k | `.x68`, `.x68k` | ✅ | ✅ | — | — | — |
 | ShfXlEdit | `.shx` | ✅ | ✅ | — | — | — |
@@ -860,7 +860,7 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | Wad3 | `.wad` | ✅ | ✅ | — | — | — |
 | Wal | `.wal` | ✅ | ✅ | — | — | — |
 | Wbmp | `.wbmp`, `.wbm`, `.wap` | ✅ | ✅ | — | — | — |
-| WebP | `.webp`, `.wep` | ✅ | ✅ | — | ✅ | — |
+| WebP | `.webp`, `.wep` | ✅ | ✅ | — | ✅ | ✅ |
 | WebShots | `.wb1`, `.wbc`, `.wbp`, `.wbz` | ✅ | ✅ | — | — | — |
 | WigmoreArtist | `.wig` | ✅ | ✅ | — | — | — |
 | WinFax | `.fxs`, `.fxo`, `.fxr`, `.fxd`, `.fxm` | ✅ | ✅ | — | — | — |
@@ -956,7 +956,7 @@ For these formats `✅` means more than "the project can read what it wrote". A 
 | MNG | ✅ | ✅ | Writer is MNG-VLC: `MHDR`/`TERM` wire values, VLC layer/frame/play-time accounting and a truthful simplicity profile are asserted byte for byte. Full MNG-LC/MNG object buffers, loops, JNG and delta-PNG are not written and not claimed. |
 | JPEG XR | ✅ | ✅ | T.832 core is a managed port of JXRLib (see `Formats/JpegXr/Reference/UPSTREAM.md`), oracle-tested upstream against `JxrEncApp`/`JxrDecApp`/WIC; the public path writes real `WMPHOTO` codestreams with standard WIC pixel-format GUIDs and decodes the independent JXRLib `red.jxr` fixture (frequency-order YUV444 plus a planar alpha plane). Gray8, RGB24 and RGBA32 are exposed; other WIC layouts may be refused at the container adapter even though the core handles them. |
 | JPEG 2000 | ⚠️ | ⚠️ | Reader: our own codestreams round-trip, but every JPEG 2000 written by OpenJPEG or ffmpeg decodes to a flat mid-grey field — the Tier-2/Tier-1 path agrees with our writer and with nothing else, so the reader is not interoperable and this cell stays amber until it decodes independent codestreams. Writer: 8-bit Gray/RGB reversible 5/3 baseline; the Tier-2 packet headers serialise inclusion and zero-bit-plane counts as plain values where the standard requires tag trees, so independent decoders do not accept the output. |
-| HEIF / HEIC | ⚠️ | — | Directly coded HEVC items decode through the shared managed H.265 decoder for Main-profile intra 8-bit 4:2:0; 10- and 12-bit streams (what `libheif`/x265 write by default) are refused with the clause that says why rather than decoded wrongly. No managed HEVC encoder is registered. |
+| HEIF / HEIC | ⚠️ | ⚠️ | Directly coded HEVC items decode through the shared managed H.265 decoder for Main-profile intra 8-bit 4:2:0; 10- and 12-bit streams (what `libheif`/x265 write by default) are refused with the clause that says why rather than decoded wrongly. Writer: a managed HEVC encoder is registered and builds the picture out of 64x64 intra PCM coding units, which is ordinary Main-profile syntax rather than a private escape — every sample is carried verbatim, so the file is large and exactly lossless. It is amber, not green, because the evidence for it is our own decoder reading it back; no independent HEVC decoder has been run against the output here. |
 | AVIF | ⚠️ | — | The ISO-BMFF container parses (size and item layout come back), but the AV1 decoder under `Formats/Avif/Codec` lacks the context-adaptive CDF machinery and would return a uniform field, so an AV1 payload is refused. The raw-`mdat` writer is deliberately not registered. |
 | JPEG XL | ⚠️ | — | Container, `SizeHeader`, `ImageMetadata` and `FrameHeader` are spec-conformant, so signature, dimensions and image-level metadata of real `.jxl` files are correct. The modular and VarDCT pixel codecs are not ISO/IEC 18181 interoperable: real files refuse their pixels, and the writer is unregistered because `djxl` rejects what it emits. |
 
@@ -968,7 +968,7 @@ Formats no installed tool writes are judged the other way round — what we writ
 
 ### Registered but read-only
 
-These 36 entries read but have no writer; each is a decision, not an oversight. **Not bounded** (an encoder or a model this package does not have): Avif (AV1), Crw, Mrw, X3f (camera-raw sensor models), Dwg, Dxf, Hpgl (CAD/vector), TrueType (font), PeResource, PowerPoint, Fpx, PocketPcTheme (executable, OLE and CAB containers), IffAnim8, IffDpan, IffHame, IffDctv (multi-frame or hardware-mode Amiga animation), IffSham, IffMultiPalette (per-line palette encoders whose identity is unverified), Spectrum512Smoosh (its packing is not specified), Graph2FontScroll, Xld4, EciGraphicEditor, FunPainter, Gem, IconLibrary, PhotoSuiteProject (compressed or container layouts read from one sample each). **Deliberately not written** because a file built from arbitrary pixels would not be what the name promises: EmbeddedDib, Eroiica, Crd, NeoBookCartoon, CartesMichelin. **Bounded and queued**: Mdp, MicroDesignCut, MapletownMl1, ElectricImage, HalfLifeModel — simple raster layouts with specified headers whose writers are being added.
+These 35 entries read but have no writer; each is a decision, not an oversight. **Not bounded** (an encoder or a model this package does not have): Avif (AV1), Crw, Mrw, X3f (camera-raw sensor models), Dwg, Dxf, Hpgl (CAD/vector), TrueType (font), PeResource, PowerPoint, Fpx, PocketPcTheme (executable, OLE and CAB containers), IffAnim8, IffDpan, IffHame, IffDctv (multi-frame or hardware-mode Amiga animation), IffSham, IffMultiPalette (per-line palette encoders whose identity is unverified), Spectrum512Smoosh (its packing is not specified), Graph2FontScroll, Xld4, EciGraphicEditor, FunPainter, Gem, IconLibrary, PhotoSuiteProject (compressed or container layouts read from one sample each). **Deliberately not written** because a file built from arbitrary pixels would not be what the name promises: EmbeddedDib, Eroiica, Crd, NeoBookCartoon, CartesMichelin. **Written but not registered**: JpegXl — an encoder exists and its codec tests drive it, but what it assembles is a `0x4D`-prefixed payload behind a bare component-count byte rather than the ImageMetadata bundle ISO/IEC 18181-1 puts after the `SizeHeader`. `djxl` will not decode it and neither will the reader in the same folder, so it is not reachable through the registry. **Bounded and not yet written**: MapletownMl1, ElectricImage, HalfLifeModel — simple raster layouts with specified headers; nothing blocks an encoder for them beyond the work, and none is written today.
 ## 🚀 Quick start
 
 ```csharp
@@ -1357,7 +1357,7 @@ The long tail also includes TGA/Targa, PCX, SGI/Iris, Sun Raster, X PixMap (XPM)
 
 <!-- API:BEGIN generated by Hawkynt/RepositoryTemplate/package-readme — edit the XML docs in source, not here -->
 
-Every public and protected member of all 3241 types, generated from the built assembly and its XML documentation, is in [REFERENCE.md](https://github.com/Hawkynt/PNGCrushCS/blob/main/Hawkynt.FileFormats.Images/REFERENCE.md).
+Every public and protected member of all 3242 types, generated from the built assembly and its XML documentation, is in [REFERENCE.md](https://github.com/Hawkynt/PNGCrushCS/blob/main/Hawkynt.FileFormats.Images/REFERENCE.md).
 
 <!-- API:END -->
 
@@ -1376,7 +1376,7 @@ Every public and protected member of all 3241 types, generated from the built as
 ## ⚠️ Limitations
 
 - **Lossy advanced features** — VP8 lossy is keyframe-only; multi-pass rate control and token-partition threading are not implemented yet. Alpha IS preserved (the encoder writes an ALPH chunk on RGBA input; uncompressed method 0 — VP8L-encoded alpha is a future optimization).
-- **Codec subsets** — HEIF/HEIC now resolves and decodes directly coded HEVC image items through the shared managed H.265 decoder; that path currently targets Main-profile intra-picture 8-bit 4:2:0 content and rejects unsupported HEVC profiles/features instead of fabricating pixels. AVIF container parsing exists, but real AV1 pixel decoding remains disabled until the AV1 entropy syntax is conforming. BPG remains an I-frame-oriented managed subset. **JPEG 2000** writing uses a deliberately narrow 8-bit Gray/RGB conforming baseline profile; unsupported optional coding modes are outside that authoring profile rather than encoded with private syntax. **JPEG XL**: container + SizeHeader + ImageMetadata + FrameHeader (ISO/IEC 18181-1 §3.6.2 / §3.6.3 / §3.6.5) are spec-conformant — the all_default fast path that most libjxl-encoded files use is fully supported, and the non-default conditional plumbing (orientation, bit_depth, num_extra_channels, extra_channel_info, color_encoding, tone_mapping, frame_type, encoding flag) is in place. Pixel codec (modular sub-codec body and VarDCT) is the remaining workstream — arbitrary real-world `.jxl` files will not decode their pixels yet, but signature, dimensions, and image-level metadata are extracted correctly. **JPEG XR** recognizes real containers but the current pixel decoder is known to reproduce the wrong image, so real-file pixels are deliberately refused until the T.832 codec is repaired. Camera RAW supports DNG lossless JPEG, Canon CR2, Nikon NEF, Sony ARW2; other manufacturer-specific compressions are future work.
+- **Codec subsets** — HEIF/HEIC now resolves and decodes directly coded HEVC image items through the shared managed H.265 decoder; that path currently targets Main-profile intra-picture 8-bit 4:2:0 content and rejects unsupported HEVC profiles/features instead of fabricating pixels. AVIF container parsing exists, but real AV1 pixel decoding remains disabled until the AV1 entropy syntax is conforming. BPG remains an I-frame-oriented managed subset. **JPEG 2000** writing uses a deliberately narrow 8-bit Gray/RGB conforming baseline profile; unsupported optional coding modes are outside that authoring profile rather than encoded with private syntax. **JPEG XL**: container + SizeHeader + ImageMetadata + FrameHeader (ISO/IEC 18181-1 §3.6.2 / §3.6.3 / §3.6.5) are spec-conformant — the all_default fast path that most libjxl-encoded files use is fully supported, and the non-default conditional plumbing (orientation, bit_depth, num_extra_channels, extra_channel_info, color_encoding, tone_mapping, frame_type, encoding flag) is in place. Pixel codec (modular sub-codec body and VarDCT) is the remaining workstream — arbitrary real-world `.jxl` files will not decode their pixels yet, but signature, dimensions, and image-level metadata are extracted correctly. **JPEG XR** decodes real codestreams through a managed port of JXRLib's T.832 core and writes real `WMPHOTO`; what it refuses is narrower than the whole format — a component count outside one, three or four, and interleaved alpha, which needs a planar BCC2/BCC3 codestream instead. Gray8, RGB24 and RGBA32 are exposed; other WIC layouts may be turned down at the container adapter even where the core handles them. Camera RAW supports DNG lossless JPEG, Canon CR2, Nikon NEF, Sony ARW2; other manufacturer-specific compressions are future work.
 - **Write coverage** — Read support does not imply authoring support. Use the exhaustive matrix above or filter `FormatRegistry.AllFormats` by `SupportsWrite` for the exact current set of formats that can encode an arbitrary `RawImage`.
 - **PDF / PE** — image extraction only. PDF rendering, page composition, vector graphics, and PE writing are out of scope.
 - **Bundle size** — `~4.9 MB`, four assemblies. There is no way to take only the formats you need; if that matters, per-format NuGet packages may be published in future.

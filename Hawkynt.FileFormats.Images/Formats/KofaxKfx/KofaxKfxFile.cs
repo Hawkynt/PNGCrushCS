@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using FileFormat.Core;
 
 namespace FileFormat.KofaxKfx;
@@ -31,7 +31,15 @@ public readonly record struct KofaxKfxFile : IImageFormatReader<KofaxKfxFile>, I
   static string IImageFormatMetadata<KofaxKfxFile>.PrimaryExtension => ".kfx";
   static string[] IImageFormatMetadata<KofaxKfxFile>.FileExtensions => [".kfx"];
   static KofaxKfxFile IImageFormatReader<KofaxKfxFile>.FromSpan(ReadOnlySpan<byte> data) => KofaxKfxReader.FromSpan(data);
-  static VideoMode[] IImageFormatMetadata<KofaxKfxFile>.VideoModes => [new("Default", [(IntegerRange.Any, IntegerRange.Any)], [2])];
+  /// <summary>Fifty-six pixels wide, because seven bytes a row is what fixes it; any number of rows.</summary>
+  /// <remarks>
+  /// This used to declare any width at all, which is the one thing the format does not allow: the
+  /// reader takes the width from the row length and refuses a file that is not a whole number of
+  /// seven-byte rows. Declaring Any invited callers — the write sweep among them — to hand over a
+  /// 64-pixel picture, which packs to eight bytes a row and produces a file this very reader will
+  /// not open.
+  /// </remarks>
+  static VideoMode[] IImageFormatMetadata<KofaxKfxFile>.VideoModes => [new("Default", [(RowWidth, IntegerRange.Any)], [2])];
   static byte[] IImageFormatWriter<KofaxKfxFile>.ToBytes(KofaxKfxFile file) => KofaxKfxWriter.ToBytes(file);
 
   public int Width { get; init; }
@@ -51,6 +59,11 @@ public readonly record struct KofaxKfxFile : IImageFormatReader<KofaxKfxFile>, I
 
   public static KofaxKfxFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
+    if (image.Width != RowWidth)
+      throw new ArgumentException(
+        $"A Kofax KFX row is {BytesPerRow} bytes, so the picture is {RowWidth} pixels wide; this one is {image.Width}.",
+        nameof(image));
+
     image = image.EnsureFormat(PixelFormat.Indexed1);
     return new() {
       Width = image.Width,
