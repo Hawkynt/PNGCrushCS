@@ -174,7 +174,20 @@ public static class JpegXlReader {
       // ended on a byte boundary and the alignment below has nothing to swallow.
       JxlCustomTransformData.Decode(reader, imageMetadata.XybEncoded);
       reader.ZeroPadToByte();
+
+      // Frames kept aside for a later one to draw from are read first and never
+      // shown. A file that patches itself opens with one: the thing that
+      // repeats, coded once.
+      var references = new float[_ReferenceSlots][][];
+      var referenceSizes = new (int Width, int Height)[_ReferenceSlots];
       var frame = JxlSpecFrameHeader.Decode(reader, imageMetadata, width, height);
+      while (frame.FrameType == JxlFrameType.ReferenceOnly) {
+        var next = _DecodeReferenceFrame(
+          codestream, reader, imageMetadata, frame, references, referenceSizes);
+        reader = new JxlBitReader(codestream, next);
+        frame = JxlSpecFrameHeader.Decode(reader, imageMetadata, width, height);
+      }
+
       metadata = _Metadata(width, height, imageMetadata, frame);
 
       // A frame that is not the last one is a layer, not the picture: what a
@@ -202,8 +215,9 @@ public static class JpegXlReader {
       // flags — patches, then splines, then noise — and only then the
       // quantization tables. Reading them in any other order, or not at all,
       // puts every field behind them at the wrong offset.
-      if ((frame.Flags & _FlagPatches) != 0)
-        throw new NotSupportedException("This JPEG XL frame overlays patches, which this decoder does not read yet.");
+      var patches = (frame.Flags & _FlagPatches) != 0
+        ? JxlPatches.Decode(reader, width, height, (int)imageMetadata.NumExtraChannels, referenceSizes)
+        : null;
 
       var splines = (frame.Flags & _FlagSplines) != 0
         ? JxlSplines.Decode(reader, checked((long)width * height))
@@ -262,6 +276,13 @@ public static class JpegXlReader {
         numDcGroups: numDcGroups,
         numExtraChannels: (int)imageMetadata.NumExtraChannels,
         frameFlags: frame.Flags);
+
+      // Patches are stamped on after the filters and before the noise, which is
+      // the order libjxl's pipeline puts them in.
+      if (patches != null && image is JxlVarDctImage patched)
+        JxlPatches.Apply(
+          patched.Channels, patched.Width, patched.Height, patches, references, referenceSizes,
+          _PremultipliedAlphas(imageMetadata));
 
       // Noise goes on after the smoothing and edge-preserving filters and
       // before the colour transform, which is exactly where the VarDCT decoder
@@ -429,6 +450,116 @@ public static class JpegXlReader {
         Planes = composed,
         AlphaPlane = alphaPlane,
       };
+  }
+
+  /// <summary>Whether each extra channel's alpha is already carried in the colour.</summary>
+  private static bool[] _PremultipliedAlphas(JxlImageMetadata imageMetadata) {
+    var flags = new bool[imageMetadata.ExtraChannelInfo.Length];
+    for (var i = 0; i < flags.Length; ++i)
+      flags[i] = imageMetadata.ExtraChannelInfo[i].AlphaAssociated;
+    return flags;
+  }
+
+  /// <summary>
+  /// Read a frame that is kept aside rather than shown, and put it in the slot
+  /// it names.
+  /// </summary>
+  /// <remarks>
+  /// A kept-aside frame is stored the way the frame that draws from it will
+  /// want it, which for a picture coded in XYB means XYB and not colour. A
+  /// modular frame carrying XYB states it as Y, X and B minus Y, each in units
+  /// of that channel's own DC quantisation step — so the planes have to be put
+  /// back in order and the Y added into the B before anything can be stamped
+  /// from them.
+  /// </remarks>
+  /// <returns>The offset of the frame that follows.</returns>
+  private static int _DecodeReferenceFrame(
+    byte[] codestream,
+    JxlBitReader reader,
+    JxlImageMetadata imageMetadata,
+    JxlSpecFrameHeader frame,
+    float[][]?[] references,
+    (int Width, int Height)[] referenceSizes
+  ) {
+    if (frame.Encoding != JxlFrameEncoding.Modular)
+      throw new NotSupportedException("This JPEG XL file keeps a lossy frame aside, which this decoder does not read.");
+
+    var frameWidth = frame.FrameWidth;
+    var frameHeight = frame.FrameHeight;
+    if (frameWidth <= 0 || frameHeight <= 0)
+      throw new InvalidDataException("A kept-aside frame states no size.");
+
+    var groupDim = 128 << (int)frame.GroupSizeShift;
+    var numGroupsX = (frameWidth + groupDim - 1) / groupDim;
+    var numGroupsY = (frameHeight + groupDim - 1) / groupDim;
+    var numGroups = checked(numGroupsX * numGroupsY);
+    var lfGroupDim = groupDim * 8;
+    var numDcGroups = checked(((frameWidth + lfGroupDim - 1) / lfGroupDim)
+                              * ((frameHeight + lfGroupDim - 1) / lfGroupDim));
+    var toc = JxlFrameToc.Decode(reader, numGroups, (int)frame.NumPasses, numDcGroups);
+    var frameBody = checked((int)(reader.BitsRead / 8));
+
+    if ((frame.Flags & (_FlagPatches | _FlagSplines | _FlagNoise)) != 0)
+      throw new NotSupportedException("A kept-aside frame states image features this decoder does not read.");
+
+    var dcQuant = JxlFrameQuantizer.ReadDcQuantization(reader);
+
+    var isGray = imageMetadata.ColorEncoding.ColorSpace == 1;
+    var baseChannels = isGray ? 1 : 3;
+    var extraChannels = (int)imageMetadata.NumExtraChannels;
+    var totalChannels = checked(baseChannels + extraChannels);
+    var bits = (int)imageMetadata.BitDepth.BitsPerSample;
+
+    var decoded = numGroups == 1
+      ? JxlModularSpecDecoder.Decode(reader, frameWidth, frameHeight, totalChannels, bits, isTopLevelFrame: true)
+      : JxlModularSpecDecoder.DecodeMultiGroup(
+        codestream, reader, frameWidth, frameHeight, totalChannels, bits,
+        groupDim, numGroupsX, numGroupsY, numDcGroups, (int)frame.NumPasses, toc, frameBody);
+    if (!_ValidateDecodedImage(decoded, frameWidth, frameHeight, totalChannels))
+      throw new InvalidDataException("A kept-aside frame did not decode.");
+
+    var count = checked(frameWidth * frameHeight);
+    var planeCount = 3 + extraChannels;
+    var planes = new float[planeCount][];
+    for (var p = 0; p < planeCount; ++p)
+      planes[p] = new float[count];
+
+    var channels = decoded.Channels;
+    if (frame.ColorTransform == JxlColorTransform.Xyb) {
+      // Stored as Y, X, B-Y; wanted as X, Y, B.
+      for (var i = 0; i < count; ++i) {
+        var y = channels[0].Pixels[i];
+        planes[0][i] = channels[1].Pixels[i] * dcQuant[0];
+        planes[1][i] = y * dcQuant[1];
+        planes[2][i] = (channels[2].Pixels[i] + y) * dcQuant[2];
+      }
+    } else {
+      var scale = 1.0f / ((1 << Math.Clamp(bits, 1, 30)) - 1);
+      for (var p = 0; p < 3; ++p) {
+        var source = channels[Math.Min(p, baseChannels - 1)].Pixels;
+        for (var i = 0; i < count; ++i)
+          planes[p][i] = source[i] * scale;
+      }
+    }
+
+    var extraScale = 1.0f / ((1 << Math.Clamp(bits, 1, 30)) - 1);
+    for (var p = 3; p < planeCount; ++p) {
+      var source = channels[baseChannels + (p - 3)].Pixels;
+      for (var i = 0; i < count; ++i)
+        planes[p][i] = source[i] * extraScale;
+    }
+
+    var slot = (int)(frame.SaveAsReference % _ReferenceSlots);
+    references[slot] = planes;
+    referenceSizes[slot] = (frameWidth, frameHeight);
+
+    var total = 0;
+    foreach (var size in toc.SectionSizes)
+      total = checked(total + size);
+    var next = checked(frameBody + total);
+    if (next <= 0 || next >= codestream.Length)
+      throw new InvalidDataException("A kept-aside frame's sections run past the end of the file.");
+    return next;
   }
 
   /// <summary>Which plane carries the alpha, or -1 when the picture has none.</summary>
