@@ -76,6 +76,7 @@ public static class JpegXlReader {
       (width, height) = JxlSizeHeader.Decode(reader);
       imageMetadata = JxlImageMetadata.Decode(reader);
       JxlCustomTransformData.Decode(reader, imageMetadata.XybEncoded);
+      _SkipIccProfile(reader, imageMetadata);
       reader.ZeroPadToByte();
       var frame = JxlSpecFrameHeader.Decode(reader, imageMetadata, width, height);
       metadata = _Metadata(width, height, imageMetadata, frame);
@@ -173,6 +174,7 @@ public static class JpegXlReader {
       // file leaves it alone, and skipping it only shows up when the metadata
       // ended on a byte boundary and the alignment below has nothing to swallow.
       JxlCustomTransformData.Decode(reader, imageMetadata.XybEncoded);
+      _SkipIccProfile(reader, imageMetadata);
       reader.ZeroPadToByte();
 
       // Frames kept aside for a later one to draw from are read first and never
@@ -366,6 +368,7 @@ public static class JpegXlReader {
         JxlSizeHeader.Decode(reader);
         JxlImageMetadata.Decode(reader);
         JxlCustomTransformData.Decode(reader, imageMetadata.XybEncoded);
+        _SkipIccProfile(reader, imageMetadata);
         reader.ZeroPadToByte();
       } else
         reader = new JxlBitReader(codestream, at);
@@ -450,6 +453,22 @@ public static class JpegXlReader {
         Planes = composed,
         AlphaPlane = alphaPlane,
       };
+  }
+
+  /// <summary>
+  /// Read past the embedded colour profile, if the picture has one.
+  /// </summary>
+  /// <remarks>
+  /// The profile is entropy-coded, and every byte of it is coded in a context
+  /// built from the two before it, so there is no length to skip by: the only
+  /// way past it is to decode it. What comes back is not used — the pictures
+  /// this hands back are in the colour space the samples are already in — but
+  /// the frames start where the profile ends, so not reading it puts every
+  /// field after it at the wrong offset.
+  /// </remarks>
+  private static void _SkipIccProfile(JxlBitReader reader, JxlImageMetadata imageMetadata) {
+    if (imageMetadata.ColorEncoding.WantIcc)
+      JxlIccProfileDecoder.Read(reader);
   }
 
   /// <summary>Whether each extra channel's alpha is already carried in the colour.</summary>

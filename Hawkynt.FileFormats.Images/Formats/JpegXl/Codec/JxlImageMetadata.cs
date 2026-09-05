@@ -367,15 +367,11 @@ internal sealed class JxlImageMetadata {
         r.Skip(checked((long)totalExtBits));
     }
 
-    // Per libjxl `dec_frame.cc`, when ColorEncoding.want_icc=true the bitstream
-    // contains an ICC profile blob AFTER the ImageMetadata bundle (i.e. after
-    // extensions). Reading it here keeps subsequent FrameHeader reads aligned.
-    // Currently throws NotImplementedException — the libjxl predictor port is
-    // pending; partial-metadata extraction in JpegXlReader.TryReadSpec catches
-    // this and surfaces dimensions even when ICC blocks full decode.
-    if (colorEnc.WantIcc)
-      JxlIccProfileDecoder.Read(r);
-
+    // The ICC profile is not read here. It follows the custom-transform bundle
+    // rather than this one — libjxl reads the transform data first and only
+    // then the profile, which its own decoder marks with a field named for
+    // exactly that ("to skip everything before ICC"). Reading it here put it a
+    // bundle too early, and a file with a profile could not be opened at all.
     return new() {
       AllDefault = false,
       ExtraFields = extraFields,
