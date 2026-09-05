@@ -74,7 +74,8 @@ public static class JpegXlReader {
       var reader = new JxlBitReader(codestream, 2);
       (width, height) = JxlSizeHeader.Decode(reader);
       imageMetadata = JxlImageMetadata.Decode(reader);
-      _AlignToByte(reader);
+      JxlCustomTransformData.Decode(reader, imageMetadata.XybEncoded);
+      reader.ZeroPadToByte();
       var frame = JxlSpecFrameHeader.Decode(reader, imageMetadata);
       metadata = _Metadata(width, height, imageMetadata, frame);
       return true;
@@ -167,7 +168,11 @@ public static class JpegXlReader {
       var reader = new JxlBitReader(codestream, 2);
       var (width, height) = JxlSizeHeader.Decode(reader);
       imageMetadata = JxlImageMetadata.Decode(reader);
-      _AlignToByte(reader);
+      // The bundle between the metadata and the first frame is one bit when the
+      // file leaves it alone, and skipping it only shows up when the metadata
+      // ended on a byte boundary and the alignment below has nothing to swallow.
+      JxlCustomTransformData.Decode(reader, imageMetadata.XybEncoded);
+      reader.ZeroPadToByte();
       var frame = JxlSpecFrameHeader.Decode(reader, imageMetadata);
       metadata = _Metadata(width, height, imageMetadata, frame);
 
@@ -345,12 +350,6 @@ public static class JpegXlReader {
       IsXybEncoded: image?.XybEncoded ?? false,
       IsModularFrame: false,
       IsProgressiveFrame: false);
-  }
-
-  private static void _AlignToByte(JxlBitReader reader) {
-    var bits = (int)((8 - reader.BitsRead % 8) % 8);
-    if (bits > 0)
-      reader.ReadBits(bits);
   }
 
   private static bool _TryExtractCodestream(byte[] data, out byte[] codestream, out string brand) {
