@@ -61,14 +61,6 @@ internal static class JxlLowestFrequencies {
     if (blocksX * blocksY != covered)
       return null;
 
-    // Square shapes only. Measured against libjxl, drawing a rectangular
-    // transform once from its origin is far worse than drawing it at each block
-    // it covers — the two disagree about which way round the transform's rows
-    // and columns go, and drawing it once spreads that over the whole rectangle
-    // instead of leaving it in one block.
-    if (blockW != blockH)
-      return null;
-
     var order = JxlNaturalCoeffOrder.For(strategy);
     var forward = new float[covered][];
     var coefficients = new float[area];
