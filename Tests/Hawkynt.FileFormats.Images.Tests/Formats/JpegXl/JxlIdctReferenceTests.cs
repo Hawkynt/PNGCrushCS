@@ -118,10 +118,18 @@ internal sealed class JxlIdctReferenceTests {
   [TestCase(JxlAcStrategyType.Dct4x8)]
   [TestCase(JxlAcStrategyType.Dct8x4)]
   public void ASplitBlockIsTwoOfThatTransformSideBySide(JxlAcStrategyType strategy) {
-    var coefficients = _Random(64, seed: (int)strategy * 104729 + 3);
+    var stored = _Random(64, seed: (int)strategy * 104729 + 3);
 
     var pixels = new float[64];
-    JxlVarDctIdct.InverseAcStrategy(strategy, coefficients, pixels);
+    JxlVarDctIdct.InverseAcStrategy(strategy, stored, pixels);
+
+    // A block is kept the way the scan order fills it, which is the transpose
+    // of the way the format writes it down. A shape that picks rows out of the
+    // block by number has to be handed it the written way round.
+    var coefficients = new float[64];
+    for (var y = 0; y < 8; ++y)
+    for (var x = 0; x < 8; ++x)
+      coefficients[y * 8 + x] = stored[x * 8 + y];
 
     var levels = new[] { coefficients[0] + coefficients[8], coefficients[0] - coefficients[8] };
     var reference = new double[8, 8];
