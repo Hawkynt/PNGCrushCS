@@ -7,14 +7,10 @@ namespace FileFormat.Jpeg2000.Tests;
 /// How wide the length field in a packet header is.
 /// </summary>
 /// <remarks>
-/// The standard makes it Lblock bits plus one for every doubling of the coding-pass count. That
-/// second term was missing from the writer and from the reader alike, so the two agreed with each
-/// other and with nothing else: OpenJPEG read a length of 48959 where the code-block held 2301
-/// bytes and refused the file.
-/// <para/>
-/// The term is what these tests pin. They cannot say the packet header is right — it is not, the
-/// standard signalling inclusion and zero bit-planes through tag trees where plain values are
-/// written here — only that this particular width is no longer a private agreement.
+/// The standard makes it Lblock bits plus one for every doubling of the coding-pass count. The
+/// second term is easy to leave out, and leaving it out is invisible from inside: a writer and a
+/// reader that both omit it agree with each other, and with nothing else. OpenJPEG read a length of
+/// 48959 where the code-block held 2301 bytes and refused the file.
 /// </remarks>
 [TestFixture]
 public sealed class PacketLengthFieldTests {

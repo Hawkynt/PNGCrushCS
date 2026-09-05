@@ -83,6 +83,15 @@
     </None>
   </ItemGroup>
 
+  <!-- Codestreams OpenJPEG wrote from the two .pnm pictures beside them, one per coding option
+       worth exercising, plus its own decode of the irreversible one. -->
+  <ItemGroup>
+    <None Include="Formats\Jpeg2000\Fixtures\*">
+      <Link>Fixtures\Jpeg2000\%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
   <ItemGroup>
     <Using Include="NUnit.Framework" />
   </ItemGroup>

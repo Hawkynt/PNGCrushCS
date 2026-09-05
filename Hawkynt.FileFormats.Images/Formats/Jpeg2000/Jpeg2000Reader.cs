@@ -1,6 +1,4 @@
 using System;
-using System.Buffers.Binary;
-using System.Collections.Generic;
 using System.IO;
 using FileFormat.Jpeg2000.Codec;
 
@@ -9,29 +7,8 @@ namespace FileFormat.Jpeg2000;
 /// <summary>Reads JPEG 2000 files (JP2 container or raw J2K codestream) from bytes, streams, or file paths.</summary>
 public static class Jpeg2000Reader {
 
-  /// <summary>Minimum size: 12-byte JP2 signature or at least SOC+SIZ+EOC markers.</summary>
+  /// <summary>Twelve bytes is the JP2 signature box; a bare codestream needs at least SOC and SIZ.</summary>
   private const int _MINIMUM_SIZE = 12;
-
-  /// <summary>J2K SOC marker: Start of Codestream.</summary>
-  private const ushort _SOC = 0xFF4F;
-
-  /// <summary>J2K SIZ marker: Image and Tile Size.</summary>
-  private const ushort _SIZ = 0xFF51;
-
-  /// <summary>J2K COD marker: Coding Style Default.</summary>
-  private const ushort _COD = 0xFF52;
-
-  /// <summary>J2K QCD marker: Quantization Default.</summary>
-  private const ushort _QCD = 0xFF5C;
-
-  /// <summary>J2K SOT marker: Start of Tile-Part.</summary>
-  private const ushort _SOT = 0xFF90;
-
-  /// <summary>J2K SOD marker: Start of Data.</summary>
-  private const ushort _SOD = 0xFF93;
-
-  /// <summary>J2K EOC marker: End of Codestream.</summary>
-  private const ushort _EOC = 0xFFD9;
 
   public static Jpeg2000File FromFile(FileInfo file) {
     ArgumentNullException.ThrowIfNull(file);
@@ -48,9 +25,10 @@ public static class Jpeg2000Reader {
       stream.ReadExactly(data);
       return FromBytes(data);
     }
-    using var ms = new MemoryStream();
-    stream.CopyTo(ms);
-    return FromBytes(ms.ToArray());
+
+    using var buffer = new MemoryStream();
+    stream.CopyTo(buffer);
+    return FromBytes(buffer.ToArray());
   }
 
   public static Jpeg2000File FromBytes(byte[] data) {
@@ -62,21 +40,19 @@ public static class Jpeg2000Reader {
     if (data.Length < _MINIMUM_SIZE)
       throw new InvalidDataException("Data too small for a valid JPEG 2000 file.");
 
-    var dataArray = data.ToArray();
+    var bytes = data.ToArray();
 
-    // Check for JP2 container (box-based)
-    if (_IsJp2Container(dataArray))
-      return _ParseJp2(dataArray);
+    if (_IsJp2Container(bytes))
+      return _ParseJp2(bytes);
 
-    // Check for raw J2K codestream
-    if (data.Length >= 2 && data[0] == 0xFF && data[1] == 0x4F)
-      return _ParseCodestream(dataArray, 0, dataArray.Length);
+    if (bytes[0] == 0xFF && bytes[1] == 0x4F)
+      return _Decode(bytes, 0, bytes.Length);
 
-    throw new InvalidDataException("Invalid JPEG 2000 signature: expected JP2 box or J2K SOC marker.");
+    throw new InvalidDataException("Invalid JPEG 2000 signature: expected a JP2 box or a J2K SOC marker.");
   }
 
   private static bool _IsJp2Container(byte[] data) {
-    if (data.Length < 12)
+    if (data.Length < Jp2Box.JP2_SIGNATURE_BYTES.Length)
       return false;
 
     for (var i = 0; i < Jp2Box.JP2_SIGNATURE_BYTES.Length; ++i)
@@ -87,417 +63,64 @@ public static class Jpeg2000Reader {
   }
 
   private static Jpeg2000File _ParseJp2(byte[] data) {
-    var boxes = Jp2Box.ReadBoxes(data, 0, data.Length);
-
-    foreach (var box in boxes)
+    foreach (var box in Jp2Box.ReadBoxes(data, 0, data.Length))
       if (box.Type == Jp2Box.TYPE_CODESTREAM)
-        return _ParseCodestream(box.Data, 0, box.Data.Length);
+        return _Decode(box.Data, 0, box.Data.Length);
 
-    throw new InvalidDataException("JP2 file missing Contiguous Codestream (jp2c) box.");
+    throw new InvalidDataException("JP2 file has no contiguous codestream (jp2c) box.");
   }
 
-  private static Jpeg2000File _ParseCodestream(byte[] data, int offset, int length) {
-    var end = offset + length;
-    var pos = offset;
+  private static Jpeg2000File _Decode(byte[] data, int offset, int length) {
+    var decoded = Jp2CodestreamDecoder.Decode(data, offset, length);
 
-    if (pos + 2 > end || BinaryPrimitives.ReadUInt16BigEndian(data.AsSpan(pos)) != _SOC)
-      throw new InvalidDataException("J2K codestream missing SOC marker.");
-
-    pos += 2;
-
-    var width = 0;
-    var height = 0;
-    var componentCount = 0;
-    var bitsPerComponent = 8;
-    var decompositionLevels = 3;
-    var codeBlockWidthExp = 4; // 2^(4+2) = 64
-    var codeBlockHeightExp = 4;
-    var layers = 1;
-    var useMct = false;
-    var quantStyle = 0; // 0 = no quantization (reversible)
-    var guardBits = 0;
-    byte[]? tileData = null;
-
-    while (pos + 2 <= end) {
-      var marker = BinaryPrimitives.ReadUInt16BigEndian(data.AsSpan(pos));
-      pos += 2;
-
-      switch (marker) {
-        case _SIZ:
-          _ParseSiz(data, ref pos, end, out width, out height, out componentCount, out bitsPerComponent);
-          break;
-
-        case _COD:
-          _ParseCod(data, ref pos, end, out decompositionLevels, out codeBlockWidthExp, out codeBlockHeightExp, out layers, out useMct);
-          break;
-
-        case _QCD:
-          _ParseQcd(data, ref pos, end, out quantStyle, out guardBits);
-          break;
-
-        case _SOT:
-          _ParseSot(data, ref pos, end, out tileData);
-          break;
-
-        case _EOC:
-          goto done;
-
-        default:
-          if (marker >= 0xFF30 && marker <= 0xFF3F)
-            break;
-          if (pos + 2 <= end) {
-            var segLen = BinaryPrimitives.ReadUInt16BigEndian(data.AsSpan(pos));
-            pos += segLen;
-          }
-          break;
-      }
-    }
-
-    done:
-    if (width == 0 || height == 0)
-      throw new InvalidDataException("J2K codestream missing SIZ marker or has zero dimensions.");
-
-    var cbWidth = 1 << (codeBlockWidthExp + 2);
-    var cbHeight = 1 << (codeBlockHeightExp + 2);
-
-    var tileInfo = new TileInfo {
-      Width = width,
-      Height = height,
-      DecompLevels = decompositionLevels,
-      ComponentCount = componentCount,
-      CodeBlockWidth = cbWidth,
-      CodeBlockHeight = cbHeight,
-      Layers = layers,
-      UseMct = useMct,
-      BitsPerComponent = bitsPerComponent,
-    };
-
-    byte[] pixelData;
-    if (tileData != null)
-      pixelData = _DecodeTileData(tileData, tileInfo, quantStyle, guardBits);
-    else
-      pixelData = new byte[width * height * componentCount];
-
-    return new Jpeg2000File {
-      Width = width,
-      Height = height,
-      ComponentCount = componentCount,
-      BitsPerComponent = bitsPerComponent,
-      DecompositionLevels = decompositionLevels,
-      PixelData = pixelData,
-    };
-  }
-
-  private static void _ParseSiz(byte[] data, ref int pos, int end, out int width, out int height, out int componentCount, out int bitsPerComponent) {
-    if (pos + 2 > end)
-      throw new InvalidDataException("SIZ marker segment truncated.");
-
-    var segLen = BinaryPrimitives.ReadUInt16BigEndian(data.AsSpan(pos));
-    var segEnd = pos + segLen;
-    if (segEnd > end)
-      throw new InvalidDataException("SIZ marker segment extends beyond data.");
-
-    if (segLen < 38)
-      throw new InvalidDataException("SIZ marker segment too small.");
-
-    var p = pos + 4; // skip Lsiz(2) + Rsiz(2)
-    width = (int)BinaryPrimitives.ReadUInt32BigEndian(data.AsSpan(p));
-    p += 4;
-    height = (int)BinaryPrimitives.ReadUInt32BigEndian(data.AsSpan(p));
-    p += 4;
-    p += 24; // skip XOsiz, YOsiz, XTsiz, YTsiz, XTOsiz, YTOsiz
-
-    componentCount = BinaryPrimitives.ReadUInt16BigEndian(data.AsSpan(p));
-    p += 2;
-
-    if (p < segEnd) {
-      var ssiz = data[p];
-      bitsPerComponent = (ssiz & 0x7F) + 1;
-    } else
-      bitsPerComponent = 8;
-
-    pos = segEnd;
-  }
-
-  private static void _ParseCod(byte[] data, ref int pos, int end, out int decompositionLevels, out int cbWidthExp, out int cbHeightExp, out int layers, out bool useMct) {
-    if (pos + 2 > end)
-      throw new InvalidDataException("COD marker segment truncated.");
-
-    var segLen = BinaryPrimitives.ReadUInt16BigEndian(data.AsSpan(pos));
-    var segEnd = pos + segLen;
-    if (segEnd > end)
-      throw new InvalidDataException("COD marker segment extends beyond data.");
-
-    decompositionLevels = 3;
-    cbWidthExp = 4;
-    cbHeightExp = 4;
-    layers = 1;
-    useMct = false;
-
-    if (segLen >= 12) {
-      // Lcod(2) + Scod(1) + SGcod: ProgOrder(1) + NumLayers(2) + MCT(1) + SPcod: NL(1) + cbW(1) + cbH(1) + cbStyle(1) + transform(1) = 12
-      var p = pos + 3; // skip Lcod(2) + Scod(1)
-      // SGcod
-      p += 1; // skip progression order
-      layers = BinaryPrimitives.ReadUInt16BigEndian(data.AsSpan(p));
-      p += 2;
-      useMct = data[p] != 0;
-      p += 1;
-      // SPcod
-      decompositionLevels = data[p];
-      p += 1;
-      cbWidthExp = data[p];
-      p += 1;
-      cbHeightExp = data[p];
-    } else if (segLen >= 10) {
-      var nlOffset = pos + 7;
-      decompositionLevels = data[nlOffset];
-    }
-
-    pos = segEnd;
-  }
-
-  private static void _ParseQcd(byte[] data, ref int pos, int end, out int quantStyle, out int guardBits) {
-    if (pos + 2 > end)
-      throw new InvalidDataException("QCD marker segment truncated.");
-
-    var segLen = BinaryPrimitives.ReadUInt16BigEndian(data.AsSpan(pos));
-    var segEnd = pos + segLen;
-    if (segEnd > end)
-      throw new InvalidDataException("QCD marker segment extends beyond data.");
-
-    quantStyle = 0;
-    guardBits = 0;
-
-    if (segLen >= 3) {
-      // Lqcd(2) + Sqcd(1)
-      var sqcd = data[pos + 2];
-      quantStyle = sqcd & 0x1F;     // Quantization style (0=no quant, 1=scalar derived, 2=scalar expounded)
-      guardBits = (sqcd >> 5) & 0x07; // Guard bits
-    }
-
-    pos = segEnd;
-  }
-
-  private static void _ParseSot(byte[] data, ref int pos, int end, out byte[]? tileData) {
-    if (pos + 2 > end)
-      throw new InvalidDataException("SOT marker segment truncated.");
-
-    var segLen = BinaryPrimitives.ReadUInt16BigEndian(data.AsSpan(pos));
-    var segEnd = pos + segLen;
-    if (segEnd > end)
-      throw new InvalidDataException("SOT marker segment extends beyond data.");
-
-    var psot = 0u;
-    if (segLen >= 10)
-      psot = BinaryPrimitives.ReadUInt32BigEndian(data.AsSpan(pos + 6));
-
-    pos = segEnd;
-
-    tileData = null;
-    if (pos + 2 > end)
-      return;
-
-    var sodMarker = BinaryPrimitives.ReadUInt16BigEndian(data.AsSpan(pos));
-    if (sodMarker != _SOD)
-      return;
-
-    pos += 2;
-
-    int tileDataLen;
-    if (psot > 0)
-      tileDataLen = (int)(psot - 2u - (uint)segLen - 2u);
-    else
-      tileDataLen = end - pos - 2;
-
-    if (tileDataLen < 0)
-      tileDataLen = 0;
-
-    if (pos + tileDataLen > end)
-      tileDataLen = end - pos;
-
-    if (tileDataLen > 0) {
-      tileData = new byte[tileDataLen];
-      data.AsSpan(pos, tileDataLen).CopyTo(tileData.AsSpan(0));
-    }
-
-    pos += tileDataLen;
-  }
-
-  /// <summary>Decode tile data: tries simplified (raw int32) format first, then EBCOT codec pipeline.</summary>
-  private static byte[] _DecodeTileData(byte[] tileData, TileInfo tile, int quantStyle, int guardBits) {
-    var width = tile.Width;
-    var height = tile.Height;
-    var componentCount = tile.ComponentCount;
-    var levels = tile.DecompLevels;
-
-    // Try simplified raw-int32 format first (our default writer output)
-    var expectedSimplifiedSize = width * height * componentCount * 4;
-    if (tileData.Length >= expectedSimplifiedSize)
-      return _DecodeSimplified(tileData, width, height, componentCount, levels);
-
-    // Try EBCOT decoding for spec-compliant JPEG 2000 bitstreams
-    return _DecodeEbcot(tileData, tile, quantStyle, guardBits);
-  }
-
-  /// <summary>Decode via the full EBCOT pipeline.</summary>
-  private static byte[] _DecodeEbcot(byte[] tileData, TileInfo tile, int quantStyle, int guardBits) {
-    var width = tile.Width;
-    var height = tile.Height;
-    var componentCount = tile.ComponentCount;
-    var levels = tile.DecompLevels;
-
-    // Step 1: Tier-2 packet parsing
-    var codeBlocks = Tier2Decoder.ParsePackets(tileData, 0, tileData.Length, tile);
-
-    // The packet parser here does not implement the tag-tree signalling that says which code-blocks
-    // a layer includes and how many bit-planes of each are zero; it assumes the arrangement our own
-    // encoder writes. Against a codestream from anything else it recovers no coefficients at all,
-    // and the picture that falls out is a uniform mid-grey — the level shift and nothing else.
-    //
-    // Returning that would be claiming to have read the file. Saying so is the honest answer until
-    // the parser is finished.
-    if (codeBlocks.TrueForAll(block => block.CompressedData.Length == 0 || block.NumCodingPasses == 0))
-      throw new NotSupportedException(
-        "This JPEG 2000 codestream uses packet signalling the Tier-2 parser does not implement, so no "
-        + "coefficients could be recovered. Only codestreams written by this library can be read.");
-
-    // Step 2: Tier-1 decoding of each code-block + assembly into component coefficient planes
-    var subbands = SubbandInfo.ComputeSubbands(width, height, levels);
-    var pixelData = new byte[width * height * componentCount];
-
-    var planes = new int[componentCount][,];
+    // The public model carries eight-bit grey or RGB. A codestream with an alpha or a spot channel
+    // still decodes; the extra components simply do not reach the raster.
+    var componentCount = decoded.Components.Length >= 3 ? 3 : 1;
+    var width = decoded.Width;
+    var height = decoded.Height;
+    var pixels = new byte[width * height * componentCount];
 
     for (var c = 0; c < componentCount; ++c) {
-      var plane = planes[c] = new int[height, width];
+      var component = decoded.Components[c];
+      var plane = decoded.Planes[c];
+      var planeWidth = decoded.PlaneWidths[c];
+      var planeHeight = decoded.PlaneHeights[c];
+      if (planeWidth <= 0 || planeHeight <= 0)
+        continue;
 
-      // Decode each code-block and place coefficients into the subband region
-      foreach (var cb in codeBlocks) {
-        // Find which subband this code-block belongs to for this component
-        var sbIdx = cb.SubbandIndex - c * subbands.Length;
-        if (sbIdx < 0 || sbIdx >= subbands.Length)
-          continue;
+      // The same offset serves twice over: it undoes the DC level shift an unsigned component was
+      // coded with, and it moves a signed component's range up into the one a raster can hold.
+      var shift = 1 << (component.Precision - 1);
+      var maximum = component.Precision >= 31 ? int.MaxValue : (1 << component.Precision) - 1;
 
-        var sb = subbands[sbIdx];
-        if (cb.CompressedData.Length == 0 || cb.NumCodingPasses == 0)
-          continue;
-
-        var cbActualW = Math.Min(tile.CodeBlockWidth, sb.Width - cb.CodeBlockX * tile.CodeBlockWidth);
-        var cbActualH = Math.Min(tile.CodeBlockHeight, sb.Height - cb.CodeBlockY * tile.CodeBlockHeight);
-        if (cbActualW <= 0 || cbActualH <= 0)
-          continue;
-
-        // Tier-1 decode
-        var cbCoeffs = Tier1Decoder.DecodeCodeBlock(
-          cb.CompressedData, cbActualW, cbActualH,
-          cb.NumCodingPasses, cb.ZeroBitPlanes
-        );
-
-        // Step 3: Dequantize (reversible = no-op for integer coefficients)
-        if (quantStyle == 0)
-          Jp2Dequantizer.DequantizeReversible(cbCoeffs, guardBits);
-
-        // Place into the coefficient plane at the subband offset
-        var baseX = sb.OffsetX + cb.CodeBlockX * tile.CodeBlockWidth;
-        var baseY = sb.OffsetY + cb.CodeBlockY * tile.CodeBlockHeight;
-        for (var y = 0; y < cbActualH; ++y)
-          for (var x = 0; x < cbActualW; ++x) {
-            var py = baseY + y;
-            var px = baseX + x;
-            if (py < height && px < width)
-              plane[py, px] = cbCoeffs[y, x];
-          }
-      }
-
-      // Step 4: Inverse DWT (already exists)
-      Jp2Wavelet.InverseMultiLevel(plane, width, height, levels);
-    }
-
-    // Step 5: Undo the component transform, which the codestream states and this used to parse and
-    // then ignore. It leaves the three planes as luminance and two differences rather than as
-    // colours, so a picture without it is recognisable and wrongly coloured throughout.
-    if (tile.UseMct && componentCount >= 3)
-      _InverseReversibleComponentTransform(planes, width, height);
-
-    for (var c = 0; c < componentCount; ++c) {
-      var plane = planes[c];
-
-      // Step 6: Extract pixels with level shift and clamping
-      //
-      // The samples are as deep as the codestream says, and it commonly says sixteen — a tool that
-      // works internally in sixteen bits writes sixteen. Casting that to a byte keeps the bottom
-      // eight, which is not a darker picture but a meaningless one: a full-scale blue lands on 0.
-      // So the range is brought down to a byte, by taking the top bits when it is deeper and by
-      // repeating them when it is shallower.
-      var levelShift = tile.BitsPerComponent > 1 ? 1 << (tile.BitsPerComponent - 1) : 0;
-      var maxVal = tile.BitsPerComponent >= 31 ? int.MaxValue : (1 << tile.BitsPerComponent) - 1;
-      for (var y = 0; y < height; ++y)
+      for (var y = 0; y < height; ++y) {
+        var sourceRow = Math.Min(y / component.Dy, planeHeight - 1) * planeWidth;
         for (var x = 0; x < width; ++x) {
-          var val = plane[y, x] + levelShift;
-          if (val < 0) val = 0;
-          else if (val > maxVal) val = maxVal;
-          pixelData[(y * width + x) * componentCount + c] = _ToByte(val, tile.BitsPerComponent);
+          var value = plane[sourceRow + Math.Min(x / component.Dx, planeWidth - 1)] + shift;
+          value = Math.Clamp(value, 0, maximum);
+          pixels[(y * width + x) * componentCount + c] = _ToByte(value, component.Precision);
         }
+      }
     }
 
-    return pixelData;
+    return new() {
+      Width = width,
+      Height = height,
+      ComponentCount = componentCount,
+      BitsPerComponent = decoded.Components[0].Precision,
+      DecompositionLevels = decoded.DecompositionLevels,
+      PixelData = pixels,
+    };
   }
 
-  /// <summary>Undoes the reversible colour transform, which pairs with the 5/3 wavelet.</summary>
-  /// <remarks>
-  /// It is exactly invertible in integers, which is the point of it: green comes back from the
-  /// luminance and the two differences, and the other two from green.
-  /// </remarks>
-  private static void _InverseReversibleComponentTransform(int[][,] planes, int width, int height) {
-    for (var y = 0; y < height; ++y)
-    for (var x = 0; x < width; ++x) {
-      int y0 = planes[0][y, x], y1 = planes[1][y, x], y2 = planes[2][y, x];
-
-      var green = y0 - ((y1 + y2) >> 2);
-      planes[0][y, x] = y2 + green;
-      planes[1][y, x] = green;
-      planes[2][y, x] = y1 + green;
-    }
-  }
-
-  /// <summary>Brings one sample of a stated depth down to a byte.</summary>
+  /// <summary>
+  /// Brings one sample of the codestream's stated depth down to a byte. A deeper sample keeps its
+  /// top bits; a shallower one is scaled so full scale stays full scale.
+  /// </summary>
   private static byte _ToByte(int value, int bits) => bits switch {
     8 => (byte)value,
     > 8 => (byte)(value >> (bits - 8)),
+    1 => value != 0 ? (byte)255 : (byte)0,
     _ => (byte)(value * 255 / ((1 << bits) - 1)),
   };
-
-  /// <summary>Backward-compatible simplified format: raw big-endian int32 wavelet coefficients per component.</summary>
-  private static byte[] _DecodeSimplified(byte[] tileData, int width, int height, int componentCount, int levels) {
-    var coeffsPerComponent = width * height;
-    var expectedSize = coeffsPerComponent * componentCount * 4;
-
-    if (tileData.Length < expectedSize)
-      throw new InvalidDataException($"Tile data too small: expected {expectedSize} bytes, got {tileData.Length}.");
-
-    var pixelData = new byte[width * height * componentCount];
-    var plane = new int[height, width];
-
-    for (var c = 0; c < componentCount; ++c) {
-      var baseOffset = c * coeffsPerComponent * 4;
-
-      for (var y = 0; y < height; ++y)
-        for (var x = 0; x < width; ++x) {
-          var idx = baseOffset + (y * width + x) * 4;
-          plane[y, x] = BinaryPrimitives.ReadInt32BigEndian(tileData.AsSpan(idx));
-        }
-
-      Jp2Wavelet.InverseMultiLevel(plane, width, height, levels);
-
-      for (var y = 0; y < height; ++y)
-        for (var x = 0; x < width; ++x) {
-          var val = plane[y, x];
-          if (val < 0) val = 0;
-          else if (val > 255) val = 255;
-          pixelData[(y * width + x) * componentCount + c] = (byte)val;
-        }
-    }
-
-    return pixelData;
-  }
 }
