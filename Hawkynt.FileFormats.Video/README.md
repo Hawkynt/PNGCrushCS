@@ -232,7 +232,7 @@ nothing could be verified even with a description in hand.
 | Chronomaster DFA | The only description reads as a transcription of a working decoder — C-shaped pseudocode with unexplained bit-level tie-breaks and no citation for any of its six chunk algorithms |
 | 8088flex TMV | No description of any kind, and the single sample is truncated before its own last frame |
 
-### Adapted from FFmpeg, and named
+### Adapted from somebody else's code, and named
 
 Fourteen decoders are adaptations of FFmpeg's own LGPL-2.1-or-later decoders rather than
 implementations from a published description: Escape 124, LCL MSZH's back-reference parser, LOCO,
@@ -247,6 +247,14 @@ Each of those fourteen sat among the undecoded above, and for the same reason th
 the missing piece existed nowhere but an implementation. Reading a licence-compatible implementation
 is what closed them. The entries recording why they could not be closed the other way are kept,
 because that reasoning still holds for everything reached without one.
+
+FFmpeg is not the only source. The H.264 decoder's CABAC engine — `Codecs/H264/`, the arithmetic
+decoder and its context tables — is adapted from
+[OxideAV/oxideav-h264](https://github.com/OxideAV/oxideav-h264)'s `src/cabac.rs` and
+`src/cabac_ctx.rs`, under the MIT licence. A verbatim copy of that licence and the statement of what
+was taken sit beside the code in
+[`Codecs/H264/THIRD-PARTY-NOTICE.OxideAV.txt`](https://github.com/Hawkynt/PNGCrushCS/blob/main/Hawkynt.FileFormats.Video/Codecs/H264/THIRD-PARTY-NOTICE.OxideAV.txt),
+which is where the licence requires it to be rather than only here.
 
 ## 🚀 Quick start
 
