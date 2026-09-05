@@ -31,8 +31,23 @@ internal static class H265ColorConversion {
   /// <param name="top">The first displayed row.</param>
   /// <param name="width">The displayed width.</param>
   /// <param name="height">The displayed height.</param>
-  internal static byte[] ToRgb24(H265Picture picture, int left, int top, int width, int height) {
+  /// <param name="bitDepthLuma">The sequence's luminance sample depth: eight for Main, ten for Main 10.</param>
+  /// <param name="bitDepthChroma">The sequence's chrominance sample depth.</param>
+  internal static byte[] ToRgb24(
+    H265Picture picture, int left, int top, int width, int height, int bitDepthLuma, int bitDepthChroma) {
     var rgb = new byte[width * height * 3];
+
+    // Studio swing is defined as a fraction of the range, so its two anchors move with the sample
+    // depth: black is 16 at eight bits and 64 at ten, and the chrominance centre likewise. Reading a
+    // ten-bit picture with the eight-bit anchors leaves it dark and green rather than obviously broken.
+    var black = 16 << (bitDepthLuma - 8);
+    var centre = 128 << (bitDepthChroma - 8);
+
+    // The matrix below is 8-bit fixed point, so the final shift is eight plus whatever headroom the
+    // sample depth adds. Chrominance is brought onto the luminance scale first so both share it.
+    var chromaToLuma = bitDepthLuma - bitDepthChroma;
+    var shift = bitDepthLuma;
+    var rounding = 1 << (shift - 1);
 
     // The chrominance samples that belong to the displayed picture, which is not the whole plane. A
     // cropped stream is coded wider or taller than it is shown, and the samples past the crop are
@@ -57,13 +72,13 @@ internal static class H265ColorConversion {
 
         // ITU-R BT.601 with studio swing, in 8-bit fixed point:
         // 1.164 = 298/256, 1.596 = 409/256, 0.391 = 100/256, 0.813 = 208/256, 2.017 = 516/256.
-        var scaledLuma = 298 * (luma - 16);
-        var blueDifference = cb - 128;
-        var redDifference = cr - 128;
+        var scaledLuma = 298 * (luma - black);
+        var blueDifference = _Rescale(cb - centre, chromaToLuma);
+        var redDifference = _Rescale(cr - centre, chromaToLuma);
 
-        rgb[target] = _Clamp(scaledLuma + 409 * redDifference + 128);
-        rgb[target + 1] = _Clamp(scaledLuma - 100 * blueDifference - 208 * redDifference + 128);
-        rgb[target + 2] = _Clamp(scaledLuma + 516 * blueDifference + 128);
+        rgb[target] = _Clamp(scaledLuma + 409 * redDifference + rounding, shift);
+        rgb[target + 1] = _Clamp(scaledLuma - 100 * blueDifference - 208 * redDifference + rounding, shift);
+        rgb[target + 2] = _Clamp(scaledLuma + 516 * blueDifference + rounding, shift);
         target += 3;
       }
     }
@@ -73,7 +88,7 @@ internal static class H265ColorConversion {
 
   /// <summary>One chrominance sample at a luminance position, interpolated from the four around it.</summary>
   private static int _Chroma(
-    byte[] plane, int planeWidth, int x, int y, int minX, int maxX, int minY, int maxY) {
+    ushort[] plane, int planeWidth, int x, int y, int minX, int maxX, int minY, int maxY) {
     var nearX = x >> 1;
     var nearY = y >> 1;
 
@@ -100,8 +115,12 @@ internal static class H265ColorConversion {
   private static int _Clip(int value, int lowest, int highest)
     => value < lowest ? lowest : value > highest ? highest : value;
 
-  private static byte _Clamp(int scaled) {
-    var value = scaled >> 8;
+  /// <summary>Moves a chrominance difference onto the luminance scale, in either direction.</summary>
+  private static int _Rescale(int difference, int shift)
+    => shift == 0 ? difference : shift > 0 ? difference << shift : difference >> -shift;
+
+  private static byte _Clamp(int scaled, int shift) {
+    var value = scaled >> shift;
     return (byte)(value < 0 ? 0 : value > 255 ? 255 : value);
   }
 }
