@@ -782,6 +782,34 @@ internal static class JxlVarDctSpecDecoder {
   }
 
   /// <summary>
+  /// How much luma a block's chroma channel carries, from the tile it sits in.
+  /// </summary>
+  /// <remarks>
+  /// libjxl <c>ColorCorrelation::YtoXRatio</c> and <c>YtoBRatio</c>: the stated
+  /// number over the colour factor, added to the channel's base. A tile is
+  /// eight blocks across.
+  /// </remarks>
+  private static float _CorrelationAt(
+    JxlChannel map,
+    JxlVarDctGroup group,
+    int bx,
+    int by,
+    float baseCorrelation
+  ) {
+    if (map.Width <= 0 || map.Height <= 0)
+      return baseCorrelation;
+
+    const int blocksPerTile = 8;
+    var tileX = (group.X / _BlockDim + bx) / blocksPerTile;
+    var tileY = (group.Y / _BlockDim + by) / blocksPerTile;
+    if (tileX >= map.Width || tileY >= map.Height)
+      return baseCorrelation;
+
+    return baseCorrelation
+           + map.Pixels[tileY * map.Width + tileX] / (float)JxlColorCorrelationMap.DefaultColorFactor;
+  }
+
+  /// <summary>
   /// Whether this transform is drawn once from the block it starts at.
   /// </summary>
   private static bool _ReconstructsFromOrigin(
