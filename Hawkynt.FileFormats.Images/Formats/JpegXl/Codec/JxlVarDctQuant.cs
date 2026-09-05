@@ -45,6 +45,45 @@ internal static class JxlVarDctQuant {
 
   /// <summary>libjxl's `Mult`: maps a distance-band parameter to a multiplicative
   /// step. From `quant_weights.cc`: `Mult(v) = v > 0 ? 1+v : 1/(1-v)`.</summary>
+  /// <summary>
+  /// What a quantised coefficient is worth before its weight is applied
+  /// (libjxl <c>quantizer-inl.h::AdjustQuantBias</c>).
+  /// </summary>
+  /// <remarks>
+  /// Quantising rounds towards zero, so a coefficient that came back as one was
+  /// more likely a little under one than a little over. The format says what to
+  /// assume instead of taking the number at face value: a lone step is worth
+  /// slightly less than a whole one, by an amount stated per plane, and
+  /// anything larger is pulled towards zero by a fixed amount divided by
+  /// itself, which matters less the larger it is. Taking them at face value
+  /// leaves a small error on every coefficient a picture has, and pictures with
+  /// detail have a great many of them at exactly one step.
+  /// </remarks>
+  /// <param name="quantised">The coefficient as the file states it.</param>
+  /// <param name="channel">Which plane it belongs to.</param>
+  public static float AdjustQuantBias(int quantised, int channel) {
+    if (quantised == 0)
+      return 0.0f;
+    if (quantised == 1)
+      return _QuantBias[channel];
+    if (quantised == -1)
+      return -_QuantBias[channel];
+
+    return quantised - _QuantBiasDivisor / quantised;
+  }
+
+  /// <summary>libjxl <c>kDefaultQuantBias</c>: what a lone step is worth in
+  /// each plane.</summary>
+  private static readonly float[] _QuantBias = [
+    1.0f - 0.05465007330715401f,
+    1.0f - 0.07005449891748593f,
+    1.0f - 0.049935103337343655f,
+  ];
+
+  /// <summary>And what everything larger is pulled towards zero by, divided by
+  /// itself.</summary>
+  private const float _QuantBiasDivisor = 0.145f;
+
   private static float _Mult(float v) => v > 0.0f ? 1.0f + v : 1.0f / (1.0f - v);
 
   /// <summary>libjxl's `InterpolateVec` (the path actually taken at runtime):
