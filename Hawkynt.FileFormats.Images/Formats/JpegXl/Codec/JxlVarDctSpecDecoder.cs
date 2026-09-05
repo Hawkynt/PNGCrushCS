@@ -584,7 +584,12 @@ internal static class JxlVarDctSpecDecoder {
     //   so the inverse here is required for accurate output. When the
     //   bitstream signalled custom Gaborish weights (gaborishParams !=
     //   null with non-default WeightsX/Y/B), we honour them per channel.
-    _ = epfParams; // EPF apply requires sigma plane not yet wired.
+    // The sharpness each block states is the fourth channel of the metadata
+    // beside the low-frequency groups, which was decoded and thrown away for as
+    // long as the filter it belongs to went unrun.
+    var sharpnessPlane = acMetadata.Channels.Length > 3
+      ? acMetadata.Channels[3].Pixels
+      : new int[dcGroupBlocksX * dcGroupBlocksY];
     try {
       if (gaborishParams is null || !gaborishParams.Enabled) {
         // Gaborish disabled: skip the inverse filter entirely.
@@ -604,6 +609,15 @@ internal static class JxlVarDctSpecDecoder {
         JxlGaborish.ApplyInPlace(channels[1], width, height, weightsY);
         JxlGaborish.ApplyInPlace(channels[2], width, height, weightsB);
       }
+
+      // The edge-preserving filter follows the smoothing one, on the same
+      // planes and before the colour transform, which is the order libjxl
+      // builds its pipeline in.
+      if (epfParams is { Iters: > 0 })
+        JxlEdgePreservingFilter.Apply(
+          channels, width, height,
+          perBlockQuant, sharpnessPlane, dcGroupBlocksX, dcGroupBlocksY,
+          quantParams.InvGlobalScale, epfParams.Iters);
     } catch (System.NotImplementedException) {
       // Some sub-feature isn't ready; skip.
     } catch (System.ArgumentException) {
