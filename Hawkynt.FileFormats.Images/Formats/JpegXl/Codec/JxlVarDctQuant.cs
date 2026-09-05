@@ -240,6 +240,16 @@ internal static class JxlVarDctQuant {
     switch (strategy) {
       case JxlAcStrategyType.Hornuss: return _BuildFromLayout(_HornussWeights, _LayOutHornuss);
       case JxlAcStrategyType.Dct2x2: return _BuildFromLayout(_Dct2Weights, _LayOutDct2);
+      // Three shapes divide the 8x8 block into smaller transforms, and their
+      // weights are the smaller shape's own curve spread back over the whole
+      // block — each of its rows covering two of the block's for the 4x8 pair,
+      // each row and column for the 4x4. Building the curve at the block's size
+      // instead stretches it over the wrong distance.
+      case JxlAcStrategyType.Dct4x8:
+      case JxlAcStrategyType.Dct8x4:
+        return _BuildSpreadOverBlock(4, 8, _kDct4x8Bands);
+      case JxlAcStrategyType.Dct4x4:
+        return _BuildSpreadOverBlock(4, 4, _kDct4Bands);
       case JxlAcStrategyType.Afv0:
       case JxlAcStrategyType.Afv1:
       case JxlAcStrategyType.Afv2:
@@ -387,6 +397,30 @@ internal static class JxlVarDctQuant {
     [960.0f, 640.0f, 320.0f, 180.0f, 140.0f, 120.0f],
     [640.0f, 320.0f, 128.0f, 64.0f, 32.0f, 16.0f],
   ];
+
+  /// <summary>
+  /// The weights of a shape that divides the 8x8 block: the smaller shape's own
+  /// curve, each of its entries covering as many of the block's as it takes to
+  /// fill it (libjxl's <c>kQuantModeDCT4X8</c> and <c>kQuantModeDCT4</c>). Laid
+  /// out the way the block is stored, which is the transpose of the way the
+  /// format writes it down.
+  /// </summary>
+  private static JxlQuantTableSet _BuildSpreadOverBlock(int rows, int cols, float[][] bands) {
+    var down = 8 / rows;
+    var across = 8 / cols;
+    var tables = new JxlQuantTable[3];
+    for (var c = 0; c < 3; ++c) {
+      var small = _BandValues(rows, cols, bands[c]);
+      var weights = new float[64];
+      for (var y = 0; y < 8; ++y)
+      for (var x = 0; x < 8; ++x)
+        weights[x * 8 + y] = 1.0f / small[y / down * cols + x / across];
+
+      tables[c] = new JxlQuantTable { Width = 8, Height = 8, Weights = weights };
+    }
+
+    return new JxlQuantTableSet { Tables = tables };
+  }
 
   private static JxlQuantTableSet _BuildFromLayout(float[][] perChannel, Action<float[], float[]> layOut) {
     var tables = new JxlQuantTable[3];
