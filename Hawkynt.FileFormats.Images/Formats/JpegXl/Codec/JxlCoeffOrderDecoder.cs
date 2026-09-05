@@ -86,7 +86,14 @@ internal static class JxlCoeffOrderDecoder {
   public static int[][][] DecodeCoeffOrders(JxlBitReader reader, uint usedOrders) {
     ArgumentNullException.ThrowIfNull(reader);
 
-    var orders = new int[NumOrders][][];
+    // Indexed by strategy rather than by bucket. The bitstream states one
+    // permutation per bucket, but a bucket holds a shape and its transpose, and
+    // what the permutation is a permutation *of* is the natural order — which
+    // is not the same array for the two of them. libjxl can share one because
+    // it keeps every transform's coefficients in one normalised layout; this
+    // decoder keeps them in the shape's own, so the permutation has to be
+    // composed onto each shape's own order.
+    var orders = new int[NumValidStrategies][][];
 
     // libjxl: no histograms at all when nothing states an order of its own.
     JxlEntropyDecoder? entropy = null;
@@ -103,20 +110,42 @@ internal static class JxlCoeffOrderDecoder {
 
       var llf = CoveredBlocksX[o] * CoveredBlocksY[o];
       var size = DctBlockSize * llf;
-      var natural = JxlNaturalCoeffOrder.For((JxlAcStrategyType)o);
-      if (natural.Length != size)
-        throw new System.IO.InvalidDataException(
-          $"The natural order of strategy {o} has {natural.Length} entries where its shape needs {size}.");
 
-      orders[ord] = new int[3][];
+      // Every shape this bucket covers. They share the bucket's permutation and
+      // each keeps its own natural order.
+      var shapes = new System.Collections.Generic.List<int>();
+      for (var other = 0; other < NumValidStrategies; ++other)
+        if (StrategyOrder[other] == ord)
+          shapes.Add(other);
+
+      foreach (var shape in shapes) {
+        orders[shape] = new int[3][];
+        var natural = JxlNaturalCoeffOrder.For((JxlAcStrategyType)shape);
+        if (natural.Length != size)
+          throw new System.IO.InvalidDataException(
+            $"The natural order of strategy {shape} has {natural.Length} entries where its shape needs {size}.");
+      }
+
       if ((usedOrders & ordBit) == 0) {
-        for (var c = 0; c < 3; ++c)
-          orders[ord][c] = natural;
+        foreach (var shape in shapes) {
+          var natural = JxlNaturalCoeffOrder.For((JxlAcStrategyType)shape);
+          for (var c = 0; c < 3; ++c)
+            orders[shape][c] = natural;
+        }
+
         continue;
       }
 
-      for (var c = 0; c < 3; ++c)
-        orders[ord][c] = _ReadPermutation(entropy!, skip: llf, size: size, natural);
+      for (var c = 0; c < 3; ++c) {
+        var permutation = _ReadPermutation(entropy!, skip: llf, size: size);
+        foreach (var shape in shapes) {
+          var natural = JxlNaturalCoeffOrder.For((JxlAcStrategyType)shape);
+          var composed = new int[size];
+          for (var k = 0; k < size; ++k)
+            composed[k] = natural[permutation[k]];
+          orders[shape][c] = composed;
+        }
+      }
     }
 
     // The permutations were read exactly as written only when the arithmetic
@@ -131,15 +160,13 @@ internal static class JxlCoeffOrderDecoder {
   /// <summary>The order for a transform's shape, in the channel's own version.</summary>
   public static int[] For(int[][][] orders, JxlAcStrategyType strategy, int channel) {
     ArgumentNullException.ThrowIfNull(orders);
-    var bucket = StrategyOrder[(int)strategy];
-    var perChannel = orders[bucket];
-    return perChannel[channel];
+    return orders[(int)strategy][channel];
   }
 
-  /// <summary>libjxl <c>ReadPermutation</c> followed by the composition
-  /// <c>order[k] = natural[permutation[k]]</c> that <c>DecodeCoeffOrder</c>
-  /// applies to it.</summary>
-  private static int[] _ReadPermutation(JxlEntropyDecoder entropy, int skip, int size, int[] natural) {
+  /// <summary>libjxl <c>ReadPermutation</c>. The composition onto a natural
+  /// order that <c>DecodeCoeffOrder</c> follows it with is done by the caller,
+  /// once per shape sharing this bucket.</summary>
+  private static int[] _ReadPermutation(JxlEntropyDecoder entropy, int skip, int size) {
     var lehmer = new int[size];
     var end = entropy.ReadInt(CoeffOrderContext((uint)size)) + skip;
     if (end < skip || end > size)
@@ -157,12 +184,7 @@ internal static class JxlCoeffOrderDecoder {
       last = (uint)value;
     }
 
-    var permutation = JxlLehmerCode.Decode(lehmer, size);
-    var order = new int[size];
-    for (var k = 0; k < size; ++k)
-      order[k] = natural[permutation[k]];
-
-    return order;
+    return JxlLehmerCode.Decode(lehmer, size);
   }
 
   private static uint _FloorLog2Nonzero(uint x) {

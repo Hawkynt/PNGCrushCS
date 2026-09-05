@@ -46,28 +46,26 @@ internal sealed class JxlStatedScanOrderTests {
   }
 
   /// <summary>
-  /// Orders are stated per bucket, and a shape shares its bucket with its own
-  /// transpose — so both use whichever of the two comes first, rather than each
-  /// computing its own.
+  /// A shape shares its bucket, and so the stated permutation, with its own
+  /// transpose — but not the order that permutation is applied to. What the
+  /// permutation permutes is the natural order, and a shape and its transpose
+  /// do not have the same one: this decoder keeps a transform's coefficients in
+  /// the shape's own layout, so handing a 16-wide shape the order of its
+  /// 8-wide transpose puts every coefficient somewhere else.
   /// </summary>
   [Test]
-  public void AShapeAndItsTransposeShareOneOrder() {
-    var orders = new int[JxlCoeffOrderDecoder.NumOrders][][];
-    for (var bucket = 0; bucket < orders.Length; ++bucket) {
-      orders[bucket] = new int[3][];
-      for (var channel = 0; channel < 3; ++channel)
-        orders[bucket][channel] = [bucket, channel];
-    }
+  public void AShapeAndItsTransposeEachKeepTheirOwnOrder() {
+    var reader = new JxlBitReader(new byte[16], 0);
+    var orders = JxlCoeffOrderDecoder.DecodeCoeffOrders(reader, usedOrders: 0);
 
-    var wide = JxlCoeffOrderDecoder.For(orders, JxlAcStrategyType.Dct16x8, channel: 1);
-    var tall = JxlCoeffOrderDecoder.For(orders, JxlAcStrategyType.Dct8x16, channel: 1);
-    var other = JxlCoeffOrderDecoder.For(orders, JxlAcStrategyType.Dct16x16, channel: 1);
+    var tall = JxlCoeffOrderDecoder.For(orders, JxlAcStrategyType.Dct16x8, channel: 1);
+    var wide = JxlCoeffOrderDecoder.For(orders, JxlAcStrategyType.Dct8x16, channel: 1);
 
     Assert.Multiple(() => {
-      Assert.That(wide, Is.SameAs(tall), "a shape and its transpose are one bucket");
-      Assert.That(other, Is.Not.SameAs(wide), "a different shape is a different one");
-      Assert.That(JxlCoeffOrderDecoder.For(orders, JxlAcStrategyType.Dct16x8, channel: 2),
-        Is.Not.SameAs(wide), "each channel states its own");
+      Assert.That(tall, Is.EqualTo(JxlNaturalCoeffOrder.For(JxlAcStrategyType.Dct16x8)));
+      Assert.That(wide, Is.EqualTo(JxlNaturalCoeffOrder.For(JxlAcStrategyType.Dct8x16)));
+      Assert.That(wide, Is.Not.EqualTo(tall), "the two layouts are a transpose apart");
+      Assert.That(tall, Has.Length.EqualTo(wide.Length), "and the same size");
     });
   }
 
