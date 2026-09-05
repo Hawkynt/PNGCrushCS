@@ -73,16 +73,36 @@ public sealed class H265VideoDecoderTests {
     Assert.That(message, Does.Contain("4:2:0"));
   }
 
+  /// <summary>
+  /// Sixteen-bit samples need the extended precision the range extensions add, which nothing here
+  /// implements. Eight, ten and twelve are all decoded, so the refusal has to name the depth rather
+  /// than reject everything past eight.
+  /// </summary>
   [Test]
   [Category("Unit")]
-  public void TenBitSamples_AreRefusedByTheirDepth() {
+  public void SamplesDeeperThanTwelveBits_AreRefusedByTheirDepth() {
     var message = _Refusal(new H265TestStream()
       .VideoParameterSet()
-      .SequenceParameterSet(bitDepthLuma: 10, bitDepthChroma: 10, profileIdc: 2)
+      .SequenceParameterSet(bitDepthLuma: 16, bitDepthChroma: 16, profileIdc: 4)
       .ToArray());
 
-    Assert.That(message, Does.Contain("10-bit"));
-    Assert.That(message, Does.Contain("eight bits"));
+    Assert.That(message, Does.Contain("16-bit"));
+    Assert.That(message, Does.Contain("twelve bits"));
+  }
+
+  [TestCase(8)]
+  [TestCase(10)]
+  [TestCase(12)]
+  [Category("Unit")]
+  public void SamplesUpToTwelveBits_AreNotRefusedByTheirDepth(int depth) {
+    var failure = _Decode(new H265TestStream()
+      .VideoParameterSet()
+      .SequenceParameterSet(bitDepthLuma: depth, bitDepthChroma: depth, profileIdc: 2)
+      .ToArray());
+
+    // A parameter set on its own yields no picture, so the only thing that can fail here is the
+    // depth check itself.
+    Assert.That(failure?.Message ?? string.Empty, Does.Not.Contain("chroma samples"));
   }
 
   [Test]

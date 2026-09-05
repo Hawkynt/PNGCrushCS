@@ -37,9 +37,9 @@ internal sealed class H265Picture {
     this.Height = height;
     this.ChromaWidth = width >> 1;
     this.ChromaHeight = height >> 1;
-    this.Luma = new byte[width * height];
-    this.Cb = new byte[this.ChromaWidth * this.ChromaHeight];
-    this.Cr = new byte[this.ChromaWidth * this.ChromaHeight];
+    this.Luma = new ushort[width * height];
+    this.Cb = new ushort[this.ChromaWidth * this.ChromaHeight];
+    this.Cr = new ushort[this.ChromaWidth * this.ChromaHeight];
 
     this.MinBlockLog2Size = minBlockLog2Size;
     this.BlocksAcross = (width + (1 << minBlockLog2Size) - 1) >> minBlockLog2Size;
@@ -58,14 +58,19 @@ internal sealed class H265Picture {
 
   internal int ChromaHeight { get; }
 
-  internal byte[] Luma { get; }
+  /// <summary>
+  /// The luminance samples. Sixteen bits wide because Main 10 codes ten of them; an eight-bit
+  /// stream stores its samples here unshifted, so the plane's values are always in the sequence's
+  /// own depth and every consumer has to know that depth to read them.
+  /// </summary>
+  internal ushort[] Luma { get; }
 
-  internal byte[] Cb { get; }
+  internal ushort[] Cb { get; }
 
-  internal byte[] Cr { get; }
+  internal ushort[] Cr { get; }
 
   /// <summary>The plane a chroma component index names: 0 is Cb, 1 is Cr.</summary>
-  internal byte[] Chroma(int component) => component == 0 ? this.Cb : this.Cr;
+  internal ushort[] Chroma(int component) => component == 0 ? this.Cb : this.Cr;
 
   internal int MinBlockLog2Size { get; }
 

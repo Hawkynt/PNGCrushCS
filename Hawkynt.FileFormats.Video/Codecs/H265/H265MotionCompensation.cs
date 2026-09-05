@@ -107,7 +107,7 @@ internal static class H265MotionCompensation {
 
   /// <summary>The luma interpolation of clause 8.5.3.3.3.2.</summary>
   private static void _InterpolateLuma(
-    byte[] reference, int referenceWidth, int referenceHeight, int x, int y, int width, int height,
+    ushort[] reference, int referenceWidth, int referenceHeight, int x, int y, int width, int height,
     int mvX, int mvY, int[] target, int bitDepth) {
     var xInteger = x + (mvX >> 2);
     var yInteger = y + (mvY >> 2);
@@ -168,7 +168,7 @@ internal static class H265MotionCompensation {
   }
 
   private static int _FilterHorizontally(
-    byte[] reference, int width, int height, int x, int y, int fraction) {
+    ushort[] reference, int width, int height, int x, int y, int fraction) {
     var taps = fraction << 3;
     var sum = 0;
     for (var tap = 0; tap < 8; ++tap)
@@ -178,7 +178,7 @@ internal static class H265MotionCompensation {
   }
 
   private static int _FilterVertically(
-    byte[] reference, int width, int height, int x, int y, int fraction) {
+    ushort[] reference, int width, int height, int x, int y, int fraction) {
     var taps = fraction << 3;
     var sum = 0;
     for (var tap = 0; tap < 8; ++tap)
@@ -189,7 +189,7 @@ internal static class H265MotionCompensation {
 
   /// <summary>The chroma interpolation of clause 8.5.3.3.3.3.</summary>
   private static void _InterpolateChroma(
-    byte[] reference, int referenceWidth, int referenceHeight, int x, int y, int width, int height,
+    ushort[] reference, int referenceWidth, int referenceHeight, int x, int y, int width, int height,
     int mvX, int mvY, int[] target, int bitDepth) {
     var xInteger = x + (mvX >> 3);
     var yInteger = y + (mvY >> 3);
@@ -252,7 +252,7 @@ internal static class H265MotionCompensation {
   }
 
   private static int _ChromaHorizontally(
-    byte[] reference, int width, int height, int x, int y, int fraction) {
+    ushort[] reference, int width, int height, int x, int y, int fraction) {
     var taps = fraction << 2;
     var sum = 0;
     for (var tap = 0; tap < 4; ++tap)
@@ -262,7 +262,7 @@ internal static class H265MotionCompensation {
   }
 
   /// <summary>One reference sample, with the picture extended by repeating its edge.</summary>
-  private static int _At(byte[] plane, int width, int height, int x, int y)
+  private static int _At(ushort[] plane, int width, int height, int x, int y)
     => plane[Math.Clamp(y, 0, height - 1) * width + Math.Clamp(x, 0, width - 1)];
 
   /// <summary>
@@ -270,7 +270,7 @@ internal static class H265MotionCompensation {
   /// </summary>
   /// <param name="component">-1 for luma, 0 for Cb, 1 for Cr — which set of weights applies.</param>
   private static void _Combine(
-    H265FrameDecoder frame, in H265MotionInfo motion, int[][] predictions, byte[] plane, int stride,
+    H265FrameDecoder frame, in H265MotionInfo motion, int[][] predictions, ushort[] plane, int stride,
     int x, int y, int width, int height, int bitDepth, int component) {
     var maximum = (1 << bitDepth) - 1;
     var weights = frame.Header.PredictionWeights;
@@ -307,7 +307,7 @@ internal static class H265MotionCompensation {
       for (var row = 0; row < height; ++row)
         for (var column = 0; column < width; ++column) {
           var at = row * width + column;
-          plane[(y + row) * stride + x + column] = (byte)Math.Clamp(
+          plane[(y + row) * stride + x + column] = (ushort)Math.Clamp(
             (predictions[0][at] * w0 + predictions[1][at] * w1 + rounding) >> (denominator + 1), 0, maximum);
         }
 
@@ -326,13 +326,13 @@ internal static class H265MotionCompensation {
           ? ((samples[at] * weight + (1 << (denominator - 1))) >> denominator) + offset
           : samples[at] * weight + offset;
 
-        plane[(y + row) * stride + x + column] = (byte)Math.Clamp(value, 0, maximum);
+        plane[(y + row) * stride + x + column] = (ushort)Math.Clamp(value, 0, maximum);
       }
   }
 
   /// <summary>The unweighted combination of clause 8.5.3.3.4.2: a straight average, or a shift.</summary>
   private static void _CombineUnweighted(
-    int[][] predictions, byte[] plane, int stride, int x, int y, int width, int height, int bitDepth,
+    int[][] predictions, ushort[] plane, int stride, int x, int y, int width, int height, int bitDepth,
     int maximum, bool bidirectional) {
     if (bidirectional) {
       var shift = 15 - bitDepth;
@@ -342,7 +342,7 @@ internal static class H265MotionCompensation {
         for (var column = 0; column < width; ++column) {
           var at = row * width + column;
           plane[(y + row) * stride + x + column] =
-            (byte)Math.Clamp((predictions[0][at] + predictions[1][at] + rounding) >> shift, 0, maximum);
+            (ushort)Math.Clamp((predictions[0][at] + predictions[1][at] + rounding) >> shift, 0, maximum);
         }
 
       return;
@@ -354,7 +354,7 @@ internal static class H265MotionCompensation {
 
     for (var row = 0; row < height; ++row)
       for (var column = 0; column < width; ++column)
-        plane[(y + row) * stride + x + column] = (byte)Math.Clamp(
+        plane[(y + row) * stride + x + column] = (ushort)Math.Clamp(
           (samples[row * width + column] + uniRounding) >> uniShift, 0, maximum);
   }
 }
