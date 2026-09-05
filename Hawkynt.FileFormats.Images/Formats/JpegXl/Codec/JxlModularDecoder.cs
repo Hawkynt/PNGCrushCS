@@ -201,10 +201,6 @@ internal static class JxlModularDecoder {
   private static int _ZigzagDecode(uint value) =>
     (int)(value >> 1) ^ -(int)(value & 1);
 
-  /// <summary>Encode a signed value to zigzag unsigned: 0->0, -1->1, 1->2, -2->3, etc.</summary>
-  internal static uint ZigzagEncode(int value) =>
-    (uint)((value << 1) ^ (value >> 31));
-
   private enum TransformType {
     Rct = 0,     // Reversible Color Transform
     Palette = 1, // Palette transform

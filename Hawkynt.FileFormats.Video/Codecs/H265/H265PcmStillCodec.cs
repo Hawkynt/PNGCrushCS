@@ -10,7 +10,7 @@ namespace FileFormat.Codecs.H265;
 /// A deliberately small HEVC Main-Still-Picture encoder for lossless 8-bit 4:2:0 still images.
 /// </summary>
 /// <remarks>
-/// The coded picture is made exclusively from 64 by 64 intra PCM coding units. HEVC's PCM mode is
+/// The coded picture is made exclusively from 32 by 32 intra PCM coding units. HEVC's PCM mode is
 /// part of the ordinary Main profile syntax: a coding unit terminates CABAC, byte-aligns, carries its
 /// Y/Cb/Cr samples verbatim and then restarts CABAC without resetting the probability contexts.
 /// This makes a useful first encoder because it is completely interoperable while requiring none of
@@ -31,7 +31,10 @@ internal static class H265PcmStillCodec {
     int HevcDisplayHeight
   );
 
-  private const int _CTB_LOG2 = 6;
+  // 32 by 32, not 64 by 64: H.265 7.4.3.2 caps Log2MaxIpcmCbSizeY at Min(CtbLog2SizeY, 5), so a
+  // coding block carrying PCM samples can never be larger than 32 by 32. Making the coding tree
+  // block the same size keeps every tree block exactly one unsplit PCM coding unit.
+  private const int _CTB_LOG2 = 5;
   private const int _CTB_SIZE = 1 << _CTB_LOG2;
   private const int _PCM_BYTES_PER_CTB = _CTB_SIZE * _CTB_SIZE + 2 * (_CTB_SIZE / 2) * (_CTB_SIZE / 2);
 
@@ -52,14 +55,15 @@ internal static class H265PcmStillCodec {
     var yuv = FastRawImageConverter.Convert(evenRgb, PixelFormat.Yuv420P8);
     var planes = _PadYuvToCodedSize(yuv, codedWidth, codedHeight);
 
-    var vps = _MakeNal(H265NalUnitType.VideoParameterSet, _BuildVps());
+    var level = _SmallestLevelFor(codedWidth, codedHeight);
+    var vps = _MakeNal(H265NalUnitType.VideoParameterSet, _BuildVps(level));
     var sps = _MakeNal(H265NalUnitType.SequenceParameterSet,
-      _BuildSps(codedWidth, codedHeight, displayWidth, displayHeight));
+      _BuildSps(codedWidth, codedHeight, displayWidth, displayHeight, level));
     var pps = _MakeNal(H265NalUnitType.PictureParameterSet, _BuildPps());
     var slice = _MakeNal(H265NalUnitType.IdrWithNoLeadingPictures,
       _BuildSlice(planes.Y, planes.Cb, planes.Cr, codedWidth, codedHeight));
 
-    var configuration = _BuildDecoderConfiguration(vps, sps, pps);
+    var configuration = _BuildDecoderConfiguration(vps, sps, pps, level);
     var sample = new byte[4 + slice.Length];
     BinaryPrimitives.WriteUInt32BigEndian(sample, (uint)slice.Length);
     slice.CopyTo(sample, 4);
@@ -210,7 +214,30 @@ internal static class H265PcmStillCodec {
     return result;
   }
 
-  private static byte[] _BuildVps() {
+  /// <summary>
+  /// Picks the lowest general_level_idc whose picture-size limit covers this image. A level a
+  /// picture does not fit into makes the stream non-conformant, and a decoder that allocates from
+  /// the level is entitled to refuse it, so the number cannot be a constant.
+  /// </summary>
+  private static byte _SmallestLevelFor(int width, int height) {
+    // H.265 Table A.8, MaxLumaPs per level, plus A.4.1's dimension bound of Sqrt(MaxLumaPs * 8).
+    (byte Level, long MaxLumaPs)[] levels = [
+      (30, 36864), (60, 122880), (63, 245760), (90, 552960), (93, 983040),
+      (120, 2228224), (150, 8912896), (180, 35651584),
+    ];
+
+    var samples = (long)width * height;
+    foreach (var (level, maxLumaPs) in levels) {
+      var maxSide = (long)Math.Sqrt(maxLumaPs * 8d);
+      if (samples <= maxLumaPs && width <= maxSide && height <= maxSide)
+        return level;
+    }
+
+    throw new NotSupportedException(
+      $"HEVC: a {width} by {height} picture exceeds the largest defined level's picture size.");
+  }
+
+  private static byte[] _BuildVps(byte level) {
     var w = new Bits();
     w.WriteBits(0, 4); // vps_video_parameter_set_id
     w.WriteBit(1); // vps_base_layer_internal_flag
@@ -219,7 +246,7 @@ internal static class H265PcmStillCodec {
     w.WriteBits(0, 3); // vps_max_sub_layers_minus1
     w.WriteBit(1); // vps_temporal_id_nesting_flag
     w.WriteBits(0xffff, 16);
-    _WriteProfileTierLevel(w);
+    _WriteProfileTierLevel(w, level);
     w.WriteBit(0); // vps_sub_layer_ordering_info_present_flag
     w.WriteUe(0); // max_dec_pic_buffering_minus1
     w.WriteUe(0); // max_num_reorder_pics
@@ -232,12 +259,12 @@ internal static class H265PcmStillCodec {
     return w.ToArray();
   }
 
-  private static byte[] _BuildSps(int width, int height, int displayWidth, int displayHeight) {
+  private static byte[] _BuildSps(int width, int height, int displayWidth, int displayHeight, byte level) {
     var w = new Bits();
     w.WriteBits(0, 4); // sps_video_parameter_set_id
     w.WriteBits(0, 3); // sps_max_sub_layers_minus1
     w.WriteBit(1); // temporal nesting
-    _WriteProfileTierLevel(w);
+    _WriteProfileTierLevel(w, level);
     w.WriteUe(0); // sps_seq_parameter_set_id
     w.WriteUe(1); // chroma_format_idc = 4:2:0
     w.WriteUe((uint)width);
@@ -261,7 +288,7 @@ internal static class H265PcmStillCodec {
     w.WriteUe(0); // max_num_reorder_pics
     w.WriteUe(0); // max_latency_increase_plus1
     w.WriteUe(0); // log2_min_luma_coding_block_size_minus3 => 8
-    w.WriteUe(3); // log2_diff_max_min_luma_coding_block_size => 64 CTB
+    w.WriteUe((uint)(_CTB_LOG2 - 3)); // log2_diff_max_min_luma_coding_block_size
     w.WriteUe(0); // log2_min_luma_transform_block_size_minus2 => 4
     w.WriteUe(3); // log2_diff_max_min_luma_transform_block_size => 32
     w.WriteUe(0); // max_transform_hierarchy_depth_inter
@@ -273,7 +300,7 @@ internal static class H265PcmStillCodec {
     w.WriteBits(7, 4); // pcm_sample_bit_depth_luma_minus1
     w.WriteBits(7, 4); // pcm_sample_bit_depth_chroma_minus1
     w.WriteUe(0); // log2_min_pcm_luma_coding_block_size_minus3 => 8
-    w.WriteUe(3); // log2_diff_max_min_pcm_luma_coding_block_size => 64
+    w.WriteUe((uint)(_CTB_LOG2 - 3)); // log2_diff_max_min_pcm_luma_coding_block_size
     w.WriteBit(1); // pcm_loop_filter_disabled_flag
     w.WriteUe(0); // num_short_term_ref_pic_sets
     w.WriteBit(0); // long_term_ref_pics_present_flag
@@ -487,14 +514,15 @@ internal static class H265PcmStillCodec {
     return FastRawImageConverter.Convert(yuv, PixelFormat.Rgb24);
   }
 
-  private static byte[] _BuildDecoderConfiguration(byte[] vps, byte[] sps, byte[] pps) {
+  private static byte[] _BuildDecoderConfiguration(byte[] vps, byte[] sps, byte[] pps, byte level) {
     var size = 23 + (3 + 2 + vps.Length) + (3 + 2 + sps.Length) + (3 + 2 + pps.Length);
     var result = new byte[size];
     result[0] = 1;
     result[1] = H265ProfileTierLevel.MAIN_STILL_PICTURE;
     // general_profile_compatibility_flags: advertise Main and Main Still Picture.
     result[2] = 0x50;
-    result[12] = 120; // level 4.0; deliberately generous for still-image dimensions.
+    result[6] = _CONSTRAINT_FLAGS_FIRST_BYTE;
+    result[12] = level;
     result[13] = 0xF0;
     result[14] = 0x00;
     result[15] = 0xFC;
@@ -544,7 +572,7 @@ internal static class H265PcmStillCodec {
     return output.ToArray();
   }
 
-  private static void _WriteProfileTierLevel(Bits w) {
+  private static void _WriteProfileTierLevel(Bits w, byte level) {
     w.WriteBits(0, 2); // general_profile_space
     w.WriteBit(0); // general_tier_flag
     w.WriteBits(H265ProfileTierLevel.MAIN_STILL_PICTURE, 5);
@@ -556,8 +584,15 @@ internal static class H265PcmStillCodec {
     w.WriteBit(1); // general_frame_only_constraint_flag
     w.WriteBits(0, 32);
     w.WriteBits(0, 12); // remainder of the 48-bit constraint field
-    w.WriteBits(120, 8); // general_level_idc
+    w.WriteBits(level, 8); // general_level_idc
   }
+
+  /// <summary>
+  /// The first six bytes of general_constraint_indicator_flags as
+  /// <see cref="_WriteProfileTierLevel"/> spells them. ISO/IEC 14496-15 requires the hvcC record to
+  /// repeat the sequence parameter set's values rather than invent its own.
+  /// </summary>
+  private const byte _CONSTRAINT_FLAGS_FIRST_BYTE = 0b1011_0000;
 
   private static int _RoundUp(int value, int multiple)
     => checked((value + multiple - 1) / multiple * multiple);

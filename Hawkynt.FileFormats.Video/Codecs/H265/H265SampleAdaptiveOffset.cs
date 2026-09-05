@@ -19,8 +19,8 @@ internal static class H265SampleAdaptiveOffset {
       return;
 
     var picture = frame.Picture;
-    var source = new byte[][] {
-      (byte[])picture.Luma.Clone(), (byte[])picture.Cb.Clone(), (byte[])picture.Cr.Clone(),
+    var source = new ushort[][] {
+      (ushort[])picture.Luma.Clone(), (ushort[])picture.Cb.Clone(), (ushort[])picture.Cr.Clone(),
     };
 
     var log2Ctb = frame.Sps.CtbLog2SizeY;
@@ -58,7 +58,7 @@ internal static class H265SampleAdaptiveOffset {
   }
 
   private static void _ApplyBandOffset(
-    H265FrameDecoder frame, int ctb, int component, byte[] source, byte[] target, int stride,
+    H265FrameDecoder frame, int ctb, int component, ushort[] source, ushort[] target, int stride,
     int x0, int y0, int x1, int y1, int depth, int shift) {
     var band = frame.SaoBandOrClassAt(ctb, component);
     var bandShift = depth - 5;
@@ -74,12 +74,12 @@ internal static class H265SampleAdaptiveOffset {
           continue;
 
         var at = y * stride + x;
-        target[at] = (byte)Math.Clamp(source[at] + offsets[source[at] >> bandShift], 0, maximum);
+        target[at] = (ushort)Math.Clamp(source[at] + offsets[source[at] >> bandShift], 0, maximum);
       }
   }
 
   private static void _ApplyEdgeOffset(
-    H265FrameDecoder frame, int ctb, int component, byte[] source, byte[] target, int stride,
+    H265FrameDecoder frame, int ctb, int component, ushort[] source, ushort[] target, int stride,
     int width, int height, int x0, int y0, int x1, int y1, int depth, int shift) {
     var direction = frame.SaoBandOrClassAt(ctb, component) << 2;
     var firstX = _Neighbours[direction];
@@ -117,7 +117,7 @@ internal static class H265SampleAdaptiveOffset {
         var value = source[at];
         var shape = 2 + Math.Sign(value - source[ny0 * stride + nx0]) + Math.Sign(value - source[ny1 * stride + nx1]);
 
-        target[at] = (byte)Math.Clamp(value + byShape[shape], 0, maximum);
+        target[at] = (ushort)Math.Clamp(value + byShape[shape], 0, maximum);
       }
   }
 

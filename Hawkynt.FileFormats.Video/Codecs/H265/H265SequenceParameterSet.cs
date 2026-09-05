@@ -342,11 +342,12 @@ internal sealed class H265SequenceParameterSet {
           _ => $"chroma_format_idc {this.ChromaFormatIdc}",
         }} (clause 7.4.3.2.1). Only 4:2:0, which is what the Main and Main 10 profiles permit, is implemented.");
 
-    if (this.BitDepthLuma != 8 || this.BitDepthChroma != 8)
+    if (this.BitDepthLuma is < 8 or > 12 || this.BitDepthChroma is < 8 or > 12)
       throw new NotSupportedException(
         $"This H.265 stream codes {this.BitDepthLuma}-bit luma and {this.BitDepthChroma}-bit chroma samples "
-        + "(clause 7.4.3.2.1). Only eight bits, which is what the Main profile permits, is implemented — the "
-        + "transform, the dequantiser and both loop filters all shift by the sample depth.");
+        + "(clause 7.4.3.2.1). Eight to twelve bits are implemented, which covers Main, Main 10 and the twelve-bit "
+        + "still profile; deeper samples need the extended precision the range extensions add, and the parameter "
+        + "sets refuse every tool of theirs that changes a sample.");
   }
 
   /// <summary>Reads the extension flags and refuses the ones that change the decoding process.</summary>

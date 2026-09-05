@@ -1,185 +1,413 @@
 using System;
+using FileFormat.Jpeg2000.Codec;
 
 namespace FileFormat.Jpeg2000;
 
-/// <summary>LeGall 5/3 reversible integer wavelet transform for lossless JPEG 2000 coding.</summary>
+/// <summary>The discrete wavelet transforms of ITU-T T.800 Annex F.</summary>
+/// <remarks>
+/// Two details decide whether this agrees with any other implementation. The first is parity: a
+/// subband's samples are indexed by their position on the reference grid, so a tile that begins at
+/// an odd coordinate has its low-pass and high-pass halves the other way round, and the filter has
+/// to be told. The second is order. Synthesis interleaves the four subbands, filters rows, then
+/// filters columns; analysis therefore has to filter columns first and rows second, because it undoes
+/// synthesis in reverse. Doing both passes the same way round is exactly invertible against itself
+/// and wrong against everyone else, since the 5/3 rounding does not commute.
+/// </remarks>
 internal static class Jp2Wavelet {
 
-  /// <summary>Performs a 1D forward LeGall 5/3 wavelet transform in-place.</summary>
-  /// <param name="data">Input signal, length must be >= 2.</param>
-  /// <param name="length">Number of samples to transform.</param>
-  /// <param name="low">Output low-frequency (scaling) coefficients.</param>
-  /// <param name="high">Output high-frequency (detail) coefficients.</param>
-  internal static void Forward1D(int[] data, int length, int[] low, int[] high) {
-    var halfLen = (length + 1) / 2;
-    var highLen = length / 2;
+  private const float _ALPHA = -1.586134342f;
+  private const float _BETA = -0.052980118f;
+  private const float _GAMMA = 0.882911075f;
+  private const float _DELTA = 0.443506852f;
+  private const float _K = 1.230174105f;
 
-    // Lifting step 1: predict (high-pass)
-    for (var n = 0; n < highLen; ++n) {
-      var left = data[2 * n];
-      var right = 2 * n + 2 < length ? data[2 * n + 2] : data[2 * n]; // mirror at boundary
-      high[n] = data[2 * n + 1] - ((left + right) >> 1);
+  /// <summary>The high-pass scaling of the 9/7 synthesis, which is not the reciprocal of K.</summary>
+  private const float _TWO_OVER_K = 1.625732422f;
+
+  /// <summary>
+  /// Reversible 5/3 synthesis of one interleaved line. <paramref name="parity"/> is the low bit of
+  /// the line's first coordinate; when it is one the first sample is a high-pass one.
+  /// </summary>
+  public static void Inverse53(int[] signal, int lowCount, int highCount, int parity) {
+    ArgumentNullException.ThrowIfNull(signal);
+
+    if (parity == 0) {
+      if (highCount <= 0 && lowCount <= 1)
+        return;
+
+      for (var i = 0; i < lowCount; ++i)
+        signal[2 * i] -= (_High(signal, highCount, i - 1) + _High(signal, highCount, i) + 2) >> 2;
+      for (var i = 0; i < highCount; ++i)
+        signal[2 * i + 1] += (_Low(signal, lowCount, i) + _Low(signal, lowCount, i + 1)) >> 1;
+
+      return;
     }
 
-    // Lifting step 2: update (low-pass)
-    for (var n = 0; n < halfLen; ++n) {
-      var dLeft = n > 0 ? high[n - 1] : high[0]; // mirror at boundary
-      var dRight = n < highLen ? high[n] : high[highLen - 1]; // mirror at boundary
-      low[n] = data[2 * n] + ((dLeft + dRight + 2) >> 2);
+    if (lowCount == 0 && highCount == 1) {
+      signal[0] /= 2;
+      return;
+    }
+
+    for (var i = 0; i < lowCount; ++i)
+      signal[2 * i + 1] -= (_Even(signal, highCount, i) + _Even(signal, highCount, i + 1) + 2) >> 2;
+    for (var i = 0; i < highCount; ++i)
+      signal[2 * i] += (_Odd(signal, lowCount, i) + _Odd(signal, lowCount, i - 1)) >> 1;
+  }
+
+  /// <summary>Reversible 5/3 analysis of one interleaved line; the exact inverse of <see cref="Inverse53"/>.</summary>
+  public static void Forward53(int[] signal, int lowCount, int highCount, int parity) {
+    ArgumentNullException.ThrowIfNull(signal);
+
+    if (parity == 0) {
+      if (highCount <= 0 && lowCount <= 1)
+        return;
+
+      for (var i = 0; i < highCount; ++i)
+        signal[2 * i + 1] -= (_Low(signal, lowCount, i) + _Low(signal, lowCount, i + 1)) >> 1;
+      for (var i = 0; i < lowCount; ++i)
+        signal[2 * i] += (_High(signal, highCount, i - 1) + _High(signal, highCount, i) + 2) >> 2;
+
+      return;
+    }
+
+    if (lowCount == 0 && highCount == 1) {
+      signal[0] *= 2;
+      return;
+    }
+
+    for (var i = 0; i < highCount; ++i)
+      signal[2 * i] -= (_Odd(signal, lowCount, i) + _Odd(signal, lowCount, i - 1)) >> 1;
+    for (var i = 0; i < lowCount; ++i)
+      signal[2 * i + 1] += (_Even(signal, highCount, i) + _Even(signal, highCount, i + 1) + 2) >> 2;
+  }
+
+  /// <summary>Irreversible 9/7 synthesis of one interleaved line.</summary>
+  public static void Inverse97(float[] signal, int lowCount, int highCount, int parity) {
+    ArgumentNullException.ThrowIfNull(signal);
+
+    var lowStart = parity;
+    var highStart = 1 - parity;
+    if (lowCount == 0 && highCount == 0)
+      return;
+
+    for (var i = 0; i < lowCount; ++i)
+      signal[lowStart + 2 * i] *= _K;
+    for (var i = 0; i < highCount; ++i)
+      signal[highStart + 2 * i] *= _TWO_OVER_K;
+
+    _Lift97(signal, lowStart, lowCount, highStart, highCount, -_DELTA);
+    _Lift97(signal, highStart, highCount, lowStart, lowCount, -_GAMMA);
+    _Lift97(signal, lowStart, lowCount, highStart, highCount, -_BETA);
+    _Lift97(signal, highStart, highCount, lowStart, lowCount, -_ALPHA);
+  }
+
+  /// <summary>Irreversible 9/7 analysis of one interleaved line.</summary>
+  public static void Forward97(float[] signal, int lowCount, int highCount, int parity) {
+    ArgumentNullException.ThrowIfNull(signal);
+
+    var lowStart = parity;
+    var highStart = 1 - parity;
+    if (lowCount == 0 && highCount == 0)
+      return;
+
+    _Lift97(signal, highStart, highCount, lowStart, lowCount, _ALPHA);
+    _Lift97(signal, lowStart, lowCount, highStart, highCount, _BETA);
+    _Lift97(signal, highStart, highCount, lowStart, lowCount, _GAMMA);
+    _Lift97(signal, lowStart, lowCount, highStart, highCount, _DELTA);
+
+    for (var i = 0; i < lowCount; ++i)
+      signal[lowStart + 2 * i] /= _K;
+    for (var i = 0; i < highCount; ++i)
+      signal[highStart + 2 * i] /= _TWO_OVER_K;
+  }
+
+  /// <summary>
+  /// One lifting step: every sample of the target half takes a weighted sum of the two source-half
+  /// samples that straddle it, with the edge value repeated outside the line.
+  /// </summary>
+  private static void _Lift97(
+    float[] signal,
+    int targetStart,
+    int targetCount,
+    int sourceStart,
+    int sourceCount,
+    float weight
+  ) {
+    if (targetCount == 0 || sourceCount == 0)
+      return;
+
+    // Target i sits between source i-1 and source i when the source half starts one place later,
+    // and between source i and source i+1 when it starts one place earlier.
+    var offset = targetStart < sourceStart ? -1 : 0;
+    for (var i = 0; i < targetCount; ++i) {
+      var left = Math.Clamp(i + offset, 0, sourceCount - 1);
+      var right = Math.Clamp(i + offset + 1, 0, sourceCount - 1);
+      signal[targetStart + 2 * i] += weight * (signal[sourceStart + 2 * left] + signal[sourceStart + 2 * right]);
     }
   }
 
-  /// <summary>Performs a 1D inverse LeGall 5/3 wavelet transform.</summary>
-  /// <param name="low">Low-frequency (scaling) coefficients.</param>
-  /// <param name="high">High-frequency (detail) coefficients.</param>
-  /// <param name="length">Original signal length.</param>
-  /// <param name="output">Reconstructed signal.</param>
-  internal static void Inverse1D(int[] low, int[] high, int length, int[] output) {
-    var halfLen = (length + 1) / 2;
-    var highLen = length / 2;
+  private static int _Low(int[] signal, int count, int index)
+    => signal[2 * Math.Clamp(index, 0, count - 1)];
 
-    // Undo update: recover even samples
-    var even = new int[halfLen];
-    for (var n = 0; n < halfLen; ++n) {
-      var dLeft = n > 0 ? high[n - 1] : high[0];
-      var dRight = n < highLen ? high[n] : (highLen > 0 ? high[highLen - 1] : 0);
-      even[n] = low[n] - ((dLeft + dRight + 2) >> 2);
-    }
+  private static int _High(int[] signal, int count, int index)
+    => signal[2 * Math.Clamp(index, 0, count - 1) + 1];
 
-    // Undo predict: recover odd samples
-    for (var n = 0; n < halfLen; ++n)
-      output[2 * n] = even[n];
+  private static int _Even(int[] signal, int count, int index)
+    => signal[2 * Math.Clamp(index, 0, count - 1)];
 
-    for (var n = 0; n < highLen; ++n) {
-      var left = even[n];
-      var right = n + 1 < halfLen ? even[n + 1] : even[halfLen - 1];
-      output[2 * n + 1] = high[n] + ((left + right) >> 1);
-    }
+  private static int _Odd(int[] signal, int count, int index)
+    => signal[2 * Math.Clamp(index, 0, count - 1) + 1];
+
+  /// <summary>Rebuilds a tile-component's samples from its subband coefficients.</summary>
+  public static void InverseTransform(Jp2TileComponent component) {
+    ArgumentNullException.ThrowIfNull(component);
+
+    if (component.Style.Transform == 1)
+      _InverseReversible(component);
+    else
+      _InverseIrreversible(component);
   }
 
-  /// <summary>Performs a 2D forward wavelet transform on the given component plane.</summary>
-  /// <param name="plane">2D array of pixel/coefficient values [height, width].</param>
-  /// <param name="width">Active width.</param>
-  /// <param name="height">Active height.</param>
-  internal static void Forward2D(int[,] plane, int width, int height) {
-    // Rows
-    var rowBuf = new int[width];
-    var rowLow = new int[(width + 1) / 2];
-    var rowHigh = new int[width / 2];
-    for (var y = 0; y < height; ++y) {
-      for (var x = 0; x < width; ++x)
-        rowBuf[x] = plane[y, x];
+  /// <summary>Splits a tile-component's samples into its subband coefficients.</summary>
+  public static void ForwardTransform(Jp2TileComponent component) {
+    ArgumentNullException.ThrowIfNull(component);
+    if (component.Style.Transform != 1)
+      throw new NotSupportedException("The JPEG 2000 encoder writes the reversible 5/3 transform only.");
 
-      if (width >= 2) {
-        Forward1D(rowBuf, width, rowLow, rowHigh);
-        var lowLen = (width + 1) / 2;
-        var highLen = width / 2;
-        for (var x = 0; x < lowLen; ++x)
-          plane[y, x] = rowLow[x];
-        for (var x = 0; x < highLen; ++x)
-          plane[y, lowLen + x] = rowHigh[x];
-      }
-    }
+    var levels = component.Resolutions.Length - 1;
+    var current = component.Samples;
+    var currentWidth = component.Width;
+    var currentHeight = component.Height;
 
-    // Columns
-    var colBuf = new int[height];
-    var colLow = new int[(height + 1) / 2];
-    var colHigh = new int[height / 2];
-    for (var x = 0; x < width; ++x) {
-      for (var y = 0; y < height; ++y)
-        colBuf[y] = plane[y, x];
+    for (var resolution = levels; resolution >= 1; --resolution) {
+      var level = component.Resolutions[resolution];
+      var lower = component.Resolutions[resolution - 1];
+      var width = level.X1 - level.X0;
+      var height = level.Y1 - level.Y0;
+      if (width <= 0 || height <= 0)
+        continue;
 
-      if (height >= 2) {
-        Forward1D(colBuf, height, colLow, colHigh);
-        var lowLen = (height + 1) / 2;
-        var highLen = height / 2;
-        for (var y = 0; y < lowLen; ++y)
-          plane[y, x] = colLow[y];
-        for (var y = 0; y < highLen; ++y)
-          plane[lowLen + y, x] = colHigh[y];
-      }
-    }
-  }
+      if (width != currentWidth || height != currentHeight)
+        throw new InvalidOperationException("JPEG 2000 analysis lost track of the resolution geometry.");
 
-  /// <summary>Performs a 2D inverse wavelet transform on the given component plane.</summary>
-  /// <param name="plane">2D array of coefficient values [height, width].</param>
-  /// <param name="width">Active width.</param>
-  /// <param name="height">Active height.</param>
-  internal static void Inverse2D(int[,] plane, int width, int height) {
-    // Columns (inverse of what was done last in forward)
-    var colLow = new int[(height + 1) / 2];
-    var colHigh = new int[height / 2];
-    var colOut = new int[height];
-    for (var x = 0; x < width; ++x) {
-      if (height >= 2) {
-        var lowLen = (height + 1) / 2;
-        var highLen = height / 2;
-        for (var y = 0; y < lowLen; ++y)
-          colLow[y] = plane[y, x];
-        for (var y = 0; y < highLen; ++y)
-          colHigh[y] = plane[lowLen + y, x];
+      var lowWidth = lower.X1 - lower.X0;
+      var lowHeight = lower.Y1 - lower.Y0;
+      var parityX = level.X0 & 1;
+      var parityY = level.Y0 & 1;
 
-        Inverse1D(colLow, colHigh, height, colOut);
+      var column = new int[height];
+      for (var x = 0; x < width; ++x) {
         for (var y = 0; y < height; ++y)
-          plane[y, x] = colOut[y];
+          column[y] = current[y * width + x];
+
+        Forward53(column, lowHeight, height - lowHeight, parityY);
+
+        for (var y = 0; y < height; ++y)
+          current[y * width + x] = column[y];
       }
+
+      var row = new int[width];
+      for (var y = 0; y < height; ++y) {
+        Array.Copy(current, y * width, row, 0, width);
+        Forward53(row, lowWidth, width - lowWidth, parityX);
+        Array.Copy(row, 0, current, y * width, width);
+      }
+
+      var next = new int[lowWidth * lowHeight];
+      _Deinterleave(current, width, height, level, lower, next);
+
+      current = next;
+      currentWidth = lowWidth;
+      currentHeight = lowHeight;
     }
 
-    // Rows
-    var rowLow = new int[(width + 1) / 2];
-    var rowHigh = new int[width / 2];
-    var rowOut = new int[width];
-    for (var y = 0; y < height; ++y) {
-      if (width >= 2) {
-        var lowLen = (width + 1) / 2;
-        var highLen = width / 2;
-        for (var x = 0; x < lowLen; ++x)
-          rowLow[x] = plane[y, x];
-        for (var x = 0; x < highLen; ++x)
-          rowHigh[x] = plane[y, lowLen + x];
+    var root = component.Resolutions[0].Bands[0];
+    Array.Copy(current, root.Coefficients, Math.Min(current.Length, root.Coefficients.Length));
+  }
 
-        Inverse1D(rowLow, rowHigh, width, rowOut);
-        for (var x = 0; x < width; ++x)
-          plane[y, x] = rowOut[x];
+  private static void _InverseReversible(Jp2TileComponent component) {
+    var levels = component.Resolutions.Length - 1;
+    var root = component.Resolutions[0].Bands[0];
+    var current = (int[])root.Coefficients.Clone();
+    var currentWidth = root.Width;
+    var currentHeight = root.Height;
+
+    for (var resolution = 1; resolution <= levels; ++resolution) {
+      var level = component.Resolutions[resolution];
+      var width = level.X1 - level.X0;
+      var height = level.Y1 - level.Y0;
+      var buffer = new int[Math.Max(0, width) * Math.Max(0, height)];
+      if (width <= 0 || height <= 0) {
+        current = buffer;
+        currentWidth = Math.Max(0, width);
+        currentHeight = Math.Max(0, height);
+        continue;
       }
+
+      _Interleave(current, currentWidth, currentHeight, level, buffer);
+
+      var lowWidth = Jp2Math.CeilDivPow2(level.X1, 1) - Jp2Math.CeilDivPow2(level.X0, 1);
+      var lowHeight = Jp2Math.CeilDivPow2(level.Y1, 1) - Jp2Math.CeilDivPow2(level.Y0, 1);
+      var parityX = level.X0 & 1;
+      var parityY = level.Y0 & 1;
+
+      var row = new int[width];
+      for (var y = 0; y < height; ++y) {
+        Array.Copy(buffer, y * width, row, 0, width);
+        Inverse53(row, lowWidth, width - lowWidth, parityX);
+        Array.Copy(row, 0, buffer, y * width, width);
+      }
+
+      var column = new int[height];
+      for (var x = 0; x < width; ++x) {
+        for (var y = 0; y < height; ++y)
+          column[y] = buffer[y * width + x];
+
+        Inverse53(column, lowHeight, height - lowHeight, parityY);
+
+        for (var y = 0; y < height; ++y)
+          buffer[y * width + x] = column[y];
+      }
+
+      current = buffer;
+      currentWidth = width;
+      currentHeight = height;
+    }
+
+    component.Samples = current;
+  }
+
+  private static void _InverseIrreversible(Jp2TileComponent component) {
+    var levels = component.Resolutions.Length - 1;
+    var root = component.Resolutions[0].Bands[0];
+    var current = new float[root.Coefficients.Length];
+    for (var i = 0; i < current.Length; ++i)
+      current[i] = root.Coefficients[i] * (root.StepSize * 0.5f);
+
+    var currentWidth = root.Width;
+    var currentHeight = root.Height;
+
+    for (var resolution = 1; resolution <= levels; ++resolution) {
+      var level = component.Resolutions[resolution];
+      var width = level.X1 - level.X0;
+      var height = level.Y1 - level.Y0;
+      var buffer = new float[Math.Max(0, width) * Math.Max(0, height)];
+      if (width <= 0 || height <= 0) {
+        current = buffer;
+        currentWidth = Math.Max(0, width);
+        currentHeight = Math.Max(0, height);
+        continue;
+      }
+
+      _InterleaveFloat(current, currentWidth, currentHeight, level, buffer);
+
+      var lowWidth = Jp2Math.CeilDivPow2(level.X1, 1) - Jp2Math.CeilDivPow2(level.X0, 1);
+      var lowHeight = Jp2Math.CeilDivPow2(level.Y1, 1) - Jp2Math.CeilDivPow2(level.Y0, 1);
+      var parityX = level.X0 & 1;
+      var parityY = level.Y0 & 1;
+
+      var row = new float[width];
+      for (var y = 0; y < height; ++y) {
+        Array.Copy(buffer, y * width, row, 0, width);
+        Inverse97(row, lowWidth, width - lowWidth, parityX);
+        Array.Copy(row, 0, buffer, y * width, width);
+      }
+
+      var column = new float[height];
+      for (var x = 0; x < width; ++x) {
+        for (var y = 0; y < height; ++y)
+          column[y] = buffer[y * width + x];
+
+        Inverse97(column, lowHeight, height - lowHeight, parityY);
+
+        for (var y = 0; y < height; ++y)
+          buffer[y * width + x] = column[y];
+      }
+
+      current = buffer;
+      currentWidth = width;
+      currentHeight = height;
+    }
+
+    var samples = new int[current.Length];
+    for (var i = 0; i < samples.Length; ++i)
+      samples[i] = (int)MathF.Round(current[i]);
+
+    component.Samples = samples;
+  }
+
+  /// <summary>F.3.3 2D_INTERLEAVE: the four subbands back onto one grid, low samples on even coordinates.</summary>
+  private static void _Interleave(int[] low, int lowWidth, int lowHeight, Jp2Resolution level, int[] target) {
+    var width = level.X1 - level.X0;
+    var originX = level.X0;
+    var originY = level.Y0;
+
+    for (var y = 0; y < lowHeight; ++y)
+      for (var x = 0; x < lowWidth; ++x) {
+        var gx = 2 * (Jp2Math.CeilDivPow2(originX, 1) + x) - originX;
+        var gy = 2 * (Jp2Math.CeilDivPow2(originY, 1) + y) - originY;
+        target[gy * width + gx] = low[y * lowWidth + x];
+      }
+
+    foreach (var band in level.Bands) {
+      var xob = band.Orientation & 1;
+      var yob = (band.Orientation >> 1) & 1;
+      for (var y = 0; y < band.Height; ++y)
+        for (var x = 0; x < band.Width; ++x) {
+          var gx = 2 * (band.X0 + x) + xob - originX;
+          var gy = 2 * (band.Y0 + y) + yob - originY;
+          target[gy * width + gx] = band.Coefficients[y * band.Width + x];
+        }
     }
   }
 
-  /// <summary>Performs multi-level 2D forward wavelet decomposition.</summary>
-  /// <param name="plane">2D array of pixel values.</param>
-  /// <param name="width">Image width.</param>
-  /// <param name="height">Image height.</param>
-  /// <param name="levels">Number of decomposition levels.</param>
-  internal static void ForwardMultiLevel(int[,] plane, int width, int height, int levels) {
-    var w = width;
-    var h = height;
-    for (var level = 0; level < levels; ++level) {
-      if (w < 2 || h < 2)
-        break;
-      Forward2D(plane, w, h);
-      w = (w + 1) / 2;
-      h = (h + 1) / 2;
+  private static void _InterleaveFloat(float[] low, int lowWidth, int lowHeight, Jp2Resolution level, float[] target) {
+    var width = level.X1 - level.X0;
+    var originX = level.X0;
+    var originY = level.Y0;
+
+    for (var y = 0; y < lowHeight; ++y)
+      for (var x = 0; x < lowWidth; ++x) {
+        var gx = 2 * (Jp2Math.CeilDivPow2(originX, 1) + x) - originX;
+        var gy = 2 * (Jp2Math.CeilDivPow2(originY, 1) + y) - originY;
+        target[gy * width + gx] = low[y * lowWidth + x];
+      }
+
+    foreach (var band in level.Bands) {
+      var xob = band.Orientation & 1;
+      var yob = (band.Orientation >> 1) & 1;
+      for (var y = 0; y < band.Height; ++y)
+        for (var x = 0; x < band.Width; ++x) {
+          var gx = 2 * (band.X0 + x) + xob - originX;
+          var gy = 2 * (band.Y0 + y) + yob - originY;
+          target[gy * width + gx] = band.Coefficients[y * band.Width + x] * (band.StepSize * 0.5f);
+        }
     }
   }
 
-  /// <summary>Performs multi-level 2D inverse wavelet reconstruction.</summary>
-  /// <param name="plane">2D array of coefficient values.</param>
-  /// <param name="width">Image width.</param>
-  /// <param name="height">Image height.</param>
-  /// <param name="levels">Number of decomposition levels.</param>
-  internal static void InverseMultiLevel(int[,] plane, int width, int height, int levels) {
-    // Compute the dimensions at each level
-    var widths = new int[levels + 1];
-    var heights = new int[levels + 1];
-    widths[0] = width;
-    heights[0] = height;
-    for (var i = 1; i <= levels; ++i) {
-      widths[i] = (widths[i - 1] + 1) / 2;
-      heights[i] = (heights[i - 1] + 1) / 2;
-    }
+  /// <summary>The inverse of <see cref="_Interleave"/>, writing the three detail bands and the next low band.</summary>
+  private static void _Deinterleave(int[] source, int width, int height, Jp2Resolution level, Jp2Resolution lower, int[] low) {
+    _ = height;
+    var originX = level.X0;
+    var originY = level.Y0;
+    var lowWidth = lower.X1 - lower.X0;
 
-    // Reconstruct from the deepest level back
-    for (var level = levels - 1; level >= 0; --level)
-      Inverse2D(plane, widths[level], heights[level]);
+    for (var y = 0; y < lower.Y1 - lower.Y0; ++y)
+      for (var x = 0; x < lowWidth; ++x) {
+        var gx = 2 * (lower.X0 + x) - originX;
+        var gy = 2 * (lower.Y0 + y) - originY;
+        low[y * lowWidth + x] = source[gy * width + gx];
+      }
+
+    foreach (var band in level.Bands) {
+      var xob = band.Orientation & 1;
+      var yob = (band.Orientation >> 1) & 1;
+      for (var y = 0; y < band.Height; ++y)
+        for (var x = 0; x < band.Width; ++x) {
+          var gx = 2 * (band.X0 + x) + xob - originX;
+          var gy = 2 * (band.Y0 + y) + yob - originY;
+          band.Coefficients[y * band.Width + x] = source[gy * width + gx];
+        }
+    }
   }
 }

@@ -254,17 +254,67 @@ public sealed class H265VideoDecoder : IVideoCodecDecoder<H265VideoDecoder> {
 
   private RawImage _ToImage(H265Picture picture) {
     var sps = this._pictureSequence!;
+    var width = sps.DisplayWidth;
+    var height = sps.DisplayHeight;
+    var chromaWidth = (width + 1) >> 1;
+    var chromaHeight = (height + 1) >> 1;
 
-    return RawImageFactory.FromYuv420P8(
-      sps.DisplayWidth,
-      sps.DisplayHeight,
-      picture.Luma,
-      picture.Width,
-      picture.Cb,
-      picture.Cr,
-      picture.ChromaWidth,
-      sps.CropOffsetX,
-      sps.CropOffsetY,
-      RawImageColorInfo.Bt601Limited);
+    if (sps.BitDepthLuma == 8 && sps.BitDepthChroma == 8)
+      return RawImageFactory.FromYuv420P8(
+        width,
+        height,
+        _Narrow(picture.Luma),
+        picture.Width,
+        _Narrow(picture.Cb),
+        _Narrow(picture.Cr),
+        picture.ChromaWidth,
+        sps.CropOffsetX,
+        sps.CropOffsetY,
+        RawImageColorInfo.Bt601Limited);
+
+    // A Main 10 sequence keeps its ten bits: the samples go out in RawImage's P10 layout rather than
+    // being shifted down to a byte, because that shift is a quality decision the caller has not made.
+    var data = new byte[checked((width * height + 2 * chromaWidth * chromaHeight) * 2)];
+    var at = _CopyTenBitPlane(
+      picture.Luma, picture.Width, sps.CropOffsetX, sps.CropOffsetY, width, height, data, 0);
+    at = _CopyTenBitPlane(
+      picture.Cb, picture.ChromaWidth, sps.CropOffsetX >> 1, sps.CropOffsetY >> 1,
+      chromaWidth, chromaHeight, data, at);
+    _CopyTenBitPlane(
+      picture.Cr, picture.ChromaWidth, sps.CropOffsetX >> 1, sps.CropOffsetY >> 1,
+      chromaWidth, chromaHeight, data, at);
+
+    return new() {
+      Width = width,
+      Height = height,
+      Format = PixelFormat.Yuv420P10,
+      PixelData = data,
+      ColorInfo = RawImageColorInfo.Bt601Limited,
+    };
+  }
+
+  /// <summary>Copies an eight-bit sequence's samples out of the wider plane they are decoded into.</summary>
+  private static byte[] _Narrow(ushort[] plane) {
+    var result = new byte[plane.Length];
+    for (var i = 0; i < plane.Length; ++i)
+      result[i] = (byte)plane[i];
+    return result;
+  }
+
+  /// <summary>
+  /// Crops one plane into RawImage's P10 layout: a right-justified sample in a little-endian ushort.
+  /// </summary>
+  private static int _CopyTenBitPlane(
+    ushort[] source, int sourceStride, int left, int top, int width, int height, byte[] target, int at) {
+    for (var y = 0; y < height; ++y) {
+      var row = (top + y) * sourceStride + left;
+      for (var x = 0; x < width; ++x) {
+        var sample = source[row + x];
+        target[at++] = (byte)sample;
+        target[at++] = (byte)(sample >> 8);
+      }
+    }
+
+    return at;
   }
 }

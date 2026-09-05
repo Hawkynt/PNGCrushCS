@@ -952,9 +952,17 @@ internal sealed class H265FrameDecoder {
         ref this._cabac, this._coefficients, log2Size, 0, mode, this._pps, this._cuTransquantBypass);
 
     this._Reconstruct(
-      this._picture.Luma, this._picture.Width, x0, y0, log2Size, hasResidual, transformSkip, qp, 0,
-      this._sps.BitDepthLuma, mode);
+      this._picture.Luma, this._picture.Width, x0, y0, log2Size, hasResidual, transformSkip,
+      this._LumaQuantiser(qp), 0, this._sps.BitDepthLuma, mode);
   }
+
+  /// <summary>
+  /// <c>Qp′Y</c>: the quantiser the dequantiser of clause 8.6.2 works with. <c>QpY</c> itself runs
+  /// down to <c>−QpBdOffsetY</c> — twelve below zero for a ten-bit sequence — and the scale table is
+  /// indexed from zero, so the offset goes back in here. It stays out of everything that compares
+  /// quantisers to each other, which is what the deblocking filter and the chroma table do.
+  /// </summary>
+  private int _LumaQuantiser(int qpY) => qpY + this._sps.QpBdOffsetLuma;
 
   private void _ReconstructIntraChroma(int x0, int y0, int log2Size, bool cbfCb, bool cbfCr, int qp) {
     var chromaX = x0 >> 1;
@@ -983,8 +991,8 @@ internal sealed class H265FrameDecoder {
     var transformSkip = H265Residual.Decode(
       ref this._cabac, this._coefficients, log2Size, 0, -1, this._pps, this._cuTransquantBypass);
     this._AddResidual(
-      this._picture.Luma, this._picture.Width, x0, y0, log2Size, transformSkip, qp, 0,
-      this._sps.BitDepthLuma, false);
+      this._picture.Luma, this._picture.Width, x0, y0, log2Size, transformSkip,
+      this._LumaQuantiser(qp), 0, this._sps.BitDepthLuma, false);
   }
 
   private void _AddChromaResidual(int x0, int y0, int log2Size, bool cbfCb, bool cbfCr, int qp) {
@@ -1010,7 +1018,7 @@ internal sealed class H265FrameDecoder {
   }
 
   private void _Reconstruct(
-    byte[] plane, int stride, int x0, int y0, int log2Size, bool hasResidual, bool transformSkip,
+    ushort[] plane, int stride, int x0, int y0, int log2Size, bool hasResidual, bool transformSkip,
     int qp, int component, int bitDepth, int intraMode) {
     var size = 1 << log2Size;
     var maximum = (1 << bitDepth) - 1;
@@ -1023,13 +1031,13 @@ internal sealed class H265FrameDecoder {
         var value = this._prediction[(y << log2Size) + x];
         if (hasResidual)
           value += this._coefficients[(y << log2Size) + x];
-        plane[row + x] = (byte)Math.Clamp(value, 0, maximum);
+        plane[row + x] = (ushort)Math.Clamp(value, 0, maximum);
       }
     }
   }
 
   private void _AddResidual(
-    byte[] plane, int stride, int x0, int y0, int log2Size, bool transformSkip, int qp, int component,
+    ushort[] plane, int stride, int x0, int y0, int log2Size, bool transformSkip, int qp, int component,
     int bitDepth, bool intra) {
     var size = 1 << log2Size;
     var maximum = (1 << bitDepth) - 1;
@@ -1038,7 +1046,7 @@ internal sealed class H265FrameDecoder {
     for (var y = 0; y < size; ++y) {
       var row = (y0 + y) * stride + x0;
       for (var x = 0; x < size; ++x)
-        plane[row + x] = (byte)Math.Clamp(plane[row + x] + this._coefficients[(y << log2Size) + x], 0, maximum);
+        plane[row + x] = (ushort)Math.Clamp(plane[row + x] + this._coefficients[(y << log2Size) + x], 0, maximum);
     }
   }
 
@@ -1117,7 +1125,7 @@ internal sealed class H265FrameDecoder {
   }
 
   private bool _TakeReference(
-    byte[] plane, int stride, int width, int height, int x0, int y0, int x, int y, int slot) {
+    ushort[] plane, int stride, int width, int height, int x0, int y0, int x, int y, int slot) {
     if (x < 0 || y < 0 || x >= width || y >= height)
       return false;
     if (!this._IsPredictable(x0, y0, x, y))
@@ -1127,7 +1135,7 @@ internal sealed class H265FrameDecoder {
   }
 
   private bool _TakeReferenceChroma(
-    byte[] plane, int stride, int width, int height, int x0, int y0, int x, int y, int slot) {
+    ushort[] plane, int stride, int width, int height, int x0, int y0, int x, int y, int slot) {
     if (x < 0 || y < 0 || x >= width || y >= height)
       return false;
     if (!this._IsPredictable(x0 << 1, y0 << 1, x << 1, y << 1))

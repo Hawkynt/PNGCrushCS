@@ -20604,6 +20604,7 @@ Implements `IEquatable<Jpeg2000File>`, `IImageFormatMetadata<Jpeg2000File>`, `II
 | Member | Signature | Summary |
 | --- | --- | --- |
 | `ToBytes` | `static byte[] ToBytes(Jpeg2000File file)` |  |
+| `ToCodestreamBytes` | `static byte[] ToCodestreamBytes(Jpeg2000File file)` |  |
 
 ### Namespace `FileFormat.JpegLs`
 
@@ -20653,7 +20654,7 @@ Implements `IEquatable<JpegLsFile>`, `IImageFormatMetadata<JpegLsFile>`, `IImage
 
 #### `JpegXlFile`
 
-Implements `IEquatable<JpegXlFile>`, `IImageFormatMetadata<JpegXlFile>`, `IImageFormatReader<JpegXlFile>`, `IImageToRawImage<JpegXlFile>`.
+Implements `IEquatable<JpegXlFile>`, `IImageFormatMetadata<JpegXlFile>`, `IImageFormatReader<JpegXlFile>`, `IImageFormatWriter<JpegXlFile>`, `IImageFromRawImage<JpegXlFile>`, `IImageToRawImage<JpegXlFile>`.
 
 | Member | Signature | Summary |
 | --- | --- | --- |

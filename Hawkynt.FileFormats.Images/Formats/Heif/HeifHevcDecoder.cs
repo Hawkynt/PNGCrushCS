@@ -86,7 +86,9 @@ internal static class HeifHevcDecoder {
         pictureSequence.CropOffsetX,
         pictureSequence.CropOffsetY,
         pictureSequence.DisplayWidth,
-        pictureSequence.DisplayHeight),
+        pictureSequence.DisplayHeight,
+        pictureSequence.BitDepthLuma,
+        pictureSequence.BitDepthChroma),
     };
   }
 

@@ -224,7 +224,7 @@ internal static class H265Deblocking {
     }
   }
 
-  private static bool _StrongDecision(byte[] plane, int at, int step, int curvature, int beta, int clip) {
+  private static bool _StrongDecision(ushort[] plane, int at, int step, int curvature, int beta, int clip) {
     if (curvature >= beta >> 2)
       return false;
     var span = Math.Abs(plane[at - 4 * step] - plane[at - step]) + Math.Abs(plane[at] - plane[at + 3 * step]);
@@ -234,7 +234,7 @@ internal static class H265Deblocking {
   }
 
   private static void _FilterStrong(
-    byte[] plane, int at, int step, int clip, int maximum, bool keepP, bool keepQ) {
+    ushort[] plane, int at, int step, int clip, int maximum, bool keepP, bool keepQ) {
     var p3 = plane[at - 4 * step];
     var p2 = plane[at - 3 * step];
     var p1 = plane[at - 2 * step];
@@ -259,7 +259,7 @@ internal static class H265Deblocking {
   }
 
   private static void _FilterWeak(
-    byte[] plane, int at, int step, int clip, int maximum, bool filterP1, bool filterQ1,
+    ushort[] plane, int at, int step, int clip, int maximum, bool filterP1, bool filterQ1,
     bool keepP, bool keepQ) {
     var p2 = plane[at - 3 * step];
     var p1 = plane[at - 2 * step];
@@ -274,22 +274,22 @@ internal static class H265Deblocking {
 
     delta = Math.Clamp(delta, -clip, clip);
     if (!keepP) {
-      plane[at - step] = (byte)Math.Clamp(p0 + delta, 0, maximum);
+      plane[at - step] = (ushort)Math.Clamp(p0 + delta, 0, maximum);
       if (filterP1) {
         var adjust = Math.Clamp((((p2 + p0 + 1) >> 1) - p1 + delta) >> 1, -(clip >> 1), clip >> 1);
-        plane[at - 2 * step] = (byte)Math.Clamp(p1 + adjust, 0, maximum);
+        plane[at - 2 * step] = (ushort)Math.Clamp(p1 + adjust, 0, maximum);
       }
     }
 
     if (keepQ)
       return;
 
-    plane[at] = (byte)Math.Clamp(q0 - delta, 0, maximum);
+    plane[at] = (ushort)Math.Clamp(q0 - delta, 0, maximum);
     if (!filterQ1)
       return;
 
     var adjustQ = Math.Clamp((((q2 + q0 + 1) >> 1) - q1 - delta) >> 1, -(clip >> 1), clip >> 1);
-    plane[at + step] = (byte)Math.Clamp(q1 + adjustQ, 0, maximum);
+    plane[at + step] = (ushort)Math.Clamp(q1 + adjustQ, 0, maximum);
   }
 
   private static void _FilterChromaSegment(
@@ -330,9 +330,9 @@ internal static class H265Deblocking {
       var delta = Math.Clamp((((q0 - p0) << 2) + p1 - q1 + 4) >> 3, -clip, clip);
 
       if (!keepP)
-        plane[at - step] = (byte)Math.Clamp(p0 + delta, 0, maximum);
+        plane[at - step] = (ushort)Math.Clamp(p0 + delta, 0, maximum);
       if (!keepQ)
-        plane[at] = (byte)Math.Clamp(q0 - delta, 0, maximum);
+        plane[at] = (ushort)Math.Clamp(q0 - delta, 0, maximum);
     }
   }
 
@@ -340,6 +340,6 @@ internal static class H265Deblocking {
     => frame.IsTransquantBypassAt(block)
        || (sps.PcmLoopFilterDisabled && frame.IsPulseCodeModulatedAt(block));
 
-  private static byte _Move(int from, int to, int limit, int maximum)
-    => (byte)Math.Clamp(Math.Clamp(to, from - limit, from + limit), 0, maximum);
+  private static ushort _Move(int from, int to, int limit, int maximum)
+    => (ushort)Math.Clamp(Math.Clamp(to, from - limit, from + limit), 0, maximum);
 }

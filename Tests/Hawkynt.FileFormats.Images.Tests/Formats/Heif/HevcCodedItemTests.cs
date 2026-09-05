@@ -13,19 +13,20 @@ namespace FileFormat.Heif.Tests;
 /// wrote.
 /// </summary>
 /// <remarks>
-/// There is no HEVC decoder here. There used to be something shaped like one, and when it failed —
-/// which it did on every stream libheif has ever produced — the reader copied the raw mdat bytes
-/// into a buffer sized for the picture and returned that as a successful read. For the 61x37 file
-/// ImageMagick 7.1.2 writes that came back as 74 non-zero bytes out of 6771: a black rectangle of
-/// the right size, announced as the picture.
+/// There used to be something shaped like a decoder here, and when it failed — which it did on
+/// every stream libheif has ever produced — the reader copied the raw mdat bytes into a buffer
+/// sized for the picture and returned that as a successful read. For the 61x37 file ImageMagick
+/// 7.1.2 writes that came back as 74 non-zero bytes out of 6771: a black rectangle of the right
+/// size, announced as the picture. A wrong picture nothing announces is worse than a refusal.
 /// <para/>
-/// A wrong picture that nothing announces is worse than a refusal, so this refuses. The extent is
-/// still readable — it comes from the container's ispe and clap boxes, not from the codestream —
-/// and <see cref="HeifFile.ReadImageInfo"/> keeps answering it.
+/// The picture is now really decoded, by the H.265 implementation shared with the video package, at
+/// eight, ten and twelve bits — ImageMagick's writer chooses twelve. What is still refused is
+/// refused by name: an item with an hvcC that is not a decoder configuration record, a chroma
+/// format other than 4:2:0, and the coding tools of the range and screen-content extensions.
 /// <para/>
-/// The video library does decode HEVC intra pictures, which is what a still HEIF carries, but this
-/// library does not reference it and the two ship apart. Bringing them together would make these
-/// files readable and is a change of its own.
+/// The extent is separately readable in every case, because it comes from the container's ispe and
+/// clap boxes rather than from the codestream, and <see cref="HeifFile.ReadImageInfo"/> answers it
+/// without decoding anything.
 /// </remarks>
 [TestFixture]
 public sealed class HevcCodedItemTests {
@@ -33,7 +34,7 @@ public sealed class HevcCodedItemTests {
   /// <summary>The file this is really about: one a reference encoder wrote.</summary>
   [Test]
   [Category("Conformance")]
-  public void FromBytes_LibheifWrittenFile_RefusesRatherThanAnnouncingAnEmptyPicture() {
+  public void FromBytes_LibheifWrittenFile_DecodesThePictureRatherThanAPaddedBuffer() {
     var directory = Directory.CreateTempSubdirectory("heif-hevc");
     try {
       var source = Path.Combine(directory.FullName, "source.png");
@@ -56,8 +57,23 @@ public sealed class HevcCodedItemTests {
       if (!_IsIsoBmff(bytes))
         Assert.Ignore("ImageMagick has no HEIF encoder here: it wrote the source back unconverted rather than refusing.");
 
-      var refusal = Assert.Throws<NotSupportedException>(() => HeifReader.FromBytes(bytes));
-      Assert.That(refusal!.Message, Does.Contain("HEVC"), "the refusal must name what is unimplemented");
+      var image = HeifFile.ToRawImage(HeifReader.FromBytes(bytes));
+
+      Assert.Multiple(() => {
+        Assert.That(image.Width, Is.EqualTo(61));
+        Assert.That(image.Height, Is.EqualTo(37));
+        Assert.That(image.PixelData.Length, Is.EqualTo(61 * 37 * 3));
+      });
+
+      // The old fallback returned 74 non-zero bytes out of 6771. A blue-to-yellow gradient is
+      // bright everywhere, so counting what is not black separates a picture from a padded buffer.
+      var lit = 0;
+      foreach (var value in image.PixelData)
+        if (value > 8)
+          ++lit;
+
+      Assert.That(lit, Is.GreaterThan(image.PixelData.Length / 2),
+        "a gradient decodes to a lit picture, not to a rectangle of zeroes");
     } finally {
       try { directory.Delete(recursive: true); } catch { /* best effort */ }
     }
