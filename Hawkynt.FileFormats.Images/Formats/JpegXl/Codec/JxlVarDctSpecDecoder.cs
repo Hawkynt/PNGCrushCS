@@ -65,7 +65,12 @@ internal static class JxlVarDctSpecDecoder {
     EpfParams? epfParams = null,
     float[]? dcQuant = null,
     uint xQmScale = 3,
-    uint bQmScale = 2
+    uint bQmScale = 2,
+    byte[]? codestream = null,
+    JxlFrameToc? toc = null,
+    int frameBody = 0,
+    int groupSizeOverride = 0,
+    int numDcGroups = 1
   ) {
     ArgumentNullException.ThrowIfNull(reader);
     if (width <= 0)
@@ -86,9 +91,26 @@ internal static class JxlVarDctSpecDecoder {
     //
     // libjxl ref: lib/jxl/frame_dimensions.h::FrameDimensions::Set
     // ---------------------------------------------------------------
-    var groupSize = 1 << _DefaultGroupSizeLog2; // 256
+    var groupSize = groupSizeOverride > 0 ? groupSizeOverride : 1 << _DefaultGroupSizeLog2;
     var numGroupsW = (width + groupSize - 1) / groupSize;
     var numGroupsH = (height + groupSize - 1) / groupSize;
+
+    // A frame in more than one group states each of its parts at its own offset
+    // rather than one after another, and the table of contents gives them. With
+    // one part there is nothing to seek to and the reader simply carries on.
+    var sections = toc?.SectionSizes.Length ?? 1;
+    var seeks = codestream is not null && toc is { Permuted: false } && sections > 1;
+
+    JxlBitReader SectionReader(int index) {
+      if (!seeks || index >= sections)
+        return reader;
+
+      var at = checked(frameBody + toc!.SectionOffsets[index]);
+      if (at < 0 || at > codestream!.Length)
+        throw new InvalidDataException($"This frame's section {index} sits past the end of the codestream.");
+
+      return new JxlBitReader(codestream, at);
+    }
 
     // ---------------------------------------------------------------
     // Step 1 (NEW): Restoration filter (Gaborish + EPF) header.
@@ -198,7 +220,9 @@ internal static class JxlVarDctSpecDecoder {
     // The empty ModularDecode call (group_id=0 nb_ch=0) that libjxl shows
     // first is for the DC group's 0-channel placeholder image — handled by
     // our DecodeGroup early-return-on-empty path.
-    var extraPrecision = (int)reader.ReadBits(2);
+    // The DC group and the metadata beside it are the frame's second section.
+    var dcGroupReader = SectionReader(1);
+    var extraPrecision = (int)dcGroupReader.ReadBits(2);
     // libjxl `DequantDC` multiplies DC by `mul = 1.0 / (1 << extra_precision)`.
     var extraPrecisionMul = 1f / (1 << extraPrecision);
 
@@ -212,7 +236,7 @@ internal static class JxlVarDctSpecDecoder {
     var acMetadataStreamId = 1 + 2 * numDcGroupsForStreams + dcGroupIndex;
 
     var dcImage = JxlModularSpecDecoder.DecodeGroup(
-      reader,
+      dcGroupReader,
       width: dcWidth,
       height: dcHeight,
       numChannels: _NumXybChannels,
@@ -252,7 +276,7 @@ internal static class JxlVarDctSpecDecoder {
       new() { Width = dcGroupBlocksX, Height = dcGroupBlocksY, HShift = 0, VShift = 0, Pixels = new int[dcGroupBlocksX * dcGroupBlocksY] },
     };
     var acMetadata = JxlModularSpecDecoder.DecodeGroupChannels(
-      reader, acMetaChannels, bitDepth, modularGlobalTree, modularGlobalEntropy, acMetadataStreamId);
+      dcGroupReader, acMetaChannels, bitDepth, modularGlobalTree, modularGlobalEntropy, acMetadataStreamId);
 
     // Build per-block raw_quant_field from AC metadata (libjxl dec_modular.cc:
     // `row_qf[ix] = 1 + max(0, min(kQuantMax-1, row_in_2[num]))`). Channel 2
@@ -315,7 +339,11 @@ internal static class JxlVarDctSpecDecoder {
     // it lives in the AC global section, AFTER BlockContextMap and the DC
     // modular sub-image.
     // ---------------------------------------------------------------
-    var quantTableSet = JxlFrameQuantizer.ReadDequantMatrices(reader);
+    // The quantisation tables, the scan orders and the coefficient histograms
+    // are the frame's high-frequency global section, which follows its
+    // low-frequency groups.
+    var hfGlobalReader = SectionReader(1 + numDcGroups);
+    var quantTableSet = JxlFrameQuantizer.ReadDequantMatrices(hfGlobalReader);
 
     // After DequantMatrices, libjxl `ProcessACGlobal` reads:
     //   1. num_histograms = 1 + ReadBits(CeilLog2Nonzero(num_groups))
@@ -331,7 +359,7 @@ internal static class JxlVarDctSpecDecoder {
     // DecodeCoeffOrders (used_orders=0x5F triggers natural-order init only).
     var numGroups = numGroupsW * numGroupsH;
     var numHistoBits = numGroups <= 1 ? 0 : (int)Math.Ceiling(Math.Log2(numGroups));
-    var numHistograms = 1 + (int)reader.ReadBits(numHistoBits);
+    var numHistograms = 1 + (int)hfGlobalReader.ReadBits(numHistoBits);
     _ = numHistograms;
 
     // Single pass for now (matches the 1-pass assumption baked into our
@@ -343,10 +371,10 @@ internal static class JxlVarDctSpecDecoder {
       // Selector 0/1/2 are constants (0x5F, 0x13, 0) consuming 0 payload
       // bits. Only selector 3 reads 13 payload bits. NOT the BitsOffset
       // form used by other U32Encoders.
-      var usedOrders = reader.ReadU32(0x5Fu, 0u, 0x13u, 0u, 0u, 0u, 0u, 13u);
+      var usedOrders = hfGlobalReader.ReadU32(0x5Fu, 0u, 0x13u, 0u, 0u, 0u, 0u, 13u);
       // Decode permutations for any non-natural orders. Bit-position-only;
       // the actual permutations aren't yet plumbed to AC coefficient decode.
-      JxlCoeffOrderDecoder.DecodeCoeffOrders(reader, usedOrders);
+      JxlCoeffOrderDecoder.DecodeCoeffOrders(hfGlobalReader, usedOrders);
       // AC entropy block: libjxl `dec_frame.cc::ProcessACGlobal` computes
       //   num_contexts = num_histograms * block_ctx_map.NumACContexts()
       // where NumACContexts = num_ctxs * (kNonZeroBuckets +
@@ -354,7 +382,7 @@ internal static class JxlVarDctSpecDecoder {
       // (num_ctxs = 15) this is 15 * 495 = 7425 contexts per histogram.
       var acContexts = numHistograms * blockCtxMap.NumACContexts;
       acEntropyForPass = JxlEntropyDecoder.Read(
-        reader, acContexts, disallowLz77: false,
+        hfGlobalReader, acContexts, disallowLz77: false,
         distanceMultiplier: (uint)Math.Max(width, height));
     }
 
@@ -434,8 +462,11 @@ internal static class JxlVarDctSpecDecoder {
         // Step 6: AC blocks per channel — non-DC coefficients per 8×8 cell.
         // Now uses the global BlockContextMap + per-frame AC entropy decoder
         // (matches libjxl `dec_group.cc::DecodeGroupImpl`).
+        // Each group's coefficients sit at their own offset, after the
+        // low-frequency groups and the high-frequency global section.
+        var acGroupReader = SectionReader(2 + numDcGroups + groupIdx);
         var acBlocks = JxlAcDecoder.DecodeGroup(
-          reader, acEntropy, strategies, blockCtxMap,
+          acGroupReader, acEntropy, strategies, blockCtxMap,
           blocksX, blocksY, _NumXybChannels, groupQuant[groupIdx]);
 
         // Inject DC values into AC blocks at scan position 0. The AC decoder
