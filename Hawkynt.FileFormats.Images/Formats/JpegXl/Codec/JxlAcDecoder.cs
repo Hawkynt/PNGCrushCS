@@ -337,11 +337,7 @@ internal static class JxlAcDecoder {
 
     // (4) Store the count over every block the transform covers, so the
     //     neighbours that predict from it see the same number.
-    // Plain 8x8 keeps the table this decoder has always used, which is the
-    // scan transposed the way the inverse transform here expects to read it.
-    // The computed order is the format's own arrangement and is applied only to
-    // the larger transforms, where nothing was applied at all before.
-    var order = coveredBlocks == 1 ? null : JxlNaturalCoeffOrder.For(strategy);
+    var order = JxlNaturalCoeffOrder.For(strategy);
     var stored = (nzeros + coveredBlocks - 1) >> log2CoveredBlocks;
     var wide = JxlAcStrategyGeometry.BlocksWide(strategy);
     var high = JxlAcStrategyGeometry.BlocksHigh(strategy);
@@ -371,8 +367,7 @@ internal static class JxlAcDecoder {
       // coefficients at the correct frequency positions. For DCT8 the
       // permutation is the JPEG zigzag (precomputed in Dct8NaturalOrder).
       // Where the coefficient belongs, from the order the transform states.
-      var at = order is null ? Dct8NaturalOrder[k] : order[k];
-      outBlock[at] += (short)coeff;
+      outBlock[order[k]] += (short)coeff;
 
       prev = uCoeff != 0 ? 1 : 0;
       nzeros -= prev;

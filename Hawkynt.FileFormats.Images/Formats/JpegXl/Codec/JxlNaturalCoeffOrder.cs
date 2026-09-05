@@ -51,6 +51,13 @@ internal static class JxlNaturalCoeffOrder {
     var next = cx * cy;
     var span = cx * _BlockDim;
 
+    // The walk runs over a matrix whose wider side is `span`. This decoder's
+    // inverse transform reads a block the other way round — the shape the
+    // transform actually has, narrow side first — so each position is stored
+    // transposed. For a plain 8x8 that reproduces, entry for entry, the zigzag
+    // table this decoder has always used.
+    var stride = cy * _BlockDim;
+
     // The diagonals from the top-left corner, alternating direction.
     for (var i = 0; i < span; ++i)
     for (var j = 0; j <= i; ++j) {
@@ -63,7 +70,7 @@ internal static class JxlNaturalCoeffOrder {
 
       y >>= aspectShift;
       var at = x < cx && y < cy ? y * cx + x : next++;
-      order[at] = y * span + x;
+      order[at] = x * stride + y;
     }
 
     // The diagonals running back to the bottom-right corner.
@@ -78,7 +85,7 @@ internal static class JxlNaturalCoeffOrder {
           continue;
 
         y >>= aspectShift;
-        order[next++] = y * span + x;
+        order[next++] = x * stride + y;
       }
     }
 
