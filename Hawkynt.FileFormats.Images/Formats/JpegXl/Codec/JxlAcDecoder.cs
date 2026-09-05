@@ -238,6 +238,14 @@ internal static class JxlAcDecoder {
       }
     }
 
+    // Every group's coefficients are read with the histograms the frame stated
+    // once, but out of the group's own run of bits. libjxl builds a fresh
+    // arithmetic reader per group over those shared histograms, and the state
+    // word each one begins with sits at that group's own offset. With a single
+    // group the two are the same place, which is why leaving the decoder bound
+    // to the high-frequency global section worked for as long as it did.
+    entropy.ResetForGroup(reader, distanceMultiplier: 0);
+
     if (totalBlocks == 0)
       return result;
 

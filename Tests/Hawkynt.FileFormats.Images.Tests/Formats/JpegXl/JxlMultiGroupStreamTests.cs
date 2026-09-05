@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Linq;
+using FileFormat.JpegXl;
 using FileFormat.JpegXl.Codec;
 using NUnit.Framework;
 
@@ -94,6 +95,35 @@ internal sealed class JxlMultiGroupStreamTests {
       // almost nothing per sample and gives back a flat plane.
       Assert.That(dc.Channels[1].Pixels.Distinct().Count(), Is.GreaterThan(1),
         "a picture's DC is not one value repeated");
+    });
+  }
+
+  /// <summary>
+  /// A 260x48 lossy file cjxl 0.12.0 wrote, decoded all the way through. Its
+  /// coefficients are read with the histograms the frame states once in its
+  /// high-frequency global section, but out of each group's own run of bits —
+  /// and the arithmetic decoder over those histograms was left on the section
+  /// the histograms came from, so it took the state word and every symbol after
+  /// it from the wrong place. A frame in one group never showed it, because
+  /// there the two are the same position.
+  /// </summary>
+  [Test]
+  public void AFrameInTwoGroupsDecodesAllTheWayThrough() {
+    var data = _Fixture("cjxl_two_groups_coefficients.jxl");
+
+    var decoded = JpegXlReader.TryReadSpecRgb24(data, out var width, out var height, out var rgb);
+
+    Assert.Multiple(() => {
+      Assert.That(decoded, Is.True, "every block of every group has to run to the end of its coefficients");
+      Assert.That(width, Is.EqualTo(260));
+      Assert.That(height, Is.EqualTo(48));
+      Assert.That(rgb, Is.Not.Null.And.Length.EqualTo(260 * 48 * 3));
+      // The second group is the rightmost four pixels of the picture. Reading it
+      // from the wrong place leaves it at the flat fill the buffers start on.
+      var rightmost = new System.Collections.Generic.HashSet<int>();
+      for (var y = 0; y < 48; ++y)
+        rightmost.Add(rgb![(y * 260 + 258) * 3]);
+      Assert.That(rightmost, Has.Count.GreaterThan(1), "the second group carries a picture, not one value");
     });
   }
 
