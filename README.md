@@ -107,6 +107,8 @@ Key design rules:
 - Registry population happens at compile time rather than through runtime reflection.
 - Writers are added only when external/reference tooling can validate the generated files.
 
+[`FileFormat.md`](FileFormat.md) is the long form of that: the intermediate representation, the interface stack, and the attribute language the header serializer generator reads — which is the one part of this codebase a new format's author has to know and cannot read off the formats themselves.
+
 ## 🛠️ Build / test / run
 
 PNGCrushCS can optionally consume the sibling `CompressionWorkbench` checkout for linked-source primitives:

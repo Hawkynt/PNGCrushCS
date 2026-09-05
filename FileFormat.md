@@ -2,6 +2,16 @@
 
 How to build metadata-compatible file format libraries across any domain — image, audio, video, compression, crypto — with idiot-proof implementations, zero hand-written parsing for headers, and automatic format discovery.
 
+> **What this document is.** It describes the pattern, which is deliberately wider than any one
+> implementation of it. Where it names an attribute, the name is either something
+> `FileFormat.Core.Generators` in this repository reads today or a piece of the design surface that
+> is not built here, and the two are marked apart wherever they appear — because a reader cannot
+> otherwise tell a reference manual from a proposal, and following the wrong half produces code that
+> does not compile. The implemented set below was read off `HeaderSerializerGenerator.cs`'s own
+> attribute constants and checked against what the formats use; re-derive it the same way rather
+> than trusting this paragraph.
+
+
 ## Design Goals
 
 1. **Idiot-proof to implement** — the compiler enforces completeness; forget a method and it won't build
@@ -21,13 +31,16 @@ Every domain needs a canonical, format-agnostic data container that sits between
 For images, this is `RawImage`:
 
 ```csharp
-public class RawImage {
+public sealed class RawImage {
   public required int Width { get; init; }
   public required int Height { get; init; }
   public required PixelFormat Format { get; init; }
   public required byte[] PixelData { get; init; }
-  public byte[]? Palette { get; init; }
-  public byte[]? AlphaTable { get; init; }
+  public RawImageColorInfo? ColorInfo { get; init; }   // range, primaries, transfer, matrix
+  public byte[]? Palette { get; init; }                // RGB triplets; required for indexed formats
+  public int PaletteCount { get; init; }
+  public byte[]? AlphaTable { get; init; }             // per-entry alpha, PNG tRNS style
+  public ImageMetadata? Metadata { get; init; }        // EXIF/XMP/IPTC/ICC/DPI/text, or null
 }
 ```
 
@@ -37,7 +50,7 @@ For other domains, define the equivalent:
 - **Video**: `RawFrame[]` or frame-by-frame `RawImage` sequence
 - **Crypto**: `ReadOnlySpan<byte>` (raw bytes in, raw bytes out)
 
-The IR is deliberately dumb — no codec knowledge, no format-specific fields, just the universal representation that every format can produce and consume.
+The IR is deliberately dumb — no codec knowledge, no format-specific fields, just the universal representation that every format can produce and consume. The two things it does carry beyond pixels earn their place by being unreconstructable: `ColorInfo`, because a planar YUV or HDR buffer's layout does not say what its component values mean, and `Metadata`, because `null` there means "the source had none" or "the reader does not extract it" and never licence to fabricate a substitute.
 
 ### 2. The Interface Stack
 
@@ -111,63 +124,89 @@ The generator is modelled after [Kaitai Struct](https://kaitai.io/)'s declarativ
 
 #### 4.1 Attribute Taxonomy
 
+Everything in this block is read by the generator in this repository:
+
 ```
 Core
 ├── [GenerateSerializer]              Triggers source generation on the type
-├── [Endian(Little|Big)]              Default byte order for all fields in this type
+├── [GenerateSerializer(Sequential)]  Sequential mode: positions run on from the previous field
+├── [Endian(Endianness.Little|Big)]   Default byte order for all fields in this type
 └── [StructSize(N)]                   Declare total byte size (asserted at compile time)
 
 Field Positioning
 ├── [Field(offset, size)]             Fixed position: absolute byte offset + size
-├── [Field(offset, size, Endian=Big)] Override endianness for one field
-└── [SeqField]                        Sequential: position = previous field's end
-    └── [SeqField(Size=N)]            Explicit size in sequential mode
-
-Bit-Level Access
-├── [BitField(byteOff, bitOff, N)]   Extract N bits starting at bit bitOff of byte byteOff
-├── [BitFlags]                        Interpret a field as a [Flags] enum
-└── [PackedField(container, mask)]    Extract via bitmask from a named container field
+├── [FieldOffset(N)]                  Restart sequential numbering at an absolute offset
+├── [SeqField]                        Sequential: position = previous field's end
+└── [SeqField(Size=N)]                Explicit size in sequential mode
 
 Type Variants
-├── [StringField(enc)]                Fixed-size string: "ASCII", "UTF-8", "Latin1"
-├── [NullTermString(enc)]             Variable-length null-terminated string
-├── [OctalString]                     Octal-encoded integer (TAR headers)
-├── [RawBytes]                        Uninterpreted byte array
-└── [EnumField(typeof(T))]            Cast raw integer to enum T
+├── [String(enc)]                     Fixed-size string: "ASCII", "UTF-8", "Latin1"
+├── [StringZ(enc)]                    Variable-length null-terminated string
+└── [TypeOverride(typeof(T))]         Read as one type, surface as another
 
 Conditional & Dynamic
 ├── [If(field, op, value)]            Parse only when condition is true
 ├── [SizedBy(field)]                  Byte count comes from another field's value
-├── [SwitchOn(field)]                 Discriminated union: type depends on field value
-│   └── [Case(value, typeof(T))]      Maps a discriminator value to a sub-type
-├── [Repeat(field)]                   Array of N items, N from another field
 ├── [Repeat(N)]                       Fixed-count array
+├── [Repeat(field)]                   Array of N items, N from another field
 ├── [RepeatUntil(sentinel)]           Repeat until a sentinel value
 └── [RepeatEos]                       Repeat until end of buffer
 
 Validation
-├── [Valid(value)]                     Exact match (magic bytes, signatures)
+├── [Valid(value)]                    Exact match (magic bytes, signatures)
 ├── [ValidRange(min, max)]            Inclusive range check
-├── [ValidAnyOf(v1, v2, ...)]         Whitelist of allowed values
+└── [ValidAnyOf(v1, v2, ...)]         Whitelist of allowed values
+
+Layout
+└── [Filler(offset, size)]            Skip reserved/padding bytes
+```
+
+Three attributes are declared in `FileFormat.Core` and inert: `[SwitchOn]` is named by a generator
+constant that nothing reads, and `[Case]` and `[RawBytes]` are not named at all. No format uses any
+of the three. Declaring an attribute the generator ignores is worse than not having it, because the
+code compiles and the field is simply not serialised — so treat these as unbuilt rather than as
+available.
+
+The rest of the taxonomy below is design surface with no implementation here at all. It is kept
+because the pattern is the subject of this document and these are the shapes a binary header takes;
+a header that needs one of them is written by hand in this repository today.
+
+```
+Bit-Level Access
+├── [BitField(byteOff, bitOff, N)]    Extract N bits starting at bit bitOff of byte byteOff
+├── [BitFlags]                        Interpret a field as a [Flags] enum
+└── [PackedField(container, mask)]    Extract via bitmask from a named container field
+
+Type Variants
+├── [OctalString]                     Octal-encoded integer (TAR headers)
+└── [EnumField(typeof(T))]            Cast raw integer to enum T
+
+Positioning
+├── [Field(offset, size, Endian=Big)] Override endianness for one field
+└── [EndianField("ByteOrder")]        Byte order decided at runtime (TIFF II/MM)
+
+Validation
 └── [ValidExpr("_ % 2 == 0")]         Expression-based validation
 
 Computed (not in binary)
-├── [Computed("Width * Height")]       Derived from other fields
-└── [Computed(field, "_ >> 56")]       Transform of another field
+├── [Computed("Width * Height")]      Derived from other fields
+└── [Computed(field, "_ >> 56")]      Transform of another field
 
 Integrity
-├── [Checksum(algo, start, end)]       CRC32/Adler32 over byte range
-└── [ChecksumField(algo, field)]       Checksum covering another field's span
+├── [Checksum(algo, start, end)]      CRC32/Adler32 over byte range
+└── [ChecksumField(algo, field)]      Checksum covering another field's span
 
 Processing
 ├── [Process(Xor, key)]               XOR transform before parsing
-├── [Process(Zlib)]                    Inflate before parsing
-└── [Process(Custom, typeof(T))]       Custom IFieldProcessor implementation
+├── [Process(Zlib)]                   Inflate before parsing
+└── [Process(Custom, typeof(T))]      Custom IFieldProcessor implementation
 
 Layout
-├── [Filler(offset, size)]            Skip reserved/padding bytes
-└── [Align(N)]                         Align next field to N-byte boundary
+└── [Align(N)]                        Align next field to N-byte boundary
 ```
+
+An enum-typed field does not need `[EnumField]`: the generator infers the underlying width from the
+enum and casts, which is how every `ViffStorageType`-shaped field in this tree is read.
 
 #### 4.2 Fixed-Layout Mode — Absolute Offsets
 
@@ -225,9 +264,9 @@ public readonly partial record struct GzipHeader(
   [property: SeqField, If(nameof(Flags), Op.HasFlag, GzipFlags.FExtra),
              SizedBy(Size = 2, Prefix = true)]  byte[]? ExtraField,
   [property: SeqField, If(nameof(Flags), Op.HasFlag, GzipFlags.FName),
-             NullTermString("Latin1")]          string? FileName,
+             StringZ("Latin1")]                string? FileName,
   [property: SeqField, If(nameof(Flags), Op.HasFlag, GzipFlags.FComment),
-             NullTermString("Latin1")]          string? Comment,
+             StringZ("Latin1")]                string? Comment,
   [property: SeqField, If(nameof(Flags), Op.HasFlag, GzipFlags.FHcrc),
              SeqField(Size = 2)]                ushort? HeaderCrc
 );
@@ -267,6 +306,9 @@ public static GzipHeader ReadFrom(ReadOnlySpan<byte> source) {
 ```
 
 #### 4.4 Bit-Packing — Sub-Word Field Extraction
+
+> Design surface. `[BitField]`, `[BitFlags]` and `[PackedField]` are not implemented in this
+> repository; a packed header field here is unpacked in the reader by hand.
 
 For fields packed into a single integer (WIM resource entries: 56-bit size + 8-bit flags in one `uint64`):
 
@@ -339,7 +381,9 @@ public readonly partial record struct WimHeader(
 
 #### 4.6 Octal Strings and Domain-Specific Encodings
 
-TAR headers encode numbers as null-terminated octal ASCII strings. The `[OctalString]` attribute handles this:
+> Design surface. `[OctalString]` is not implemented in this repository.
+
+TAR headers encode numbers as null-terminated octal ASCII strings. The `[OctalString]` attribute would handle this:
 
 ```csharp
 [GenerateSerializer, StructSize(512)]
@@ -383,6 +427,9 @@ private static long ParseOctalLong(ReadOnlySpan<byte> field) {
 ```
 
 #### 4.7 Switch/Discriminated Unions
+
+> Inert. `[SwitchOn]` is named by a generator constant that nothing reads and `[Case]` is not named
+> at all, so a type written this way compiles and serialises nothing. No format here uses it.
 
 For formats with multiple block types sharing a common header (ZIP sections, ARC header versions):
 
@@ -441,38 +488,49 @@ public readonly partial record struct Zip64ExtendedInfo(
 
 #### 4.9 Supported `[Field]` Feature Matrix
 
-| Feature | Attribute | Example | Kaitai Equivalent |
-| --- | --- | --- | --- |
-| Absolute position + size | `Field(offset, size)` | `Field(8, 4)` | `seq` with explicit `pos` |
-| Sequential position | `SeqField` | (inferred from decl order) | `seq` default |
-| Byte order | `Endian(Big)` | class-level or per-field | `meta.endian`, `u4be` |
-| Runtime byte order | `EndianField("ByteOrder")` | TIFF II/MM | `meta.endian: ...` switch |
-| Enum cast | `EnumField(typeof(T))` | `ZipCompressionMethod` | `enum: ...` |
-| Fixed array | `Repeat(N)` | `uint[4]` mipmap offsets | `repeat: expr` |
-| Bit extraction | `BitField(byte, bit, N)` | WIM 56+8 packing | `type: b5` |
-| Bit flags | `BitFlags` | GZIP flags | — |
-| Packed bitmask | `PackedField(container, mask)` | `_ & 0x1F` | expression |
-| ASCII string | `StringField("ASCII")` | TAR name field | `type: str, encoding: ASCII` |
-| Null-terminated string | `NullTermString("Latin1")` | GZIP filename | `type: strz` |
-| Octal string | `OctalString` | TAR size/mode | — (custom) |
-| Raw byte array | `RawBytes` | WIM GUID | no type + `size` |
-| Conditional | `If(field, op, value)` | GZIP optional fields | `if: ...` |
-| Size from field | `SizedBy(field)` | ZIP filename | `size: len_file_name` |
-| Size until end | `SizeEos` | remaining bytes | `size-eos: true` |
-| Discriminated union | `SwitchOn(field)` + `Case` | ZIP section types | `switch-on` + `cases` |
-| Counted repetition | `Repeat(field)` | entry count | `repeat: expr` |
-| Sentinel repetition | `RepeatUntil(value)` | zero-block | `repeat: until` |
-| EOS repetition | `RepeatEos` | read all | `repeat: eos` |
-| Exact value | `Valid(value)` | magic bytes | `valid: ...` |
-| Range check | `ValidRange(min, max)` | version bounds | `valid: { min, max }` |
-| Whitelist | `ValidAnyOf(...)` | allowed methods | `valid: { any-of }` |
-| Expression check | `ValidExpr("...")` | alignment | `valid: { expr }` |
-| Derived value | `Computed("expr")` | not in binary | `instances` with `value` |
-| CRC/checksum | `Checksum(algo, start, end)` | TAR, ZIP | — |
-| Skip bytes | `Filler(offset, size)` | reserved | — |
-| Alignment | `Align(N)` | sector align | — |
-| Byte transform | `Process(Xor, key)` | obfuscated | `process: xor(key)` |
-| Sub-struct | (type reference) | WIM resource entry | `types` section |
+`Here` is what `FileFormat.Core.Generators` reads today; `design` is the pattern's surface with no
+implementation in this repository, written by hand where a header needs it.
+
+| Feature | Attribute | Here | Example | Kaitai Equivalent |
+| --- | --- | :---: | --- | --- |
+| Absolute position + size | `Field(offset, size)` | ✅ | `Field(8, 4)` | `seq` with explicit `pos` |
+| Sequential position | `SeqField` | ✅ | (inferred from decl order) | `seq` default |
+| Restart at an offset | `FieldOffset(N)` | ✅ | Cineon element records | — |
+| Byte order | `Endian(Endianness.Big)` | ✅ | class-level | `meta.endian`, `u4be` |
+| Enum cast | (type reference) | ✅ | an enum-typed field | `enum: ...` |
+| Type substitution | `TypeOverride(typeof(T))` | ✅ | read one width, surface another | — |
+| Fixed array | `Repeat(N)` | ✅ | `uint[4]` mipmap offsets | `repeat: expr` |
+| Counted repetition | `Repeat(field)` | ✅ | entry count | `repeat: expr` |
+| Sentinel repetition | `RepeatUntil(value)` | ✅ | zero-block | `repeat: until` |
+| EOS repetition | `RepeatEos` | ✅ | read all | `repeat: eos` |
+| ASCII string | `String("ASCII")` | ✅ | TAR name field | `type: str, encoding: ASCII` |
+| Null-terminated string | `StringZ("Latin1")` | ✅ | GZIP filename | `type: strz` |
+| Conditional | `If(field, op, value)` | ✅ | GZIP optional fields | `if: ...` |
+| Size from field | `SizedBy(field)` | ✅ | ZIP filename | `size: len_file_name` |
+| Exact value | `Valid(value)` | ✅ | magic bytes | `valid: ...` |
+| Range check | `ValidRange(min, max)` | ✅ | version bounds | `valid: { min, max }` |
+| Whitelist | `ValidAnyOf(...)` | ✅ | allowed methods | `valid: { any-of }` |
+| Skip bytes | `Filler(offset, size)` | ✅ | reserved | — |
+| Declared size | `StructSize(N)` | ✅ | asserted at compile time | — |
+| Discriminated union | `SwitchOn(field)` + `Case` | inert | ZIP section types | `switch-on` + `cases` |
+| Raw byte array | `RawBytes` | inert | WIM GUID | no type + `size` |
+| Runtime byte order | `EndianField("ByteOrder")` | design | TIFF II/MM | `meta.endian: ...` switch |
+| Per-field byte order | `Field(..., Endian=Big)` | design | one field against the type | — |
+| Bit extraction | `BitField(byte, bit, N)` | design | WIM 56+8 packing | `type: b5` |
+| Bit flags | `BitFlags` | design | GZIP flags | — |
+| Packed bitmask | `PackedField(container, mask)` | design | `_ & 0x1F` | expression |
+| Octal string | `OctalString` | design | TAR size/mode | — (custom) |
+| Size until end | `SizeEos` | design | remaining bytes | `size-eos: true` |
+| Expression check | `ValidExpr("...")` | design | alignment | `valid: { expr }` |
+| Derived value | `Computed("expr")` | design | not in binary | `instances` with `value` |
+| CRC/checksum | `Checksum(algo, start, end)` | design | TAR, ZIP | — |
+| Alignment | `Align(N)` | design | sector align | — |
+| Byte transform | `Process(Xor, key)` | design | obfuscated | `process: xor(key)` |
+| Sub-struct | (type reference) | ✅ | WIM resource entry | `types` section |
+
+`inert` means the attribute type exists and the generator does not act on it, which is the worst of
+the three states: the code compiles and the field is silently not serialised. Nothing in this
+repository uses one.
 
 ### 5. Format Detection
 
@@ -673,11 +731,11 @@ folder in is enough. The project it lands in references core and hooks up both g
 
 ## Complete Example: Fixed-Layout Header (QCOW2 — Big-Endian Disk Image)
 
-QCOW2 is a virtual disk image format with a 72-byte big-endian header. Demonstrates endianness control, validation, and computed fields.
+QCOW2 is a virtual disk image format with a 72-byte big-endian header. Demonstrates endianness control and validation.
 
 ```csharp
 // Qcow2Header.cs — currently ~60 LOC of manual BinaryPrimitives, replaced by declaration
-[GenerateSerializer, Endian(Big), StructSize(72)]
+[GenerateSerializer, Endian(Endianness.Big), StructSize(72)]
 public readonly partial record struct Qcow2Header(
   [property: Field(0, 4),  Valid(0x514649FBu)]  uint Magic,         // "QFI\xFB"
   [property: Field(4, 4),  ValidAnyOf(2u, 3u)]  uint Version,
@@ -691,16 +749,18 @@ public readonly partial record struct Qcow2Header(
   [property: Field(48, 8)]                        ulong RefcountTableOffset,
   [property: Field(56, 4)]                        uint RefcountTableClusters,
   [property: Field(60, 4)]                        uint NbSnapshots,
-  [property: Field(64, 8)]                        ulong SnapshotsOffset,
-  // --- computed (not in binary) ---
-  [property: Computed("1u << (int)ClusterBits")]  uint ClusterSize,
-  [property: Computed("ClusterSize / 8")]         uint L2Entries
+  [property: Field(64, 8)]                        ulong SnapshotsOffset
 ) {
   public const int Size = 72;
+
+  // Derived, not in the binary. [Computed] is design surface and not implemented here, so a
+  // derived value is an ordinary expression-bodied property.
+  public uint ClusterSize => 1u << (int)this.ClusterBits;
+  public uint L2Entries => this.ClusterSize / 8;
 }
 ```
 
-Zero hand-written `BinaryPrimitives` calls. The generator handles all big-endian reads/writes, validates magic and version on parse, and computes derived fields.
+Zero hand-written `BinaryPrimitives` calls. The generator handles all big-endian reads/writes and validates magic and version on parse.
 
 ## Complete Example: Sequential Header with Conditionals (GZIP)
 
@@ -719,9 +779,9 @@ public readonly partial record struct GzipHeader(
   [property: SeqField, If(nameof(Flags), Op.HasFlag, GzipFlags.FExtra),
              SizedBy(Size = 2, Prefix = true)]               byte[]? ExtraField,
   [property: SeqField, If(nameof(Flags), Op.HasFlag, GzipFlags.FName),
-             NullTermString("Latin1")]                       string? FileName,
+             StringZ("Latin1")]                             string? FileName,
   [property: SeqField, If(nameof(Flags), Op.HasFlag, GzipFlags.FComment),
-             NullTermString("Latin1")]                       string? Comment,
+             StringZ("Latin1")]                             string? Comment,
   [property: SeqField, If(nameof(Flags), Op.HasFlag, GzipFlags.FHcrc)]
                                                              ushort? HeaderCrc
 );
@@ -729,7 +789,7 @@ public readonly partial record struct GzipHeader(
 
 ## Complete Example: Compression Stream (Unix Compress — from CompressionWorkbench)
 
-The same architecture works for compression and archive formats. The sibling repo [CompressionWorkbench](../CompressionWorkbench) uses an instance-based descriptor pattern instead of static abstract interfaces, but the project structure, naming conventions, magic bytes, capability flags, and one-project-per-format principle are identical.
+The same architecture works for compression and archive formats. The sibling repo [CompressionWorkbench](https://github.com/Hawkynt/CompressionWorkbench) uses an instance-based descriptor pattern instead of static abstract interfaces, but the project structure, naming conventions, magic bytes, capability flags, and one-project-per-format principle are identical.
 
 Unix Compress (`.Z`) is a real, shipping format — 3 files, 35-line descriptor.
 
@@ -877,5 +937,7 @@ The tradeoff: Kaitai's YAML is more concise for simple cases and cross-language.
 
 This architecture is not theoretical. It runs in two production repos:
 
-- **PNGCrushCS** — 542 image format libraries (PNG, JPEG, WebP, QOI, TIFF, hundreds of retro/scientific/professional formats), 11 format-specific optimizers, a universal CLI, and a 500+ format viewer
-- **CompressionWorkbench** — ~180 archive/compression format libraries (ZIP, RAR, 7z, Gzip, Brotli, LZMA, filesystem images, game archives), 38 building blocks, a universal CLI, a WPF archive browser, a binary analysis engine with auto-extraction, and 3500+ tests
+- **PNGCrushCS** — 884 registered image formats (PNG, JPEG, WebP, QOI, TIFF, hundreds of retro/scientific/professional formats) plus a video package of containers and codecs, 12 format-specific optimizers behind one universal engine, a universal CLI, and a viewer that opens whatever the registry holds
+- **CompressionWorkbench** — archive and compression formats (ZIP, RAR, 7z, Gzip, Brotli, LZMA, filesystem images, game archives), a universal CLI, a WPF archive browser and a binary analysis engine with auto-extraction
+
+Counts go stale faster than anything else in a document like this, so they are not repeated per package here. The authoritative number for the image formats is the generated table in [`Hawkynt.FileFormats.Images/README.md`](Hawkynt.FileFormats.Images/README.md), which a test rebuilds from `FormatRegistry.AllFormats` and fails on any disagreement; the video package's two tables are checked the same way against its own registry. `CompressionWorkbench`'s own README is the authority for its side.
