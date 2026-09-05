@@ -259,7 +259,7 @@ internal static class JxlVarDctSpecDecoder {
     // were all read as stream zero, so a tree that told the DC apart from the
     // metadata sent both down the same branch.
     const int dcGroupIndex = 0;
-    var numDcGroupsForStreams = 1;
+    var numDcGroupsForStreams = Math.Max(1, numDcGroups);
     var dcStreamId = 1 + dcGroupIndex;
     var acMetadataStreamId = 1 + 2 * numDcGroupsForStreams + dcGroupIndex;
 
@@ -292,7 +292,10 @@ internal static class JxlVarDctSpecDecoder {
     var dcGroupBlocksY = (height + _BlockDim - 1) / _BlockDim;
     var upperBound = dcGroupBlocksX * dcGroupBlocksY;
     var countBits = upperBound <= 1 ? 0 : (int)Math.Ceiling(Math.Log2(upperBound));
-    var count = (int)reader.ReadBits(countBits) + 1;
+    // The count belongs to the DC group's own section, not to whatever the
+    // sequential reader is pointing at. With one section the two are the same
+    // reader, which is why reading it from the wrong one went unnoticed.
+    var count = (int)dcGroupReader.ReadBits(countBits) + 1;
     var crX = (dcGroupBlocksX + 7) >> 3;
     var crY = (dcGroupBlocksY + 7) >> 3;
     // libjxl default Image::Create gives ch[3] dims = r.xsize × r.ysize with

@@ -23,7 +23,7 @@ internal sealed class JxlAnsDecoder {
   private const int _RenormBits = 16;
 
   private uint _state;
-  private readonly JxlBitReader _reader;
+  private JxlBitReader _reader;
 
   public JxlAnsDecoder(JxlBitReader reader) {
     _reader = reader ?? throw new ArgumentNullException(nameof(reader));
@@ -31,6 +31,20 @@ internal sealed class JxlAnsDecoder {
 
   /// <summary>Initialize the rANS state by reading 32 bits LSB-first from the bitstream.</summary>
   public void Init() => _state = _reader.ReadBits(_StateBits);
+
+  /// <summary>
+  /// Start over on another stream. A frame's histograms are decoded once and
+  /// then shared by every stream that follows, but each of those streams is a
+  /// run of bits somewhere else in the file, and the state has to be taken
+  /// from there. Binding this at construction and never again left the symbols
+  /// coming from wherever the histograms happened to end while everything
+  /// beside them was read from the right place.
+  /// </summary>
+  public void Rebind(JxlBitReader reader) {
+    ArgumentNullException.ThrowIfNull(reader);
+    _reader = reader;
+    SymbolsRead = 0;
+  }
 
   /// <summary>
   /// Decode one symbol using the given distribution. State update follows libjxl

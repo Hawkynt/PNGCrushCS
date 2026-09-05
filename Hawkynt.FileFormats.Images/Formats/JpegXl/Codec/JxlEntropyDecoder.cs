@@ -95,8 +95,11 @@ internal sealed class JxlEntropyDecoder {
   public void ResetForGroup(JxlBitReader reader, uint distanceMultiplier) {
     ArgumentNullException.ThrowIfNull(reader);
     _reader = reader;
-    if (!_usePrefixCode)
+    if (!_usePrefixCode) {
       _ansInitDone = false;
+      // The rANS decoder reads its own bits and has to follow the move too.
+      _ansDecoder?.Rebind(reader);
+    }
 
     if (!_lz77Enabled)
       return;
