@@ -915,14 +915,24 @@ internal static class JxlModularSpecDecoder {
   }
 
   /// <summary>JPEG XL 'Select' predictor (LOCO-I / JPEG-LS MED edge detector).</summary>
+  /// <summary>
+  /// libjxl <c>Select(left, top, topleft)</c>: the gradient is computed, and
+  /// whichever of the two neighbours it lands nearer is the prediction.
+  /// </summary>
+  /// <remarks>
+  /// This is not PNG's Paeth filter, which is what stood here. Paeth compares
+  /// three ways and can return the corner; this compares two and never does.
+  /// The difference is invisible on most pixels and wrong on the ones where the
+  /// corner is nearest, and a single wrong sample desynchronises everything
+  /// after it — the neighbours it becomes decide which branch of the tree the
+  /// next pixel takes, so the reader starts pulling tokens from the wrong
+  /// context and runs off the end of the frame.
+  /// </remarks>
   private static int _SelectPredictor(int n, int w, int nw) {
     var p = w + n - nw;
     var pa = Math.Abs(p - w);
     var pb = Math.Abs(p - n);
-    var pc = Math.Abs(p - nw);
-    if (pa <= pb && pa <= pc)
-      return w;
-    return pb <= pc ? n : nw;
+    return pa < pb ? w : n;
   }
 
   /// <summary>

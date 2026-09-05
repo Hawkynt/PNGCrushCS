@@ -31,6 +31,27 @@ internal sealed class JxlChannel {
 /// <summary>Result of decoding a modular image: the list of channels after all
 /// transforms have been inverted. Channels are in canonical color order
 /// (Y or R-G-B, then alpha, then any extras).</summary>
+/// <summary>
+/// A picture assembled from several frames, already blended and already in
+/// float, one plane per channel.
+/// </summary>
+/// <remarks>
+/// A multi-frame file cannot come back as its last frame's samples, because
+/// blending happens between them at a precision samples do not have. What comes
+/// back is the composition, and it is rounded once on the way out.
+/// </remarks>
+internal sealed class JxlComposedImage {
+  public required int Width { get; init; }
+  public required int Height { get; init; }
+
+  /// <summary>Three colour planes followed by the extra channels, each a
+  /// fraction of full scale.</summary>
+  public required float[][] Planes { get; init; }
+
+  /// <summary>Which plane is the alpha, or -1 for none.</summary>
+  public required int AlphaPlane { get; init; }
+}
+
 internal sealed class JxlModularImage {
   public required JxlChannel[] Channels { get; init; }
 

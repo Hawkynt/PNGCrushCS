@@ -77,7 +77,7 @@ public static class JpegXlReader {
       imageMetadata = JxlImageMetadata.Decode(reader);
       JxlCustomTransformData.Decode(reader, imageMetadata.XybEncoded);
       reader.ZeroPadToByte();
-      var frame = JxlSpecFrameHeader.Decode(reader, imageMetadata);
+      var frame = JxlSpecFrameHeader.Decode(reader, imageMetadata, width, height);
       metadata = _Metadata(width, height, imageMetadata, frame);
       return true;
     } catch (InvalidDataException) {
@@ -174,17 +174,16 @@ public static class JpegXlReader {
       // ended on a byte boundary and the alignment below has nothing to swallow.
       JxlCustomTransformData.Decode(reader, imageMetadata.XybEncoded);
       reader.ZeroPadToByte();
-      var frame = JxlSpecFrameHeader.Decode(reader, imageMetadata);
+      var frame = JxlSpecFrameHeader.Decode(reader, imageMetadata, width, height);
       metadata = _Metadata(width, height, imageMetadata, frame);
 
       // A frame that is not the last one is a layer, not the picture: what a
       // caller should see is every frame composed in order, with the blending
-      // each states. Handing back the first on its own would be a picture
-      // nobody encoded, so a file with more than one frame is refused until
-      // they are composed.
-      if (!frame.IsLast)
-        throw new NotSupportedException(
-          "This JPEG XL file has more than one frame, and composing frames is not implemented.");
+      // each states.
+      if (!frame.IsLast) {
+        image = _DecodeComposed(codestream, imageMetadata, width, height);
+        return image != null;
+      }
 
       // A group is 128 pixels shifted by what the frame header states, and a
       // low-frequency group is eight of those across.
@@ -282,6 +281,182 @@ public static class JpegXlReader {
   private const ulong _FlagPatches = 2;
   private const ulong _FlagSplines = 16;
 
+  /// <summary>How many frames a file may keep aside to draw over later.</summary>
+  private const int _ReferenceSlots = 4;
+
+  /// <summary>
+  /// Read every frame in the file and compose them into the picture.
+  /// </summary>
+  /// <remarks>
+  /// Each frame states where it sits, how it combines with what is under it,
+  /// and which of up to four kept-aside frames that is. The result of each is
+  /// what the next one draws over, and the last frame's result is the picture.
+  ///
+  /// <para>Composition is in float over the colour planes followed by the extra
+  /// ones, because the alpha a frame blends by is one of the extra channels.
+  /// Only modular frames are composed: blending VarDCT frames happens in XYB
+  /// before the colour transform, and nothing here has been measured against
+  /// libjxl doing that, so such a file is refused by name instead.</para>
+  /// </remarks>
+  private static object? _DecodeComposed(byte[] codestream, JxlImageMetadata imageMetadata, int width, int height) {
+    var isGray = imageMetadata.ColorEncoding.ColorSpace == 1;
+    var baseChannels = isGray ? 1 : 3;
+    var extraChannels = (int)imageMetadata.NumExtraChannels;
+    var totalChannels = checked(baseChannels + extraChannels);
+    var bits = (int)imageMetadata.BitDepth.BitsPerSample;
+    var scale = 1.0f / ((1 << Math.Clamp(bits, 1, 30)) - 1);
+
+    // Three colour planes even for a grey picture, so that a spline's colour
+    // and a blend have somewhere to go.
+    var planeCount = 3 + extraChannels;
+    var alphaPlane = _AlphaPlane(imageMetadata);
+    var premultiplied = alphaPlane >= 3
+                        && imageMetadata.ExtraChannelInfo[alphaPlane - 3].AlphaAssociated;
+
+    var references = new float[_ReferenceSlots][][];
+    float[][]? composed = null;
+
+    var at = 0;
+    for (var frameIndex = 0; ; ++frameIndex) {
+      if (frameIndex > 512)
+        throw new NotSupportedException("This JPEG XL file states more frames than this decoder will follow.");
+
+      JxlBitReader reader;
+      JxlSpecFrameHeader frame;
+      if (frameIndex == 0) {
+        reader = new JxlBitReader(codestream, 2);
+        JxlSizeHeader.Decode(reader);
+        JxlImageMetadata.Decode(reader);
+        JxlCustomTransformData.Decode(reader, imageMetadata.XybEncoded);
+        reader.ZeroPadToByte();
+      } else
+        reader = new JxlBitReader(codestream, at);
+
+      frame = JxlSpecFrameHeader.Decode(reader, imageMetadata, width, height);
+      if (frame.Encoding != JxlFrameEncoding.Modular)
+        throw new NotSupportedException(
+          "This JPEG XL file has several frames and at least one is lossy; composing those is not implemented.");
+      if (frame.FrameType != JxlFrameType.Regular)
+        throw new NotSupportedException(
+          $"This JPEG XL file has a {frame.FrameType} frame, which this decoder does not compose.");
+
+      var frameWidth = frame.FrameWidth > 0 ? frame.FrameWidth : width;
+      var frameHeight = frame.FrameHeight > 0 ? frame.FrameHeight : height;
+
+      var groupDim = 128 << (int)frame.GroupSizeShift;
+      var numGroupsX = (frameWidth + groupDim - 1) / groupDim;
+      var numGroupsY = (frameHeight + groupDim - 1) / groupDim;
+      var numGroups = checked(numGroupsX * numGroupsY);
+      var lfGroupDim = groupDim * 8;
+      var numDcGroups = checked(((frameWidth + lfGroupDim - 1) / lfGroupDim)
+                                * ((frameHeight + lfGroupDim - 1) / lfGroupDim));
+      var toc = JxlFrameToc.Decode(reader, numGroups, (int)frame.NumPasses, numDcGroups);
+      var frameBody = checked((int)(reader.BitsRead / 8));
+
+      if ((frame.Flags & _FlagPatches) != 0)
+        throw new NotSupportedException("This JPEG XL frame overlays patches, which this decoder does not read yet.");
+
+      var splines = (frame.Flags & _FlagSplines) != 0
+        ? JxlSplines.Decode(reader, checked((long)frameWidth * frameHeight))
+        : null;
+
+      if ((frame.Flags & _FlagNoise) != 0)
+        throw new NotSupportedException("This JPEG XL frame adds noise, which this decoder does not read yet.");
+
+      JxlFrameQuantizer.ReadDcQuantization(reader);
+
+      var decoded = numGroups == 1
+        ? JxlModularSpecDecoder.Decode(reader, frameWidth, frameHeight, totalChannels, bits, isTopLevelFrame: true)
+        : JxlModularSpecDecoder.DecodeMultiGroup(
+          codestream, reader, frameWidth, frameHeight, totalChannels, bits,
+          groupDim, numGroupsX, numGroupsY, numDcGroups, (int)frame.NumPasses, toc, frameBody);
+      if (!_ValidateDecodedImage(decoded, frameWidth, frameHeight, totalChannels))
+        return null;
+
+      if (splines != null)
+        _DrawSplines((JxlModularImage)decoded!, splines, frameWidth, frameHeight, bits, isGray);
+
+      var foreground = _ToPlanes(decoded, frameWidth, frameHeight, planeCount, baseChannels, scale);
+      composed = JxlFrameComposer.Compose(
+        references[frame.BlendSource % _ReferenceSlots], foreground, planeCount,
+        width, height, frameWidth, frameHeight, frame.OriginX, frame.OriginY,
+        frame.BlendMode, alphaPlane, frame.BlendClamp, premultiplied);
+
+      if (frame.SaveAsReference != 0)
+        references[frame.SaveAsReference % _ReferenceSlots] = composed;
+
+      if (frame.IsLast)
+        break;
+
+      // An animation is not a stack of layers: its frames follow one another in
+      // time, and what a still picture means for one is the first frame a
+      // viewer would show. A frame of no duration is a layer of the next one,
+      // so composition carries on through those and stops at the first frame
+      // that is actually shown.
+      if (imageMetadata.HaveAnimation && frame.Duration > 0)
+        break;
+
+      var total = 0;
+      foreach (var size in toc.SectionSizes)
+        total = checked(total + size);
+      at = checked(frameBody + total);
+      if (at <= 0 || at >= codestream.Length)
+        throw new InvalidDataException("A frame's sections run past the end of the file.");
+    }
+
+    return composed == null
+      ? null
+      : new JxlComposedImage {
+        Width = width,
+        Height = height,
+        Planes = composed,
+        AlphaPlane = alphaPlane,
+      };
+  }
+
+  /// <summary>Which plane carries the alpha, or -1 when the picture has none.</summary>
+  private static int _AlphaPlane(JxlImageMetadata imageMetadata) {
+    for (var i = 0; i < imageMetadata.ExtraChannelInfo.Length; ++i)
+      if (imageMetadata.ExtraChannelInfo[i].Type == 0)
+        return 3 + i;
+    return -1;
+  }
+
+  /// <summary>
+  /// A decoded frame as float planes: three colour ones followed by its extra
+  /// channels, all as fractions of full scale.
+  /// </summary>
+  private static float[][] _ToPlanes(
+    object? decoded, int frameWidth, int frameHeight, int planeCount, int baseChannels, float scale
+  ) {
+    var modular = (JxlModularImage)decoded!;
+    var count = checked(frameWidth * frameHeight);
+    var planes = new float[planeCount][];
+
+    for (var p = 0; p < planeCount; ++p) {
+      planes[p] = new float[count];
+      // A grey frame's one channel stands for all three colour planes.
+      var source = p < 3
+        ? Math.Min(p, baseChannels - 1)
+        : baseChannels + (p - 3);
+      if (source >= modular.Channels.Length)
+        continue;
+
+      // Splines are drawn in float and leave the samples underneath alone, so
+      // where they ran the planes they produced are the picture.
+      if (p < 3 && modular.ColorPlanes is { } drawn) {
+        Array.Copy(drawn[p], planes[p], Math.Min(drawn[p].Length, count));
+        continue;
+      }
+
+      var pixels = modular.Channels[source].Pixels;
+      for (var i = 0; i < count && i < pixels.Length; ++i)
+        planes[p][i] = pixels[i] * scale;
+    }
+
+    return planes;
+  }
+
   /// <summary>
   /// Finish a modular frame by drawing its splines on top, in the fractions of
   /// full scale libjxl works in rather than in whole samples.
@@ -362,6 +537,37 @@ public static class JpegXlReader {
         ComponentCount = 3,
         BitsPerSample = deep ? 16 : 8,
         PixelData = rgb,
+        Brand = brand,
+      };
+      return true;
+    }
+
+    // A composed picture is already blended and already in float; all that is
+    // left is to round it once and drop the extra channels that are not alpha.
+    if (decoded is JxlComposedImage composed) {
+      var keepsAlpha = composed.AlphaPlane >= 3;
+      var parts = keepsAlpha ? 4 : 3;
+      var maximum = deep ? 65535.0f : 255.0f;
+      var blended = new byte[checked(pixelCount * parts * bytesPerSample)];
+      for (var i = 0; i < pixelCount; ++i)
+      for (var c = 0; c < parts; ++c) {
+        var plane = c < 3 ? c : composed.AlphaPlane;
+        var value = Math.Clamp(composed.Planes[plane][i], 0.0f, 1.0f) * maximum + 0.5f;
+        var at = (i * parts + c) * bytesPerSample;
+        if (deep) {
+          var sample = (ushort)Math.Clamp((int)value, 0, 65535);
+          blended[at] = (byte)(sample >> 8);
+          blended[at + 1] = (byte)sample;
+        } else
+          blended[at] = (byte)Math.Clamp((int)value, 0, 255);
+      }
+
+      file = new JpegXlFile {
+        Width = metadata.Width,
+        Height = metadata.Height,
+        ComponentCount = parts,
+        BitsPerSample = deep ? 16 : 8,
+        PixelData = blended,
         Brand = brand,
       };
       return true;
