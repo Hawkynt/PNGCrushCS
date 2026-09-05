@@ -670,7 +670,7 @@ internal static class JxlVarDctSpecDecoder {
       for (var bx = 0; bx < blocksX; ++bx) {
         var blockIdx = by * blocksX + bx;
         var strategy = strategies[by][bx];
-        if (strategy != JxlAcStrategyType.Dct8x8)
+        if (!_ReconstructsFromOrigin(strategies, bx, by, strategy))
           continue;
 
         var coeffBlock = group.AcBlocks[yCh][blockIdx];
@@ -692,6 +692,14 @@ internal static class JxlVarDctSpecDecoder {
         for (var bx = 0; bx < blocksX; ++bx) {
           var blockIdx = by * blocksX + bx;
           var strategy = strategies[by][bx];
+
+          // A transform whose lowest coefficients can be rebuilt from the DC
+          // values of the blocks it covers is reconstructed once, from the
+          // block it starts at. The rest are still drawn once per block they
+          // cover, which is not what the format says but is closer than
+          // spreading an inverse transform that disagrees with it.
+          if (!_ReconstructsFromOrigin(strategies, bx, by, strategy))
+            continue;
           var coeffBlock = group.AcBlocks[c][blockIdx];
           var (blockW, blockH) = JxlVarDctIdct.BlockSize(strategy);
           var blockArea = blockW * blockH;
@@ -723,10 +731,33 @@ internal static class JxlVarDctSpecDecoder {
             }
           }
 
-          // DC dequantization: overwrite position 0 with the pre-computed
-          // dequantized DC (uses mulDc[c] * extraPrecisionMul; includes cfl
-          // DC correction for X/B).
-          dequantized[0] = dequantDc[c * totalBlocks + blockIdx];
+          // The lowest coefficients come from the DC values of every block the
+          // transform covers, not from the one it starts at. A transform of one
+          // block has one of them and it is that block's DC.
+          var toCoefficients = JxlLowestFrequencies.DcToCoefficients(strategy);
+          if (toCoefficients is null) {
+            dequantized[0] = dequantDc[c * totalBlocks + blockIdx];
+          } else {
+            var order = JxlNaturalCoeffOrder.For(strategy);
+            var coveredWide = blockW / _BlockDim;
+            var coveredHigh = blockH / _BlockDim;
+            var dcOfCovered = new float[coveredWide * coveredHigh];
+            for (var dy = 0; dy < coveredHigh; ++dy)
+            for (var dx = 0; dx < coveredWide; ++dx) {
+              var at = (by + dy) * blocksX + bx + dx;
+              dcOfCovered[dy * coveredWide + dx] = at < totalBlocks
+                ? dequantDc[c * totalBlocks + at]
+                : dequantDc[c * totalBlocks + blockIdx];
+            }
+
+            for (var i = 0; i < toCoefficients.Length; ++i) {
+              var value = 0f;
+              for (var j = 0; j < dcOfCovered.Length; ++j)
+                value += toCoefficients[i][j] * dcOfCovered[j];
+
+              dequantized[order[i]] = value;
+            }
+          }
 
           // Step 6: inverse DCT. Output is BlockW×BlockH spatial samples
           // in float. Defers to JxlVarDctIdct.InverseAcStrategy.
@@ -748,6 +779,26 @@ internal static class JxlVarDctSpecDecoder {
         }
       }
     }
+  }
+
+  /// <summary>
+  /// Whether this transform is drawn once from the block it starts at.
+  /// </summary>
+  private static bool _ReconstructsFromOrigin(
+    JxlAcStrategyType[][] strategies,
+    int bx,
+    int by,
+    JxlAcStrategyType strategy
+  ) {
+    // A shape whose lowest coefficients can be rebuilt from the covered blocks'
+    // DC values is drawn once, from where it starts. A shape whose cannot is
+    // still drawn at every block it covers — not what the format says, but
+    // closer than drawing it once from coefficients that would be wrong across
+    // the whole rectangle.
+    if (JxlLowestFrequencies.DcToCoefficients(strategy) is null)
+      return true;
+
+    return JxlAcStrategyGeometry.IsTransformOrigin(strategies, bx, by);
   }
 
   /// <summary>The quantisation weights a transform's own shape is dequantised with.</summary>
