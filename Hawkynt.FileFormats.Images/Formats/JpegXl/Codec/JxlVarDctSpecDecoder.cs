@@ -34,6 +34,10 @@ namespace FileFormat.JpegXl.Codec;
 /// </summary>
 internal static class JxlVarDctSpecDecoder {
 
+  /// <summary>The frame flag that asks for the low frequencies to be left as
+  /// they are (libjxl <c>kSkipAdaptiveDCSmoothing</c>).</summary>
+  private const ulong _kSkipAdaptiveDcSmoothing = 0x80;
+
   /// <summary>Default group size for VarDCT frames per ISO/IEC 18181-1 §C.2.4
   /// — log2 of pixel dimension. group_size_shift defaults to 1, which yields
   /// 256×256 pixel groups (1 &lt;&lt; (8 + group_size_shift)).</summary>
@@ -71,7 +75,8 @@ internal static class JxlVarDctSpecDecoder {
     int frameBody = 0,
     int groupSizeOverride = 0,
     int numDcGroups = 1,
-    int numExtraChannels = 0
+    int numExtraChannels = 0,
+    ulong frameFlags = 0
   ) {
     ArgumentNullException.ThrowIfNull(reader);
     if (width <= 0)
@@ -561,7 +566,7 @@ internal static class JxlVarDctSpecDecoder {
       // per `dec_cache.h:RecomputeRowQuant`.
       var xDmMul = MathF.Pow(1f / 1.25f, (int)xQmScale - 2);
       var bDmMul = MathF.Pow(1f / 1.25f, (int)bQmScale - 2);
-      _RenderGroup(group, strategies, origins, correlationX, correlationB, blocksX, blocksY, quantTableSet,
+      _RenderGroup(group, strategies, origins, correlationX, correlationB, frameFlags, blocksX, blocksY, quantTableSet,
         mulDc, extraPrecisionMul, dcCorrelation,
         quantParams.InvGlobalScale, perBlockQuant, xDmMul, bDmMul,
         channels, width, height);
@@ -717,6 +722,7 @@ internal static class JxlVarDctSpecDecoder {
     bool[][] origins,
     JxlChannel correlationX,
     JxlChannel correlationB,
+    ulong frameFlags,
     int blocksX,
     int blocksY,
     JxlQuantTableSet quantTableSet,
@@ -751,6 +757,12 @@ internal static class JxlVarDctSpecDecoder {
       dequantDc[xCh * totalBlocks + i] = qX * mulDc[xCh] * extraPrecisionMul + yDc * dcCorrelation.YtoX;
       dequantDc[bCh * totalBlocks + i] = qB * mulDc[bCh] * extraPrecisionMul + yDc * dcCorrelation.YtoB;
     }
+
+    // The frame is written expecting the steps between neighbouring blocks to
+    // be taken back out of its low frequencies, and says so by not asking to
+    // skip it. Leaving them in is not a smaller picture, it is a different one.
+    if ((frameFlags & _kSkipAdaptiveDcSmoothing) == 0)
+      JxlAdaptiveDcSmoothing.Apply(dequantDc, blocksX, blocksY, mulDc);
 
     // Pre-pass: dequantize Y for every block, because the other two planes are
     // stated as what is left of them once their share of the luma is taken out,
