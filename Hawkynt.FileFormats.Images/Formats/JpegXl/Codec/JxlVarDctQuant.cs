@@ -251,10 +251,14 @@ internal static class JxlVarDctQuant {
 
     var bands = _DefaultBandsForStrategy(strategy);
     if (bands is null) return null;
-    var (w, h) = _BlockDimsForStrategy(strategy);
+    // The weights are applied to the block as this decoder stores it, so they
+    // have to be laid out the same way round. Taking the shape's name for that
+    // laid every rectangle's curve down the wrong axis, which no square shape
+    // could show.
+    var (blockWidth, blockHeight) = JxlVarDctIdct.BlockSize(strategy);
     var tables = new JxlQuantTable[3];
     for (var c = 0; c < 3; c++)
-      tables[c] = BuildFromDistanceBands(h, w, bands[c]);
+      tables[c] = BuildFromDistanceBands(blockHeight, blockWidth, bands[c]);
     return new JxlQuantTableSet { Tables = tables };
   }
 
@@ -349,9 +353,15 @@ internal static class JxlVarDctQuant {
         inverse[2 * y * 8 + 2 * x + 1] = band4x4[y * 4 + x];
       }
 
+      // Laid out the way the format writes a block down; the weights are
+      // applied to the block as this decoder stores it, which is the other way
+      // round. The two corner entries either side of the diagonal hold the same
+      // value, but the two curves laid into the rows and columns do not.
       var weights = new float[64];
-      for (var i = 0; i < 64; ++i)
-        weights[i] = 1.0f / inverse[i];
+      for (var y = 0; y < 8; ++y)
+      for (var x = 0; x < 8; ++x)
+        weights[x * 8 + y] = 1.0f / inverse[y * 8 + x];
+
       tables[c] = new JxlQuantTable { Width = 8, Height = 8, Weights = weights };
     }
 
