@@ -402,6 +402,7 @@ internal static class JxlVarDctSpecDecoder {
     // Single pass for now (matches the 1-pass assumption baked into our
     // groupStrategies layout below).
     JxlEntropyDecoder acEntropyForPass;
+    int[][][] coeffOrders;
     {
       // used_orders: libjxl frame_header.h:503 kOrderEnc =
       //   U32Enc(Val(0x5F), Val(0x13), Val(0), Bits(13))
@@ -411,7 +412,7 @@ internal static class JxlVarDctSpecDecoder {
       var usedOrders = hfGlobalReader.ReadU32(0x5Fu, 0u, 0x13u, 0u, 0u, 0u, 0u, 13u);
       // Decode permutations for any non-natural orders. Bit-position-only;
       // the actual permutations aren't yet plumbed to AC coefficient decode.
-      JxlCoeffOrderDecoder.DecodeCoeffOrders(hfGlobalReader, usedOrders);
+      coeffOrders = JxlCoeffOrderDecoder.DecodeCoeffOrders(hfGlobalReader, usedOrders);
       // AC entropy block: libjxl `dec_frame.cc::ProcessACGlobal` computes
       //   num_contexts = num_histograms * block_ctx_map.NumACContexts()
       // where NumACContexts = num_ctxs * (kNonZeroBuckets +
@@ -508,7 +509,7 @@ internal static class JxlVarDctSpecDecoder {
         var acGroupReader = SectionReader(2 + numDcGroups + groupIdx);
         var acBlocks = JxlAcDecoder.DecodeGroup(
           acGroupReader, acEntropy, strategies, blockCtxMap,
-          blocksX, blocksY, _NumXybChannels, groupQuant[groupIdx], groupOrigins[groupIdx]);
+          blocksX, blocksY, _NumXybChannels, groupQuant[groupIdx], groupOrigins[groupIdx], coeffOrders);
 
         // Inject DC values into AC blocks at scan position 0. The AC decoder
         // skips position 0 (DC) per spec; combining LF DC with AC produces

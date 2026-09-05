@@ -60,29 +60,39 @@ internal static class JxlCoeffOrderDecoder {
     return Math.Min(token, PermutationContexts - 1);
   }
 
-  /// <summary>libjxl <c>DecodeCoeffOrders</c>: when <paramref name="usedOrders"/>
-  /// is non-zero, decode permutation histograms + per-(strategy,channel)
-  /// Lehmer-code permutations. Bit-stream advance only — the actual
-  /// permutations are not yet exposed (AC decode falls back to natural
-  /// order).
+  /// <summary>Number of order buckets the strategies map onto.</summary>
+  internal const int NumOrders = 13;
+
+  /// <summary>
+  /// The scan order each transform states for itself, per order bucket and
+  /// channel (libjxl <c>coeff_order.cc::DecodeCoeffOrders</c>).
   /// </summary>
-  /// <param name="reader">Bit reader positioned at the permutation
-  /// histograms.</param>
-  /// <param name="usedOrders">Bit mask of orders that the encoder actually
-  /// permuted. Bit <c>i</c> set ⇒ order bucket <c>i</c> uses a
-  /// permutation.</param>
-  public static void DecodeCoeffOrders(JxlBitReader reader, uint usedOrders) {
+  /// <remarks>
+  /// A frame may state, for any bucket, an order of its own instead of the one
+  /// the shape implies. It states it as a permutation of the shape's natural
+  /// order rather than as positions, so the two are composed: the k-th
+  /// coefficient goes where the natural order's <c>permutation[k]</c>-th one
+  /// would have gone.
+  ///
+  /// <para>Buckets are shared. Several shapes map onto one bucket and all of
+  /// them use the natural order of whichever shape comes first, which is not
+  /// the same as each computing its own — a shape and its transpose share a
+  /// bucket, and the first of the pair decides for both.</para>
+  /// </remarks>
+  /// <param name="reader">Bit reader positioned at the permutation histograms.</param>
+  /// <param name="usedOrders">Bit <c>i</c> set means bucket <c>i</c> states an
+  /// order of its own.</param>
+  /// <returns>Indexed by bucket, then by channel.</returns>
+  public static int[][][] DecodeCoeffOrders(JxlBitReader reader, uint usedOrders) {
     ArgumentNullException.ThrowIfNull(reader);
-    if (usedOrders == 0)
-      return;
 
-    // libjxl: DecodeHistograms with kPermutationContexts contexts, then
-    // ANSSymbolReader::Create. Our JxlEntropyDecoder.Read combines both,
-    // deferring the rANS state read to first ReadInt — exactly what we want.
-    var entropy = JxlEntropyDecoder.Read(reader, numContexts: PermutationContexts, disallowLz77: false);
+    var orders = new int[NumOrders][][];
 
-    // For each AC strategy, decode 3 permutations IF its order bucket is in
-    // usedOrders AND not yet computed.
+    // libjxl: no histograms at all when nothing states an order of its own.
+    JxlEntropyDecoder? entropy = null;
+    if (usedOrders != 0)
+      entropy = JxlEntropyDecoder.Read(reader, numContexts: PermutationContexts, disallowLz77: false);
+
     var computed = 0u;
     for (var o = 0; o < NumValidStrategies; ++o) {
       var ord = StrategyOrder[o];
@@ -91,40 +101,68 @@ internal static class JxlCoeffOrderDecoder {
         continue;
       computed |= ordBit;
 
-      if ((usedOrders & ordBit) == 0)
-        continue;
-
-      var llf = (int)CoveredBlocksX[o] * CoveredBlocksY[o];
+      var llf = CoveredBlocksX[o] * CoveredBlocksY[o];
       var size = DctBlockSize * llf;
-      // Per libjxl `DecodeCoeffOrder`: 3 channels share an order bucket.
+      var natural = JxlNaturalCoeffOrder.For((JxlAcStrategyType)o);
+      if (natural.Length != size)
+        throw new System.IO.InvalidDataException(
+          $"The natural order of strategy {o} has {natural.Length} entries where its shape needs {size}.");
+
+      orders[ord] = new int[3][];
+      if ((usedOrders & ordBit) == 0) {
+        for (var c = 0; c < 3; ++c)
+          orders[ord][c] = natural;
+        continue;
+      }
+
       for (var c = 0; c < 3; ++c)
-        _ReadPermutation(entropy, skip: llf, size: size);
+        orders[ord][c] = _ReadPermutation(entropy!, skip: llf, size: size, natural);
     }
 
-    // libjxl checks rANS final state — we tolerate misalignment here, the
-    // entropy block is otherwise self-contained.
-    _ = entropy.CheckFinalState();
+    // The permutations were read exactly as written only when the arithmetic
+    // decoder is back where it started.
+    if (entropy is not null && !entropy.CheckFinalState())
+      throw new System.IO.InvalidDataException(
+        "The coefficient orders did not end in the arithmetic decoder's initial state.");
+
+    return orders;
   }
 
-  /// <summary>libjxl <c>ReadPermutation</c>: reads
-  /// <c>end = ReadHybridUint(CoeffOrderContext(size)) + skip</c> followed by
-  /// <c>end - skip</c> Lehmer-code entries (each via
-  /// <c>ReadHybridUint(CoeffOrderContext(last))</c>). We read but don't
-  /// surface the permutation — the caller's natural-order fallback is used
-  /// for actual AC coefficient decoding.</summary>
-  private static void _ReadPermutation(JxlEntropyDecoder entropy, int skip, int size) {
-    var end = (uint)entropy.ReadInt(CoeffOrderContext((uint)size)) + (uint)skip;
-    if (end > (uint)size)
+  /// <summary>The order for a transform's shape, in the channel's own version.</summary>
+  public static int[] For(int[][][] orders, JxlAcStrategyType strategy, int channel) {
+    ArgumentNullException.ThrowIfNull(orders);
+    var bucket = StrategyOrder[(int)strategy];
+    var perChannel = orders[bucket];
+    return perChannel[channel];
+  }
+
+  /// <summary>libjxl <c>ReadPermutation</c> followed by the composition
+  /// <c>order[k] = natural[permutation[k]]</c> that <c>DecodeCoeffOrder</c>
+  /// applies to it.</summary>
+  private static int[] _ReadPermutation(JxlEntropyDecoder entropy, int skip, int size, int[] natural) {
+    var lehmer = new int[size];
+    var end = entropy.ReadInt(CoeffOrderContext((uint)size)) + skip;
+    if (end < skip || end > size)
       throw new System.IO.InvalidDataException(
-        $"DecodeCoeffOrders: permutation end={end} exceeds size={size}.");
+        $"This frame states a permutation running to {end} of {size}.");
+
     uint last = 0;
-    for (var i = (uint)skip; i < end; ++i) {
-      var v = (uint)entropy.ReadInt(CoeffOrderContext(last));
-      if (v >= (uint)size - i)
+    for (var i = skip; i < end; ++i) {
+      var value = entropy.ReadInt(CoeffOrderContext(last));
+      if (value < 0 || value >= size - i)
         throw new System.IO.InvalidDataException(
-          $"DecodeCoeffOrders: invalid lehmer code v={v} at position {i} (size={size}).");
-      last = v;
+          $"This frame states {value} at position {i} of a permutation of {size}, which names no value still unused.");
+
+      lehmer[i] = value;
+      last = (uint)value;
     }
+
+    var permutation = JxlLehmerCode.Decode(lehmer, size);
+    var order = new int[size];
+    for (var k = 0; k < size; ++k)
+      order[k] = natural[permutation[k]];
+
+    return order;
   }
 
   private static uint _FloorLog2Nonzero(uint x) {
