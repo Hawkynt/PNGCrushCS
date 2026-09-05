@@ -177,6 +177,15 @@ public static class JpegXlReader {
       var frame = JxlSpecFrameHeader.Decode(reader, imageMetadata);
       metadata = _Metadata(width, height, imageMetadata, frame);
 
+      // A frame that is not the last one is a layer, not the picture: what a
+      // caller should see is every frame composed in order, with the blending
+      // each states. Handing back the first on its own would be a picture
+      // nobody encoded, so a file with more than one frame is refused until
+      // they are composed.
+      if (!frame.IsLast)
+        throw new NotSupportedException(
+          "This JPEG XL file has more than one frame, and composing frames is not implemented.");
+
       // A group is 128 pixels shifted by what the frame header states, and a
       // low-frequency group is eight of those across.
       var groupDim = 128 << (int)frame.GroupSizeShift;
@@ -189,6 +198,20 @@ public static class JpegXlReader {
 
       // The table of contents ends byte-aligned on the frame's first section.
       var frameBody = checked((int)(reader.BitsRead / 8));
+
+      // The frame's global section opens with whatever it states in its header
+      // flags — patches, then splines, then noise — and only then the
+      // quantization tables. Reading them in any other order, or not at all,
+      // puts every field behind them at the wrong offset.
+      if ((frame.Flags & _FlagPatches) != 0)
+        throw new NotSupportedException("This JPEG XL frame overlays patches, which this decoder does not read yet.");
+
+      var splines = (frame.Flags & _FlagSplines) != 0
+        ? JxlSplines.Decode(reader, checked((long)width * height))
+        : null;
+
+      if ((frame.Flags & _FlagNoise) != 0)
+        throw new NotSupportedException("This JPEG XL frame adds noise, which this decoder does not read yet.");
 
       // Every frame carries the DC quantization defaults, including modular frames.
       var dcQuant = JxlFrameQuantizer.ReadDcQuantization(reader);
@@ -205,7 +228,14 @@ public static class JpegXlReader {
             codestream, reader, width, height, totalChannels, bits,
             groupDim, numGroupsX, numGroupsY, numDcGroups, (int)frame.NumPasses, toc, frameBody);
 
-        return _ValidateDecodedImage(image, width, height, totalChannels);
+        if (!_ValidateDecodedImage(image, width, height, totalChannels))
+          return false;
+
+        // A modular frame states no colour correlation of its own, so a spline's
+        // colour is taken as it stands.
+        if (splines != null)
+          _DrawSplines((JxlModularImage)image!, splines, width, height, bits, isGray);
+        return true;
       }
 
       image = JxlVarDctSpecDecoder.Decode(
@@ -245,6 +275,47 @@ public static class JpegXlReader {
     } catch (OverflowException) {
       return false;
     }
+  }
+
+  /// <summary>libjxl <c>FrameHeader::Flags</c>.</summary>
+  private const ulong _FlagNoise = 1;
+  private const ulong _FlagPatches = 2;
+  private const ulong _FlagSplines = 16;
+
+  /// <summary>
+  /// Finish a modular frame by drawing its splines on top, in the fractions of
+  /// full scale libjxl works in rather than in whole samples.
+  /// </summary>
+  private static void _DrawSplines(
+    JxlModularImage modular, SplineList splines, int width, int height, int bits, bool isGray
+  ) {
+    // A spline's colour is stated against the luma channel the same way a
+    // block's is, and it uses the frame's base correlation rather than any
+    // per-tile one. A modular frame states no correlation map, so the base is
+    // what it started as — and the B half of that is one, not zero, which is
+    // the whole difference between a blue channel that agrees with libjxl and
+    // one that is out by half its range.
+    var segments = JxlSplines.BuildSegments(
+      splines, width, height,
+      yToX: JxlColorCorrelationMap.DefaultYtoXRatio,
+      yToB: JxlColorCorrelationMap.DefaultYtoBRatio);
+    if (segments.Count == 0)
+      return;
+
+    var count = checked(width * height);
+    var scale = 1.0f / ((1 << Math.Clamp(bits, 1, 30)) - 1);
+    var planes = new float[3][];
+    for (var c = 0; c < 3; ++c) {
+      planes[c] = new float[count];
+      // A grey frame carries one channel and all three planes are drawn on it,
+      // which is what makes a coloured spline show up on a grey picture.
+      var source = modular.Channels[isGray ? 0 : Math.Min(c, modular.Channels.Length - 1)].Pixels;
+      for (var i = 0; i < count; ++i)
+        planes[c][i] = source[i] * scale;
+    }
+
+    JxlSplines.AddTo(segments, planes, width, height);
+    modular.ColorPlanes = planes;
   }
 
   private static bool _ValidateDecodedImage(object? image, int width, int height, int channels) {
@@ -302,6 +373,35 @@ public static class JpegXlReader {
     var baseChannels = gray ? 1 : 3;
     if (modular.Channels.Length < baseChannels)
       return false;
+
+    // Once something has been drawn on top, the picture is the float planes and
+    // the samples underneath are only what it was drawn over. A grey frame that
+    // was drawn on comes back in colour, because a spline has a colour.
+    if (modular.ColorPlanes is { } drawn) {
+      var maximum = deep ? 65535.0f : 255.0f;
+      var painted = new byte[checked(pixelCount * 3 * bytesPerSample)];
+      for (var i = 0; i < pixelCount; ++i)
+      for (var c = 0; c < 3; ++c) {
+        var value = Math.Clamp(drawn[c][i], 0.0f, 1.0f) * maximum + 0.5f;
+        var at = (i * 3 + c) * bytesPerSample;
+        if (deep) {
+          var sample = (ushort)Math.Clamp((int)value, 0, 65535);
+          painted[at] = (byte)(sample >> 8);
+          painted[at + 1] = (byte)sample;
+        } else
+          painted[at] = (byte)Math.Clamp((int)value, 0, 255);
+      }
+
+      file = new JpegXlFile {
+        Width = metadata.Width,
+        Height = metadata.Height,
+        ComponentCount = 3,
+        BitsPerSample = deep ? 16 : 8,
+        PixelData = painted,
+        Brand = brand,
+      };
+      return true;
+    }
 
     var alphaIndex = -1;
     for (var i = 0; i < imageMetadata.ExtraChannelInfo.Length; ++i) {
