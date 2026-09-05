@@ -33,6 +33,19 @@ internal sealed class JxlChannel {
 /// (Y or R-G-B, then alpha, then any extras).</summary>
 internal sealed class JxlModularImage {
   public required JxlChannel[] Channels { get; init; }
+
+  /// <summary>
+  /// The three colour planes as fractions of full scale, present only when the
+  /// frame carried something that had to be drawn on top of the samples rather
+  /// than coded into them — splines, so far.
+  /// </summary>
+  /// <remarks>
+  /// A spline states a colour that is not a whole sample, so the picture has to
+  /// be finished in floats and rounded once at the end. When this is set it is
+  /// the picture, and <see cref="Channels"/> holds what was there before the
+  /// drawing.
+  /// </remarks>
+  public float[][]? ColorPlanes { get; set; }
 }
 
 /// <summary>One node of the meta-adaptive (MA) decision tree (ISO/IEC 18181-1 §H.2).

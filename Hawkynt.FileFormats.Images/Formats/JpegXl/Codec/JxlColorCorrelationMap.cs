@@ -89,6 +89,10 @@ internal sealed class JxlColorCorrelationMap {
   /// addend <c>YtoBRatio(ytob_dc)</c> is added on top.</summary>
   public const float DefaultYtoBRatio = 1.0f;
 
+  /// <summary>libjxl <c>base_correlation_x_</c>. The X half of the same pair,
+  /// which unlike the B half starts at nothing.</summary>
+  public const float DefaultYtoXRatio = 0.0f;
+
   /// <summary>The pair of DC-level CfL factors (libjxl
   /// <c>ColorCorrelation::DCFactors()</c>): <c>[YtoX_dc, 0, YtoB_dc, 0]</c>
   /// stored in canonical XYB order. Index 0 is the Y→X correction applied
