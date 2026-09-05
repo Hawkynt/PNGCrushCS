@@ -172,6 +172,9 @@ internal static class JxlAcDecoder {
   /// <param name="groupBlocksWide">Number of 8×8 blocks across the group.</param>
   /// <param name="groupBlocksHigh">Number of 8×8 blocks down the group.</param>
   /// <param name="numChannels">Number of XYB channels (typically 3).</param>
+  /// <param name="coeffOrders">The scan order per bucket and channel, as the
+  /// frame stated it. Null falls back to the order each shape implies, which is
+  /// right only for a frame that states none of its own.</param>
   /// <param name="origins">Which cell each transform starts at, as the file
   /// stated it. Without it the start has to be guessed from the shapes of the
   /// cells around it, and that guess is wrong wherever two transforms of the
@@ -190,7 +193,8 @@ internal static class JxlAcDecoder {
     int groupBlocksHigh,
     int numChannels,
     int[][]? quantField = null,
-    bool[][]? origins = null
+    bool[][]? origins = null,
+    int[][][]? coeffOrders = null
   ) {
     ArgumentNullException.ThrowIfNull(reader);
     ArgumentNullException.ThrowIfNull(entropy);
@@ -282,7 +286,8 @@ internal static class JxlAcDecoder {
             nzerosPlane[c], bx, by, groupBlocksWide, groupBlocksHigh,
             quantField is null ? 0 : quantField[by][bx],
             channel: c,
-            outBlock: result[c][by * groupBlocksWide + bx].Coefficients);
+            outBlock: result[c][by * groupBlocksWide + bx].Coefficients,
+            coeffOrders: coeffOrders);
         }
 
         bx += wide;
@@ -306,7 +311,8 @@ internal static class JxlAcDecoder {
     int bx, int by, int blocksWide, int blocksHigh,
     int quantField,
     int channel,
-    short[] outBlock
+    short[] outBlock,
+    int[][][]? coeffOrders
   ) {
     var log2CoveredBlocks = JxlAcStrategyGeometry.Log2Blocks(strategy);
     var coveredBlocks = 1 << log2CoveredBlocks;
@@ -344,7 +350,12 @@ internal static class JxlAcDecoder {
 
     // (4) Store the count over every block the transform covers, so the
     //     neighbours that predict from it see the same number.
-    var order = JxlNaturalCoeffOrder.For(strategy);
+    // The frame may state a scan order of its own for this shape. Where it
+    // does, taking the natural one instead puts every coefficient of every
+    // block of that shape somewhere else than the file put it.
+    var order = coeffOrders is null
+      ? JxlNaturalCoeffOrder.For(strategy)
+      : JxlCoeffOrderDecoder.For(coeffOrders, strategy, channel);
     var stored = (nzeros + coveredBlocks - 1) >> log2CoveredBlocks;
     var wide = JxlAcStrategyGeometry.BlocksWide(strategy);
     var high = JxlAcStrategyGeometry.BlocksHigh(strategy);
