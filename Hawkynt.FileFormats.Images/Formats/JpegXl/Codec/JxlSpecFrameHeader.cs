@@ -50,6 +50,41 @@ internal sealed class JxlSpecFrameHeader {
   public uint BQmScale { get; init; } = 2;
   public uint NumPasses { get; init; } = 1;
   public bool IsLast { get; init; } = true;
+
+  /// <summary>Where the frame sits in the picture, and how much of it the frame
+  /// covers. A frame that does not cover the picture is drawn over what is
+  /// already there.</summary>
+  public int OriginX { get; init; }
+  public int OriginY { get; init; }
+  public int FrameWidth { get; init; }
+  public int FrameHeight { get; init; }
+
+  /// <summary>How the frame is combined with what is under it: 0 replace,
+  /// 1 add, 2 blend, 3 alpha-weighted add, 4 multiply.</summary>
+  public uint BlendMode { get; init; }
+
+  /// <summary>Which stored frame it is combined with.</summary>
+  public uint BlendSource { get; init; }
+
+  /// <summary>Which extra channel carries the alpha it blends by.</summary>
+  public uint BlendAlphaChannel { get; init; }
+
+  /// <summary>Whether the alpha is clamped before blending.</summary>
+  public bool BlendClamp { get; init; }
+
+  /// <summary>Which slot the frame is kept in for a later one to refer to,
+  /// or zero for none.</summary>
+  public uint SaveAsReference { get; init; }
+
+  /// <summary>True when the frame covers less than the whole picture.</summary>
+  public bool IsPartialFrame { get; init; }
+
+  /// <summary>
+  /// How long the frame is shown, in the file's own ticks. Only meaningful when
+  /// the file is an animation; zero there means the frame is a layer of the one
+  /// that follows rather than something shown on its own.
+  /// </summary>
+  public uint Duration { get; init; }
   public bool SaveBeforeColorTransform { get; init; }
   public string Name { get; init; } = "";
 
@@ -76,7 +111,13 @@ internal sealed class JxlSpecFrameHeader {
   /// Decode a FrameHeader. Mirrors libjxl <c>FrameHeader::VisitFields</c>
   /// step-for-step.
   /// </summary>
-  public static JxlSpecFrameHeader Decode(JxlBitReader r, JxlImageMetadata? imageMetadata = null) {
+  /// <param name="imageWidth">The picture's width, which is what a frame's own
+  /// size is compared against to tell whether it covers the picture. Zero means
+  /// unknown, and then a frame is taken to cover it.</param>
+  /// <param name="imageHeight">The picture's height, likewise.</param>
+  public static JxlSpecFrameHeader Decode(
+    JxlBitReader r, JxlImageMetadata? imageMetadata = null, int imageWidth = 0, int imageHeight = 0
+  ) {
     ArgumentNullException.ThrowIfNull(r);
 
     // libjxl `frame_header.cc`: when `nonserialized_metadata` is null,
@@ -169,6 +210,10 @@ internal sealed class JxlSpecFrameHeader {
     // 11. custom_size_or_origin and conditional crop fields when !DCFrame.
     var customSizeOrOrigin = false;
     var isPartialFrame = false;
+    var originX = 0;
+    var originY = 0;
+    var frameWidth = imageWidth;
+    var frameHeight = imageHeight;
     if (frameType != JxlFrameType.DcFrame) {
       customSizeOrOrigin = r.ReadBool();
       if (customSizeOrOrigin) {
@@ -176,26 +221,43 @@ internal sealed class JxlSpecFrameHeader {
         //          BitsOffset(30, 18688).
         // Origin (signed-packed) only for Regular / SkipProgressive.
         if (frameType == JxlFrameType.Regular || frameType == JxlFrameType.SkipProgressive) {
-          r.ReadU32(0, 8, 256, 11, 2304, 14, 18688, 30); // ux0
-          r.ReadU32(0, 8, 256, 11, 2304, 14, 18688, 30); // uy0
+          originX = _UnpackSigned(r.ReadU32(0, 8, 256, 11, 2304, 14, 18688, 30));
+          originY = _UnpackSigned(r.ReadU32(0, 8, 256, 11, 2304, 14, 18688, 30));
         }
-        r.ReadU32(0, 8, 256, 11, 2304, 14, 18688, 30); // xsize
-        r.ReadU32(0, 8, 256, 11, 2304, 14, 18688, 30); // ysize
-        // is_partial_frame would be derived from the crop, but the orchestrator
-        // only needs the bit count to advance — we treat it as not-partial.
+        frameWidth = (int)r.ReadU32(0, 8, 256, 11, 2304, 14, 18688, 30);
+        frameHeight = (int)r.ReadU32(0, 8, 256, 11, 2304, 14, 18688, 30);
+        if (frameWidth == 0 || frameHeight == 0)
+          throw new System.IO.InvalidDataException("A frame states a crop with no width or no height.");
+
+        // Whether the frame covers the whole picture, which decides one field
+        // further down: a frame that does not cover it has to say which older
+        // frame it is drawn over, even when it replaces rather than blends.
+        // Treating every frame as covering skips that field and puts the whole
+        // rest of the frame at the wrong offset.
+        if (frameType is JxlFrameType.Regular or JxlFrameType.SkipProgressive) {
+          isPartialFrame |= originX > 0;
+          isPartialFrame |= originY > 0;
+          isPartialFrame |= imageWidth > 0 && frameWidth + originX < imageWidth;
+          isPartialFrame |= imageHeight > 0 && frameHeight + originY < imageHeight;
+        }
       }
     }
 
     // 12. BlendingInfo, ec_blending_info, animation, is_last for Regular/SkipProgressive.
     var isLast = true;
     var blendMode = 0u; // default kReplace
+    var blendSource = 0u;
+    var blendAlphaChannel = 0u;
+    var blendClamp = false;
+    var duration = 0u;
     if (frameType == JxlFrameType.Regular || frameType == JxlFrameType.SkipProgressive) {
-      blendMode = _ReadBlendingInfo(r, numExtraChannels, isPartialFrame);
+      (blendMode, blendSource, blendAlphaChannel, blendClamp) =
+        _ReadBlendingInfo(r, numExtraChannels, isPartialFrame);
       for (var i = 0; i < numExtraChannels; ++i)
         _ReadBlendingInfo(r, numExtraChannels, isPartialFrame);
       if (haveAnimation) {
         // duration: U32(Val(0), Val(1), Bits(8), Bits(32))
-        r.ReadU32(0, 0, 1, 0, 0, 8, 0, 32);
+        duration = r.ReadU32(0, 0, 1, 0, 0, 8, 0, 32);
         if (haveTimecodes)
           r.ReadBits(32);
       }
@@ -258,6 +320,17 @@ internal sealed class JxlSpecFrameHeader {
       BQmScale = bqm,
       NumPasses = numPasses,
       IsLast = isLast,
+      OriginX = originX,
+      OriginY = originY,
+      FrameWidth = frameWidth,
+      FrameHeight = frameHeight,
+      BlendMode = blendMode,
+      BlendSource = blendSource,
+      BlendAlphaChannel = blendAlphaChannel,
+      BlendClamp = blendClamp,
+      SaveAsReference = saveAsReference,
+      IsPartialFrame = isPartialFrame,
+      Duration = duration,
       SaveBeforeColorTransform = saveBeforeCT,
       Name = name,
       GaborishParameters = gabParams,
@@ -290,22 +363,33 @@ internal sealed class JxlSpecFrameHeader {
   /// <summary>Read libjxl <c>BlendingInfo::VisitFields</c>: mode + conditional
   /// alpha_channel + clamp + source.</summary>
   /// <returns>The blend mode (0=kReplace, 1=kAdd, 2=kBlend, 3=kAlphaWeightedAdd, 4=kMul).</returns>
-  private static uint _ReadBlendingInfo(JxlBitReader r, int numExtraChannels, bool isPartialFrame) {
+  private static (uint Mode, uint Source, uint AlphaChannel, bool Clamp) _ReadBlendingInfo(
+    JxlBitReader r, int numExtraChannels, bool isPartialFrame
+  ) {
     // mode: U32(Val(0), Val(1), Val(2), BitsOffset(2, 3))
     var mode = r.ReadU32(0, 0, 1, 0, 2, 0, 3, 2);
     var hasBlendOrAwa = (mode == 2 /* kBlend */ || mode == 3 /* kAlphaWeightedAdd */);
+    var alphaChannel = 0u;
     if (numExtraChannels > 0 && hasBlendOrAwa) {
       // alpha_channel: U32(Val(0), Val(1), Val(2), BitsOffset(3, 3))
-      r.ReadU32(0, 0, 1, 0, 2, 0, 3, 3);
+      alphaChannel = r.ReadU32(0, 0, 1, 0, 2, 0, 3, 3);
+      if (alphaChannel >= numExtraChannels)
+        throw new System.IO.InvalidDataException(
+          $"A frame blends against extra channel {alphaChannel}, and there are only {numExtraChannels}.");
     }
-    if ((numExtraChannels > 0 && hasBlendOrAwa) || mode == 4 /* kMul */) {
-      r.ReadBool(); // clamp
-    }
+
+    var clamp = false;
+    if ((numExtraChannels > 0 && hasBlendOrAwa) || mode == 4 /* kMul */)
+      clamp = r.ReadBool();
+
     // source: U32(Val(0), Val(1), Val(2), Val(3)) only when mode != kReplace || partial.
+    var source = 0u;
     if (mode != 0 /* kReplace */ || isPartialFrame)
-      r.ReadU32(0, 0, 1, 0, 2, 0, 3, 0);
-    return mode;
+      source = r.ReadU32(0, 0, 1, 0, 2, 0, 3, 0);
+    return (mode, source, alphaChannel, clamp);
   }
+
+  private static int _UnpackSigned(uint packed) => (int)((packed >> 1) ^ (~(packed & 1) + 1));
 
   /// <summary>Read libjxl <c>LoopFilter::VisitFields</c>. Always reads
   /// 1-bit all_default; if 0 then gab/EPF/extensions.</summary>
