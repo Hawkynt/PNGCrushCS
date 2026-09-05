@@ -108,8 +108,17 @@ internal static class JxlFrameQuantizer {
     if (allDefault)
       return (float[])DefaultDcQuant.Clone();
     var values = new float[3];
-    for (var c = 0; c < 3; c++)
-      values[c] = _ReadF16(reader);
+    for (var c = 0; c < 3; c++) {
+      // The stated value is in units of a hundred and twenty-eighths. Taking it
+      // at face value makes every sample of the frame a hundred and twenty-eight
+      // times too large, which no file in the corpus showed because they all
+      // take the defaults and only a frame that states its own is affected.
+      values[c] = _ReadF16(reader) * (1.0f / 128.0f);
+      if (values[c] < 1e-8f)
+        throw new System.IO.InvalidDataException(
+          $"A frame states a DC quantisation step of {values[c]} for channel {c}, which is too small to divide by.");
+    }
+
     return values;
   }
 
