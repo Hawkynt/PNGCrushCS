@@ -202,6 +202,15 @@ internal static class JxlVarDctSpecDecoder {
     // libjxl `DequantDC` multiplies DC by `mul = 1.0 / (1 << extra_precision)`.
     var extraPrecisionMul = 1f / (1 << extraPrecision);
 
+    // Each of a VarDCT frame's sub-images is a modular stream of its own, and
+    // the stream's number is property one, which an MA tree may split on. These
+    // were all read as stream zero, so a tree that told the DC apart from the
+    // metadata sent both down the same branch.
+    const int dcGroupIndex = 0;
+    var numDcGroupsForStreams = 1;
+    var dcStreamId = 1 + dcGroupIndex;
+    var acMetadataStreamId = 1 + 2 * numDcGroupsForStreams + dcGroupIndex;
+
     var dcImage = JxlModularSpecDecoder.DecodeGroup(
       reader,
       width: dcWidth,
@@ -209,7 +218,8 @@ internal static class JxlVarDctSpecDecoder {
       numChannels: _NumXybChannels,
       bitDepth: bitDepth,
       globalTree: modularGlobalTree,
-      globalEntropy: modularGlobalEntropy);
+      globalEntropy: modularGlobalEntropy,
+      streamId: dcStreamId);
 
     // ProcessDCGroup also issues an empty ModularDecode for ModularDC (group_id=2)
     // which is for non-default modular-in-VarDCT features. For typical XYB
@@ -242,7 +252,7 @@ internal static class JxlVarDctSpecDecoder {
       new() { Width = dcGroupBlocksX, Height = dcGroupBlocksY, HShift = 0, VShift = 0, Pixels = new int[dcGroupBlocksX * dcGroupBlocksY] },
     };
     var acMetadata = JxlModularSpecDecoder.DecodeGroupChannels(
-      reader, acMetaChannels, bitDepth, modularGlobalTree, modularGlobalEntropy);
+      reader, acMetaChannels, bitDepth, modularGlobalTree, modularGlobalEntropy, acMetadataStreamId);
 
     // Build per-block raw_quant_field from AC metadata (libjxl dec_modular.cc:
     // `row_qf[ix] = 1 + max(0, min(kQuantMax-1, row_in_2[num]))`). Channel 2
@@ -251,11 +261,45 @@ internal static class JxlVarDctSpecDecoder {
     // single-block frame, dcGroupBlocksX*dcGroupBlocksY for fully-dense AC).
     // For the first-wave (DCT8-only, no multi-block strategies), every block
     // is its own count entry, in row-major scan order.
+    // Walk the blocks in raster order and take one entry from the packed list
+    // for each transform that starts there, stepping over the blocks a
+    // multi-block transform covers. This is libjxl's own scan, and it is the
+    // only way the list can be read: the entries are not per block, they are
+    // per transform, so a decoder that assumed one entry per block would take
+    // the wrong strategy for every block after the first large one.
+    var strategyPlane = new JxlAcStrategyType[dcGroupBlocksX * dcGroupBlocksY];
     var perBlockQuant = new int[dcGroupBlocksX * dcGroupBlocksY];
-    var qfChannel = acMetadata.Channels[2];
-    for (var i = 0; i < perBlockQuant.Length; ++i) {
-      var qfRaw = i < count ? qfChannel.Pixels[count + i] : 0;
-      perBlockQuant[i] = 1 + Math.Max(0, Math.Min(255, qfRaw));
+    var covered = new bool[dcGroupBlocksX * dcGroupBlocksY];
+    var packed = acMetadata.Channels[2];
+    var taken = 0;
+    for (var by = 0; by < dcGroupBlocksY; ++by)
+    for (var bx = 0; bx < dcGroupBlocksX; ++bx) {
+      if (covered[by * dcGroupBlocksX + bx])
+        continue;
+      if (taken >= count)
+        throw new InvalidDataException("This frame states fewer transforms than it has blocks to cover.");
+
+      var raw = packed.Pixels[taken];
+      if (!JxlAcStrategyGeometry.IsValid(raw))
+        throw new InvalidDataException($"This frame states transform {raw}, which the format does not define.");
+
+      var strategy = (JxlAcStrategyType)raw;
+      var wide = JxlAcStrategyGeometry.BlocksWide(strategy);
+      var high = JxlAcStrategyGeometry.BlocksHigh(strategy);
+      if (bx + wide > dcGroupBlocksX || by + high > dcGroupBlocksY)
+        throw new InvalidDataException(
+          $"A {wide}x{high}-block transform at ({bx}, {by}) reaches past the picture.");
+
+      var quant = 1 + Math.Max(0, Math.Min(255, packed.Pixels[count + taken]));
+      for (var cy = 0; cy < high; ++cy)
+      for (var cx = 0; cx < wide; ++cx) {
+        var at = (by + cy) * dcGroupBlocksX + bx + cx;
+        covered[at] = true;
+        strategyPlane[at] = strategy;
+        perBlockQuant[at] = quant;
+      }
+
+      ++taken;
     }
 
     // ---------------------------------------------------------------
@@ -318,16 +362,27 @@ internal static class JxlVarDctSpecDecoder {
     // packs ACS<<4 | QF). For first-wave compatibility we still build a
     // synthetic per-group strategies array filled with DCT8 — the simplest
     // strategy that all 8×8 blocks use unless the encoder chose otherwise.
+    // Each group's view of the strategy plane, which the metadata stated for the
+    // whole picture. This used to be filled with 8x8 everywhere regardless of
+    // what the file said, which is right only for a picture whose blocks really
+    // are all plain 8x8.
+    var blocksPerGroup = groupSize / _BlockDim;
     var groupStrategies = new JxlAcStrategyType[numGroupsW * numGroupsH][][];
+    var groupQuant = new int[numGroupsW * numGroupsH][][];
     for (var gy = 0; gy < numGroupsH; ++gy) {
       for (var gx = 0; gx < numGroupsW; ++gx) {
         var groupIdx = gy * numGroupsW + gx;
         var (blocksX, blocksY) = _GroupBlockDims(gx, gy, width, height, groupSize);
         groupStrategies[groupIdx] = new JxlAcStrategyType[blocksY][];
+        groupQuant[groupIdx] = new int[blocksY][];
         for (var by = 0; by < blocksY; ++by) {
           groupStrategies[groupIdx][by] = new JxlAcStrategyType[blocksX];
-          for (var bx = 0; bx < blocksX; ++bx)
-            groupStrategies[groupIdx][by][bx] = JxlAcStrategyType.Dct8x8;
+          groupQuant[groupIdx][by] = new int[blocksX];
+          for (var bx = 0; bx < blocksX; ++bx) {
+            var at = (gy * blocksPerGroup + by) * dcGroupBlocksX + gx * blocksPerGroup + bx;
+            groupStrategies[groupIdx][by][bx] = strategyPlane[at];
+            groupQuant[groupIdx][by][bx] = perBlockQuant[at];
+          }
         }
       }
     }
@@ -381,7 +436,7 @@ internal static class JxlVarDctSpecDecoder {
         // (matches libjxl `dec_group.cc::DecodeGroupImpl`).
         var acBlocks = JxlAcDecoder.DecodeGroup(
           reader, acEntropy, strategies, blockCtxMap,
-          blocksX, blocksY, _NumXybChannels);
+          blocksX, blocksY, _NumXybChannels, groupQuant[groupIdx]);
 
         // Inject DC values into AC blocks at scan position 0. The AC decoder
         // skips position 0 (DC) per spec; combining LF DC with AC produces

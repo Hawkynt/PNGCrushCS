@@ -233,26 +233,37 @@ internal sealed class JxlAcDecoderTests {
   // Multi-block / large-strategy rejection
   // ============================================================
 
-  /// <summary>A non-DCT8 strategy in the grid causes
-  /// <see cref="NotImplementedException"/> with a descriptive message.</summary>
+  /// <summary>
+  /// A transform covering more than one block is read once, at the block it
+  /// starts from, and holds a coefficient for every block it covers.
+  /// </summary>
   [Test]
-  public void DecodeGroup_Dct16Strategy_ThrowsNotImplemented() {
+  public void DecodeGroup_Dct16Strategy_ReadsOneBlockOfFourBlocksWorth() {
     var bytes = new byte[16];
     var bcm = JxlBlockContextMap.CreateDefault();
     var strategies = JxlAcStrategyDecoder.CreateAllDct8x8(2, 2);
-    strategies[0][0] = JxlAcStrategyType.Dct16x16;
+    for (var y = 0; y < 2; ++y)
+    for (var x = 0; x < 2; ++x)
+      strategies[y][x] = JxlAcStrategyType.Dct16x16;
+
     var reader = new JxlBitReader(bytes, 0);
     var entropy = JxlEntropyDecoder.CreateSimple(reader, 1, 0);
 
-    var ex = Assert.Throws<NotImplementedException>(
-      () => JxlAcDecoder.DecodeGroup(reader, entropy, strategies, bcm, 2, 2, 3));
-    Assert.That(ex!.Message, Does.Contain("Dct16x16"));
+    var blocks = JxlAcDecoder.DecodeGroup(reader, entropy, strategies, bcm, 2, 2, 3);
+    Assert.Multiple(() => {
+      // Sixteen pixels across and down: four blocks' worth of coefficients.
+      Assert.That(blocks[0][0].Coefficients, Has.Length.EqualTo(4 * 64));
+      Assert.That(blocks[0][0].Width, Is.EqualTo(16));
+      Assert.That(blocks[0][0].Height, Is.EqualTo(16));
+    });
   }
 
-  /// <summary>A "covered by neighbour" sentinel cell triggers the
-  /// covered-by-neighbour-not-supported branch.</summary>
+  /// <summary>
+  /// A cell marked as covered by a neighbour names no transform of its own, so
+  /// nothing is read for it.
+  /// </summary>
   [Test]
-  public void DecodeGroup_CoveredByNeighbour_ThrowsNotImplemented() {
+  public void DecodeGroup_CoveredByNeighbour_ReadsNothingForThatCell() {
     var bytes = new byte[16];
     var bcm = JxlBlockContextMap.CreateDefault();
     var strategies = JxlAcStrategyDecoder.CreateAllDct8x8(2, 2);
@@ -260,9 +271,8 @@ internal sealed class JxlAcDecoderTests {
     var reader = new JxlBitReader(bytes, 0);
     var entropy = JxlEntropyDecoder.CreateSimple(reader, 1, 0);
 
-    var ex = Assert.Throws<NotImplementedException>(
-      () => JxlAcDecoder.DecodeGroup(reader, entropy, strategies, bcm, 2, 2, 3));
-    Assert.That(ex!.Message, Does.Contain("covered-by-neighbour"));
+    var blocks = JxlAcDecoder.DecodeGroup(reader, entropy, strategies, bcm, 2, 2, 3);
+    Assert.That(blocks[0][1].Coefficients, Is.All.Zero);
   }
 
   // ============================================================
