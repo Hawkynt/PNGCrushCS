@@ -489,6 +489,29 @@ internal static class JxlVarDctSpecDecoder {
     // structural pipeline alive while the entropy block was being wired.)
     var acEntropy = acEntropyForPass;
 
+    // The low frequencies belong to the frame, not to a group: smoothing them a
+    // group at a time would smooth the blocks along a group's edge against that
+    // edge instead of against their neighbours across it. So they are
+    // dequantised once, for the whole picture, and sliced afterwards.
+    var frameDcCount = dcGroupBlocksX * dcGroupBlocksY;
+    var frameDc = new float[_NumXybChannels * frameDcCount];
+    for (var i = 0; i < frameDcCount; ++i) {
+      // Canonical X/Y/B are the modular sub-image's channels 1/0/2.
+      var qY = dcImage.Channels[0].Pixels[i];
+      var qX = dcImage.Channels[1].Pixels[i];
+      var qB = dcImage.Channels[2].Pixels[i];
+      var yDc = qY * mulDc[1] * extraPrecisionMul;
+      frameDc[1 * frameDcCount + i] = yDc;
+      frameDc[0 * frameDcCount + i] = qX * mulDc[0] * extraPrecisionMul + yDc * dcCorrelation.YtoX;
+      frameDc[2 * frameDcCount + i] = qB * mulDc[2] * extraPrecisionMul + yDc * dcCorrelation.YtoB;
+    }
+
+    // The frame is written expecting the steps between neighbouring blocks to
+    // be taken back out of its low frequencies, and says so by not asking to
+    // skip it. Leaving them in is not a smaller picture, it is a different one.
+    if ((frameFlags & _kSkipAdaptiveDcSmoothing) == 0)
+      JxlAdaptiveDcSmoothing.Apply(frameDc, dcGroupBlocksX, dcGroupBlocksY, mulDc);
+
     var groups = new JxlVarDctGroup[numGroupsW * numGroupsH];
     for (var gy = 0; gy < numGroupsH; ++gy) {
       for (var gx = 0; gx < numGroupsW; ++gx) {
@@ -566,7 +589,7 @@ internal static class JxlVarDctSpecDecoder {
       // per `dec_cache.h:RecomputeRowQuant`.
       var xDmMul = MathF.Pow(1f / 1.25f, (int)xQmScale - 2);
       var bDmMul = MathF.Pow(1f / 1.25f, (int)bQmScale - 2);
-      _RenderGroup(group, strategies, origins, correlationX, correlationB, frameFlags, blocksX, blocksY, quantTableSet,
+      _RenderGroup(group, strategies, origins, correlationX, correlationB, frameDc, dcGroupBlocksX, blocksX, blocksY, quantTableSet,
         mulDc, extraPrecisionMul, dcCorrelation,
         quantParams.InvGlobalScale, perBlockQuant, xDmMul, bDmMul,
         channels, width, height);
@@ -722,7 +745,8 @@ internal static class JxlVarDctSpecDecoder {
     bool[][] origins,
     JxlChannel correlationX,
     JxlChannel correlationB,
-    ulong frameFlags,
+    float[] frameDc,
+    int frameStride,
     int blocksX,
     int blocksY,
     JxlQuantTableSet quantTableSet,
@@ -730,7 +754,7 @@ internal static class JxlVarDctSpecDecoder {
     float extraPrecisionMul,
     JxlColorCorrelationMap.DcCorrelationFactors dcCorrelation,
     float invGlobalScale,
-    int[] perBlockQuant,
+    int[] frameQuant,
     float xDmMultiplier,
     float bDmMultiplier,
     float[][] channels,
@@ -746,23 +770,25 @@ internal static class JxlVarDctSpecDecoder {
     // mixes Y into X/B and our IDCT is linear: applying it to the DC frequency
     // coefficient is equivalent to applying it to the post-IDCT spatial DC.
     var totalBlocks = blocksX * blocksY;
+    var frameCount = frameStride * (frameDc.Length / (_NumXybChannels * frameStride));
     var dequantDc = new float[_NumXybChannels * totalBlocks];
     const int xCh = 0, yCh = 1, bCh = 2;
-    for (var i = 0; i < totalBlocks; ++i) {
-      var qY = group.AcBlocks[yCh][i].Coefficients[0];
-      var qX = group.AcBlocks[xCh][i].Coefficients[0];
-      var qB = group.AcBlocks[bCh][i].Coefficients[0];
-      var yDc = qY * mulDc[yCh] * extraPrecisionMul;
-      dequantDc[yCh * totalBlocks + i] = yDc;
-      dequantDc[xCh * totalBlocks + i] = qX * mulDc[xCh] * extraPrecisionMul + yDc * dcCorrelation.YtoX;
-      dequantDc[bCh * totalBlocks + i] = qB * mulDc[bCh] * extraPrecisionMul + yDc * dcCorrelation.YtoB;
-    }
+    var blockX0 = group.X / _BlockDim;
+    var blockY0 = group.Y / _BlockDim;
 
-    // The frame is written expecting the steps between neighbouring blocks to
-    // be taken back out of its low frequencies, and says so by not asking to
-    // skip it. Leaving them in is not a smaller picture, it is a different one.
-    if ((frameFlags & _kSkipAdaptiveDcSmoothing) == 0)
-      JxlAdaptiveDcSmoothing.Apply(dequantDc, blocksX, blocksY, mulDc);
+    // The quantisation step each block states belongs to the frame too, and is
+    // taken from where the block sits in it. Reading it at the block's position
+    // within its own group gives the right answer only for the group that
+    // starts at the corner of the picture.
+    var perBlockQuant = new int[totalBlocks];
+    for (var by = 0; by < blocksY; ++by)
+    for (var bx = 0; bx < blocksX; ++bx) {
+      var from = (blockY0 + by) * frameStride + blockX0 + bx;
+      var to = by * blocksX + bx;
+      perBlockQuant[to] = from < frameQuant.Length ? frameQuant[from] : 1;
+      for (var c = 0; c < _NumXybChannels; ++c)
+        dequantDc[c * totalBlocks + to] = frameDc[c * frameCount + from];
+    }
 
     // Pre-pass: dequantize Y for every block, because the other two planes are
     // stated as what is left of them once their share of the luma is taken out,
