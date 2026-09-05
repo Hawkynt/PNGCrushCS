@@ -69,6 +69,9 @@ internal sealed class JxlSpecFrameHeader {
   private const ulong _kUseDcFrame = 0x20;
   private const ulong _kSkipAdaptiveDcSmoothing = 0x80;
 
+  /// <summary>libjxl <c>LoopFilter::epf_iters</c> default.</summary>
+  private const int _DefaultEpfIters = 2;
+
   /// <summary>
   /// Decode a FrameHeader. Mirrors libjxl <c>FrameHeader::VisitFields</c>
   /// step-for-step.
@@ -88,14 +91,19 @@ internal sealed class JxlSpecFrameHeader {
     // 0. all_default
     var allDefault = r.ReadBool();
     if (allDefault) {
-      // libjxl: SetDefault. Defaults: Regular frame, encoding chosen by
-      // xyb_encoded flag, all sub-bundles default.
+      // libjxl: SetDefault, which defaults every nested bundle too — including
+      // the loop filter, whose own defaults are the smoothing filter on and two
+      // passes of the edge-preserving one. Leaving those unset here reads as
+      // "no filtering at all", and a frame that states nothing is exactly the
+      // frame that expects both.
       return new() {
         AllDefault = true,
         FrameType = JxlFrameType.Regular,
         Encoding = xybEncoded ? JxlFrameEncoding.VarDct : JxlFrameEncoding.Modular,
         ColorTransform = xybEncoded ? JxlColorTransform.Xyb : JxlColorTransform.None,
         Flags = 0,
+        GaborishParameters = new GaborishParams { Enabled = true },
+        EpfParameters = new EpfParams { Iters = _DefaultEpfIters },
       };
     }
 
@@ -304,9 +312,8 @@ internal sealed class JxlSpecFrameHeader {
   private static (GaborishParams? Gab, EpfParams? Epf) _ReadLoopFilter(JxlBitReader r, bool isModular) {
     var allDefault = r.ReadBool();
     if (allDefault) {
-      // libjxl Bundle::SetDefault for LoopFilter: gab=true (default), epf_iters=2.
-      // Surface defaults.
-      return (new GaborishParams { Enabled = true }, null);
+      // libjxl Bundle::SetDefault for LoopFilter: gab on, two passes of EPF.
+      return (new GaborishParams { Enabled = true }, new EpfParams { Iters = _DefaultEpfIters });
     }
 
     // gab Bool (default true)
