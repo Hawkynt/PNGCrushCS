@@ -79,7 +79,12 @@ internal static class JxlNoise {
   /// <param name="lut">The stated curve.</param>
   /// <param name="yToX">The frame's base X correlation.</param>
   /// <param name="yToB">Its base B correlation.</param>
-  public static void Apply(float[][] planes, int width, int height, float[] lut, float yToX, float yToB) {
+  /// <param name="groupDim">How wide a group is. The field is generated a group
+  /// at a time, each from its own corner, so this decides where one run of the
+  /// generator stops and the next begins.</param>
+  public static void Apply(
+    float[][] planes, int width, int height, float[] lut, float yToX, float yToB, int groupDim
+  ) {
     ArgumentNullException.ThrowIfNull(planes);
     ArgumentNullException.ThrowIfNull(lut);
     if (planes.Length < 3)
@@ -87,7 +92,7 @@ internal static class JxlNoise {
     if (!HasAny(lut))
       return;
 
-    var noise = _RandomPlanes(width, height);
+    var noise = _RandomPlanes(width, height, groupDim);
     for (var c = 0; c < 3; ++c)
       noise[c] = _Convolve(noise[c], width, height);
 
@@ -151,32 +156,56 @@ internal static class JxlNoise {
   /// generator (libjxl <c>Random3Planes</c>).
   /// </summary>
   /// <remarks>
-  /// The seed is the frame's index and the group's position. Only frames of one
-  /// group are handled here, so both indices and both positions are zero; a
-  /// frame of several groups seeds each group separately and its edges need the
-  /// neighbouring group's numbers, which is not worked out here.
+  /// The seed is the frame's index and the group's corner, so a picture of
+  /// several groups is not one field but one per group, each starting the
+  /// generator afresh. They are laid into the same three planes, and the filter
+  /// that shapes them afterwards runs across the whole picture — which is what
+  /// makes a group's edge take the numbers of the group beside it rather than a
+  /// reflection of its own.
   /// </remarks>
-  private static float[][] _RandomPlanes(int width, int height) {
-    // The count of frames shown so far, the count of frames not shown since the
-    // last one that was, and the group's corner. libjxl raises the first of
-    // those before it decodes a frame rather than after, so the first frame
-    // shown is the first and not the zeroth — which is not a detail: seeding
-    // with a zero there gives a field that has nothing to do with libjxl's, and
-    // the picture is wrong everywhere by a couple of levels.
-    var rng = new _Xorshift128Plus(_FirstVisibleFrame, 0, 0, 0);
+  private static float[][] _RandomPlanes(int width, int height, int groupDim) {
+    if (groupDim <= 0)
+      groupDim = Math.Max(width, height);
+
     var planes = new float[3][];
     for (var c = 0; c < 3; ++c)
-      planes[c] = _RandomImage(rng, width, height);
+      planes[c] = new float[width * height];
+
+    for (var y0 = 0; y0 < height; y0 += groupDim)
+    for (var x0 = 0; x0 < width; x0 += groupDim) {
+      // The count of frames shown so far, the count of frames not shown since
+      // the last one that was, and this group's corner. libjxl raises the first
+      // of those before it decodes a frame rather than after, so the first
+      // frame shown is the first and not the zeroth — which is not a detail:
+      // seeding with a zero there gives a field that has nothing to do with
+      // libjxl's, and the picture is wrong everywhere by a couple of levels.
+      var rng = new _Xorshift128Plus(_FirstVisibleFrame, 0, (uint)x0, (uint)y0);
+      var groupWidth = Math.Min(groupDim, width - x0);
+      var groupHeight = Math.Min(groupDim, height - y0);
+      for (var c = 0; c < 3; ++c)
+        _RandomImage(rng, planes[c], width, x0, y0, groupWidth, groupHeight);
+    }
+
     return planes;
   }
 
-  private static float[] _RandomImage(_Xorshift128Plus rng, int width, int height) {
-    var plane = new float[width * height];
+  /// <summary>
+  /// Fill one group's rectangle of one plane (libjxl <c>RandomImage</c>).
+  /// </summary>
+  /// <remarks>
+  /// The generator turns a fixed number of times per row, decided by the width
+  /// of the rectangle and not of the picture, so a group at the right edge —
+  /// narrower than the rest — takes fewer turns. Getting that count wrong moves
+  /// every number after it.
+  /// </remarks>
+  private static void _RandomImage(
+    _Xorshift128Plus rng, float[] plane, int stride, int x0, int y0, int width, int height
+  ) {
     var bits = new ulong[_Xorshift128Plus.N];
     var floats = new float[_FloatsPerBatch];
 
     for (var y = 0; y < height; ++y) {
-      var row = y * width;
+      var row = (y0 + y) * stride + x0;
       var x = 0;
       // Whole turns only, then one more for whatever is left of the row. The
       // count of turns is what advances the generator, so it has to be the same
@@ -191,8 +220,6 @@ internal static class JxlNoise {
       _BitsToFloats(bits, floats);
       Array.Copy(floats, 0, plane, row + x, Math.Min(_FloatsPerBatch, width - x));
     }
-
-    return plane;
   }
 
   /// <summary>One turn's bits as floats in [1, 2). The kernel below sums to

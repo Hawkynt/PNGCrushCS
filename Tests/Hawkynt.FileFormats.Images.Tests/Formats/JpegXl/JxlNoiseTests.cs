@@ -81,6 +81,59 @@ public sealed class JxlNoiseTests {
       Assert.That(actual[i], Is.EqualTo(expected[i]).Within(1e-6f), $"number {i}");
   }
 
+  /// <summary>
+  /// A noisy picture of more than one group decodes to what libjxl decodes it
+  /// to.
+  /// </summary>
+  /// <remarks>
+  /// The field is not one field but one per group, each starting the generator
+  /// afresh from that group's corner, and the filter that shapes them runs
+  /// across the whole picture — so a group's edge takes the numbers of the
+  /// group beside it rather than a reflection of its own. This fixture is 260
+  /// square against a group of 256, so it has four groups and the last of them
+  /// is four pixels wide and four tall: the case where a group's own width
+  /// decides how many times the generator turns per row.
+  ///
+  /// <para>Measured against libjxl's float output, 13 of its 202,800 samples
+  /// differ and every one is on a rounding boundary.</para>
+  /// </remarks>
+  [Test]
+  public void ANoisyPictureOfSeveralGroupsDecodesToWhatLibjxlDecodesItTo() {
+    var file = JpegXlReader.FromBytes(_Fixture("cjxl_photon_noise_groups.jxl"));
+    var (width, height, expected) = _ReadPpm(_Fixture("cjxl_photon_noise_groups.ppm"));
+
+    Assert.Multiple(() => {
+      Assert.That(file.Width, Is.EqualTo(width));
+      Assert.That(file.Height, Is.EqualTo(height));
+      Assert.That(width, Is.EqualTo(260), "wider than one group, and not by a whole one");
+    });
+    Assert.That(file.PixelData, Has.Length.EqualTo(expected.Length));
+
+    var worst = 0;
+    for (var i = 0; i < expected.Length; ++i)
+      worst = Math.Max(worst, Math.Abs(file.PixelData[i] - expected[i]));
+
+    Assert.That(worst, Is.LessThanOrEqualTo(1),
+      $"a sample is out by {worst} levels, which is more than libjxl's output dither can explain");
+  }
+
+  /// <summary>
+  /// Each group starts the generator from its own corner, so the same picture
+  /// read as one group is a different field.
+  /// </summary>
+  [Test]
+  public void EachGroupStartsTheGeneratorFromItsOwnCorner() {
+    var first = JxlNoise.FirstRandomNumbersForTest(1, 0, 0, 0);
+    var second = JxlNoise.FirstRandomNumbersForTest(1, 0, 256, 0);
+    var below = JxlNoise.FirstRandomNumbersForTest(1, 0, 0, 256);
+
+    Assert.Multiple(() => {
+      Assert.That(second, Is.Not.EqualTo(first));
+      Assert.That(below, Is.Not.EqualTo(first));
+      Assert.That(below, Is.Not.EqualTo(second));
+    });
+  }
+
   /// <summary>The curve is eight values of ten bits, in a thousand and
   /// twenty-fourths.</summary>
   [Test]
@@ -111,7 +164,7 @@ public sealed class JxlNoiseTests {
     var before = (float[])planes[1].Clone();
 
     Assert.That(JxlNoise.HasAny(new float[8]), Is.False);
-    JxlNoise.Apply(planes, 2, 2, new float[8], 0.0f, 1.0f);
+    JxlNoise.Apply(planes, 2, 2, new float[8], 0.0f, 1.0f, groupDim: 256);
 
     Assert.That(planes[1], Is.EqualTo(before));
   }
