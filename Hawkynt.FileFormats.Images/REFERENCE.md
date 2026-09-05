@@ -20657,6 +20657,7 @@ Implements `IEquatable<JpegXlFile>`, `IImageFormatMetadata<JpegXlFile>`, `IImage
 
 | Member | Signature | Summary |
 | --- | --- | --- |
+| `BitsPerSample` | `int BitsPerSample { get; init; }` |  |
 | `Brand` | `string Brand { get; init; }` |  |
 | `ComponentCount` | `int ComponentCount { get; init; }` |  |
 | `Height` | `int Height { get; init; }` |  |

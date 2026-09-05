@@ -43,27 +43,43 @@ public readonly record struct JpegXlFile : IImageFormatReader<JpegXlFile>, IImag
   public int Width { get; init; }
   public int Height { get; init; }
 
-  /// <summary>Interleaved 8-bit component count: 1=Gray, 2=Gray+Alpha, 3=RGB, 4=RGBA.</summary>
+  /// <summary>Component count: 1=Gray, 2=Gray+Alpha, 3=RGB, 4=RGBA.</summary>
   public int ComponentCount { get; init; }
 
-  /// <summary>Interleaved 8-bit pixels.</summary>
+  /// <summary>
+  /// Bits per sample of <see cref="PixelData"/>, either 8 or 16. Sixteen means
+  /// two big-endian bytes per component, which is how this package's deeper
+  /// pixel formats are laid out.
+  /// </summary>
+  /// <remarks>
+  /// Zero is read as 8, so a value built without naming a depth is still an
+  /// eight-bit picture rather than an empty one.
+  /// </remarks>
+  public int BitsPerSample { get; init; }
+
+  /// <summary>Interleaved pixels, at <see cref="BitsPerSample"/> per component.</summary>
   public byte[] PixelData { get; init; }
 
   /// <summary>Container major brand, or <c>"jxl "</c> for a bare codestream.</summary>
   public string Brand { get; init; }
 
   public static RawImage ToRawImage(JpegXlFile file) {
-    var format = file.ComponentCount switch {
-      1 => PixelFormat.Gray8,
-      2 => PixelFormat.GrayAlpha16,
-      3 => PixelFormat.Rgb24,
-      4 => PixelFormat.Rgba32,
-      _ => throw new NotSupportedException($"JPEG XL component count {file.ComponentCount} is not supported by RawImage."),
+    var deep = file.BitsPerSample == 16;
+    var format = (file.ComponentCount, deep) switch {
+      (1, false) => PixelFormat.Gray8,
+      (2, false) => PixelFormat.GrayAlpha16,
+      (3, false) => PixelFormat.Rgb24,
+      (4, false) => PixelFormat.Rgba32,
+      (1, true) => PixelFormat.Gray16,
+      (3, true) => PixelFormat.Rgb48,
+      (4, true) => PixelFormat.Rgba64,
+      _ => throw new NotSupportedException(
+        $"JPEG XL component count {file.ComponentCount} at {file.BitsPerSample} bits is not supported by RawImage."),
     };
-    var needed = checked((long)file.Width * file.Height * file.ComponentCount);
+    var needed = checked((long)file.Width * file.Height * file.ComponentCount * (deep ? 2 : 1));
     if (file.PixelData == null || file.PixelData.LongLength < needed)
       throw new InvalidOperationException(
-        $"JPEG XL decoder returned an incomplete raster: {file.Width}x{file.Height}x{file.ComponentCount} needs {needed} bytes.");
+        $"JPEG XL decoder returned an incomplete raster: {file.Width}x{file.Height}x{file.ComponentCount} at {(deep ? 16 : 8)} bits needs {needed} bytes.");
 
     return new() {
       Width = file.Width,
@@ -89,6 +105,7 @@ public readonly record struct JpegXlFile : IImageFormatReader<JpegXlFile>, IImag
       Width = image.Width,
       Height = image.Height,
       ComponentCount = componentCount,
+      BitsPerSample = 8,
       PixelData = image.PixelData[..],
       Brand = "jxl ",
     };
