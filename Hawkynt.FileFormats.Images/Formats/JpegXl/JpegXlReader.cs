@@ -209,8 +209,16 @@ public static class JpegXlReader {
         ? JxlSplines.Decode(reader, checked((long)width * height))
         : null;
 
-      if ((frame.Flags & _FlagNoise) != 0)
-        throw new NotSupportedException("This JPEG XL frame adds noise, which this decoder does not read yet.");
+      // The noise field is generated per group from a seed that includes the
+      // group's position, and a group's edges need the numbers of the group
+      // next to it. Only a frame that is one group is worked out here.
+      float[]? noiseLut = null;
+      if ((frame.Flags & _FlagNoise) != 0) {
+        if (numGroups != 1)
+          throw new NotSupportedException(
+            "This JPEG XL frame adds noise and is coded in several groups, which this decoder does not follow.");
+        noiseLut = JxlNoise.Decode(reader);
+      }
 
       // Every frame carries the DC quantization defaults, including modular frames.
       var dcQuant = JxlFrameQuantizer.ReadDcQuantization(reader);
@@ -254,6 +262,15 @@ public static class JpegXlReader {
         numDcGroups: numDcGroups,
         numExtraChannels: (int)imageMetadata.NumExtraChannels,
         frameFlags: frame.Flags);
+
+      // Noise goes on after the smoothing and edge-preserving filters and
+      // before the colour transform, which is exactly where the VarDCT decoder
+      // leaves off.
+      if (noiseLut != null && image is JxlVarDctImage noised)
+        JxlNoise.Apply(
+          noised.Channels, noised.Width, noised.Height, noiseLut,
+          JxlColorCorrelationMap.DefaultYtoXRatio, JxlColorCorrelationMap.DefaultYtoBRatio);
+
       return image is JxlVarDctImage vardct
              && vardct.Width == width
              && vardct.Height == height
