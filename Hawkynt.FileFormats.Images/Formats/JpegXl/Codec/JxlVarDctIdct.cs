@@ -426,6 +426,28 @@ internal static class JxlVarDctIdct {
   /// row-major order; the result is written into
   /// <paramref name="dst"/>[dstY..dstY+H-1, dstX..dstX+W-1] using
   /// <paramref name="dstStride"/> as the row pitch.</summary>
+  /// <summary>
+  /// A square sub-transform's coefficients, turned the way this decoder's
+  /// transform wants them.
+  /// </summary>
+  /// <remarks>
+  /// A whole block is kept the way the scan order fills it, which is the
+  /// transpose of the way the format writes it down, and the transform is
+  /// written to match. The shapes that divide a block gather their pieces by
+  /// the numbers the format states, so those pieces come out the written way
+  /// round and have to be turned back. It shows only on the square pieces: a
+  /// four-by-eight strip is stored with its short side first either way round,
+  /// so turning it is the same as not, and only the square ones can tell.
+  /// </remarks>
+  private static float[] _AsStoredSquare(float[] coefficients, int side) {
+    var turned = new float[side * side];
+    for (var y = 0; y < side; ++y)
+    for (var x = 0; x < side; ++x)
+      turned[y * side + x] = coefficients[x * side + y];
+
+    return turned;
+  }
+
   private static void _InverseDct2DToRect(
     float[] srcCoeffs, int width, int height,
     float[] dst, int dstX, int dstY, int dstStride
@@ -478,7 +500,7 @@ internal static class JxlVarDctIdct {
             subCoeffs[iy * 4 + ix] = coeffs[(qy + iy * 2) * stride + qx + ix * 2];
           }
         }
-        _InverseDct2DToRect(subCoeffs, 4, 4, outputPixels, qx * 4, qy * 4, stride);
+        _InverseDct2DToRect(_AsStoredSquare(subCoeffs, 4), 4, 4, outputPixels, qx * 4, qy * 4, stride);
       }
     }
   }
@@ -716,7 +738,7 @@ internal static class JxlVarDctIdct {
     }
     // Output at row offset afvY*4, column offset (afvX==1 ? 0 : 4).
     var col4x4 = afvX == 1 ? 0 : 4;
-    _InverseDct2DToRect(dct4x4Coeff, 4, 4, outputPixels, col4x4, afvY * 4, stride);
+    _InverseDct2DToRect(_AsStoredSquare(dct4x4Coeff, 4), 4, 4, outputPixels, col4x4, afvY * 4, stride);
 
     // ---- 4x8 IDCT in the (full-row, opposite-y) strip. ----
     var dct4x8Coeff = new float[4 * 8];
