@@ -216,7 +216,8 @@ public static class JpegXlReader {
         toc: toc,
         frameBody: frameBody,
         groupSizeOverride: groupDim,
-        numDcGroups: numDcGroups);
+        numDcGroups: numDcGroups,
+        numExtraChannels: (int)imageMetadata.NumExtraChannels);
       return image is JxlVarDctImage vardct
              && vardct.Width == width
              && vardct.Height == height
