@@ -82,14 +82,18 @@ internal sealed class JxlSpecialShapeQuantTests {
     var set = JxlVarDctQuant.DefaultsForStrategy(JxlAcStrategyType.Afv0);
     Assert.That(set, Is.Not.Null);
 
+    // Stated in the layout the format writes a block down in; the table is
+    // kept the way this decoder stores one, which is its transpose.
     var weights = set!.Tables[channel].Weights;
+    float At(int x, int y) => weights[x * 8 + y];
+
     Assert.Multiple(() => {
       Assert.That(weights, Has.Length.EqualTo(64));
-      Assert.That(weights[1 * 8 + 0], Is.EqualTo(1.0f / corner[0]).Within(1e-9), "below the corner");
-      Assert.That(weights[0 * 8 + 1], Is.EqualTo(1.0f / corner[1]).Within(1e-9), "beside it");
-      Assert.That(weights[2 * 8 + 0], Is.EqualTo(1.0f / corner[2]).Within(1e-9), "two below");
-      Assert.That(weights[0 * 8 + 2], Is.EqualTo(1.0f / corner[3]).Within(1e-9), "two across");
-      Assert.That(weights[2 * 8 + 2], Is.EqualTo(1.0f / corner[4]).Within(1e-9), "the corner itself");
+      Assert.That(At(0, 1), Is.EqualTo(1.0f / corner[0]).Within(1e-9), "below the corner");
+      Assert.That(At(1, 0), Is.EqualTo(1.0f / corner[1]).Within(1e-9), "beside it");
+      Assert.That(At(0, 2), Is.EqualTo(1.0f / corner[2]).Within(1e-9), "two below");
+      Assert.That(At(2, 0), Is.EqualTo(1.0f / corner[3]).Within(1e-9), "two across");
+      Assert.That(At(2, 2), Is.EqualTo(1.0f / corner[4]).Within(1e-9), "the corner itself");
     });
   }
 

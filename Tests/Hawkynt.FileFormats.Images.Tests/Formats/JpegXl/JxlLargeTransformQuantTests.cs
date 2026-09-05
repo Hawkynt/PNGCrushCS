@@ -24,16 +24,20 @@ internal sealed class JxlLargeTransformQuantTests {
     return File.ReadAllBytes(path);
   }
 
-  [TestCase(JxlAcStrategyType.Dct64x64, 64 * 64)]
-  [TestCase(JxlAcStrategyType.Dct64x32, 64 * 32)]
-  [TestCase(JxlAcStrategyType.Dct32x64, 32 * 64)]
-  public void ALargeTransformHasWeightsOfItsOwn(JxlAcStrategyType strategy, int samples) {
+  [TestCase(JxlAcStrategyType.Dct64x64)]
+  [TestCase(JxlAcStrategyType.Dct64x32)]
+  [TestCase(JxlAcStrategyType.Dct32x64)]
+  public void ALargeTransformHasWeightsOfItsOwn(JxlAcStrategyType strategy) {
     var set = JxlVarDctQuant.DefaultsForStrategy(strategy);
+    var (width, height) = JxlVarDctIdct.BlockSize(strategy);
 
     Assert.That(set, Is.Not.Null, "without a table of its own the 8x8 one gets stretched over the block");
-    for (var channel = 0; channel < 3; ++channel)
-      Assert.That(set!.Tables[channel].Width * set.Tables[channel].Height, Is.EqualTo(samples),
-        $"channel {channel} covers the whole transform");
+    for (var channel = 0; channel < 3; ++channel) {
+      // Laid out the way the block it is applied to is, not the way the shape
+      // is named.
+      Assert.That(set!.Tables[channel].Width, Is.EqualTo(width), $"channel {channel} is as wide as the block");
+      Assert.That(set.Tables[channel].Height, Is.EqualTo(height), $"channel {channel} is as tall as it");
+    }
   }
 
   /// <summary>The curve is the shape's own, not the 8x8 one under another name.</summary>
