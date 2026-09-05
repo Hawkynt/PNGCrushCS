@@ -106,6 +106,53 @@ internal static class JxlXybColorTransform {
     return (byte)scaled;
   }
 
+  /// <summary>Convert linear sRGB float to a gamma-sRGB 16-bit sample.</summary>
+  public static ushort LinearSrgbToGammaUInt16(float v) {
+    var scaled = LinearSrgbToGamma(v) * 65535.0f + 0.5f;
+    if (scaled <= 0.0f)
+      return 0;
+    if (scaled >= 65535.0f)
+      return ushort.MaxValue;
+    return (ushort)scaled;
+  }
+
+  /// <summary>Bulk transform: 3 XYB channels (W*H floats each) → packed RGB48
+  /// buffer (W*H*6), two big-endian bytes per component.</summary>
+  public static byte[] XybPlanesToRgb48(float[] x, float[] y, float[] b, int width, int height) {
+    _CheckPlanes(x, y, b, width, height);
+
+    var n = checked(width * height);
+    var output = new byte[checked(n * 6)];
+    for (var i = 0; i < n; i++) {
+      var (r, g, bl) = XybToLinearSrgb(x[i], y[i], b[i]);
+      var dst = i * 6;
+      var rr = LinearSrgbToGammaUInt16(r);
+      var gg = LinearSrgbToGammaUInt16(g);
+      var bb = LinearSrgbToGammaUInt16(bl);
+      output[dst + 0] = (byte)(rr >> 8);
+      output[dst + 1] = (byte)rr;
+      output[dst + 2] = (byte)(gg >> 8);
+      output[dst + 3] = (byte)gg;
+      output[dst + 4] = (byte)(bb >> 8);
+      output[dst + 5] = (byte)bb;
+    }
+
+    return output;
+  }
+
+  private static void _CheckPlanes(float[] x, float[] y, float[] b, int width, int height) {
+    if (x is null) throw new ArgumentNullException(nameof(x));
+    if (y is null) throw new ArgumentNullException(nameof(y));
+    if (b is null) throw new ArgumentNullException(nameof(b));
+    if (width <= 0) throw new ArgumentOutOfRangeException(nameof(width));
+    if (height <= 0) throw new ArgumentOutOfRangeException(nameof(height));
+
+    var n = checked(width * height);
+    if (x.Length != n) throw new ArgumentException($"x length {x.Length} != {n}.", nameof(x));
+    if (y.Length != n) throw new ArgumentException($"y length {y.Length} != {n}.", nameof(y));
+    if (b.Length != n) throw new ArgumentException($"b length {b.Length} != {n}.", nameof(b));
+  }
+
   /// <summary>Bulk transform: 3 XYB channels (W*H floats each) → packed RGB24
   /// byte buffer (W*H*3).</summary>
   public static byte[] XybPlanesToRgb24(float[] x, float[] y, float[] b, int width, int height) {

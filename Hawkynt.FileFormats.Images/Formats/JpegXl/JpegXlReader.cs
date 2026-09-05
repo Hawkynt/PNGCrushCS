@@ -265,21 +265,31 @@ public static class JpegXlReader {
     out JpegXlFile file
   ) {
     file = default;
-    if (metadata.BitsPerSample is < 1 or > 8 || metadata.IsFloatSample)
+    // Floating-point samples have no home in either raster this hands back.
+    if (metadata.BitsPerSample is < 1 or > 16 || metadata.IsFloatSample)
       return false;
+
+    // Anything deeper than eight bits is carried at sixteen rather than
+    // narrowed, because narrowing is a decision the caller should get to make.
+    var deep = metadata.BitsPerSample > 8;
+    var bytesPerSample = deep ? 2 : 1;
 
     var pixelCount = checked(metadata.Width * metadata.Height);
     if (decoded is JxlVarDctImage vardct) {
       if (vardct.Channels.Length < 3)
         return false;
-      var rgb = JxlXybColorTransform.XybPlanesToRgb24(
-        vardct.Channels[0], vardct.Channels[1], vardct.Channels[2], vardct.Width, vardct.Height);
-      if (rgb.Length != checked(pixelCount * 3))
+      var rgb = deep
+        ? JxlXybColorTransform.XybPlanesToRgb48(
+          vardct.Channels[0], vardct.Channels[1], vardct.Channels[2], vardct.Width, vardct.Height)
+        : JxlXybColorTransform.XybPlanesToRgb24(
+          vardct.Channels[0], vardct.Channels[1], vardct.Channels[2], vardct.Width, vardct.Height);
+      if (rgb.Length != checked(pixelCount * 3 * bytesPerSample))
         return false;
       file = new JpegXlFile {
         Width = metadata.Width,
         Height = metadata.Height,
         ComponentCount = 3,
+        BitsPerSample = deep ? 16 : 8,
         PixelData = rgb,
         Brand = brand,
       };
@@ -302,15 +312,21 @@ public static class JpegXlReader {
       }
     }
     var components = baseChannels + (alphaIndex >= 0 ? 1 : 0);
-    var pixels = new byte[checked(pixelCount * components)];
+    // Two components at sixteen bits is Gray+Alpha, which has no deep format
+    // here, so that one combination stays refused rather than narrowed.
+    if (deep && components == 2)
+      return false;
+
+    var pixels = new byte[checked(pixelCount * components * bytesPerSample)];
     for (var i = 0; i < pixelCount; ++i) {
-      var destination = i * components;
+      var destination = i * components * bytesPerSample;
       for (var c = 0; c < baseChannels; ++c)
-        pixels[destination + c] = _ToByte(modular.Channels[c].Pixels[i], metadata.BitsPerSample);
+        _Store(pixels, destination + c * bytesPerSample, modular.Channels[c].Pixels[i], metadata.BitsPerSample, deep);
       if (alphaIndex >= 0) {
         if (alphaIndex >= modular.Channels.Length)
           return false;
-        pixels[destination + baseChannels] = _ToByte(modular.Channels[alphaIndex].Pixels[i], metadata.BitsPerSample);
+        _Store(pixels, destination + baseChannels * bytesPerSample,
+          modular.Channels[alphaIndex].Pixels[i], metadata.BitsPerSample, deep);
       }
     }
 
@@ -318,10 +334,31 @@ public static class JpegXlReader {
       Width = metadata.Width,
       Height = metadata.Height,
       ComponentCount = components,
+      BitsPerSample = deep ? 16 : 8,
       PixelData = pixels,
       Brand = brand,
     };
     return true;
+  }
+
+  private static void _Store(byte[] pixels, int at, int value, int bitsPerSample, bool deep) {
+    if (!deep) {
+      pixels[at] = _ToByte(value, bitsPerSample);
+      return;
+    }
+
+    var sample = _ToUInt16(value, bitsPerSample);
+    pixels[at] = (byte)(sample >> 8);
+    pixels[at + 1] = (byte)sample;
+  }
+
+  /// <summary>A sample at the file's own depth, spread over the full 16-bit
+  /// range so that the deepest value the file can state is the deepest
+  /// value here.</summary>
+  private static ushort _ToUInt16(int value, int bitsPerSample) {
+    var max = (1 << Math.Clamp(bitsPerSample, 1, 16)) - 1;
+    var clamped = Math.Clamp(value, 0, max);
+    return (ushort)((clamped * 65535 + max / 2) / max);
   }
 
   private static byte _ToByte(int value, int bitsPerSample) {
