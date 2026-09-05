@@ -2,8 +2,8 @@
 
 Working agreement for **all** coding agents and human contributors working in
 this repository. These rules are not optional. The full house spec lives in
-the `Hawkynt/project-template` repo (`STANDARD.md`); this file is the
-per-repo distillation.
+[`Hawkynt/RepositoryTemplate`](https://github.com/Hawkynt/RepositoryTemplate/blob/main/AGENTS.md);
+this file is the per-repo distillation.
 
 ## What this is
 
@@ -109,9 +109,12 @@ cannot, commit the captured expected output with a note saying what produced it.
 - Standard frame: title → badges → one-line `>` blockquote; fixed emoji
   mapping for the standard sections (`## 🚀 CLI usage`,
   `## 🛠️ Build / test / run`, `## ❤️ Support`, `## 📜 License`).
-- Package READMEs follow [`docs/PACKAGE_README_TEMPLATE.md`](docs/PACKAGE_README_TEMPLATE.md):
-  common headings stay in one order, use the standard emoji vocabulary, and
-  represent format/capability support with tables rather than prose.
+- Package READMEs follow the house template,
+  [`package-readme/TEMPLATE.md`](https://github.com/Hawkynt/RepositoryTemplate/blob/main/package-readme/TEMPLATE.md)
+  in that same repo: common headings stay in one order, use the standard emoji
+  vocabulary, and represent format/capability support with tables rather than
+  prose. Every link in a package README must be an ABSOLUTE URL — nuget.org
+  renders the file outside the repository and cannot follow a relative one.
 - Format names in support tables should link to a useful overview; put the
   normative specification, original paper, or author's/project website in a
   separate Reference column whenever one exists.
