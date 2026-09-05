@@ -325,6 +325,11 @@ internal static class JxlVarDctSpecDecoder {
     var strategyPlane = new JxlAcStrategyType[dcGroupBlocksX * dcGroupBlocksY];
     var perBlockQuant = new int[dcGroupBlocksX * dcGroupBlocksY];
     var covered = new bool[dcGroupBlocksX * dcGroupBlocksY];
+    // Which cell a transform starts at is stated per cell, not implied by the
+    // shape: two transforms of the same shape side by side leave a run of
+    // identical cells, and there is no telling from the run alone where one
+    // ends and the next begins. It has to be carried.
+    var originPlane = new bool[dcGroupBlocksX * dcGroupBlocksY];
     var packed = acMetadata.Channels[2];
     var taken = 0;
     for (var by = 0; by < dcGroupBlocksY; ++by)
@@ -352,6 +357,7 @@ internal static class JxlVarDctSpecDecoder {
         covered[at] = true;
         strategyPlane[at] = strategy;
         perBlockQuant[at] = quant;
+        originPlane[at] = cy == 0 && cx == 0;
       }
 
       ++taken;
@@ -427,19 +433,23 @@ internal static class JxlVarDctSpecDecoder {
     // are all plain 8x8.
     var blocksPerGroup = groupSize / _BlockDim;
     var groupStrategies = new JxlAcStrategyType[numGroupsW * numGroupsH][][];
+    var groupOrigins = new bool[numGroupsW * numGroupsH][][];
     var groupQuant = new int[numGroupsW * numGroupsH][][];
     for (var gy = 0; gy < numGroupsH; ++gy) {
       for (var gx = 0; gx < numGroupsW; ++gx) {
         var groupIdx = gy * numGroupsW + gx;
         var (blocksX, blocksY) = _GroupBlockDims(gx, gy, width, height, groupSize);
         groupStrategies[groupIdx] = new JxlAcStrategyType[blocksY][];
+        groupOrigins[groupIdx] = new bool[blocksY][];
         groupQuant[groupIdx] = new int[blocksY][];
         for (var by = 0; by < blocksY; ++by) {
           groupStrategies[groupIdx][by] = new JxlAcStrategyType[blocksX];
+          groupOrigins[groupIdx][by] = new bool[blocksX];
           groupQuant[groupIdx][by] = new int[blocksX];
           for (var bx = 0; bx < blocksX; ++bx) {
             var at = (gy * blocksPerGroup + by) * dcGroupBlocksX + gx * blocksPerGroup + bx;
             groupStrategies[groupIdx][by][bx] = strategyPlane[at];
+            groupOrigins[groupIdx][by][bx] = originPlane[at];
             groupQuant[groupIdx][by][bx] = perBlockQuant[at];
           }
         }
@@ -498,7 +508,7 @@ internal static class JxlVarDctSpecDecoder {
         var acGroupReader = SectionReader(2 + numDcGroups + groupIdx);
         var acBlocks = JxlAcDecoder.DecodeGroup(
           acGroupReader, acEntropy, strategies, blockCtxMap,
-          blocksX, blocksY, _NumXybChannels, groupQuant[groupIdx]);
+          blocksX, blocksY, _NumXybChannels, groupQuant[groupIdx], groupOrigins[groupIdx]);
 
         // Inject DC values into AC blocks at scan position 0. The AC decoder
         // skips position 0 (DC) per spec; combining LF DC with AC produces
@@ -539,12 +549,13 @@ internal static class JxlVarDctSpecDecoder {
         groupIdx % numGroupsW, groupIdx / numGroupsW, width, height, groupSize
       );
       var strategies = groupStrategies[groupIdx];
+      var origins = groupOrigins[groupIdx];
       // Per-block AC dequant scale: libjxl `Quantizer::inv_quant_ac` =
       // inv_global_scale / quant. dm multipliers = pow(1/1.25, qm_scale-2)
       // per `dec_cache.h:RecomputeRowQuant`.
       var xDmMul = MathF.Pow(1f / 1.25f, (int)xQmScale - 2);
       var bDmMul = MathF.Pow(1f / 1.25f, (int)bQmScale - 2);
-      _RenderGroup(group, strategies, blocksX, blocksY, quantTableSet,
+      _RenderGroup(group, strategies, origins, blocksX, blocksY, quantTableSet,
         mulDc, extraPrecisionMul, dcCorrelation,
         quantParams.InvGlobalScale, perBlockQuant, xDmMul, bDmMul,
         channels, width, height);
@@ -683,6 +694,7 @@ internal static class JxlVarDctSpecDecoder {
   private static void _RenderGroup(
     JxlVarDctGroup group,
     JxlAcStrategyType[][] strategies,
+    bool[][] origins,
     int blocksX,
     int blocksY,
     JxlQuantTableSet quantTableSet,
@@ -732,7 +744,7 @@ internal static class JxlVarDctSpecDecoder {
       for (var bx = 0; bx < blocksX; ++bx) {
         var blockIdx = by * blocksX + bx;
         var strategy = strategies[by][bx];
-        if (!_ReconstructsFromOrigin(strategies, bx, by, strategy))
+        if (!_ReconstructsFromOrigin(origins, bx, by, strategy))
           continue;
 
         var coeffBlock = group.AcBlocks[yCh][blockIdx];
@@ -760,7 +772,7 @@ internal static class JxlVarDctSpecDecoder {
           // block it starts at. The rest are still drawn once per block they
           // cover, which is not what the format says but is closer than
           // spreading an inverse transform that disagrees with it.
-          if (!_ReconstructsFromOrigin(strategies, bx, by, strategy))
+          if (!_ReconstructsFromOrigin(origins, bx, by, strategy))
             continue;
           var coeffBlock = group.AcBlocks[c][blockIdx];
           var (blockW, blockH) = JxlVarDctIdct.BlockSize(strategy);
@@ -875,7 +887,7 @@ internal static class JxlVarDctSpecDecoder {
   /// Whether this transform is drawn once from the block it starts at.
   /// </summary>
   private static bool _ReconstructsFromOrigin(
-    JxlAcStrategyType[][] strategies,
+    bool[][] origins,
     int bx,
     int by,
     JxlAcStrategyType strategy
@@ -888,7 +900,7 @@ internal static class JxlVarDctSpecDecoder {
     if (JxlLowestFrequencies.DcToCoefficients(strategy) is null)
       return true;
 
-    return JxlAcStrategyGeometry.IsTransformOrigin(strategies, bx, by);
+    return origins[by][bx];
   }
 
   /// <summary>The quantisation weights a transform's own shape is dequantised with.</summary>

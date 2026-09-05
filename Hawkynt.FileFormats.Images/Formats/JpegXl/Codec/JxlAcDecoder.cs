@@ -172,6 +172,12 @@ internal static class JxlAcDecoder {
   /// <param name="groupBlocksWide">Number of 8×8 blocks across the group.</param>
   /// <param name="groupBlocksHigh">Number of 8×8 blocks down the group.</param>
   /// <param name="numChannels">Number of XYB channels (typically 3).</param>
+  /// <param name="origins">Which cell each transform starts at, as the file
+  /// stated it. Without it the start has to be guessed from the shapes of the
+  /// cells around it, and that guess is wrong wherever two transforms of the
+  /// same shape sit side by side — which is most of a picture coded in large
+  /// transforms. Callers that only ever pass single-block transforms may leave
+  /// it null.</param>
   /// <returns>Per-channel AC blocks, indexed
   /// <c>[channel][blockIdx]</c> where
   /// <c>blockIdx = blockY * groupBlocksWide + blockX</c>.</returns>
@@ -183,7 +189,8 @@ internal static class JxlAcDecoder {
     int groupBlocksWide,
     int groupBlocksHigh,
     int numChannels,
-    int[][]? quantField = null
+    int[][]? quantField = null,
+    bool[][]? origins = null
   ) {
     ArgumentNullException.ThrowIfNull(reader);
     ArgumentNullException.ThrowIfNull(entropy);
@@ -259,7 +266,7 @@ internal static class JxlAcDecoder {
         // Only the block a transform starts at is read. The rest of the
         // rectangle it covers is stepped over, which is what libjxl's
         // IsFirstBlock check amounts to.
-        if (!JxlAcStrategyGeometry.IsTransformOrigin(strategies, bx, by)) {
+        if (!(origins is not null ? origins[by][bx] : JxlAcStrategyGeometry.IsTransformOrigin(strategies, bx, by))) {
           bx += wide;
           continue;
         }
