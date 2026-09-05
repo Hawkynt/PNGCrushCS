@@ -124,6 +124,48 @@ internal sealed class JxlSpecialShapeQuantTests {
     }
   }
 
+  /// <summary>
+  /// The three shapes that divide the block take the smaller shape's curve
+  /// spread back over it: each row of a 4x8 covers two of the block's rows, and
+  /// each row and column of a 4x4 covers two of each. Building the curve at the
+  /// block's own size instead stretches it over twice the distance, which is a
+  /// different curve and not a coarser one.
+  /// </summary>
+  /// <param name="strategy">One of the three.</param>
+  /// <param name="rowsRepeat">How many of the block's rows one of the smaller
+  /// shape's covers.</param>
+  /// <param name="columnsRepeat">And how many of its columns.</param>
+  [TestCase(JxlAcStrategyType.Dct4x8, 2, 1)]
+  [TestCase(JxlAcStrategyType.Dct8x4, 2, 1)]
+  [TestCase(JxlAcStrategyType.Dct4x4, 2, 2)]
+  public void ABlockDividingShapeSpreadsTheSmallerCurveOverTheBlock(
+    JxlAcStrategyType strategy, int rowsRepeat, int columnsRepeat
+  ) {
+    var set = JxlVarDctQuant.DefaultsForStrategy(strategy);
+    Assert.That(set, Is.Not.Null);
+
+    // The table is kept the way a block is stored, which is the transpose of
+    // the way the format writes one down. The third plane is the one whose
+    // curve varies for all three of these shapes; the first two state a flat
+    // curve for the 4x4, which would make the last check below vacuous.
+    var weights = set!.Tables[2].Weights;
+    float At(int x, int y) => weights[x * 8 + y];
+
+    Assert.Multiple(() => {
+      for (var y = 0; y < 8; ++y)
+      for (var x = 0; x < 8; ++x) {
+        // Every entry equals the one at the start of its own patch.
+        var patchY = y / rowsRepeat * rowsRepeat;
+        var patchX = x / columnsRepeat * columnsRepeat;
+        Assert.That(At(x, y), Is.EqualTo(At(patchX, patchY)).Within(1e-9f), $"({x},{y})");
+      }
+
+      // And neighbouring patches are not all the same value, or nothing was
+      // spread at all.
+      Assert.That(At(0, 0), Is.Not.EqualTo(At(0, 7)).Within(1e-9f), "the curve still falls away");
+    });
+  }
+
   /// <summary>Neither is the plain 8x8 curve under another name.</summary>
   [Test]
   public void NeitherIsTheEightByEightCurve() {
