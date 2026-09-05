@@ -70,7 +70,8 @@ internal static class JxlVarDctSpecDecoder {
     JxlFrameToc? toc = null,
     int frameBody = 0,
     int groupSizeOverride = 0,
-    int numDcGroups = 1
+    int numDcGroups = 1,
+    int numExtraChannels = 0
   ) {
     ArgumentNullException.ThrowIfNull(reader);
     if (width <= 0)
@@ -211,6 +212,33 @@ internal static class JxlVarDctSpecDecoder {
     var dcHeight = (height + _BlockDim - 1) / _BlockDim;
     var (modularGlobalTree, modularGlobalEntropy) = JxlModularSpecDecoder.DecodeGlobalInfo(
       reader, distanceMultiplierHint: (uint)Math.Max(dcWidth, _NumXybChannels));
+
+    // The global modular stream of a VarDCT frame carries no colour — the
+    // colour is in the transforms — but it does carry the frame's extra
+    // channels, an alpha plane among them, at full size. A frame that has none
+    // states a stream of no channels and nothing is read for it, which is why
+    // skipping this went unnoticed until a picture with alpha turned up: there
+    // the plane sits in the bitstream and everything after it was read a plane
+    // too late.
+    if (numExtraChannels > 0) {
+      var extraChannels = new JxlChannel[numExtraChannels];
+      for (var i = 0; i < numExtraChannels; ++i)
+        extraChannels[i] = new JxlChannel {
+          Width = width,
+          Height = height,
+          HShift = 0,
+          VShift = 0,
+          Pixels = new int[checked(width * height)],
+        };
+
+      JxlModularSpecDecoder.DecodeStream(
+        reader, extraChannels, bitDepth, modularGlobalTree, modularGlobalEntropy,
+        new JxlModularStreamOptions {
+          MaxChannelSize = groupSize,
+          StreamId = 0,
+          UndoTransforms = false,
+        });
+    }
 
     // ProcessDCGroup for VarDCT (libjxl `dec_modular.cc::DecodeVarDCTDC`):
     //   1. Read 2 bits `extra_precision` (DC quantization precision boost).
