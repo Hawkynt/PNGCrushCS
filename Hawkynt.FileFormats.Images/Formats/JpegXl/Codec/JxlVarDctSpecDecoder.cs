@@ -670,18 +670,21 @@ internal static class JxlVarDctSpecDecoder {
       for (var bx = 0; bx < blocksX; ++bx) {
         var blockIdx = by * blocksX + bx;
         var strategy = strategies[by][bx];
-        if (strategy != JxlAcStrategyType.Dct8x8) continue;
+        if (strategy != JxlAcStrategyType.Dct8x8)
+          continue;
+
         var coeffBlock = group.AcBlocks[yCh][blockIdx];
         var (blockW, blockH) = JxlVarDctIdct.BlockSize(strategy);
-        var blockArea = blockW * blockH;
         var quantValue = perBlockQuant[blockIdx];
         if (quantValue <= 0) quantValue = 1;
-        var scaled = invGlobalScale / quantValue * 1f; // Y dm_mul = 1
-        var table = quantTableSet.Tables[yCh];
-        var arr = new float[blockArea];
-        for (var i = 0; i < blockArea; ++i)
-          arr[i] = coeffBlock.Coefficients[i] * scaled * table.Weights[i];
-        dequantedY[blockIdx] = arr;
+
+        // The weights belong to the transform's own shape. Taking the plain 8x8
+        // table for every shape read past its end the moment a larger transform
+        // appeared.
+        dequantedY[blockIdx] = _Dequantize(
+          coeffBlock.Coefficients, strategy, blockW, blockH,
+          _StrategyTables(strategy, quantTableSet).Tables[yCh], quantTableSet.Tables[yCh],
+          invGlobalScale / quantValue);
       }
 
     for (var c = 0; c < _NumXybChannels; ++c) {
@@ -698,26 +701,14 @@ internal static class JxlVarDctSpecDecoder {
           //                 dm_multiplier * dequant_matrix[k]
           // where inv_global_scale = kGlobalScaleDenom / global_scale and
           // dm_multiplier = 1 (Y), xDmMultiplier (X), or bDmMultiplier (B).
-          var dequantized = new float[blockArea];
-          var strategyTables = strategy == JxlAcStrategyType.Dct8x8
-            ? quantTableSet
-            : (JxlVarDctQuant.DefaultsForStrategy(strategy) ?? quantTableSet);
-          var table = strategyTables.Tables[c];
           var quantValue = perBlockQuant[blockIdx];
           if (quantValue <= 0) quantValue = 1;
           var scaledDequant = invGlobalScale / quantValue
             * (c == xCh ? xDmMultiplier : c == bCh ? bDmMultiplier : 1f);
-          if (table.Width * table.Height == blockArea) {
-            for (var i = 0; i < blockArea; ++i)
-              dequantized[i] = coeffBlock.Coefficients[i] * scaledDequant * table.Weights[i];
-          } else {
-            for (var i = 0; i < blockArea; ++i) {
-              var ty = (i / blockW) * 8 / Math.Max(1, blockH);
-              var tx = (i % blockW) * 8 / Math.Max(1, blockW);
-              dequantized[i] = coeffBlock.Coefficients[i] * scaledDequant
-                * quantTableSet.Tables[c].Weights[ty * 8 + tx];
-            }
-          }
+          var dequantized = _Dequantize(
+            coeffBlock.Coefficients, strategy, blockW, blockH,
+            _StrategyTables(strategy, quantTableSet).Tables[c], quantTableSet.Tables[c],
+            scaledDequant);
 
           // Apply chroma-from-luma AC mixing: for X channel add x_cc_mul *
           // dequant_y[k]; for B add b_cc_mul * dequant_y[k]. Y itself is
@@ -757,6 +748,47 @@ internal static class JxlVarDctSpecDecoder {
         }
       }
     }
+  }
+
+  /// <summary>The quantisation weights a transform's own shape is dequantised with.</summary>
+  private static JxlQuantTableSet _StrategyTables(JxlAcStrategyType strategy, JxlQuantTableSet fallback)
+    => strategy == JxlAcStrategyType.Dct8x8
+      ? fallback
+      : JxlVarDctQuant.DefaultsForStrategy(strategy) ?? fallback;
+
+  /// <summary>
+  /// Undo the quantisation of one transform's coefficients.
+  /// </summary>
+  /// <remarks>
+  /// The weights come from a table of the transform's own shape. Where none is
+  /// to hand the plain 8x8 one is stretched over the block, which is an
+  /// approximation and one of the reasons a VarDCT frame is not handed back.
+  /// </remarks>
+  private static float[] _Dequantize(
+    short[] coefficients,
+    JxlAcStrategyType strategy,
+    int blockW,
+    int blockH,
+    JxlQuantTable table,
+    JxlQuantTable fallback,
+    float scale
+  ) {
+    var area = blockW * blockH;
+    var result = new float[area];
+    if (table.Width * table.Height == area) {
+      for (var i = 0; i < area; ++i)
+        result[i] = coefficients[i] * scale * table.Weights[i];
+
+      return result;
+    }
+
+    for (var i = 0; i < area; ++i) {
+      var ty = i / blockW * 8 / Math.Max(1, blockH);
+      var tx = i % blockW * 8 / Math.Max(1, blockW);
+      result[i] = coefficients[i] * scale * fallback.Weights[ty * 8 + tx];
+    }
+
+    return result;
   }
 
   // ===============================================================
