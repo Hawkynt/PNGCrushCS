@@ -81,7 +81,7 @@ quietly come to mean "some of it". How each codec was measured is in
 Every codec the package registers has a row, and the name in the first column is the codec's own
 `CodecName` — the same string a refusal message names it by. `Decode` is what
 [`VideoFormatRegistry.CreateDecoder`](https://github.com/Hawkynt/PNGCrushCS/blob/main/Hawkynt.FileFormats.Video/VideoFormatRegistry.cs) builds, 82 of them; `Encode` is
-what [`VideoFormatRegistry.CreateEncoder`](https://github.com/Hawkynt/PNGCrushCS/blob/main/Hawkynt.FileFormats.Video/VideoFormatRegistry.cs) builds, 22 of them. The two
+what [`VideoFormatRegistry.CreateEncoder`](https://github.com/Hawkynt/PNGCrushCS/blob/main/Hawkynt.FileFormats.Video/VideoFormatRegistry.cs) builds, 23 of them. The two
 are separate tables in the registry because they are looked up by different things: a decoder by a
 whole stream description, an encoder by the four-character code a caller wants written.
 
@@ -128,7 +128,7 @@ to fit, the encoder refuses it by name instead. Codec-by-codec provenance and me
 | [Apple Video (RPZA)](https://en.wikipedia.org/wiki/Apple_Video) | ✅ | — | `rpza` in QuickTime, `azpr` in AVI; 15-bit RGB vector quantisation over 4x4 blocks | [MultimediaWiki Apple RPZA](https://wiki.multimedia.cx/index.php/Apple_RPZA) |
 | [Apple Graphics (SMC)](https://en.wikipedia.org/wiki/QuickTime_Graphics) | ✅ | — | `smc `; 8-bit palettised only. The colour table comes from the sample description, or from the QuickTime default where the stream names none; a stream naming a system colour resource by number is refused | [MultimediaWiki Apple SMC](https://wiki.multimedia.cx/index.php/Apple_SMC) |
 | [Apple Planar RGB (8BPS)](https://wiki.multimedia.cx/index.php/8BPS) | ⚠️ | — | `8BPS` at 8-bit palettised, 24-bit RGB and 32-bit RGB with alpha. A named system colour resource is refused rather than substituted | [MultimediaWiki 8BPS](https://wiki.multimedia.cx/index.php/8BPS) |
-| [Autodesk Animator Codec](https://wiki.multimedia.cx/index.php/Autodesk_Animator_Codec) | ✅ | — | `AASC` at 24 bits a pixel, bottom-up. Other depths and top-down heights refused | [MultimediaWiki AASC](https://wiki.multimedia.cx/index.php/Autodesk_Animator_Codec) |
+| [Autodesk Animator Codec](https://wiki.multimedia.cx/index.php/Autodesk_Animator_Codec) | ✅ | ✅ | `AASC` at 24 bits a pixel, bottom-up. Other depths and top-down heights refused | [MultimediaWiki AASC](https://wiki.multimedia.cx/index.php/Autodesk_Animator_Codec) |
 | [FLIC](https://en.wikipedia.org/wiki/FLIC_(file_format)) | ⚠️ | — | `FLIC`; palettised 8-bit over a canvas kept between packets. Sub-chunk types outside {4, 7, 11, 12, 13, 15, 16, 18} and other depths refused | [MultimediaWiki FLIC](https://wiki.multimedia.cx/index.php/Flic_Video) |
 | [Q-Team QPEG](https://wiki.multimedia.cx/index.php/QPEG) | ✅ | — | `QPEG`, `Q1.0`, `Q1.1`; palettised 8-bit bottom-up, with run-length, skip, fill-table and block motion coding | [MultimediaWiki QPEG](https://wiki.multimedia.cx/index.php/QPEG) |
 | [ASUS V1](https://wiki.multimedia.cx/index.php/Asus_Video) | ✅ | — | `ASV1`; intra-only 4:2:0 DCT, per-file quantiser from stream private data | [MultimediaWiki Asus Video](https://wiki.multimedia.cx/index.php/Asus_Video) |
@@ -386,7 +386,7 @@ Every public and protected member of all 360 types, generated from the built ass
 - Large RealVideo pictures require preserved slice offsets when they must be split across 16-bit RealMedia packet lengths, and RoQ sound requires its original predictor argument.
 - Several advanced codecs intentionally implement well-defined subsets (for example H.264 progressive 8-bit 4:2:0, HEVC Main profile, and VC-1 Simple/Main intra pictures). Every row marked ⚠️ in the codec table names its own subset. Unsupported profiles/features are refused by name rather than silently misdecoded.
 - Codec support is more precise than a single green check can express; consult [`codec-notes.md`](https://github.com/Hawkynt/PNGCrushCS/blob/main/Hawkynt.FileFormats.Video/codec-notes.md) before relying on a profile/level/feature not named in this README.
-- Encoding is a smaller domain than decoding on purpose: 22 codecs of the 82 read can also be written, and every one of them is lossless or format-faithful. Nothing here transcodes a picture into a lossy codec, so a stream read as H.264 cannot be written back as H.264.
+- Encoding is a smaller domain than decoding on purpose: 23 codecs of the 82 read can also be written, and every one of them is lossless or format-faithful. Nothing here transcodes a picture into a lossy codec, so a stream read as H.264 cannot be written back as H.264.
 - Video correctness depends on real-world packetization as much as codec math. The project therefore validates packet counts, sizes, timestamps, and key-frame flags against external tools where samples are available.
 
 ## ❤️ Support
