@@ -551,12 +551,17 @@ internal static class JxlVarDctSpecDecoder {
       );
       var strategies = groupStrategies[groupIdx];
       var origins = groupOrigins[groupIdx];
+      // How much of the luma the other two planes carry is stated per tile of
+      // eight blocks, in the first two channels of the metadata beside the
+      // low-frequency groups.
+      var correlationX = acMetadata.Channels[0];
+      var correlationB = acMetadata.Channels[1];
       // Per-block AC dequant scale: libjxl `Quantizer::inv_quant_ac` =
       // inv_global_scale / quant. dm multipliers = pow(1/1.25, qm_scale-2)
       // per `dec_cache.h:RecomputeRowQuant`.
       var xDmMul = MathF.Pow(1f / 1.25f, (int)xQmScale - 2);
       var bDmMul = MathF.Pow(1f / 1.25f, (int)bQmScale - 2);
-      _RenderGroup(group, strategies, origins, blocksX, blocksY, quantTableSet,
+      _RenderGroup(group, strategies, origins, correlationX, correlationB, blocksX, blocksY, quantTableSet,
         mulDc, extraPrecisionMul, dcCorrelation,
         quantParams.InvGlobalScale, perBlockQuant, xDmMul, bDmMul,
         channels, width, height);
@@ -710,6 +715,8 @@ internal static class JxlVarDctSpecDecoder {
     JxlVarDctGroup group,
     JxlAcStrategyType[][] strategies,
     bool[][] origins,
+    JxlChannel correlationX,
+    JxlChannel correlationB,
     int blocksX,
     int blocksY,
     JxlQuantTableSet quantTableSet,
@@ -745,15 +752,12 @@ internal static class JxlVarDctSpecDecoder {
       dequantDc[bCh * totalBlocks + i] = qB * mulDc[bCh] * extraPrecisionMul + yDc * dcCorrelation.YtoB;
     }
 
-    // Pre-pass: dequantize Y AC for all blocks so X and B can apply the
-    // chroma-from-luma `b_cc_mul * dequant_y + dequant_b_cc` mixing per
-    // libjxl `DequantLane`. For a fixture whose AC-metadata cmap channels
-    // (ytox_map, ytob_map) are zero, X uses `YtoXRatio(0) = 0` (no mixing)
-    // and B uses `YtoBRatio(0) = kYToBRatio = 1.0` (full Y added). For
-    // non-default cmap, the per-tile factor would be looked up here.
-    // First-wave assumes single-tile / all-zero cmap.
-    const float xCcMul = 0f;             // YtoXRatio(0) = 0
-    const float bCcMul = JxlColorCorrelationMap.DefaultYtoBRatio;  // = 1.0
+    // Pre-pass: dequantize Y for every block, because the other two planes are
+    // stated as what is left of them once their share of the luma is taken out,
+    // and that share is per tile of eight blocks rather than per frame. Taking
+    // the frame's own figure for every tile is right only where the encoder
+    // found nothing to state — which is to say, on a picture with no colour in
+    // it. Everything else was assembled with the wrong share of its luma.
     var dequantedY = new float[totalBlocks][];
     for (var by = 0; by < blocksY; ++by)
       for (var bx = 0; bx < blocksX; ++bx) {
@@ -813,7 +817,9 @@ internal static class JxlVarDctSpecDecoder {
           // (non-DCT8 strategies in the first wave).
           if ((c == xCh || c == bCh) && dequantedY[blockIdx] != null) {
             var yDeq = dequantedY[blockIdx];
-            var mix = c == xCh ? xCcMul : bCcMul;
+            var mix = c == xCh
+              ? _CorrelationAt(correlationX, group, bx, by, dcCorrelation.YtoX)
+              : _CorrelationAt(correlationB, group, bx, by, dcCorrelation.YtoB);
             if (mix != 0f) {
               for (var i = 0; i < blockArea; ++i)
                 dequantized[i] += mix * yDeq[i];
@@ -878,7 +884,7 @@ internal static class JxlVarDctSpecDecoder {
   /// number over the colour factor, added to the channel's base. A tile is
   /// eight blocks across.
   /// </remarks>
-  private static float _CorrelationAt(
+  internal static float _CorrelationAt(
     JxlChannel map,
     JxlVarDctGroup group,
     int bx,
