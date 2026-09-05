@@ -2,138 +2,146 @@ using System;
 
 namespace FileFormat.Jpeg2000.Codec;
 
-/// <summary>MQ (binary arithmetic) decoder used in JPEG 2000 EBCOT tier-1 coding (ITU-T T.800 Section D).</summary>
+/// <summary>MQ arithmetic decoder for EBCOT tier-1 coding (ITU-T T.800 Annex C).</summary>
+/// <remarks>
+/// Pairs with <see cref="MqEncoder"/> and, more to the point, with every other implementation: the
+/// LPS sub-interval is at the bottom of the interval, so the comparison that separates the two
+/// branches is against Qe rather than against the remaining interval.
+/// </remarks>
 internal sealed class MqDecoder {
 
-  /// <summary>Interval register (16-bit range).</summary>
   private uint _a;
-
-  /// <summary>Code register (upper 16 bits of C hold the active value).</summary>
   private uint _c;
-
-  /// <summary>Counter (bits remaining before next byte-in).</summary>
   private int _ct;
 
   private readonly byte[] _data;
-  private int _pos;
+  private readonly int _start;
   private readonly int _end;
-  private byte _lastByte;
+  private int _bp;
 
-  /// <summary>Current state index per context.</summary>
   private readonly int[] _states;
-
-  /// <summary>Most probable symbol (0 or 1) per context.</summary>
   private readonly int[] _mps;
 
   public MqDecoder(byte[] data, int offset, int length, int numContexts) {
+    ArgumentNullException.ThrowIfNull(data);
+    if ((uint)offset > (uint)data.Length)
+      throw new ArgumentOutOfRangeException(nameof(offset));
+    if (length < 0 || offset + length > data.Length)
+      throw new ArgumentOutOfRangeException(nameof(length));
+
     _data = data;
-    _pos = offset;
+    _start = offset;
     _end = offset + length;
     _states = new int[numContexts];
     _mps = new int[numContexts];
     _Initialize();
   }
 
-  /// <summary>Decode one bit in the given context (ITU-T T.800 Section D.2).</summary>
-  public int DecodeBit(int context) {
-    var stateIdx = _states[context];
-    var qe = (uint)MqTables.QE[stateIdx];
-    _a -= qe;
-
-    int d;
-    if ((_c >> 16) < _a) {
-      // MPS sub-interval: C_active < A
-      if (_a >= 0x8000)
-        return _mps[context];
-
-      if (_a < qe) {
-        // Conditional exchange: LPS is actually more probable in this interval
-        d = 1 - _mps[context];
-        if (MqTables.SWITCH[stateIdx] != 0)
-          _mps[context] = 1 - _mps[context];
-        _states[context] = MqTables.NLPS[stateIdx];
-        _a = qe;
-      } else {
-        d = _mps[context];
-        _states[context] = MqTables.NMPS[stateIdx];
-      }
-    } else {
-      // LPS sub-interval: C_active >= A
-      _c -= _a << 16;
-      if (_a < qe) {
-        // Conditional exchange: MPS
-        d = _mps[context];
-        _states[context] = MqTables.NMPS[stateIdx];
-      } else {
-        d = 1 - _mps[context];
-        if (MqTables.SWITCH[stateIdx] != 0)
-          _mps[context] = 1 - _mps[context];
-        _states[context] = MqTables.NLPS[stateIdx];
-        _a = qe;
-      }
-    }
-
-    _Renormalize();
-    return d;
-  }
-
-  /// <summary>Set a context's initial state and MPS value.</summary>
+  /// <summary>Sets a context's initial state index and most probable symbol (Table D.7).</summary>
   internal void SetContext(int context, int stateIndex, int mpsValue) {
     _states[context] = stateIndex;
     _mps[context] = mpsValue;
   }
 
-  private void _Initialize() {
-    // INITDEC procedure (ITU-T T.800 Section D.2.6)
-    _lastByte = 0;
-    _a = 0x8000;
-    _c = 0;
+  /// <summary>Decodes one decision in the given context (C.3.2 DECODE).</summary>
+  public int DecodeBit(int context) {
+    var stateIndex = _states[context];
+    var qe = (uint)MqTables.QE[stateIndex];
+    _a -= qe;
 
-    // Read first byte
-    if (_pos < _end) {
-      _lastByte = _data[_pos];
-      ++_pos;
+    int decision;
+    if ((_c >> 16) < qe) {
+      decision = _LpsExchange(context, stateIndex, qe);
+      _Renormalize();
+      return decision;
     }
 
-    _c = (uint)_lastByte << 16;
+    _c -= qe << 16;
+    if ((_a & 0x8000) != 0)
+      return _mps[context];
+
+    decision = _MpsExchange(context, stateIndex, qe);
+    _Renormalize();
+    return decision;
+  }
+
+  private int _MpsExchange(int context, int stateIndex, uint qe) {
+    if (_a < qe) {
+      var decision = 1 - _mps[context];
+      if (MqTables.SWITCH[stateIndex] != 0)
+        _mps[context] = decision;
+      _states[context] = MqTables.NLPS[stateIndex];
+      return decision;
+    }
+
+    _states[context] = MqTables.NMPS[stateIndex];
+    return _mps[context];
+  }
+
+  private int _LpsExchange(int context, int stateIndex, uint qe) {
+    if (_a < qe) {
+      _a = qe;
+      var mps = _mps[context];
+      _states[context] = MqTables.NMPS[stateIndex];
+      return mps;
+    }
+
+    _a = qe;
+    var decision = 1 - _mps[context];
+    if (MqTables.SWITCH[stateIndex] != 0)
+      _mps[context] = decision;
+    _states[context] = MqTables.NLPS[stateIndex];
+    return decision;
+  }
+
+  private void _Initialize() {
+    _bp = _start;
+    _c = _bp < _end ? (uint)_data[_bp] << 16 : 0xFF0000u;
     _ByteIn();
     _c <<= 7;
     _ct -= 7;
     _a = 0x8000;
   }
 
+  /// <summary>
+  /// C.3.4 BYTEIN. Past the end of the segment the decoder feeds itself 1-bits, which is what lets a
+  /// truncated code-block still decode the passes that are present.
+  /// </summary>
   private void _ByteIn() {
-    if (_lastByte == 0xFF) {
-      var nextByte = _pos < _end ? _data[_pos] : (byte)0xFF;
-      if (nextByte > 0x8F) {
-        // Marker segment detected: do not consume the marker
-        _ct = 8;
-      } else {
-        ++_pos;
-        _lastByte = nextByte;
-        _c += (uint)_lastByte << 9;
-        _ct = 7;
-      }
-    } else {
-      if (_pos < _end) {
-        _lastByte = _data[_pos];
-        ++_pos;
-      } else
-        _lastByte = 0xFF;
-
-      _c += (uint)_lastByte << 8;
+    if (_bp >= _end) {
+      _c += 0xFF00;
       _ct = 8;
+      return;
     }
+
+    var next = _bp + 1 < _end ? _data[_bp + 1] : (byte)0xFF;
+    if (_data[_bp] == 0xFF) {
+      if (next > 0x8F) {
+        // A marker follows; it is not part of the code-block and must not be consumed.
+        _c += 0xFF00;
+        _ct = 8;
+        return;
+      }
+
+      ++_bp;
+      _c += (uint)next << 9;
+      _ct = 7;
+      return;
+    }
+
+    ++_bp;
+    _c += (uint)next << 8;
+    _ct = 8;
   }
 
   private void _Renormalize() {
-    while (_a < 0x8000) {
+    do {
       if (_ct == 0)
         _ByteIn();
 
       _a <<= 1;
       _c <<= 1;
       --_ct;
-    }
+    } while ((_a & 0x8000) == 0);
   }
 }

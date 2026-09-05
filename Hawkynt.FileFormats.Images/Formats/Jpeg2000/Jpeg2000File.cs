@@ -21,7 +21,7 @@ public readonly record struct Jpeg2000File : IImageFormatReader<Jpeg2000File>, I
   /// <summary>Number of image components (1 for grayscale, 3 for RGB).</summary>
   public int ComponentCount { get; init; }
 
-  /// <summary>Bits per component (always 8 in this implementation).</summary>
+  /// <summary>Bits per component as the codestream declares it; the writer authors 8.</summary>
   public int BitsPerComponent { get; init; }
 
   /// <summary>Number of DWT decomposition levels used.</summary>

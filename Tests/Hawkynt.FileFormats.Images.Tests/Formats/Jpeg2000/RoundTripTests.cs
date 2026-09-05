@@ -272,6 +272,41 @@ public sealed class RoundTripTests {
     Assert.That(restored.PixelData, Is.EqualTo(original.PixelData));
   }
 
+  /// <summary>
+  /// Wide enough that several subbands hold more than one code-block, which is the only case in
+  /// which the packet header's tag trees carry anything: with a single code-block per precinct every
+  /// tree is one node deep and a plain value would do just as well.
+  /// </summary>
+  [Test]
+  [Category("Integration")]
+  public void RoundTrip_ManyCodeBlocksPerSubband_Rgb() {
+    var width = 200;
+    var height = 150;
+    var pixelData = new byte[width * height * 3];
+    var rng = new Random(4711);
+    for (var y = 0; y < height; ++y)
+      for (var x = 0; x < width; ++x) {
+        var index = (y * width + x) * 3;
+        pixelData[index] = (byte)(x + y);
+        pixelData[index + 1] = (byte)rng.Next(256);
+        pixelData[index + 2] = (byte)(x < 100 ? 0 : 255);
+      }
+
+    var original = new Jpeg2000File {
+      Width = width,
+      Height = height,
+      ComponentCount = 3,
+      BitsPerComponent = 8,
+      DecompositionLevels = 5,
+      PixelData = pixelData,
+    };
+
+    var bytes = Jpeg2000Writer.ToBytes(original);
+    var restored = Jpeg2000Reader.FromBytes(bytes);
+
+    Assert.That(restored.PixelData, Is.EqualTo(original.PixelData));
+  }
+
   [Test]
   [Category("Integration")]
   public void RoundTrip_DecompositionLevels_Preserved() {

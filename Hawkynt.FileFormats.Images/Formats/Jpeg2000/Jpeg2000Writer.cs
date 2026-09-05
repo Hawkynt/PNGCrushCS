@@ -1,410 +1,338 @@
 using System;
 using System.Buffers.Binary;
-using System.Collections.Generic;
 using System.IO;
 using FileFormat.Jpeg2000.Codec;
 
 namespace FileFormat.Jpeg2000;
 
-/// <summary>Assembles JPEG 2000 (JP2) file bytes from pixel data.</summary>
+/// <summary>Writes JPEG 2000 files: one tile, one quality layer, reversible 5/3, lossless.</summary>
+/// <remarks>
+/// The authoring profile is deliberately narrow — a single tile with the default precinct partition,
+/// LRCP progression, 64 by 64 code-blocks and no coding-mode switches — but everything it does emit
+/// is what T.800 specifies, packet headers included, so other decoders read it.
+/// </remarks>
 public static class Jpeg2000Writer {
 
-  /// <summary>J2K SOC marker: Start of Codestream.</summary>
   private const ushort _SOC = 0xFF4F;
-
-  /// <summary>J2K SIZ marker: Image and Tile Size.</summary>
   private const ushort _SIZ = 0xFF51;
-
-  /// <summary>J2K COD marker: Coding Style Default.</summary>
   private const ushort _COD = 0xFF52;
-
-  /// <summary>J2K QCD marker: Quantization Default.</summary>
   private const ushort _QCD = 0xFF5C;
-
-  /// <summary>J2K SOT marker: Start of Tile-Part.</summary>
   private const ushort _SOT = 0xFF90;
-
-  /// <summary>J2K SOD marker: Start of Data.</summary>
   private const ushort _SOD = 0xFF93;
-
-  /// <summary>J2K EOC marker: End of Codestream.</summary>
   private const ushort _EOC = 0xFFD9;
 
-  /// <summary>
-  /// KNOWN WRONG, and no longer what the format writes. Kept for reading files this once produced.
-  /// </summary>
-  /// <remarks>
-  /// The container is well formed — ImageMagick opens the file and reports the right size — but what
-  /// sits inside it is raw wavelet coefficients as big-endian int32, this library's own invention
-  /// rather than what the standard codes. Handed a 32 by 24 gradient, ImageMagick reads the file
-  /// back with not one of its 768 pixels matching, an average error of 64 in 255: the picture opens,
-  /// and it is a different picture.
-  /// <para/>
-  /// That is worse than a file which fails to open, and it was invisible from inside this library,
-  /// whose reader accepts the same invention coming back — so every round-trip test passed while
-  /// nothing else read what was written. The format now writes through <see cref="ToBytesEbcot"/>
-  /// instead, which is refused by other decoders rather than misread by them.
-  /// </remarks>
-    public static byte[] ToBytes(Jpeg2000File file) {
-    ArgumentNullException.ThrowIfNull(file);
-    var codestream = _BuildCodestream(file);
-    return _BuildJp2Container(file, codestream);
+  private const int _CODE_BLOCK_EXPONENT = 6;
+  private const int _GUARD_BITS = 2;
+
+  /// <summary>Wraps the codestream in a JP2 container.</summary>
+  public static byte[] ToBytes(Jpeg2000File file) {
+    ArgumentNullException.ThrowIfNull(file.PixelData);
+    return _BuildJp2Container(file, ToCodestreamBytes(file));
   }
 
-  internal static byte[] ToCodestreamBytes(Jpeg2000File file) {
-    ArgumentNullException.ThrowIfNull(file);
-    return _BuildCodestream(file);
+  /// <summary>Builds the bare J2K codestream.</summary>
+  public static byte[] ToCodestreamBytes(Jpeg2000File file) {
+    _Validate(file);
+
+    var levels = _ChooseDecompositionLevels(file);
+    var image = _BuildImage(file, out var componentCount);
+    var styles = new Jp2CodingStyle[componentCount];
+    for (var c = 0; c < componentCount; ++c) {
+      styles[c] = new() {
+        DecompositionLevels = levels,
+        CodeBlockWidthExp = _CODE_BLOCK_EXPONENT,
+        CodeBlockHeightExp = _CODE_BLOCK_EXPONENT,
+        CodeBlockStyle = 0,
+        Transform = 1,
+        QuantizationStyle = 0,
+        GuardBits = _GUARD_BITS,
+        QuantExponents = _BuildExponents(levels, file.BitsPerComponent),
+        QuantMantissas = new int[3 * levels + 1],
+      };
+      styles[c].UseDefaultPrecincts();
+    }
+
+    var useMct = componentCount == 3;
+    var tile = Jp2StructureBuilder.Build(image, 0, styles, 1, 0, useMct, false, false, allocateCoefficients: true);
+
+    _LoadSamples(file, tile, componentCount);
+    if (useMct)
+      _ForwardComponentTransform(tile);
+
+    foreach (var component in tile.Components)
+      Jp2Wavelet.ForwardTransform(component);
+
+    var guardBits = _EncodeCodeBlocks(tile);
+    if (guardBits != _GUARD_BITS)
+      foreach (var style in styles)
+        style.GuardBits = guardBits;
+
+    var tileData = Tier2Encoder.AssemblePackets(image, tile);
+
+    using var output = new MemoryStream();
+    _WriteMarker(output, _SOC);
+    _WriteSiz(output, image, file.BitsPerComponent);
+    _WriteCod(output, levels, useMct);
+    _WriteQcd(output, styles[0]);
+    _WriteSot(output, tileData.Length);
+    _WriteMarker(output, _SOD);
+    output.Write(tileData);
+    _WriteMarker(output, _EOC);
+
+    return output.ToArray();
+  }
+
+  private static void _Validate(Jpeg2000File file) {
+    if (file.Width <= 0 || file.Height <= 0)
+      throw new ArgumentOutOfRangeException(nameof(file), "JPEG 2000 dimensions must be positive.");
+    if (file.ComponentCount is not 1 and not 3)
+      throw new NotSupportedException("The JPEG 2000 writer authors one-component grey or three-component colour.");
+    if (file.BitsPerComponent is < 1 or > 16)
+      throw new NotSupportedException("The JPEG 2000 writer authors components of 1 to 16 bits.");
+
+    var expected = checked(file.Width * file.Height * file.ComponentCount);
+    if (file.PixelData == null || file.PixelData.Length != expected)
+      throw new InvalidDataException($"JPEG 2000 pixel buffer has {file.PixelData?.Length ?? 0} bytes; expected {expected}.");
   }
 
   /// <summary>
-  /// Encode using the EBCOT pipeline (Tier-1/Tier-2 arithmetic coding), which is what the format
-  /// writes.
+  /// Caps the requested depth so no resolution level collapses; a decomposition finer than the
+  /// picture is not something other encoders emit and not something every decoder accepts.
   /// </summary>
-  /// <remarks>
-  /// STILL INCOMPLETE, but incomplete in the way that fails loudly rather than quietly. The length
-  /// field in a packet header is now the width the standard states — Lblock plus one bit for every
-  /// doubling of the coding-pass count — where before both this and the matching reader left the
-  /// second term out and so agreed only with each other.
-  /// <para/>
-  /// What remains is the packet header's shape: the standard signals which code-blocks a packet
-  /// includes, and how many bit-planes of each are zero, through tag trees, and both are written
-  /// here as plain values instead. <c>TagTree</c> sits unused beside this file. Until that is done
-  /// OpenJPEG refuses the output, reading a length longer than the code-block it belongs to — which
-  /// is at least a refusal and not a wrong picture.
-  /// </remarks>
-  internal static byte[] ToBytesEbcot(Jpeg2000File file) {
-    ArgumentNullException.ThrowIfNull(file);
-    var codestream = _BuildCodestreamEbcot(file);
-    return _BuildJp2Container(file, codestream);
+  private static int _ChooseDecompositionLevels(Jpeg2000File file) {
+    var levels = Math.Clamp(file.DecompositionLevels, 0, 32);
+    var smallest = Math.Min(file.Width, file.Height);
+    while (levels > 0 && smallest >> levels == 0)
+      --levels;
+
+    return levels;
+  }
+
+  private static Jp2Image _BuildImage(Jpeg2000File file, out int componentCount) {
+    componentCount = file.ComponentCount;
+    var components = new Jp2Component[componentCount];
+    for (var c = 0; c < componentCount; ++c)
+      components[c] = new() { Precision = file.BitsPerComponent, Signed = false, Dx = 1, Dy = 1 };
+
+    return new() {
+      X0 = 0,
+      Y0 = 0,
+      X1 = file.Width,
+      Y1 = file.Height,
+      TileX0 = 0,
+      TileY0 = 0,
+      TileWidth = file.Width,
+      TileHeight = file.Height,
+      Components = components,
+    };
+  }
+
+  /// <summary>E.1.1: the reversible exponent for a subband is the source precision plus its gain.</summary>
+  private static int[] _BuildExponents(int levels, int precision) {
+    var exponents = new int[3 * levels + 1];
+    exponents[0] = precision;
+    for (var resolution = 1; resolution <= levels; ++resolution) {
+      exponents[3 * (resolution - 1) + 1] = precision + 1; // HL
+      exponents[3 * (resolution - 1) + 2] = precision + 1; // LH
+      exponents[3 * (resolution - 1) + 3] = precision + 2; // HH
+    }
+
+    return exponents;
+  }
+
+  private static void _LoadSamples(Jpeg2000File file, Jp2Tile tile, int componentCount) {
+    var shift = 1 << (file.BitsPerComponent - 1);
+    var count = file.Width * file.Height;
+
+    for (var c = 0; c < componentCount; ++c) {
+      var samples = tile.Components[c].Samples;
+      for (var i = 0; i < count; ++i)
+        samples[i] = file.PixelData[i * componentCount + c] - shift;
+    }
+  }
+
+  /// <summary>The reversible colour transform, exact in integers and the partner of the 5/3 filter.</summary>
+  private static void _ForwardComponentTransform(Jp2Tile tile) {
+    var red = tile.Components[0].Samples;
+    var green = tile.Components[1].Samples;
+    var blue = tile.Components[2].Samples;
+
+    for (var i = 0; i < red.Length; ++i) {
+      var r = red[i];
+      var g = green[i];
+      var b = blue[i];
+      red[i] = (r + 2 * g + b) >> 2;
+      green[i] = b - g;
+      blue[i] = r - g;
+    }
+  }
+
+  /// <summary>
+  /// Runs tier-1 over every code-block and reports the guard bits the result needs, which is two
+  /// unless the transform produced more dynamic range than E.1's nominal range allows for.
+  /// </summary>
+  private static int _EncodeCodeBlocks(Jp2Tile tile) {
+    var guardBits = _GUARD_BITS;
+
+    foreach (var component in tile.Components)
+      foreach (var resolution in component.Resolutions)
+        foreach (var band in resolution.Bands) {
+          if (band.Width <= 0 || band.Height <= 0)
+            continue;
+
+          foreach (var precinct in band.Precincts)
+            foreach (var block in precinct.CodeBlocks) {
+              if (block.Width <= 0 || block.Height <= 0)
+                continue;
+
+              var coefficients = new int[block.Width * block.Height];
+              for (var y = 0; y < block.Height; ++y)
+                Array.Copy(
+                  band.Coefficients, (block.Y0 - band.Y0 + y) * band.Width + block.X0 - band.X0,
+                  coefficients, y * block.Width, block.Width);
+
+              block.Encoded = Tier1Coder.Encode(
+                coefficients, block.Width, block.Height, band.Orientation, 0,
+                out var passes, out var magnitudeBits);
+              block.TotalPasses = passes;
+              block.MagnitudeBits = magnitudeBits;
+
+              var needed = _GUARD_BITS + Math.Max(0, magnitudeBits - band.MagnitudeBits);
+              if (needed > guardBits)
+                guardBits = needed;
+            }
+        }
+
+    if (guardBits > 7)
+      throw new InvalidDataException("JPEG 2000 wavelet coefficients need more guard bits than a quantization marker can carry.");
+
+    if (guardBits != _GUARD_BITS)
+      foreach (var component in tile.Components)
+        foreach (var resolution in component.Resolutions)
+          foreach (var band in resolution.Bands)
+            band.MagnitudeBits += guardBits - _GUARD_BITS;
+
+    foreach (var component in tile.Components)
+      foreach (var resolution in component.Resolutions)
+        foreach (var band in resolution.Bands)
+          foreach (var precinct in band.Precincts)
+            foreach (var block in precinct.CodeBlocks)
+              block.ZeroBitPlanes = block.Encoded.Length > 0 ? band.MagnitudeBits - block.MagnitudeBits : band.MagnitudeBits;
+
+    return guardBits;
   }
 
   private static byte[] _BuildJp2Container(Jpeg2000File file, byte[] codestream) {
-    using var ms = new MemoryStream();
+    using var output = new MemoryStream();
 
-    // JP2 Signature box (12 bytes)
-    ms.Write(Jp2Box.JP2_SIGNATURE_BYTES);
+    output.Write(Jp2Box.JP2_SIGNATURE_BYTES);
+    Jp2Box.WriteBox(output, Jp2Box.TYPE_FILE_TYPE, _BuildFileTypeBox());
+    Jp2Box.WriteBox(output, Jp2Box.TYPE_JP2_HEADER, _BuildJp2HeaderBox(file));
+    Jp2Box.WriteBox(output, Jp2Box.TYPE_CODESTREAM, codestream);
 
-    // File Type box (ftyp)
-    var ftypData = _BuildFileTypeBox();
-    Jp2Box.WriteBox(ms, Jp2Box.TYPE_FILE_TYPE, ftypData);
-
-    // JP2 Header superbox (jp2h) containing ihdr and colr
-    var jp2hData = _BuildJp2HeaderBox(file);
-    Jp2Box.WriteBox(ms, Jp2Box.TYPE_JP2_HEADER, jp2hData);
-
-    // Contiguous Codestream box (jp2c)
-    Jp2Box.WriteBox(ms, Jp2Box.TYPE_CODESTREAM, codestream);
-
-    return ms.ToArray();
+    return output.ToArray();
   }
 
   private static byte[] _BuildFileTypeBox() {
-    // ftyp: BR(4) + MinV(4) + CL0(4) = 12 bytes
     var data = new byte[12];
-    data[0] = (byte)'j';
-    data[1] = (byte)'p';
-    data[2] = (byte)'2';
-    data[3] = (byte)' ';
+    "jp2 "u8.CopyTo(data);
     BinaryPrimitives.WriteUInt32BigEndian(data.AsSpan(4), 0);
-    data[8] = (byte)'j';
-    data[9] = (byte)'p';
-    data[10] = (byte)'2';
-    data[11] = (byte)' ';
+    "jp2 "u8.CopyTo(data.AsSpan(8));
     return data;
   }
 
   private static byte[] _BuildJp2HeaderBox(Jpeg2000File file) {
-    using var ms = new MemoryStream();
+    using var output = new MemoryStream();
 
-    // Image Header box (ihdr): 14 bytes payload
-    var ihdrData = new byte[14];
-    BinaryPrimitives.WriteUInt32BigEndian(ihdrData.AsSpan(0), (uint)file.Height);
-    BinaryPrimitives.WriteUInt32BigEndian(ihdrData.AsSpan(4), (uint)file.Width);
-    BinaryPrimitives.WriteUInt16BigEndian(ihdrData.AsSpan(8), (ushort)file.ComponentCount);
-    ihdrData[10] = (byte)(file.BitsPerComponent - 1); // Ssiz: unsigned, bpc - 1
-    ihdrData[11] = 7; // C: compression type = JPEG 2000
-    ihdrData[12] = 0; // UnkC: colourspace unknown = 0 (known)
-    ihdrData[13] = 0; // IPR: no intellectual property
-    Jp2Box.WriteBox(ms, Jp2Box.TYPE_IMAGE_HEADER, ihdrData);
+    var header = new byte[14];
+    BinaryPrimitives.WriteUInt32BigEndian(header.AsSpan(0), (uint)file.Height);
+    BinaryPrimitives.WriteUInt32BigEndian(header.AsSpan(4), (uint)file.Width);
+    BinaryPrimitives.WriteUInt16BigEndian(header.AsSpan(8), (ushort)file.ComponentCount);
+    header[10] = (byte)(file.BitsPerComponent - 1);
+    header[11] = 7; // compression type: JPEG 2000
+    header[12] = 0; // colourspace is known
+    header[13] = 0; // no intellectual property box
+    Jp2Box.WriteBox(output, Jp2Box.TYPE_IMAGE_HEADER, header);
 
-    // Colour Specification box (colr): method 1 (enumerated colourspace)
-    var colrData = new byte[7];
-    colrData[0] = 1; // METH: Enumerated Colourspace
-    colrData[1] = 0; // PREC: precedence
-    colrData[2] = 0; // APPROX: approximation
-    var enumCs = file.ComponentCount == 1 ? 17u : 16u;
-    BinaryPrimitives.WriteUInt32BigEndian(colrData.AsSpan(3), enumCs);
-    Jp2Box.WriteBox(ms, Jp2Box.TYPE_COLOUR_SPEC, colrData);
+    var colour = new byte[7];
+    colour[0] = 1; // enumerated colourspace
+    BinaryPrimitives.WriteUInt32BigEndian(colour.AsSpan(3), file.ComponentCount == 1 ? 17u : 16u);
+    Jp2Box.WriteBox(output, Jp2Box.TYPE_COLOUR_SPEC, colour);
 
-    return ms.ToArray();
+    return output.ToArray();
   }
 
-  private static byte[] _BuildCodestream(Jpeg2000File file) {
-    using var ms = new MemoryStream();
-
-    _WriteMarker(ms, _SOC);
-    _WriteSiz(ms, file);
-    _WriteCod(ms, file);
-    _WriteQcd(ms, file);
-
-    var tileData = _EncodeCoefficients(file);
-
-    _WriteSot(ms, tileData.Length);
-    _WriteMarker(ms, _SOD);
-    ms.Write(tileData);
-    _WriteMarker(ms, _EOC);
-
-    return ms.ToArray();
+  private static void _WriteMarker(Stream output, ushort marker) {
+    Span<byte> buffer = stackalloc byte[2];
+    BinaryPrimitives.WriteUInt16BigEndian(buffer, marker);
+    output.Write(buffer);
   }
 
-  private static byte[] _BuildCodestreamEbcot(Jpeg2000File file) {
-    using var ms = new MemoryStream();
+  private static void _WriteSiz(Stream output, Jp2Image image, int precision) {
+    _WriteMarker(output, _SIZ);
 
-    _WriteMarker(ms, _SOC);
-    _WriteSiz(ms, file);
-    _WriteCod(ms, file);
-    _WriteQcd(ms, file);
+    var count = image.Components.Length;
+    var data = new byte[38 + 3 * count];
+    BinaryPrimitives.WriteUInt16BigEndian(data.AsSpan(0), (ushort)data.Length);
+    BinaryPrimitives.WriteUInt16BigEndian(data.AsSpan(2), 0);
+    BinaryPrimitives.WriteUInt32BigEndian(data.AsSpan(4), (uint)image.X1);
+    BinaryPrimitives.WriteUInt32BigEndian(data.AsSpan(8), (uint)image.Y1);
+    BinaryPrimitives.WriteUInt32BigEndian(data.AsSpan(12), (uint)image.X0);
+    BinaryPrimitives.WriteUInt32BigEndian(data.AsSpan(16), (uint)image.Y0);
+    BinaryPrimitives.WriteUInt32BigEndian(data.AsSpan(20), (uint)image.TileWidth);
+    BinaryPrimitives.WriteUInt32BigEndian(data.AsSpan(24), (uint)image.TileHeight);
+    BinaryPrimitives.WriteUInt32BigEndian(data.AsSpan(28), (uint)image.TileX0);
+    BinaryPrimitives.WriteUInt32BigEndian(data.AsSpan(32), (uint)image.TileY0);
+    BinaryPrimitives.WriteUInt16BigEndian(data.AsSpan(36), (ushort)count);
 
-    var tileData = _EncodeEbcot(file);
-
-    _WriteSot(ms, tileData.Length);
-    _WriteMarker(ms, _SOD);
-    ms.Write(tileData);
-    _WriteMarker(ms, _EOC);
-
-    return ms.ToArray();
-  }
-
-  private static void _WriteMarker(MemoryStream ms, ushort marker) {
-    Span<byte> buf = stackalloc byte[2];
-    BinaryPrimitives.WriteUInt16BigEndian(buf, marker);
-    ms.Write(buf);
-  }
-
-  private static void _WriteSiz(MemoryStream ms, Jpeg2000File file) {
-    _WriteMarker(ms, _SIZ);
-
-    var csiz = file.ComponentCount;
-    var lsiz = (ushort)(38 + 3 * csiz);
-    var data = new byte[lsiz];
-    var pos = 0;
-
-    BinaryPrimitives.WriteUInt16BigEndian(data.AsSpan(pos), lsiz);
-    pos += 2;
-    BinaryPrimitives.WriteUInt16BigEndian(data.AsSpan(pos), 0); // Rsiz
-    pos += 2;
-    BinaryPrimitives.WriteUInt32BigEndian(data.AsSpan(pos), (uint)file.Width);
-    pos += 4;
-    BinaryPrimitives.WriteUInt32BigEndian(data.AsSpan(pos), (uint)file.Height);
-    pos += 4;
-    BinaryPrimitives.WriteUInt32BigEndian(data.AsSpan(pos), 0); // XOsiz
-    pos += 4;
-    BinaryPrimitives.WriteUInt32BigEndian(data.AsSpan(pos), 0); // YOsiz
-    pos += 4;
-    BinaryPrimitives.WriteUInt32BigEndian(data.AsSpan(pos), (uint)file.Width); // XTsiz (single tile)
-    pos += 4;
-    BinaryPrimitives.WriteUInt32BigEndian(data.AsSpan(pos), (uint)file.Height); // YTsiz
-    pos += 4;
-    BinaryPrimitives.WriteUInt32BigEndian(data.AsSpan(pos), 0); // XTOsiz
-    pos += 4;
-    BinaryPrimitives.WriteUInt32BigEndian(data.AsSpan(pos), 0); // YTOsiz
-    pos += 4;
-    BinaryPrimitives.WriteUInt16BigEndian(data.AsSpan(pos), (ushort)csiz);
-    pos += 2;
-
-    for (var c = 0; c < csiz; ++c) {
-      data[pos] = (byte)(file.BitsPerComponent - 1); // Ssiz
-      ++pos;
-      data[pos] = 1; // XRsiz
-      ++pos;
-      data[pos] = 1; // YRsiz
-      ++pos;
+    for (var c = 0; c < count; ++c) {
+      data[38 + 3 * c] = (byte)(precision - 1);
+      data[39 + 3 * c] = 1;
+      data[40 + 3 * c] = 1;
     }
 
-    ms.Write(data);
+    output.Write(data);
   }
 
-  private static void _WriteCod(MemoryStream ms, Jpeg2000File file) {
-    _WriteMarker(ms, _COD);
+  private static void _WriteCod(Stream output, int levels, bool useMct) {
+    _WriteMarker(output, _COD);
 
-    var lcod = (ushort)12;
-    var data = new byte[lcod];
-    var pos = 0;
-
-    BinaryPrimitives.WriteUInt16BigEndian(data.AsSpan(pos), lcod);
-    pos += 2;
-    data[pos] = 0; // Scod: no precincts, no SOP, no EPH
-    ++pos;
-    data[pos] = 0; // Progression order: LRCP
-    ++pos;
-    BinaryPrimitives.WriteUInt16BigEndian(data.AsSpan(pos), 1); // Number of layers
-    pos += 2;
-    // No component transform. This used to declare one and then not perform it, so the three planes
-    // went out as plain colours while the header said they were a luminance and two differences —
-    // anything else reading the file would undo a transform that was never done and get colours
-    // that are wrong everywhere. Saying nothing is what is actually true of these bytes.
-    data[pos] = 0; // MCT
-    ++pos;
-    data[pos] = (byte)file.DecompositionLevels;
-    ++pos;
-    data[pos] = 4; // Code-block width exponent offset: 2^(4+2) = 64
-    ++pos;
-    data[pos] = 4; // Code-block height exponent offset: 2^(4+2) = 64
-    ++pos;
-    data[pos] = 0; // Code-block style
-    ++pos;
-    data[pos] = 1; // Wavelet transform: 1 = 5/3 reversible
-    ++pos;
-
-    ms.Write(data);
+    var data = new byte[12];
+    BinaryPrimitives.WriteUInt16BigEndian(data.AsSpan(0), (ushort)data.Length);
+    data[2] = 0; // Scod: default precincts, no SOP, no EPH
+    data[3] = 0; // LRCP
+    BinaryPrimitives.WriteUInt16BigEndian(data.AsSpan(4), 1);
+    data[6] = (byte)(useMct ? 1 : 0);
+    data[7] = (byte)levels;
+    data[8] = _CODE_BLOCK_EXPONENT - 2;
+    data[9] = _CODE_BLOCK_EXPONENT - 2;
+    data[10] = 0; // no code-block style switches
+    data[11] = 1; // reversible 5/3
+    output.Write(data);
   }
 
-  private static void _WriteQcd(MemoryStream ms, Jpeg2000File file) {
-    _WriteMarker(ms, _QCD);
+  private static void _WriteQcd(Stream output, Jp2CodingStyle style) {
+    _WriteMarker(output, _QCD);
 
-    var numSubbands = 1 + 3 * file.DecompositionLevels;
-    var lqcd = (ushort)(3 + numSubbands);
-    var data = new byte[lqcd];
-    var pos = 0;
+    var bands = style.QuantExponents.Length;
+    var data = new byte[3 + bands];
+    BinaryPrimitives.WriteUInt16BigEndian(data.AsSpan(0), (ushort)data.Length);
+    data[2] = (byte)(style.GuardBits << 5); // no quantization
+    for (var b = 0; b < bands; ++b)
+      data[3 + b] = (byte)(style.QuantExponents[b] << 3);
 
-    BinaryPrimitives.WriteUInt16BigEndian(data.AsSpan(pos), lqcd);
-    pos += 2;
-    data[pos] = 0; // Sqcd: no quantization (reversible)
-    ++pos;
-
-    for (var i = 0; i < numSubbands; ++i) {
-      data[pos] = (byte)((file.BitsPerComponent + 1) << 3); // epsilon << 3
-      ++pos;
-    }
-
-    ms.Write(data);
+    output.Write(data);
   }
 
-  private static void _WriteSot(MemoryStream ms, int tileDataLength) {
-    _WriteMarker(ms, _SOT);
+  private static void _WriteSot(Stream output, int tileDataLength) {
+    _WriteMarker(output, _SOT);
 
     var data = new byte[10];
-    var pos = 0;
-
-    BinaryPrimitives.WriteUInt16BigEndian(data.AsSpan(pos), 10); // Lsot
-    pos += 2;
-    BinaryPrimitives.WriteUInt16BigEndian(data.AsSpan(pos), 0); // Isot: tile 0
-    pos += 2;
-    var psot = (uint)(2 + 10 + 2 + tileDataLength);
-    BinaryPrimitives.WriteUInt32BigEndian(data.AsSpan(pos), psot);
-    pos += 4;
-    data[pos] = 0; // TPsot
-    ++pos;
-    data[pos] = 1; // TNsot
-    ++pos;
-
-    ms.Write(data);
-  }
-
-  /// <summary>Simplified encoding: raw big-endian int32 wavelet coefficients per component.</summary>
-  private static byte[] _EncodeCoefficients(Jpeg2000File file) {
-    var width = file.Width;
-    var height = file.Height;
-    var componentCount = file.ComponentCount;
-    var levels = file.DecompositionLevels;
-    var coeffsPerComponent = width * height;
-
-    var result = new byte[coeffsPerComponent * componentCount * 4];
-    var plane = new int[height, width];
-
-    for (var c = 0; c < componentCount; ++c) {
-      for (var y = 0; y < height; ++y)
-        for (var x = 0; x < width; ++x)
-          plane[y, x] = file.PixelData[(y * width + x) * componentCount + c];
-
-      Jp2Wavelet.ForwardMultiLevel(plane, width, height, levels);
-
-      var baseOffset = c * coeffsPerComponent * 4;
-      for (var y = 0; y < height; ++y)
-        for (var x = 0; x < width; ++x) {
-          var idx = baseOffset + (y * width + x) * 4;
-          BinaryPrimitives.WriteInt32BigEndian(result.AsSpan(idx), plane[y, x]);
-        }
-    }
-
-    return result;
-  }
-
-  /// <summary>Encode pixel data using the EBCOT pipeline: Forward DWT -> Tier-1 -> Tier-2.</summary>
-  internal static byte[] _EncodeEbcot(Jpeg2000File file) {
-    var width = file.Width;
-    var height = file.Height;
-    var componentCount = file.ComponentCount;
-    var levels = file.DecompositionLevels;
-    var cbWidth = 64;
-    var cbHeight = 64;
-
-    var subbands = SubbandInfo.ComputeSubbands(width, height, levels);
-    var allCodeBlocks = new List<CodeBlockData>();
-
-    for (var c = 0; c < componentCount; ++c) {
-      var plane = new int[height, width];
-
-      // Extract component plane with DC level shift
-      var shift = file.BitsPerComponent > 1 ? 1 << (file.BitsPerComponent - 1) : 0;
-      for (var y = 0; y < height; ++y)
-        for (var x = 0; x < width; ++x)
-          plane[y, x] = file.PixelData[(y * width + x) * componentCount + c] - shift;
-
-      // Forward DWT
-      Jp2Wavelet.ForwardMultiLevel(plane, width, height, levels);
-
-      // Encode each code-block per subband
-      foreach (var sb in subbands) {
-        if (sb.Width == 0 || sb.Height == 0)
-          continue;
-
-        sb.GetCodeBlockGrid(cbWidth, cbHeight, out var numCbX, out var numCbY);
-
-        for (var cbY = 0; cbY < numCbY; ++cbY)
-          for (var cbX = 0; cbX < numCbX; ++cbX) {
-            var actualW = Math.Min(cbWidth, sb.Width - cbX * cbWidth);
-            var actualH = Math.Min(cbHeight, sb.Height - cbY * cbHeight);
-            if (actualW <= 0 || actualH <= 0)
-              continue;
-
-            var cbCoeffs = new int[actualH, actualW];
-            var baseX = sb.OffsetX + cbX * cbWidth;
-            var baseY = sb.OffsetY + cbY * cbHeight;
-            for (var y = 0; y < actualH; ++y)
-              for (var x = 0; x < actualW; ++x)
-                cbCoeffs[y, x] = plane[baseY + y, baseX + x];
-
-            var compData = Tier1Encoder.EncodeCodeBlock(
-              cbCoeffs, actualW, actualH,
-              out var numPasses, out var zeroBitPlanes
-            );
-
-            if (numPasses > 0 && compData.Length > 0)
-              allCodeBlocks.Add(new CodeBlockData {
-                SubbandIndex = sb.Index + c * subbands.Length,
-                CodeBlockX = cbX,
-                CodeBlockY = cbY,
-                NumCodingPasses = numPasses,
-                ZeroBitPlanes = zeroBitPlanes,
-                CompressedData = compData,
-              });
-          }
-      }
-    }
-
-    var tileInfo = new TileInfo {
-      Width = width,
-      Height = height,
-      DecompLevels = levels,
-      ComponentCount = componentCount,
-      CodeBlockWidth = cbWidth,
-      CodeBlockHeight = cbHeight,
-      Layers = 1,
-      UseMct = false,
-      BitsPerComponent = file.BitsPerComponent,
-    };
-
-    return Tier2Encoder.AssemblePackets(allCodeBlocks, tileInfo);
+    BinaryPrimitives.WriteUInt16BigEndian(data.AsSpan(0), 10);
+    BinaryPrimitives.WriteUInt16BigEndian(data.AsSpan(2), 0); // tile zero
+    BinaryPrimitives.WriteUInt32BigEndian(data.AsSpan(4), (uint)(2 + 10 + 2 + tileDataLength));
+    data[8] = 0; // first tile-part
+    data[9] = 1; // and the only one
+    output.Write(data);
   }
 }
