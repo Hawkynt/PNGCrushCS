@@ -48,6 +48,29 @@ namespace FileFormat.JpegXl.Codec;
 
 internal static class JxlVarDctIdct {
 
+  /// <summary>
+  /// A block's coefficients as the format writes them down, for the shapes that
+  /// divide the block rather than cover it.
+  /// </summary>
+  /// <remarks>
+  /// This decoder keeps a block the way the scan order fills it, which for an
+  /// 8x8 is the transpose of the way the format writes it down — the two pair
+  /// up, and a transform over the whole block cannot tell them apart because
+  /// transposing both the coefficients and the result changes nothing. The
+  /// shapes that divide the block can tell: they pick particular rows out of it
+  /// by number, so they have to be handed it the way those numbers mean. Not
+  /// turning it round left every one of them reading its neighbours' rows.
+  /// </remarks>
+  private static float[] _AsWrittenLayout(float[] coefficients) {
+    var turned = new float[64];
+    for (var y = 0; y < 8; ++y)
+    for (var x = 0; x < 8; ++x)
+      turned[y * 8 + x] = coefficients[x * 8 + y];
+
+    return turned;
+  }
+
+
   // -------------------------------------------------------------------------
   // Public API
   // -------------------------------------------------------------------------
@@ -423,7 +446,8 @@ internal static class JxlVarDctIdct {
   /// they are encoded as a 2x2 Hadamard transform at coeffs[0,0], [0,1], [1,0],
   /// [1,1]. Per-quadrant AC coefficients live at the 2-strided positions.
   /// Mirrors libjxl <c>TransformToPixels</c> case <c>DCT4X4</c>.</summary>
-  private static void _InverseDct4x4QuadBlock(float[] coeffs, float[] outputPixels) {
+  private static void _InverseDct4x4QuadBlock(float[] coeffsIn, float[] outputPixels) {
+    var coeffs = _AsWrittenLayout(coeffsIn);
     // Stride for the source 8x8 layout.
     const int stride = 8;
 
@@ -464,7 +488,8 @@ internal static class JxlVarDctIdct {
   /// are encoded as a 1x2 Hadamard at coeffs[0] / coeffs[8]; AC coefficients
   /// for the two strips are interleaved at row stride 2.
   /// Mirrors libjxl <c>TransformToPixels</c> case <c>DCT4X8</c>.</summary>
-  private static void _InverseDct4x8DualBlock(float[] coeffs, float[] outputPixels) {
+  private static void _InverseDct4x8DualBlock(float[] coeffsIn, float[] outputPixels) {
+    var coeffs = _AsWrittenLayout(coeffsIn);
     const int stride = 8;
     var dcs = new float[2];
     var b0 = coeffs[0];
@@ -495,7 +520,8 @@ internal static class JxlVarDctIdct {
   /// libjxl source: <c>TransformToPixels</c> case <c>DCT8X4</c>, computes a
   /// <c>ComputeScaledIDCT&lt;8, 4&gt;()</c>, with COLS=4, ROWS=8 — i.e. width=4
   /// and height=8 in our axis convention.</summary>
-  private static void _InverseDct8x4DualBlock(float[] coeffs, float[] outputPixels) {
+  private static void _InverseDct8x4DualBlock(float[] coeffsIn, float[] outputPixels) {
+    var coeffs = _AsWrittenLayout(coeffsIn);
     const int stride = 8;
     var dcs = new float[2];
     var b0 = coeffs[0];
@@ -535,7 +561,8 @@ internal static class JxlVarDctIdct {
   /// "residual" coefficients via a 2x2 Hadamard. After S=8 the entire 8x8
   /// region holds spatial pixel values.
   /// Mirrors libjxl <c>IDCT2TopBlock&lt;S&gt;</c> applied for S in {2, 4, 8}.</summary>
-  private static void _InverseDct2x2Tower(float[] coeffs, float[] outputPixels) {
+  private static void _InverseDct2x2Tower(float[] coeffsIn, float[] outputPixels) {
+    var coeffs = _AsWrittenLayout(coeffsIn);
     const int dim = 8;
 
     // Operate in-place on a working buffer (libjxl uses a memcpy-then-mutate).
@@ -586,7 +613,8 @@ internal static class JxlVarDctIdct {
   /// (position (4y+1, 4x+1) of the 8x8 output) equals
   /// <c>quadrant_dc - sum_of_residuals * 1/16</c>.
   /// Mirrors libjxl <c>TransformToPixels</c> case <c>IDENTITY</c>.</summary>
-  private static void _InverseHornuss(float[] coeffs, float[] outputPixels) {
+  private static void _InverseHornuss(float[] coeffsIn, float[] outputPixels) {
+    var coeffs = _AsWrittenLayout(coeffsIn);
     const int stride = 8;
     var b00 = coeffs[0];
     var b01 = coeffs[1];
@@ -643,7 +671,8 @@ internal static class JxlVarDctIdct {
   /// </list>
   /// The three "DCs" are derived from a 1x3 Hadamard of coeffs[0,0],[0,1],[1,0].
   /// Mirrors libjxl <c>AFVTransformToPixels&lt;afv_kind&gt;</c>.</summary>
-  private static void _InverseAfv(float[] coeffs, float[] outputPixels, int afvKind) {
+  private static void _InverseAfv(float[] coeffsIn, float[] outputPixels, int afvKind) {
+    var coeffs = _AsWrittenLayout(coeffsIn);
     const int stride = 8;
     var afvX = afvKind & 1;
     var afvY = afvKind >> 1;

@@ -47,19 +47,27 @@ internal sealed class JxlFlatBlockInvariantTests {
     });
   }
 
+  /// <summary>The shapes whose whole block is one transform, so that a lone
+  /// coefficient is spread over all of it.</summary>
+  private static readonly JxlAcStrategyType[] _WholeBlockShapes = [
+    JxlAcStrategyType.Dct8x8, JxlAcStrategyType.Dct16x16, JxlAcStrategyType.Dct32x32,
+    JxlAcStrategyType.Dct16x8, JxlAcStrategyType.Dct8x16, JxlAcStrategyType.Dct32x8,
+    JxlAcStrategyType.Dct8x32, JxlAcStrategyType.Dct32x16, JxlAcStrategyType.Dct16x32,
+    JxlAcStrategyType.Dct64x64, JxlAcStrategyType.Dct64x32, JxlAcStrategyType.Dct32x64,
+  ];
+
   /// <summary>
-  /// And a lone coefficient anywhere else carries its whole weight into the
-  /// block rather than losing part of it. A shape that spends its coefficients
-  /// over a smaller area keeps the same total, which is what lets one
-  /// quantisation step mean the same thing for all of them.
+  /// And a lone coefficient carries its whole weight into the block rather than
+  /// losing part of it, so that one quantisation step means the same thing for
+  /// all of them. Only the shapes whose whole block is one transform are held
+  /// to this: a shape that divides the block spends a coefficient on one
+  /// division of it, and the rest of the block is rightly left alone.
   /// </summary>
-  [TestCaseSource(nameof(_EveryShape))]
+  [TestCaseSource(nameof(_WholeBlockShapes))]
   public void ALoneCoefficientKeepsItsWeight(JxlAcStrategyType strategy) {
     const float level = 100.0f;
     var (width, height) = JxlVarDctIdct.BlockSize(strategy);
 
-    // Position 8 is the second row of the block, which every shape in the
-    // family treats as a lowest coefficient of its own or a plain frequency.
     var coefficients = new float[width * height];
     coefficients[8] = level;
     var pixels = new float[width * height];
