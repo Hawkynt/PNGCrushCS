@@ -66,6 +66,60 @@ internal sealed class JxlSpecialShapeQuantTests {
     });
   }
 
+  /// <summary>
+  /// The AFV shape's block is three curves laid together: its odd rows are a
+  /// 4x8, its even rows and odd columns a 4x4, and what is left is its own —
+  /// five entries stated outright at the corner, the rest read off four bands.
+  /// These are the five stated ones, which are the part that is unique to it.
+  /// </summary>
+  /// <param name="channel">Which of the three the weights are for.</param>
+  /// <param name="corner">The shape's first five weights, in the order it
+  /// states them.</param>
+  [TestCase(0, new[] { 3072.0f, 3072.0f, 256.0f, 256.0f, 256.0f })]
+  [TestCase(1, new[] { 1024.0f, 1024.0f, 50.0f, 50.0f, 50.0f })]
+  [TestCase(2, new[] { 384.0f, 384.0f, 12.0f, 12.0f, 12.0f })]
+  public void TheAfvShapeStatesFiveEntriesAtItsCorner(int channel, float[] corner) {
+    var set = JxlVarDctQuant.DefaultsForStrategy(JxlAcStrategyType.Afv0);
+    Assert.That(set, Is.Not.Null);
+
+    var weights = set!.Tables[channel].Weights;
+    Assert.Multiple(() => {
+      Assert.That(weights, Has.Length.EqualTo(64));
+      Assert.That(weights[1 * 8 + 0], Is.EqualTo(1.0f / corner[0]).Within(1e-9), "below the corner");
+      Assert.That(weights[0 * 8 + 1], Is.EqualTo(1.0f / corner[1]).Within(1e-9), "beside it");
+      Assert.That(weights[2 * 8 + 0], Is.EqualTo(1.0f / corner[2]).Within(1e-9), "two below");
+      Assert.That(weights[0 * 8 + 2], Is.EqualTo(1.0f / corner[3]).Within(1e-9), "two across");
+      Assert.That(weights[2 * 8 + 2], Is.EqualTo(1.0f / corner[4]).Within(1e-9), "the corner itself");
+    });
+  }
+
+  /// <summary>The four AFV shapes are one shape turned about, and the format
+  /// gives them one table between them.</summary>
+  [Test]
+  public void TheFourAfvShapesShareOneTable() {
+    var zero = JxlVarDctQuant.DefaultsForStrategy(JxlAcStrategyType.Afv0)!;
+
+    foreach (var other in new[] { JxlAcStrategyType.Afv1, JxlAcStrategyType.Afv2, JxlAcStrategyType.Afv3 }) {
+      var set = JxlVarDctQuant.DefaultsForStrategy(other);
+      Assert.That(set, Is.Not.Null, $"{other} has a table");
+      for (var c = 0; c < 3; ++c)
+        Assert.That(set!.Tables[c].Weights, Is.EqualTo(zero.Tables[c].Weights), $"{other} channel {c}");
+    }
+  }
+
+  /// <summary>Every entry is a real weight — nothing was left at its zero fill,
+  /// which is what a gap in the layout would show up as.</summary>
+  [Test]
+  public void EveryEntryOfTheAfvTableWasWritten() {
+    var set = JxlVarDctQuant.DefaultsForStrategy(JxlAcStrategyType.Afv0)!;
+
+    for (var c = 0; c < 3; ++c) {
+      var weights = set.Tables[c].Weights;
+      for (var i = 0; i < 64; ++i)
+        Assert.That(weights[i], Is.GreaterThan(0.0f).And.LessThan(float.PositiveInfinity), $"channel {c} entry {i}");
+    }
+  }
+
   /// <summary>Neither is the plain 8x8 curve under another name.</summary>
   [Test]
   public void NeitherIsTheEightByEightCurve() {
