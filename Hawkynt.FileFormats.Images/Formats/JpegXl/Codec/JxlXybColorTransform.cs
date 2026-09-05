@@ -76,19 +76,27 @@ internal static class JxlXybColorTransform {
     return (linR, linG, linB);
   }
 
-  /// <summary>Convert linear sRGB float to gamma-sRGB byte (0..255). Uses the
-  /// IEC 61966-2-1 piecewise transfer function.</summary>
+  /// <summary>Convert linear sRGB float to gamma-sRGB, still as a float in
+  /// 0..1. Uses the IEC 61966-2-1 piecewise transfer function.</summary>
+  public static float LinearSrgbToGamma(float v) {
+    if (v <= 0.0f)
+      return 0.0f;
+    if (v >= 1.0f)
+      return 1.0f;
+
+    return v <= 0.0031308f
+      ? 12.92f * v
+      : 1.055f * MathF.Pow(v, 1.0f / 2.4f) - 0.055f;
+  }
+
+  /// <summary>Convert linear sRGB float to gamma-sRGB byte (0..255).</summary>
   public static byte LinearSrgbToGammaByte(float v) {
     if (v <= 0.0f)
       return 0;
     if (v >= 1.0f)
       return 255;
 
-    float gamma;
-    if (v <= 0.0031308f)
-      gamma = 12.92f * v;
-    else
-      gamma = 1.055f * MathF.Pow(v, 1.0f / 2.4f) - 0.055f;
+    var gamma = LinearSrgbToGamma(v);
 
     var scaled = gamma * 255.0f + 0.5f;
     if (scaled <= 0.0f)

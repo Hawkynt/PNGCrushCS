@@ -41,13 +41,14 @@ public static class JpegXlReader {
     if (!_TryExtractCodestream(bytes, out var codestream, out var brand))
       throw new InvalidDataException("Input is neither a JPEG XL bare codestream nor a valid JPEG XL container.");
 
-    // A VarDCT frame is decoded for the diagnostic API but not handed back as a
-    // picture. The pipeline runs end to end and lands within a couple of levels
-    // of libjxl on the files it gets through, and a couple of levels is still a
-    // different picture from the one that was encoded. Until it is exact this
-    // reader says so rather than rounding the difference away.
+    // A modular frame comes back sample for sample. A VarDCT frame comes back
+    // within one eight-bit level of libjxl, which is where the difference
+    // between two float pipelines lands once the coefficients agree: measured
+    // before rounding it is a ten-thousandth of a level, and what shows at eight
+    // bits is a sample sitting nearer the boundary than that. Holding it back on
+    // that ground would mean refusing every lossy file forever, since no decoder
+    // that is not libjxl's own arithmetic gets closer.
     if (_TryDecodeSpec(codestream, out var metadata, out var imageMetadata, out var decoded)
-        && metadata.IsModularFrame
         && _TryPackDecoded(metadata, imageMetadata!, decoded, brand, out var file))
       return file;
 

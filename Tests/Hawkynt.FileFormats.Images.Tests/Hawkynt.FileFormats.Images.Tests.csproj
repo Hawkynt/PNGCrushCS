@@ -50,6 +50,12 @@
       <Link>Fixtures\%(Filename)%(Extension)</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+    <!-- The blue-noise pattern libjxl adds to every eight-bit sample it writes. Comparing a lossy
+         decode against one of those .ppm files means nothing without it. -->
+    <None Include="Formats\JpegXl\Fixtures\*.txt">
+      <Link>Fixtures\%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
 
   <!-- An Aseprite sprite written by ImageMagick, and the picture ImageMagick was given to write it
