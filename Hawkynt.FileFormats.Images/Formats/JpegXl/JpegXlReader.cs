@@ -211,7 +211,12 @@ public static class JpegXlReader {
         epfParams: frame.EpfParameters,
         dcQuant: dcQuant,
         xQmScale: frame.XQmScale,
-        bQmScale: frame.BQmScale);
+        bQmScale: frame.BQmScale,
+        codestream: codestream,
+        toc: toc,
+        frameBody: frameBody,
+        groupSizeOverride: groupDim,
+        numDcGroups: numDcGroups);
       return image is JxlVarDctImage vardct
              && vardct.Width == width
              && vardct.Height == height
