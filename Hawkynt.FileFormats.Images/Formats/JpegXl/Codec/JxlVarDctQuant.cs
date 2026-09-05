@@ -220,6 +220,16 @@ internal static class JxlVarDctQuant {
   /// `required_size_y[t] * 8`.
   /// </remarks>
   public static JxlQuantTableSet? DefaultsForStrategy(JxlAcStrategyType strategy) {
+    // Two shapes state their weights outright rather than as a curve over
+    // distance, because neither is a plain transform: the Hornuss shape carries
+    // one value over the whole block with three corners of its own, and the 2x2
+    // one is four nested squares. Both were being dequantised with the 8x8
+    // curve, which is a different set of numbers entirely.
+    switch (strategy) {
+      case JxlAcStrategyType.Hornuss: return _BuildFromLayout(_HornussWeights, _LayOutHornuss);
+      case JxlAcStrategyType.Dct2x2: return _BuildFromLayout(_Dct2Weights, _LayOutDct2);
+    }
+
     var bands = _DefaultBandsForStrategy(strategy);
     if (bands is null) return null;
     var (w, h) = _BlockDimsForStrategy(strategy);
@@ -246,6 +256,74 @@ internal static class JxlVarDctQuant {
     JxlAcStrategyType.Dct64x32 or JxlAcStrategyType.Dct32x64 => _kDct64x32Bands,
     _ => null,
   };
+
+  /// <summary>The Hornuss shape's weights: one over the block, then the two
+  /// neighbours of the corner and the corner itself (libjxl <c>IDENTITY</c>).</summary>
+  private static readonly float[][] _HornussWeights = [
+    [280.0f, 3160.0f, 3160.0f],
+    [60.0f, 864.0f, 864.0f],
+    [18.0f, 200.0f, 200.0f],
+  ];
+
+  /// <summary>The 2x2 shape's weights, one per nested square.</summary>
+  private static readonly float[][] _Dct2Weights = [
+    [3840.0f, 2560.0f, 1280.0f, 640.0f, 480.0f, 300.0f],
+    [960.0f, 640.0f, 320.0f, 180.0f, 140.0f, 120.0f],
+    [640.0f, 320.0f, 128.0f, 64.0f, 32.0f, 16.0f],
+  ];
+
+  private static JxlQuantTableSet _BuildFromLayout(float[][] perChannel, Action<float[], float[]> layOut) {
+    var tables = new JxlQuantTable[3];
+    for (var c = 0; c < 3; ++c) {
+      var inverse = new float[64];
+      layOut(perChannel[c], inverse);
+      var weights = new float[64];
+      for (var i = 0; i < 64; ++i)
+        weights[i] = 1.0f / inverse[i];
+      tables[c] = new JxlQuantTable { Width = 8, Height = 8, Weights = weights };
+    }
+
+    return new JxlQuantTableSet { Tables = tables };
+  }
+
+  /// <summary>libjxl <c>GetQuantWeightsIdentity</c>.</summary>
+  private static void _LayOutHornuss(float[] w, float[] inverse) {
+    for (var i = 0; i < 64; ++i)
+      inverse[i] = w[0];
+    inverse[1] = w[1];
+    inverse[8] = w[1];
+    inverse[9] = w[2];
+  }
+
+  /// <summary>libjxl <c>GetQuantWeightsDCT2</c>: four nested squares.</summary>
+  private static void _LayOutDct2(float[] w, float[] inverse) {
+    // The corner is never read — the lowest coefficient comes from the DC
+    // image — and libjxl parks a marker there. Kept so the two agree entry for
+    // entry rather than only where it matters.
+    inverse[0] = 0xBAD;
+    inverse[1] = w[0];
+    inverse[8] = w[0];
+    inverse[9] = w[1];
+    for (var y = 0; y < 2; ++y)
+    for (var x = 0; x < 2; ++x) {
+      inverse[y * 8 + x + 2] = w[2];
+      inverse[(y + 2) * 8 + x] = w[2];
+    }
+
+    for (var y = 0; y < 2; ++y)
+    for (var x = 0; x < 2; ++x)
+      inverse[(y + 2) * 8 + x + 2] = w[3];
+
+    for (var y = 0; y < 4; ++y)
+    for (var x = 0; x < 4; ++x) {
+      inverse[y * 8 + x + 4] = w[4];
+      inverse[(y + 4) * 8 + x] = w[4];
+    }
+
+    for (var y = 0; y < 4; ++y)
+    for (var x = 0; x < 4; ++x)
+      inverse[(y + 4) * 8 + x + 4] = w[5];
+  }
 
   /// <summary>Return (width, height) in samples for a given AC strategy.</summary>
   private static (int W, int H) _BlockDimsForStrategy(JxlAcStrategyType s) => s switch {
