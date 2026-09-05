@@ -913,6 +913,20 @@ What is not implemented refuses and says so, naming the clause: quarter-sample m
 sprites and global motion compensation, interlaced coding, overlapped block motion compensation, data
 partitioning, scalability, non-rectangular shape, samples of any depth but eight, chroma formats
 other than 4:2:0, newpred, reduced-resolution pictures and the complexity estimation header.
+
+The vendor four-character codes were measured the same way the pictures were. `XVIX`, `BLZ0`, `DM4V`,
+`DXGM`, `HDX4`, `SEDG`, `SMP4` and `WV1F` each name this bitstream in ffmpeg's own AVI tag table, and
+each was checked against two elementary streams rather than taken on that word: 176x144 over fifty
+frames and 352x288 over a hundred with one intra picture at the front, written into an AVI under each
+code in turn so that only the four letters differ. Under every code the decode here is identical to
+the decode of the same stream under `XVID` — 3.8 and 30.4 million samples, none differing — and the
+difference from ffmpeg's decode of the same file is the same in every case, which is the transform's
+residual and not the code's. A code that is only a name costs nothing to take, and refusing it costs
+a file every other tool plays.
+
+`DVX3` was checked the same way and is **not** one of them: it names Microsoft's MPEG-4 version 3, so
+it is claimed by the version 2 decoder beside this one and refused there by name. Matroska's
+`V_MPEG4/MS/V3` is the same bitstream under that container's name and is refused with it.
 ### Apple ProRes
 
 Written from SMPTE RDD 36:2022, which is the published description of the bitstream and is cited by
@@ -1044,9 +1058,15 @@ the bitstream was read the way it was written.
 
 What refuses, by name: predicted, bidirectional and skipped pictures, each as what it is, because
 every one of them needs motion compensation against a reference this builds no part of; the Advanced
-profile, under its own code, since it carries a sequence header and entry point inside a byte stream
+profile, under its own codes, since it carries a sequence header and entry point inside a byte stream
 and shares only its block layer; and multi-resolution coding, range reduction and the in-loop
 deblocking filter, where the sequence header signals them.
+
+`WMVA` is one of those codes and not a second name for `WMV3`, which the name invites. It is Windows
+Media Video 9 Advanced Profile as it was written before the profile was standardised, and ffmpeg maps
+it to VC-1 rather than to WMV3 — so what follows the tag is a markered sequence header and entry
+point, not `STRUCT_C`. Reading it as `STRUCT_C` would find a profile and a quantiser in bits that mean
+something else, which is why it sits beside `WVC1` and not beside `WMV3`.
 
 One note on the source. The freely circulating committee draft of SMPTE 421M prints its three intra
 scan tables twenty-four columns wide on a page that fits twenty-three, so two cells of each fall past

@@ -302,6 +302,10 @@ public sealed class Vc1VideoDecoderTests {
 
   [TestCase("WVC1")]
   [TestCase("VC-1")]
+  // WMVA is Windows Media Video 9 Advanced Profile as it was written before the profile was
+  // standardised. The name puts it next to WMV3 and the bitstream does not: what follows the tag is
+  // a markered sequence header and entry point, not the thirty-two bit STRUCT_C read here.
+  [TestCase("WMVA")]
   [Category("Unit")]
   public void TheAdvancedProfileIsRefusedByItsOwnCode(string code) {
     // It states its sequence header and entry point inside the bitstream rather than in the container,

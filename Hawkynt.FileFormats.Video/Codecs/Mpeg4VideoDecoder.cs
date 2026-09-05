@@ -56,8 +56,14 @@ public sealed class Mpeg4VideoDecoder : IVideoCodecDecoder<Mpeg4VideoDecoder> {
   /// <remarks>
   /// The vendor codes are here because they are the same bitstream under a different name — an
   /// encoder wrote its own four letters into an AVI and the pictures inside are ISO/IEC 14496-2.
-  /// What is deliberately absent is the <c>DIV3</c> family: those are Microsoft's MPEG-4 version 3,
-  /// which is a different bitstream that this decoder would start and then stop part way into.
+  /// Each was checked rather than believed: one elementary stream written into an AVI under each code
+  /// in turn, decoded here and by ffmpeg, gives the same pictures as it does under <c>XVID</c> on
+  /// every sample of every frame. A code that is only a name costs nothing to take and refusing it
+  /// costs a file that every other tool plays.
+  /// <para/>
+  /// What is deliberately absent is the <c>DIV3</c> family, <c>DVX3</c> among them: those are
+  /// Microsoft's MPEG-4 version 3, which is a different bitstream that this decoder would start and
+  /// then stop part way into.
   /// </remarks>
   private static readonly CodecTag[] _Tags = [
     CodecTag.FromCharacters("mp4v"),
@@ -70,6 +76,14 @@ public sealed class Mpeg4VideoDecoder : IVideoCodecDecoder<Mpeg4VideoDecoder> {
     CodecTag.FromCharacters("3IV2"),
     CodecTag.FromCharacters("FVFW"),
     CodecTag.FromCharacters("RMP4"),
+    CodecTag.FromCharacters("XVIX"),
+    CodecTag.FromCharacters("BLZ0"),
+    CodecTag.FromCharacters("DM4V"),
+    CodecTag.FromCharacters("DXGM"),
+    CodecTag.FromCharacters("HDX4"),
+    CodecTag.FromCharacters("SEDG"),
+    CodecTag.FromCharacters("SMP4"),
+    CodecTag.FromCharacters("WV1F"),
   ];
 
   /// <summary>

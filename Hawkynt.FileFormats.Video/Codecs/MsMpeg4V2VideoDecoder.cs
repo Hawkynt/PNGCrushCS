@@ -106,7 +106,17 @@ public sealed class MsMpeg4V2VideoDecoder : IVideoCodecDecoder<MsMpeg4V2VideoDec
     CodecTag.FromCharacters("AP41"),
     CodecTag.FromCharacters("MPG3"),
     CodecTag.FromCharacters("COL1"),
+    CodecTag.FromCharacters("DVX3"),
   ];
+
+  /// <summary>The name Matroska gives version 3.</summary>
+  /// <remarks>
+  /// The only one of the three versions Matroska names at all: a file carrying version 1 or version 2
+  /// states a <c>BITMAPINFOHEADER</c> code the way an AVI does, so those reach the lists above through
+  /// their tag. Without this the refusal for a Matroska file would be the registry's — that nothing
+  /// decodes the stream — which says nothing about which codec went missing.
+  /// </remarks>
+  private static readonly string[] _Version3CodecIds = ["V_MPEG4/MS/V3"];
 
   private readonly int _width;
   private readonly int _height;
@@ -142,7 +152,7 @@ public sealed class MsMpeg4V2VideoDecoder : IVideoCodecDecoder<MsMpeg4V2VideoDec
     if (stream.Kind != MediaStreamKind.Video)
       return false;
 
-    return _Matches(stream, _Tags) || _Matches(stream, _Version1Tags) || _Matches(stream, _Version3Tags);
+    return _Matches(stream, _Tags) || _Matches(stream, _Version1Tags) || _IsVersion3(stream);
   }
 
   /// <summary>
@@ -166,9 +176,9 @@ public sealed class MsMpeg4V2VideoDecoder : IVideoCodecDecoder<MsMpeg4V2VideoDec
         + "encoder for the format exists to derive them from or to check a guess against, so version 1 is refused "
         + "rather than decoded on a guess.");
 
-    if (_Matches(stream, _Version3Tags))
+    if (_IsVersion3(stream))
       throw new NotSupportedException(
-        $"Stream {stream.Index} is coded as '{stream.Codec}', which is Microsoft's MPEG-4 version 3 — the original "
+        $"Stream {stream.Index} is coded as '{_NameOf(stream)}', which is Microsoft's MPEG-4 version 3 — the original "
         + "DivX. Each of its pictures chooses which of six run-level tables, which of two DC tables and which of two "
         + "motion vector tables it was coded with, and all ten are Microsoft's own with no published statement "
         + "anywhere. The motion vector tables pair one code with a whole vector over some eleven hundred entries, "
@@ -230,6 +240,22 @@ public sealed class MsMpeg4V2VideoDecoder : IVideoCodecDecoder<MsMpeg4V2VideoDec
 
     return false;
   }
+
+  private static bool _IsVersion3(MediaStreamInfo stream) {
+    if (_Matches(stream, _Version3Tags))
+      return true;
+
+    foreach (var id in _Version3CodecIds)
+      if (string.Equals(stream.CodecId, id, StringComparison.OrdinalIgnoreCase))
+        return true;
+
+    return false;
+  }
+
+  /// <summary>What a refusal calls the stream: its four-character code, or the name a container gave
+  /// it where there is no code.</summary>
+  private static string _NameOf(MediaStreamInfo stream)
+    => stream.Codec == CodecTag.None && stream.CodecId != null ? stream.CodecId : stream.Codec.ToString();
 
   private RawImage _ToImage(Mpeg4Frame frame) => new() {
     Width = this._width,
