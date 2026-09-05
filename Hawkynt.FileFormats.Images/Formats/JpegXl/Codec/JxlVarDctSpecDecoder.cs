@@ -815,7 +815,7 @@ internal static class JxlVarDctSpecDecoder {
         dequantedY[blockIdx] = _Dequantize(
           coeffBlock.Coefficients, strategy, blockW, blockH,
           _StrategyTables(strategy, quantTableSet).Tables[yCh], quantTableSet.Tables[yCh],
-          invGlobalScale / quantValue);
+          invGlobalScale / quantValue, yCh);
       }
 
     for (var c = 0; c < _NumXybChannels; ++c) {
@@ -847,7 +847,7 @@ internal static class JxlVarDctSpecDecoder {
           var dequantized = _Dequantize(
             coeffBlock.Coefficients, strategy, blockW, blockH,
             _StrategyTables(strategy, quantTableSet).Tables[c], quantTableSet.Tables[c],
-            scaledDequant);
+            scaledDequant, c);
 
           // Apply chroma-from-luma AC mixing: for X channel add x_cc_mul *
           // dequant_y[k]; for B add b_cc_mul * dequant_y[k]. Y itself is
@@ -983,13 +983,14 @@ internal static class JxlVarDctSpecDecoder {
     int blockH,
     JxlQuantTable table,
     JxlQuantTable fallback,
-    float scale
+    float scale,
+    int channel
   ) {
     var area = blockW * blockH;
     var result = new float[area];
     if (table.Width * table.Height == area) {
       for (var i = 0; i < area; ++i)
-        result[i] = coefficients[i] * scale * table.Weights[i];
+        result[i] = JxlVarDctQuant.AdjustQuantBias(coefficients[i], channel) * scale * table.Weights[i];
 
       return result;
     }
@@ -997,7 +998,7 @@ internal static class JxlVarDctSpecDecoder {
     for (var i = 0; i < area; ++i) {
       var ty = i / blockW * 8 / Math.Max(1, blockH);
       var tx = i % blockW * 8 / Math.Max(1, blockW);
-      result[i] = coefficients[i] * scale * fallback.Weights[ty * 8 + tx];
+      result[i] = JxlVarDctQuant.AdjustQuantBias(coefficients[i], channel) * scale * fallback.Weights[ty * 8 + tx];
     }
 
     return result;
