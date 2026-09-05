@@ -20,8 +20,12 @@ internal static class JxlSizeHeader {
       var heightDiv8 = (int)r.ReadBits(5);
       var height = (heightDiv8 + 1) * 8;
       var ratio = (int)r.ReadBits(3);
+      // A small picture states its width the way it stated its height — five
+      // bits of eighths — not in the four-selector form the large one uses.
+      // Reading the wrong one costs six bits and takes the rest of the
+      // codestream with it.
       var width = ratio == 0
-        ? _ReadU32Dim(r)
+        ? ((int)r.ReadBits(5) + 1) * 8
         : _ApplyRatio(ratio, height);
       return (width, height);
     }
