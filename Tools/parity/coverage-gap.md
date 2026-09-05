@@ -5,8 +5,15 @@ covered but for `.gr10p`, which RECOIL comments out of its own list for having a
 extension, so this is the whole of the known coverage gap.
 
 A name here is a file we cannot open. That is counted and closed rather than explained — unlike
-the rendering differences in the report beside this, which are cases of the tool giving
+the rendering differences in [the report beside this](README.md), which are cases of the tool giving
 something up and are correct as they stand.
+
+**Every count in this file was measured on 2026-08-09 and has not been re-measured since.** The
+registry has grown from 741 entries to 884 in the meantime, and the formats added since — Aseprite,
+Garmin JNX, Brother PES, AVCI, Canon CR3 — came out of a comparison against ImageMagick rather than
+against this catalogue, so none of them closes a row here. Re-measure before quoting a number:
+`Decode --extensions` against XnView's own `Formats.txt` is where the gap list comes from, and this
+file is the record of how it got to where it was, not a cache of the answer.
 
 **197 distinct extensions across 176 of its format names** when this was written. A few extensions
 are claimed by more than one of its names, so the rows below add up to more than that. The list grew

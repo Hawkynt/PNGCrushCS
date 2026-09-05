@@ -6,6 +6,26 @@ read differently?
 That is the question replacing them turns on. Counting how often we agree with a tool does not
 answer it — agreeing on nine formats out of ten is no comfort if the tenth is one somebody has.
 
+## What else is in this folder
+
+This file is the rendering half of the question — of the files both sides can open, do we draw the
+same picture? Two other documents sit beside it, each answering a question this one does not, and
+neither is reachable from anywhere but here:
+
+  - [`coverage-gap.md`](coverage-gap.md) — the *opening* half. Every extension XnView's catalogue
+    claims and this registry does not, how each of the closed ones was closed, and why the eleven
+    still open are not waiting on effort. A name there is a file we cannot open at all, which is a
+    different failure from drawing it wrongly.
+  - [`upstream-not-ported.md`](upstream-not-ported.md) — the four fixes the published `main` had
+    that this line still does not, after the merge that took this tree whole. One of them is a trap
+    rather than a gap: the VIFF type enums are numbered densely where Khoros' constants are not.
+
+The scripts the walkthrough below does not name: `build-oracle-corpus.sh` asks each installed tool
+to write every format it can and runs the registry over the result; `toms-coverage.sh` compares
+Tom's Editor's catalogue against ours without spending its daily conversion limit; `probe_bytes.py`
+maps an unknown layout by altering one byte of a real file and asking the reference tool what moved.
+Each carries its own usage in its header.
+
 ## Two tools agreeing is not always two opinions
 
 The rule worth applying to a disagreement is that one tool differing from us is an opinion and two
@@ -99,13 +119,19 @@ are wrong at once in each, and the arithmetic that worked will not.
 
 ## How many formats are actually supported
 
-The registry lists 741 formats and claims to read all of them. That number means much less than it
+The registry lists 884 formats and claims to read all of them. That number means much less than it
 looks, and JPEG XR is why it is worth saying so: it parsed containers, decoded nothing, and was
 counted the whole time. Its round-trip tests passed because the writer stored pixels and the reader
 had a fallback that copied compressed bytes back out — two halves of the same misunderstanding
-agreeing with each other.
+agreeing with each other. That particular hole is closed — `Formats/JpegXr/Reference` is now a
+managed port of Microsoft's JXRLib, oracle-tested upstream against `JxrEncApp`, `JxrDecApp` and WIC,
+and it decodes an independent JXRLib fixture — but it is kept as the example because it is the
+clearest one: nothing about being counted told anybody it did not work.
 
-Counting instead by what can be shown, over the 320 formats that have a sample here:
+The counts below were taken when the registry held 741, against the 320 formats that had a sample
+then. They have not been re-measured since, and the registry has grown by 143 entries; treat them as
+what was shown at that time rather than as today's state, and re-run the comparison before quoting
+them. Counting by what can be shown, over the 320 formats that had a sample:
 
 | | formats |
 |---|---|
@@ -114,10 +140,16 @@ Counting instead by what can be shown, over the 320 formats that have a sample h
 | decode, but no tool here reads the file to check against | 22 |
 | refuse their own samples | 1 |
 
-The other 421 registered formats have no sample in this corpus at all. Nothing is known about them —
-they may be right, they may be JPEG XR. That is not a claim that they are broken; it is a claim that
-"741 formats" and "240 formats shown to work" are different statements, and only the second is
-evidence.
+The other 421 registered formats had no sample in this corpus at all, and the 143 added since have
+none either. Nothing is known about them — they may be right, they may be JPEG XR. That is not a
+claim that they are broken; it is a claim that "884 formats" and "240 formats shown to work" are
+different statements, and only the second is evidence.
+
+Which formats are unread rather than unverified is a separate count, and it is kept in
+[`coverage-gap.md`](coverage-gap.md) beside this file: every extension XnView's catalogue claims and
+this registry does not, how each was closed, and the reasons the last eleven stay open. That one is
+re-measured by `Decode --extensions` against XnView's own `Formats.txt` rather than counted up from
+its own history.
 
 ## Getting more samples
 
@@ -893,12 +925,24 @@ format by — its own format list says CUT is Dr Halo, ICN is the Microsoft icon
 portable bitmap, and all three of those are separate formats here. It knows no name for the Amiga
 PBM at all. Those are recorded as unjudgeable, with the tool's own listing as the evidence.
 
-The other four are real, and they stay red rather than being explained away:
+The other four were real, and three of them have since been answered by taking the writer off the
+registry rather than by mending it — which is the same verdict this fixture was asking for, stated
+where a caller can see it:
 
-  - **AVIF** — "No 'av1C' box". The container is assembled without the box that states the codec
-    configuration, so nothing can tell what the coded data is.
-  - **HEIF** — "No 'iinf' box". Same shape of fault: no item information, so no item to decode.
-  - **JPEG XL** — "unable to read image data". The header is accepted and the codestream is not.
+  - **AVIF** — was "No 'av1C' box": the container was assembled without the box that states the
+    codec configuration, so nothing could tell what the coded data was. The raw-`mdat` writer is now
+    deliberately unregistered, and the format is read-only.
+  - **HEIF** — was "No 'iinf' box", the same shape of fault: no item information, so no item to
+    decode. There is a registered writer now, and it is a different thing entirely — a managed HEVC
+    encoder that builds the picture out of 64x64 intra PCM coding units, which is ordinary
+    Main-profile syntax. The package README calls that cell amber rather than green, because the
+    evidence for it is our own decoder reading it back; no independent HEVC decoder has been run
+    against the output. Running one is what would close this row properly.
+  - **JPEG XL** — was "unable to read image data": the header was accepted and the codestream was
+    not. The encoder still assembles a `0x4D`-prefixed payload behind a bare component-count byte
+    rather than the ImageMetadata bundle ISO/IEC 18181-1 puts after the `SizeHeader`, so `djxl` will
+    not decode it and neither will the reader in the same folder. It is unregistered for that
+    reason, so it no longer reaches this fixture.
   - **XCF** — two faults were found and fixed and it is still refused. It took only three pixel
     formats and threw for the rest, including the plain Rgb24 most readers here hand over; and its
     run-length coder was off by one on every repeat opcode and used four-byte counts where the

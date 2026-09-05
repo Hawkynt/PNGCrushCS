@@ -107,6 +107,8 @@ Key design rules:
 - Registry population happens at compile time rather than through runtime reflection.
 - Writers are added only when external/reference tooling can validate the generated files.
 
+[`FileFormat.md`](FileFormat.md) is the long form of that: the intermediate representation, the interface stack, and the attribute language the header serializer generator reads — which is the one part of this codebase a new format's author has to know and cannot read off the formats themselves.
+
 ## 🛠️ Build / test / run
 
 PNGCrushCS can optionally consume the sibling `CompressionWorkbench` checkout for linked-source primitives:
@@ -141,9 +143,9 @@ The cross-repo links are conditional; consumers of the published packages do not
 
 ## 🤖 CI
 
-`ci.yml` validates pull requests and pushes. `viewer-screenshot.yml` refreshes the README screenshot on pushes to non-`main` branches. `release.yml` handles coordinated releases and NuGet publishing. Version stamping is performed by `.github/workflows/scripts/version.pl --stamp` during CI.
+`ci.yml` is the merge gate and runs on pull requests only — nothing runs on a push to `main`, because a pull request has to be green to merge and re-running the same matrix on the merge commit proves nothing. `smoke.yml` gives a working branch the fast tier on one runner, `viewer-platforms.yml` builds the viewer on all three operating systems, and `viewer-screenshot.yml` refreshes the README screenshot, all on pushes to non-`main` branches. `coverage.yml` reports coverage on a daily schedule, gating nobody. `release.yml` handles coordinated releases and NuGet publishing. Version stamping is performed by `.github/workflows/scripts/version.pl --stamp` during CI.
 
-Stable releases are manual. Nightlies are generated from green `main` builds.
+Stable releases are manual. Nightlies are built from `main`, which only ever receives merges of green pull requests. The pipeline is documented in full in [`.github/workflows/README.md`](.github/workflows/README.md).
 
 ## 💡 Inspiration
 

@@ -1508,3 +1508,5 @@ If this project saves you time or money, consider supporting its development:
 ## 📜 License
 
 Licensed under LGPL-3.0-or-later — see the repository [LICENSE](https://github.com/Hawkynt/PNGCrushCS/blob/main/LICENSE).
+
+Several codecs here are managed adaptations of permissively licensed reference code, and the terms those came under travel with them. [THIRD_PARTY_NOTICES.md](https://github.com/Hawkynt/PNGCrushCS/blob/main/Hawkynt.FileFormats.Images/THIRD_PARTY_NOTICES.md) names each one, what was taken and under which licence — the AV1 range encoder from rav1e, the JPEG XL fast-lossless encoder from libjxl, and the JPEG XR T.832 core from SharpAstro. Attribution is a licence term, not a courtesy.
