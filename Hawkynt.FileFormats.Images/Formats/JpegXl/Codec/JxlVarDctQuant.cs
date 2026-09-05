@@ -160,6 +160,25 @@ internal static class JxlVarDctQuant {
   /// <param name="distanceBands">Per-band parameters; first is the absolute
   /// scaler, the rest are `Mult` deltas that compose multiplicatively.</param>
   public static JxlQuantTable BuildFromDistanceBands(int rows, int cols, float[] distanceBands) {
+    var inv = _BandValues(rows, cols, distanceBands);
+
+    const float kAlmostZero = 1e-8f;
+    var weights = new float[rows * cols];
+    for (var i = 0; i < rows * cols; i++) {
+      var v = inv[i];
+      if (v < kAlmostZero || v > 1.0f / kAlmostZero)
+        throw new InvalidOperationException("Quant weight out of range.");
+      weights[i] = 1.0f / v;
+    }
+    return new JxlQuantTable { Width = cols, Height = rows, Weights = weights };
+  }
+
+  /// <summary>
+  /// The curve itself, before it is inverted into dequantisation multipliers.
+  /// The AFV shape is three curves laid into one block and needs them in this
+  /// form; every other shape inverts them straight away.
+  /// </summary>
+  private static float[] _BandValues(int rows, int cols, float[] distanceBands) {
     if (rows <= 0 || cols <= 0)
       throw new ArgumentOutOfRangeException(nameof(rows));
     if (distanceBands is null)
@@ -196,14 +215,7 @@ internal static class JxlVarDctQuant {
       }
     }
 
-    var weights = new float[rows * cols];
-    for (var i = 0; i < rows * cols; i++) {
-      var v = inv[i];
-      if (v < kAlmostZero || v > 1.0f / kAlmostZero)
-        throw new InvalidOperationException("Quant weight out of range.");
-      weights[i] = 1.0f / v;
-    }
-    return new JxlQuantTable { Width = cols, Height = rows, Weights = weights };
+    return inv;
   }
 
   /// <summary>
@@ -228,6 +240,13 @@ internal static class JxlVarDctQuant {
     switch (strategy) {
       case JxlAcStrategyType.Hornuss: return _BuildFromLayout(_HornussWeights, _LayOutHornuss);
       case JxlAcStrategyType.Dct2x2: return _BuildFromLayout(_Dct2Weights, _LayOutDct2);
+      case JxlAcStrategyType.Afv0:
+      case JxlAcStrategyType.Afv1:
+      case JxlAcStrategyType.Afv2:
+      case JxlAcStrategyType.Afv3:
+        // All four are the same shape turned about, and the format gives them
+        // one table between them.
+        return _BuildAfv();
     }
 
     var bands = _DefaultBandsForStrategy(strategy);
@@ -256,6 +275,88 @@ internal static class JxlVarDctQuant {
     JxlAcStrategyType.Dct64x32 or JxlAcStrategyType.Dct32x64 => _kDct64x32Bands,
     _ => null,
   };
+
+  /// <summary>The AFV shape's own nine weights, per channel: the two beside the
+  /// corner, the three of the corner itself, then four bands (libjxl
+  /// <c>AFV0</c>).</summary>
+  private static readonly float[][] _AfvWeights = [
+    [3072.0f, 3072.0f, 256.0f, 256.0f, 256.0f, 414.0f, 0.0f, 0.0f, 0.0f],
+    [1024.0f, 1024.0f, 50.0f, 50.0f, 50.0f, 58.0f, 0.0f, 0.0f, 0.0f],
+    [384.0f, 384.0f, 12.0f, 12.0f, 12.0f, 22.0f, -0.25f, -0.25f, -0.25f],
+  ];
+
+  /// <summary>Where each of the AFV shape's own sixteen entries sits along the
+  /// four bands. The four marked here are the corner, which is stated outright
+  /// rather than interpolated.</summary>
+  private static readonly float[] _AfvFrequencies = [
+    _AfvStated, _AfvStated, 0.8517778890324296f, 5.37778436506804f,
+    _AfvStated, _AfvStated, 4.734747904497923f, 5.449245381693219f,
+    1.6598270267479331f, 4.0f, 7.275749096817861f, 10.423227632456525f,
+    2.662932286148962f, 7.630657783650829f, 8.962388608184032f, 12.97166202570235f,
+  ];
+
+  private const float _AfvStated = 0xBAD;
+  private const float _AfvLow = 0.8517778890324296f;
+  private const float _AfvHigh = 12.97166202570235f - _AfvLow + 1e-6f;
+
+  /// <summary>
+  /// The AFV shape's weights (libjxl <c>ComputeQuantTable</c>'s AFV case). The
+  /// block is three curves laid together: its odd rows are a 4x8, its even rows
+  /// and odd columns a 4x4, and what is left is the shape's own — five entries
+  /// stated outright at the corner and the rest read off four bands.
+  /// </summary>
+  private static JxlQuantTableSet _BuildAfv() {
+    var tables = new JxlQuantTable[3];
+    for (var c = 0; c < 3; ++c) {
+      var w = _AfvWeights[c];
+      var bands = new float[4];
+      bands[0] = w[5];
+      for (var i = 1; i < 4; ++i)
+        bands[i] = bands[i - 1] * _Mult(w[i + 5]);
+
+      var inverse = new float[64];
+      inverse[0] = 1.0f; // never read: the lowest coefficient comes from the DC.
+      inverse[1 * 8 + 0] = w[0];
+      inverse[0 * 8 + 1] = w[1];
+      inverse[2 * 8 + 0] = w[2];
+      inverse[0 * 8 + 2] = w[3];
+      inverse[2 * 8 + 2] = w[4];
+
+      for (var y = 0; y < 4; ++y)
+      for (var x = 0; x < 4; ++x) {
+        if (x < 2 && y < 2)
+          continue;
+
+        var position = (_AfvFrequencies[y * 4 + x] - _AfvLow) * 3.0f / _AfvHigh;
+        inverse[2 * y * 8 + 2 * x] = _InterpolateVec(position, bands, 4);
+      }
+
+      var band4x8 = _BandValues(4, 8, _kDct4x8Bands[c]);
+      for (var y = 0; y < 4; ++y)
+      for (var x = 0; x < 8; ++x) {
+        if (x == 0 && y == 0)
+          continue;
+
+        inverse[(2 * y + 1) * 8 + x] = band4x8[y * 8 + x];
+      }
+
+      var band4x4 = _BandValues(4, 4, _kDct4Bands[c]);
+      for (var y = 0; y < 4; ++y)
+      for (var x = 0; x < 4; ++x) {
+        if (x == 0 && y == 0)
+          continue;
+
+        inverse[2 * y * 8 + 2 * x + 1] = band4x4[y * 4 + x];
+      }
+
+      var weights = new float[64];
+      for (var i = 0; i < 64; ++i)
+        weights[i] = 1.0f / inverse[i];
+      tables[c] = new JxlQuantTable { Width = 8, Height = 8, Weights = weights };
+    }
+
+    return new JxlQuantTableSet { Tables = tables };
+  }
 
   /// <summary>The Hornuss shape's weights: one over the block, then the two
   /// neighbours of the corner and the corner itself (libjxl <c>IDENTITY</c>).</summary>
