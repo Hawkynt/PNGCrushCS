@@ -61,11 +61,11 @@ internal static class JxlLowestFrequencies {
     if (blocksX * blocksY != covered)
       return null;
 
-    // Square shapes only. The inverse transforms for the rectangular ones do
-    // not yet agree with the format, and reconstructing one of those from its
-    // origin spreads that disagreement over its whole rectangle instead of
-    // leaving it in a single block. Measured against libjxl, doing it for the
-    // square shapes alone is what improves the picture.
+    // Square shapes only. Measured against libjxl, drawing a rectangular
+    // transform once from its origin is far worse than drawing it at each block
+    // it covers — the two disagree about which way round the transform's rows
+    // and columns go, and drawing it once spreads that over the whole rectangle
+    // instead of leaving it in one block.
     if (blockW != blockH)
       return null;
 
