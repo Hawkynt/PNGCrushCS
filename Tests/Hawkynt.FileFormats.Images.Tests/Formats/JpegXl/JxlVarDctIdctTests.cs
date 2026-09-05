@@ -215,6 +215,13 @@ internal sealed class JxlVarDctIdctTests {
   /// Mirrors libjxl's <c>AcStrategy::covered_blocks_x() * 8</c>,
   /// <c>covered_blocks_y() * 8</c>.</summary>
   [Test]
+  /// <remarks>
+  /// A shape's name states its rows and then its columns, so the rectangular
+  /// ones measure taller than they are wide: a sixteen-by-eight is eight pixels
+  /// across and sixteen down. These used to read the names the other way about,
+  /// which handed the inverse transform every rectangle as its own transpose —
+  /// the squares could not show it and nothing else looked.
+  /// </remarks>
   public void BlockSize_AllEnumValues_ReturnExpectedDimensions() {
     Assert.Multiple(() => {
       Assert.That(JxlVarDctIdct.BlockSize(JxlAcStrategyType.Dct8x8), Is.EqualTo((8, 8)));
@@ -223,12 +230,12 @@ internal sealed class JxlVarDctIdctTests {
       Assert.That(JxlVarDctIdct.BlockSize(JxlAcStrategyType.Dct4x4), Is.EqualTo((8, 8)));
       Assert.That(JxlVarDctIdct.BlockSize(JxlAcStrategyType.Dct16x16), Is.EqualTo((16, 16)));
       Assert.That(JxlVarDctIdct.BlockSize(JxlAcStrategyType.Dct32x32), Is.EqualTo((32, 32)));
-      Assert.That(JxlVarDctIdct.BlockSize(JxlAcStrategyType.Dct16x8), Is.EqualTo((16, 8)));
-      Assert.That(JxlVarDctIdct.BlockSize(JxlAcStrategyType.Dct8x16), Is.EqualTo((8, 16)));
-      Assert.That(JxlVarDctIdct.BlockSize(JxlAcStrategyType.Dct32x8), Is.EqualTo((32, 8)));
-      Assert.That(JxlVarDctIdct.BlockSize(JxlAcStrategyType.Dct8x32), Is.EqualTo((8, 32)));
-      Assert.That(JxlVarDctIdct.BlockSize(JxlAcStrategyType.Dct32x16), Is.EqualTo((32, 16)));
-      Assert.That(JxlVarDctIdct.BlockSize(JxlAcStrategyType.Dct16x32), Is.EqualTo((16, 32)));
+      Assert.That(JxlVarDctIdct.BlockSize(JxlAcStrategyType.Dct16x8), Is.EqualTo((8, 16)));
+      Assert.That(JxlVarDctIdct.BlockSize(JxlAcStrategyType.Dct8x16), Is.EqualTo((16, 8)));
+      Assert.That(JxlVarDctIdct.BlockSize(JxlAcStrategyType.Dct32x8), Is.EqualTo((8, 32)));
+      Assert.That(JxlVarDctIdct.BlockSize(JxlAcStrategyType.Dct8x32), Is.EqualTo((32, 8)));
+      Assert.That(JxlVarDctIdct.BlockSize(JxlAcStrategyType.Dct32x16), Is.EqualTo((16, 32)));
+      Assert.That(JxlVarDctIdct.BlockSize(JxlAcStrategyType.Dct16x32), Is.EqualTo((32, 16)));
       Assert.That(JxlVarDctIdct.BlockSize(JxlAcStrategyType.Dct4x8), Is.EqualTo((8, 8)));
       Assert.That(JxlVarDctIdct.BlockSize(JxlAcStrategyType.Dct8x4), Is.EqualTo((8, 8)));
       Assert.That(JxlVarDctIdct.BlockSize(JxlAcStrategyType.Afv0), Is.EqualTo((8, 8)));
@@ -236,14 +243,14 @@ internal sealed class JxlVarDctIdctTests {
       Assert.That(JxlVarDctIdct.BlockSize(JxlAcStrategyType.Afv2), Is.EqualTo((8, 8)));
       Assert.That(JxlVarDctIdct.BlockSize(JxlAcStrategyType.Afv3), Is.EqualTo((8, 8)));
       Assert.That(JxlVarDctIdct.BlockSize(JxlAcStrategyType.Dct64x64), Is.EqualTo((64, 64)));
-      Assert.That(JxlVarDctIdct.BlockSize(JxlAcStrategyType.Dct64x32), Is.EqualTo((64, 32)));
-      Assert.That(JxlVarDctIdct.BlockSize(JxlAcStrategyType.Dct32x64), Is.EqualTo((32, 64)));
+      Assert.That(JxlVarDctIdct.BlockSize(JxlAcStrategyType.Dct64x32), Is.EqualTo((32, 64)));
+      Assert.That(JxlVarDctIdct.BlockSize(JxlAcStrategyType.Dct32x64), Is.EqualTo((64, 32)));
       Assert.That(JxlVarDctIdct.BlockSize(JxlAcStrategyType.Dct128x128), Is.EqualTo((128, 128)));
-      Assert.That(JxlVarDctIdct.BlockSize(JxlAcStrategyType.Dct128x64), Is.EqualTo((128, 64)));
-      Assert.That(JxlVarDctIdct.BlockSize(JxlAcStrategyType.Dct64x128), Is.EqualTo((64, 128)));
+      Assert.That(JxlVarDctIdct.BlockSize(JxlAcStrategyType.Dct128x64), Is.EqualTo((64, 128)));
+      Assert.That(JxlVarDctIdct.BlockSize(JxlAcStrategyType.Dct64x128), Is.EqualTo((128, 64)));
       Assert.That(JxlVarDctIdct.BlockSize(JxlAcStrategyType.Dct256x256), Is.EqualTo((256, 256)));
-      Assert.That(JxlVarDctIdct.BlockSize(JxlAcStrategyType.Dct256x128), Is.EqualTo((256, 128)));
-      Assert.That(JxlVarDctIdct.BlockSize(JxlAcStrategyType.Dct128x256), Is.EqualTo((128, 256)));
+      Assert.That(JxlVarDctIdct.BlockSize(JxlAcStrategyType.Dct256x128), Is.EqualTo((128, 256)));
+      Assert.That(JxlVarDctIdct.BlockSize(JxlAcStrategyType.Dct128x256), Is.EqualTo((256, 128)));
     });
   }
 

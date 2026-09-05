@@ -161,36 +161,26 @@ internal static class JxlVarDctIdct {
   /// covers. DCT8x8 -> (8, 8), DCT16x16 -> (16, 16), DCT8x16 -> (8, 16),
   /// AFV0..3 -> (8, 8), Hornuss -> (8, 8). Matches libjxl's
   /// AcStrategy::covered_blocks_x() * 8, covered_blocks_y() * 8.</summary>
-  public static (int W, int H) BlockSize(JxlAcStrategyType strategy) => strategy switch {
-    JxlAcStrategyType.Dct8x8 => (8, 8),
-    JxlAcStrategyType.Hornuss => (8, 8),
-    JxlAcStrategyType.Dct2x2 => (8, 8),    // libjxl: DCT2X2 actually operates on an 8x8 block with a 2x2 sub-DCT layout.
-    JxlAcStrategyType.Dct4x4 => (8, 8),    // libjxl: DCT4X4 operates on an 8x8 block as four 4x4 DCTs.
-    JxlAcStrategyType.Dct16x16 => (16, 16),
-    JxlAcStrategyType.Dct32x32 => (32, 32),
-    JxlAcStrategyType.Dct16x8 => (16, 8),
-    JxlAcStrategyType.Dct8x16 => (8, 16),
-    JxlAcStrategyType.Dct32x8 => (32, 8),
-    JxlAcStrategyType.Dct8x32 => (8, 32),
-    JxlAcStrategyType.Dct32x16 => (32, 16),
-    JxlAcStrategyType.Dct16x32 => (16, 32),
-    JxlAcStrategyType.Dct4x8 => (8, 8),    // 4x8/8x4 still cover 1 block (8x8) per libjxl covered_blocks.
-    JxlAcStrategyType.Dct8x4 => (8, 8),
-    JxlAcStrategyType.Afv0 => (8, 8),
-    JxlAcStrategyType.Afv1 => (8, 8),
-    JxlAcStrategyType.Afv2 => (8, 8),
-    JxlAcStrategyType.Afv3 => (8, 8),
-    JxlAcStrategyType.Dct64x64 => (64, 64),
-    JxlAcStrategyType.Dct64x32 => (64, 32),
-    JxlAcStrategyType.Dct32x64 => (32, 64),
-    JxlAcStrategyType.Dct128x128 => (128, 128),
-    JxlAcStrategyType.Dct128x64 => (128, 64),
-    JxlAcStrategyType.Dct64x128 => (64, 128),
-    JxlAcStrategyType.Dct256x256 => (256, 256),
-    JxlAcStrategyType.Dct256x128 => (256, 128),
-    JxlAcStrategyType.Dct128x256 => (128, 256),
-    _ => throw new ArgumentOutOfRangeException(nameof(strategy), strategy, "Unknown AC strategy."),
-  };
+  /// <summary>The pixels a transform covers, wide by high.</summary>
+  /// <remarks>
+  /// Taken from how many 8x8 blocks the transform covers in each direction,
+  /// which is the format's own table. It used to be a list of its own, and that
+  /// list read every rectangular shape's name as width-by-height where the
+  /// format states it as rows-by-columns — so a sixteen-by-eight was handed to
+  /// the inverse transform as its own transpose, and the pixels came back
+  /// turned on their side. The shapes that are square could not show it.
+  ///
+  /// <para>The four small shapes that fit inside one block — the two-by-two and
+  /// four-by-four sub-divisions, the four-by-eight pair, the Hornuss and the
+  /// four fovea variants — are all carried in an 8x8 block whatever their
+  /// name.</para>
+  /// </remarks>
+  public static (int W, int H) BlockSize(JxlAcStrategyType strategy) {
+    if (!JxlAcStrategyGeometry.IsValid((int)strategy))
+      throw new ArgumentOutOfRangeException(nameof(strategy), strategy, "Unknown AC strategy.");
+
+    return (JxlAcStrategyGeometry.BlocksWide(strategy) * 8, JxlAcStrategyGeometry.BlocksHigh(strategy) * 8);
+  }
 
   // -------------------------------------------------------------------------
   // 2-D separable IDCT
