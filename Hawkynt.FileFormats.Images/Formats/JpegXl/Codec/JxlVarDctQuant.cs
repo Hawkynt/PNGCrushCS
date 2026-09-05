@@ -242,6 +242,8 @@ internal static class JxlVarDctQuant {
     JxlAcStrategyType.Dct16x32 or JxlAcStrategyType.Dct32x16 => _kDct32x16Bands,
     JxlAcStrategyType.Dct4x4 => _kDct4Bands,
     JxlAcStrategyType.Dct4x8 or JxlAcStrategyType.Dct8x4 => _kDct4x8Bands,
+    JxlAcStrategyType.Dct64x64 => _kDct64Bands,
+    JxlAcStrategyType.Dct64x32 or JxlAcStrategyType.Dct32x64 => _kDct64x32Bands,
     _ => null,
   };
 
@@ -259,6 +261,9 @@ internal static class JxlVarDctQuant {
     JxlAcStrategyType.Dct4x4 => (4, 4),
     JxlAcStrategyType.Dct4x8 => (4, 8),
     JxlAcStrategyType.Dct8x4 => (8, 4),
+    JxlAcStrategyType.Dct64x64 => (64, 64),
+    JxlAcStrategyType.Dct64x32 => (64, 32),
+    JxlAcStrategyType.Dct32x64 => (32, 64),
     _ => (8, 8),
   };
 
@@ -269,6 +274,23 @@ internal static class JxlVarDctQuant {
     [8000.0f, -0.3f, -0.5f, -0.5f, -0.5f, -0.5f],
     [3000.0f, -0.3f, -0.3f, -0.3f, -0.3f, -0.3f],
     [1000.0f, -0.5f, -0.5f, -0.5f, -0.5f, -0.5f],
+  ];
+
+  /// <summary>The 64x64 transform's own weights. Without them its coefficients
+  /// were dequantised with the 8x8 table stretched over the block, which is a
+  /// different curve entirely — and a picture small enough to be one transform
+  /// is coded as exactly one of these.</summary>
+  private static readonly float[][] _kDct64Bands = [
+    [0.9f * 26629.073922049845f, -1.025f, -0.78f, -0.65012f, -0.19041574084286472f, -0.20819395464f, -0.421064f, -0.32733845535848671f],
+    [0.9f * 9311.3238710010046f, -0.3041958212306401f, -0.3633036457487539f, -0.35660379990111464f, -0.3443074455424403f, -0.33699592683512467f, -0.30180866526242109f, -0.27321683125358037f],
+    [0.9f * 4992.2486445538634f, -1.2f, -1.2f, -0.8f, -0.7f, -0.7f, -0.4f, -0.5f],
+  ];
+
+  /// <summary>The 64x32 transform and its transpose.</summary>
+  private static readonly float[][] _kDct64x32Bands = [
+    [0.65f * 23629.073922049845f, -1.025f, -0.78f, -0.65012f, -0.19041574084286472f, -0.20819395464f, -0.421064f, -0.32733845535848671f],
+    [0.65f * 8611.3238710010046f, -0.3041958212306401f, -0.3633036457487539f, -0.35660379990111464f, -0.3443074455424403f, -0.33699592683512467f, -0.30180866526242109f, -0.27321683125358037f],
+    [0.65f * 4492.2486445538634f, -1.2f, -1.2f, -0.8f, -0.7f, -0.7f, -0.4f, -0.5f],
   ];
 
   private static readonly float[][] _kDct32Bands = [
