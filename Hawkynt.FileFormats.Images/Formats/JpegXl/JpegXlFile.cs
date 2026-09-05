@@ -9,20 +9,19 @@ namespace FileFormat.JpegXl;
 /// implements the real modular and VarDCT paths and refuses unsupported syntax instead of returning
 /// placeholders.
 /// <para/>
-/// This format registers a reader only. <see cref="JpegXlWriter"/> still exists and the codec tests
-/// still drive it, but it is not reachable through <c>FormatRegistry</c>: what it assembles is a
-/// <c>0x4D</c>-prefixed payload behind a bare component-count byte, which is this package's own
-/// arrangement and not the ImageMetadata bundle ISO/IEC 18181-1 puts after the <c>SizeHeader</c>.
-/// libjxl will not decode it and neither will the reader in this very folder, so registering it
-/// would put a write capability in the registry that no decoder on earth can honour. It becomes a
-/// writer again when it emits a codestream <c>djxl</c> accepts, and the test that pins that is the
-/// one that has to change with it.
+/// The writer emits a lossless modular codestream: one frame in one group, samples predicted from
+/// their neighbours and entropy-coded, no colour transform and nothing quantised. That covers grey
+/// and colour at eight and sixteen bits, with or without alpha, up to a thousand and twenty-four
+/// pixels a side — the largest picture a single group holds. Lossy coding is read but not written.
 /// </remarks>
-public readonly record struct JpegXlFile : IImageFormatReader<JpegXlFile>, IImageToRawImage<JpegXlFile> {
+public readonly record struct JpegXlFile
+  : IImageFormatReader<JpegXlFile>, IImageFormatWriter<JpegXlFile>,
+    IImageToRawImage<JpegXlFile>, IImageFromRawImage<JpegXlFile> {
 
   static string IImageFormatMetadata<JpegXlFile>.PrimaryExtension => ".jxl";
   static string[] IImageFormatMetadata<JpegXlFile>.FileExtensions => [".jxl"];
   static JpegXlFile IImageFormatReader<JpegXlFile>.FromSpan(ReadOnlySpan<byte> data) => JpegXlReader.FromSpan(data);
+  static byte[] IImageFormatWriter<JpegXlFile>.ToBytes(JpegXlFile file) => JpegXlWriter.ToBytes(file);
 
   static bool? IImageFormatMetadata<JpegXlFile>.MatchesSignature(ReadOnlySpan<byte> header) {
     if (header.Length >= 2 && header[0] == 0xFF && header[1] == 0x0A)
