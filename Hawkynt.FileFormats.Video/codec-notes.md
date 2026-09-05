@@ -1813,6 +1813,71 @@ no alpha, and comparing this format through it would invent a value the coding s
 The alpha channel is carried through unchanged rather than composited or assumed opaque, for the same
 reason v408's is.
 
+### The ten raw pixel layouts — YUY2, YVYU, UYVY, VYUY, YV12, I420, IYUV, NV12, NV21, Y800
+
+Not codecs at all: ten four-character codes each naming a pixel layout, with nothing compressed, no
+header ahead of the picture and no padding anywhere. Four pack 4:2:2 into two-pixel macropixels of
+four bytes, three lay 4:2:0 out as separate planes, two fold its chroma into one interleaved plane,
+and one carries luma alone. What separates them is only the order of the bytes — which is exactly why
+getting one wrong does not fail: the picture still decodes and its reds and blues are exchanged.
+
+Every one of them was measured against ffmpeg in both directions and at three geometries apiece, five
+frames each. Files ffmpeg wrote as `rawvideo` at the matching `-pix_fmt` with the tag forced were
+decoded here and compared sample for sample against ffmpeg's own planar decode of the very same files;
+then packets written here were muxed into an AVI and read back through ffmpeg the same way. Every
+sample of every plane of every frame is identical in both directions, and — for eight of the ten — the
+packets written here are byte for byte the ones ffmpeg's own encoder wrote for the same pictures.
+
+| Code | Layout | ffmpeg `-pix_fmt` | Geometries | Samples compared |
+| --- | --- | --- | --- | --- |
+| `YUY2` | Y0 Cb Y1 Cr | `yuyv422` | 16x8, 34x18, 8x5 | 7,800 each way |
+| `YVYU` | Y0 Cr Y1 Cb | `yvyu422` | 16x8, 34x18, 8x5 | 7,800 each way |
+| `UYVY` | Cb Y0 Cr Y1 | `uyvy422` | 16x8, 34x18, 8x5 | 7,800 each way |
+| `VYUY` | Cr Y0 Cb Y1 | none — see below | 16x8, 34x18, 8x5 | 7,800 each way |
+| `YV12` | Y, Cr plane, Cb plane | `yuv420p` | 16x8, 34x18, 8x6 | 5,910 each way |
+| `I420` | Y, Cb plane, Cr plane | `yuv420p` | 16x8, 34x18, 8x6 | 5,910 each way |
+| `IYUV` | I420 under a second name | `yuv420p` | 16x8, 34x18, 8x6 | 5,910 each way |
+| `NV12` | Y, then Cb Cr interleaved | `nv12` | 16x8, 34x18, 8x6 | 5,910 each way |
+| `NV21` | Y, then Cr Cb interleaved | `nv21` | 16x8, 34x18, 8x6 | 5,910 each way |
+| `Y800` | Y alone, one byte a pixel | `gray` | 16x8, 17x9, 7x5 | 1,580 each way |
+
+**Two of the ten disagree with ffmpeg, and both disagreements are ffmpeg's.**
+
+`VYUY` is the one ffmpeg cannot answer for: its raw-video tag table maps that code onto `yuyv422`, so
+it reads and writes YUY2's ordering under it. Comparing against its decode would have confirmed the
+wrong layout — its reading of the files measured here differs from this one in 7,775 of 7,800 samples.
+The order used instead is the one the Linux kernel's V4L2 documentation prints for
+`V4L2_PIX_FMT_VYUY` — Cr0, Y'0, Cb0, Y'1 — and the one Microsoft's note on 8-bit YUV formats states by
+describing VYUY as UYVY with the chroma samples exchanged. It is still checked against ffmpeg, by the
+one detour that works: VYUY's bytes are UYVY's packing of the same picture with its two chroma planes
+exchanged, so ffmpeg's `uyvy422` writing of the exchanged picture *is* a VYUY frame, and decoding it
+here returns the picture before the exchange exactly.
+
+`YV12` is where ffmpeg's own writer and its own reader disagree. Asked for `-vtag YV12` its raw-video
+encoder writes I420's plane order and leaves the tag to say otherwise; its decoder does exchange the
+two chroma planes for that tag. Both readers therefore arrive at the same picture and the asymmetry
+never shows in a decode comparison — which is what makes that comparison worth something here, since a
+decoder that did not exchange the planes would have disagreed on every one of the 1,970 chroma samples.
+What is written here is what the code states, so over the same pictures these packets differ from
+ffmpeg's in all 1,970 chroma bytes and in none of the 3,940 luma ones, and are exactly its packets with
+the two chroma planes exchanged.
+
+**Odd geometries are refused rather than guessed at.** A 4:2:2 macropixel is two pixels, so an odd
+width would end a row in two bytes stating one luma sample and one of the two chroma samples that pixel
+needs; ffmpeg writes no such frame either, rounding an odd width up to the next even one. 4:2:0 states
+one chroma pair per two-by-two block, so an odd width or height leaves a partial block. ffmpeg *will*
+write that one — it rounds each chroma plane's dimensions up, so a 7x5 frame carries 35 luma bytes and
+two 4x3 chroma planes — but that is its own convention rather than anything the four-character code
+states, and no VfW or DirectShow renderer of these codes accepts an odd dimension at all. Y800 has no
+chroma grid to divide and so takes any size, odd in both directions included, which is what the 7x5 and
+17x9 measurements above are for.
+
+**What comes out is the samples, not colour.** Unpacking any of the ten is a rearrangement of eight-bit
+bytes, so each hands back the pixel format that says exactly that — `Yuv422P8`, `Yuv420P8` or `Gray8` —
+rather than converting to RGB on the way out and stating a display convention the code does not.
+Y800's luma is nominally studio swing and is handed over unscaled, which is what ffmpeg's own decode of
+the tag does as well.
+
 ### avrp
 
 Avid's own "1:1" RGB packer, and a close relative of r10k rather than the same word under a second
