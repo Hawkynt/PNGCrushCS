@@ -111,11 +111,15 @@ public static class Commodore64Graphics {
   /// <para/>
   /// KNOWN INCOMPLETE for the interlaced kinds. Several formats that call this store two pictures
   /// and show them one after the other fast enough to blend, which is how they hold more colours
-  /// than the machine has: RECOIL draws 109 distinct colours for a FunPainter II sample where this
-  /// draws the 16 the hardware owns, because only the first picture is decoded. Seven samples in the
-  /// corpus are affected — bfli, bml, eci, ffli, fp2, fun and pp — and each format puts its second
-  /// picture in its own place, so the blending cannot be done here without knowing which format is
-  /// calling.
+  /// than the machine has, and this decodes only the first — so they come back in the 16 colours the
+  /// hardware owns rather than the hundred or so the blend shows. Five samples in the corpus are
+  /// still affected — bfli, bml, eci, ffli and pp — and each format puts its second picture in its
+  /// own place, so the blending cannot be done here without knowing which format is calling.
+  /// <para/>
+  /// Fun Painter II (fp2, fun) was the sixth and no longer calls this: it reads its two fields
+  /// itself and averages them through <see cref="FrameBlend"/>, which is the shape the rest of them
+  /// want. See <c>FunPainterFile</c> for what that costs — chiefly that the payload is packed, so
+  /// there is nothing to decode until that is undone.
   /// <para/>
   /// Their geometry is settled: RECOIL drops the leftmost 24 pixels, which FLI cannot control, and
   /// shows each remaining multicolour pixel twice, so a 160 by 200 decode becomes 296 by 200. Undoing
