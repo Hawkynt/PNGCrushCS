@@ -311,7 +311,7 @@ Implements `IVideoContainerWriter<CdxlWriter>`, `IVideoFormatMetadata<CdxlWriter
 
 ### Namespace `FileFormat.Codecs`
 
-[`AascVideoDecoder`](#aascvideodecoder) · [`AascVideoEncoder`](#aascvideoencoder) · [`AnimVideoDecoder`](#animvideodecoder) · [`AppleGraphicsDecoder`](#applegraphicsdecoder) · [`AppleVideoDecoder`](#applevideodecoder) · [`Asv1VideoDecoder`](#asv1videodecoder) · [`Asv2VideoDecoder`](#asv2videodecoder) · [`AvrnVideoDecoder`](#avrnvideodecoder) · [`AvrpVideoDecoder`](#avrpvideodecoder) · [`AvrpVideoEncoder`](#avrpvideoencoder) · [`AvuiVideoDecoder`](#avuivideodecoder) · [`AyuvVideoDecoder`](#ayuvvideodecoder) · [`AyuvVideoEncoder`](#ayuvvideoencoder) · [`BfiVideoDecoder`](#bfivideodecoder) · [`CanopusLosslessVideoDecoder`](#canopuslosslessvideodecoder) · [`CdxlVideoDecoder`](#cdxlvideodecoder) · [`CineFormVideoDecoder`](#cineformvideodecoder) · [`CinepakVideoDecoder`](#cinepakvideodecoder) · [`CinepakVideoEncoder`](#cinepakvideoencoder) · [`CljrVideoDecoder`](#cljrvideodecoder) · [`CljrVideoEncoder`](#cljrvideoencoder) · [`CreativeYuvVideoDecoder`](#creativeyuvvideodecoder) · [`CscdVideoDecoder`](#cscdvideodecoder) · [`DnxHdVideoDecoder`](#dnxhdvideodecoder) · [`DvVideoDecoder`](#dvvideodecoder) · [`DvVideoEncoder`](#dvvideoencoder) · [`EaCmvVideoDecoder`](#eacmvvideodecoder) · [`EightBpsVideoDecoder`](#eightbpsvideodecoder) · [`EightBpsVideoEncoder`](#eightbpsvideoencoder) · [`Escape124VideoDecoder`](#escape124videodecoder) · [`Escape130VideoDecoder`](#escape130videodecoder) · [`Ffv1Decoder`](#ffv1decoder) · [`Ffv1Encoder`](#ffv1encoder) · [`FlashSv2VideoDecoder`](#flashsv2videodecoder) · [`FlashSvVideoDecoder`](#flashsvvideodecoder) · [`FlashSvVideoEncoder`](#flashsvvideoencoder) · [`FlicVideoDecoder`](#flicvideodecoder) · [`H261VideoDecoder`](#h261videodecoder) · [`H263VideoDecoder`](#h263videodecoder) · [`H264VideoDecoder`](#h264videodecoder) · [`H265VideoDecoder`](#h265videodecoder) · [`HapDecoder`](#hapdecoder) · [`HuffYuvDecoder`](#huffyuvdecoder) · [`HuffYuvEncoder`](#huffyuvencoder) · [`HuffYuvPredictionMethod`](#huffyuvpredictionmethod) · [`I420VideoDecoder`](#i420videodecoder) · [`I420VideoEncoder`](#i420videoencoder) · [`IdcinVideoDecoder`](#idcinvideodecoder) · [`Indeo2VideoDecoder`](#indeo2videodecoder) · [`Indeo3VideoDecoder`](#indeo3videodecoder) · [`IyuvVideoDecoder`](#iyuvvideodecoder) · [`IyuvVideoEncoder`](#iyuvvideoencoder) · [`LclZlibVideoDecoder`](#lclzlibvideodecoder) · [`LclZlibVideoEncoder`](#lclzlibvideoencoder) · [`LocoVideoDecoder`](#locovideodecoder) · [`M101VideoDecoder`](#m101videodecoder) · [`MagicYuvDecoder`](#magicyuvdecoder) · [`MagicYuvEncoder`](#magicyuvencoder) · [`MagicYuvEncoder.Predictor`](#magicyuvencoderpredictor) · [`MicrosoftRleDecoder`](#microsoftrledecoder) · [`MicrosoftRleEncoder`](#microsoftrleencoder) · [`MicrosoftVideo1Decoder`](#microsoftvideo1decoder) · [`MicrosoftVideo1Encoder`](#microsoftvideo1encoder) · [`MjpegBVideoDecoder`](#mjpegbvideodecoder) · [`MotionJpegDecoder`](#motionjpegdecoder) · [`MotionJpegVideoEncoder`](#motionjpegvideoencoder) · [`Mpeg1VideoDecoder`](#mpeg1videodecoder) · [`Mpeg2VideoDecoder`](#mpeg2videodecoder) · [`Mpeg4VideoDecoder`](#mpeg4videodecoder) · [`MsMpeg4VideoDecoder`](#msmpeg4videodecoder) · [`MsMpeg4VideoEncoder`](#msmpeg4videoencoder) · [`MsccVideoDecoder`](#msccvideodecoder) · [`Mss1VideoDecoder`](#mss1videodecoder) · [`MszhVideoDecoder`](#mszhvideodecoder) · [`MveVideoDecoder`](#mvevideodecoder) · [`MvhaVideoDecoder`](#mvhavideodecoder) · [`MwscVideoDecoder`](#mwscvideodecoder) · [`Nv12VideoDecoder`](#nv12videodecoder) · [`Nv12VideoEncoder`](#nv12videoencoder) · [`Nv21VideoDecoder`](#nv21videodecoder) · [`Nv21VideoEncoder`](#nv21videoencoder) · [`ProResVideoDecoder`](#proresvideodecoder) · [`QpegVideoDecoder`](#qpegvideodecoder) · [`QuickTimeRleDecoder`](#quicktimerledecoder) · [`QuickTimeRleEncoder`](#quicktimerleencoder) · [`R10kVideoDecoder`](#r10kvideodecoder) · [`R10kVideoEncoder`](#r10kvideoencoder) · [`R210VideoDecoder`](#r210videodecoder) · [`R210VideoEncoder`](#r210videoencoder) · [`RascVideoDecoder`](#rascvideodecoder) · [`RawPlanarVideoDecoder`](#rawplanarvideodecoder) · [`RawPlanarVideoEncoder`](#rawplanarvideoencoder) · [`RawVideoDecoder`](#rawvideodecoder) · [`RawVideoEncoder`](#rawvideoencoder) · [`RealVideoDecoder`](#realvideodecoder) · [`RoqVideoDecoder`](#roqvideodecoder) · [`RsccVideoDecoder`](#rsccvideodecoder) · [`ScreenpressoVideoDecoder`](#screenpressovideodecoder) · [`TdscVideoDecoder`](#tdscvideodecoder) · [`TheoraVideoDecoder`](#theoravideodecoder) · [`TsccVideoDecoder`](#tsccvideodecoder) · [`Uncompressed012vVideoDecoder`](#uncompressed012vvideodecoder) · [`Uncompressed012vVideoEncoder`](#uncompressed012vvideoencoder) · [`UtVideoDecoder`](#utvideodecoder) · [`UtVideoEncoder`](#utvideoencoder) · [`UyvyVideoDecoder`](#uyvyvideodecoder) · [`UyvyVideoEncoder`](#uyvyvideoencoder) · [`V210VideoDecoder`](#v210videodecoder) · [`V210VideoEncoder`](#v210videoencoder) · [`V308VideoDecoder`](#v308videodecoder) · [`V308VideoEncoder`](#v308videoencoder) · [`V408VideoDecoder`](#v408videodecoder) · [`V408VideoEncoder`](#v408videoencoder) · [`VbleVideoDecoder`](#vblevideodecoder) · [`Vc1VideoDecoder`](#vc1videodecoder) · [`VmdVideoDecoder`](#vmdvideodecoder) · [`VmncVideoDecoder`](#vmncvideodecoder) · [`Vp3VideoDecoder`](#vp3videodecoder) · [`Vp8VideoDecoder`](#vp8videodecoder) · [`Vp9VideoDecoder`](#vp9videodecoder) · [`VqaVideoDecoder`](#vqavideodecoder) · [`VyuyVideoDecoder`](#vyuyvideodecoder) · [`VyuyVideoEncoder`](#vyuyvideoencoder) · [`WcmvVideoDecoder`](#wcmvvideodecoder) · [`Y41pVideoDecoder`](#y41pvideodecoder) · [`Y41pVideoEncoder`](#y41pvideoencoder) · [`Y800VideoDecoder`](#y800videodecoder) · [`Y800VideoEncoder`](#y800videoencoder) · [`Yuy2VideoDecoder`](#yuy2videodecoder) · [`Yuy2VideoEncoder`](#yuy2videoencoder) · [`Yv12VideoDecoder`](#yv12videodecoder) · [`Yv12VideoEncoder`](#yv12videoencoder) · [`YvyuVideoDecoder`](#yvyuvideodecoder) · [`YvyuVideoEncoder`](#yvyuvideoencoder) · [`ZeroCodecVideoDecoder`](#zerocodecvideodecoder) · [`ZmbvVideoDecoder`](#zmbvvideodecoder) · [`ZmbvVideoEncoder`](#zmbvvideoencoder)
+[`AascVideoDecoder`](#aascvideodecoder) · [`AascVideoEncoder`](#aascvideoencoder) · [`AnimVideoDecoder`](#animvideodecoder) · [`AppleGraphicsDecoder`](#applegraphicsdecoder) · [`AppleGraphicsEncoder`](#applegraphicsencoder) · [`AppleVideoDecoder`](#applevideodecoder) · [`AppleVideoEncoder`](#applevideoencoder) · [`Asv1VideoDecoder`](#asv1videodecoder) · [`Asv1VideoEncoder`](#asv1videoencoder) · [`Asv2VideoDecoder`](#asv2videodecoder) · [`Asv2VideoEncoder`](#asv2videoencoder) · [`AvrnVideoDecoder`](#avrnvideodecoder) · [`AvrpVideoDecoder`](#avrpvideodecoder) · [`AvrpVideoEncoder`](#avrpvideoencoder) · [`AvuiVideoDecoder`](#avuivideodecoder) · [`AyuvVideoDecoder`](#ayuvvideodecoder) · [`AyuvVideoEncoder`](#ayuvvideoencoder) · [`BfiVideoDecoder`](#bfivideodecoder) · [`CanopusLosslessVideoDecoder`](#canopuslosslessvideodecoder) · [`CdxlVideoDecoder`](#cdxlvideodecoder) · [`CineFormVideoDecoder`](#cineformvideodecoder) · [`CinepakVideoDecoder`](#cinepakvideodecoder) · [`CinepakVideoEncoder`](#cinepakvideoencoder) · [`CljrVideoDecoder`](#cljrvideodecoder) · [`CljrVideoEncoder`](#cljrvideoencoder) · [`CreativeYuvVideoDecoder`](#creativeyuvvideodecoder) · [`CscdVideoDecoder`](#cscdvideodecoder) · [`DnxHdVideoDecoder`](#dnxhdvideodecoder) · [`DvVideoDecoder`](#dvvideodecoder) · [`DvVideoEncoder`](#dvvideoencoder) · [`EaCmvVideoDecoder`](#eacmvvideodecoder) · [`EightBpsVideoDecoder`](#eightbpsvideodecoder) · [`EightBpsVideoEncoder`](#eightbpsvideoencoder) · [`Escape124VideoDecoder`](#escape124videodecoder) · [`Escape130VideoDecoder`](#escape130videodecoder) · [`Ffv1Decoder`](#ffv1decoder) · [`Ffv1Encoder`](#ffv1encoder) · [`FlashSv2VideoDecoder`](#flashsv2videodecoder) · [`FlashSvVideoDecoder`](#flashsvvideodecoder) · [`FlashSvVideoEncoder`](#flashsvvideoencoder) · [`FlicVideoDecoder`](#flicvideodecoder) · [`H261VideoDecoder`](#h261videodecoder) · [`H263VideoDecoder`](#h263videodecoder) · [`H264VideoDecoder`](#h264videodecoder) · [`H265VideoDecoder`](#h265videodecoder) · [`HapDecoder`](#hapdecoder) · [`HuffYuvDecoder`](#huffyuvdecoder) · [`HuffYuvEncoder`](#huffyuvencoder) · [`HuffYuvPredictionMethod`](#huffyuvpredictionmethod) · [`I420VideoDecoder`](#i420videodecoder) · [`I420VideoEncoder`](#i420videoencoder) · [`IdcinVideoDecoder`](#idcinvideodecoder) · [`Indeo2VideoDecoder`](#indeo2videodecoder) · [`Indeo3VideoDecoder`](#indeo3videodecoder) · [`IyuvVideoDecoder`](#iyuvvideodecoder) · [`IyuvVideoEncoder`](#iyuvvideoencoder) · [`LclZlibVideoDecoder`](#lclzlibvideodecoder) · [`LclZlibVideoEncoder`](#lclzlibvideoencoder) · [`LocoVideoDecoder`](#locovideodecoder) · [`M101VideoDecoder`](#m101videodecoder) · [`MagicYuvDecoder`](#magicyuvdecoder) · [`MagicYuvEncoder`](#magicyuvencoder) · [`MagicYuvEncoder.Predictor`](#magicyuvencoderpredictor) · [`MicrosoftRleDecoder`](#microsoftrledecoder) · [`MicrosoftRleEncoder`](#microsoftrleencoder) · [`MicrosoftVideo1Decoder`](#microsoftvideo1decoder) · [`MicrosoftVideo1Encoder`](#microsoftvideo1encoder) · [`MjpegBVideoDecoder`](#mjpegbvideodecoder) · [`MotionJpegDecoder`](#motionjpegdecoder) · [`MotionJpegVideoEncoder`](#motionjpegvideoencoder) · [`Mpeg1VideoDecoder`](#mpeg1videodecoder) · [`Mpeg2VideoDecoder`](#mpeg2videodecoder) · [`Mpeg4VideoDecoder`](#mpeg4videodecoder) · [`MsMpeg4VideoDecoder`](#msmpeg4videodecoder) · [`MsMpeg4VideoEncoder`](#msmpeg4videoencoder) · [`MsccVideoDecoder`](#msccvideodecoder) · [`Mss1VideoDecoder`](#mss1videodecoder) · [`MszhVideoDecoder`](#mszhvideodecoder) · [`MveVideoDecoder`](#mvevideodecoder) · [`MvhaVideoDecoder`](#mvhavideodecoder) · [`MwscVideoDecoder`](#mwscvideodecoder) · [`Nv12VideoDecoder`](#nv12videodecoder) · [`Nv12VideoEncoder`](#nv12videoencoder) · [`Nv21VideoDecoder`](#nv21videodecoder) · [`Nv21VideoEncoder`](#nv21videoencoder) · [`ProResVideoDecoder`](#proresvideodecoder) · [`QpegVideoDecoder`](#qpegvideodecoder) · [`QuickTimeRleDecoder`](#quicktimerledecoder) · [`QuickTimeRleEncoder`](#quicktimerleencoder) · [`R10kVideoDecoder`](#r10kvideodecoder) · [`R10kVideoEncoder`](#r10kvideoencoder) · [`R210VideoDecoder`](#r210videodecoder) · [`R210VideoEncoder`](#r210videoencoder) · [`RascVideoDecoder`](#rascvideodecoder) · [`RawPlanarVideoDecoder`](#rawplanarvideodecoder) · [`RawPlanarVideoEncoder`](#rawplanarvideoencoder) · [`RawVideoDecoder`](#rawvideodecoder) · [`RawVideoEncoder`](#rawvideoencoder) · [`RealVideoDecoder`](#realvideodecoder) · [`RoqVideoDecoder`](#roqvideodecoder) · [`RsccVideoDecoder`](#rsccvideodecoder) · [`ScreenpressoVideoDecoder`](#screenpressovideodecoder) · [`TdscVideoDecoder`](#tdscvideodecoder) · [`TheoraVideoDecoder`](#theoravideodecoder) · [`TsccVideoDecoder`](#tsccvideodecoder) · [`Uncompressed012vVideoDecoder`](#uncompressed012vvideodecoder) · [`Uncompressed012vVideoEncoder`](#uncompressed012vvideoencoder) · [`UtVideoDecoder`](#utvideodecoder) · [`UtVideoEncoder`](#utvideoencoder) · [`UyvyVideoDecoder`](#uyvyvideodecoder) · [`UyvyVideoEncoder`](#uyvyvideoencoder) · [`V210VideoDecoder`](#v210videodecoder) · [`V210VideoEncoder`](#v210videoencoder) · [`V308VideoDecoder`](#v308videodecoder) · [`V308VideoEncoder`](#v308videoencoder) · [`V408VideoDecoder`](#v408videodecoder) · [`V408VideoEncoder`](#v408videoencoder) · [`VbleVideoDecoder`](#vblevideodecoder) · [`Vc1VideoDecoder`](#vc1videodecoder) · [`VmdVideoDecoder`](#vmdvideodecoder) · [`VmncVideoDecoder`](#vmncvideodecoder) · [`Vp3VideoDecoder`](#vp3videodecoder) · [`Vp8VideoDecoder`](#vp8videodecoder) · [`Vp9VideoDecoder`](#vp9videodecoder) · [`VqaVideoDecoder`](#vqavideodecoder) · [`VyuyVideoDecoder`](#vyuyvideodecoder) · [`VyuyVideoEncoder`](#vyuyvideoencoder) · [`WcmvVideoDecoder`](#wcmvvideodecoder) · [`Y41pVideoDecoder`](#y41pvideodecoder) · [`Y41pVideoEncoder`](#y41pvideoencoder) · [`Y800VideoDecoder`](#y800videodecoder) · [`Y800VideoEncoder`](#y800videoencoder) · [`Yuy2VideoDecoder`](#yuy2videodecoder) · [`Yuy2VideoEncoder`](#yuy2videoencoder) · [`Yv12VideoDecoder`](#yv12videodecoder) · [`Yv12VideoEncoder`](#yv12videoencoder) · [`YvyuVideoDecoder`](#yvyuvideodecoder) · [`YvyuVideoEncoder`](#yvyuvideoencoder) · [`ZeroCodecVideoDecoder`](#zerocodecvideodecoder) · [`ZmbvVideoDecoder`](#zmbvvideodecoder) · [`ZmbvVideoEncoder`](#zmbvvideoencoder)
 
 #### `AascVideoDecoder`
 
@@ -366,6 +366,20 @@ Implements `IVideoCodecDecoder<AppleGraphicsDecoder>`, `IVideoFrameDecoder`.
 | `Create` | `static AppleGraphicsDecoder Create(MediaStreamInfo stream)` | Builds a decoder for one Apple Graphics stream, reading its colour table from the sample description QuickTime carries beside it — or, where the description states none of its own, filling in the standard table QuickTime defines for the depth. |
 | `TryDecode` | `bool TryDecode(CodedPacket packet, out RawImage frame)` | Decodes one packet, which for this codec is always exactly one whole frame. |
 
+#### `AppleGraphicsEncoder`
+
+Encodes Apple Graphics, the codec every QuickTime file calls `smc `: eight-bit palette indices as 4x4 blocks of one, two, four, eight or sixteen colours, with runs of blocks skipped or repeated where the picture lets them be.
+
+Implements `IVideoCodecEncoder<AppleGraphicsEncoder>`, `IVideoPacketEncoder`.
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `CodecName` | `static string CodecName { get; }` |  |
+| `Codec` | `static CodecTag Codec { get; }` |  |
+| `Create` | `static AppleGraphicsEncoder Create(MediaStreamInfo stream)` | Builds an encoder for the stream described, refusing a depth this format is not defined at. |
+| `DescribeStream` | `MediaStreamInfo DescribeStream()` | The stream as a muxer needs it: a whole `smc ` visual sample entry with the colour table inside it. |
+| `TryEncode` | `bool TryEncode(RawImage frame, long? presentationTimestamp, out CodedPacket packet)` | Codes one picture against the one before it, or whole when there is none. |
+
 #### `AppleVideoDecoder`
 
 Decodes Apple Video, the codec every QuickTime file calls `rpza` and every AVI calls `azpr`: a vector quantizer over 4x4 blocks of 15-bit RGB colour, also known as "Road Pizza".
@@ -378,6 +392,20 @@ Implements `IVideoCodecDecoder<AppleVideoDecoder>`, `IVideoFrameDecoder`.
 | `Accepts` | `static bool Accepts(MediaStreamInfo stream)` |  |
 | `Create` | `static AppleVideoDecoder Create(MediaStreamInfo stream)` | Builds a decoder from the stream's own picture size. |
 | `TryDecode` | `bool TryDecode(CodedPacket packet, out RawImage frame)` | Decodes one packet, which for this codec is always exactly one whole frame. |
+
+#### `AppleVideoEncoder`
+
+Encodes Apple Video, the codec QuickTime calls `rpza`: 4x4 blocks of 15-bit RGB colour as runs of skipped blocks, runs of one colour, and blocks stating all sixteen of their pixels.
+
+Implements `IVideoCodecEncoder<AppleVideoEncoder>`, `IVideoPacketEncoder`.
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `CodecName` | `static string CodecName { get; }` |  |
+| `Codec` | `static CodecTag Codec { get; }` |  |
+| `Create` | `static AppleVideoEncoder Create(MediaStreamInfo stream)` | Builds an encoder for the stream described, refusing a picture the chunk header could not state the length of. |
+| `DescribeStream` | `MediaStreamInfo DescribeStream()` | The stream as a muxer needs it: a whole `rpza` visual sample entry. |
+| `TryEncode` | `bool TryEncode(RawImage frame, long? presentationTimestamp, out CodedPacket packet)` | Codes one picture against the blocks coded before it, or whole when there are none. |
 
 #### `Asv1VideoDecoder`
 
@@ -393,6 +421,21 @@ Implements `IVideoCodecDecoder<Asv1VideoDecoder>`, `IVideoFrameDecoder`.
 | `Flush` | `IEnumerable<RawImage> Flush()` | Nothing is ever held back: ASV1 has no prediction between pictures to reorder around. |
 | `TryDecode` | `bool TryDecode(CodedPacket packet, out RawImage frame)` |  |
 
+#### `Asv1VideoEncoder`
+
+Encodes ASUS V1, the intra-only 4:2:0 DCT codec ASUSTeK wrote for its own TV tuner cards, from the same document `Asv1VideoDecoder` reads: Michael Niedermayer's "ASUS V1/V2 Codecs" (asv1.txt, 2003-2016, GNU FDL/GPL).
+
+Implements `IVideoCodecEncoder<Asv1VideoEncoder>`, `IVideoPacketEncoder`.
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `CodecName` | `static string CodecName { get; }` |  |
+| `Codec` | `static CodecTag Codec { get; }` |  |
+| `Create` | `static Asv1VideoEncoder Create(MediaStreamInfo stream)` |  |
+| `DescribeStream` | `MediaStreamInfo DescribeStream()` | The stream as a muxer needs it: a `BITMAPINFOHEADER` naming ASV1, and behind it the eight-byte global header carrying the one quantisation parameter the whole file is coded at. |
+| `Flush` | `IEnumerable<CodedPacket> Flush()` | Nothing is ever held back, so there is nothing left at the end. |
+| `TryEncode` | `bool TryEncode(RawImage frame, long? presentationTimestamp, out CodedPacket packet)` | Codes one picture, whole and on its own. |
+
 #### `Asv2VideoDecoder`
 
 Decodes ASUS V2, ASUSTeK's successor to ASV1 for the same TV tuner cards, coded from the same document ASV1 is: Michael Niedermayer's "ASUS V1/V2 Codecs" (asv1.txt, 2003-2016, GNU FDL/GPL).
@@ -406,6 +449,21 @@ Implements `IVideoCodecDecoder<Asv2VideoDecoder>`, `IVideoFrameDecoder`.
 | `Create` | `static Asv2VideoDecoder Create(MediaStreamInfo stream)` |  |
 | `Flush` | `IEnumerable<RawImage> Flush()` | Nothing is ever held back: ASV2 has no prediction between pictures to reorder around. |
 | `TryDecode` | `bool TryDecode(CodedPacket packet, out RawImage frame)` |  |
+
+#### `Asv2VideoEncoder`
+
+Encodes ASUS V2, ASUSTeK's successor to ASV1 for the same TV tuner cards, from the same document `Asv2VideoDecoder` reads: Michael Niedermayer's "ASUS V1/V2 Codecs" (asv1.txt, 2003-2016, GNU FDL/GPL).
+
+Implements `IVideoCodecEncoder<Asv2VideoEncoder>`, `IVideoPacketEncoder`.
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `CodecName` | `static string CodecName { get; }` |  |
+| `Codec` | `static CodecTag Codec { get; }` |  |
+| `Create` | `static Asv2VideoEncoder Create(MediaStreamInfo stream)` |  |
+| `DescribeStream` | `MediaStreamInfo DescribeStream()` | The stream as a muxer needs it: a `BITMAPINFOHEADER` naming ASV2, and behind it the eight-byte global header carrying the one quantisation parameter the whole file is coded at. |
+| `Flush` | `IEnumerable<CodedPacket> Flush()` | Nothing is ever held back, so there is nothing left at the end. |
+| `TryEncode` | `bool TryEncode(RawImage frame, long? presentationTimestamp, out CodedPacket packet)` | Codes one picture, whole and on its own. |
 
 #### `AvrnVideoDecoder`
 
