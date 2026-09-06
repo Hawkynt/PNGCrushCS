@@ -1020,19 +1020,30 @@ specification prints a note of its own about.
 Measured against ffmpeg on the planes, at the coded depth, before any reduction to eight bits —
 against `-pix_fmt yuv422p10le` and `yuv444p12le` — because this library interpolates chroma where
 ffmpeg replicates and a comparison on packed colour measures that disagreement instead of the decode.
-All six profiles, both of ffmpeg's encoders, progressive and interlaced in both field orders, sizes
-that are and are not a whole number of macroblocks, and 176x144 up to 1280x718: **every sample of
-every plane is within one level**, and one is the only difference that ever occurs. That residue is
-the inverse transform and nothing else — RDD 36 specifies no particular IDCT and requires only the
-accuracy of its Annex A, so this evaluates the defining sum in double precision rather than
-reproducing anyone's fixed-point approximation. **Alpha is exact**: 8- and 16-bit alpha both decode
-to ffmpeg's values with no sample differing anywhere, which it should, since ProRes codes alpha
-losslessly with no transform in the path.
+Re-measured against ffmpeg 9 over 80 ffmpeg-written 4:2:2 movies — profiles 0 to 3 of both
+`prores_ks` and `prores_aw`, two sources, 40x24 to 1280x718, five frames apiece, 200,407,040 samples
+of `yuv422p10le`: **every sample is within one level**, 720,615 of them differing and one being the
+only difference that ever occurs. That residue is the inverse transform and nothing else — RDD 36
+specifies no particular IDCT and requires only the accuracy of its Annex A, so this evaluates the
+defining sum in double precision rather than reproducing anyone's fixed-point approximation.
+**Alpha is exact**: 8- and 16-bit alpha both decode to ffmpeg's values with no sample differing
+anywhere, which it should, since ProRes codes alpha losslessly with no transform in the path.
 
-The clamping bounds are the second of the two 7.5.1 offers — the permissible video levels, 4 to 1019
-at ten bits and 16 to 4079 at twelve, rather than the full 0 to 2^b−1. Taking the wider pair puts a
-scatter of samples exactly four levels apart at the extremes of a heavily quantised picture and
-nowhere else, which is how the choice was found.
+The clamping bounds are the second of the two 7.5.1 offers — the permissible video levels rather than
+the full 0 to 2^b−1 — and the permissible video levels scale with the depth: 4 to 1019 at ten bits and
+16 to 4079 at twelve. Taking the wider pair instead puts a scatter of samples exactly four levels
+apart at the extremes of a heavily quantised picture and nowhere else, which is how the choice was
+found.
+
+**At twelve bits ffmpeg does not scale them, and that is the whole of the 4:4:4 disagreement.** Its
+`CLIP_MIN` is the constant 4 at both depths, so it clamps a twelve-bit sample to 4 and 4091 where
+RDD 36 asks for 16 and 4079. Over 20 ffmpeg-written `ap4h` and `ap4x` movies, 75,152,640 samples of
+`yuv444p12le`: 1,571,468 differ by one — the transform residue again — and **66,133 differ by more,
+every single one of them a sample this decoder put at exactly 16 or exactly 4079** and ffmpeg put
+somewhere in 4 to 14 or 4081 to 4091, for a largest difference of twelve. There is no third case. So
+the "within one level everywhere" that holds for the 4:2:2 profiles does not hold for the 4:4:4 ones
+against this decoder, and the difference is a clamping rule rather than a decode: away from the two
+extremes of the range the two agree to within one level there as well.
 
 Reducing the samples to the eight bits a `RawImage` holds is folded into the colour conversion so
 that a sample is rounded once. It is worth saying why this is not `ChannelScaling`'s reduction:
@@ -1047,6 +1058,72 @@ What refuses: a bitstream version later than the two RDD 36 describes; a reserve
 `interlace_mode` or `alpha_channel_type`; a `quantization_index` outside the permitted 1 to 224; a
 version 0 frame stating syntax its own version does not have; a packet that is not a compressed
 frame; and any structure whose stated size does not fit inside the one containing it.
+
+**Writing it: the four 4:2:2 profiles, and nothing else.** The encoder writes `apco`, `apcs`, `apcn`
+and `apch` — progressive, ten-bit 4:2:2, no alpha, one whole picture a packet at bitstream version 0,
+which is the version 6.4 defines for exactly that combination. `ap4h` and `ap4x` are refused by name:
+they are 4:4:4 at twelve bits with an alpha channel, and none of the three is written here. So is any
+other four-character code, and so is a picture whose size is not the stream's, since every ProRes
+frame restates its own size and a stream cannot carry two.
+
+Each half of the encoder sits in the file its decoding half sits in, and the tests assert the pairs
+are inverses rather than merely plausible: the Golomb-Rice/exponential-Golomb writer beside the
+reader in `ProResGolombCode`, the run-and-level coder beside the decoder in `ProResCoefficients`, the
+forward transform against the inverse over the same `ProResDctBasis`. The block scan and the block
+arrangements of Figures 6 to 8 are not duplicated at all — the encoder calls the decoder's own.
+
+**A profile is a policy, not a bitstream mode.** RDD 36 has one decoding process and no profiles;
+every frame carries its own weight matrices and every slice its own quantisation index, so a name
+selects two things and both of them on this side. The first is the pair of weight matrices in the
+frame header, and those are copied rather than derived — the specification prints none of them,
+because a decoder is told them by every frame, so the only written statement of a profile's matrices
+is in an encoder. The four pairs here are FFmpeg's `prores_quant_matrices` and were additionally read
+back byte for byte out of the frame headers of files written by both of its ProRes encoders;
+provenance is in `Codecs/ProRes/THIRD-PARTY-NOTICE.FFmpeg.txt`. The second is the data rate, taken
+from the *Apple ProRes White Paper* and divided by the 8160 macroblocks of 1920x1080 and by 29.97
+frames a second, which turns each profile's headline figure into bits a macroblock: 184 for Proxy,
+417 for LT, 601 for 422 and 900 for 422 HQ.
+
+**One quantisation index a picture, bisected against that budget.** The index is the smallest of the
+1 to 224 that 6.3.1 permits whose coded slices together fit, and 1 wherever the picture already does,
+so a simple frame is coded at the finest quantiser the profile's matrices allow and only a frame that
+overruns is coarsened. One index for the picture rather than one per slice is not a simplification —
+it was measured against the alternative. Capping each slice at its own share of the budget leaves the
+easy slices' unspent share unspent and quantises the busy ones far past what the picture as a whole
+could afford: on a detailed 1280x718 frame at 422 that coded to under a third of the profile's
+allowance while pushing 79 of its 450 slices off the finest quantiser and the busiest of them to an
+index above a hundred. Over the same forty streams the picture-wide index is never worse and is up to
+**29.4 dB** better, the gain being largest exactly where the content is busiest.
+
+**Measured by ffmpeg's decoder, on the planes.** 64 streams written here, 272 frames, were decoded by
+ffmpeg 9 at `-pix_fmt yuv422p10le` — the ProRes decoder's own output format, so swscale is not in the
+path — and compared with this package's decode of the same bytes: 150,087,847 samples, 567,418 of
+them differing, **and one level is the largest difference anywhere**, which is the same inverse
+transform residue the decoder direction shows. ffmpeg emitted no warning on any of the 64, read back
+the frame count written in each, and reported the four-character code, the pixel format and the exact
+raster every time. The set is the four profiles over 40x24, 176x144, 320x240, 640x360, 720x480,
+1280x718 and 1920x1080 from `testsrc2` and `smptehdbars`, plus geometries ffmpeg's own tools decline
+to produce as 4:2:2 planes at all — 7x5, 17x17, 33x18 and 41x25, odd in width, in height or in both.
+
+Against the planes that went in, and beside ffmpeg's own encoder on the same source at the same
+profile: over the 40 natural-source streams the mean peak signal-to-noise ratio is **57.2 dB here
+against 51.7 dB** for `prores_ks`, higher on 29 of the 40 and 11% more bytes in total. The eleven
+where it is lower are all rate control rather than coding, and they share one cause: the allowance is
+a flat figure per macroblock taken from a 1920x1080 raster, where Apple's own published rates give a
+smaller raster proportionally more. Every one of the eleven is at 40x24, 176x144 or 320x240, seven of
+them at 40x24 alone — a picture 68 times smaller in macroblocks than any raster ProRes was defined
+for — where the budget binds hard and costs 0.2 to 8.2 dB at two thirds of ffmpeg's size. **At
+640x360 and above this one is ahead on all sixteen.**
+
+Two smaller choices are worth stating. The frame header says `matrix_coefficients` 2, unknown, as
+ffmpeg's encoders do, and the conversion into the planes uses the same height-based fall-back the
+decoder applies to an unlabelled frame — BT.601 up to 576 lines and BT.709 above — so a picture
+converted here and displayed there goes through one matrix and its inverse rather than two different
+ones. And the slices are eight macroblocks, the largest of the four sizes 6.2.1 permits and what
+every ProRes file examined here is written with. Padding to whole macroblocks repeats the last row
+and column: those samples are transformed and transmitted like any other and 7.5.3 has the decoder
+throw them away, so repeating the edge is both the cheapest and the only choice that cannot bleed an
+invented value back into the block it shares a transform with.
 
 ### Avid DNxHD and DNxHR
 

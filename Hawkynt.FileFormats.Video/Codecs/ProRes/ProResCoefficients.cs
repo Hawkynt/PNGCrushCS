@@ -170,6 +170,68 @@ internal static class ProResCoefficients {
   }
 
   /// <summary>
+  /// Codes one colour component's scanned quantised coefficients into its coded bytes.
+  /// </summary>
+  /// <remarks>
+  /// The exact inverse of <see cref="Decode"/>, sharing its codebooks so that an adaptation cannot be
+  /// stepped one way here and another way there. The three states — the previous DC difference, the
+  /// previous run and the previous level symbol — start where 7.1.1.3 and 7.1.1.4 say and are carried
+  /// through the same sequence of symbols the decoder will read back.
+  /// <para/>
+  /// <b>Nothing marks the end.</b> The last run of zeroes of a component is never coded (7.1.1.4);
+  /// what stops the decoder is <c>endOfData()</c>, which the padding
+  /// <see cref="ProResBitWriter.ToArray"/> writes is what satisfies.
+  /// </remarks>
+  /// <param name="bits">The writer the component's bits go into.</param>
+  /// <param name="coefficients">The scanned quantised coefficients, as <see cref="Decode"/> returns.</param>
+  /// <param name="blockCount">The number of 8×8 blocks of this component in the slice.</param>
+  internal static void Encode(ProResBitWriter bits, ReadOnlySpan<int> coefficients, int blockCount) {
+    _EncodeDcCoefficients(bits, coefficients, blockCount);
+    _EncodeAcCoefficients(bits, coefficients, blockCount);
+  }
+
+  private static void _EncodeDcCoefficients(ProResBitWriter bits, ReadOnlySpan<int> coefficients, int blockCount) {
+    _FirstDc.Write(bits, _ToSymbol(coefficients[0]));
+
+    var previousDifference = _INITIAL_DC_DIFFERENCE;
+
+    for (var n = 1; n < blockCount; ++n) {
+      var magnitude = previousDifference < 0 ? -previousDifference : previousDifference;
+      var codebook = _DcDifference[magnitude < _DcDifference.Length ? magnitude : _DcDifference.Length - 1];
+
+      // 7.1.1.3 makes a difference's sign relative to the sign of the one before it, so what goes
+      // into the codeword after a negative difference is the negation of the actual one.
+      var difference = coefficients[n] - coefficients[n - 1];
+      codebook.Write(bits, _ToSymbol(previousDifference < 0 ? -difference : difference));
+
+      previousDifference = difference;
+    }
+  }
+
+  private static void _EncodeAcCoefficients(ProResBitWriter bits, ReadOnlySpan<int> coefficients, int blockCount) {
+    var previousRun = _INITIAL_RUN;
+    var previousLevelSymbol = _INITIAL_LEVEL_SYMBOL;
+    var previousPosition = blockCount - 1;
+
+    for (var n = blockCount; n < coefficients.Length; ++n) {
+      var coefficient = coefficients[n];
+      if (coefficient == 0)
+        continue;
+
+      var run = n - previousPosition - 1;
+      _Run[previousRun < _Run.Length ? previousRun : _Run.Length - 1].Write(bits, run);
+      previousRun = run;
+
+      var levelSymbol = (coefficient < 0 ? -coefficient : coefficient) - 1;
+      _Level[previousLevelSymbol < _Level.Length ? previousLevelSymbol : _Level.Length - 1].Write(bits, levelSymbol);
+      previousLevelSymbol = levelSymbol;
+
+      bits.Bit(coefficient < 0 ? 1 : 0);
+      previousPosition = n;
+    }
+  }
+
+  /// <summary>
   /// The inverse of the signed integer-to-symbol mapping, RDD 36:2022, 7.1.1.2.
   /// </summary>
   /// <remarks>
@@ -177,4 +239,7 @@ internal static class ProResCoefficients {
   /// close together at the front of the alphabet where the codes are short.
   /// </remarks>
   private static int _ToSigned(int symbol) => (symbol & 1) == 0 ? symbol >> 1 : -((symbol + 1) >> 1);
+
+  /// <summary>The signed integer-to-symbol mapping itself, RDD 36:2022, 7.1.1.2.</summary>
+  private static int _ToSymbol(int value) => value >= 0 ? value << 1 : (-value << 1) - 1;
 }

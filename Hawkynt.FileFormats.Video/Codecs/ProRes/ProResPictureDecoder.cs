@@ -218,7 +218,7 @@ internal static class ProResPictureDecoder {
       var originX = (macroblockOffset + m) * macroblockWidth;
 
       for (var b = 0; b < blocksPerMacroblock; ++b) {
-        var (blockX, blockY) = _BlockPosition(component, blocksPerMacroblock, b);
+        var (blockX, blockY) = BlockPosition(component, blocksPerMacroblock, b);
 
         ProResBlocks.Reconstruct(
           coefficients, blocksPerMacroblock, sliceSizeInMacroblocks, m, b, weights, qScale, scan,
@@ -238,7 +238,7 @@ internal static class ProResPictureDecoder {
   /// of every macroblock in quarters — visible on a hard edge, invisible on anything smooth, which
   /// is exactly the sort of thing a still frame of a gradient would not catch.
   /// </remarks>
-  private static (int X, int Y) _BlockPosition(int component, int blocksPerMacroblock, int block) {
+  internal static (int X, int Y) BlockPosition(int component, int blocksPerMacroblock, int block) {
     // Figure 6, the four luma blocks: left to right, then top to bottom.
     if (component == 0)
       return (8 * (block & 1), 8 * (block >> 1));

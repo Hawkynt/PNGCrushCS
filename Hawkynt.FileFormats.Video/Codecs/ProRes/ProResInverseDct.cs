@@ -33,24 +33,10 @@ namespace FileFormat.Codecs.ProRes;
 internal static class ProResInverseDct {
 
   /// <summary>
-  /// <c>C(u)/2 * cos((2x+1)u&#960;/16)</c>, indexed <c>[u * 8 + x]</c>.
+  /// <c>C(u)/2 * cos((2x+1)u&#960;/16)</c>, indexed <c>[u * 8 + x]</c>, shared with the forward
+  /// transform so that the two cannot come to disagree — see <see cref="ProResDctBasis"/>.
   /// </summary>
-  /// <remarks>
-  /// Half of the transform's <c>1/4</c> scale factor is folded into each of the two passes, so
-  /// applying the table twice produces the <c>1/4 C(u) C(v)</c> the definition carries.
-  /// </remarks>
-  private static readonly double[] _Basis = _BuildBasis();
-
-  private static double[] _BuildBasis() {
-    var basis = new double[64];
-    for (var u = 0; u < 8; ++u) {
-      var scale = (u == 0 ? 1d / Math.Sqrt(2d) : 1d) / 2d;
-      for (var x = 0; x < 8; ++x)
-        basis[u * 8 + x] = scale * Math.Cos((2 * x + 1) * u * Math.PI / 16d);
-    }
-
-    return basis;
-  }
+  private static readonly double[] _Basis = ProResDctBasis.Cosines;
 
   /// <summary>
   /// Transforms one block of dequantised coefficients in place into reconstructed component values.
