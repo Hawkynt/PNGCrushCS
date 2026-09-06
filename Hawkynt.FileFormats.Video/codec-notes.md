@@ -3477,6 +3477,98 @@ colourspace is.
 What refuses, by name: a picture whose width or height is not a whole number of 2x2 blocks, and — in
 `RplContainer` rather than here, since it is the demuxer's own business — an ARMovie/RPL chunk stating
 more than one frame.
+### VMware Screen Codec (VMnc)
+
+An RFB/VNC session written to a file. A packet is a two-byte prefix, a rectangle count, and then that
+many rectangles, each with a position, a size and a 32-bit encoding: 0 for raw pixels, 5 for Hextile,
+and seven `WMV`-prefixed magic numbers VMware added for its cursor and for the RFB server's own
+`ServerInitialization` record. Nothing in the format is compressed.
+
+**The pixel layout is stated twice and the two statements can disagree.** The container carries a
+depth, and the `WMVi` rectangle carries a whole RFB `PIXEL_FORMAT` — bits, depth, an endian flag, a
+true-colour flag, a maximum and a shift for each channel. The reference decoder reads the depth, checks
+the endian flag and skips the remaining thirteen bytes, painting from the layout the container stated;
+this decoder reads the whole descriptor and adopts it when it is one it can paint from, which is what
+lets an 8-bit true-colour screen decode at all. Where the two disagree the container wins here as it
+does there, because a stream that plays everywhere else must not stop playing here.
+
+A five-bit channel widens to eight by repeating its own bits, not by proportional rounding: three
+becomes 24 and seven becomes 57. The difference is one count at two of the thirty-two levels, and it
+is the difference between agreeing with every other decoder of this format and not.
+
+**A Hextile sub-rectangle is bounded by its rectangle, not by its own tile.** Its position is four bits
+and its size four more, so it can reach 31 pixels across a tile only 16 wide. The reference decoder
+allows exactly that, clipping against what is left of the rectangle; a decoder that clipped against the
+16-pixel tile instead would refuse streams that decode. Painting order makes the spill invisible — the
+next tile fills its own area before anything reads it — so the looser bound changes which files open,
+not what they look like.
+
+**The cursor is composited onto the returned picture and never into the reference canvas.** The
+reference decoder does the opposite: it paints the cursor into its own picture, saves what was under it
+first, and restores that region at the top of the next frame. The two produce the same pictures, and
+the second is simply the first with an extra copy. Where they part is a cursor hanging off the top or
+left edge, which the reference decoder clips by height and width while still reading the sprite from
+its first row and column — drawing the wrong part of the pointer. This decoder offsets the source as
+well, so a cursor half off the screen shows its correct half.
+
+**Measured against ffmpeg 9.0.1** on both of FATE's own VMnc files — `VMnc/test.avi`, 192 frames of
+720x400 at 16 bits, and `VMnc/VS2k5DebugDemo-01-partial.avi`, 1268x961 at 32 bits — decoded here and by
+ffmpeg to `rgb24` with frame duplication turned off, and compared frame by frame. **Every byte of every
+one of the 241 frames is identical**, cursor composition included. The 32-bit file is a truncated
+capture and both decoders stop at the same frame, 49, for the same reason: a Hextile tile whose data
+ends mid-sub-rectangle. Five smaller streams were built by hand for the cases those two files do not
+reach — the whole 32-level widening table, a sub-rectangle leaving its tile, an undefined rectangle
+encoding, the 32-bit channel order, and the cursor — muxed into AVI, read back out of ffmpeg, and the
+numbers it returned are what the tests assert.
+
+What refuses, by name: a stored depth other than 8, 16, 24 or 32; a picture with no pixels; a rectangle
+reaching outside the canvas; an RFB endian flag that is neither 0 nor 1; an 8-bit screen that never
+stated a true-colour descriptor, since the packet carries no palette to draw one with; and a packet
+that ends inside a field. An encoding the codec does not define ends the packet and keeps the picture
+decoded so far, which is what the reference decoder does with one.
+
+### TDSC
+
+Tiles onto a canvas, the whole packet behind zlib. A frame is a `TDSF` block — a tile count, a
+`BITMAPINFOHEADER` restating the picture size, and then `TDSB` tiles each carrying a rectangle and
+either raw BGR24 rows or a whole JPEG — optionally followed by a `DTSM` cursor record, which can also
+arrive as a packet of its own with no picture data at all.
+
+**The four-character code is `TDSC` and the reference decoder's own file header says `TSDC`.** Its
+registration table says `TDSC`, every sample carries `TDSC`, and the comment at the top of the file is
+simply wrong. Both spellings are accepted here rather than one of them being guessed at. The raw tile
+mode reads `' WAR'` in a little-endian 32-bit field, which is `RAW ` written backwards; taking the
+letters in the order they read rather than the order they are stored is the same mistake in a different
+place, and it makes every raw tile in every file unreadable.
+
+**The reference decoder writes JPEG tiles with red and blue transposed.** It declares its picture
+`BGR24`, copies raw tiles into it byte for byte — which is what makes them BGR — and then writes
+`R, G, B` for every pixel of a JPEG tile, so a single frame carrying both comes out with two different
+channel orders in it. That is not copied here. The evidence is in the frames themselves: on FATE's
+`tdsc/tdsc.asf` the raw tiles agree with the reference decoder to the byte over 368,640 pixels, and the
+JPEG tiles agree only once red and blue are exchanged.
+
+JPEG tiles go through the image package's own JPEG reader rather than a copy of one. That reader
+reconstructs chroma properly where the reference decoder takes the nearest sample, so the two differ
+slightly inside a JPEG tile — most pixels by nothing or a count or two, and up to a hundred on a sharp
+colour edge, which is where a nearest-sample reconstruction is at its worst.
+
+**Measured against ffmpeg 9.0.1** on FATE's `tdsc/tdsc.asf`, 1440x900. The sample is truncated and both
+decoders stop at the same frame, 41. Raw tiles were compared against ffmpeg's own `bgr24` output over
+two of the largest — 276,480 and 92,160 pixels — with **no difference at all**, and the cursor paths
+were measured on hand-built streams muxed into AVI and read back out of ffmpeg: a 32-bit BGRA sprite,
+its move to a second position, and a monochrome sprite with its AND and XOR planes. The numbers ffmpeg
+returned are what the tests assert.
+
+What refuses, by name: a picture with no pixels or one implausibly large; a `BITMAPINFOHEADER` that is
+not 40 bytes, not one plane or not 24 bits; a tile that is not `TDSB`, reaches outside the canvas, or
+is too small for the rows it claims; a tile mode that is neither raw nor JPEG; a cursor larger than
+256 pixels either way; a cursor format the reference decoder does not define either; a packet that is
+not a zlib stream, or that inflates past what its own frame size can account for. A JPEG tile that will
+not decode leaves that part of the canvas alone rather than failing the frame, an unknown cursor action
+leaves the cursor where it was, and a packet whose leading tag is neither `TDSF` nor `DTSM` hands back
+the canvas unchanged — each of which is what the reference decoder does.
+
 
 ## 📜 License
 
