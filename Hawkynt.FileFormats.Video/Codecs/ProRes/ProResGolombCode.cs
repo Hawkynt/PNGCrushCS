@@ -1,4 +1,5 @@
 using System.IO;
+using System.Numerics;
 
 namespace FileFormat.Codecs.ProRes;
 
@@ -54,5 +55,31 @@ internal readonly record struct ProResGolombCode(int LastRiceQ, int RiceOrder, i
     var value = (1 << suffixBits) | (int)bits.Bits(suffixBits);
 
     return value - (1 << this.ExpOrder) + ((this.LastRiceQ + 1) << this.RiceOrder);
+  }
+
+  /// <summary>Writes the codeword one non-negative symbol stands for.</summary>
+  /// <remarks>
+  /// The exact inverse of <see cref="Read"/>, and written beside it so that the two are read
+  /// together. Which half of the combination code a symbol falls in is decided by the same threshold
+  /// the reader uses to tell them apart: <c>(lastRiceQ + 1) · 2^kRice</c> symbols are spent on the
+  /// Golomb-Rice half and everything above it goes to the exponential-Golomb one, where the code
+  /// level is the exponent's excess over <c>kExp</c> plus the prefix that marked the switch.
+  /// </remarks>
+  internal void Write(ProResBitWriter bits, int symbol) {
+    var riceSymbols = (this.LastRiceQ + 1) << this.RiceOrder;
+
+    if (symbol < riceSymbols) {
+      bits.UnaryPrefix(symbol >> this.RiceOrder);
+      bits.Bits(symbol, this.RiceOrder);
+      return;
+    }
+
+    // The reader's "binary representation of n + 2^k": the value whose leading '1' is the separator
+    // and whose remaining bits are the suffix, so the suffix is as many bits as the value's exponent.
+    var value = symbol - riceSymbols + (1 << this.ExpOrder);
+    var suffixBits = BitOperations.Log2((uint)value);
+
+    bits.UnaryPrefix(this.LastRiceQ + 1 + suffixBits - this.ExpOrder);
+    bits.Bits(value, suffixBits);
   }
 }

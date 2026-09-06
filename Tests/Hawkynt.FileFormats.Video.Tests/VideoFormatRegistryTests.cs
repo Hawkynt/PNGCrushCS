@@ -69,13 +69,24 @@ public sealed class VideoFormatRegistryTests {
     });
   }
 
+  /// <summary>
+  /// A code this package decodes and does not write is refused by name, and the refusal says what is
+  /// on offer instead.
+  /// </summary>
+  /// <remarks>
+  /// The example is H.264 because it is a stated boundary rather than a gap waiting to be filled:
+  /// the modern lossy codecs are read and not written back, and the README says so. This used to name
+  /// ProRes, which stopped being an example of anything the day a ProRes encoder went in — a test
+  /// whose subject can acquire the property it asserts the absence of will fail for a good reason one
+  /// day, and that is the worst kind of red.
+  /// </remarks>
   [Test]
   [Category("Unit")]
   public void ACodeNothingWritesIsRefusedByName() {
     var stream = new MediaStreamInfo {
       Index = 3,
       Kind = MediaStreamKind.Video,
-      Codec = CodecTag.FromCharacters("apcn"),
+      Codec = CodecTag.FromCharacters("avc1"),
       Width = 176,
       Height = 144,
     };
@@ -83,7 +94,7 @@ public sealed class VideoFormatRegistryTests {
     Assert.That(VideoFormatRegistry.CanEncode(stream), Is.False);
     var failure = Assert.Throws<NotSupportedException>(() => VideoFormatRegistry.CreateEncoder(stream));
     Assert.Multiple(() => {
-      Assert.That(failure!.Message, Does.Contain("apcn"));
+      Assert.That(failure!.Message, Does.Contain("avc1"));
       Assert.That(failure.Message, Does.Contain("Encoders present"));
     });
   }

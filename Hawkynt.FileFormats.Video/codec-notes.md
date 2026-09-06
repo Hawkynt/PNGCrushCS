@@ -1110,19 +1110,30 @@ specification prints a note of its own about.
 Measured against ffmpeg on the planes, at the coded depth, before any reduction to eight bits —
 against `-pix_fmt yuv422p10le` and `yuv444p12le` — because this library interpolates chroma where
 ffmpeg replicates and a comparison on packed colour measures that disagreement instead of the decode.
-All six profiles, both of ffmpeg's encoders, progressive and interlaced in both field orders, sizes
-that are and are not a whole number of macroblocks, and 176x144 up to 1280x718: **every sample of
-every plane is within one level**, and one is the only difference that ever occurs. That residue is
-the inverse transform and nothing else — RDD 36 specifies no particular IDCT and requires only the
-accuracy of its Annex A, so this evaluates the defining sum in double precision rather than
-reproducing anyone's fixed-point approximation. **Alpha is exact**: 8- and 16-bit alpha both decode
-to ffmpeg's values with no sample differing anywhere, which it should, since ProRes codes alpha
-losslessly with no transform in the path.
+Re-measured against ffmpeg 9 over 80 ffmpeg-written 4:2:2 movies — profiles 0 to 3 of both
+`prores_ks` and `prores_aw`, two sources, 40x24 to 1280x718, five frames apiece, 200,407,040 samples
+of `yuv422p10le`: **every sample is within one level**, 720,615 of them differing and one being the
+only difference that ever occurs. That residue is the inverse transform and nothing else — RDD 36
+specifies no particular IDCT and requires only the accuracy of its Annex A, so this evaluates the
+defining sum in double precision rather than reproducing anyone's fixed-point approximation.
+**Alpha is exact**: 8- and 16-bit alpha both decode to ffmpeg's values with no sample differing
+anywhere, which it should, since ProRes codes alpha losslessly with no transform in the path.
 
-The clamping bounds are the second of the two 7.5.1 offers — the permissible video levels, 4 to 1019
-at ten bits and 16 to 4079 at twelve, rather than the full 0 to 2^b−1. Taking the wider pair puts a
-scatter of samples exactly four levels apart at the extremes of a heavily quantised picture and
-nowhere else, which is how the choice was found.
+The clamping bounds are the second of the two 7.5.1 offers — the permissible video levels rather than
+the full 0 to 2^b−1 — and the permissible video levels scale with the depth: 4 to 1019 at ten bits and
+16 to 4079 at twelve. Taking the wider pair instead puts a scatter of samples exactly four levels
+apart at the extremes of a heavily quantised picture and nowhere else, which is how the choice was
+found.
+
+**At twelve bits ffmpeg does not scale them, and that is the whole of the 4:4:4 disagreement.** Its
+`CLIP_MIN` is the constant 4 at both depths, so it clamps a twelve-bit sample to 4 and 4091 where
+RDD 36 asks for 16 and 4079. Over 20 ffmpeg-written `ap4h` and `ap4x` movies, 75,152,640 samples of
+`yuv444p12le`: 1,571,468 differ by one — the transform residue again — and **66,133 differ by more,
+every single one of them a sample this decoder put at exactly 16 or exactly 4079** and ffmpeg put
+somewhere in 4 to 14 or 4081 to 4091, for a largest difference of twelve. There is no third case. So
+the "within one level everywhere" that holds for the 4:2:2 profiles does not hold for the 4:4:4 ones
+against this decoder, and the difference is a clamping rule rather than a decode: away from the two
+extremes of the range the two agree to within one level there as well.
 
 Reducing the samples to the eight bits a `RawImage` holds is folded into the colour conversion so
 that a sample is rounded once. It is worth saying why this is not `ChannelScaling`'s reduction:
@@ -1137,6 +1148,72 @@ What refuses: a bitstream version later than the two RDD 36 describes; a reserve
 `interlace_mode` or `alpha_channel_type`; a `quantization_index` outside the permitted 1 to 224; a
 version 0 frame stating syntax its own version does not have; a packet that is not a compressed
 frame; and any structure whose stated size does not fit inside the one containing it.
+
+**Writing it: the four 4:2:2 profiles, and nothing else.** The encoder writes `apco`, `apcs`, `apcn`
+and `apch` — progressive, ten-bit 4:2:2, no alpha, one whole picture a packet at bitstream version 0,
+which is the version 6.4 defines for exactly that combination. `ap4h` and `ap4x` are refused by name:
+they are 4:4:4 at twelve bits with an alpha channel, and none of the three is written here. So is any
+other four-character code, and so is a picture whose size is not the stream's, since every ProRes
+frame restates its own size and a stream cannot carry two.
+
+Each half of the encoder sits in the file its decoding half sits in, and the tests assert the pairs
+are inverses rather than merely plausible: the Golomb-Rice/exponential-Golomb writer beside the
+reader in `ProResGolombCode`, the run-and-level coder beside the decoder in `ProResCoefficients`, the
+forward transform against the inverse over the same `ProResDctBasis`. The block scan and the block
+arrangements of Figures 6 to 8 are not duplicated at all — the encoder calls the decoder's own.
+
+**A profile is a policy, not a bitstream mode.** RDD 36 has one decoding process and no profiles;
+every frame carries its own weight matrices and every slice its own quantisation index, so a name
+selects two things and both of them on this side. The first is the pair of weight matrices in the
+frame header, and those are copied rather than derived — the specification prints none of them,
+because a decoder is told them by every frame, so the only written statement of a profile's matrices
+is in an encoder. The four pairs here are FFmpeg's `prores_quant_matrices` and were additionally read
+back byte for byte out of the frame headers of files written by both of its ProRes encoders;
+provenance is in `Codecs/ProRes/THIRD-PARTY-NOTICE.FFmpeg.txt`. The second is the data rate, taken
+from the *Apple ProRes White Paper* and divided by the 8160 macroblocks of 1920x1080 and by 29.97
+frames a second, which turns each profile's headline figure into bits a macroblock: 184 for Proxy,
+417 for LT, 601 for 422 and 900 for 422 HQ.
+
+**One quantisation index a picture, bisected against that budget.** The index is the smallest of the
+1 to 224 that 6.3.1 permits whose coded slices together fit, and 1 wherever the picture already does,
+so a simple frame is coded at the finest quantiser the profile's matrices allow and only a frame that
+overruns is coarsened. One index for the picture rather than one per slice is not a simplification —
+it was measured against the alternative. Capping each slice at its own share of the budget leaves the
+easy slices' unspent share unspent and quantises the busy ones far past what the picture as a whole
+could afford: on a detailed 1280x718 frame at 422 that coded to under a third of the profile's
+allowance while pushing 79 of its 450 slices off the finest quantiser and the busiest of them to an
+index above a hundred. Over the same forty streams the picture-wide index is never worse and is up to
+**29.4 dB** better, the gain being largest exactly where the content is busiest.
+
+**Measured by ffmpeg's decoder, on the planes.** 64 streams written here, 272 frames, were decoded by
+ffmpeg 9 at `-pix_fmt yuv422p10le` — the ProRes decoder's own output format, so swscale is not in the
+path — and compared with this package's decode of the same bytes: 150,087,847 samples, 567,418 of
+them differing, **and one level is the largest difference anywhere**, which is the same inverse
+transform residue the decoder direction shows. ffmpeg emitted no warning on any of the 64, read back
+the frame count written in each, and reported the four-character code, the pixel format and the exact
+raster every time. The set is the four profiles over 40x24, 176x144, 320x240, 640x360, 720x480,
+1280x718 and 1920x1080 from `testsrc2` and `smptehdbars`, plus geometries ffmpeg's own tools decline
+to produce as 4:2:2 planes at all — 7x5, 17x17, 33x18 and 41x25, odd in width, in height or in both.
+
+Against the planes that went in, and beside ffmpeg's own encoder on the same source at the same
+profile: over the 40 natural-source streams the mean peak signal-to-noise ratio is **57.2 dB here
+against 51.7 dB** for `prores_ks`, higher on 29 of the 40 and 11% more bytes in total. The eleven
+where it is lower are all rate control rather than coding, and they share one cause: the allowance is
+a flat figure per macroblock taken from a 1920x1080 raster, where Apple's own published rates give a
+smaller raster proportionally more. Every one of the eleven is at 40x24, 176x144 or 320x240, seven of
+them at 40x24 alone — a picture 68 times smaller in macroblocks than any raster ProRes was defined
+for — where the budget binds hard and costs 0.2 to 8.2 dB at two thirds of ffmpeg's size. **At
+640x360 and above this one is ahead on all sixteen.**
+
+Two smaller choices are worth stating. The frame header says `matrix_coefficients` 2, unknown, as
+ffmpeg's encoders do, and the conversion into the planes uses the same height-based fall-back the
+decoder applies to an unlabelled frame — BT.601 up to 576 lines and BT.709 above — so a picture
+converted here and displayed there goes through one matrix and its inverse rather than two different
+ones. And the slices are eight macroblocks, the largest of the four sizes 6.2.1 permits and what
+every ProRes file examined here is written with. Padding to whole macroblocks repeats the last row
+and column: those samples are transformed and transmitted like any other and 7.5.3 has the decoder
+throw them away, so repeating the edge is both the cheapest and the only choice that cannot bleed an
+invented value back into the block it shares a transform with.
 
 ### Avid DNxHD and DNxHR
 
@@ -2246,6 +2323,73 @@ bit this decoder reads and rejects rather than silently ignoring; a picture size
 while a picture predicted from the old size is still held as the reference; and, as in every codec here,
 there is no `catch` anywhere that hands back a blank, a copied or a zero-filled picture.
 
+**Encoding is the decoder's own walk run backwards, and the decisions are the test model's.** The same
+group numbering off Figure 6, the same macroblock geometry off Figures 8 and 10, the same vector
+predictor of 4.2.3.4 and the same loop filter in the same place in the pipeline; where the decoder reads
+a field the encoder writes one. Every codeword comes out of the very tables `H261VlcTables` decodes
+with, inverted rather than transcribed a second time — a table typed twice can disagree with itself, and
+that disagreement is precisely the failure a round trip through this library alone cannot see, because
+both halves would be wrong in the same way. What H.261 leaves open is chosen the way the ITU's own test
+model chooses it: the vector by a logarithmic search of the reference over the ±15 whole pixels clause
+3.2.2 allows, narrowed so every referenced pel lies inside the coded picture; whether to spend a vector
+at all by the model's bias of 100 towards standing still; whether the macroblock is better coded on its
+own by the model's comparison of the prediction error against the source macroblock's spread about its
+own mean, less 500; and the quantiser by `|LEVEL| = |COF| / (2 × QUANT)` truncated towards zero, which
+never overshoots, so a residual coded this way cannot amplify itself through a run of predicted
+pictures. A macroblock whose residual quantises away entirely and whose prediction is the co-located one
+is simply not transmitted, which is the whole of H.261's skip machinery — the Recommendation has no
+"coded with nothing" macroblock and no picture-level skip either.
+
+**The loop filter is written, which nothing else here writes.** ffmpeg's own H.261 encoder was measured
+never to emit it, so a stream that uses it exercises a path in ffmpeg's decoder that no ffmpeg-written
+file reaches. Across the corpus below, 9,411 of 23,624 transmitted macroblocks carry one of the two
+filtered macroblock types, and ffmpeg decodes every one of them to the same samples this library
+reconstructs — which is what turns clause 3.2.3's ordering, filter the prediction *then* add the
+residual, from a reading of the text into a measured fact in both directions.
+
+**Measured, in both directions and on the 4:2:0 planes rather than after a colour conversion.** The
+first direction calibrates the oracle: **two streams written by ffmpeg's own H.261 encoder**, a QCIF and
+a CIF clip of sixty frames each, decoded here and by ffmpeg and compared sample by sample. Against
+`-idct faani` the QCIF stream differs in **5 samples of 2,280,960** and the CIF stream in **31 of
+9,123,840**, every one of them by exactly one level; against ffmpeg's default integer transform the
+figures are 43,423 and 57,652 capped at two levels, which is the same size as the gap between ffmpeg's
+own two transforms and is Annex A's accuracy bound rather than a disagreement about the bitstream.
+
+The second direction is the one that matters. **Six streams written here** — `testsrc2` at QCIF and CIF
+of sixty frames each, and `smptebars` QCIF, `life` QCIF, `mandelbrot` CIF and `rgbtestsrc` CIF of thirty
+each, 240 pictures and 22,809,600 samples in all — were handed to ffmpeg's own H.261 decoder, which
+accepted every picture of every one without a warning and produced the frame count written. Compared
+against this encoder's own reconstruction, plane by plane and again against `-idct faani`: **79
+differing samples of 22,809,600, none by more than one level**, and two of the six streams identical on
+every sample. Against ffmpeg's default integer transform the same QCIF stream differs in 33,835 samples
+capped at two levels — the same signature, and the same size, as the gap measured above between this
+decoder and ffmpeg over ffmpeg's own encoded streams. Per stream, ffmpeg's decode against our
+reconstruction and against the source planes:
+
+| Stream | Coded | ffmpeg vs our reconstruction | ffmpeg vs the source planes |
+| --- | ---: | ---: | ---: |
+| `testsrc2` QCIF, 60 frames | 117,934 B | 13 of 2,280,960, all ±1 | 36.17 dB |
+| `testsrc2` CIF, 60 frames | 253,381 B | 4 of 9,123,840, all ±1 | 39.48 dB |
+| `smptebars` QCIF, 30 frames | 6,543 B | none of 1,140,480 | 45.32 dB |
+| `life` QCIF, 30 frames | 119,805 B | 12 of 1,140,480, all ±1 | 31.70 dB |
+| `mandelbrot` CIF, 30 frames | 167,802 B | 50 of 4,561,920, all ±1 | 37.59 dB |
+| `rgbtestsrc` CIF, 30 frames | 10,944 B | none of 4,561,920 | 48.04 dB |
+
+Those 240 pictures transmit 23,624 macroblocks and leave 35,776 untransmitted, spend 8,752 non-zero
+motion vectors, and escape 13,461 coefficients out of Table 5 — so the address-difference layer, the
+vector layer and clause 4.2.4.1's escape are each exercised thousands of times over rather than argued
+about. The one like-for-like quality comparison the corpus allows is the QCIF `testsrc2` clip, where
+ffmpeg's own encoder produced 117,929 bytes from the same sixty pictures against this encoder's 117,934:
+**35.14 dB there against 36.17 dB here**, so the mode decisions are at least not costing anything.
+
+What the encoder refuses, by name: any picture size other than QCIF and CIF, because clause 3.1 defines
+exactly those two and 4.2.1.3 names one of them in a single bit — a 320x240 picture written as CIF would
+decode, and would be the wrong picture — a stream that is not video, and a picture whose size is not the
+stream's. What it never writes: the four macroblock types carrying MQUANT (Table 2 rows 2, 4, 7 and 10),
+since there is no rate control here for a mid-group quantiser change to serve and a fixed step is what
+makes the same picture code to the same bytes; the bit-stuffing codeword of 4.2.3.1, which exists to
+fill a channel this encoder is not driving; and Annex D, which the decoder beside it will not read.
+
 ### id RoQ
 
 The FMV format Graeme Devine wrote for The 11th Hour, carried into Quake III and Return to Castle
@@ -2315,6 +2459,106 @@ one that changes part way through a stream; a codebook cell named before any cod
 one; and a motion vector reaching outside the picture, which nothing measured this against exercises.
 Sound (`RoQ_SOUND_MONO`, `RoQ_SOUND_STEREO`) is demuxed onto its own stream, DPCM-coded and unread past
 that — decoding it is future work.
+
+**Writing it.** The encoder is written against the decoder above rather than against anybody else's
+encoder: every code it emits is one that walk reads, in the order that walk reads it, and the picture it
+paints into its own buffers is the picture that walk paints. That is worth stating because the walk was
+not read out of a description — it was settled sample for sample against ffmpeg over 1338 pictures — so
+it is the strongest statement of this format available here.
+
+A picture is more than one chunk, which is the one place this codec does not fit the shape the rest of
+the package uses. Cinepak's frame is one chunk and Microsoft Video 1's is one packet; a RoQ picture is a
+`QUAD_VQ` chunk, the `QUAD_CODEBOOK` chunk it needs wherever the cells it names have changed, and — once,
+at the head of the film — an `INFO` chunk stating the size. `TryEncode` hands back one packet a picture,
+so a packet here carries that whole run of chunks, headers and all, exactly as they are to appear in the
+file; `RoqWriter` walks the run rather than trusting the first header for the whole of it, and reading the
+file back splits it into one packet a chunk again, which is what the demuxer always did.
+
+**The decision.** Every 8x8 quadrant is priced at a skip, a motion vector, one 4x4 cell doubled to fill
+it, and subdivision; every 4x4 block below a subdivision at a skip, a motion vector, one 4x4 cell at its
+own size, and four raw 2x2 cells. The price is the squared error the coding leaves over the block's own
+samples — luminance and both chrominances at full resolution, since that is where this format's motion
+compensation leaves them — plus two units of that error for every bit it costs, the codebook cells it
+newly refers to included. Two was picked by measurement. Swept at 2, 4, 8, 16 and 32 over five sequences,
+every value writes fewer bytes than ffmpeg's own encoder does on all five, so the choice is not between
+being smaller and not; it is how much quality to give up for the rest of the saving, and past two the
+answer is too much. On a 128x96 colour grid, two gives 54.51 dB in 3018 bytes against ffmpeg's 53.19 in
+3244; four gives 50.60 in 2412, already 2.6 dB below ffmpeg for a fifth fewer bytes; sixteen gives 47.39
+in 1568, 5.8 dB below for half.
+
+**A skip has to be priced against the right picture.** The two-buffer finding above is not a decoder
+detail an encoder can ignore: what a `MOT` block leaves showing is the target buffer's own stale content,
+two pictures back and not one. An encoder modelling a single buffer would price a skip against the picture
+immediately before and be wrong about it on every other frame — and, worse, would be wrong in a way its
+own decoder would agree with. So the alternation is performed here too, and the price of a skip is read
+out of the buffer being built.
+
+**Sizing the codebook.** 256 2x2 cells and 256 4x4 ones cost 2560 bytes, which is more than a whole 64x64
+picture is worth, so the size has to be chosen rather than assumed. The farthest-point seeding is nested —
+the first *k* seeds of a 256-seed run are the seeds a *k*-seed run would have picked — so one seeding
+gives every size worth trying at no extra cost, and the picture is priced at 2, 8, 32, 128 and 256. Only
+the winner is then refined by Lloyd's rule, twelve rounds rather than the four Cinepak's quantiser here
+settles for, because a RoQ codebook is worked much harder: it serves a whole picture rather than one strip
+of one, and serves it at two sizes at once. On a 320x240 fractal the twelfth round is worth 0.31 dB and 3
+per cent fewer bytes against the fourth, and the twentieth another 0.07 dB for 2 per cent more. The
+refinement is kept only where it prices better, since a codebook fitting its training set more closely
+leaves the blocks free to choose again.
+
+**An exact error, cheaply.** A 2x2 cell painted over a 4x4 or an 8x8 square spreads each of its six
+numbers over an area of pixels, so what it leaves is `Σ(pixel − sample)²` over that area, which expands to
+`n·sample² − 2·sample·Σpixel + Σpixel²`. Only the first two terms depend on the cell, so a whole codebook
+is priced against a block from six sums rather than from its pixels — the same number the pixels would
+give, at a twentieth of the arithmetic, and an exact integer either way rather than a sampled
+approximation.
+
+**Measured, and measured on both sides separately.** ffmpeg 9.0.1 has both a `roqvideo` encoder and a RoQ
+decoder, so the two halves are measured against different things and the counts are kept apart.
+
+*What ffmpeg wrote.* Ten RoQ files written by ffmpeg's own `roqvideo` encoder — 64x48 to 512x512, 108
+pictures — were decoded here and by ffmpeg and compared plane by plane against ffmpeg's own `yuvj444p`
+output: all 17246208 samples identical, no differing plane on any picture of any file. An eleventh file
+ffmpeg wrote, from a wholly static 176x144 sequence, is corrupt — after its first picture chunk the file
+is no longer chunk-structured at all, and ffmpeg's own demuxer rejects it with "unknown RoQ chunk (020A)".
+This decoder refuses it too, one chunk earlier, because that first picture's `QUAD_VQ` chunk already ends
+where a block's own argument byte should be. Reproducible; it is ffmpeg's file, not a reading of it, and
+the same sequence encoded here reads back in ffmpeg with no complaint.
+
+*What this encoder wrote.* Eleven sequences — 64x48 to 512x512, 118 pictures, covering flat colour, test
+patterns, a fractal, a pan, a still, cellular automata, a repeating cell pattern and genuine per-pixel
+noise — were encoded here, written into RoQ files, and decoded by ffmpeg. It accepted every picture of
+every file and its `yuvj444p` planes are identical to this package's own decode of the same files, sample
+for sample: 0 differing of 18006528. The comparison is on the planes rather than on colour, deliberately:
+RGB would compare two chroma paths and two colour matrices as much as two codecs, and this package has
+been caught out by exactly that before.
+
+*Against ffmpeg's own encoder*, from the same source planes, ten of the eleven can be compared at all —
+the static one cannot, ffmpeg's file for it being the corrupt one above. On those ten this encoder writes
+fewer bytes on eight, the same on one and more on one, and is closer to the source on five, level on one
+and behind on four. The two 320x240 sequences: `testsrc2` 67168 bytes at 34.90 dB against ffmpeg's 72451
+at 34.49, and `mandelbrot` 84946 at 28.29 against 110983 at 28.45. The one it loses on size is cellular
+automata at 160x112, 44467 against 43067, where it is 0.24 dB ahead; the four it is behind on in quality
+are 0.01 dB (colour bars), 0.16 (the fractal), 0.27 (512x512 test pattern) and 2.22 (flat grey) — and the
+last of those is the source's own chroma fringe rather than the picture, ffmpeg spending the extra third
+of its bytes to state a two-pixel border its own conversion invented. Encoding costs six to fourteen
+times what ffmpeg's encoder costs, measured against its best of three runs on four sequences.
+
+ffmpeg's figures move a little from run to run, which is worth saying since these are quoted to the byte:
+its quantiser is ELBG seeded from a pseudo-random generator, so the same source need not produce the same
+file twice — the cellular-automata sequence came out 43359 bytes at 23.79 dB on one run and 43067 at 24.26
+on the next. This encoder has no random state and writes the same bytes for the same pictures every time.
+
+**What is lossy about it, precisely.** RoQ has no lossless form and nothing here pretends otherwise. Only
+a picture the codebook can hold outright — at most 256 distinct 2x2 cells, arranged so that no coarser
+coding prices better than an exact one — comes back sample for sample. A flat picture does, and so does a
+picture built of whole 8x8 or whole 4x4 squares of a few dozen levels; both are asserted in
+`RoqVideoEncoderTests`. Anything richer is quantised, which is the format.
+
+**What it refuses, by name.** A picture whose sides are not a whole number of 16-pixel macroblocks — the
+same size this package's own decoder and ffmpeg's own muxer refuse; a picture larger than the two bytes
+`INFO` states each side in; a picture size that changes part way through a stream, the buffer a skipped
+block leaves showing being the size it was; and a non-video stream. Motion vectors whose source would
+leave the picture are never searched, because the decoder refuses those rather than clamping and an
+encoder writing one would be writing a file it cannot read back.
 
 ### Flash Screen Video 2
 
@@ -2608,12 +2852,13 @@ than only by construction. ffmpeg's own top-level section headers are all eight 
 size, so the four-byte form and an explicit chunk offset table are reached only by hand-built frames in
 this codec's own tests.
 
-**Hap R (BC7) and Hap HDR (BC6U/BC6S) refuse by name**, at `Create`, before a single frame is read —
-not for want of a block decoder, since this package already has one for each, reused by the image
-formats that carry them, but because BC6 is half-float HDR data and this package's `RawImage` has no
-floating-point pixel format to receive it in, and because ffmpeg's own Hap encoder — what this decoder
-is measured against — writes none of the four HDR or BC7 variants, so there would be no oracle to
-check a decode against even if one were written.
+**Hap R (BC7) and Hap HDR (BC6U/BC6S) are decoded**, through the block decoders this package already
+has for each and shares with the image formats that carry them. This paragraph used to say they were
+refused by name at `Create`; that stopped being true when those paths went in and the entry was not
+brought with it, which the codec table above has said all along. What remains true is the reason
+they are worth treating carefully: ffmpeg's own Hap encoder writes none of the HDR or BC7 variants,
+so there is no oracle to measure a decode of one against, and the numbers quoted here cover the
+three formats the encoder below writes and nothing else.
 
 What else refuses, by name: a section whose header does not fit, a size that runs past the data
 holding it, a top-level type byte naming no pixel format and no multiple-image marker, a "consult
@@ -2623,6 +2868,75 @@ length its own preamble states, a Snappy back-reference pointing before the star
 multiple-image section holding any combination other than Scaled YCoCg DXT5 with RGTC1/BC4 alpha.
 There is no `catch` anywhere in this decoder that hands back a blank frame or repeats the one before
 it.
+
+**The encoder writes three of the seven pixel formats**: `Hap1` (DXT1/BC1), `Hap5` (DXT5/BC3 with
+alpha) and `HapY` (Scaled YCoCg DXT5). Those are exactly the three ffmpeg's own `hap` encoder writes,
+which is the whole reason they are the three: a BC7 or BC6H texture built from the specification alone
+would be a plausible picture with no second encoder to check it against, and `HapM` and `HapA` — which
+this package decodes — have no encoder anywhere to compare a writing of them with. All four refuse by
+name at `Create`, before a frame is read, as does a picture whose width or height is not a whole number
+of 4x4 blocks (a Hap frame carries the texture and nothing else, so there is nowhere to say that part
+of the last block is to be thrown away; ffmpeg's encoder refuses the same size) and a picture that is
+neither `Rgb24` nor `Rgba32` — those two being what the decoder hands back, so a decode and a re-encode
+need no conversion, and whether any other conversion may lose something is not this codec's decision.
+
+Each frame is one top-level section with the eight-byte header form, one chunk, no Decode Instructions
+Container: the texture is offered to Snappy whole and the result kept only where it came out smaller
+than the texture, the type byte's high nibble saying which happened. That is ffmpeg's own single-chunk
+behaviour, header form included. The Snappy writer is this package's own — Snappy's block format is a
+decoder's contract and states nothing about which elements a compressor picks — so the bytes around the
+texture are not the reference's; the texture inside them is.
+
+**The block compression is FFmpeg's `libavcodec/texturedspenc.c` carried across whole.** That file is
+the one part of libavcodec touched here that is not LGPL: it carries its own MIT grant and states that
+it is itself based on public domain code by Fabian Giesen, Sean Barrett and Yann Collet, so it is taken
+rather than merely consulted (rung 1 of the sourcing ladder — see
+`Codecs/Hap/THIRD-PARTY-NOTICE.FFmpeg.txt`). The principal-axis endpoint fit with its four rounds of
+power iteration, the one-dimensional index match, the least-squares refinement, the DXT5 alpha index
+derivation, the RGB-to-YCoCg transform and the `expand5`, `expand6`, `match5` and `match6` tables are
+all its, value for value. Note that the encoder's own `expand5`/`expand6` are **bit replication** where
+the decoder's, measured off ffmpeg's decode, **round** — the two disagree at nine of the thirty-two
+five-bit values. That is not a mistake in either: the encoder's tables only ever decide which of a
+block's four colours a pixel is nearest, and copying them exactly is what keeps the choice of endpoints
+identical to the reference's.
+
+**One place the encoder deliberately parts from the reference**, and it is the "a picture the format
+can hold exactly must come back exactly" rule. A block holding one or two colours that the block
+decode's own 5-6-5 widening states outright can be carried untouched — name them as the endpoint pair
+and index 0 and 1 are them, unmixed, in either of DXT1's branches. The reference's constant-colour path
+does not do that: its match tables aim at the one-third interpolation and are built against bit
+replication rather than the rounding widening the decode uses, so such a block comes back a level or
+two off. So the encoder writes the reference's block, decodes it back under the decoder's own rules,
+and only where that does not reproduce the source block, and only where the block is one the format
+could have held exactly, writes it exactly instead.
+
+**Measured against ffmpeg, in both directions, and the two counts are kept apart.** Files ffmpeg wrote:
+96 Hap streams at 4x4, 12x8, 68x36, 64x64, 96x64, 128x96, 160x120 and 320x240, in all three pixel
+formats, at one, four and eight chunks and both second-stage compressors, ten frames each — 960 frames,
+48435200 samples — decoded here and by ffmpeg at its own native pixel format for each variant (`rgb0`
+for `Hap1` and `HapY`, `rgba` for `Hap5`, so no scaler stands between the two readings) and identical
+on every sample, max delta 0. A further 24 ffmpeg-written streams at `-compressor none -chunks 1`, whose
+packet is an eight-byte header and then the texture itself, gave 96 textures and 1210880 texture bytes
+to compare byte for byte against this encoder's: 20 bytes differ, in 3 of the 96, and every one of them
+is one of the exactness blocks above — 48 pixels exact here and not there, none the other way round.
+
+Files written here: 24 streams, 240 frames, muxed and handed to ffmpeg's own Hap decoder at the same
+native pixel formats. Against this package's decode of the same packets, 12108800 samples, every one
+identical, max delta 0. 146 of those 240 frames went out Snappy-compressed and 94 uncompressed, so
+Google's own Snappy — which is what ffmpeg reads them with — accepted this package's block writer on
+146 of them. On the same corpus, ffmpeg's decode measured against the pictures that went in: 30.5 to
+36.5 dB for `Hap1`, 31.7 to 38.2 dB for `Hap5` and 33.1 to 38.9 dB for `HapY` over gradients and flat
+plates, and 13.5 to 16.2 dB over pseudo-random noise, which is what four colours to sixteen pixels does
+to a picture that has no structure to find.
+
+And what comes back exactly: every one of the 65536 colours the block decode's widening states — 32
+red and blue values, 64 green — one to a block and again chequered two to a block, 1048576 pixels a
+picture at max delta 0 through both `Hap1` and `Hap5`; and all 256 alpha values, one to a block, through
+`Hap5`. Off that grid the coding is as close as the reference's search gets and no closer: no farther
+than 2 from any of the 256 greys, of which only seven are on the grid at all, and no farther than 1
+from any of the 32768 colours of the bit-replicated 5-5-5 grid. `HapY` is lossy even for a flat block,
+its chroma transform not being reversible in eight bits — no farther than 1 from any grey and 3 from any
+grid colour — which is the format's own transform and not a choice made here.
 
 ### id Cinematic Video
 

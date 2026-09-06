@@ -44,13 +44,8 @@ public sealed class RoqWriter : IVideoContainerWriter<RoqWriter> {
       throw new ArgumentOutOfRangeException(nameof(packet));
 
     if (packet.StreamIndex == 0) {
-      var data = packet.Data.Span;
-      if (data.Length < 8)
-        throw new InvalidDataException("A RoQ video packet must include its eight-byte codec chunk header.");
-      var size = BinaryPrimitives.ReadUInt32LittleEndian(data.Slice(2, 4));
-      if (size != data.Length - 8)
-        throw new InvalidDataException($"RoQ packet header states {size} payload bytes but the packet carries {data.Length - 8}.");
-      this._output.Write(data);
+      _CheckVideoChunks(packet.Data.Span);
+      this._output.Write(packet.Data.Span);
       return;
     }
 
@@ -66,6 +61,39 @@ public sealed class RoqWriter : IVideoContainerWriter<RoqWriter> {
     ContainerWriterTools.WriteUInt32LittleEndian(this._output, checked((uint)packet.Data.Length));
     this._output.Write(packet.ContainerPrivateData.Span);
     this._output.Write(packet.Data.Span);
+  }
+
+  /// <summary>
+  /// Checks that a video packet is a whole number of RoQ chunks, each stating its own length truly.
+  /// </summary>
+  /// <remarks>
+  /// One packet, one chunk is what the demuxer hands out, and a remux writes those back unchanged. An
+  /// encoder cannot work that way: a picture is a <c>QUAD_VQ</c> chunk plus the <c>QUAD_CODEBOOK</c>
+  /// chunk it needs and, at the start of a film, an <c>INFO</c> chunk, and
+  /// <see cref="FileFormat.Core.IVideoPacketEncoder.TryEncode"/> hands back one packet per picture. So a
+  /// packet is a run of chunks here rather than exactly one, and the run is walked rather than the first
+  /// header trusted for the whole of it — a packet whose last chunk overruns is a file that cannot be
+  /// read back, and is refused here rather than written.
+  /// </remarks>
+  private static void _CheckVideoChunks(ReadOnlySpan<byte> data) {
+    if (data.Length < 8)
+      throw new InvalidDataException("A RoQ video packet must include its eight-byte codec chunk header.");
+
+    var at = 0;
+    while (at < data.Length) {
+      if (at + 8 > data.Length)
+        throw new InvalidDataException(
+          $"A RoQ chunk header would start {data.Length - at} bytes from the end of a packet whose chunk "
+          + "headers are eight bytes each.");
+
+      var size = BinaryPrimitives.ReadUInt32LittleEndian(data.Slice(at + 2, 4));
+      if (size > int.MaxValue || at + 8 + (long)size > data.Length)
+        throw new InvalidDataException(
+          $"A RoQ chunk at byte {at} of a packet states {size} payload bytes, which runs past the packet's "
+          + $"{data.Length - at - 8} remaining.");
+
+      at += 8 + (int)size;
+    }
   }
 
   public byte[] Finish() {

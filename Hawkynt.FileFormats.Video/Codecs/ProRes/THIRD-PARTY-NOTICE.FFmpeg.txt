@@ -1,0 +1,38 @@
+The four pairs of quantisation weight matrices in ProResProfile.cs — one pair
+for each of the 4:2:2 profiles 422 Proxy, 422 LT, 422 and 422 HQ — are the
+tables FFmpeg (https://ffmpeg.org) carries as constants in
+libavcodec/proresenc_kostya.c, under the name prores_quant_matrices.
+
+SMPTE RDD 36 prints none of them: it describes a decoding process, and a
+decoder is told the matrices by every frame it reads, so the only place a
+profile's own matrices exist in writing is in an encoder. Each of the four
+pairs here was additionally read back byte for byte out of the frame headers of
+files written by both of FFmpeg's ProRes encoders, so the copies are confirmed
+against the bitstream as well as against the source.
+
+Nothing else in this directory comes from FFmpeg. The bitstream syntax, the
+entropy codes, the block scans, the transforms and the rate decision are
+written from SMPTE RDD 36:2022 and are cited by clause in the source.
+
+  proresenc_kostya.c   prores_quant_matrices — the four 4:2:2 profiles' luma
+                       and chroma quantisation weight matrices
+
+Copyright (c) 2012 Konstantin Shishkov
+
+FFmpeg is free software; you can redistribute it and/or modify it under the
+terms of the GNU Lesser General Public License as published by the Free
+Software Foundation; either version 2.1 of the License, or (at your option)
+any later version.
+
+FFmpeg is distributed in the hope that it will be useful, but WITHOUT ANY
+WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
+A PARTICULAR PURPOSE.  See the GNU Lesser General Public License for more
+details.
+
+You should have received a copy of the GNU Lesser General Public License along
+with FFmpeg; if not, write to the Free Software Foundation, Inc., 51 Franklin
+Street, Fifth Floor, Boston, MA 02110-1301 USA.
+
+This library is licensed LGPL-3.0-or-later, which is a permitted "any later
+version" of the LGPL-2.1 FFmpeg offers, so the two are compatible in this
+direction and in no other.
