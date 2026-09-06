@@ -3759,6 +3759,7 @@ Implements `IEquatable<RawImageColorInfo>`.
 | `Primaries` | `RawColorPrimaries Primaries { get; init; }` |  |
 | `Range` | `RawColorRange Range { get; init; }` |  |
 | `Transfer` | `RawTransferCharacteristic Transfer { get; init; }` |  |
+| `FromCodePoints` | `static RawImageColorInfo FromCodePoints(int colourPrimaries, int transferCharacteristics, int matrixCoefficients, bool fullRange, RawChromaLocation chromaLocation = 0)` | The interpretation a set of ITU-T H.273 code points states — clauses 8.1 to 8.3 and Tables 2, 3 and 4. |
 
 #### `RawImageConverter`
 
