@@ -644,6 +644,45 @@ last block, and a chunk that stops before every block is accounted for. A skip o
 on the very first frame — the canvas a freshly built decoder starts with is black, which is exactly
 the picture a skip paints when nothing has been decoded yet, so an encoder using one there is stating
 a black block rather than pointing at a frame that does not exist.
+
+**Writing it.** The encoder is FFmpeg's `libavcodec/rpzaenc.c` carried across — LGPL-2.1-or-later, so
+this package can absorb it, with the attribution beside the code — at the thresholds that file
+defaults to. It writes three of the format's four codings: a run of skipped blocks, a run of one
+colour, and a block stating all sixteen of its pixels, chosen in the reference's own order. A run
+stops at thirty-two blocks, which is all its opcode's count bits can say, and at the end of a block
+row.
+
+The fourth coding, the four-colour block, is read and written by nothing here, and that is a decision
+rather than an unfinished corner. The reference's own path for it never runs at the reference's own
+thresholds: six lavfi sources over eighteen frames, and separately every frame of twenty-one real
+streams, coded without a single four-colour block between them. Forcing it with a raised threshold
+shows why that went unnoticed. The path indexes its colour triple the way the bitstream numbers
+channels, blue first, and hands it to a packer that reads the same triple red first, so the block it
+writes carries red and blue exchanged; and it clips the two endpoints of its least-squares fit to
+eight bits before shifting them into a five-bit field, which measures as a channel error of 31 out of
+31. A block that would have been coded that way is written as sixteen colours instead, which is exact
+and costs twenty-four bytes more. Reinventing the coding was not attempted either: a four-colour
+block wants a quantiser, and choosing one is a decision with no evidence behind it.
+
+What that leaves is a loss with a bound rather than an average. Eight-bit colour is rounded to the
+five bits the format stores, and after that a pixel moves at most one level further: a sixteen-colour
+block states every pixel exactly, a skip is written only where every pixel still equals what was coded
+there before, and a one-colour run stays open only while every pixel of it is within one of the run's
+own average. Nothing accumulates over a stream, since a skip is exact by construction.
+
+Both directions were measured against ffmpeg, which has an `rpza` encoder as well as an `rpza`
+decoder, and in RGB555 rather than RGB — comparing RGB would compare two colour conversions as much
+as two codecs. ffmpeg is fed and read as `rgb555le` raw video so that swscale never runs, and the
+five-bit values are widened and narrowed here by bit replication, which is exactly invertible; bit 15
+is masked off on both sides, being no part of any channel. First the reader was calibrated on files
+neither side wrote: twenty-one real streams — the eight at `samples.ffmpeg.org/V-codecs/RPZA` and the
+thirteen in its `odd_sizes/` directory, 3,830 frames and 108,728,920 pixels, 60x64 up to 574x252 —
+decode identically here and in ffmpeg, not one pixel apart. Then the same pictures were re-coded by
+both encoders, and this one writes byte for byte what ffmpeg's writes: all 3,830 frames of those
+streams, 42,032,609 bytes, and 149 further frames of thirteen clips ffmpeg generated, geometry that is
+and is not a whole number of blocks and down to four pixels wide included. ffmpeg's decode of what
+this encoder writes is identical to this package's decode of it on every one of those pixels, and
+against the pictures handed in no channel of any pixel moved by more than one level of thirty-two.
 ### Apple Graphics (SMC)
 
 A vector quantizer over 4x4 blocks of eight-bit palettised pixels, named after its author Sean M.

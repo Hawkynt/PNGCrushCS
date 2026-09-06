@@ -81,7 +81,7 @@ quietly come to mean "some of it". How each codec was measured is in
 Every codec the package registers has a row, and the name in the first column is the codec's own
 `CodecName` — the same string a refusal message names it by. `Decode` is what
 [`VideoFormatRegistry.CreateDecoder`](https://github.com/Hawkynt/PNGCrushCS/blob/main/Hawkynt.FileFormats.Video/VideoFormatRegistry.cs) builds, 97 of them; `Encode` is
-what [`VideoFormatRegistry.CreateEncoder`](https://github.com/Hawkynt/PNGCrushCS/blob/main/Hawkynt.FileFormats.Video/VideoFormatRegistry.cs) builds, 41 of them. The two
+what [`VideoFormatRegistry.CreateEncoder`](https://github.com/Hawkynt/PNGCrushCS/blob/main/Hawkynt.FileFormats.Video/VideoFormatRegistry.cs) builds, 42 of them. The two
 are separate tables in the registry because they are looked up by different things: a decoder by a
 whole stream description, an encoder by the four-character code a caller wants written.
 
@@ -92,7 +92,7 @@ forms no encoder produces, because a plausible wrong picture is worse than a ref
 silently misdecodes what it will not read. An `Encode` tick is a lossless or format-faithful writer.
 Where the codec has a lossless form the encoder writes it and refuses by name any picture it would
 have to reduce to fit; where the format itself is lossy — Motion JPEG, Microsoft Video 1, Cinepak, DV,
-Microsoft's MPEG-4, ASUS V1 and V2 — the row says so, because there is nothing else such an encoder
+Microsoft's MPEG-4, ASUS V1 and V2, Apple Video — the row says so, because there is nothing else such an encoder
 could write. Codec-by-codec provenance and
 measurement notes are in
 [`codec-notes.md`](https://github.com/Hawkynt/PNGCrushCS/blob/main/Hawkynt.FileFormats.Video/codec-notes.md).
@@ -131,7 +131,7 @@ measurement notes are in
 | [Intel Indeo 2](https://wiki.multimedia.cx/index.php/Indeo_2) | ✅ | — | `RT21`; Huffman-coded sample pairs against one of four delta tables, intra frames predicting from the line above and inter frames from the frame before. The picture's width must divide by eight and its height by four, which is what coding pairs into quarter-size chrominance planes means | [MultimediaWiki Indeo 2](https://wiki.multimedia.cx/index.php/Indeo_2) |
 | [Intel Indeo 3](https://wiki.multimedia.cx/index.php/Indeo_3) | ⚠️ | — | `IV31`, `IV32`; a binary tree cutting each plane into cells, motion compensation, and vector quantisation over 4x4 to 8x8 blocks. Eight-bit samples and half-sample motion vectors are flagged in a frame header and refused — no encoder is known to have written either — as is the "skip cell" null code, whose effect on the two frame buffers is stated nowhere | [MultimediaWiki Indeo 3](https://wiki.multimedia.cx/index.php/Indeo_3) |
 | [QuickTime Animation (RLE)](https://en.wikipedia.org/wiki/QuickTime_Animation) | ✅ | ✅ | `rle `; depths 1, 2, 4, 8, 16, 24 and 32, plus greyscale 33, 34, 36 and 40. A palettised stream with no colour table is refused rather than drawn through a guessed palette. The encoder writes 8-bit palettised, 24- and 32-bit frames, choosing each line's opcodes by the reference encoder's own dynamic programme. 16-bit is not written | [MultimediaWiki QuickTime RLE](https://wiki.multimedia.cx/index.php/Apple_QuickTime_RLE) |
-| [Apple Video (RPZA)](https://en.wikipedia.org/wiki/Apple_Video) | ✅ | — | `rpza` in QuickTime, `azpr` in AVI; 15-bit RGB vector quantisation over 4x4 blocks | [MultimediaWiki Apple RPZA](https://wiki.multimedia.cx/index.php/Apple_RPZA) |
+| [Apple Video (RPZA)](https://en.wikipedia.org/wiki/Apple_Video) | ✅ | ✅ | `rpza` in QuickTime, `azpr` in AVI; 15-bit RGB vector quantisation over 4x4 blocks. The encoder writes `rpza`, choosing per block between a run of skips, a run of one colour and a block stating all sixteen of its pixels; the four-colour opcode is read and never written — the reference encoder's own path for it never runs at its own thresholds, and forced it exchanges red and blue. Lossy by construction — 15-bit colour, and blocks — but bounded: no channel of any pixel comes back more than one level of 32 from the picture handed in, and nothing accumulates over a stream. Measured against ffmpeg, which has an `rpza` encoder as well as a decoder, in RGB555 rather than RGB so that no colour conversion sits between the two: this decoder agrees with ffmpeg's on all 108,728,920 pixels of the 21 RPZA streams published at samples.ffmpeg.org, this encoder writes byte for byte what ffmpeg's writes on all 3,830 of their frames and on 149 frames of 13 clips ffmpeg generated, and ffmpeg's decode of what it writes is identical to this package's on every pixel | [MultimediaWiki Apple RPZA](https://wiki.multimedia.cx/index.php/Apple_RPZA) |
 | [Apple Graphics (SMC)](https://en.wikipedia.org/wiki/QuickTime_Graphics) | ✅ | ✅ | `smc `; 8-bit palettised only. The colour table comes from the sample description, or from the QuickTime default where the stream names none; a stream naming a system colour resource by number is refused. The encoder writes the same eight-bit indices and is exact rather than lossy, because every block of a palettised picture is representable — one to eight colours by the shared-colour opcodes, more than eight by the sixteen raw indices — so a picture that is not `Indexed8` is refused by name instead of being reduced to 256 colours, as are depth 40, a missing palette, and a palette or picture size that changes mid-stream. It resets the three colour caches with every packet and never names an entry that packet has not written, which is what makes its output read the same whether or not a decoder carries those caches between chunks — the one point on which the two readings of this format differ. 27 files it wrote, 394 frames, come back from ffmpeg's own SMC decoder with the index plane and the colour table identical; of 14 files ffmpeg's encoder wrote — 262 frames — this decoder agrees with ffmpeg's on 3 and differs on 11, in the carried-over caches and nowhere else | [MultimediaWiki Apple SMC](https://wiki.multimedia.cx/index.php/Apple_SMC) |
 | [Apple Planar RGB (8BPS)](https://wiki.multimedia.cx/index.php/8BPS) | ⚠️ | ✅ | `8BPS` at 8-bit palettised, 24-bit RGB and 32-bit RGB with alpha. A named system colour resource is refused rather than substituted | [MultimediaWiki 8BPS](https://wiki.multimedia.cx/index.php/8BPS) |
 | [Autodesk Animator Codec](https://wiki.multimedia.cx/index.php/Autodesk_Animator_Codec) | ✅ | ✅ | `AASC` at 24 bits a pixel, bottom-up. Other depths and top-down heights refused | [MultimediaWiki AASC](https://wiki.multimedia.cx/index.php/Autodesk_Animator_Codec) |
@@ -254,10 +254,11 @@ nothing could be verified even with a description in hand.
 Sixteen decoders are adaptations of FFmpeg's own LGPL-2.1-or-later decoders rather than
 implementations from a published description: Escape 124, LCL MSZH's back-reference parser, LOCO,
 Canopus Lossless, Matrox M101, VBLE, MidiVid Archive, MS Screen 1, RemotelyAnywhere, MSCC, MWSC,
-RSCC, Screenpresso, WinCAM, VMware Screen Codec and TDSC. Thirteen of the encoders are as well:
-Cinepak's bitstream, CLJR, DV, FFV1, Flash Screen Video, HuffYUV, LCL ZLIB, MagicYUV, Microsoft
-RLE, Microsoft Video 1's mode decision, QuickTime Animation, Ut Video and ZMBV. Every one
-of those files
+RSCC, Screenpresso, WinCAM, VMware Screen Codec and TDSC. Fifteen of the encoders are as well:
+Apple Graphics, Apple Video, Cinepak's bitstream, CLJR, DV, FFV1, Flash Screen Video, HuffYUV, LCL
+ZLIB, MagicYUV, Microsoft RLE, Microsoft Video 1's mode decision, QuickTime Animation, Ut Video and
+ZMBV. The ASUS encoders are not among them: those were written from the published description and
+take nothing from FFmpeg's code. Every one of those files
 carries the original author and the licence notice it came under; LGPL-2.1-or-later permits
 redistribution under this package's LGPL-3.0-or-later.
 
@@ -404,7 +405,7 @@ Every public and protected member of all 391 types, generated from the built ass
 - Large RealVideo pictures require preserved slice offsets when they must be split across 16-bit RealMedia packet lengths, and RoQ sound requires its original predictor argument.
 - Several advanced codecs intentionally implement well-defined subsets (for example H.264 progressive 8-bit 4:2:0, HEVC Main profile, and VC-1 Simple/Main intra pictures). Every row marked ⚠️ in the codec table names its own subset. Unsupported profiles/features are refused by name rather than silently misdecoded.
 - Codec support is more precise than a single green check can express; consult [`codec-notes.md`](https://github.com/Hawkynt/PNGCrushCS/blob/main/Hawkynt.FileFormats.Video/codec-notes.md) before relying on a profile/level/feature not named in this README.
-- Encoding is a smaller domain than decoding on purpose: 41 codecs of the 97 read can also be written. Most are lossless; seven are not, and each says so in its own row. Motion JPEG writes baseline JPEG, whose loss is a matter of degree, and DV's fixed-length frames, Microsoft Video 1's two-colours-to-a-block coding, Cinepak's vector quantisation, Microsoft's MPEG-4 transform and the ASUS codecs' quantised DCT have no lossless form at all — a picture that codec can hold exactly comes back exactly, and one it cannot does not. What is still not written back is the modern lossy codecs: a stream read as H.264 cannot be written back as H.264.
+- Encoding is a smaller domain than decoding on purpose: 42 codecs of the 97 read can also be written. Most are lossless; eight are not, and each says so in its own row. Motion JPEG writes baseline JPEG, whose loss is a matter of degree, and DV's fixed-length frames, Microsoft Video 1's two-colours-to-a-block coding, Cinepak's vector quantisation, Microsoft's MPEG-4 transform, the ASUS codecs' quantised DCT and Apple Video's 15-bit blocks have no lossless form at all — a picture that codec can hold exactly comes back exactly, and one it cannot does not. What is still not written back is the modern lossy codecs: a stream read as H.264 cannot be written back as H.264.
 - Video correctness depends on real-world packetization as much as codec math. The project therefore validates packet counts, sizes, timestamps, and key-frame flags against external tools where samples are available.
 
 ## ❤️ Support
