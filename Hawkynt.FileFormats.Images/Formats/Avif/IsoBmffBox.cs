@@ -14,6 +14,9 @@ internal sealed class IsoBmffBox {
   /// <summary>Raw payload data (excluding the 8-byte box header).</summary>
   public byte[] Data { get; init; } = [];
 
+  /// <summary>Offset of the payload inside the array it was read from.</summary>
+  public int DataOffset { get; init; }
+
   /// <summary>Minimum box header size (4 bytes size + 4 bytes type).</summary>
   internal const int HeaderSize = 8;
 
@@ -32,6 +35,11 @@ internal sealed class IsoBmffBox {
   internal static readonly uint Mdat = FourCC("mdat");
   internal static readonly uint Iinf = FourCC("iinf");
   internal static readonly uint Infe = FourCC("infe");
+  internal static readonly uint Iref = FourCC("iref");
+  internal static readonly uint Idat = FourCC("idat");
+  internal static readonly uint AuxC = FourCC("auxC");
+  internal static readonly uint Colr = FourCC("colr");
+  internal static readonly uint Auxl = FourCC("auxl");
 
   /// <summary>Converts a 4-character ASCII string to a big-endian uint.</summary>
   internal static uint FourCC(string s) {
@@ -57,22 +65,30 @@ internal sealed class IsoBmffBox {
     var end = offset + length;
 
     while (offset + HeaderSize <= end) {
-      var boxSize = (int)BinaryPrimitives.ReadUInt32BigEndian(data.AsSpan(offset));
+      var boxSize = (long)BinaryPrimitives.ReadUInt32BigEndian(data.AsSpan(offset));
       var boxType = BinaryPrimitives.ReadUInt32BigEndian(data.AsSpan(offset + 4));
+      var headerSize = HeaderSize;
 
-      if (boxSize < HeaderSize)
+      // ISO/IEC 14496-12 allows a 64-bit size, and a size of zero means "to the end of the file".
+      // An mdat holding a large picture uses the first; the last box of a file may use the second.
+      if (boxSize == 1) {
+        if (offset + 16 > end)
+          break;
+        boxSize = (long)BinaryPrimitives.ReadUInt64BigEndian(data.AsSpan(offset + 8));
+        headerSize = 16;
+      } else if (boxSize == 0)
+        boxSize = end - offset;
+
+      if (boxSize < headerSize || offset + boxSize > end)
         break;
 
-      if (offset + boxSize > end)
-        break;
-
-      var payloadLength = boxSize - HeaderSize;
+      var payloadLength = (int)(boxSize - headerSize);
       var payload = new byte[payloadLength];
       if (payloadLength > 0)
-        Array.Copy(data, offset + HeaderSize, payload, 0, payloadLength);
+        Array.Copy(data, offset + headerSize, payload, 0, payloadLength);
 
-      boxes.Add(new IsoBmffBox { Type = boxType, Data = payload });
-      offset += boxSize;
+      boxes.Add(new IsoBmffBox { Type = boxType, Data = payload, DataOffset = offset + headerSize });
+      offset += (int)boxSize;
     }
 
     return boxes;

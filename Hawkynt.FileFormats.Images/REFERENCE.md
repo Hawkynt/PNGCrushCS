@@ -4258,11 +4258,12 @@ Implements `IEquatable<AvhrrImageFile>`, `IImageFormatMetadata<AvhrrImageFile>`,
 
 #### `AvifFile`
 
-Implements `IEquatable<AvifFile>`, `IImageFormatMetadata<AvifFile>`, `IImageFormatReader<AvifFile>`, `IImageToRawImage<AvifFile>`.
+Implements `IEquatable<AvifFile>`, `IImageFormatMetadata<AvifFile>`, `IImageFormatReader<AvifFile>`, `IImageFormatWriter<AvifFile>`, `IImageFromRawImage<AvifFile>`, `IImageToRawImage<AvifFile>`.
 
 | Member | Signature | Summary |
 | --- | --- | --- |
 | `Brand` | `string Brand { get; init; }` |  |
+| `HasAlpha` | `bool HasAlpha { get; init; }` |  |
 | `Height` | `int Height { get; init; }` |  |
 | `PixelData` | `byte[] PixelData { get; init; }` |  |
 | `RawImageData` | `byte[] RawImageData { get; init; }` |  |

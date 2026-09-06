@@ -2,436 +2,390 @@ using System;
 
 namespace FileFormat.Avif.Codec;
 
-/// <summary>AV1 partition types for superblock subdivision.</summary>
-internal enum Av1PartitionType {
-  None = 0,
-  Horizontal = 1,
-  Vertical = 2,
-  Split = 3,
-  HorizontalA = 4,
-  HorizontalB = 5,
-  VerticalA = 6,
-  VerticalB = 7,
-  Horizontal4 = 8,
-  Vertical4 = 9,
-}
+/// <summary>
+/// Decodes one AV1 tile of a key frame: the superblock partition tree, intra mode information,
+/// residual coefficients, and the reconstruction that follows each transform block.
+/// </summary>
+/// <remarks>
+/// Only intra frames reach this class. AVIF still pictures are always key frames, so the inter
+/// paths of AV1 5.11 have no counterpart here and anything that would need them is refused by name
+/// rather than approximated.
+/// </remarks>
+internal sealed partial class Av1TileDecoder {
 
-/// <summary>Decodes AV1 tiles for single key frames: partition tree traversal,
-/// intra prediction block decode, coefficient decode, and inverse transform.</summary>
-internal sealed class Av1TileDecoder {
+  private const int _MI_SIZE = 4;
+  private const int _MI_SIZE_LOG2 = 2;
+  private const int _MAX_ANGLE_DELTA = 3;
+  private const int _ANGLE_STEP = 3;
+  private const int _DELTA_Q_SMALL = 3;
+  private const int _DELTA_LF_SMALL = 3;
+  private const int _FRAME_LF_COUNT = 4;
 
   private readonly Av1SequenceHeader _seq;
   private readonly Av1FrameHeader _fh;
-  private readonly short[][] _planes;
-  private readonly int[] _planeWidths;
-  private readonly int[] _planeHeights;
-  private readonly int[] _planeStrides;
+  private readonly Av1DecodedFrame _frame;
+  private readonly Av1CdfContext _frameCdf;
+  private readonly Av1LoopRestorationUnits? _restoration;
+  private readonly int _numPlanes;
+  private readonly int _bitDepth;
   private readonly int _miCols;
   private readonly int _miRows;
-  private readonly int _sbSizeLog2;
-  private readonly int _sbSize;
-  private readonly byte[] _miWidthLog2;
-  private readonly byte[] _miHeightLog2;
+  private readonly int _sbSize4;
+  private readonly int _sbMask;
+  private readonly Av1BlockSize _sbSize;
+
+  private readonly byte[] _abovePartitionContext;
+  private readonly byte[] _leftPartitionContext;
+  private readonly byte[][] _aboveEntropyContext;
+  private readonly byte[][] _leftEntropyContext;
+  private readonly byte[] _aboveTxfmContext;
+  private readonly byte[] _leftTxfmContext;
+  private readonly bool[][] _blockDecoded;
+  private readonly int _blockDecodedStride;
+
+  // Loop-restoration references carried across units within a tile (AV1 5.11.57).
+  private readonly int[][] _refLrWiener;
+  private readonly int[][] _refSgrXqd;
+
+  private Av1SymbolDecoder _reader = null!;
+  private Av1CdfContext _cdf = null!;
   private int _tileMiRowStart;
   private int _tileMiRowEnd;
   private int _tileMiColStart;
   private int _tileMiColEnd;
 
-  public Av1TileDecoder(Av1SequenceHeader seq, Av1FrameHeader fh, short[][] planes, int[] planeWidths, int[] planeHeights, int[] planeStrides) {
-    _seq = seq;
-    _fh = fh;
-    _planes = planes;
-    _planeWidths = planeWidths;
-    _planeHeights = planeHeights;
-    _planeStrides = planeStrides;
-    // AV1 compute_image_size() rounds the MI grid to whole 8x8 luma regions.
-    _miCols = 2 * ((fh.FrameWidth + 7) >> 3);
-    _miRows = 2 * ((fh.FrameHeight + 7) >> 3);
-    _sbSizeLog2 = seq.Use128x128Superblock ? 7 : 6;
-    _sbSize = 1 << _sbSizeLog2;
-    _miWidthLog2 = new byte[_miCols * _miRows];
-    _miHeightLog2 = new byte[_miCols * _miRows];
+  // Block-scoped mode information, mirroring the spec's frame-level variables.
+  private int _miRow;
+  private int _miCol;
+  private Av1BlockSize _miSize;
+  private bool _skip;
+  private bool _hasChroma;
+  private bool _availU;
+  private bool _availL;
+  private bool _availUChroma;
+  private bool _availLChroma;
+  private Av1PredictionMode _yMode;
+  private Av1PredictionMode _uvMode;
+  private int _angleDeltaY;
+  private int _angleDeltaUv;
+  private bool _useFilterIntra;
+  private Av1FilterIntraMode _filterIntraMode;
+  private int _cflAlphaU;
+  private int _cflAlphaV;
+  private Av1TxSize _txSize;
+  private int _segmentId;
+  private int _currentQIndex;
+  private bool _readDeltas;
+  private readonly int[] _deltaLf = new int[_FRAME_LF_COUNT];
+  private int _maxLumaWidth;
+  private int _maxLumaHeight;
+
+  public Av1TileDecoder(
+    Av1SequenceHeader seq,
+    Av1FrameHeader fh,
+    Av1DecodedFrame frame,
+    Av1CdfContext frameCdf,
+    Av1LoopRestorationUnits? restoration
+  ) {
+    this._seq = seq;
+    this._fh = fh;
+    this._frame = frame;
+    this._frameCdf = frameCdf;
+    this._restoration = restoration;
+    this._numPlanes = frame.NumPlanes;
+    this._bitDepth = seq.BitDepth;
+    this._miCols = frame.MiCols;
+    this._miRows = frame.MiRows;
+    this._sbSize = seq.Use128x128Superblock ? Av1BlockSize.Block128x128 : Av1BlockSize.Block64x64;
+    this._sbSize4 = Av1StructureTables.MiSizeWide[(int)this._sbSize];
+    this._sbMask = this._sbSize4 - 1;
+
+    this._abovePartitionContext = new byte[this._miCols + 32];
+    this._leftPartitionContext = new byte[this._sbSize4 + 32];
+    this._aboveTxfmContext = new byte[this._miCols + 32];
+    this._leftTxfmContext = new byte[this._sbSize4 + 32];
+
+    this._aboveEntropyContext = new byte[this._numPlanes][];
+    this._leftEntropyContext = new byte[this._numPlanes][];
+    for (var plane = 0; plane < this._numPlanes; ++plane) {
+      this._aboveEntropyContext[plane] = new byte[this._miCols + 32];
+      this._leftEntropyContext[plane] = new byte[this._sbSize4 + 32];
+    }
+
+    // BlockDecoded carries a one-sample border on the top and left, and one extra column past the
+    // right edge, because the intra predictor asks about the block above-right and below-left.
+    this._blockDecodedStride = this._sbSize4 + 3;
+    this._blockDecoded = new bool[this._numPlanes][];
+    for (var plane = 0; plane < this._numPlanes; ++plane)
+      this._blockDecoded[plane] = new bool[this._blockDecodedStride * this._blockDecodedStride];
+
+    // One reference per plane, per pass, per coefficient (AV1 5.11.2 RefLrWiener).
+    this._refLrWiener = [new int[6], new int[6], new int[6]];
+    this._refSgrXqd = [new int[2], new int[2], new int[2]];
   }
 
-  /// <summary>Decodes a single tile from compressed data, placing pixels into the plane buffers.</summary>
+  /// <summary>The CDF state the tile finished with, which a frame-end update would adopt.</summary>
+  public Av1CdfContext TileCdf => this._cdf;
+
+  /// <summary>AV1 5.11.2 decode_tile(): decodes one tile into the frame buffers.</summary>
   public void DecodeTile(byte[] data, int offset, int length, int tileCol, int tileRow) {
-    var decoder = new Av1AnsDecoder(data, offset, length, _fh.DisableCdfUpdate);
-    var partitionCdfs = new Av1PartitionCdfs();
-    var sbMiSize = _sbSize / 4; // superblock size in MI units (4-pixel units)
+    this._reader = new(data, offset, length, this._fh.DisableCdfUpdate);
+    this._cdf = this._frameCdf.Clone();
 
-    var colStartSb = _fh.TileColStarts[tileCol];
-    var colEndSb = _fh.TileColStarts[tileCol + 1];
-    var rowStartSb = _fh.TileRowStarts[tileRow];
-    var rowEndSb = _fh.TileRowStarts[tileRow + 1];
+    var colStartSb = this._fh.TileColStarts[tileCol];
+    var colEndSb = this._fh.TileColStarts[tileCol + 1];
+    var rowStartSb = this._fh.TileRowStarts[tileRow];
+    var rowEndSb = this._fh.TileRowStarts[tileRow + 1];
 
-    _tileMiColStart = colStartSb * sbMiSize;
-    _tileMiColEnd = Math.Min(_miCols, colEndSb * sbMiSize);
-    _tileMiRowStart = rowStartSb * sbMiSize;
-    _tileMiRowEnd = Math.Min(_miRows, rowEndSb * sbMiSize);
+    this._tileMiColStart = colStartSb * this._sbSize4;
+    this._tileMiColEnd = Math.Min(this._miCols, colEndSb * this._sbSize4);
+    this._tileMiRowStart = rowStartSb * this._sbSize4;
+    this._tileMiRowEnd = Math.Min(this._miRows, rowEndSb * this._sbSize4);
 
-    for (var sbRow = rowStartSb; sbRow < rowEndSb; ++sbRow) {
-      for (var sbCol = colStartSb; sbCol < colEndSb; ++sbCol) {
-        var miRowStart = sbRow * sbMiSize;
-        var miColStart = sbCol * sbMiSize;
-        _DecodePartition(decoder, partitionCdfs, miRowStart, miColStart, _sbSizeLog2);
+    // AV1 5.11.2 clear_above_context(): the above contexts are per tile, not per frame.
+    Array.Clear(this._abovePartitionContext);
+    Array.Clear(this._aboveTxfmContext);
+    foreach (var plane in this._aboveEntropyContext)
+      Array.Clear(plane);
+
+    Array.Clear(this._deltaLf);
+    this._currentQIndex = this._fh.BaseQIndex;
+    for (var plane = 0; plane < 3; ++plane) {
+      this._refSgrXqd[plane][0] = _SGR_XQD_MID[0];
+      this._refSgrXqd[plane][1] = _SGR_XQD_MID[1];
+      for (var pass = 0; pass < 2; ++pass)
+        for (var j = 0; j < Av1Constants.WienerCoeffs; ++j)
+          this._refLrWiener[plane][pass * Av1Constants.WienerCoeffs + j] = _WIENER_TAPS_MID[j];
+    }
+
+    for (var miRow = this._tileMiRowStart; miRow < this._tileMiRowEnd; miRow += this._sbSize4) {
+      Array.Clear(this._leftPartitionContext);
+      Array.Clear(this._leftTxfmContext);
+      foreach (var plane in this._leftEntropyContext)
+        Array.Clear(plane);
+
+      for (var miCol = this._tileMiColStart; miCol < this._tileMiColEnd; miCol += this._sbSize4) {
+        this._readDeltas = this._fh.DeltaQPresent;
+        this._ClearBlockDecodedFlags(miRow, miCol);
+        this._ReadLoopRestoration(miRow, miCol, this._sbSize);
+        this._DecodePartition(miRow, miCol, this._sbSize);
       }
     }
   }
 
-  private void _DecodePartition(Av1AnsDecoder decoder, Av1PartitionCdfs cdfs, int miRow, int miCol, int blockSizeLog2) {
-    if (miRow >= _miRows || miCol >= _miCols)
-      return;
+  private void _ClearBlockDecodedFlags(int miRow, int miCol) {
+    // AV1 5.11.3: samples above and to the left of the superblock count as decoded when they lie
+    // inside the frame, which is what lets the first block of a superblock look upwards.
+    for (var plane = 0; plane < this._numPlanes; ++plane) {
+      var subX = this._frame.SubX[plane];
+      var subY = this._frame.SubY[plane];
+      var flags = this._blockDecoded[plane];
+      Array.Clear(flags);
 
-    var blockSizeMi = (1 << blockSizeLog2) / 4;
-    if (blockSizeLog2 < 3) {
-      _DecodeBlock(decoder, miRow, miCol, blockSizeLog2, blockSizeLog2);
-      return;
+      var sbWidth4 = (this._tileMiColEnd - miCol) >> subX;
+      var sbHeight4 = (this._tileMiRowEnd - miRow) >> subY;
+      var lastX = this._sbSize4 >> subX;
+      var lastY = this._sbSize4 >> subY;
+
+      for (var y = -1; y <= lastY; ++y)
+        for (var x = -1; x <= lastX; ++x) {
+          var value = (y < 0 && x < sbWidth4) || (x < 0 && y < sbHeight4);
+          flags[this._BlockDecodedIndex(y, x)] = value;
+        }
+
+      // The sample below the superblock's bottom-left corner belongs to the superblock row that
+      // has not been decoded yet, whatever the tile bounds say.
+      flags[this._BlockDecodedIndex(lastY, -1)] = false;
     }
+  }
 
-    var halfMi = blockSizeMi >> 1;
-    var quarterMi = halfMi >> 1;
-    var hasRows = miRow + halfMi < _miRows;
-    var hasCols = miCol + halfMi < _miCols;
-    var partition = _DecodePartitionType(decoder, cdfs, miRow, miCol, blockSizeLog2, hasRows, hasCols);
-    var splitLog2 = blockSizeLog2 - 1;
+  private int _BlockDecodedIndex(int y, int x) => (y + 1) * this._blockDecodedStride + (x + 1);
+
+  private void _DecodePartition(int miRow, int miCol, Av1BlockSize blockSize) {
+    if (miRow >= this._miRows || miCol >= this._miCols)
+      return;
+
+    var num4x4 = Av1StructureTables.MiSizeWide[(int)blockSize];
+    var halfBlock4x4 = num4x4 >> 1;
+    var quarterBlock4x4 = halfBlock4x4 >> 1;
+    var hasRows = miRow + halfBlock4x4 < this._miRows;
+    var hasCols = miCol + halfBlock4x4 < this._miCols;
+
+    var partition = blockSize < Av1BlockSize.Block8x8
+      ? Av1PartitionType.None
+      : this._ReadPartition(miRow, miCol, blockSize, hasRows, hasCols);
+
+    var subSize = _PartitionSubsize(partition, blockSize);
+    var splitSize = _PartitionSubsize(Av1PartitionType.Split, blockSize);
 
     switch (partition) {
       case Av1PartitionType.None:
-        _DecodeBlock(decoder, miRow, miCol, blockSizeLog2, blockSizeLog2);
+        this._DecodeBlock(miRow, miCol, subSize);
         break;
-
       case Av1PartitionType.Horizontal:
-        _DecodeBlock(decoder, miRow, miCol, blockSizeLog2, splitLog2);
+        this._DecodeBlock(miRow, miCol, subSize);
         if (hasRows)
-          _DecodeBlock(decoder, miRow + halfMi, miCol, blockSizeLog2, splitLog2);
+          this._DecodeBlock(miRow + halfBlock4x4, miCol, subSize);
         break;
-
       case Av1PartitionType.Vertical:
-        _DecodeBlock(decoder, miRow, miCol, splitLog2, blockSizeLog2);
+        this._DecodeBlock(miRow, miCol, subSize);
         if (hasCols)
-          _DecodeBlock(decoder, miRow, miCol + halfMi, splitLog2, blockSizeLog2);
+          this._DecodeBlock(miRow, miCol + halfBlock4x4, subSize);
         break;
-
       case Av1PartitionType.Split:
-        _DecodePartition(decoder, cdfs, miRow, miCol, splitLog2);
-        _DecodePartition(decoder, cdfs, miRow, miCol + halfMi, splitLog2);
-        _DecodePartition(decoder, cdfs, miRow + halfMi, miCol, splitLog2);
-        _DecodePartition(decoder, cdfs, miRow + halfMi, miCol + halfMi, splitLog2);
+        this._DecodePartition(miRow, miCol, subSize);
+        this._DecodePartition(miRow, miCol + halfBlock4x4, subSize);
+        this._DecodePartition(miRow + halfBlock4x4, miCol, subSize);
+        this._DecodePartition(miRow + halfBlock4x4, miCol + halfBlock4x4, subSize);
         break;
-
       case Av1PartitionType.HorizontalA:
-        _DecodeBlock(decoder, miRow, miCol, splitLog2, splitLog2);
-        _DecodeBlock(decoder, miRow, miCol + halfMi, splitLog2, splitLog2);
-        _DecodeBlock(decoder, miRow + halfMi, miCol, blockSizeLog2, splitLog2);
+        this._DecodeBlock(miRow, miCol, splitSize);
+        this._DecodeBlock(miRow, miCol + halfBlock4x4, splitSize);
+        this._DecodeBlock(miRow + halfBlock4x4, miCol, subSize);
         break;
-
       case Av1PartitionType.HorizontalB:
-        _DecodeBlock(decoder, miRow, miCol, blockSizeLog2, splitLog2);
-        _DecodeBlock(decoder, miRow + halfMi, miCol, splitLog2, splitLog2);
-        _DecodeBlock(decoder, miRow + halfMi, miCol + halfMi, splitLog2, splitLog2);
+        this._DecodeBlock(miRow, miCol, subSize);
+        this._DecodeBlock(miRow + halfBlock4x4, miCol, splitSize);
+        this._DecodeBlock(miRow + halfBlock4x4, miCol + halfBlock4x4, splitSize);
         break;
-
       case Av1PartitionType.VerticalA:
-        _DecodeBlock(decoder, miRow, miCol, splitLog2, splitLog2);
-        _DecodeBlock(decoder, miRow + halfMi, miCol, splitLog2, splitLog2);
-        _DecodeBlock(decoder, miRow, miCol + halfMi, splitLog2, blockSizeLog2);
+        this._DecodeBlock(miRow, miCol, splitSize);
+        this._DecodeBlock(miRow + halfBlock4x4, miCol, splitSize);
+        this._DecodeBlock(miRow, miCol + halfBlock4x4, subSize);
         break;
-
       case Av1PartitionType.VerticalB:
-        _DecodeBlock(decoder, miRow, miCol, splitLog2, blockSizeLog2);
-        _DecodeBlock(decoder, miRow, miCol + halfMi, splitLog2, splitLog2);
-        _DecodeBlock(decoder, miRow + halfMi, miCol + halfMi, splitLog2, splitLog2);
+        this._DecodeBlock(miRow, miCol, subSize);
+        this._DecodeBlock(miRow, miCol + halfBlock4x4, splitSize);
+        this._DecodeBlock(miRow + halfBlock4x4, miCol + halfBlock4x4, splitSize);
         break;
-
       case Av1PartitionType.Horizontal4:
-        for (var i = 0; i < 3; ++i)
-          _DecodeBlock(decoder, miRow + quarterMi * i, miCol, blockSizeLog2, blockSizeLog2 - 2);
-        if (miRow + quarterMi * 3 < _miRows)
-          _DecodeBlock(decoder, miRow + quarterMi * 3, miCol, blockSizeLog2, blockSizeLog2 - 2);
+        for (var i = 0; i < 4; ++i) {
+          var row = miRow + quarterBlock4x4 * i;
+          if (i > 0 && row >= this._miRows)
+            break;
+          this._DecodeBlock(row, miCol, subSize);
+        }
         break;
-
       case Av1PartitionType.Vertical4:
-        for (var i = 0; i < 3; ++i)
-          _DecodeBlock(decoder, miRow, miCol + quarterMi * i, blockSizeLog2 - 2, blockSizeLog2);
-        if (miCol + quarterMi * 3 < _miCols)
-          _DecodeBlock(decoder, miRow, miCol + quarterMi * 3, blockSizeLog2 - 2, blockSizeLog2);
+        for (var i = 0; i < 4; ++i) {
+          var col = miCol + quarterBlock4x4 * i;
+          if (i > 0 && col >= this._miCols)
+            break;
+          this._DecodeBlock(miRow, col, subSize);
+        }
         break;
-
       default:
-        throw new InvalidOperationException($"AV1: invalid partition symbol {(int)partition}.");
+        throw new NotSupportedException($"AV1: partition type {partition} is not defined.");
     }
+
+    this._UpdatePartitionContext(miRow, miCol, blockSize, subSize, splitSize, partition);
   }
 
-  private Av1PartitionType _DecodePartitionType(
-    Av1AnsDecoder decoder,
-    Av1PartitionCdfs cdfs,
-    int miRow,
-    int miCol,
-    int blockSizeLog2,
-    bool hasRows,
-    bool hasCols
-  ) {
-    var context = _GetPartitionContext(miRow, miCol, blockSizeLog2);
-    var partitionCdf = cdfs.GetPartitionCdf(blockSizeLog2, context);
+  private static Av1BlockSize _PartitionSubsize(Av1PartitionType partition, Av1BlockSize blockSize) {
+    // libaom subsize_lookup is indexed by the six square block sizes, whose BLOCK_SIZE values are
+    // every third entry starting at BLOCK_4X4.
+    var squareIndex = (int)blockSize / 3;
+    return (Av1BlockSize)Av1StructureTables.PartitionSubsize[(int)partition * 6 + squareIndex];
+  }
 
-    if (hasRows && hasCols)
-      return (Av1PartitionType)decoder.DecodeSymbol(partitionCdf, partitionCdf.Length - 1);
+  private Av1PartitionType _ReadPartition(int miRow, int miCol, Av1BlockSize blockSize, bool hasRows, bool hasCols) {
+    if (!hasRows && !hasCols)
+      return Av1PartitionType.Split;
+
+    var bsl = Av1StructureTables.MiSizeWideLog2[(int)blockSize] - Av1StructureTables.MiSizeWideLog2[(int)Av1BlockSize.Block8x8];
+    var above = (this._abovePartitionContext[miCol] >> bsl) & 1;
+    var left = (this._leftPartitionContext[miRow & this._sbMask] >> bsl) & 1;
+    var context = (left * 2 + above) + bsl * 4;
+    var offset = context * Av1CdfContext.PartitionStride;
+
+    if (hasRows && hasCols) {
+      var symbols = blockSize <= Av1BlockSize.Block8x8 ? 4 : blockSize == Av1BlockSize.Block128x128 ? 8 : 10;
+      return (Av1PartitionType)this._reader.ReadSymbol(this._cdf.Partition, offset, symbols);
+    }
+
+    // Only one of the two halves is inside the frame, so the choice narrows to a split or the one
+    // rectangular partition that codes the visible half. libaom folds every partition that would
+    // still divide the block along the missing direction into a single "split" symbol
+    // (partition_gather_vert_alike / partition_gather_horz_alike); the folded CDF is never adapted
+    // because there is nothing persistent behind it.
+    const int CDF_TOP = 1 << 15;
+    Span<ushort> folded = stackalloc ushort[2];
+    folded[1] = CDF_TOP;
+    var full = this._cdf.Partition.AsSpan(offset, Av1CdfContext.PartitionStride);
+    var is128 = blockSize == Av1BlockSize.Block128x128;
 
     if (hasCols) {
-      var edgeCdf = Av1PartitionCdfs.BuildSplitOrHorizontalCdf(partitionCdf, blockSizeLog2 == 7);
-      return decoder.DecodeSymbol(edgeCdf, 2) == 0 ? Av1PartitionType.Horizontal : Av1PartitionType.Split;
+      var splitLike = _ElementProbability(full, (int)Av1PartitionType.Vertical)
+        + _ElementProbability(full, (int)Av1PartitionType.Split)
+        + _ElementProbability(full, (int)Av1PartitionType.HorizontalA)
+        + _ElementProbability(full, (int)Av1PartitionType.VerticalA)
+        + _ElementProbability(full, (int)Av1PartitionType.VerticalB)
+        + (is128 ? 0 : _ElementProbability(full, (int)Av1PartitionType.Vertical4));
+      folded[0] = (ushort)(CDF_TOP - splitLike);
+      return this._reader.ReadSymbolNoUpdate(folded, 2) != 0 ? Av1PartitionType.Split : Av1PartitionType.Horizontal;
     }
 
-    if (hasRows) {
-      var edgeCdf = Av1PartitionCdfs.BuildSplitOrVerticalCdf(partitionCdf, blockSizeLog2 == 7);
-      return decoder.DecodeSymbol(edgeCdf, 2) == 0 ? Av1PartitionType.Vertical : Av1PartitionType.Split;
-    }
-
-    return Av1PartitionType.Split;
+    var horizontalSplitLike = _ElementProbability(full, (int)Av1PartitionType.Horizontal)
+      + _ElementProbability(full, (int)Av1PartitionType.Split)
+      + _ElementProbability(full, (int)Av1PartitionType.HorizontalA)
+      + _ElementProbability(full, (int)Av1PartitionType.HorizontalB)
+      + _ElementProbability(full, (int)Av1PartitionType.VerticalA)
+      + (is128 ? 0 : _ElementProbability(full, (int)Av1PartitionType.Horizontal4));
+    folded[0] = (ushort)(CDF_TOP - horizontalSplitLike);
+    return this._reader.ReadSymbolNoUpdate(folded, 2) != 0 ? Av1PartitionType.Split : Av1PartitionType.Vertical;
   }
 
-  private int _GetPartitionContext(int miRow, int miCol, int blockSizeLog2) {
-    // AV1 section 8.3.2 partition CDF selection. Mi width/height logarithms are measured in 4x4
-    // units, so an 8x8 square has bsl=1, 16x16 has bsl=2, ..., 128x128 has bsl=5.
-    var bsl = blockSizeLog2 - 2;
-    var aboveAvailable = miRow > _tileMiRowStart
-      && miRow < _tileMiRowEnd
-      && miCol >= _tileMiColStart
-      && miCol < _tileMiColEnd;
-    var leftAvailable = miCol > _tileMiColStart
-      && miCol < _tileMiColEnd
-      && miRow >= _tileMiRowStart
-      && miRow < _tileMiRowEnd;
+  private static int _ElementProbability(ReadOnlySpan<ushort> cdf, int symbol) =>
+    symbol == 0 ? cdf[0] : cdf[symbol] - cdf[symbol - 1];
 
-    var above = aboveAvailable && _miWidthLog2[(miRow - 1) * _miCols + miCol] < bsl;
-    var left = leftAvailable && _miHeightLog2[miRow * _miCols + miCol - 1] < bsl;
-    return (left ? 2 : 0) + (above ? 1 : 0);
-  }
+  private void _UpdatePartitionContext(
+    int miRow, int miCol, Av1BlockSize blockSize,
+    Av1BlockSize subSize, Av1BlockSize splitSize, Av1PartitionType partition
+  ) {
+    if (blockSize < Av1BlockSize.Block8x8)
+      return;
 
-  private void _DecodeBlock(Av1AnsDecoder decoder, int miRow, int miCol, int bwLog2, int bhLog2) {
-    var bw = 1 << bwLog2; // block width in pixels
-    var bh = 1 << bhLog2; // block height in pixels
-    var pixelX = miCol * 4;
-    var pixelY = miRow * 4;
-
-    // Decode intra mode
-    var mode = _DecodeIntraMode(decoder);
-    var angleDelta = 0;
-    if ((int)mode >= 1 && (int)mode <= 8) {
-      // Directional modes can have angle deltas
-      if (!decoder.IsAtEnd) {
-        var hasDelta = decoder.DecodeLiteral();
-        if (hasDelta != 0)
-          angleDelta = decoder.DecodeLiteral() * 2 - 1; // simplified: -1, 0, or +1
-      }
-    }
-
-    // Decode each plane
-    for (var plane = 0; plane < _seq.NumPlanes; ++plane) {
-      var subX = plane > 0 ? _seq.SubsamplingX : 0;
-      var subY = plane > 0 ? _seq.SubsamplingY : 0;
-      var pw = bw >> subX;
-      var ph = bh >> subY;
-      var px = pixelX >> subX;
-      var py = pixelY >> subY;
-
-      if (pw == 0) pw = 1;
-      if (ph == 0) ph = 1;
-
-      var planeW = _planeWidths[plane];
-      var planeH = _planeHeights[plane];
-      var stride = _planeStrides[plane];
-
-      if (px >= planeW || py >= planeH)
-        continue;
-
-      var actualW = Math.Min(pw, planeW - px);
-      var actualH = Math.Min(ph, planeH - py);
-
-      // Get reference samples for intra prediction
-      var above = _GetAboveRefSamples(plane, px, py, actualW, actualH);
-      var left = _GetLeftRefSamples(plane, px, py, actualW, actualH);
-      var topLeft = _GetTopLeftSample(plane, px, py);
-
-      // Perform intra prediction
-      var predMode = plane == 0 ? mode : _MapChromaMode(mode);
-      var pred = new short[actualW * actualH];
-      Av1IntraPredictor.Predict(predMode, angleDelta, actualW, actualH, _seq.BitDepth, above, left, topLeft, pred, actualW);
-
-      // Decode transform coefficients and apply inverse transform
-      var txSize = _GetTxSize(actualW, actualH);
-      var txType = Av1TxType.DctDct; // Default transform type for key frames
-      var coeffs = _DecodeCoefficients(decoder, actualW, actualH, plane);
-
-      // Copy prediction to output, then add residual via inverse transform
-      for (var y = 0; y < actualH; ++y)
-        for (var x = 0; x < actualW; ++x)
-          _planes[plane][(py + y) * stride + (px + x)] = pred[y * actualW + x];
-
-      if (_HasNonZeroCoeffs(coeffs))
-        Av1Transform.InverseTransform2D(coeffs, _planes[plane], py * stride + px, stride, txType, txSize, _seq.BitDepth);
-    }
-
-    _RecordBlockSize(miRow, miCol, bwLog2, bhLog2);
-  }
-
-  private void _RecordBlockSize(int miRow, int miCol, int bwLog2, int bhLog2) {
-    var widthMi = Math.Max(1, (1 << bwLog2) / 4);
-    var heightMi = Math.Max(1, (1 << bhLog2) / 4);
-    var widthMiLog2 = (byte)Math.Max(0, bwLog2 - 2);
-    var heightMiLog2 = (byte)Math.Max(0, bhLog2 - 2);
-    var rowEnd = Math.Min(_miRows, miRow + heightMi);
-    var colEnd = Math.Min(_miCols, miCol + widthMi);
-
-    for (var row = miRow; row < rowEnd; ++row) {
-      for (var col = miCol; col < colEnd; ++col) {
-        var index = row * _miCols + col;
-        _miWidthLog2[index] = widthMiLog2;
-        _miHeightLog2[index] = heightMiLog2;
-      }
+    var half = Av1StructureTables.MiSizeWide[(int)blockSize] >> 1;
+    switch (partition) {
+      case Av1PartitionType.Split when blockSize != Av1BlockSize.Block8x8:
+        // A split above 8x8 has already had its context written by the four sub-partitions.
+        break;
+      case Av1PartitionType.Split:
+      case Av1PartitionType.None:
+      case Av1PartitionType.Horizontal:
+      case Av1PartitionType.Vertical:
+      case Av1PartitionType.Horizontal4:
+      case Av1PartitionType.Vertical4:
+        this._SetPartitionContext(miRow, miCol, subSize, blockSize);
+        break;
+      case Av1PartitionType.HorizontalA:
+        this._SetPartitionContext(miRow, miCol, splitSize, subSize);
+        this._SetPartitionContext(miRow + half, miCol, subSize, subSize);
+        break;
+      case Av1PartitionType.HorizontalB:
+        this._SetPartitionContext(miRow, miCol, subSize, subSize);
+        this._SetPartitionContext(miRow + half, miCol, splitSize, subSize);
+        break;
+      case Av1PartitionType.VerticalA:
+        this._SetPartitionContext(miRow, miCol, splitSize, subSize);
+        this._SetPartitionContext(miRow, miCol + half, subSize, subSize);
+        break;
+      case Av1PartitionType.VerticalB:
+        this._SetPartitionContext(miRow, miCol, subSize, subSize);
+        this._SetPartitionContext(miRow, miCol + half, splitSize, subSize);
+        break;
     }
   }
 
-  private Av1PredictionMode _DecodeIntraMode(Av1AnsDecoder decoder) {
-    if (decoder.IsAtEnd)
-      return Av1PredictionMode.DcPred;
+  private void _SetPartitionContext(int miRow, int miCol, Av1BlockSize subSize, Av1BlockSize blockSize) {
+    var bw = Av1StructureTables.MiSizeWide[(int)blockSize];
+    var bh = Av1StructureTables.MiSizeHigh[(int)blockSize];
+    var above = Av1StructureTables.PartitionContextAbove[(int)subSize];
+    var left = Av1StructureTables.PartitionContextLeft[(int)subSize];
 
-    // Decode intra mode using entropy coder
-    // Simplified: read a few bits to determine mode
-    var modeBits = decoder.DecodeLiteralBits(4);
-    return (Av1PredictionMode)Math.Min(modeBits, 12);
-  }
-
-  private static Av1PredictionMode _MapChromaMode(Av1PredictionMode lumaMode) {
-    // For key frames, chroma typically uses the same mode as luma
-    // CFL would be decoded separately
-    return lumaMode;
-  }
-
-  private short[] _GetAboveRefSamples(int plane, int px, int py, int w, int h) {
-    var stride = _planeStrides[plane];
-    var planeW = _planeWidths[plane];
-    var samples = new short[w + h + 1];
-
-    if (py == 0) {
-      // No above row available, use (1 << (bitDepth - 1))
-      var mid = (short)(1 << (_seq.BitDepth - 1));
-      Array.Fill(samples, mid);
-      return samples;
-    }
-
-    for (var i = 0; i < w + h + 1 && px + i < planeW; ++i)
-      samples[i] = _planes[plane][(py - 1) * stride + px + i];
-
-    // Pad with last available sample
-    if (px + w + h >= planeW) {
-      var lastSample = samples[Math.Min(planeW - px - 1, w + h)];
-      for (var i = Math.Max(0, planeW - px); i < w + h + 1; ++i)
-        samples[i] = lastSample;
-    }
-
-    return samples;
-  }
-
-  private short[] _GetLeftRefSamples(int plane, int px, int py, int w, int h) {
-    var stride = _planeStrides[plane];
-    var planeH = _planeHeights[plane];
-    var samples = new short[h + w + 1];
-
-    if (px == 0) {
-      var mid = (short)(1 << (_seq.BitDepth - 1));
-      Array.Fill(samples, mid);
-      return samples;
-    }
-
-    for (var i = 0; i < h + w + 1 && py + i < planeH; ++i)
-      samples[i] = _planes[plane][(py + i) * stride + px - 1];
-
-    // Pad with last available sample
-    if (py + h + w >= planeH) {
-      var lastSample = samples[Math.Min(planeH - py - 1, h + w)];
-      for (var i = Math.Max(0, planeH - py); i < h + w + 1; ++i)
-        samples[i] = lastSample;
-    }
-
-    return samples;
-  }
-
-  private short _GetTopLeftSample(int plane, int px, int py) {
-    if (px == 0 || py == 0)
-      return (short)(1 << (_seq.BitDepth - 1));
-
-    return _planes[plane][(py - 1) * _planeStrides[plane] + px - 1];
-  }
-
-  private int[] _DecodeCoefficients(Av1AnsDecoder decoder, int w, int h, int plane) {
-    var coeffs = new int[w * h];
-
-    if (decoder.IsAtEnd)
-      return coeffs;
-
-    // Simplified coefficient decoding:
-    // In a full implementation, this reads coefficient levels using CDF-based
-    // entropy coding with context modeling. For now, decode a basic representation.
-    var hasCoeffs = decoder.DecodeLiteral();
-    if (hasCoeffs == 0)
-      return coeffs;
-
-    // Read end-of-block position (simplified)
-    var maxCoeffs = Math.Min(w * h, 1024);
-    var numCoeffs = Math.Min((int)decoder.DecodeLiteralBits(Math.Min(_CeilLog2(maxCoeffs + 1), 10)), maxCoeffs);
-
-    for (var i = 0; i < numCoeffs && !decoder.IsAtEnd; ++i) {
-      // Read coefficient level
-      var sign = decoder.DecodeLiteral();
-      var level = (int)decoder.DecodeLiteralBits(Math.Min(8, 16));
-      coeffs[i] = sign != 0 ? -level : level;
-    }
-
-    return coeffs;
-  }
-
-  private static bool _HasNonZeroCoeffs(int[] coeffs) {
-    foreach (var c in coeffs)
-      if (c != 0)
-        return true;
-    return false;
-  }
-
-  private static Av1TxSize _GetTxSize(int w, int h) {
-    if (w == h)
-      return (w, h) switch {
-        (4, 4) => Av1TxSize.Tx4x4,
-        (8, 8) => Av1TxSize.Tx8x8,
-        (16, 16) => Av1TxSize.Tx16x16,
-        (32, 32) => Av1TxSize.Tx32x32,
-        (64, 64) => Av1TxSize.Tx64x64,
-        _ => Av1TxSize.Tx4x4,
-      };
-
-    return (w, h) switch {
-      (4, 8) => Av1TxSize.Tx4x8,
-      (8, 4) => Av1TxSize.Tx8x4,
-      (8, 16) => Av1TxSize.Tx8x16,
-      (16, 8) => Av1TxSize.Tx16x8,
-      (16, 32) => Av1TxSize.Tx16x32,
-      (32, 16) => Av1TxSize.Tx32x16,
-      (32, 64) => Av1TxSize.Tx32x64,
-      (64, 32) => Av1TxSize.Tx64x32,
-      (4, 16) => Av1TxSize.Tx4x16,
-      (16, 4) => Av1TxSize.Tx16x4,
-      (8, 32) => Av1TxSize.Tx8x32,
-      (32, 8) => Av1TxSize.Tx32x8,
-      (16, 64) => Av1TxSize.Tx16x64,
-      (64, 16) => Av1TxSize.Tx64x16,
-      _ => Av1TxSize.Tx4x4,
-    };
-  }
-
-  private static int _CeilLog2(int n) {
-    var k = 0;
-    while ((1 << k) < n)
-      ++k;
-    return k;
+    for (var i = 0; i < bw && miCol + i < this._abovePartitionContext.Length; ++i)
+      this._abovePartitionContext[miCol + i] = above;
+    for (var i = 0; i < bh; ++i)
+      this._leftPartitionContext[(miRow & this._sbMask) + i] = left;
   }
 }

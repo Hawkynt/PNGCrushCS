@@ -31,6 +31,9 @@ internal sealed class Av1SequenceHeader {
   public int MaxFrameWidth => MaxFrameWidthMinus1 + 1;
   public int MaxFrameHeight => MaxFrameHeightMinus1 + 1;
   public int OperatingPointsCount { get; set; }
+
+  /// <summary>Temporal and spatial layer mask per operating point.</summary>
+  public int[] OperatingPointIdc { get; set; } = [];
   public bool TimingInfoPresent { get; set; }
   public bool DecoderModelInfoPresent { get; set; }
   public bool FrameIdNumbersPresent { get; set; }
@@ -47,6 +50,23 @@ internal sealed class Av1SequenceHeader {
   public bool EnableJntComp { get; set; }
   public bool EnableRefFrameMvs { get; set; }
   public int OrderHintBits { get; set; }
+
+  /// <summary>Length in bits of each buffer_removal_time field, when a decoder model is present.</summary>
+  public int BufferRemovalTimeLength { get; set; }
+
+  /// <summary>Length in bits of the frame_presentation_time field in temporal_point_info().</summary>
+  public int FramePresentationTimeLength { get; set; }
+
+  /// <summary>Whether the timing information declares a constant picture interval.</summary>
+  public bool EqualPictureInterval { get; set; }
+
+  /// <summary>Which operating points carry a decoder model, and so a buffer removal time.</summary>
+  public bool[] DecoderModelPresentForOperatingPoint { get; set; } = [];
+
+  /// <summary>Bits used by the frame size fields when a frame overrides the sequence maximum.</summary>
+  public int FrameWidthBits { get; set; }
+
+  public int FrameHeightBits { get; set; }
 
   /// <summary>AV1 SELECT=2, OFF=0, ON=1 sequence force selector.</summary>
   public int SeqForceScreenContentTools { get; set; } = 2;
@@ -85,43 +105,62 @@ internal sealed class Av1SequenceHeader {
       sh.TimingInfoPresent = false;
       sh.DecoderModelInfoPresent = false;
       sh.OperatingPointsCount = 1;
+      sh.DecoderModelPresentForOperatingPoint = [false];
       reader.ReadBits(5); // seq_level_idx[0]
       sh.SeqForceScreenContentTools = 2;
       sh.SeqForceIntegerMv = 2;
     } else {
+      var bufferDelayLength = 0;
       sh.TimingInfoPresent = reader.ReadBool();
       if (sh.TimingInfoPresent) {
+        // timing_info(): num_units_in_display_tick, time_scale, equal_picture_interval.
         reader.ReadBits(32);
         reader.ReadBits(32);
-        if (reader.ReadBool())
+        sh.EqualPictureInterval = reader.ReadBool();
+        if (sh.EqualPictureInterval)
           reader.ReadUvlc();
+
         sh.DecoderModelInfoPresent = reader.ReadBool();
         if (sh.DecoderModelInfoPresent) {
+          // decoder_model_info(): the delay length comes first and sizes the per-operating-point
+          // fields below, so it cannot be skipped over blindly.
+          bufferDelayLength = (int)reader.ReadBits(5) + 1;
           reader.ReadBits(32);
-          reader.ReadBits(32);
-          reader.ReadBits(5);
-          reader.ReadBits(5);
+          sh.BufferRemovalTimeLength = (int)reader.ReadBits(5) + 1;
+          sh.FramePresentationTimeLength = (int)reader.ReadBits(5) + 1;
         }
       }
 
+      var initialDisplayDelayPresent = reader.ReadBool();
       sh.OperatingPointsCount = (int)reader.ReadBits(5) + 1;
+      sh.OperatingPointIdc = new int[sh.OperatingPointsCount];
+      sh.DecoderModelPresentForOperatingPoint = new bool[sh.OperatingPointsCount];
+
       for (var i = 0; i < sh.OperatingPointsCount; ++i) {
-        reader.ReadBits(12);
+        sh.OperatingPointIdc[i] = (int)reader.ReadBits(12);
         var level = (int)reader.ReadBits(5);
         if (level > 7)
           reader.ReadBool();
-        if (sh.DecoderModelInfoPresent && reader.ReadBool()) {
-          reader.ReadBits(32);
-          reader.ReadBits(32);
-          reader.ReadBool();
+
+        if (sh.DecoderModelInfoPresent) {
+          sh.DecoderModelPresentForOperatingPoint[i] = reader.ReadBool();
+          if (sh.DecoderModelPresentForOperatingPoint[i]) {
+            // operating_parameters_info(i)
+            reader.ReadBits(bufferDelayLength);
+            reader.ReadBits(bufferDelayLength);
+            reader.ReadBool();
+          }
         }
+
+        if (initialDisplayDelayPresent && reader.ReadBool())
+          reader.ReadBits(4);
       }
     }
 
-    var widthBits = (int)reader.ReadBits(4) + 1;
-    var heightBits = (int)reader.ReadBits(4) + 1;
-    sh.MaxFrameWidthMinus1 = (int)reader.ReadBits(widthBits);
-    sh.MaxFrameHeightMinus1 = (int)reader.ReadBits(heightBits);
+    sh.FrameWidthBits = (int)reader.ReadBits(4) + 1;
+    sh.FrameHeightBits = (int)reader.ReadBits(4) + 1;
+    sh.MaxFrameWidthMinus1 = (int)reader.ReadBits(sh.FrameWidthBits);
+    sh.MaxFrameHeightMinus1 = (int)reader.ReadBits(sh.FrameHeightBits);
 
     if (sh.ReducedStillPictureHeader)
       sh.FrameIdNumbersPresent = false;

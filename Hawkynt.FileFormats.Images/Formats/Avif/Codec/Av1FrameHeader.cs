@@ -59,6 +59,18 @@ internal sealed class Av1FrameHeader {
   public int[] CdefUvSecStrength { get; set; } = [];
   public int[] LrType { get; set; } = [0, 0, 0];
   public int[] LrUnitShift { get; set; } = [0, 0, 0];
+
+  /// <summary>Loop-restoration unit size per plane, in that plane's samples (AV1 5.9.20).</summary>
+  public int[] LoopRestorationSize { get; set; } = [0, 0, 0];
+
+  /// <summary>Whether every coded block in the frame is lossless (AV1 5.9.2 CodedLossless).</summary>
+  public bool CodedLossless { get; set; }
+
+  /// <summary>CodedLossless without super-resolution in play (AV1 5.9.2 AllLossless).</summary>
+  public bool AllLossless { get; set; }
+
+  /// <summary>Frame width before any super-resolution downscale.</summary>
+  public int UpscaledWidth { get; set; }
   public Av1TxMode TxMode { get; set; }
   public bool ReferenceSelect { get; set; }
   public bool AllowHighPrecisionMv { get; set; }
@@ -80,12 +92,20 @@ internal sealed class Av1FrameHeader {
       fh.ShowExistingFrame = reader.ReadBool();
       if (fh.ShowExistingFrame)
         throw new NotSupportedException("AV1: show_existing_frame is not supported for still images.");
+
       fh.FrameType = (Av1FrameType)reader.ReadBits(2);
-      fh.ShowFrame = reader.ReadBool();
-      if (!fh.ShowFrame)
-        fh.ShowableFrame = reader.ReadBool();
       if (fh.FrameType != Av1FrameType.Key && fh.FrameType != Av1FrameType.IntraOnly)
         throw new NotSupportedException($"AV1: frame type {fh.FrameType} is not supported for AVIF still images.");
+
+      fh.ShowFrame = reader.ReadBool();
+      if (fh.ShowFrame && seq.DecoderModelInfoPresent && !seq.EqualPictureInterval)
+        reader.ReadBits(seq.FramePresentationTimeLength); // temporal_point_info()
+
+      if (fh.ShowFrame)
+        fh.ShowableFrame = fh.FrameType != Av1FrameType.Key;
+      else
+        fh.ShowableFrame = reader.ReadBool();
+
       fh.ErrorResilientMode = fh.FrameType == Av1FrameType.Switch
         || (fh.FrameType == Av1FrameType.Key && fh.ShowFrame)
         || reader.ReadBool();
@@ -101,20 +121,53 @@ internal sealed class Av1FrameHeader {
     else
       fh.ForceIntegerMv = fh.FrameType is Av1FrameType.Key or Av1FrameType.IntraOnly;
 
-    // current_frame_id/order-hint/reference syntax is absent in the reduced still-picture profile used here.
-    if (!seq.ReducedStillPictureHeader && seq.FrameIdNumbersPresent)
-      throw new NotSupportedException("AV1 frame IDs are not supported by the still-image decoder.");
+    if (seq.FrameIdNumbersPresent)
+      throw new NotSupportedException("AV1: frame IDs are not supported by this still-image decoder.");
 
-    _ParseFrameSize(reader, seq, fh);
+    // The fields between the screen-content flags and the frame size are all absent from a reduced
+    // still-picture header, but an encoder is free to write a full one for a single image and
+    // several do, so they are parsed rather than assumed away.
+    var frameSizeOverride = false;
+    if (!seq.ReducedStillPictureHeader) {
+      frameSizeOverride = fh.FrameType == Av1FrameType.Switch || reader.ReadBool();
+      reader.ReadBits(seq.OrderHintBits); // order_hint
+
+      // primary_ref_frame is PRIMARY_REF_NONE for every frame this decoder accepts.
+      if (seq.DecoderModelInfoPresent && reader.ReadBool())
+        for (var i = 0; i < seq.OperatingPointsCount; ++i)
+          if (seq.DecoderModelPresentForOperatingPoint[i])
+            reader.ReadBits(seq.BufferRemovalTimeLength);
+
+      var refreshesAll = fh.FrameType == Av1FrameType.Switch
+        || (fh.FrameType == Av1FrameType.Key && fh.ShowFrame);
+      var refreshFrameFlags = refreshesAll ? 0xFF : (int)reader.ReadBits(8);
+      if (refreshFrameFlags != 0xFF && fh.ErrorResilientMode && seq.EnableOrderHint)
+        for (var i = 0; i < 8; ++i)
+          reader.ReadBits(seq.OrderHintBits);
+    }
+
+    _ParseFrameSize(reader, seq, fh, frameSizeOverride);
     _ParseRenderSize(reader, fh);
-    if (fh.FrameType == Av1FrameType.Key && fh.AllowScreenContentTools)
+    if (fh.AllowScreenContentTools && fh.UpscaledWidth == fh.FrameWidth)
       fh.AllowIntraBc = reader.ReadBool();
+
+    if (!seq.ReducedStillPictureHeader && !fh.DisableCdfUpdate)
+      reader.ReadBool(); // disable_frame_end_update_cdf
 
     _ParseTileInfo(reader, seq, fh);
     _ParseQuantizationParams(reader, seq, fh);
     _ParseSegmentationParams(reader, fh);
     _ParseDeltaQParams(reader, fh);
     _ParseDeltaLfParams(reader, fh);
+
+    // AV1 5.9.2: whether the frame is lossless decides whether the loop filter, CDEF and loop
+    // restoration are signalled at all, so it has to be settled before those are parsed.
+    fh.CodedLossless = fh.BaseQIndex == 0
+      && fh.DeltaQYDc == 0
+      && fh.DeltaQUAc == 0 && fh.DeltaQUDc == 0
+      && fh.DeltaQVAc == 0 && fh.DeltaQVDc == 0;
+    fh.AllLossless = fh.CodedLossless && fh.FrameWidth == fh.UpscaledWidth;
+
     _ParseLoopFilterParams(reader, seq, fh);
     _ParseCdefParams(reader, seq, fh);
     _ParseLrParams(reader, seq, fh);
@@ -122,20 +175,30 @@ internal sealed class Av1FrameHeader {
     fh.ReferenceSelect = false;
     fh.ReducedTxSet = reader.ReadBool();
     reader.ByteAlign();
-    fh.TileDataOffset = reader.ByteOffset;
+
+    // Relative to the OBU payload, because that is what the caller has a pointer to.
+    fh.TileDataOffset = reader.ByteOffset - offset;
     return fh;
   }
 
-  private static void _ParseFrameSize(Av1BitReader reader, Av1SequenceHeader seq, Av1FrameHeader fh) {
+  private static void _ParseFrameSize(Av1BitReader reader, Av1SequenceHeader seq, Av1FrameHeader fh, bool sizeOverride) {
+    if (sizeOverride) {
+      fh.FrameWidth = (int)reader.ReadBits(seq.FrameWidthBits) + 1;
+      fh.FrameHeight = (int)reader.ReadBits(seq.FrameHeightBits) + 1;
+    } else {
+      fh.FrameWidth = seq.MaxFrameWidth;
+      fh.FrameHeight = seq.MaxFrameHeight;
+    }
+
     if (seq.EnableSuperRes) {
       fh.UseSuperRes = reader.ReadBool();
       if (fh.UseSuperRes)
         fh.SuperResDenom = (int)reader.ReadBits(3) + 9;
     }
-    fh.FrameWidth = seq.MaxFrameWidth;
-    fh.FrameHeight = seq.MaxFrameHeight;
+
+    fh.UpscaledWidth = fh.FrameWidth;
     if (fh.UseSuperRes)
-      fh.FrameWidth = (fh.FrameWidth * 8 + fh.SuperResDenom / 2) / fh.SuperResDenom;
+      throw new NotSupportedException("AV1: super-resolution is not supported by this still-image decoder.");
   }
 
   private static void _ParseRenderSize(Av1BitReader reader, Av1FrameHeader fh) {
@@ -158,8 +221,9 @@ internal sealed class Av1FrameHeader {
     var maxTileWidthSb = 4096 / sbSize;
     var maxTileAreaSb = 4096 * 2304 / (sbSize * sbSize);
     var minLog2TileCols = _TileLog2(maxTileWidthSb, sbCols);
-    var maxLog2TileCols = _TileLog2(1, Math.Min(sbCols, 64));
-    var maxLog2TileRows = _TileLog2(1, Math.Min(sbRows, 64));
+    var maxLog2TileCols = _TileLog2(1, Math.Min(sbCols, Av1Constants.MaxTileCols));
+    var maxLog2TileRows = _TileLog2(1, Math.Min(sbRows, Av1Constants.MaxTileRows));
+    var minLog2Tiles = Math.Max(minLog2TileCols, _TileLog2(maxTileAreaSb, sbRows * sbCols));
 
     if (reader.ReadBool()) {
       var tileColsLog2 = minLog2TileCols;
@@ -175,7 +239,7 @@ internal sealed class Av1FrameHeader {
       fh.TileCols = ncols;
       fh.TileColStarts = cols[..(ncols + 1)];
 
-      var minLog2TileRows = Math.Max(0, _TileLog2(maxTileAreaSb, sbCols * sbRows / ncols));
+      var minLog2TileRows = Math.Max(minLog2Tiles - tileColsLog2, 0);
       var tileRowsLog2 = minLog2TileRows;
       while (tileRowsLog2 < maxLog2TileRows && reader.ReadBool())
         ++tileRowsLog2;
@@ -206,7 +270,9 @@ internal sealed class Av1FrameHeader {
       fh.TileColStarts = cols[..(ncols + 1)];
       fh.TileColsLog2 = _TileLog2(1, ncols);
 
-      var maxHeightSb = Math.Max(1, maxTileAreaSb / widest);
+      // AV1 5.9.15: once the column layout is known the area budget is recomputed from it.
+      var rowAreaSb = minLog2Tiles > 0 ? (sbRows * sbCols) >> (minLog2Tiles + 1) : sbRows * sbCols;
+      var maxHeightSb = Math.Max(1, rowAreaSb / widest);
       var rows = new int[sbRows + 1];
       var nrows = 0;
       start = 0;
@@ -284,7 +350,7 @@ internal sealed class Av1FrameHeader {
   }
 
   private static void _ParseLoopFilterParams(Av1BitReader reader, Av1SequenceHeader seq, Av1FrameHeader fh) {
-    if (fh.AllowIntraBc || fh.BaseQIndex == 0)
+    if (fh.CodedLossless || fh.AllowIntraBc)
       return;
     fh.LoopFilterLevel[0] = (int)reader.ReadBits(6);
     fh.LoopFilterLevel[1] = (int)reader.ReadBits(6);
@@ -303,7 +369,7 @@ internal sealed class Av1FrameHeader {
   }
 
   private static void _ParseCdefParams(Av1BitReader reader, Av1SequenceHeader seq, Av1FrameHeader fh) {
-    if (!seq.EnableCdef || fh.AllowIntraBc || fh.BaseQIndex == 0) {
+    if (fh.CodedLossless || fh.AllowIntraBc || !seq.EnableCdef) {
       fh.CdefBits = 0;
       fh.CdefDamping = 3;
       fh.CdefYPriStrength = fh.CdefYSecStrength = fh.CdefUvPriStrength = fh.CdefUvSecStrength = [0];
@@ -328,32 +394,42 @@ internal sealed class Av1FrameHeader {
   }
 
   private static void _ParseLrParams(Av1BitReader reader, Av1SequenceHeader seq, Av1FrameHeader fh) {
-    if (!seq.EnableRestoration || fh.AllowIntraBc || fh.BaseQIndex == 0)
+    if (fh.AllLossless || fh.AllowIntraBc || !seq.EnableRestoration)
       return;
+
     var uses = false;
     var usesChroma = false;
     for (var i = 0; i < seq.NumPlanes; ++i) {
+      // lr_type is coded in signalling order; Remap_Lr_Type turns it into the restoration type,
+      // which happens to be the same order as Av1RestorationType.
       fh.LrType[i] = (int)reader.ReadBits(2);
       uses |= fh.LrType[i] != 0;
       usesChroma |= i > 0 && fh.LrType[i] != 0;
     }
-    if (!uses) return;
+
+    if (!uses)
+      return;
+
+    int unitShift;
     if (seq.Use128x128Superblock)
-      fh.LrUnitShift[0] = (int)reader.ReadBits(1) + 1;
+      unitShift = (int)reader.ReadBits(1) + 1;
     else {
-      fh.LrUnitShift[0] = (int)reader.ReadBits(1);
-      if (fh.LrUnitShift[0] != 0) fh.LrUnitShift[0] += (int)reader.ReadBits(1);
+      unitShift = (int)reader.ReadBits(1);
+      if (unitShift != 0)
+        unitShift += (int)reader.ReadBits(1);
     }
-    fh.LrUnitShift[1] = fh.LrUnitShift[2] = fh.LrUnitShift[0];
-    if (seq.SubsamplingX != 0 && seq.SubsamplingY != 0 && usesChroma) {
-      var uvShift = reader.ReadBool() ? 1 : 0;
-      fh.LrUnitShift[1] -= uvShift;
-      fh.LrUnitShift[2] -= uvShift;
-    }
+
+    fh.LrUnitShift[0] = unitShift;
+    fh.LoopRestorationSize[0] = Av1Constants.RestorationTileSizeMax >> (2 - unitShift);
+
+    var uvShift = seq.SubsamplingX != 0 && seq.SubsamplingY != 0 && usesChroma && reader.ReadBool() ? 1 : 0;
+    fh.LrUnitShift[1] = fh.LrUnitShift[2] = unitShift - uvShift;
+    fh.LoopRestorationSize[1] = fh.LoopRestorationSize[0] >> uvShift;
+    fh.LoopRestorationSize[2] = fh.LoopRestorationSize[0] >> uvShift;
   }
 
   private static void _ParseTxMode(Av1BitReader reader, Av1FrameHeader fh) {
-    if (fh.BaseQIndex == 0) {
+    if (fh.CodedLossless) {
       fh.TxMode = Av1TxMode.Only4x4;
       return;
     }

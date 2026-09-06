@@ -55,7 +55,9 @@ public sealed class UndecodableIsRefusedTests {
     for (var i = 0; i < noise.Length; ++i)
       noise[i] = (byte)(i * 37 + 11);
 
-    Assert.Throws<NotSupportedException>(() => AvifReader.FromBytes(_Container(noise)));
+    Assert.That(
+      () => AvifReader.FromBytes(_Container(noise)),
+      Throws.InstanceOf<NotSupportedException>().Or.InstanceOf<InvalidDataException>());
   }
 
   /// <summary>

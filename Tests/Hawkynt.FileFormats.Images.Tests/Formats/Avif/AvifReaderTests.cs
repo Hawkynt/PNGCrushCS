@@ -61,12 +61,15 @@ public sealed class AvifReaderTests {
     Assert.That(result.Brand, Is.EqualTo("avif"));
   }
 
+  /// <summary>
+  /// The brand is recognised, but a file with nothing behind it still has no picture in it. Saying
+  /// so is the point: the reader used to answer such a file with an empty raster and a size.
+  /// </summary>
   [Test]
   [Category("Unit")]
-  public void FromBytes_AvisBrandAccepted() {
+  public void FromBytes_ABrandWithNoImageItemIsRefused() {
     var data = _BuildMinimalFtypBox("avis");
-    var result = AvifReader.FromBytes(data);
-    Assert.That(result.Brand, Is.EqualTo("avis"));
+    Assert.Throws<InvalidDataException>(() => AvifReader.FromBytes(data));
   }
 
   [Test]
