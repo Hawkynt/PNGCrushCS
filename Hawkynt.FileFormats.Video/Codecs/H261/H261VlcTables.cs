@@ -262,11 +262,29 @@ internal static class H261VlcTables {
   /// <summary>The value whose (Run, Level) is this pair, for building test streams from a table lookup
   /// rather than a second transcription of the codes.</summary>
   internal static int IndexOf(int run, int level) {
-    for (var i = 0; i < _Rows.Length; ++i)
-      if (_Rows[i].Run == run && _Rows[i].Level == level)
-        return i;
+    if (TryIndexOf(run, level, out var value))
+      return value;
 
     throw new System.ArgumentException($"Table 5/H.261 has no non-escaped code for run {run}, level {level}.");
+  }
+
+  /// <summary>
+  /// The value whose (Run, Level) is this pair, or <c>false</c> where Table 5 gives the pair no code of
+  /// its own and the escape of 4.2.4.1 has to carry it.
+  /// </summary>
+  /// <remarks>
+  /// The table is far from a full cross-product — level 15 exists only at run 0 and level 3 only up to
+  /// run 5 — so an encoder asks this of every coefficient rather than of the few it expects to escape.
+  /// </remarks>
+  internal static bool TryIndexOf(int run, int level, out int value) {
+    for (var i = 0; i < _Rows.Length; ++i)
+      if (_Rows[i].Run == run && _Rows[i].Level == level) {
+        value = i;
+        return true;
+      }
+
+    value = 0;
+    return false;
   }
 
   /// <summary>
