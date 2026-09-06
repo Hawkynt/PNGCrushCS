@@ -17,6 +17,10 @@ namespace FileFormat.JpegXl.Codec;
 /// <para>The header and the tokens are not written together. A modular frame
 /// states its histograms with the rest of its global setup and only then the
 /// group header that the tokens follow, so the two halves are separate calls.</para>
+///
+/// <para>A frame cut into groups states one code for all of them and each
+/// group's tokens at its own offset in the frame, so the values are kept in runs
+/// — one run per group — that share the single histogram this block builds.</para>
 /// </remarks>
 internal sealed class JxlTokenStream {
 
@@ -27,38 +31,38 @@ internal sealed class JxlTokenStream {
   /// </summary>
   private const int _SplitExponent = 4;
 
-  private readonly List<int> _tokens = [];
-  private readonly List<int> _tailBitCounts = [];
-  private readonly List<uint> _tailBits = [];
+  /// <summary>
+  /// The values as they were added. The token and its tail are worked out again
+  /// when they are written rather than kept alongside: a picture of several
+  /// million samples would otherwise hold three lists where one does.
+  /// </summary>
+  private readonly List<uint> _values;
+
+  /// <summary>Where each run of values starts. A block with no run stated is one run.</summary>
+  private readonly List<int> _runStarts = [];
+
   private int[] _histogram = new int[32];
   private int _alphabetSize = 1;
   private JxlPrefixCode? _code;
 
+  public JxlTokenStream(int capacity = 0) => _values = new List<uint>(capacity);
+
+  /// <summary>How many runs have been begun.</summary>
+  public int RunCount => _runStarts.Count;
+
+  /// <summary>Begin a run of values that is written on its own.</summary>
+  public void BeginRun() => _runStarts.Add(_values.Count);
+
   /// <summary>Add one unsigned value to the block.</summary>
   public void Add(uint value) {
-    int token;
-    int tailBitCount;
-    uint tail;
-    if (value < 1u << _SplitExponent) {
-      token = (int)value;
-      tailBitCount = 0;
-      tail = 0;
-    } else {
-      var exponent = _FloorLog2(value);
-      token = (1 << _SplitExponent) + (exponent - _SplitExponent);
-      tailBitCount = exponent;
-      tail = value - (1u << exponent);
-    }
-
+    var token = _Token(value);
     if (token >= _histogram.Length)
       Array.Resize(ref _histogram, Math.Max(token + 1, _histogram.Length * 2));
     ++_histogram[token];
     if (token >= _alphabetSize)
       _alphabetSize = token + 1;
 
-    _tokens.Add(token);
-    _tailBitCounts.Add(tailBitCount);
-    _tailBits.Add(tail);
+    _values.Add(value);
   }
 
   /// <summary>
@@ -96,18 +100,53 @@ internal sealed class JxlTokenStream {
     _code = JxlPrefixCode.Build(writer, counts);
   }
 
-  /// <summary>Write the values themselves. <see cref="WriteHeader"/> comes first.</summary>
-  public void WriteTokens(JxlBitWriter writer) {
+  /// <summary>Write every value in the block. <see cref="WriteHeader"/> comes first.</summary>
+  public void WriteTokens(JxlBitWriter writer) => _Write(writer, 0, _values.Count);
+
+  /// <summary>
+  /// Write one run of the block, which is one group's worth of a frame stated in
+  /// several. <see cref="WriteHeader"/> comes first, once, for all of them.
+  /// </summary>
+  public void WriteRun(JxlBitWriter writer, int run) {
+    if (run < 0 || run >= _runStarts.Count)
+      throw new ArgumentOutOfRangeException(nameof(run), $"This block has {_runStarts.Count} runs, so there is no run {run}.");
+
+    var from = _runStarts[run];
+    var to = run + 1 < _runStarts.Count ? _runStarts[run + 1] : _values.Count;
+    _Write(writer, from, to);
+  }
+
+  private void _Write(JxlBitWriter writer, int from, int to) {
     ArgumentNullException.ThrowIfNull(writer);
     if (_code == null)
       throw new InvalidOperationException("The block's tokens cannot be written before its header.");
 
-    for (var i = 0; i < _tokens.Count; ++i) {
-      _code.Write(writer, _tokens[i]);
-      var tailBitCount = _tailBitCounts[i];
+    for (var i = from; i < to; ++i) {
+      var token = _Split(_values[i], out var tailBitCount, out var tail);
+      _code.Write(writer, token);
       if (tailBitCount > 0)
-        writer.WriteBits(_tailBits[i], tailBitCount);
+        writer.WriteBits(tail, tailBitCount);
     }
+  }
+
+  /// <summary>The token a value is stated by, without its tail.</summary>
+  private static int _Token(uint value) => _Split(value, out _, out _);
+
+  /// <summary>
+  /// Split a value into the token the prefix code carries and the raw tail that
+  /// follows it (libjxl <c>HybridUintConfig::Encode</c>).
+  /// </summary>
+  private static int _Split(uint value, out int tailBitCount, out uint tail) {
+    if (value < 1u << _SplitExponent) {
+      tailBitCount = 0;
+      tail = 0;
+      return (int)value;
+    }
+
+    var exponent = _FloorLog2(value);
+    tailBitCount = exponent;
+    tail = value - (1u << exponent);
+    return (1 << _SplitExponent) + (exponent - _SplitExponent);
   }
 
   /// <summary>libjxl <c>PackSigned</c>: the zigzag that folds negatives in

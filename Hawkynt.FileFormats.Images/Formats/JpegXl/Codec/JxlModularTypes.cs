@@ -50,6 +50,14 @@ internal sealed class JxlComposedImage {
 
   /// <summary>Which plane is the alpha, or -1 for none.</summary>
   public required int AlphaPlane { get; init; }
+
+  /// <summary>
+  /// Every moment an animation is shown at, in order, each the whole picture as
+  /// it stands at that moment. Empty for a still picture, and empty as well for
+  /// an animation whose later frames could not be read — a count of frames that
+  /// is short is worse than no count at all.
+  /// </summary>
+  public float[][][] Frames { get; init; } = [];
 }
 
 internal sealed class JxlModularImage {
