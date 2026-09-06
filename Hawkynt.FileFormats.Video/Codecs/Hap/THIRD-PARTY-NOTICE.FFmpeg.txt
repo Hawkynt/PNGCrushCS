@@ -1,0 +1,46 @@
+HapBlockEncoding.cs is a conversion of libavcodec/texturedspenc.c from FFmpeg
+(https://ffmpeg.org): the DXT1, DXT5 and Scaled YCoCg DXT5 block compression the
+Hap encoder in this package writes its textures with — the principal-axis endpoint
+fit and its power iteration, the one-dimensional index match, the least-squares
+endpoint refinement, the DXT5 alpha index derivation, the RGB-to-YCoCg transform,
+and the expand5, expand6, match5 and match6 tables copied value for value.
+
+Unlike almost everything else in FFmpeg, that file is not LGPL. It carries its own
+MIT grant, reproduced below, and states that it is itself based on public domain
+code by Fabian Giesen, Sean Barrett and Yann Collet.
+
+  Texture block compression
+  Copyright (C) 2015 Vittorio Giovara <vittorio.giovara@gmail.com>
+  Based on public domain code by Fabian Giesen, Sean Barrett and Yann Collet.
+
+  Permission is hereby granted, free of charge, to any person obtaining a
+  copy of this software and associated documentation files (the "Software"),
+  to deal in the Software without restriction, including without limitation
+  the rights to use, copy, modify, merge, publish, distribute, sublicense,
+  and/or sell copies of the Software, and to permit persons to whom the
+  Software is furnished to do so, subject to the following conditions:
+  The above copyright notice and this permission notice shall be included
+  in all copies or substantial portions of the Software.
+
+  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+  IN THE SOFTWARE.
+
+The frame layout HapVideoEncoder.cs writes — the eight-byte top-level section
+header, the pixel format in the type byte's low nibble and the second-stage
+compressor in its high one, and the rule that a Snappy result no smaller than the
+texture is dropped in favour of the texture — is the Hap specification's, published
+by Vidvox at documentation/HapVideoDRAFT.md, and was read there rather than out of
+libavcodec/hapenc.c, which is LGPL-2.1-or-later.
+
+HapSnappyEncoder.cs is not taken from anywhere. Snappy's block format is a
+decoder's contract and states nothing about which elements a compressor chooses;
+the choices there are this package's own, and the format they are written in comes
+from Google's own format_description.txt.
+
+This library is licensed LGPL-3.0-or-later, which can absorb both the MIT grant
+above and the LGPL-2.1-or-later the rest of FFmpeg carries.

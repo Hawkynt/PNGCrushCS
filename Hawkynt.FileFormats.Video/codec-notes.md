@@ -2691,6 +2691,75 @@ multiple-image section holding any combination other than Scaled YCoCg DXT5 with
 There is no `catch` anywhere in this decoder that hands back a blank frame or repeats the one before
 it.
 
+**The encoder writes three of the seven pixel formats**: `Hap1` (DXT1/BC1), `Hap5` (DXT5/BC3 with
+alpha) and `HapY` (Scaled YCoCg DXT5). Those are exactly the three ffmpeg's own `hap` encoder writes,
+which is the whole reason they are the three: a BC7 or BC6H texture built from the specification alone
+would be a plausible picture with no second encoder to check it against, and `HapM` and `HapA` — which
+this package decodes — have no encoder anywhere to compare a writing of them with. All four refuse by
+name at `Create`, before a frame is read, as does a picture whose width or height is not a whole number
+of 4x4 blocks (a Hap frame carries the texture and nothing else, so there is nowhere to say that part
+of the last block is to be thrown away; ffmpeg's encoder refuses the same size) and a picture that is
+neither `Rgb24` nor `Rgba32` — those two being what the decoder hands back, so a decode and a re-encode
+need no conversion, and whether any other conversion may lose something is not this codec's decision.
+
+Each frame is one top-level section with the eight-byte header form, one chunk, no Decode Instructions
+Container: the texture is offered to Snappy whole and the result kept only where it came out smaller
+than the texture, the type byte's high nibble saying which happened. That is ffmpeg's own single-chunk
+behaviour, header form included. The Snappy writer is this package's own — Snappy's block format is a
+decoder's contract and states nothing about which elements a compressor picks — so the bytes around the
+texture are not the reference's; the texture inside them is.
+
+**The block compression is FFmpeg's `libavcodec/texturedspenc.c` carried across whole.** That file is
+the one part of libavcodec touched here that is not LGPL: it carries its own MIT grant and states that
+it is itself based on public domain code by Fabian Giesen, Sean Barrett and Yann Collet, so it is taken
+rather than merely consulted (rung 1 of the sourcing ladder — see
+`Codecs/Hap/THIRD-PARTY-NOTICE.FFmpeg.txt`). The principal-axis endpoint fit with its four rounds of
+power iteration, the one-dimensional index match, the least-squares refinement, the DXT5 alpha index
+derivation, the RGB-to-YCoCg transform and the `expand5`, `expand6`, `match5` and `match6` tables are
+all its, value for value. Note that the encoder's own `expand5`/`expand6` are **bit replication** where
+the decoder's, measured off ffmpeg's decode, **round** — the two disagree at nine of the thirty-two
+five-bit values. That is not a mistake in either: the encoder's tables only ever decide which of a
+block's four colours a pixel is nearest, and copying them exactly is what keeps the choice of endpoints
+identical to the reference's.
+
+**One place the encoder deliberately parts from the reference**, and it is the "a picture the format
+can hold exactly must come back exactly" rule. A block holding one or two colours that the block
+decode's own 5-6-5 widening states outright can be carried untouched — name them as the endpoint pair
+and index 0 and 1 are them, unmixed, in either of DXT1's branches. The reference's constant-colour path
+does not do that: its match tables aim at the one-third interpolation and are built against bit
+replication rather than the rounding widening the decode uses, so such a block comes back a level or
+two off. So the encoder writes the reference's block, decodes it back under the decoder's own rules,
+and only where that does not reproduce the source block, and only where the block is one the format
+could have held exactly, writes it exactly instead.
+
+**Measured against ffmpeg, in both directions, and the two counts are kept apart.** Files ffmpeg wrote:
+96 Hap streams at 4x4, 12x8, 68x36, 64x64, 96x64, 128x96, 160x120 and 320x240, in all three pixel
+formats, at one, four and eight chunks and both second-stage compressors, ten frames each — 960 frames,
+48435200 samples — decoded here and by ffmpeg at its own native pixel format for each variant (`rgb0`
+for `Hap1` and `HapY`, `rgba` for `Hap5`, so no scaler stands between the two readings) and identical
+on every sample, max delta 0. A further 24 ffmpeg-written streams at `-compressor none -chunks 1`, whose
+packet is an eight-byte header and then the texture itself, gave 96 textures and 1210880 texture bytes
+to compare byte for byte against this encoder's: 20 bytes differ, in 3 of the 96, and every one of them
+is one of the exactness blocks above — 48 pixels exact here and not there, none the other way round.
+
+Files written here: 24 streams, 240 frames, muxed and handed to ffmpeg's own Hap decoder at the same
+native pixel formats. Against this package's decode of the same packets, 12108800 samples, every one
+identical, max delta 0. 146 of those 240 frames went out Snappy-compressed and 94 uncompressed, so
+Google's own Snappy — which is what ffmpeg reads them with — accepted this package's block writer on
+146 of them. On the same corpus, ffmpeg's decode measured against the pictures that went in: 30.5 to
+36.5 dB for `Hap1`, 31.7 to 38.2 dB for `Hap5` and 33.1 to 38.9 dB for `HapY` over gradients and flat
+plates, and 13.5 to 16.2 dB over pseudo-random noise, which is what four colours to sixteen pixels does
+to a picture that has no structure to find.
+
+And what comes back exactly: every one of the 65536 colours the block decode's widening states — 32
+red and blue values, 64 green — one to a block and again chequered two to a block, 1048576 pixels a
+picture at max delta 0 through both `Hap1` and `Hap5`; and all 256 alpha values, one to a block, through
+`Hap5`. Off that grid the coding is as close as the reference's search gets and no closer: no farther
+than 2 from any of the 256 greys, of which only seven are on the grid at all, and no farther than 1
+from any of the 32768 colours of the bit-replicated 5-5-5 grid. `HapY` is lossy even for a flat block,
+its chroma transform not being reversible in eight bits — no farther than 1 from any grey and 3 from any
+grid colour — which is the format's own transform and not a choice made here.
+
 ### id Cinematic Video
 
 Quake II's cutscene codec, `.cin`, a third self-contained container in the same family as RoQ and
