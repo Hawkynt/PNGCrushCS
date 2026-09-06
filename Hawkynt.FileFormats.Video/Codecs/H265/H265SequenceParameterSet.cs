@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using FileFormat.Core;
 
 namespace FileFormat.Codecs.H265;
 
@@ -154,6 +155,19 @@ internal sealed class H265SequenceParameterSet {
   /// <summary>Whether a flat 32x32 intra block may have its reference samples smoothed the long way.</summary>
   internal bool StrongIntraSmoothingEnabled { get; private init; }
 
+  /// <summary>
+  /// What the video usability information says the samples were meant for, or <c>null</c> where the
+  /// sequence says nothing.
+  /// </summary>
+  /// <remarks>
+  /// Null and "unspecified" are not the same answer. A sequence that omits
+  /// <c>video_signal_type_present_flag</c> has stated nothing at all, and a container that states
+  /// something is then the only source there is; a sequence that sends the flag with
+  /// <c>colour_primaries</c> of 2 has stated that the primaries are somebody else's business, and
+  /// has still stated its range.
+  /// </remarks>
+  internal RawImageColorInfo? ColorInfo { get; private init; }
+
   /// <summary>Whether two sequence parameter sets describe pictures of the same shape.</summary>
   internal bool SameGeometryAs(H265SequenceParameterSet other)
     => this.Width == other.Width
@@ -267,8 +281,9 @@ internal sealed class H265SequenceParameterSet {
     var temporalMvpEnabled = reader.ReadFlag();
     var strongIntraSmoothing = reader.ReadFlag();
 
+    RawImageColorInfo? colorInfo = null;
     if (reader.ReadFlag())
-      _SkipVideoUsabilityInformation(ref reader, maxSubLayersMinus1);
+      colorInfo = _ReadVideoUsabilityInformation(ref reader, maxSubLayersMinus1);
 
     if (reader.ReadFlag())
       _RefuseExtensions(ref reader);
@@ -312,6 +327,7 @@ internal sealed class H265SequenceParameterSet {
       LongTermReferencePictureUsed = longTermUsed,
       TemporalMvpEnabled = temporalMvpEnabled,
       StrongIntraSmoothingEnabled = strongIntraSmoothing,
+      ColorInfo = colorInfo,
     };
 
     sps._RefuseWhatIsNotDecodable();
@@ -333,14 +349,19 @@ internal sealed class H265SequenceParameterSet {
         + "three monochrome pictures with a colour_plane_id each, rather than as one picture. Reading that form is "
         + "not implemented.");
 
-    if (this.ChromaFormatIdc != 1)
+    // Monochrome joins 4:2:0 rather than being refused with the rest. It is not a subsampling at all
+    // — the sequence simply codes no chrominance, so every place that would read or reconstruct a
+    // chrominance sample has nothing to do — where 4:2:2 and 4:4:4 change the transform tree, the
+    // chrominance intra modes, the quantiser mapping and the deblocking grid. An all-black or
+    // greyscale picture comes out monochrome from libheif, so it is not an exotic case.
+    if (this.ChromaFormatIdc is not (0 or 1))
       throw new NotSupportedException(
         $"This H.265 stream is {this.ChromaFormatIdc switch {
-          0 => "monochrome",
           2 => "4:2:2",
           3 => "4:4:4",
           _ => $"chroma_format_idc {this.ChromaFormatIdc}",
-        }} (clause 7.4.3.2.1). Only 4:2:0, which is what the Main and Main 10 profiles permit, is implemented.");
+        }} (clause 7.4.3.2.1). Only 4:2:0 and monochrome, which is what the Main, Main 10 and "
+        + "Monochrome profiles permit, are implemented.");
 
     if (this.BitDepthLuma is < 8 or > 12 || this.BitDepthChroma is < 8 or > 12)
       throw new NotSupportedException(
@@ -390,27 +411,48 @@ internal sealed class H265SequenceParameterSet {
   }
 
   /// <summary>
-  /// Steps over <c>vui_parameters()</c> — Annex E.2.1 — without keeping any of it.
+  /// Steps over <c>vui_parameters()</c> — Annex E.2.1 — keeping the colour signal type.
   /// </summary>
   /// <remarks>
-  /// None of it reaches a sample. The colour description says which primaries and transfer the
-  /// samples were meant for, which is the display's business; the timing says how fast to show them,
-  /// which is the container's; the hypothetical reference decoder parameters describe a buffer model
-  /// a file being decoded from disc does not have. What the structure has to be read for is its
-  /// length, because the flags that follow it say whether the residual coding is one this decoder
+  /// Almost none of it reaches a sample. The timing says how fast to show the pictures, which is the
+  /// container's business; the hypothetical reference decoder parameters describe a buffer model a
+  /// file being decoded from disc does not have. The structure still has to be read to its end,
+  /// because the flags that follow it say whether the residual coding is one this decoder
   /// implements.
+  /// <para/>
+  /// The colour signal type is the exception, and it was the defect: <c>video_full_range_flag</c>
+  /// and <c>matrix_coeffs</c> decide what the samples mean, so a decoder that steps over them and
+  /// assumes studio-swing BT.601 hands back a washed-out picture on every full-range stream — which
+  /// is what libheif and x265 write by default. Reading it here does not change reconstruction; it
+  /// reaches the caller alongside the samples.
   /// </remarks>
-  private static void _SkipVideoUsabilityInformation(ref H265BitReader reader, int maxSubLayersMinus1) {
+  private static RawImageColorInfo? _ReadVideoUsabilityInformation(
+    ref H265BitReader reader, int maxSubLayersMinus1) {
     if (reader.ReadFlag() && reader.ReadBits(8) == 255)
       reader.Skip(32); // sar_width, sar_height
 
     if (reader.ReadFlag())
       reader.Skip(1); // overscan_appropriate_flag
 
+    RawImageColorInfo? colorInfo = null;
     if (reader.ReadFlag()) {
-      reader.Skip(4); // video_format, video_full_range_flag
-      if (reader.ReadFlag())
-        reader.Skip(24); // colour_primaries, transfer_characteristics, matrix_coeffs
+      reader.Skip(3); // video_format
+      var fullRange = reader.ReadFlag();
+
+      // Where the description is absent the three code points are 2 — unspecified — by Annex E.3.1,
+      // which is not the same as the range being unstated: the range was just read either way.
+      var primaries = 2;
+      var transfer = 2;
+      var matrix = 2;
+      if (reader.ReadFlag()) {
+        primaries = reader.ReadBits(8);
+        transfer = reader.ReadBits(8);
+        matrix = reader.ReadBits(8);
+      }
+
+      // Left siting, because H.265 codes 4:2:0 chroma level with the even luma column unless a
+      // chroma sample location SEI message says otherwise, and nothing sends that.
+      colorInfo = RawImageColorInfo.FromCodePoints(primaries, transfer, matrix, fullRange, RawChromaLocation.Left);
     }
 
     if (reader.ReadFlag()) {
@@ -435,11 +477,13 @@ internal sealed class H265SequenceParameterSet {
     }
 
     if (!reader.ReadFlag())
-      return;
+      return colorInfo;
 
     reader.Skip(3); // tiles_fixed_structure, motion_vectors_over_pic_boundaries, restricted_ref_pic_lists
     for (var i = 0; i < 5; ++i)
       reader.ReadUnsignedExpGolomb();
+
+    return colorInfo;
   }
 
   /// <summary>Steps over <c>hrd_parameters()</c> — Annex E.2.2.</summary>

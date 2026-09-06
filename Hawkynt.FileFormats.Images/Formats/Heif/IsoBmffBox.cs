@@ -30,6 +30,9 @@ internal readonly struct IsoBmffBox {
   internal const string Ipma = "ipma";
   internal const string Ispe = "ispe";
   internal const string Clap = "clap";
+
+  /// <summary>The colour information property: which primaries, transfer, matrix and range.</summary>
+  internal const string Colr = "colr";
   internal const string HvcC = "hvcC";
 
   /// <summary>The AVC decoder configuration an AVCI item is coded against.</summary>

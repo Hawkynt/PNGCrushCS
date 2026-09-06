@@ -14,7 +14,16 @@ namespace FileFormat.Heif;
 /// </remarks>
 internal static class HeifHevcDecoder {
 
-  internal static RawImage Decode(ReadOnlyMemory<byte> sample, ReadOnlyMemory<byte> configurationRecord) {
+  /// <param name="sample">The item's coded picture, as length-prefixed NAL units.</param>
+  /// <param name="configurationRecord">The item's hvcC property.</param>
+  /// <param name="containerColour">
+  /// What the item's colour information property says, or <c>null</c> where the item has none.
+  /// </param>
+  internal static RawImage Decode(
+    ReadOnlyMemory<byte> sample,
+    ReadOnlyMemory<byte> configurationRecord,
+    RawImageColorInfo? containerColour = null
+  ) {
     // HEVC PCM has a CABAC-to-raw handoff in the middle of a coding unit. The general video decoder
     // intentionally still refuses that syntax until its streaming arithmetic engine can expose the
     // handoff generically; the still-image codec has a narrow, standards-based PCM path for exactly
@@ -77,6 +86,15 @@ internal static class HeifHevcDecoder {
     H265Deblocking.Filter(frame);
     H265SampleAdaptiveOffset.Filter(frame);
 
+    // The container wins where the two disagree, and this is not a preference: ISO/IEC 23000-22
+    // (MIAF) clause 7.3.6.4 says the colour information property describes the item, and libheif —
+    // whose files these mostly are — reads only that property, which is why its --auto-correct
+    // exists to override it on the cameras that write it wrong. The sequence's video usability
+    // information is the fallback for an item that carries no such property, and ImageMagick's HEIC
+    // writer produces exactly that: no colr box, a full-range flag in the bitstream, and a picture
+    // that comes back washed out from anything reading neither.
+    var colour = containerColour ?? pictureSequence.ColorInfo;
+
     return new() {
       Width = pictureSequence.DisplayWidth,
       Height = pictureSequence.DisplayHeight,
@@ -88,7 +106,8 @@ internal static class HeifHevcDecoder {
         pictureSequence.DisplayWidth,
         pictureSequence.DisplayHeight,
         pictureSequence.BitDepthLuma,
-        pictureSequence.BitDepthChroma),
+        pictureSequence.BitDepthChroma,
+        colour),
     };
   }
 

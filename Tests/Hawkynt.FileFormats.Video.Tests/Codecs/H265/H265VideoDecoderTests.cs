@@ -59,11 +59,10 @@ public sealed class H265VideoDecoderTests {
       Is.False);
   }
 
-  [TestCase(0, "monochrome")]
   [TestCase(2, "4:2:2")]
   [TestCase(3, "4:4:4")]
   [Category("Unit")]
-  public void AChromaFormatOtherThan420_IsRefusedByName(int chromaFormatIdc, string expected) {
+  public void ASubsampledChromaFormatOtherThan420_IsRefusedByName(int chromaFormatIdc, string expected) {
     var message = _Refusal(new H265TestStream()
       .VideoParameterSet()
       .SequenceParameterSet(chromaFormatIdc: chromaFormatIdc)
@@ -71,6 +70,27 @@ public sealed class H265VideoDecoderTests {
 
     Assert.That(message, Does.Contain(expected));
     Assert.That(message, Does.Contain("4:2:0"));
+  }
+
+  /// <summary>
+  /// Monochrome is not a subsampling and is not refused with the two that are.
+  /// </summary>
+  /// <remarks>
+  /// A sequence with <c>chroma_format_idc</c> of zero codes no chrominance at all, so every place
+  /// that would read or reconstruct a chrominance sample simply has nothing to do — where 4:2:2 and
+  /// 4:4:4 change the transform tree, the chrominance intra modes, the quantiser mapping and the
+  /// deblocking grid. What this asserts is only that the parameter set is accepted; the pictures are
+  /// checked against libheif's own decode over on the HEIF side, where monochrome actually arrives.
+  /// </remarks>
+  [Test]
+  [Category("Unit")]
+  public void AMonochromeSequence_IsNotRefused() {
+    var failure = _Decode(new H265TestStream()
+      .VideoParameterSet()
+      .SequenceParameterSet(chromaFormatIdc: 0)
+      .ToArray());
+
+    Assert.That(failure, Is.Null, failure?.Message);
   }
 
   /// <summary>
