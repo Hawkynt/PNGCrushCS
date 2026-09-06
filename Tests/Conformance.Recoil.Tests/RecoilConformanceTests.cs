@@ -121,6 +121,8 @@ public sealed class RecoilConformanceTests {
     new(ImageFormat.Apple3201, "3201", 320, 200),
     new(ImageFormat.LdPic, "LdPic", 320, 256),
     new(ImageFormat.MapletownNl3, "Mapletown NL3", 160, 100),
+    // ML1 states its own corners, so the size is ours to pick rather than the format's.
+    new(ImageFormat.MapletownMl1, "Mapletown Network ML1", 320, 200, ".ml1"),
     new(ImageFormat.AtariPi9, "Graphics 9", 320, 192),
     new(ImageFormat.AtariPi8, "Graphics 8", 320, 192),
     new(ImageFormat.ZxTrefiBorderScreen, "Border Screen by Trefi", 256, 192),
@@ -149,6 +151,7 @@ public sealed class RecoilConformanceTests {
     new(ImageFormat.Rembrandt, "Rembrandt", 320, 200),
     new(ImageFormat.SinbadSlideshow, "Sinbad Slideshow", 320, 200),
     new(ImageFormat.Spectrum512Ext, "Spectrum 512 extended", 320, 199),
+    new(ImageFormat.Spectrum512Smoosh, "Spectrum 512 (smooshed)", 320, 199),
     new(ImageFormat.SyntheticArts, "Synthetic Arts", 640, 200),
     new(ImageFormat.MovieMakerBackground, "Movie Maker background", 320, 192),
     new(ImageFormat.Graphics9Plus, "Graphics 9+", 320, 240),
@@ -171,6 +174,9 @@ public sealed class RecoilConformanceTests {
     new(ImageFormat.Ilbm, "DEGAS Elite block 1", 64, 64, ".bl1"),
     new(ImageFormat.Ilbm, "DEGAS Elite block 2", 64, 64, ".bl2"),
     new(ImageFormat.Ilbm, "DEGAS Elite block 3", 64, 64, ".bl3"),
+    // Also an ILBM, but RECOIL only takes the DCTV branch when the top line carries the
+    // synchronisation sequence, so this pairing tests the composite encoding and not the container.
+    new(ImageFormat.IffDctv, "DCTV", 320, 200, ".dctv"),
     new(ImageFormat.ZxNextImage, "256x192 format", 256, 192),
     new(ImageFormat.TextureMaker0, "Texture Maker0 16x16x16", 64, 64),
     new(ImageFormat.BbcMicroScreen, "Mode 4", 320, 256, ".bb4"),
