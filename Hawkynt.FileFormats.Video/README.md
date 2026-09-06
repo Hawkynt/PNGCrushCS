@@ -81,7 +81,7 @@ quietly come to mean "some of it". How each codec was measured is in
 Every codec the package registers has a row, and the name in the first column is the codec's own
 `CodecName` — the same string a refusal message names it by. `Decode` is what
 [`VideoFormatRegistry.CreateDecoder`](https://github.com/Hawkynt/PNGCrushCS/blob/main/Hawkynt.FileFormats.Video/VideoFormatRegistry.cs) builds, 83 of them; `Encode` is
-what [`VideoFormatRegistry.CreateEncoder`](https://github.com/Hawkynt/PNGCrushCS/blob/main/Hawkynt.FileFormats.Video/VideoFormatRegistry.cs) builds, 25 of them. The two
+what [`VideoFormatRegistry.CreateEncoder`](https://github.com/Hawkynt/PNGCrushCS/blob/main/Hawkynt.FileFormats.Video/VideoFormatRegistry.cs) builds, 26 of them. The two
 are separate tables in the registry because they are looked up by different things: a decoder by a
 whole stream description, an encoder by the four-character code a caller wants written.
 
@@ -89,9 +89,11 @@ whole stream description, an encoder by the four-character code a caller wants w
 mode a conforming encoder may write — and the Notes column says which. **✅ means every layout the
 format defines is decoded**; such a codec still refuses malformed input, undefined field values and
 forms no encoder produces, because a plausible wrong picture is worse than a refusal. No codec
-silently misdecodes what it will not read. An `Encode` tick is a lossless or format-faithful writer,
-never a re-quantisation of something the codec cannot hold: where a picture would have to be reduced
-to fit, the encoder refuses it by name instead. Codec-by-codec provenance and measurement notes are in
+silently misdecodes what it will not read. An `Encode` tick is a lossless or format-faithful writer.
+Where the codec has a lossless form the encoder writes it and refuses by name any picture it would
+have to reduce to fit; where the format itself is lossy — Motion JPEG, Microsoft Video 1, DV — the
+row says so, because there is nothing else such an encoder could write. Codec-by-codec provenance and
+measurement notes are in
 [`codec-notes.md`](https://github.com/Hawkynt/PNGCrushCS/blob/main/Hawkynt.FileFormats.Video/codec-notes.md).
 
 | Codec | Decode | Encode | Implemented scope / note | Reference |
@@ -116,7 +118,7 @@ to fit, the encoder refuses it by name instead. Codec-by-codec provenance and me
 | [FFV1 (RFC 9043)](https://en.wikipedia.org/wiki/FFV1) | ⚠️ | ✅ | Versions 0, 1 and 3, both entropy coders, slices and checksums; 8-bit samples only. Version 2 and deeper samplings refused. The encoder writes version 3 with the range coder, the small context model, a slice checksum on every slice and every frame a key frame — what `ffmpeg -c:v ffv1 -level 3 -coder 1 -context 0 -slicecrc 1 -g 1` writes | [RFC 9043](https://www.rfc-editor.org/rfc/rfc9043) |
 | [Apple ProRes](https://en.wikipedia.org/wiki/Apple_ProRes) | ⚠️ | — | `apco`, `apcs`, `apcn`, `apch` at 4:2:2 and `ap4h`, `ap4x` at 4:4:4; bitstream versions 0 and 1. Reserved chroma formats, reserved interlace mode and reserved alpha types refused | [Apple ProRes white paper](https://www.apple.com/final-cut-pro/docs/Apple_ProRes_White_Paper.pdf) |
 | [Avid DNxHD / DNxHR (SMPTE VC-3)](https://en.wikipedia.org/wiki/DNxHD_codec) | ⚠️ | — | SMPTE VC-3 header versions 1-3, progressive 4:2:2 and 4:4:4. Interlaced frames, 4:2:0, alpha-bearing compression IDs and RGB-mode macroblocks refused | [SMPTE VC-3 overview](https://ieeexplore.ieee.org/document/7290708) |
-| [DV (IEC 61834 / SMPTE 314M)](https://en.wikipedia.org/wiki/DV_%28video_format%29) | ⚠️ | — | `dvsd`, `dv25`, `dv50`, `dvsl`, `dvc `, `dvcs`, `cdvc`, `CDV5`, `dvis`, `pdvc`, `SL25`, `SLDV`; the six standard-definition profiles — 525/60 and 625/50 at 25 Mbit in 4:1:1 and 4:2:0, and DVCPRO50 at 4:2:2 — with both transform modes. The profile comes from the frame, never from the tag. DVCPRO HD (SMPTE 370M, `dvhd`, `dvh1`, `CDVH`) is accepted and then refused by name | [SMPTE 314M](https://ieeexplore.ieee.org/document/7291838) |
+| [DV (IEC 61834 / SMPTE 314M)](https://en.wikipedia.org/wiki/DV_%28video_format%29) | ⚠️ | ✅ | `dvsd`, `dv25`, `dv50`, `dvsl`, `dvc `, `dvcs`, `cdvc`, `CDV5`, `dvis`, `pdvc`, `SL25`, `SLDV`; the six standard-definition profiles — 525/60 and 625/50 at 25 Mbit in 4:1:1 and 4:2:0, and DVCPRO50 at 4:2:2 — with both transform modes. The profile comes from the frame, never from the tag. DVCPRO HD (SMPTE 370M, `dvhd`, `dvh1`, `CDVH`) is accepted and then refused by name. The encoder writes five of the six profiles, the picture's own colour sampling choosing which — 4:2:2 planar asks for DVCPRO50 — and is lossy because DV is: a frame is a fixed length whatever is in it, so a picture that will not fit is quantised until it does. Handed the same planes it writes byte for byte what ffmpeg's own DV encoder writes | [SMPTE 314M](https://ieeexplore.ieee.org/document/7291838) |
 | [GoPro CineForm](https://en.wikipedia.org/wiki/CineForm) | ⚠️ | — | SMPTE VC-5 three-channel layouts: 10-bit 4:2:2 YUV and 12-bit RGB. Alpha-bearing channel counts and lowpass precisions other than 16 bits refused | [LOC CineForm overview](https://www.loc.gov/preservation/digital/formats/fdd/fdd000458.shtml) |
 | Hap | ⚠️ | — | `Hap1`, `Hap5`, `HapY`, `HapM`, `HapA`, `Hap7`, `HapH`. Texture formats and second-stage compressors the codec does not know, and image combinations Hap does not define, refused. Neither Wikipedia nor MultimediaWiki carries a page for this format; the format's own documentation is the overview | [Vidvox Hap `HapVideoDRAFT.md`](https://github.com/Vidvox/hap/blob/master/documentation/HapVideoDRAFT.md) |
 | Matrox Uncompressed SD | ✅ | — | `M101`; 8- and 10-bit 4:2:2 read from the 24-byte Matrox AVI trailer. Odd widths and other sample depths refused. Adapted from FFmpeg's LGPL-2.1-or-later decoder. No neutral overview of this format is published | [FFmpeg `m101.c`](https://github.com/FFmpeg/FFmpeg/blob/master/libavcodec/m101.c) |
@@ -388,7 +390,7 @@ Every public and protected member of all 363 types, generated from the built ass
 - Large RealVideo pictures require preserved slice offsets when they must be split across 16-bit RealMedia packet lengths, and RoQ sound requires its original predictor argument.
 - Several advanced codecs intentionally implement well-defined subsets (for example H.264 progressive 8-bit 4:2:0, HEVC Main profile, and VC-1 Simple/Main intra pictures). Every row marked ⚠️ in the codec table names its own subset. Unsupported profiles/features are refused by name rather than silently misdecoded.
 - Codec support is more precise than a single green check can express; consult [`codec-notes.md`](https://github.com/Hawkynt/PNGCrushCS/blob/main/Hawkynt.FileFormats.Video/codec-notes.md) before relying on a profile/level/feature not named in this README.
-- Encoding is a smaller domain than decoding on purpose: 25 codecs of the 83 read can also be written. Most are lossless; two are not, and each says so in its own row. Motion JPEG writes baseline JPEG, whose loss is a matter of degree, and Microsoft Video 1's two-colours-to-a-block coding has no lossless form at all — a picture that codec can hold exactly comes back exactly, and one it cannot does not. What is still not written back is the modern lossy codecs: a stream read as H.264 cannot be written back as H.264.
+- Encoding is a smaller domain than decoding on purpose: 26 codecs of the 83 read can also be written. Most are lossless; three are not, and each says so in its own row. Motion JPEG writes baseline JPEG, whose loss is a matter of degree; Microsoft Video 1's two-colours-to-a-block coding has no lossless form at all — a picture that codec can hold exactly comes back exactly, and one it cannot does not; and DV has no lossless form either, because a DV frame is a fixed length whatever is in it. What is still not written back is the modern lossy codecs: a stream read as H.264 cannot be written back as H.264.
 - Video correctness depends on real-world packetization as much as codec math. The project therefore validates packet counts, sizes, timestamps, and key-frame flags against external tools where samples are available.
 
 ## ❤️ Support

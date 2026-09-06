@@ -1074,6 +1074,47 @@ profile it claims; and a frame whose raster is not the one the container describ
 is deliberately not carried across, so a damaged frame decodes to what its bits say rather than to
 the picture ffmpeg repairs.
 
+**Encoding is the same three passes run backwards, and the bit budget is the whole problem.** Five
+macroblocks share exactly 2680 bits of coefficients, so the encoder does not choose a quality and see
+what it costs — it sizes every block, and if the five overrun, quantises the largest ones harder and
+sizes them again until they fit. The size measurement has to be exact rather than conservative, which
+is what the linked list over the non-zero coefficients is for: when a coefficient is quantised to
+nothing it is spliced out, and the run of whichever coefficient followed it has to be repaired, in
+whichever of the four coefficient areas that successor happens to live in.
+
+The class number is the one real judgement, and FFmpeg's is used rather than the standard's. SMPTE
+314M Table 22 sends any block whose largest coefficient exceeds 36 to the coarsest class, which is
+the right answer for an encoder that cannot predict its own bit consumption and throws away quality
+in one that can. Class 2 is used for almost everything and class 3 only where a coefficient exceeds
+255 and could not otherwise be written; the rate is then made to fit by the quantiser search.
+
+**Byte for byte what ffmpeg's own DV encoder writes**, on all five profiles the encoder covers —
+control blocks, macroblock headers and coefficients alike — when both are handed the same planes and
+ffmpeg is run with `-cpuflags 0`. Comparison through `-f avi` rather than `-f dv`, because the raw DV
+muxer rewrites the subcode timecode and the recording-date packs afterwards and the AVI muxer stores
+the encoder's packets verbatim. With SIMD enabled ffmpeg's own forward transform differs slightly
+from its C one — about 5% of video bytes on a detailed frame at no measurable difference in quality —
+so the comparison is against the C path, which is the definition.
+
+Round-tripped through ffmpeg's decoder, against the planes that went in, three frames of `testsrc2`
+apiece: 525/60 4:1:1 **49.2 to 50.3 dB**, 625/50 4:2:0 **48.2 to 48.6 dB**, 625/50 4:1:1 **51.1 to
+51.8 dB**, DVCPRO50 525/60 **51.8 to 53.0 dB**, DVCPRO50 625/50 **53.0 to 53.3 dB**, all planes
+together. Worst single sample 39 of 255, mean absolute luma error under 0.12. ffmpeg accepts every
+frame, reads back exactly the frame count written, and reports the raster, frame rate and pixel format
+of the profile in each case — raw `.dv` and through this package's own AVI writer alike. The one
+cosmetic difference is that a raw `.dv` written here carries no timecode, so ffmpeg's DV demuxer says
+so; the codec's packets are what a muxer is handed, and a timecode is the muxer's to write.
+
+The picture chooses the profile, exactly as FFmpeg's `av_dv_codec_profile2` chooses it: 4:2:2 planar
+is written as DVCPRO50, 4:2:0 at 625/50 as IEC 61834's arrangement, and anything else — the packed
+RGB the decoders here hand back included — as 4:1:1 at 525/60 and 4:2:0 at 625/50, which is what a
+recorder of each system wrote. There is nothing else in a stream description that could carry the
+choice, and the four-character code cannot: every DV decoder reads the profile out of the frame.
+
+What the encoder refuses: a raster that is not one of the two DV defines, a picture that is not the
+stream's size, and a stream that would change sampling part way through — the frame size would change
+with it, and no container describes a stream whose frames are two different lengths.
+
 ### VC-1 / Windows Media Video 9
 
 Intra pictures of the Simple and Main profiles, which is the first rung of SMPTE 421M and where this
