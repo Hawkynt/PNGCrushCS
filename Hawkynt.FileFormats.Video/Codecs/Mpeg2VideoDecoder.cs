@@ -56,6 +56,11 @@ public sealed class Mpeg2VideoDecoder : IVideoCodecDecoder<Mpeg2VideoDecoder> {
   /// the two MPEGs" and is in practice far more often the later one — and since the engine reads
   /// both, claiming it here costs nothing and turns what used to be "no codec for this stream" into
   /// a decode either way.
+  /// <para/>
+  /// <c>EM2V</c> and <c>MMES</c> are two encoders' own spellings of plain 13818-2, and neither is
+  /// here on the strength of a table. Three elementary streams were muxed under each of them and
+  /// under <c>MPG2</c> and decoded here and by ffmpeg: every tag produced the picture the <c>MPG2</c>
+  /// spelling of the identical stream produces, to the sample.
   /// </remarks>
   private static readonly CodecTag[] _Tags = [
     CodecTag.FromCharacters("MPG2"),
@@ -65,6 +70,8 @@ public sealed class Mpeg2VideoDecoder : IVideoCodecDecoder<Mpeg2VideoDecoder> {
     CodecTag.FromCharacters("hdv1"),
     CodecTag.FromCharacters("hdv2"),
     CodecTag.FromCharacters("hdv3"),
+    CodecTag.FromCharacters("EM2V"),
+    CodecTag.FromCharacters("MMES"),
   ];
 
   /// <summary>What Matroska calls an MPEG-2 video track.</summary>
