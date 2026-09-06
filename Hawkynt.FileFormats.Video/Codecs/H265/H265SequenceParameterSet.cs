@@ -349,14 +349,19 @@ internal sealed class H265SequenceParameterSet {
         + "three monochrome pictures with a colour_plane_id each, rather than as one picture. Reading that form is "
         + "not implemented.");
 
-    if (this.ChromaFormatIdc != 1)
+    // Monochrome joins 4:2:0 rather than being refused with the rest. It is not a subsampling at all
+    // — the sequence simply codes no chrominance, so every place that would read or reconstruct a
+    // chrominance sample has nothing to do — where 4:2:2 and 4:4:4 change the transform tree, the
+    // chrominance intra modes, the quantiser mapping and the deblocking grid. An all-black or
+    // greyscale picture comes out monochrome from libheif, so it is not an exotic case.
+    if (this.ChromaFormatIdc is not (0 or 1))
       throw new NotSupportedException(
         $"This H.265 stream is {this.ChromaFormatIdc switch {
-          0 => "monochrome",
           2 => "4:2:2",
           3 => "4:4:4",
           _ => $"chroma_format_idc {this.ChromaFormatIdc}",
-        }} (clause 7.4.3.2.1). Only 4:2:0, which is what the Main and Main 10 profiles permit, is implemented.");
+        }} (clause 7.4.3.2.1). Only 4:2:0 and monochrome, which is what the Main, Main 10 and "
+        + "Monochrome profiles permit, are implemented.");
 
     if (this.BitDepthLuma is < 8 or > 12 || this.BitDepthChroma is < 8 or > 12)
       throw new NotSupportedException(

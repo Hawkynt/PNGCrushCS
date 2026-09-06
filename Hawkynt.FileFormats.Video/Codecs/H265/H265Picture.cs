@@ -32,11 +32,19 @@ internal enum H265ReferenceMarking {
 /// </remarks>
 internal sealed class H265Picture {
 
-  internal H265Picture(int width, int height, int minBlockLog2Size) {
+  /// <param name="width">The coded picture width in luma samples.</param>
+  /// <param name="height">The coded picture height in luma samples.</param>
+  /// <param name="minBlockLog2Size">The granularity the motion field is stored at.</param>
+  /// <param name="monochrome">
+  /// Whether the sequence codes luminance alone, in which case there are no chrominance planes at
+  /// all rather than empty ones. Everything that walks a chrominance plane walks it by its own
+  /// width and height, so those being zero is what stops each of them without a flag of its own.
+  /// </param>
+  internal H265Picture(int width, int height, int minBlockLog2Size, bool monochrome = false) {
     this.Width = width;
     this.Height = height;
-    this.ChromaWidth = width >> 1;
-    this.ChromaHeight = height >> 1;
+    this.ChromaWidth = monochrome ? 0 : width >> 1;
+    this.ChromaHeight = monochrome ? 0 : height >> 1;
     this.Luma = new ushort[width * height];
     this.Cb = new ushort[this.ChromaWidth * this.ChromaHeight];
     this.Cr = new ushort[this.ChromaWidth * this.ChromaHeight];
@@ -57,6 +65,9 @@ internal sealed class H265Picture {
   internal int ChromaWidth { get; }
 
   internal int ChromaHeight { get; }
+
+  /// <summary>Whether this picture is luminance alone.</summary>
+  internal bool IsMonochrome => this.ChromaWidth == 0;
 
   /// <summary>
   /// The luminance samples. Sixteen bits wide because Main 10 codes ten of them; an eight-bit

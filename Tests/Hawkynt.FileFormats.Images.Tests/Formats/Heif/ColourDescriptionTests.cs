@@ -218,6 +218,55 @@ public sealed class ColourDescriptionTests {
     }
   }
 
+  /// <summary>
+  /// A greyscale source comes back from libheif as a monochrome item, and it decodes.
+  /// </summary>
+  /// <remarks>
+  /// Monochrome used to be refused along with 4:2:2 and 4:4:4, which put an all-black picture and
+  /// every greyscale one outside what this reader would open — libheif picks
+  /// <c>chroma_format_idc</c> of zero for both. It is not a subsampling: the sequence codes no
+  /// chrominance, so there is nothing to read, nothing to reconstruct, nothing to deblock and
+  /// nothing to interpolate back up, and the luminance is the whole picture.
+  /// </remarks>
+  [Test]
+  [Category("Conformance")]
+  public void GreyscaleSource_DecodesAsAMonochromeItem() {
+    var directory = Directory.CreateTempSubdirectory("heif-mono");
+    try {
+      var source = Path.Combine(directory.FullName, "source.png");
+      var heic = Path.Combine(directory.FullName, "picture.heic");
+      var reference = Path.Combine(directory.FullName, "reference.ppm");
+
+      _RunOrIgnore("magick", $"-size 128x96 gradient:black-white -colorspace gray \"{source}\"");
+      _RunOrIgnore("heif-enc", $"-q 90 -o \"{heic}\" \"{source}\"");
+      if (!File.Exists(heic) || !_IsIsoBmff(File.ReadAllBytes(heic)))
+        Assert.Ignore("heif-enc would not write a monochrome picture here.");
+
+      _RunOrIgnore("magick", $"\"{heic}\" -depth 8 -colorspace sRGB \"{reference}\"");
+      if (!File.Exists(reference))
+        Assert.Ignore("ImageMagick has no HEIF decoder here.");
+
+      var (width, height, expected) = _ReadPpm(reference);
+      var actual = HeifFile.ToRawImage(HeifReader.FromBytes(File.ReadAllBytes(heic)));
+
+      Assert.Multiple(() => {
+        Assert.That(actual.Width, Is.EqualTo(width));
+        Assert.That(actual.Height, Is.EqualTo(height));
+      });
+
+      var worst = 0;
+      for (var i = 0; i < expected.Length; ++i)
+        worst = Math.Max(worst, Math.Abs(actual.PixelData[i] - expected[i]));
+
+      // No chrominance means no upsampler to disagree about, so the only slack is the rounding of
+      // one multiplication.
+      Assert.That(worst, Is.LessThanOrEqualTo(1),
+        $"the worst sample differed from libheif's decode by {worst} levels");
+    } finally {
+      directory.Delete(true);
+    }
+  }
+
   private static void _RunOrIgnore(string tool, string arguments) {
     using var process = ExternalTool.StartOrIgnore(tool, arguments);
     process.StandardError.ReadToEnd();

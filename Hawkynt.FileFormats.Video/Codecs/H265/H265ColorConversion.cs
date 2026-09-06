@@ -69,6 +69,33 @@ internal static class H265ColorConversion {
     var conversion = Conversion.For(colour, bitDepthLuma, bitDepthChroma);
     var rounding = 1 << (_FRACTION_BITS - 1);
 
+    // A monochrome sequence has no chrominance planes to interpolate from, and its luminance is the
+    // whole picture: every colour component takes the same value, expanded by whatever range the
+    // stream states. It still goes out as three components because that is what every reader here
+    // hands back, and a grey picture is a colour picture whose colours agree.
+    //
+    // The range is honoured here even though libheif does not honour it for monochrome — it writes
+    // the luminance untouched whatever full_range_flag it then tags the file with, and reads it back
+    // the same way, so its own studio-swing greyscale files carry full-range samples. H.273 says the
+    // flag describes the luminance, so the flag is what this follows; a file where the two disagree
+    // is a file whose label is wrong, which is the case libheif's own --auto-correct exists for.
+    if (picture.IsMonochrome) {
+      for (var y = 0; y < height; ++y) {
+        var lumaRow = (top + y) * picture.Width + left;
+        var target = y * width * 3;
+
+        for (var x = 0; x < width; ++x) {
+          var grey = conversion.ToGrey(picture.Luma[lumaRow + x], rounding);
+          rgb[target] = grey;
+          rgb[target + 1] = grey;
+          rgb[target + 2] = grey;
+          target += 3;
+        }
+      }
+
+      return rgb;
+    }
+
     // The chrominance samples that belong to the displayed picture, which is not the whole plane. A
     // cropped stream is coded wider or taller than it is shown, and the samples past the crop are
     // real reconstructed samples that a later picture may predict from — but they are not part of
@@ -218,6 +245,9 @@ internal static class H265ColorConversion {
         _Fixed(-chromaScale * 2.0 * kr * (1.0 - kr) / kg),
         _Fixed(chromaScale * 2.0 * (1.0 - kb)));
     }
+
+    /// <summary>One luminance sample on the display's scale, which is what a monochrome picture is.</summary>
+    internal byte ToGrey(int luma, int rounding) => _Clamp(this.LumaGain * (luma - this.LumaBlack), rounding);
 
     internal void ToRgb(int luma, int cb, int cr, int rounding, out byte r, out byte g, out byte b) {
       if (this.Kind == ConversionKind.Identity) {

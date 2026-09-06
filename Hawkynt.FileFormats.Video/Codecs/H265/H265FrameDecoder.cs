@@ -81,7 +81,7 @@ internal sealed class H265FrameDecoder {
   internal H265FrameDecoder(H265SequenceParameterSet sps, H265PictureParameterSet pps) {
     this._sps = sps;
     this._pps = pps;
-    this._picture = new(sps.Width, sps.Height, _LOG2_MIN_BLOCK);
+    this._picture = new(sps.Width, sps.Height, _LOG2_MIN_BLOCK, sps.ChromaArrayType == 0);
     this._tiles = new(sps, pps);
 
     this._log2CtbSize = sps.CtbLog2SizeY;
@@ -597,7 +597,11 @@ internal sealed class H265FrameDecoder {
       this._FillBlocks(this._intraPredModeY, x, y, step, step, (byte)modes[i]);
     }
 
-    this._chromaPredMode = this._DecodeChromaMode(modes[0]);
+    // intra_chroma_pred_mode is conditioned on ChromaArrayType by clause 7.3.8.5: a monochrome coding
+    // unit has no chrominance to give a prediction mode to, and sends no bin for one.
+    if (this._sps.ChromaArrayType != 0)
+      this._chromaPredMode = this._DecodeChromaMode(modes[0]);
+
     return false;
   }
 
@@ -859,14 +863,19 @@ internal sealed class H265FrameDecoder {
 
     var cbfCb = false;
     var cbfCr = false;
-    if (log2TrafoSize > 2) {
-      if (trafoDepth == 0 || parentCbfCb)
-        cbfCb = this._cabac.DecodeBin(H265CabacContexts.CBF_CHROMA + trafoDepth) != 0;
-      if (trafoDepth == 0 || parentCbfCr)
-        cbfCr = this._cabac.DecodeBin(H265CabacContexts.CBF_CHROMA + trafoDepth) != 0;
-    } else {
-      cbfCb = parentCbfCb;
-      cbfCr = parentCbfCr;
+
+    // A monochrome sequence sends no chrominance coded-block flags at all — clause 7.3.8.8 conditions
+    // both on ChromaArrayType — so reading them would take two bins out of the luminance that follows.
+    if (this._sps.ChromaArrayType != 0) {
+      if (log2TrafoSize > 2) {
+        if (trafoDepth == 0 || parentCbfCb)
+          cbfCb = this._cabac.DecodeBin(H265CabacContexts.CBF_CHROMA + trafoDepth) != 0;
+        if (trafoDepth == 0 || parentCbfCr)
+          cbfCr = this._cabac.DecodeBin(H265CabacContexts.CBF_CHROMA + trafoDepth) != 0;
+      } else {
+        cbfCb = parentCbfCb;
+        cbfCr = parentCbfCr;
+      }
     }
 
     if (split) {
@@ -893,6 +902,7 @@ internal sealed class H265FrameDecoder {
     this._MarkTransformEdges(x0, y0, size, size);
     this._FillBlocks(this._hasCodedResidual, x0, y0, size, size, cbfLuma);
 
+    var monochrome = this._sps.ChromaArrayType == 0;
     var chromaAtParent = log2TrafoSize == 2;
     var anyChroma = chromaAtParent ? blockIdx == 3 && (cbfCb || cbfCr) : cbfCb || cbfCr;
 
@@ -907,6 +917,9 @@ internal sealed class H265FrameDecoder {
       this._ReconstructIntraLuma(x0, y0, log2TrafoSize, cbfLuma, qp);
     else if (cbfLuma)
       this._AddLumaResidual(x0, y0, log2TrafoSize, qp);
+
+    if (monochrome)
+      return;
 
     if (chromaAtParent) {
       if (blockIdx != 3)
