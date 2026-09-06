@@ -695,6 +695,56 @@ does not refuse either but answers with palette index zero — not a reading of 
 states, and not reproduced here. A skip opcode is not refused on the very first frame: the canvas a
 freshly built decoder starts with is already what a skip states, so an encoder using one there is
 stating that canvas rather than pointing at a frame that does not exist.
+
+**Writing it.** The encoder is converted from FFmpeg's `libavcodec/smcenc.c`, which is
+LGPL-2.1-or-later and so takeable — the first rung of the ladder — with the attribution beside the
+code in `Codecs/AppleGraphics/THIRD-PARTY-NOTICE.FFmpeg.txt`. What is taken is the block walk: at
+every block four runs are measured — how many blocks from here are unchanged since the frame before,
+how many repeat the block just written, how many share one set of distinct colours, and how many
+colours that set holds — and the longest of them is spent. The picture is coded over a canvas padded
+out to whole blocks with its last row and column repeated into the padding, which the decoder crops
+off again, so a width or height that is not a whole number of blocks costs compression at the edges
+and nothing else.
+
+It is lossless, and that is a property of the format rather than of the effort spent: one distinct
+colour in a block is the one-colour opcode, two the two-colour, three or four the four-colour, five to
+eight the eight-colour, and anything above that the sixteen raw indices, which hold any block
+whatever. There is nothing here to round. The other side of that is that an eight-bit palettised
+picture is the only thing it takes — a true-colour picture would have to be reduced to 256 colours
+first, and which 256 is not a codec's decision — so every other pixel format is refused by name, as
+are a depth other than eight (including the greyscale spelling, depth 40, which is written back as
+ordinary eight bits with the ramp stated as a colour table), a palettised picture carrying no palette,
+a palette or a picture size that changes between frames, and an index past the end of the palette.
+
+**The one thing the two readings of this format disagree about, measured.** Fourteen movies written by
+ffmpeg's own SMC encoder — 262 frames, 6x4 up to 640x480, test patterns, noise, gradients and a still —
+were decoded by ffmpeg and by this decoder and the index planes compared. Three of the fourteen agree
+and eleven do not. The whole of the difference is the colour caches: this decoder resets them at every
+packet, where ffmpeg's leaves the previous chunk's contents standing and only restarts the write
+pointer, and ffmpeg's encoder relies on that, matching a run against a set of colours an earlier frame
+wrote. Leaving the caches standing here makes all fourteen files agree with ffmpeg on every one of the
+262 frames, byte for byte, which locates the disagreement exactly and nowhere else. Nothing published
+about the format settles which reading is meant, and the eight real Apple-authored streams above agree
+with both, because none of them ever names an entry its own chunk has not written.
+
+So the encoder does not write one either: it resets the caches with every packet and only ever emits a
+cached-colour opcode for an entry the same packet has already written. Such a stream reads identically
+under either reading, which is the only kind worth writing while the question is open.
+
+**What ffmpeg makes of what this writes.** The 262 index planes above, written by this encoder, muxed
+into QuickTime and handed to ffmpeg: every frame of all fourteen comes back with the index plane
+identical byte for byte and the 256-entry colour table identical to the one handed in. Thirteen further
+geometries went the same way round — 1x1, 3x1, 1x7, 5x3, 7x5, 17x13, 63x47, 65x49, 4x4, 16x16, 255x129,
+301x3 and 640x480, 132 frames, sizes ffmpeg's own pal8 conversion will not produce because it rounds
+odd dimensions down — and ffmpeg decodes every one of them exactly as well. That is 27 files this
+encoder wrote and 394 frames read back by the other tool, against 14 files and 262 frames that tool
+wrote itself; the two counts are of different things and are not added together. Between them they
+exercise every opcode this encoder emits: both spellings of skip, both of repeat, both of one colour,
+and the stated and cached spellings of the two-, four- and eight-colour blocks, plus the sixteen raw
+indices. The two "repeat the last two blocks" opcodes are never written, since nothing they can say is
+cheaper than what is written instead.
+
+On the same 262 pictures this encoder's packets total 802,858 bytes against ffmpeg's 827,671.
 ### VP8
 
 The codec WebM was built around, and all of it: the boolean entropy decoder, segmentation, both loop
