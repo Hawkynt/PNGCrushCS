@@ -32,6 +32,7 @@
     <Using Include="NUnit.Framework" />
   </ItemGroup>
 
+<<<<<<< HEAD
   <!-- Six frames apiece of two real Indeo files from samples.ffmpeg.org, remuxed by ffmpeg, and
        ffmpeg's own per-frame checksums of decoding them. The checksums are the expected output: they
        are what a second implementation says the bitstream means, which is the only thing that can
@@ -39,6 +40,14 @@
   <ItemGroup>
     <None Include="Codecs\Indeo\Fixtures\*">
       <Link>Fixtures\Indeo\%(Filename)%(Extension)</Link>
+=======
+  <!-- Two single DV frames ffmpeg's own encoder wrote, so the decoder can be checked against a
+       reference bitstream rather than only against streams built here. A DV frame is a fixed
+       120000 or 240000 bytes whatever it contains, so these are one picture each and not a clip. -->
+  <ItemGroup>
+    <None Include="Codecs\Dv\Fixtures\*.dv">
+      <Link>Fixtures\Dv\%(Filename)%(Extension)</Link>
+>>>>>>> origin/video/dv
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>
