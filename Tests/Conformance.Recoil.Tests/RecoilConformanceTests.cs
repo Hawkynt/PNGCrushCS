@@ -121,6 +121,8 @@ public sealed class RecoilConformanceTests {
     new(ImageFormat.Apple3201, "3201", 320, 200),
     new(ImageFormat.LdPic, "LdPic", 320, 256),
     new(ImageFormat.MapletownNl3, "Mapletown NL3", 160, 100),
+    // ML1 states its own corners, so the size is ours to pick rather than the format's.
+    new(ImageFormat.MapletownMl1, "Mapletown Network ML1", 320, 200, ".ml1"),
     new(ImageFormat.AtariPi9, "Graphics 9", 320, 192),
     new(ImageFormat.AtariPi8, "Graphics 8", 320, 192),
     new(ImageFormat.ZxTrefiBorderScreen, "Border Screen by Trefi", 256, 192),

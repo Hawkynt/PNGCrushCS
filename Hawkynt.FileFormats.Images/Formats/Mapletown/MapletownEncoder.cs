@@ -3,13 +3,14 @@ using System.Collections.Generic;
 
 namespace FileFormat.Mapletown;
 
-/// <summary>Writes the printable bit stream a Mapletown picture is carried in.</summary>
+/// <summary>Writes the bit stream a Mapletown picture is carried in.</summary>
 /// <remarks>
-/// The mirror of <see cref="MapletownStream"/>'s text form. The alphabet is printable ASCII less
-/// the six characters a quoting layer might touch, and then part of the half-width Japanese range —
-/// 128 characters exactly, so a character carries seven bits and not the six the format's own
-/// documentation claims. The reader agrees: it refills after six shifts of a sentinel that starts
-/// one place below the value, which is seven bits out of every character.
+/// The mirror of <see cref="MapletownStream"/>, and it has the same two forms. MX1's alphabet is
+/// printable ASCII less the six characters a quoting layer might touch, and then part of the
+/// half-width Japanese range — 128 characters exactly, so a character carries seven bits and not the
+/// six the format's own documentation claims. The reader agrees: it refills after six shifts of a
+/// sentinel that starts one place below the value, which is seven bits out of every character. ML1
+/// was never posted anywhere and simply takes all eight bits of every byte.
 /// <para/>
 /// Characters above ASCII are written as the single bytes a Japanese board would have carried. The
 /// reader also accepts them re-encoded as three-byte sequences, which is what a file that has been
@@ -20,6 +21,9 @@ public sealed class MapletownEncoder {
   /// <summary>Bits one character of the printable alphabet carries.</summary>
   public const int BitsPerCharacter = 7;
 
+  /// <summary>Bits one byte of the binary form carries.</summary>
+  public const int BitsPerByte = 8;
+
   /// <summary>The widest a length may be written, which is what the reader will follow.</summary>
   private const int _MAX_LENGTH_BITS = 20;
 
@@ -29,8 +33,21 @@ public sealed class MapletownEncoder {
   private static readonly byte[] _Encode = _CreateEncodeTable();
 
   private readonly List<byte> _bytes = [];
+  private readonly byte[]? _alphabet;
+  private readonly int _bitsPerUnit;
   private int _pending;
   private int _count;
+
+  /// <summary>Creates an encoder for the printable form, seven bits to a character.</summary>
+  public MapletownEncoder() {
+    this._alphabet = _Encode;
+    this._bitsPerUnit = BitsPerCharacter;
+  }
+
+  private MapletownEncoder(int bitsPerUnit) => this._bitsPerUnit = bitsPerUnit;
+
+  /// <summary>Creates an encoder for the binary form, eight bits to a byte.</summary>
+  public static MapletownEncoder Binary() => new(BitsPerByte);
 
   private static byte[] _CreateEncodeTable() {
     var decode = MapletownStream.CreateDecodeTable();
@@ -56,10 +73,14 @@ public sealed class MapletownEncoder {
 
   public void Bit(int bit) {
     this._pending = (this._pending << 1) | (bit & 1);
-    if (++this._count < BitsPerCharacter)
+    if (++this._count < this._bitsPerUnit)
       return;
 
-    this._bytes.Add(_Encode[this._pending]);
+    this._Emit();
+  }
+
+  private void _Emit() {
+    this._bytes.Add(this._alphabet == null ? (byte)this._pending : this._alphabet[this._pending]);
     this._pending = 0;
     this._count = 0;
   }
@@ -90,16 +111,14 @@ public sealed class MapletownEncoder {
     this.Bits(value - (1 << bits) + 1, bits);
   }
 
-  /// <summary>Pads whatever is half-written out to a whole character.</summary>
+  /// <summary>Pads whatever is half-written out to a whole character or byte.</summary>
   /// <remarks>The padding is read as bits, so it may only follow something the reader stops at.</remarks>
   public void Flush() {
     if (this._count == 0)
       return;
 
-    this._pending <<= BitsPerCharacter - this._count;
-    this._bytes.Add(_Encode[this._pending]);
-    this._pending = 0;
-    this._count = 0;
+    this._pending <<= this._bitsPerUnit - this._count;
+    this._Emit();
   }
 
   public byte[] ToArray() {
