@@ -477,6 +477,74 @@ What is not implemented refuses and says so: a strip identifier that is neither 
 chunk type the format does not define, a strip reaching outside its frame or not made of whole
 blocks, a picture size that changes part way through a stream, a vector list stopping before every
 block is accounted for, and any chunk shorter than it says it is.
+### Intel Indeo 2
+
+The simplest of the Indeo family and nothing like the three that follow it: no blocks, no motion
+vectors, no transform. A plane is a stream of Huffman codes read least-significant-bit first, and a
+code either names a pair of entries in one of four delta tables or a run of pairs that change nothing.
+An intra frame's first line takes the entries as sample values outright and every line after it as
+differences from the line above; an inter frame takes them as differences from the same plane of the
+previous frame, at three quarters of their stated strength. The three planes come out in the order
+luminance, red difference, blue difference — that crossing over is the format's, not a slip.
+
+Neither table is in any file. The Huffman table is never named at all, and a frame states which of the
+four delta tables its luminance uses and which its chrominance uses in two bit pairs of one header
+byte. That is the whole reason this decoder carries them, and the reason they are copied exactly
+rather than derived: see `Codecs/Indeo/THIRD-PARTY-NOTICE.FFmpeg.txt`.
+
+**Measured.** Six real files from `samples.ffmpeg.org/V-codecs/RT21/` — all 160x120, 103 to 815 frames
+apiece, 1,984 in all — were decoded here and by ffmpeg and compared against ffmpeg's own decoded
+`yuv410p` planes, sample for sample, every frame of every file: all 42,854,400 samples are identical,
+Y, Cb and Cr alike, with no difference at all on any frame of any file. The planes and not RGB settle
+it: the RGB is a display convention this decoder chose, and the planes are the decode.
+
+What refuses, by name: a picture whose width does not divide by eight or whose height by four — every
+code writes a pair of samples and a chrominance plane is a quarter of the width, so a quarter of the
+width has to be even; a frame shorter than its own 48-byte header; a chrominance table index outside
+the four the codec defines; a run overrunning the line it starts on; a plane whose bits run out before
+its samples do; and any bit pattern that is not one of the 143 codes.
+
+### Intel Indeo 3
+
+A binary tree cuts each plane into cells; each leaf says its cell is still, moved by a vector, or
+coded; and a coded cell names one of twenty-four quantisation tables and one of six coding modes and is
+then a run of bytes, each naming a pair of deltas, or two pairs packed into one byte, or saying that
+some number of lines or of whole blocks carry no change.
+
+**The tree and the cell data share one buffer and interleave**, which is the one thing a decoder of
+this format has to get right. The tree is a bit stream; the motion vectors and the coded cells are
+whole bytes taken from the point the tree has reached, rounded up to a byte boundary. Reading a leaf
+therefore moves the byte position and the tree has to be pushed past what the leaf took — but only once
+the tree itself reaches a byte boundary, because until then it is still inside the byte the leaf began
+in. Take the skip early and the tree and the cells desynchronise, and what comes out is still a
+picture.
+
+Samples are seven bits and every write masks the eighth away, but the additions are done on two, four
+or eight samples at once as one wide integer, so a delta that overflows one sample carries into the
+next before the mask removes it. That is what the format's own encoders coded against, so the
+arithmetic is reproduced as it stands rather than clamped sample by sample.
+
+**Measured.** Nine real files from `samples.ffmpeg.org/V-codecs/IV32/` — 152x116 to 320x240, 40 to
+1,811 packets apiece, one of them a QuickTime file rather than an AVI — were decoded here and by ffmpeg
+and compared against ffmpeg's own decoded `yuv410p` planes, sample for sample: 4,828 pictures out of
+4,986 packets, 179,742,150 samples, all identical with no difference at all. The 158 packets that made
+no picture are the same 158 ffmpeg refuses, on the same three damaged files and for the same reasons —
+`indeo3sux.avi` is refused from its first packet to its last by both, and `iv32_example.avi` loses the
+same single packet 112 in both. That the refusals line up frame for frame is part of the measurement: a
+decoder giving up one packet earlier or later than ffmpeg would produce a different film out of the
+same file even with every surviving frame identical.
+
+`IV31` is accepted as well as `IV32`. The two codes name one bitstream and a frame states its own
+version in its header rather than taking it from the code, but no file coded as `IV31` could be found
+to measure, so that is a claim about the format and not a measurement.
+
+What refuses, by name: eight-bit samples and half-sample motion vectors, both flagged in a frame header
+and neither written by any encoder a corpus holds; the "skip cell" null code, whose effect on the two
+frame buffers is stated nowhere and which no measured file uses; a coding mode outside the six the
+format defines; a picture outside 16x16 to 640x480; a header failing its own checksum; plane offsets
+outside the frame; a cell reaching outside its plane or a motion vector off the picture; and a tree
+deeper than twenty levels or one that runs out of bits.
+
 ### QuickTime Animation (RLE)
 
 Lossless, and line-based rather than block-based: a frame names the band of lines it touches and
@@ -913,6 +981,20 @@ What is not implemented refuses and says so, naming the clause: quarter-sample m
 sprites and global motion compensation, interlaced coding, overlapped block motion compensation, data
 partitioning, scalability, non-rectangular shape, samples of any depth but eight, chroma formats
 other than 4:2:0, newpred, reduced-resolution pictures and the complexity estimation header.
+
+The vendor four-character codes were measured the same way the pictures were. `XVIX`, `BLZ0`, `DM4V`,
+`DXGM`, `HDX4`, `SEDG`, `SMP4` and `WV1F` each name this bitstream in ffmpeg's own AVI tag table, and
+each was checked against two elementary streams rather than taken on that word: 176x144 over fifty
+frames and 352x288 over a hundred with one intra picture at the front, written into an AVI under each
+code in turn so that only the four letters differ. Under every code the decode here is identical to
+the decode of the same stream under `XVID` — 3.8 and 30.4 million samples, none differing — and the
+difference from ffmpeg's decode of the same file is the same in every case, which is the transform's
+residual and not the code's. A code that is only a name costs nothing to take, and refusing it costs
+a file every other tool plays.
+
+`DVX3` was checked the same way and is **not** one of them: it names Microsoft's MPEG-4 version 3, so
+it is claimed by the version 2 decoder beside this one and refused there by name. Matroska's
+`V_MPEG4/MS/V3` is the same bitstream under that container's name and is refused with it.
 ### Apple ProRes
 
 Written from SMPTE RDD 36:2022, which is the published description of the bitstream and is cited by
@@ -1044,9 +1126,15 @@ the bitstream was read the way it was written.
 
 What refuses, by name: predicted, bidirectional and skipped pictures, each as what it is, because
 every one of them needs motion compensation against a reference this builds no part of; the Advanced
-profile, under its own code, since it carries a sequence header and entry point inside a byte stream
+profile, under its own codes, since it carries a sequence header and entry point inside a byte stream
 and shares only its block layer; and multi-resolution coding, range reduction and the in-loop
 deblocking filter, where the sequence header signals them.
+
+`WMVA` is one of those codes and not a second name for `WMV3`, which the name invites. It is Windows
+Media Video 9 Advanced Profile as it was written before the profile was standardised, and ffmpeg maps
+it to VC-1 rather than to WMV3 — so what follows the tag is a markered sequence header and entry
+point, not `STRUCT_C`. Reading it as `STRUCT_C` would find a profile and a quantiser in bits that mean
+something else, which is why it sits beside `WVC1` and not beside `WMV3`.
 
 One note on the source. The freely circulating committee draft of SMPTE 421M prints its three intra
 scan tables twenty-four columns wide on a page that fits twenty-three, so two cells of each fall past
@@ -1812,6 +1900,71 @@ no alpha, and comparing this format through it would invent a value the coding s
 
 The alpha channel is carried through unchanged rather than composited or assumed opaque, for the same
 reason v408's is.
+
+### The ten raw pixel layouts — YUY2, YVYU, UYVY, VYUY, YV12, I420, IYUV, NV12, NV21, Y800
+
+Not codecs at all: ten four-character codes each naming a pixel layout, with nothing compressed, no
+header ahead of the picture and no padding anywhere. Four pack 4:2:2 into two-pixel macropixels of
+four bytes, three lay 4:2:0 out as separate planes, two fold its chroma into one interleaved plane,
+and one carries luma alone. What separates them is only the order of the bytes — which is exactly why
+getting one wrong does not fail: the picture still decodes and its reds and blues are exchanged.
+
+Every one of them was measured against ffmpeg in both directions and at three geometries apiece, five
+frames each. Files ffmpeg wrote as `rawvideo` at the matching `-pix_fmt` with the tag forced were
+decoded here and compared sample for sample against ffmpeg's own planar decode of the very same files;
+then packets written here were muxed into an AVI and read back through ffmpeg the same way. Every
+sample of every plane of every frame is identical in both directions, and — for eight of the ten — the
+packets written here are byte for byte the ones ffmpeg's own encoder wrote for the same pictures.
+
+| Code | Layout | ffmpeg `-pix_fmt` | Geometries | Samples compared |
+| --- | --- | --- | --- | --- |
+| `YUY2` | Y0 Cb Y1 Cr | `yuyv422` | 16x8, 34x18, 8x5 | 7,800 each way |
+| `YVYU` | Y0 Cr Y1 Cb | `yvyu422` | 16x8, 34x18, 8x5 | 7,800 each way |
+| `UYVY` | Cb Y0 Cr Y1 | `uyvy422` | 16x8, 34x18, 8x5 | 7,800 each way |
+| `VYUY` | Cr Y0 Cb Y1 | none — see below | 16x8, 34x18, 8x5 | 7,800 each way |
+| `YV12` | Y, Cr plane, Cb plane | `yuv420p` | 16x8, 34x18, 8x6 | 5,910 each way |
+| `I420` | Y, Cb plane, Cr plane | `yuv420p` | 16x8, 34x18, 8x6 | 5,910 each way |
+| `IYUV` | I420 under a second name | `yuv420p` | 16x8, 34x18, 8x6 | 5,910 each way |
+| `NV12` | Y, then Cb Cr interleaved | `nv12` | 16x8, 34x18, 8x6 | 5,910 each way |
+| `NV21` | Y, then Cr Cb interleaved | `nv21` | 16x8, 34x18, 8x6 | 5,910 each way |
+| `Y800` | Y alone, one byte a pixel | `gray` | 16x8, 17x9, 7x5 | 1,580 each way |
+
+**Two of the ten disagree with ffmpeg, and both disagreements are ffmpeg's.**
+
+`VYUY` is the one ffmpeg cannot answer for: its raw-video tag table maps that code onto `yuyv422`, so
+it reads and writes YUY2's ordering under it. Comparing against its decode would have confirmed the
+wrong layout — its reading of the files measured here differs from this one in 7,775 of 7,800 samples.
+The order used instead is the one the Linux kernel's V4L2 documentation prints for
+`V4L2_PIX_FMT_VYUY` — Cr0, Y'0, Cb0, Y'1 — and the one Microsoft's note on 8-bit YUV formats states by
+describing VYUY as UYVY with the chroma samples exchanged. It is still checked against ffmpeg, by the
+one detour that works: VYUY's bytes are UYVY's packing of the same picture with its two chroma planes
+exchanged, so ffmpeg's `uyvy422` writing of the exchanged picture *is* a VYUY frame, and decoding it
+here returns the picture before the exchange exactly.
+
+`YV12` is where ffmpeg's own writer and its own reader disagree. Asked for `-vtag YV12` its raw-video
+encoder writes I420's plane order and leaves the tag to say otherwise; its decoder does exchange the
+two chroma planes for that tag. Both readers therefore arrive at the same picture and the asymmetry
+never shows in a decode comparison — which is what makes that comparison worth something here, since a
+decoder that did not exchange the planes would have disagreed on every one of the 1,970 chroma samples.
+What is written here is what the code states, so over the same pictures these packets differ from
+ffmpeg's in all 1,970 chroma bytes and in none of the 3,940 luma ones, and are exactly its packets with
+the two chroma planes exchanged.
+
+**Odd geometries are refused rather than guessed at.** A 4:2:2 macropixel is two pixels, so an odd
+width would end a row in two bytes stating one luma sample and one of the two chroma samples that pixel
+needs; ffmpeg writes no such frame either, rounding an odd width up to the next even one. 4:2:0 states
+one chroma pair per two-by-two block, so an odd width or height leaves a partial block. ffmpeg *will*
+write that one — it rounds each chroma plane's dimensions up, so a 7x5 frame carries 35 luma bytes and
+two 4x3 chroma planes — but that is its own convention rather than anything the four-character code
+states, and no VfW or DirectShow renderer of these codes accepts an odd dimension at all. Y800 has no
+chroma grid to divide and so takes any size, odd in both directions included, which is what the 7x5 and
+17x9 measurements above are for.
+
+**What comes out is the samples, not colour.** Unpacking any of the ten is a rearrangement of eight-bit
+bytes, so each hands back the pixel format that says exactly that — `Yuv422P8`, `Yuv420P8` or `Gray8` —
+rather than converting to RGB on the way out and stating a display convention the code does not.
+Y800's luma is nominally studio swing and is handed over unscaled, which is what ffmpeg's own decode of
+the tag does as well.
 
 ### avrp
 

@@ -27,8 +27,9 @@ namespace FileFormat.Codecs;
 /// <b>What it does not do refuses by name.</b> A predicted picture, a bidirectionally predicted one
 /// and a skipped one are each refused as what they are, because every one of them needs motion
 /// compensation against a reference this decoder never builds. The Advanced profile is refused at the
-/// stream, under its own code <c>WVC1</c>, since it carries a sequence header and an entry point
-/// structure of its own inside a byte stream and shares only its block layer with what is here.
+/// stream, under its own codes <c>WVC1</c> and <c>WMVA</c>, since it carries a sequence header and an
+/// entry point structure of its own inside a byte stream and shares only its block layer with what is
+/// here.
 /// Multi-resolution coding, range reduction and the in-loop deblocking filter are refused where the
 /// stream signals them. There is no <c>catch</c> anywhere that hands back a blank, a copied or a
 /// repeated picture: a repeated frame is what a legitimate still passage looks like, and nobody checks
@@ -47,8 +48,17 @@ public sealed class Vc1VideoDecoder : IVideoCodecDecoder<Vc1VideoDecoder> {
   ];
 
   /// <summary>The codes that name the Advanced profile, which this refuses by name rather than ignores.</summary>
+  /// <remarks>
+  /// <c>WMVA</c> is Windows Media Video 9 Advanced Profile as it was written before the profile was
+  /// standardised, and it belongs here rather than beside <c>WMV3</c> despite the family resemblance
+  /// of the name: what follows the tag is a sequence header and an entry point structure carried as
+  /// markered elements, not the thirty-two bit <c>STRUCT_C</c> the Simple and Main profiles state.
+  /// Reading it as though it were <c>STRUCT_C</c> would find a profile and a quantiser in bits that
+  /// mean something else entirely.
+  /// </remarks>
   private static readonly CodecTag[] _AdvancedTags = [
     CodecTag.FromCharacters("WVC1"),
+    CodecTag.FromCharacters("WMVA"),
     CodecTag.FromCharacters("VC-1"),
   ];
 

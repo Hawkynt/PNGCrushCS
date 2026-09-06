@@ -1,0 +1,16 @@
+#format: frame checksums
+#version: 2
+#hash: MD5
+#software: Lavf63.1.101
+#tb 0: 31247/500000
+#media_type 0: video
+#codec_id 0: rawvideo
+#dimensions 0: 160x120
+#sar 0: 0/1
+#stream#, dts,        pts, duration,     size, hash
+0,          0,          0,        1,    21600, 0970c870efa39500f4f34378e1fbe20a
+0,          1,          1,        1,    21600, 3e707a45000465237dea685792488d86
+0,          2,          2,        1,    21600, e9d0af32e284cdbe76dcc66b15fcf160
+0,          3,          3,        1,    21600, db61bcddcf664c12f4eae044241a771f
+0,          4,          4,        1,    21600, ab679ba8e33efe1691c3c6f8c649300c
+0,          5,          5,        1,    21600, 20dceebe742e80f2ebf95f5754ea10dd

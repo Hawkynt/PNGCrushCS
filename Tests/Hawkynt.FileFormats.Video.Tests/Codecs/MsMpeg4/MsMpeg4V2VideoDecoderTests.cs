@@ -59,6 +59,7 @@ public sealed class MsMpeg4V2VideoDecoderTests {
       Assert.That(MsMpeg4V2VideoDecoder.Accepts(_Stream("MPG4")), Is.True);
       Assert.That(MsMpeg4V2VideoDecoder.Accepts(_Stream("MP43")), Is.True);
       Assert.That(MsMpeg4V2VideoDecoder.Accepts(_Stream("DIV3")), Is.True);
+      Assert.That(MsMpeg4V2VideoDecoder.Accepts(_Stream("DVX3")), Is.True);
     });
   }
 
@@ -118,13 +119,35 @@ public sealed class MsMpeg4V2VideoDecoderTests {
   [TestCase("DIV4")]
   [TestCase("DIV5")]
   [TestCase("AP41")]
+  [TestCase("DVX3")]
   [Category("Unit")]
   public void VersionThreeIsRefusedByNameAndSaysWhy(string codec) {
     var e = Assert.Throws<NotSupportedException>(() => MsMpeg4V2VideoDecoder.Create(_Stream(codec)));
 
     Assert.Multiple(() => {
-      Assert.That(e!.Message, Does.Contain("version 3"));
+      Assert.That(e!.Message, Does.Contain(codec));
+      Assert.That(e.Message, Does.Contain("version 3"));
       Assert.That(e.Message, Does.Contain("motion vector tables"));
+    });
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void VersionThreeIsRefusedByNameUnderTheNameMatroskaGivesIt() {
+    // The one of the three versions Matroska names at all, and the tag is absent there — a track
+    // states either a CodecID or a BITMAPINFOHEADER code, never both — so the refusal has to find it
+    // by name and then has to have a name to put in the message.
+    var stream = new MediaStreamInfo {
+      Index = 0, Kind = MediaStreamKind.Video, CodecId = "V_MPEG4/MS/V3", Width = _WIDTH, Height = _HEIGHT,
+    };
+
+    Assert.That(MsMpeg4V2VideoDecoder.Accepts(stream), Is.True);
+
+    var e = Assert.Throws<NotSupportedException>(() => MsMpeg4V2VideoDecoder.Create(stream));
+
+    Assert.Multiple(() => {
+      Assert.That(e!.Message, Does.Contain("V_MPEG4/MS/V3"));
+      Assert.That(e.Message, Does.Contain("version 3"));
     });
   }
 

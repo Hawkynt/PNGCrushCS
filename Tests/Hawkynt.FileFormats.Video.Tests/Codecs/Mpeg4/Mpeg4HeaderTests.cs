@@ -231,11 +231,28 @@ public sealed class Mpeg4HeaderTests {
   [TestCase("DX50", true)]
   [TestCase("FMP4", true)]
   [TestCase("DIV3", false)]
+  [TestCase("DVX3", false)]
+  [TestCase("WMVA", false)]
   [TestCase("MPG1", false)]
   [TestCase("H263", false)]
   [Category("Unit")]
   public void TheCodecTakesTheStreamsItsContainersName(string tag, bool expected)
     => Assert.That(Mpeg4VideoDecoder.Accepts(_Stream(tag)), Is.EqualTo(expected));
+
+  // Each of these was written into an AVI's stream header over one MPEG-4 Part 2 elementary stream
+  // and decoded here and by ffmpeg: the pictures are the same pictures the stream produces under
+  // XVID, to the sample, so the code is a name and nothing more.
+  [TestCase("XVIX")]
+  [TestCase("BLZ0")]
+  [TestCase("DM4V")]
+  [TestCase("DXGM")]
+  [TestCase("HDX4")]
+  [TestCase("SEDG")]
+  [TestCase("SMP4")]
+  [TestCase("WV1F")]
+  [Category("Unit")]
+  public void TheCodecTakesTheVendorCodesThatAreTheSameBitstream(string tag)
+    => Assert.That(Mpeg4VideoDecoder.Accepts(_Stream(tag)), Is.True);
 
   [TestCase("V_MPEG4/ISO/ASP", true)]
   [TestCase("V_MPEG4/ISO/SP", true)]
