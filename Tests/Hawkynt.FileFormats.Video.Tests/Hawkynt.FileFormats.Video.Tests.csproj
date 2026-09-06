@@ -31,4 +31,15 @@
   <ItemGroup>
     <Using Include="NUnit.Framework" />
   </ItemGroup>
+
+  <!-- Six frames apiece of two real Indeo files from samples.ffmpeg.org, remuxed by ffmpeg, and
+       ffmpeg's own per-frame checksums of decoding them. The checksums are the expected output: they
+       are what a second implementation says the bitstream means, which is the only thing that can
+       tell a plausible decode from a correct one. -->
+  <ItemGroup>
+    <None Include="Codecs\Indeo\Fixtures\*">
+      <Link>Fixtures\Indeo\%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
 </Project>

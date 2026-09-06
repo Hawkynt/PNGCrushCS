@@ -477,6 +477,74 @@ What is not implemented refuses and says so: a strip identifier that is neither 
 chunk type the format does not define, a strip reaching outside its frame or not made of whole
 blocks, a picture size that changes part way through a stream, a vector list stopping before every
 block is accounted for, and any chunk shorter than it says it is.
+### Intel Indeo 2
+
+The simplest of the Indeo family and nothing like the three that follow it: no blocks, no motion
+vectors, no transform. A plane is a stream of Huffman codes read least-significant-bit first, and a
+code either names a pair of entries in one of four delta tables or a run of pairs that change nothing.
+An intra frame's first line takes the entries as sample values outright and every line after it as
+differences from the line above; an inter frame takes them as differences from the same plane of the
+previous frame, at three quarters of their stated strength. The three planes come out in the order
+luminance, red difference, blue difference — that crossing over is the format's, not a slip.
+
+Neither table is in any file. The Huffman table is never named at all, and a frame states which of the
+four delta tables its luminance uses and which its chrominance uses in two bit pairs of one header
+byte. That is the whole reason this decoder carries them, and the reason they are copied exactly
+rather than derived: see `Codecs/Indeo/THIRD-PARTY-NOTICE.FFmpeg.txt`.
+
+**Measured.** Six real files from `samples.ffmpeg.org/V-codecs/RT21/` — all 160x120, 103 to 815 frames
+apiece, 1,984 in all — were decoded here and by ffmpeg and compared against ffmpeg's own decoded
+`yuv410p` planes, sample for sample, every frame of every file: all 42,854,400 samples are identical,
+Y, Cb and Cr alike, with no difference at all on any frame of any file. The planes and not RGB settle
+it: the RGB is a display convention this decoder chose, and the planes are the decode.
+
+What refuses, by name: a picture whose width does not divide by eight or whose height by four — every
+code writes a pair of samples and a chrominance plane is a quarter of the width, so a quarter of the
+width has to be even; a frame shorter than its own 48-byte header; a chrominance table index outside
+the four the codec defines; a run overrunning the line it starts on; a plane whose bits run out before
+its samples do; and any bit pattern that is not one of the 143 codes.
+
+### Intel Indeo 3
+
+A binary tree cuts each plane into cells; each leaf says its cell is still, moved by a vector, or
+coded; and a coded cell names one of twenty-four quantisation tables and one of six coding modes and is
+then a run of bytes, each naming a pair of deltas, or two pairs packed into one byte, or saying that
+some number of lines or of whole blocks carry no change.
+
+**The tree and the cell data share one buffer and interleave**, which is the one thing a decoder of
+this format has to get right. The tree is a bit stream; the motion vectors and the coded cells are
+whole bytes taken from the point the tree has reached, rounded up to a byte boundary. Reading a leaf
+therefore moves the byte position and the tree has to be pushed past what the leaf took — but only once
+the tree itself reaches a byte boundary, because until then it is still inside the byte the leaf began
+in. Take the skip early and the tree and the cells desynchronise, and what comes out is still a
+picture.
+
+Samples are seven bits and every write masks the eighth away, but the additions are done on two, four
+or eight samples at once as one wide integer, so a delta that overflows one sample carries into the
+next before the mask removes it. That is what the format's own encoders coded against, so the
+arithmetic is reproduced as it stands rather than clamped sample by sample.
+
+**Measured.** Nine real files from `samples.ffmpeg.org/V-codecs/IV32/` — 152x116 to 320x240, 40 to
+1,811 packets apiece, one of them a QuickTime file rather than an AVI — were decoded here and by ffmpeg
+and compared against ffmpeg's own decoded `yuv410p` planes, sample for sample: 4,828 pictures out of
+4,986 packets, 179,742,150 samples, all identical with no difference at all. The 158 packets that made
+no picture are the same 158 ffmpeg refuses, on the same three damaged files and for the same reasons —
+`indeo3sux.avi` is refused from its first packet to its last by both, and `iv32_example.avi` loses the
+same single packet 112 in both. That the refusals line up frame for frame is part of the measurement: a
+decoder giving up one packet earlier or later than ffmpeg would produce a different film out of the
+same file even with every surviving frame identical.
+
+`IV31` is accepted as well as `IV32`. The two codes name one bitstream and a frame states its own
+version in its header rather than taking it from the code, but no file coded as `IV31` could be found
+to measure, so that is a claim about the format and not a measurement.
+
+What refuses, by name: eight-bit samples and half-sample motion vectors, both flagged in a frame header
+and neither written by any encoder a corpus holds; the "skip cell" null code, whose effect on the two
+frame buffers is stated nowhere and which no measured file uses; a coding mode outside the six the
+format defines; a picture outside 16x16 to 640x480; a header failing its own checksum; plane offsets
+outside the frame; a cell reaching outside its plane or a motion vector off the picture; and a tree
+deeper than twenty levels or one that runs out of bits.
+
 ### QuickTime Animation (RLE)
 
 Lossless, and line-based rather than block-based: a frame names the band of lines it touches and
