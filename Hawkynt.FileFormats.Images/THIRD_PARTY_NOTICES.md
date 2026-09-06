@@ -2,11 +2,35 @@
 
 This package contains managed ports/adaptations of permissively licensed reference-code algorithms. The resulting C# code is maintained in this repository; no native codec library is loaded at runtime.
 
-## AV1 range encoder
+## AV1 codec
 
-`Formats/Avif/Codec/Av1RangeEncoder.cs` is a managed adaptation of the arithmetic writer used by rav1e and libaom: the storage and carry-propagation logic follow rav1e's `src/ec.rs`. The rest of `Formats/Avif/Codec` is written from the AV1 specification's own section numbering and carries no third-party code.
+`Formats/Avif/Codec` is a managed AV1 still-picture codec derived from two permissively licensed reference implementations.
 
-Verbatim copies of the two files rav1e distributes with that code are kept beside it, in `Formats/Avif/Codec/RAV1E_LICENSE` and `Formats/Avif/Codec/RAV1E_PATENTS`. The second is not optional boilerplate: AV1 is patent-encumbered, and the Alliance for Open Media Patent License 1.0 is the grant under which an implementation may be distributed at all, so it travels with the code rather than being summarised here.
+**libaom** (BSD 2-Clause, Alliance for Open Media), pinned at tag `v3.15.0`, is the source of everything the AV1 specification leaves as a table and of the algorithms whose structure libaom fixes:
+
+- Every constant table under `Formats/Avif/Codec/Tables` is transcribed from libaom's own source, value for value. `Av1DefaultCdfTables` and `Av1CoefficientCdfTables` come from `av1/common/entropymode.c` and `av1/common/token_cdfs.h`; `Av1ScanTables` from `av1/common/scan.c`; `Av1QuantizerTables` and `Av1QuantizerMatrixTables` from `av1/common/quant_common.c`; `Av1CoefficientContextTables` from `av1/common/txb_common.c`; `Av1IntraTables` from `av1/common/reconintra.{c,h}`, `aom_dsp/intrapred_common.h` and `av1/common/blockd.h`; `Av1StructureTables` from `av1/common/common_data.{c,h}` and `av1/common/blockd.{c,h}`; `Av1PostFilterTables` from `av1/common/cdef_block.c` and `av1/common/restoration.c`. A re-derived probability table is simply a wrong one, so these are copies rather than reconstructions.
+- `Av1InverseTransform.cs` ports `av1_inv_txfm2d_add_c`, the `av1_idct*`/`av1_iadst*`/`av1_iidentity*` butterflies and `av1_highbd_iwht4x4_16_add_c`, with their cosine, shift and range tables.
+- `Av1ForwardTransform.cs` ports `av1_fwht4x4_c`.
+- `Av1IntraPrediction.cs` ports `build_intra_predictors` and the directional, smooth, Paeth, recursive-filter and chroma-from-luma predictors from `av1/common/reconintra.c`, `aom_dsp/intrapred.c` and `av1/common/cfl.c`.
+- `Av1Deblocking.cs`, `Av1CdefFilter.cs` and `Av1LoopRestoration.cs` port the in-loop filters from `av1/common/av1_loopfilter.c`, `aom_dsp/loopfilter.c`, `av1/common/cdef{,_block}.c` and `av1/common/restoration.c`.
+- The syntax and context rules in `Av1TileDecoder*.cs` follow `av1/decoder/decodetxb.c`, `av1/decoder/decodemv.c` and `av1/common/txb_common.h` alongside the specification's own section numbering; where libaom and the specification disagree the specification wins and the disagreement carries a comment.
+
+**rav1e** (BSD 2-Clause) is the source of `Formats/Avif/Codec/Av1RangeEncoder.cs`: the storage and carry-propagation logic of the arithmetic writer follow rav1e's `src/ec.rs`.
+
+Verbatim copies of the two files rav1e distributes with that code are kept beside it, in `Formats/Avif/Codec/RAV1E_LICENSE` and `Formats/Avif/Codec/RAV1E_PATENTS`. The second is not optional boilerplate: AV1 is patent-encumbered, and the Alliance for Open Media Patent License 1.0 is the grant under which an implementation may be distributed at all, so it travels with the code rather than being summarised here. libaom is distributed under the same pair of licences.
+
+### libaom license (BSD 2-Clause)
+
+Copyright (c) 2016, Alliance for Open Media. All rights reserved.
+
+Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:
+
+1. Redistributions of source code must retain the above copyright notice, this list of conditions and the following disclaimer.
+2. Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the following disclaimer in the documentation and/or other materials provided with the distribution.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+Source: https://aomedia.googlesource.com/aom/ (tag `v3.15.0`)
 
 ### rav1e license (BSD 2-Clause)
 

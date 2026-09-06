@@ -1,0 +1,82 @@
+// AV1 constant tables transcribed from the libaom reference implementation (BSD 2-Clause,
+// Alliance for Open Media). See THIRD_PARTY_NOTICES.md. Generated values are copied verbatim:
+// a re-derived probability table is simply a wrong one.
+
+using System;
+
+namespace FileFormat.Avif.Codec;
+
+/// <summary>Tables for AV1 intra prediction: recursive filter taps, smooth-predictor weights and
+/// the directional-mode derivative, from libaom's <c>av1/common/reconintra.c</c>,
+/// <c>av1/common/reconintra.h</c>, <c>aom_dsp/intrapred_common.h</c> and
+/// <c>av1/common/blockd.h</c>.</summary>
+internal static class Av1IntraTables {
+
+  /// <summary>av1_filter_intra_taps[FILTER_INTRA_MODES=5][8][8].</summary>
+  internal static readonly sbyte[] FilterIntraTaps = [
+    -6, 10, 0, 0, 0, 12, 0, 0,
+    -5, 2, 10, 0, 0, 9, 0, 0,
+    -3, 1, 1, 10, 0, 7, 0, 0,
+    -3, 1, 1, 2, 10, 5, 0, 0,
+    -4, 6, 0, 0, 0, 2, 12, 0,
+    -3, 2, 6, 0, 0, 2, 9, 0,
+    -3, 2, 2, 6, 0, 2, 7, 0,
+    -3, 1, 2, 2, 6, 3, 5, 0,
+    -10, 16, 0, 0, 0, 10, 0, 0,
+    -6, 0, 16, 0, 0, 6, 0, 0,
+    -4, 0, 0, 16, 0, 4, 0, 0,
+    -2, 0, 0, 0, 16, 2, 0, 0,
+    -10, 16, 0, 0, 0, 0, 10, 0,
+    -6, 0, 16, 0, 0, 0, 6, 0,
+    -4, 0, 0, 16, 0, 0, 4, 0,
+    -2, 0, 0, 0, 16, 0, 2, 0,
+    -8, 8, 0, 0, 0, 16, 0, 0,
+    -8, 0, 8, 0, 0, 16, 0, 0,
+    -8, 0, 0, 8, 0, 16, 0, 0,
+    -8, 0, 0, 0, 8, 16, 0, 0,
+    -4, 4, 0, 0, 0, 0, 16, 0,
+    -4, 0, 4, 0, 0, 0, 16, 0,
+    -4, 0, 0, 4, 0, 0, 16, 0,
+    -4, 0, 0, 0, 4, 0, 16, 0,
+    -2, 8, 0, 0, 0, 10, 0, 0,
+    -1, 3, 8, 0, 0, 6, 0, 0,
+    -1, 2, 3, 8, 0, 4, 0, 0,
+    0, 1, 2, 3, 8, 2, 0, 0,
+    -1, 4, 0, 0, 0, 3, 10, 0,
+    -1, 3, 4, 0, 0, 4, 6, 0,
+    -1, 2, 3, 4, 0, 4, 4, 0,
+    -1, 2, 2, 3, 4, 3, 3, 0,
+    -12, 14, 0, 0, 0, 14, 0, 0,
+    -10, 0, 14, 0, 0, 12, 0, 0,
+    -9, 0, 0, 14, 0, 11, 0, 0,
+    -8, 0, 0, 0, 14, 10, 0, 0,
+    -10, 12, 0, 0, 0, 0, 14, 0,
+    -9, 1, 12, 0, 0, 0, 12, 0,
+    -8, 0, 0, 12, 0, 1, 11, 0,
+    -7, 0, 0, 1, 12, 1, 9, 0,
+  ];
+  /// <summary>smooth_weights, concatenated for block dimensions 4, 8, 16, 32 and 64; index with dimension - 4.</summary>
+  internal static readonly byte[] SmoothWeights = [
+    255, 149, 85, 64, 255, 197, 146, 105, 73, 50, 37, 32, 255, 225, 196, 170,
+    145, 123, 102, 84, 68, 54, 43, 33, 26, 20, 17, 16, 255, 240, 225, 210,
+    196, 182, 169, 157, 145, 133, 122, 111, 101, 92, 83, 74, 66, 59, 52, 45,
+    39, 34, 29, 25, 21, 17, 14, 12, 10, 9, 8, 8, 255, 248, 240, 233,
+    225, 218, 210, 203, 196, 189, 182, 176, 169, 163, 156, 150, 144, 138, 133, 127,
+    121, 116, 111, 106, 101, 96, 91, 86, 82, 77, 73, 69, 65, 61, 57, 54,
+    50, 47, 44, 41, 38, 35, 32, 29, 27, 25, 22, 20, 18, 16, 15, 13,
+    12, 10, 9, 8, 7, 6, 6, 5, 5, 4, 4, 4,
+  ];
+  /// <summary>dr_intra_derivative[90].</summary>
+  internal static readonly short[] DrIntraDerivative = [
+    0, 0, 0, 1023, 0, 0, 547, 0, 0, 372, 0, 0, 0, 0, 273, 0,
+    0, 215, 0, 0, 178, 0, 0, 151, 0, 0, 132, 0, 0, 116, 0, 0,
+    102, 0, 0, 0, 90, 0, 0, 80, 0, 0, 71, 0, 0, 64, 0, 0,
+    57, 0, 0, 51, 0, 0, 45, 0, 0, 0, 40, 0, 0, 35, 0, 0,
+    31, 0, 0, 27, 0, 0, 23, 0, 0, 19, 0, 0, 15, 0, 0, 0,
+    0, 11, 0, 0, 7, 0, 0, 3, 0, 0,
+  ];
+  /// <summary>mode_to_angle_map[INTRA_MODES=13].</summary>
+  internal static readonly byte[] ModeToAngle = [
+    0, 90, 180, 45, 135, 113, 157, 203, 67, 0, 0, 0, 0,
+  ];
+}

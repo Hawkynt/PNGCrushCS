@@ -1,209 +1,217 @@
 using System;
-using System.Buffers.Binary;
+using System.Collections.Generic;
 
 namespace FileFormat.Avif.Codec;
 
-/// <summary>Top-level AV1 still frame decode pipeline for AVIF images.
-/// Orchestrates: OBU parsing -> sequence header -> frame header -> tile decode -> loop filter -> CDEF -> LR -> YUV to RGB.</summary>
+/// <summary>
+/// Decodes the single key frame an AVIF still picture carries: OBU parsing, sequence and frame
+/// headers, tile decode, the three in-loop filters, and finally the colour conversion.
+/// </summary>
 internal static class Av1FrameDecoder {
 
-  /// <summary>Decodes AV1 OBU data from an AVIF mdat box into RGB24 pixel data.</summary>
-  /// <returns>Tuple of (width, height, rgbPixelData).</returns>
+  /// <summary>The decoded picture together with the headers that describe how to interpret it.</summary>
+  internal sealed record Av1DecodeResult(Av1SequenceHeader Sequence, Av1FrameHeader Frame, Av1DecodedFrame Picture);
+
+  /// <summary>Decodes AV1 OBUs into RGB24 pixel data.</summary>
   public static (int Width, int Height, byte[] RgbData) Decode(byte[] av1Data, int offset, int length) {
+    var result = DecodeToPlanes(av1Data, offset, length);
+    var rgb = ConvertToRgb(result);
+    return (result.Frame.FrameWidth, result.Frame.FrameHeight, rgb);
+  }
+
+  /// <summary>Decodes AV1 OBUs and stops at the reconstructed YUV planes.</summary>
+  public static Av1DecodeResult DecodeToPlanes(byte[] av1Data, int offset, int length) {
     ArgumentNullException.ThrowIfNull(av1Data);
     if (length == 0)
       throw new InvalidOperationException("AV1: empty bitstream data.");
 
-    // Step 1: Parse all OBUs
     var obus = Av1ObuParser.ParseObus(av1Data, offset, length);
 
-    Av1SequenceHeader? seqHeader = null;
-    Av1FrameHeader? frameHeader = null;
-    byte[]? tileData = null;
-    var tileDataOffset = 0;
-    var tileDataLength = 0;
+    Av1SequenceHeader? seq = null;
+    Av1FrameHeader? fh = null;
+    var tileGroups = new List<(int Offset, int Size)>();
 
-    foreach (var obu in obus) {
+    foreach (var obu in obus)
       switch (obu.Type) {
         case Av1ObuType.SequenceHeader:
-          seqHeader = Av1SequenceHeader.Parse(av1Data, obu.PayloadOffset, obu.PayloadSize);
+          seq = Av1SequenceHeader.Parse(av1Data, obu.PayloadOffset, obu.PayloadSize);
           break;
 
         case Av1ObuType.Frame:
-          // Frame OBU contains both frame header and tile group
-          if (seqHeader == null)
+          if (seq == null)
             throw new InvalidOperationException("AV1: frame OBU before sequence header.");
-
-          frameHeader = Av1FrameHeader.Parse(av1Data, obu.PayloadOffset, obu.PayloadSize, seqHeader);
-          tileData = av1Data;
-          tileDataOffset = obu.PayloadOffset + frameHeader.TileDataOffset;
-          tileDataLength = obu.PayloadSize - frameHeader.TileDataOffset;
+          fh = Av1FrameHeader.Parse(av1Data, obu.PayloadOffset, obu.PayloadSize, seq);
+          tileGroups.Add((obu.PayloadOffset + fh.TileDataOffset, obu.PayloadSize - fh.TileDataOffset));
           break;
 
         case Av1ObuType.FrameHeader:
-          if (seqHeader == null)
+          if (seq == null)
             throw new InvalidOperationException("AV1: frame header OBU before sequence header.");
-
-          frameHeader = Av1FrameHeader.Parse(av1Data, obu.PayloadOffset, obu.PayloadSize, seqHeader);
+          fh = Av1FrameHeader.Parse(av1Data, obu.PayloadOffset, obu.PayloadSize, seq);
           break;
 
         case Av1ObuType.TileGroup:
-          tileData = av1Data;
-          tileDataOffset = obu.PayloadOffset;
-          tileDataLength = obu.PayloadSize;
+          tileGroups.Add((obu.PayloadOffset, obu.PayloadSize));
           break;
       }
-    }
 
-    if (seqHeader == null)
+    if (seq == null)
       throw new InvalidOperationException("AV1: no sequence header found in bitstream.");
-
-    if (frameHeader == null)
+    if (fh == null)
       throw new InvalidOperationException("AV1: no frame header found in bitstream.");
+    if (tileGroups.Count == 0)
+      throw new InvalidOperationException("AV1: no tile data found in bitstream.");
 
-    // Step 2: Allocate frame buffers (YCbCr planes)
-    var width = frameHeader.FrameWidth;
-    var height = frameHeader.FrameHeight;
+    var frame = new Av1DecodedFrame(seq, fh.FrameWidth, fh.FrameHeight);
+    var restoration = _CreateRestorationUnits(seq, fh);
+    var frameCdf = Av1CdfContext.CreateDefault(fh.BaseQIndex);
+    var tileDecoder = new Av1TileDecoder(seq, fh, frame, frameCdf, restoration);
 
-    var numPlanes = seqHeader.NumPlanes;
-    var planes = new short[numPlanes][];
-    var planeWidths = new int[numPlanes];
-    var planeHeights = new int[numPlanes];
-    var planeStrides = new int[numPlanes];
+    foreach (var (groupOffset, groupSize) in tileGroups)
+      _DecodeTileGroup(av1Data, groupOffset, groupSize, fh, tileDecoder);
 
-    for (var p = 0; p < numPlanes; ++p) {
-      var subX = p > 0 ? seqHeader.SubsamplingX : 0;
-      var subY = p > 0 ? seqHeader.SubsamplingY : 0;
-      planeWidths[p] = (width + subX) >> subX;
-      planeHeights[p] = (height + subY) >> subY;
-      planeStrides[p] = planeWidths[p];
-      planes[p] = new short[planeStrides[p] * planeHeights[p]];
+    // The filters run over the whole frame in the order AV1 7.4 fixes: deblocking, then CDEF, then
+    // loop restoration, which reads its stripe boundaries from the pre-CDEF picture.
+    var deblocked = _RunPostFilters(frame, seq, fh, restoration);
 
-      // Initialize to mid-gray
-      var mid = (short)(1 << (seqHeader.BitDepth - 1));
-      Array.Fill(planes[p], mid);
-    }
-
-    // Step 3: Decode tiles
-    if (tileData != null && tileDataLength > 0)
-      _DecodeTiles(tileData, tileDataOffset, tileDataLength, seqHeader, frameHeader, planes, planeWidths, planeHeights, planeStrides);
-
-    // Step 4: Apply loop filter
-    if (frameHeader.LoopFilterLevel[0] != 0 || frameHeader.LoopFilterLevel[1] != 0)
-      Av1LoopFilter.ApplyDeblocking(planes, planeWidths, planeHeights, planeStrides, frameHeader, seqHeader);
-
-    // Step 5: Apply CDEF
-    if (seqHeader.EnableCdef)
-      Av1LoopFilter.ApplyCdef(planes, planeWidths, planeHeights, planeStrides, frameHeader, seqHeader);
-
-    // Step 6: Apply Loop Restoration
-    if (seqHeader.EnableRestoration)
-      Av1LoopFilter.ApplyLoopRestoration(planes, planeWidths, planeHeights, planeStrides, frameHeader, seqHeader);
-
-    // Step 7: Convert YCbCr to RGB
-    var rgbData = _ConvertToRgb(planes, planeWidths, planeHeights, planeStrides, width, height, seqHeader);
-
-    return (width, height, rgbData);
+    return new(seq, fh, frame);
   }
 
-  private static void _DecodeTiles(
-    byte[] data, int offset, int length,
-    Av1SequenceHeader seq, Av1FrameHeader fh,
-    short[][] planes, int[] planeWidths, int[] planeHeights, int[] planeStrides
+  private static short[][] _RunPostFilters(
+    Av1DecodedFrame frame, Av1SequenceHeader seq, Av1FrameHeader fh, Av1LoopRestorationUnits? restoration
   ) {
-    var tileDecoder = new Av1TileDecoder(seq, fh, planes, planeWidths, planeHeights, planeStrides);
+    if (fh.LoopFilterLevel[0] != 0 || fh.LoopFilterLevel[1] != 0)
+      Av1Deblocking.Apply(frame, seq, fh);
 
-    var numTiles = fh.TileRows * fh.TileCols;
-    if (numTiles == 1) {
-      // Single tile: use all remaining data
-      tileDecoder.DecodeTile(data, offset, length, 0, 0);
-      return;
+    var usesRestoration = restoration != null;
+    var deblocked = new short[frame.NumPlanes][];
+    if (usesRestoration)
+      for (var plane = 0; plane < frame.NumPlanes; ++plane)
+        deblocked[plane] = (short[])frame.Planes[plane].Clone();
+
+    if (seq.EnableCdef && !fh.CodedLossless && !fh.AllowIntraBc)
+      Av1CdefFilter.Apply(frame, seq, fh);
+
+    if (usesRestoration)
+      Av1LoopRestoration.Apply(frame, deblocked, seq, fh, restoration!);
+
+    return deblocked;
+  }
+
+  private static Av1LoopRestorationUnits? _CreateRestorationUnits(Av1SequenceHeader seq, Av1FrameHeader fh) {
+    var uses = false;
+    for (var plane = 0; plane < seq.NumPlanes; ++plane)
+      uses |= fh.LrType[plane] != (int)Av1RestorationType.None;
+
+    if (!uses)
+      return null;
+
+    var unitCols = new int[seq.NumPlanes];
+    var unitRows = new int[seq.NumPlanes];
+    for (var plane = 0; plane < seq.NumPlanes; ++plane) {
+      var subX = plane > 0 ? seq.SubsamplingX : 0;
+      var subY = plane > 0 ? seq.SubsamplingY : 0;
+      var unitSize = fh.LoopRestorationSize[plane];
+      if (unitSize <= 0) {
+        unitCols[plane] = 0;
+        unitRows[plane] = 0;
+        continue;
+      }
+
+      unitCols[plane] = _CountUnitsInFrame(unitSize, _Round2(fh.UpscaledWidth, subX));
+      unitRows[plane] = _CountUnitsInFrame(unitSize, _Round2(fh.FrameHeight, subY));
     }
 
-    // Multiple tiles: each tile has a size prefix
-    var currentOffset = offset;
-    var remaining = length;
+    return new(seq.NumPlanes, unitCols, unitRows);
+  }
 
-    for (var tileIdx = 0; tileIdx < numTiles; ++tileIdx) {
-      var tileRow = tileIdx / fh.TileCols;
-      var tileCol = tileIdx % fh.TileCols;
+  private static int _CountUnitsInFrame(int unitSize, int frameSize) =>
+    Math.Max((frameSize + (unitSize >> 1)) / unitSize, 1);
 
+  private static int _Round2(int value, int shift) => shift <= 0 ? value : (value + (1 << (shift - 1))) >> shift;
+
+  private static void _DecodeTileGroup(
+    byte[] data, int offset, int length, Av1FrameHeader fh, Av1TileDecoder tileDecoder
+  ) {
+    var numTiles = fh.TileRows * fh.TileCols;
+    var reader = new Av1BitReader(data, offset, length);
+
+    var tileStart = 0;
+    var tileEnd = numTiles - 1;
+    if (numTiles > 1 && reader.ReadBool()) {
+      var bits = fh.TileColsLog2 + fh.TileRowsLog2;
+      tileStart = (int)reader.ReadBits(bits);
+      tileEnd = (int)reader.ReadBits(bits);
+    }
+
+    reader.ByteAlign();
+    var current = reader.ByteOffset;
+    var end = offset + length;
+
+    for (var tile = tileStart; tile <= tileEnd; ++tile) {
       int tileSize;
-      if (tileIdx < numTiles - 1) {
-        // Read tile size (tileSizeBytes bytes, little-endian)
-        if (remaining < fh.TileSizeBytes)
-          break;
+      if (tile == tileEnd)
+        tileSize = end - current;
+      else {
+        if (end - current < fh.TileSizeBytes)
+          throw new InvalidOperationException("AV1: tile group ended inside a tile size field.");
 
         tileSize = 0;
         for (var i = 0; i < fh.TileSizeBytes; ++i)
-          tileSize |= data[currentOffset + i] << (i * 8);
-        tileSize += 1; // tile_size_minus_1
-
-        currentOffset += fh.TileSizeBytes;
-        remaining -= fh.TileSizeBytes;
-      } else {
-        tileSize = remaining;
+          tileSize |= data[current + i] << (i * 8);
+        ++tileSize;
+        current += fh.TileSizeBytes;
       }
 
-      if (tileSize > remaining)
-        tileSize = remaining;
+      if (tileSize <= 0 || tileSize > end - current)
+        throw new InvalidOperationException("AV1: tile size runs past the end of the tile group.");
 
-      tileDecoder.DecodeTile(data, currentOffset, tileSize, tileCol, tileRow);
-
-      currentOffset += tileSize;
-      remaining -= tileSize;
+      tileDecoder.DecodeTile(data, current, tileSize, tile % fh.TileCols, tile / fh.TileCols);
+      current += tileSize;
     }
   }
 
-  private static byte[] _ConvertToRgb(
-    short[][] planes, int[] planeWidths, int[] planeHeights, int[] planeStrides,
-    int width, int height, Av1SequenceHeader seq
-  ) {
+  /// <summary>Converts the decoded planes to interleaved RGB24.</summary>
+  public static byte[] ConvertToRgb(Av1DecodeResult result) {
+    var seq = result.Sequence;
+    var frame = result.Picture;
+    var width = result.Frame.FrameWidth;
+    var height = result.Frame.FrameHeight;
+    var planes = frame.Planes;
+    var strides = frame.Strides;
+
     if (seq.MonoChrome)
-      return Av1YuvToRgb.ConvertMonoToRgb(planes[0], planeStrides[0], width, height, seq.BitDepth, seq.ColorRange);
+      return Av1YuvToRgb.ConvertMonoToRgb(planes[0], strides[0], width, height, seq.BitDepth, seq.ColorRange);
 
     if (seq.MatrixCoefficients == Av1MatrixCoefficients.Identity)
       return Av1YuvToRgb.ConvertIdentityToRgb(
-        planes[0], planeStrides[0],
-        planes[1], planeStrides[1],
-        planes[2], planeStrides[2],
+        planes[0], strides[0], planes[1], strides[1], planes[2], strides[2],
         width, height, seq.BitDepth);
 
     if (seq.SubsamplingX != 0 && seq.SubsamplingY != 0)
       return Av1YuvToRgb.ConvertYuv420ToRgb(
-        planes[0], planeStrides[0],
-        planes[1], planeStrides[1],
-        planes[2], planeStrides[2],
+        planes[0], strides[0], planes[1], strides[1], planes[2], strides[2],
         width, height, seq.BitDepth, seq.MatrixCoefficients, seq.ColorRange);
 
     if (seq.SubsamplingX == 0 && seq.SubsamplingY == 0)
       return Av1YuvToRgb.ConvertYuv444ToRgb(
-        planes[0], planeStrides[0],
-        planes[1], planeStrides[1],
-        planes[2], planeStrides[2],
+        planes[0], strides[0], planes[1], strides[1], planes[2], strides[2],
         width, height, seq.BitDepth, seq.MatrixCoefficients, seq.ColorRange);
 
-    // 4:2:2 fallback: treat as 4:4:4 (upsample U/V horizontally)
-    var upsampledU = _UpsampleHorizontal(planes[1], planeStrides[1], planeWidths[1], planeHeights[1], width);
-    var upsampledV = _UpsampleHorizontal(planes[2], planeStrides[2], planeWidths[2], planeHeights[2], width);
-
+    // 4:2:2 has full vertical chroma resolution, so only the horizontal axis needs replicating.
+    var chromaWidth = (width + 1) >> 1;
+    var upsampledU = _RepeatHorizontally(planes[1], strides[1], chromaWidth, height, width);
+    var upsampledV = _RepeatHorizontally(planes[2], strides[2], chromaWidth, height, width);
     return Av1YuvToRgb.ConvertYuv444ToRgb(
-      planes[0], planeStrides[0],
-      upsampledU, width,
-      upsampledV, width,
+      planes[0], strides[0], upsampledU, width, upsampledV, width,
       width, height, seq.BitDepth, seq.MatrixCoefficients, seq.ColorRange);
   }
 
-  private static short[] _UpsampleHorizontal(short[] src, int srcStride, int srcW, int srcH, int dstW) {
-    var dst = new short[dstW * srcH];
-    for (var y = 0; y < srcH; ++y) {
-      for (var x = 0; x < dstW; ++x) {
-        var srcX = x >> 1;
-        if (srcX >= srcW)
-          srcX = srcW - 1;
-        dst[y * dstW + x] = src[y * srcStride + srcX];
-      }
-    }
-    return dst;
+  private static short[] _RepeatHorizontally(short[] source, int sourceStride, int sourceWidth, int height, int width) {
+    var result = new short[width * height];
+    for (var y = 0; y < height; ++y)
+      for (var x = 0; x < width; ++x)
+        result[y * width + x] = source[y * sourceStride + Math.Min(x >> 1, sourceWidth - 1)];
+    return result;
   }
 }
