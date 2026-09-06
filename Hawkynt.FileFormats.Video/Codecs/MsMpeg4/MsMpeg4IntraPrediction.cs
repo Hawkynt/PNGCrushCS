@@ -3,8 +3,8 @@ using System;
 namespace FileFormat.Codecs.MsMpeg4;
 
 /// <summary>
-/// The prediction of one intra block's coefficients from its neighbours', as Microsoft's MPEG-4
-/// version 2 states it.
+/// The prediction of one intra block's coefficients from its neighbours', as versions 2 and 3 state
+/// it.
 /// </summary>
 /// <remarks>
 /// Nearly ISO/IEC 14496-2 clause 7.4.3, and the differences are small enough to be worth writing down
@@ -13,10 +13,9 @@ namespace FileFormat.Codecs.MsMpeg4;
 /// <item><b>The gradient test uses <c>&lt;=</c> where the standard uses <c>&lt;</c>.</b> The two
 /// disagree only where the two gradients are exactly equal, which is everywhere in a flat region — so
 /// the wrong one of them predicts a whole flat picture from the wrong neighbour.</item>
-/// <item><b>The DC compared is the quantised one and the absent value is 128, not 1024.</b> Version 2
-/// quantises the DC with a step of eight whatever the picture's quantiser is, so the two differ by a
-/// constant factor and the comparison could be made either way; keeping it quantised is what the
-/// format's own description does and is one multiplication fewer.</item>
+/// <item><b>The DC compared is the quantised one and the absent value is 1024 over the step.</b> The
+/// step is eight at every quantiser in version 2 and varies by a table in version 3, so the caller
+/// states what an absent neighbour comes to rather than this having a constant.</item>
 /// <item><b>A block of a macroblock that was not intra coded is absent, not merely unavailable.</b> In
 /// a predicted picture most macroblocks are not intra, so this is the common case rather than an edge
 /// one.</item>
@@ -24,22 +23,23 @@ namespace FileFormat.Codecs.MsMpeg4;
 /// meant to be decodable on its own, so the row above the first row of a slice counts as absent even
 /// though it is inside the picture.</item>
 /// <item><b>The alternating current predictors are not rescaled.</b> The standard scales them by the
-/// ratio of the two blocks' quantisers, because a macroblock there may change the quantiser; version 2
-/// states the quantiser once per picture and gives the macroblock layer no way to change it, so the
-/// ratio is always one and the multiplication and its rounding would be arithmetic that cannot alter a
-/// result.</item>
+/// ratio of the two blocks' quantisers, because a macroblock there may change the quantiser; these
+/// versions state the quantiser once per picture and give the macroblock layer no way to change it, so
+/// the ratio is always one and the multiplication and its rounding would be arithmetic that cannot
+/// alter a result.</item>
 /// </list>
+/// Version 1 uses none of this. It predicts the DC from the last one decoded in the same plane, the
+/// way MPEG-1 does, and has no alternating current prediction at all.
 /// </remarks>
 internal sealed class MsMpeg4IntraPrediction {
 
-  /// <summary>
-  /// What a block that is not there contributes, in the quantised units the DC is compared in.
-  /// </summary>
+  /// <summary>What an absent neighbour's DC is before the step is divided out.</summary>
   /// <remarks>
-  /// Mid-grey: 1024 over the DC step of eight, rounded, which is 128. The format's own description
-  /// writes it as <c>(1024 + dc_scale/2) / dc_scale</c>, and version 2 fixes <c>dc_scale</c> at eight.
+  /// Mid-grey. The format's own description writes the absent value as
+  /// <c>(1024 + dc_scale / 2) / dc_scale</c>, which is this rounded by the step the block was
+  /// quantised with — eight for version 2 at every quantiser, and one of two tables for version 3.
   /// </remarks>
-  internal const int AbsentDc = 128;
+  internal const int AbsentDcBeforeScaling = 1024;
 
   private readonly int _macroblockWidth;
   private readonly int _sliceHeight;
@@ -66,6 +66,9 @@ internal sealed class MsMpeg4IntraPrediction {
     this._available = new bool[count];
   }
 
+  /// <summary>What an absent neighbour comes to once the quantised DC's step is divided out.</summary>
+  internal static int AbsentDc(int step) => (AbsentDcBeforeScaling + step / 2) / step;
+
   /// <summary>Marks every block of a macroblock as carrying nothing to predict from.</summary>
   /// <remarks>
   /// Which is what a macroblock that was predicted rather than intra coded is, and what a skipped one
@@ -77,26 +80,34 @@ internal sealed class MsMpeg4IntraPrediction {
   }
 
   /// <summary>Which way the DC gradient says this block's prediction comes from.</summary>
+  /// <param name="address">The macroblock, counted in raster order from zero.</param>
+  /// <param name="block">Which of the macroblock's six blocks.</param>
+  /// <param name="absentDc">What a neighbour that is not there contributes, in quantised units.</param>
   /// <returns><c>true</c> when the prediction comes from the block above, <c>false</c> from the left.</returns>
-  internal bool PredictsFromAbove(int address, int block) {
+  internal bool PredictsFromAbove(int address, int block, int absentDc) {
     var (left, aboveLeft, above) = this._Neighbours(address, block);
+    var a = this._DcOf(left, absentDc);
+    var b = this._DcOf(aboveLeft, absentDc);
+    var c = this._DcOf(above, absentDc);
 
     // Less-than-or-equal, and this is the whole of the difference from ISO/IEC 14496-2 7.4.3.1.
-    return Math.Abs(this._DcOf(aboveLeft) - this._DcOf(left)) <= Math.Abs(this._DcOf(aboveLeft) - this._DcOf(above));
+    return Math.Abs(b - a) <= Math.Abs(b - c);
   }
 
   /// <summary>
   /// Adds the predicted coefficients into a block and records what it came to, for the blocks after it.
   /// </summary>
-  /// <param name="coefficients">
-  /// The block's quantised coefficients in raster order with the DC at position zero; the predictions
-  /// are added into it.
-  /// </param>
-  internal void Apply(int address, int block, Span<int> coefficients, bool predictAc, bool fromAbove) {
+  /// <remarks>
+  /// The coefficients arrive quantised, in raster order and with the DC at position nought, and the
+  /// predictions are added into them in place — so what is recorded for the blocks after this one is
+  /// the block's whole value and not the difference that was transmitted.
+  /// </remarks>
+  internal void Apply(
+    int address, int block, Span<int> coefficients, bool predictAc, bool fromAbove, int absentDc) {
     var (left, _, above) = this._Neighbours(address, block);
     var source = fromAbove ? above : left;
 
-    coefficients[0] += this._DcOf(source);
+    coefficients[0] += this._DcOf(source, absentDc);
 
     if (predictAc && source >= 0 && this._available[source])
       if (fromAbove) {
@@ -107,6 +118,26 @@ internal sealed class MsMpeg4IntraPrediction {
           coefficients[v * 8] += this._column[source * 8 + v];
       }
 
+    this.Record(address, block, coefficients);
+  }
+
+  /// <summary>
+  /// What a block's DC is predicted to be, which an encoder subtracts where a decoder adds.
+  /// </summary>
+  internal int PredictedDc(int address, int block, bool fromAbove, int absentDc) {
+    var (left, _, above) = this._Neighbours(address, block);
+    return this._DcOf(fromAbove ? above : left, absentDc);
+  }
+
+  /// <summary>
+  /// Records what a block decoded to, without predicting anything into it.
+  /// </summary>
+  /// <remarks>
+  /// Which is what version 1 needs: it has no prediction from the neighbouring blocks, but the blocks
+  /// after it in the same picture still have to see something, and what they see has to be this
+  /// block's own coefficients rather than whatever the array held from a picture ago.
+  /// </remarks>
+  internal void Record(int address, int block, scoped ReadOnlySpan<int> coefficients) {
     var index = address * 6 + block;
     this._dc[index] = coefficients[0];
     this._available[index] = true;
@@ -117,7 +148,7 @@ internal sealed class MsMpeg4IntraPrediction {
     }
   }
 
-  private int _DcOf(int index) => index >= 0 && this._available[index] ? this._dc[index] : AbsentDc;
+  private int _DcOf(int index, int absentDc) => index >= 0 && this._available[index] ? this._dc[index] : absentDc;
 
   /// <summary>Whether two macroblocks are in the same slice, which is what prediction may not cross.</summary>
   private bool _SameSlice(int address, int other)
