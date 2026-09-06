@@ -59,28 +59,41 @@ public sealed class DvVideoDecoder : IVideoCodecDecoder<DvVideoDecoder> {
     CodecTag.FromCharacters("dv25"), // 25 Mbit, stated
     CodecTag.FromCharacters("dv50"), // DVCPRO50
     CodecTag.FromCharacters("dvsl"), // DV in long-play mode
-    CodecTag.FromCharacters("dvc "), // Apple's DV
-    CodecTag.FromCharacters("dvcs"), // Apple's DVCPRO
     CodecTag.FromCharacters("cdvc"), // Canopus DV
     CodecTag.FromCharacters("CDV5"), // Canopus DVCPRO50
     CodecTag.FromCharacters("dvis"), // Pinnacle
     CodecTag.FromCharacters("pdvc"), // Pinnacle DVCPRO
     CodecTag.FromCharacters("SL25"), // SoftLab-NSK 625/50
     CodecTag.FromCharacters("SLDV"), // SoftLab-NSK
+    // QuickTime spells the same bitstream a different way for every system and aspect ratio, none of
+    // which changes anything: the frame says which profile it is in.
+    CodecTag.FromCharacters("dvc "), // 525/60
+    CodecTag.FromCharacters("dvcp"), // 625/50
+    CodecTag.FromCharacters("dvcs"), // DVCPRO
+    CodecTag.FromCharacters("dvl "), // 525/60, 16:9, Radius SoftDV
+    CodecTag.FromCharacters("dvlp"), // 625/50, 16:9, Radius SoftDV
+    CodecTag.FromCharacters("dvpp"), // DVCPRO 625/50, Final Cut Pro
+    CodecTag.FromCharacters("dv5n"), // DVCPRO50 525/60, Final Cut Pro
+    CodecTag.FromCharacters("dv5p"), // DVCPRO50 625/50, Final Cut Pro
+    CodecTag.FromCharacters("AVdv"), // Avid DV
     // The high-definition codes are claimed so that a DVCPRO HD file is refused by name rather than
     // reaching the registry's "nothing decodes this", which says nothing about what is missing.
     CodecTag.FromCharacters("dvhd"),
     CodecTag.FromCharacters("dvh1"),
+    CodecTag.FromCharacters("dvh2"),
+    CodecTag.FromCharacters("dvh3"),
+    CodecTag.FromCharacters("dvh4"),
+    CodecTag.FromCharacters("dvh5"),
+    CodecTag.FromCharacters("dvh6"),
+    CodecTag.FromCharacters("dvhq"),
+    CodecTag.FromCharacters("dvhp"),
     CodecTag.FromCharacters("CDVH"),
   ];
 
-  /// <summary>The names Matroska and QuickTime give this codec where they name codecs with text.</summary>
+  /// <summary>The names Matroska gives this codec, which states no four-character code.</summary>
   private static readonly string[] _CodecIds = [
     "V_MS/VFW/FOURCC/dvsd",
     "V_DV",
-    "dvsd",
-    "dvc ",
-    "dvcp",
   ];
 
   private readonly int _width;

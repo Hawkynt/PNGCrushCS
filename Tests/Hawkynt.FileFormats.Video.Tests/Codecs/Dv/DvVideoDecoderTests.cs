@@ -202,7 +202,11 @@ public class DvVideoDecoderTests {
   [Test]
   [Category("Unit")]
   public void TheCodesDvIsNamedByAreAllAccepted() {
-    foreach (var code in new[] { "dvsd", "DVSD", "dv25", "DV25", "dv50", "DV50", "cdvc", "CDVC", "CDV5", "dvis", "DVIS", "pdvc", "PDVC" })
+    foreach (var code in new[] {
+      "dvsd", "DVSD", "dv25", "DV25", "dv50", "DV50", "cdvc", "CDVC", "CDV5", "dvis", "DVIS", "pdvc", "PDVC",
+      "dvsl", "SL25", "SLDV", "dvc ", "dvcp", "dvcs", "dvl ", "dvlp", "dvpp", "dv5n", "dv5p", "AVdv",
+      "dvhd", "dvh1", "dvh2", "dvh3", "dvh4", "dvh5", "dvh6", "dvhq", "dvhp", "CDVH",
+    })
       Assert.That(DvVideoDecoder.Accepts(_Stream(code)), Is.True, code);
 
     Assert.Multiple(() => {
