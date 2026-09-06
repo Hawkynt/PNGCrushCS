@@ -1,0 +1,39 @@
+The Apple Video (RPZA) bitstream written by AppleVideoEncoder in this package is adapted from
+FFmpeg (https://github.com/FFmpeg/FFmpeg), in particular libavcodec/rpzaenc.c: the order the three
+codings are tried in, the skip test and its threshold, the running minimum, maximum, total and
+average that decide whether a run of blocks is one colour and how far a further block may stray from
+it, the two thresholds those tests use, the rule that a multi-block opcode stops at thirty-two
+blocks and at the end of a block row, the discipline of updating the previous-frame buffer for every
+block that was coded and no block that was skipped, and the chunk header.
+
+FFmpeg is distributed under the LGPL-2.1-or-later, which this package's LGPL-3.0-or-later can
+absorb.
+
+ * QuickTime RPZA Video Encoder
+ * QT RPZA Video Encoder by Todd Kirby <doubleshot@pacbell.net> and David Adler
+ *
+ * This file is part of FFmpeg.
+ *
+ * FFmpeg is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * FFmpeg is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with FFmpeg; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
+
+The four-colour coding is not taken from there and is not written at all. The reference's own
+default thresholds never select it, and forcing it shows why that went unnoticed: it indexes its
+colour triple blue-first, as the bitstream numbers channels, and packs it red-first, so the block
+carries red and blue exchanged; and it clips the endpoints of its least-squares fit to eight bits
+before shifting them into a five-bit field. AppleVideoEncoder writes such a block as sixteen
+colours, which is exact.
+
+This notice names the codec in its file name because the directory it sits in holds more than one
+codec's source.
