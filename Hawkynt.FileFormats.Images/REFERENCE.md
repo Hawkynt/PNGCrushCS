@@ -9612,6 +9612,7 @@ Implements `IEquatable<RawImageColorInfo>`.
 | `Primaries` | `RawColorPrimaries Primaries { get; init; }` |  |
 | `Range` | `RawColorRange Range { get; init; }` |  |
 | `Transfer` | `RawTransferCharacteristic Transfer { get; init; }` |  |
+| `FromCodePoints` | `static RawImageColorInfo FromCodePoints(int colourPrimaries, int transferCharacteristics, int matrixCoefficients, bool fullRange, RawChromaLocation chromaLocation = 0)` | The interpretation a set of ITU-T H.273 code points states — clauses 8.1 to 8.3 and Tables 2, 3 and 4. |
 
 #### `RawImageConverter`
 
@@ -20654,18 +20655,21 @@ Implements `IEquatable<JpegLsFile>`, `IImageFormatMetadata<JpegLsFile>`, `IImage
 
 #### `JpegXlFile`
 
-Implements `IEquatable<JpegXlFile>`, `IImageFormatMetadata<JpegXlFile>`, `IImageFormatReader<JpegXlFile>`, `IImageFormatWriter<JpegXlFile>`, `IImageFromRawImage<JpegXlFile>`, `IImageToRawImage<JpegXlFile>`.
+Implements `IEquatable<JpegXlFile>`, `IImageFormatMetadata<JpegXlFile>`, `IImageFormatReader<JpegXlFile>`, `IImageFormatWriter<JpegXlFile>`, `IImageFromRawImage<JpegXlFile>`, `IImageToRawImage<JpegXlFile>`, `IMultiImageFileFormat<JpegXlFile>`.
 
 | Member | Signature | Summary |
 | --- | --- | --- |
 | `BitsPerSample` | `int BitsPerSample { get; init; }` |  |
 | `Brand` | `string Brand { get; init; }` |  |
 | `ComponentCount` | `int ComponentCount { get; init; }` |  |
+| `Frames` | `byte[][] Frames { get; init; }` |  |
 | `Height` | `int Height { get; init; }` |  |
 | `PixelData` | `byte[] PixelData { get; init; }` |  |
 | `Width` | `int Width { get; init; }` |  |
 | `FromRawImage` | `static JpegXlFile FromRawImage(RawImage image)` |  |
+| `ImageCount` | `static int ImageCount(JpegXlFile file)` |  |
 | `ToRawImage` | `static RawImage ToRawImage(JpegXlFile file)` |  |
+| `ToRawImage` | `static RawImage ToRawImage(JpegXlFile file, int index)` |  |
 
 #### `JpegXlReader`
 

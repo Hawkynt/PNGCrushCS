@@ -1,6 +1,7 @@
 using System;
 using System.Text;
 using FileFormat.JpegXl;
+using FileFormat.JpegXl.Codec;
 
 namespace FileFormat.JpegXl.Tests;
 
@@ -179,18 +180,132 @@ public sealed class WriterCodestreamTests {
     });
   }
 
+  [Test]
+  [Category("Integration")]
+  public void RoundTrip_SixteenBitWithAlpha_IsSampleForSample() {
+    const int width = 21;
+    const int height = 13;
+    var pixels = new byte[width * height * 4 * 2];
+    for (var i = 0; i < width * height * 4; ++i) {
+      var value = (ushort)(i * 4093 % 65536);
+      pixels[i * 2] = (byte)(value >> 8);
+      pixels[i * 2 + 1] = (byte)value;
+    }
+
+    var original = new JpegXlFile {
+      Width = width, Height = height, ComponentCount = 4, BitsPerSample = 16, PixelData = pixels,
+    };
+    var restored = JpegXlReader.FromBytes(JpegXlWriter.ToBytes(original));
+
+    Assert.Multiple(() => {
+      Assert.That(restored.ComponentCount, Is.EqualTo(4));
+      Assert.That(restored.BitsPerSample, Is.EqualTo(16));
+      Assert.That(restored.PixelData, Is.EqualTo(pixels));
+    });
+  }
+
   /// <summary>
-  /// A picture wider or taller than a group would have to be stated a group at a
-  /// time, which this writer does not do — and it says so rather than emitting
-  /// something no decoder can open.
+  /// A picture wider or taller than a group is stated a group at a time, and the
+  /// sizes below are the ones that get that wrong: a side one pixel past a group
+  /// boundary, a side one pixel short of one, and a picture that is many groups
+  /// one way and part of a group the other.
+  /// </summary>
+  /// <remarks>
+  /// A group is a thousand and twenty-four pixels a side here, so these are the
+  /// smallest pictures that take more than one — which is what keeps a test of
+  /// the arrangement from being a test of how fast it runs.
+  /// </remarks>
+  [TestCase(1025, 1)]
+  [TestCase(1, 1025)]
+  [TestCase(1025, 3)]
+  [TestCase(3, 1025)]
+  [TestCase(1025, 1025)]
+  [TestCase(1023, 1027)]
+  [TestCase(2049, 2)]
+  [TestCase(2, 2049)]
+  [TestCase(3073, 5)]
+  [Category("Integration")]
+  public void RoundTrip_SeveralGroups_IsSampleForSample(int width, int height) {
+    var original = _Write(width, height, 3, width + height * 7);
+    var restored = JpegXlReader.FromBytes(JpegXlWriter.ToBytes(original));
+
+    Assert.Multiple(() => {
+      Assert.That(restored.Width, Is.EqualTo(width));
+      Assert.That(restored.Height, Is.EqualTo(height));
+      Assert.That(restored.ComponentCount, Is.EqualTo(3));
+      Assert.That(restored.PixelData, Is.EqualTo(original.PixelData));
+    });
+  }
+
+  [TestCase(1, 8)]
+  [TestCase(2, 8)]
+  [TestCase(4, 8)]
+  [TestCase(1, 16)]
+  [TestCase(2, 16)]
+  [TestCase(3, 16)]
+  [TestCase(4, 16)]
+  [Category("Integration")]
+  public void RoundTrip_SeveralGroups_EveryChannelArrangement_IsSampleForSample(int components, int bits) {
+    const int width = 1027;
+    const int height = 9;
+    var pixels = new byte[width * height * components * (bits > 8 ? 2 : 1)];
+    for (var i = 0; i < pixels.Length; ++i)
+      pixels[i] = (byte)(i * 61 + components * 13 + bits >> 1 & 0xFF);
+
+    var original = new JpegXlFile {
+      Width = width, Height = height, ComponentCount = components, BitsPerSample = bits, PixelData = pixels,
+    };
+    var restored = JpegXlReader.FromBytes(JpegXlWriter.ToBytes(original));
+
+    Assert.Multiple(() => {
+      Assert.That(restored.ComponentCount, Is.EqualTo(components));
+      Assert.That(restored.BitsPerSample, Is.EqualTo(bits));
+      Assert.That(restored.PixelData, Is.EqualTo(pixels));
+    });
+  }
+
+  /// <summary>
+  /// A frame in several groups states a section per group, plus the two the
+  /// format asks for whether or not it has anything to put in them and one per
+  /// low-frequency group — and the sections have to add up to the frame, because
+  /// each group is found by summing the ones before it.
   /// </summary>
   [Test]
   [Category("Unit")]
-  public void Written_PictureLargerThanOneGroup_IsRefused() {
-    var oversized = new JpegXlFile {
-      Width = 1025, Height = 4, ComponentCount = 3, BitsPerSample = 8, PixelData = new byte[1025 * 4 * 3],
-    };
+  public void Written_SeveralGroups_StatesEverySectionTheFormatAsksFor() {
+    // Three groups across by two down at a thousand and twenty-four a side, and
+    // one low-frequency group, which is eight groups a side.
+    var bytes = JpegXlWriter.ToBytes(_Write(2049, 1025, 3));
+    var codestream = _Codestream(bytes);
 
-    Assert.Throws<NotSupportedException>(() => JpegXlWriter.ToBytes(oversized));
+    var reader = new JxlBitReader(codestream, 2);
+    var (width, height) = JxlSizeHeader.Decode(reader);
+    var metadata = JxlImageMetadata.Decode(reader);
+    JxlCustomTransformData.Decode(reader, metadata.XybEncoded);
+    reader.ZeroPadToByte();
+    var frame = JxlSpecFrameHeader.Decode(reader, metadata, width, height);
+    var toc = JxlFrameToc.Decode(reader, numGroups: 6, numPasses: 1, numDcGroups: 1);
+    var frameBody = checked((int)(reader.BitsRead / 8));
+
+    var total = 0;
+    foreach (var size in toc.SectionSizes)
+      total += size;
+
+    Assert.Multiple(() => {
+      Assert.That((int)frame.GroupSizeShift, Is.EqualTo(3), "a picture past one group takes the largest group there is");
+      Assert.That(toc.SectionSizes, Has.Length.EqualTo(9), "one global, one low-frequency group, one high-frequency global, six groups");
+      Assert.That(toc.SectionSizes[0], Is.GreaterThan(0), "the global section carries the tree and the code");
+      Assert.That(toc.SectionSizes[1..3], Is.All.Zero, "a modular frame puts nothing in either of those");
+      Assert.That(toc.SectionSizes[3..], Is.All.GreaterThan(0), "every group carries samples");
+      Assert.That(frameBody + total, Is.EqualTo(codestream.Length), "the sections are the frame");
+    });
+  }
+
+  /// <summary>The codestream out of the container box that holds it.</summary>
+  private static byte[] _Codestream(byte[] file) {
+    for (var at = 0; at + 8 <= file.Length; ++at)
+      if (file[at + 4] == 'j' && file[at + 5] == 'x' && file[at + 6] == 'l' && file[at + 7] == 'c')
+        return file[(at + 8)..];
+    throw new AssertionException("The written file holds no codestream box.");
   }
 }

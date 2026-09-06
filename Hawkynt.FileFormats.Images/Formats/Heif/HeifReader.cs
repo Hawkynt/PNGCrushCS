@@ -14,6 +14,9 @@ public static class HeifReader {
   private const int _MIN_FILE_SIZE = 12;
   private const int _CLAP_PAYLOAD_SIZE = 32;
 
+  /// <summary>Four bytes of colour_type plus three 16-bit code points and the range flag's byte.</summary>
+  private const int _NCLX_PAYLOAD_SIZE = 11;
+
   private static readonly HashSet<string> _HEIF_BRANDS = new(StringComparer.Ordinal) {
     "heic", "heix", "hevc", "heim", "heis", "hevm", "hevs", "mif1",
     // AVCI is the same container with an H.264 picture in it.
@@ -206,7 +209,7 @@ public static class HeifReader {
       // The property is what says which codec the item is coded in; the item
       // type agrees with it, and an item carrying both is coded in neither.
       decoded = descriptor.HevcConfiguration != null
-        ? HeifHevcDecoder.Decode(sample, descriptor.HevcConfiguration)
+        ? HeifHevcDecoder.Decode(sample, descriptor.HevcConfiguration, descriptor.Colour)
         : HeifAvcDecoder.Decode(sample, descriptor.AvcConfiguration!);
     } catch (NotSupportedException e) {
       throw new NotSupportedException($"HEIF/HEVC item {itemId}: {e.Message}", e);
@@ -291,6 +294,7 @@ public static class HeifReader {
     byte[]? hvcc = null;
     byte[]? avcc = null;
     CleanAperture? aperture = null;
+    RawImageColorInfo? colour = null;
 
     if (container.Associations.TryGetValue(itemId, out var associations)) {
       foreach (var association in associations) {
@@ -313,6 +317,10 @@ public static class HeifReader {
               aperture = _ReadCleanAperture(property.Data);
             break;
 
+          case IsoBmffBox.Colr:
+            colour = _ReadNclxColour(property.Data) ?? colour;
+            break;
+
           case IsoBmffBox.HvcC:
             hvcc = property.Data;
             break;
@@ -324,7 +332,31 @@ public static class HeifReader {
       }
     }
 
-    return new(itemType, width, height, aperture, hvcc, avcc);
+    return new(itemType, width, height, aperture, colour, hvcc, avcc);
+  }
+
+  /// <summary>
+  /// The nclx profile of a ColourInformationBox — ISO/IEC 14496-12, clause 12.1.5.
+  /// </summary>
+  /// <remarks>
+  /// Not a FullBox: the payload starts with the colour_type directly, and reading four bytes of
+  /// version and flags off the front of it lands in the middle of the code points.
+  /// <para/>
+  /// The other colour types carry an ICC profile rather than code points, and are left alone: a
+  /// profile says what the RGB means once it exists, not how to get there from Y/Cb/Cr. QuickTime's
+  /// 'nclc' is left alone too — it is the same three code points with the range flag missing, so a
+  /// reader that took it would be inventing the one field this is here for.
+  /// </remarks>
+  private static RawImageColorInfo? _ReadNclxColour(byte[] data) {
+    if (data.Length < _NCLX_PAYLOAD_SIZE || Encoding.ASCII.GetString(data, 0, 4) != "nclx")
+      return null;
+
+    return RawImageColorInfo.FromCodePoints(
+      BinaryPrimitives.ReadUInt16BigEndian(data.AsSpan(4)),
+      BinaryPrimitives.ReadUInt16BigEndian(data.AsSpan(6)),
+      BinaryPrimitives.ReadUInt16BigEndian(data.AsSpan(8)),
+      (data[10] & 0x80) != 0,
+      RawChromaLocation.Left);
   }
 
   private static bool _LegacyHasHevcConfiguration(HeifContainer container) {
@@ -857,6 +889,7 @@ public static class HeifReader {
     int CodedWidth,
     int CodedHeight,
     CleanAperture? Aperture,
+    RawImageColorInfo? Colour,
     byte[]? HevcConfiguration,
     byte[]? AvcConfiguration
   );

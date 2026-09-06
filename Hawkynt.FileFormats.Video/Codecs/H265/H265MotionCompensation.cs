@@ -63,8 +63,11 @@ internal static class H265MotionCompensation {
     var chromaCb = new int[2][];
     var chromaCr = new int[2][];
 
-    var chromaWidth = width >> 1;
-    var chromaHeight = height >> 1;
+    // A monochrome sequence has no chrominance planes to predict into, so the two chrominance halves
+    // of every step below become zero-sized and drop out rather than being guarded one at a time.
+    var monochrome = frame.Picture.IsMonochrome;
+    var chromaWidth = monochrome ? 0 : width >> 1;
+    var chromaHeight = monochrome ? 0 : height >> 1;
 
     for (var list = 0; list < 2; ++list) {
       if (!motion.Predicts(list))

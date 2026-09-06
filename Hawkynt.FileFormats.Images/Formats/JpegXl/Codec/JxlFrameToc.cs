@@ -24,7 +24,7 @@ namespace FileFormat.JpegXl.Codec;
 //                       `DecodePermutation` in coeff_order.cc — uses entropy
 //                       coding with kPermutationContexts contexts).
 //   ZeroPadToByte()
-//   for each section:   U32(0+u(10), 1024+u(14), 17408+u(22), Bits(30))
+//   for each section:   U32(0+u(10), 1024+u(14), 17408+u(22), 4211712+u(30))
 //                       — section size in bytes.
 //   ZeroPadToByte()
 //
@@ -136,15 +136,19 @@ internal sealed class JxlFrameToc {
     var offsets = new int[numSections];
     var runningOffset = 0;
     for (var i = 0; i < numSections; i++) {
-      // libjxl `ReadGroupOffsets` per-section size encoding:
-      //   U32(Bits(10), 1024 + Bits(14), 17408 + Bits(22), Bits(30))
-      // i.e.: selector 0 = 0 + u(10); selector 1 = 1024 + u(14);
-      //       selector 2 = 17408 + u(22); selector 3 = 0 + u(30).
+      // libjxl `kTocDist` per-section size encoding:
+      //   U32(Bits(10), BitsOffset(14, 1024), BitsOffset(22, 17408),
+      //       BitsOffset(30, 4211712))
+      // The four ranges abut, each starting where the one before it ends, so the
+      // last selector's offset is not zero: it is 17408 + 2^22. Reading it as
+      // zero costs nothing until a section passes four megabytes — which is
+      // where a lossless picture of any size lands — and then puts every section
+      // after it four megabytes early.
       var size = reader.ReadU32(
-        c0: 0u, u0: 10u,        // Bits(10):              0 + read(10)
-        c1: 1024u, u1: 14u,     // BitsOffset(14, 1024):  1024 + read(14)
-        c2: 17408u, u2: 22u,    // BitsOffset(22, 17408): 17408 + read(22)
-        c3: 0u, u3: 30u);       // Bits(30):              0 + read(30)
+        c0: 0u, u0: 10u,           // Bits(10):                 0 + read(10)
+        c1: 1024u, u1: 14u,        // BitsOffset(14, 1024):     1024 + read(14)
+        c2: 17408u, u2: 22u,       // BitsOffset(22, 17408):    17408 + read(22)
+        c3: 4211712u, u3: 30u);    // BitsOffset(30, 4211712):  4211712 + read(30)
       sizes[i] = (int)size;
       offsets[i] = runningOffset;
       runningOffset += sizes[i];
