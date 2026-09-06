@@ -1,0 +1,46 @@
+AppleGraphicsEncoder.cs — the Apple Graphics (SMC) encoder — is converted from
+FFmpeg (https://ffmpeg.org/), which is licensed under the GNU Lesser General
+Public License version 2.1 or later. This package is licensed under the GNU
+Lesser General Public License version 3 or later, into which LGPL-2.1-or-later
+code may be taken.
+
+Files used:
+
+  libavcodec/smcenc.c   the block walk: the four runs measured at every block
+                        (unchanged since the frame before, repeating the block
+                        just written, sharing one set of distinct colours, and
+                        how many colours that set holds), the rule that decides
+                        between them, the search of the three colour caches, and
+                        the bit layout of the two-, four- and eight-colour flag
+                        words including the permuted six-byte packing of the
+                        eight-colour block
+
+Copyright (c) 2021 The FFmpeg project
+QT SMC Video Encoder by Paul B. Mahol
+
+Two things are deliberately not carried across. FFmpeg's encoder lets the three
+colour caches survive from one chunk to the next and matches against entries an
+earlier frame wrote; this encoder resets them with every packet and only ever
+names an entry the same packet has already written, because the two readings of
+the format disagree about whether the caches persist and a stream that never
+reaches across a chunk reads the same under either. And FFmpeg locates the block
+a repeat run copies from by an address computation which, where the run begins at
+the first block of a row, names the block at x = width - 4 + (width & 3) of the
+row above — the block the row really ends with only when the width leaves nought
+or two pixels over a whole number of blocks. Here the source is simply the block
+before the run in raster order, which is what both decoders read it as. Nothing
+measured reaches the difference: it needs a repeat run to begin exactly at a row
+of blocks, which neither encoder's own material produced.
+
+FFmpeg is free software; you can redistribute it and/or modify it under the
+terms of the GNU Lesser General Public License as published by the Free Software
+Foundation; either version 2.1 of the License, or (at your option) any later
+version.
+
+FFmpeg is distributed in the hope that it will be useful, but WITHOUT ANY
+WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
+PARTICULAR PURPOSE. See the GNU Lesser General Public License for more details.
+
+You should have received a copy of the GNU Lesser General Public License along
+with FFmpeg; if not, write to the Free Software Foundation, Inc., 51 Franklin
+Street, Fifth Floor, Boston, MA 02110-1301 USA.

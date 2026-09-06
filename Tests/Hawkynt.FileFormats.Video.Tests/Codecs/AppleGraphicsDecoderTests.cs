@@ -306,22 +306,35 @@ public sealed class AppleGraphicsDecoderTests {
   }
 
   // ============================================================================================
-  // The colour caches: reset before every packet
+  // The colour caches: write positions restart every packet, contents carry over
   // ============================================================================================
 
+  /// <summary>
+  /// A cached reference reaches an entry an earlier frame stored.
+  /// </summary>
+  /// <remarks>
+  /// This asserted the opposite until the encoder went in beside the decoder, on the reasoning that
+  /// a cache belongs to its packet. Nothing published settles it and no real stream can tell the two
+  /// apart — the eight measured against ffmpeg give the same 950 frames either way, because no
+  /// encoder among them reaches back past a chunk boundary. FFmpeg's own SMC encoder does reach back,
+  /// and against what it writes the difference is not subtle: clearing the contents costs 83,459
+  /// differing samples of 632,580 over 57 frames, at up to the full range of a channel. Carrying them
+  /// over decodes those files and loses nothing that clearing decoded, so it is what this reader
+  /// does.
+  /// </remarks>
   [Test]
   [Category("Unit")]
-  public void ACachedReferenceDoesNotReachAnEntryFromTheFrameBefore() {
+  public void ACachedReferenceReachesAnEntryFromTheFrameBefore() {
     var stream = _Stream(8, 4);
     var frame1 = _Header().Concat(_TwoColourNew(1, 7, 8, [0xFF, 0xFF])).Concat(_SkipInline(1)).ToArray();
-    // frame2 names cache slot 0 without ever storing anything new this packet: the pair must read as
-    // the reset value (0, 0), not the (7, 8) frame1 stored.
+    // frame2 names cache slot 0 without storing anything new this packet, so it reads the (7, 8) pair
+    // frame1 left there.
     var frame2 = _Header().Concat(_TwoColourCached(1, 0, [0xFF, 0xFF])).Concat(_SkipInline(1)).ToArray();
 
     var frames = _Decode(stream, [frame1, frame2]);
 
     Assert.That(_Index(frames[0], 0, 0), Is.EqualTo(8), "frame 1's own pair");
-    Assert.That(_Index(frames[1], 0, 0), Is.EqualTo(0), "frame 2's cache was reset, not carried over");
+    Assert.That(_Index(frames[1], 0, 0), Is.EqualTo(8), "frame 2 reaches the pair frame 1 stored");
   }
 
   // ============================================================================================
