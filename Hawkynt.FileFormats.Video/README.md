@@ -81,7 +81,7 @@ quietly come to mean "some of it". How each codec was measured is in
 Every codec the package registers has a row, and the name in the first column is the codec's own
 `CodecName` — the same string a refusal message names it by. `Decode` is what
 [`VideoFormatRegistry.CreateDecoder`](https://github.com/Hawkynt/PNGCrushCS/blob/main/Hawkynt.FileFormats.Video/VideoFormatRegistry.cs) builds, 97 of them; `Encode` is
-what [`VideoFormatRegistry.CreateEncoder`](https://github.com/Hawkynt/PNGCrushCS/blob/main/Hawkynt.FileFormats.Video/VideoFormatRegistry.cs) builds, 37 of them. The two
+what [`VideoFormatRegistry.CreateEncoder`](https://github.com/Hawkynt/PNGCrushCS/blob/main/Hawkynt.FileFormats.Video/VideoFormatRegistry.cs) builds, 38 of them. The two
 are separate tables in the registry because they are looked up by different things: a decoder by a
 whole stream description, an encoder by the four-character code a caller wants written.
 
@@ -91,7 +91,8 @@ format defines is decoded**; such a codec still refuses malformed input, undefin
 forms no encoder produces, because a plausible wrong picture is worse than a refusal. No codec
 silently misdecodes what it will not read. An `Encode` tick is a lossless or format-faithful writer.
 Where the codec has a lossless form the encoder writes it and refuses by name any picture it would
-have to reduce to fit; where the format itself is lossy — Motion JPEG, Microsoft Video 1, DV — the
+have to reduce to fit; where the format itself is lossy — Motion JPEG, Microsoft Video 1, Cinepak, DV,
+Microsoft's MPEG-4 — the
 row says so, because there is nothing else such an encoder could write. Codec-by-codec provenance and
 measurement notes are in
 [`codec-notes.md`](https://github.com/Hawkynt/PNGCrushCS/blob/main/Hawkynt.FileFormats.Video/codec-notes.md).
@@ -109,7 +110,7 @@ measurement notes are in
 | [H.264/AVC (ITU-T H.264 \| ISO/IEC 14496-10)](https://en.wikipedia.org/wiki/Advanced_Video_Coding) | ⚠️ | — | Progressive 8-bit 4:2:0; CAVLC and CABAC I/P/B slices, High-profile 8x8 transform and scaling lists, long-term references, weighted and direct prediction. 4:2:2/4:4:4, depths above 8 bits, interlace/MBAFF, FMO, data partitioning, SVC/MVC and lossless bypass refused | [ITU-T H.264](https://www.itu.int/rec/T-REC-H.264) |
 | [H.265/HEVC (ITU-T H.265 \| ISO/IEC 23008-2), Main profile](https://en.wikipedia.org/wiki/High_Efficiency_Video_Coding) | ⚠️ | — | Main profile, 8-bit 4:2:0; intra and inter slices, reference management, CABAC, weighted prediction, scaling lists, deblocking, SAO, tiles and dependent slices. PCM coding units, the format range extensions, screen-content coding, multilayer/3D and separate colour planes refused | [ITU-T H.265](https://www.itu.int/rec/T-REC-H.265) |
 | [VC-1 / Windows Media Video 9 (SMPTE 421M, Simple and Main profile intra pictures)](https://en.wikipedia.org/wiki/VC-1) | ⚠️ | — | `WMV3`, Simple and Main profile **intra pictures only**; sequence header read from container private data. Predicted, bidirectional and skipped pictures, Advanced profile (`WVC1`, `WMVA`), MULTIRES, RANGERED and LOOPFILTER each refused by name | [SMPTE ST 421](https://ieeexplore.ieee.org/document/7290900) |
-| [Microsoft MPEG-4 version 2 video (MP42)](https://en.wikipedia.org/wiki/MPEG-4_Part_2) | ⚠️ | — | `MP42`, intra and predicted pictures. Versions 1 (`MPG4`, `DIV1`) and 3 (`MP43`, `DIV3`, `AP41`) are accepted by the registry and then refused by name — their run-level, DC and motion-vector tables are unpublished | [ISO/IEC 14496-2](https://www.iso.org/standard/39259.html) |
+| [Microsoft MPEG-4 versions 1 to 3 video (MPG4/MP42/MP43)](https://wiki.multimedia.cx/index.php/Microsoft_MPEG-4) | ⚠️ | ✅ | All three variants, intra and predicted pictures: version 1 (`MPG4`, `MP41`, `DIV1`), version 2 (`MP42`, `DIV2`) and version 3 (`MP43`, `DIV3`-`DIV6`, `DVX3`, `AP41`, `AP42`, `COL0`, `COL1`, `MPG3`, and Matroska's `V_MPEG4/MS/V3`). Windows Media Video 7 and 8 (`WMV1`, `WMV2`) are accepted by the registry and then refused by name. The encoder writes any of the three, one slice a picture, one motion vector a macroblock and no alternating current prediction; the registry routes `MP43` to it | [DIVX3/MS-MPEG4 v1-v3](https://wiki.multimedia.cx/index.php/Microsoft_MPEG-4) |
 | [RealVideo 1 (RV10/RV13)](https://en.wikipedia.org/wiki/RealVideo) | ⚠️ | — | `RV10`, `RV13` at bitstream revision 0; H.263 macroblock layer under RealVideo's own slice header. PB-frames refused. RealVideo 2/3/4 are not claimed at all, so they reach the registry's own "no codec decodes this" refusal | [ITU-T H.263](https://www.itu.int/rec/T-REC-H.263) |
 | [On2 VP3](https://en.wikipedia.org/wiki/VP3) | ⚠️ | — | VP3.1 (`VP31`, `VP32`) entire. `VP30` is accepted and then refused: a VP3.0 key frame cannot be read with VP3.1's rules at any bit offset | [Theora specification, Appendix B](https://www.theora.org/doc/Theora.pdf) |
 | [VP8 (RFC 6386)](https://en.wikipedia.org/wiki/VP8) | ✅ | — | RFC 6386 entire. Reserved bitstream versions and the reserved colour-space/clamping fields refused | [RFC 6386](https://www.rfc-editor.org/rfc/rfc6386) |
@@ -380,7 +381,7 @@ Those rules exist because “find a familiar marker and split there” works on 
 
 <!-- API:BEGIN generated by Hawkynt/RepositoryTemplate/package-readme — edit the XML docs in source, not here -->
 
-Every public and protected member of all 390 types, generated from the built assembly and its XML documentation, is in [REFERENCE.md](https://github.com/Hawkynt/PNGCrushCS/blob/main/Hawkynt.FileFormats.Video/REFERENCE.md).
+Every public and protected member of all 391 types, generated from the built assembly and its XML documentation, is in [REFERENCE.md](https://github.com/Hawkynt/PNGCrushCS/blob/main/Hawkynt.FileFormats.Video/REFERENCE.md).
 
 <!-- API:END -->
 
@@ -403,7 +404,7 @@ Every public and protected member of all 390 types, generated from the built ass
 - Large RealVideo pictures require preserved slice offsets when they must be split across 16-bit RealMedia packet lengths, and RoQ sound requires its original predictor argument.
 - Several advanced codecs intentionally implement well-defined subsets (for example H.264 progressive 8-bit 4:2:0, HEVC Main profile, and VC-1 Simple/Main intra pictures). Every row marked ⚠️ in the codec table names its own subset. Unsupported profiles/features are refused by name rather than silently misdecoded.
 - Codec support is more precise than a single green check can express; consult [`codec-notes.md`](https://github.com/Hawkynt/PNGCrushCS/blob/main/Hawkynt.FileFormats.Video/codec-notes.md) before relying on a profile/level/feature not named in this README.
-- Encoding is a smaller domain than decoding on purpose: 37 codecs of the 97 read can also be written. Most are lossless; four are not, and each says so in its own row. Motion JPEG writes baseline JPEG, whose loss is a matter of degree, and Microsoft Video 1's two-colours-to-a-block coding and Cinepak's vector quantisation have no lossless form at all — a picture that codec can hold exactly comes back exactly, and one it cannot does not. What is still not written back is the modern lossy codecs: a stream read as H.264 cannot be written back as H.264.
+- Encoding is a smaller domain than decoding on purpose: 38 codecs of the 97 read can also be written. Most are lossless; five are not, and each says so in its own row. Motion JPEG writes baseline JPEG, whose loss is a matter of degree, and DV's fixed-length frames, Microsoft Video 1's two-colours-to-a-block coding, Cinepak's vector quantisation and Microsoft's MPEG-4 transform have no lossless form at all — a picture that codec can hold exactly comes back exactly, and one it cannot does not. What is still not written back is the modern lossy codecs: a stream read as H.264 cannot be written back as H.264.
 - Video correctness depends on real-world packetization as much as codec math. The project therefore validates packet counts, sizes, timestamps, and key-frame flags against external tools where samples are available.
 
 ## ❤️ Support

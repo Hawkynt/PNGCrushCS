@@ -5,35 +5,98 @@ using FileFormat.Codecs.Mpeg4;
 namespace FileFormat.Codecs.MsMpeg4;
 
 /// <summary>
-/// The block layer of Microsoft's MPEG-4 version 2: run-level codes in, sixty-four reconstructed
-/// samples out.
+/// The block layer of Microsoft's MPEG-4: run-level codes in, sixty-four reconstructed samples out.
 /// </summary>
 /// <remarks>
-/// The same block layer ISO/IEC 14496-2 has, with the same three escape forms, the same inverse scan,
-/// the same H.263 inverse quantisation and the same transform — the pieces are taken from the MPEG-4
-/// decoder beside this one rather than written again. What differs is small and entirely in how the
-/// codes are read:
+/// The same shape as ISO/IEC 14496-2's block layer, with the same three escape forms, the same inverse
+/// scan and the same transform — those are taken from the MPEG-4 decoder beside this one rather than
+/// written again. What differs is entirely in how the codes are read, and it differs by version:
 /// <list type="bullet">
+/// <item>the run-level tables are Microsoft's own except the pair versions 1 and 2 always use, which
+/// are the standard's B-16 and B-17; version 3 states which of three it used, once per picture and
+/// separately for luminance;</item>
 /// <item>an intra block's DC always has its own code, where the standard lets a picture say the DC is
-/// an ordinary coefficient above some quantiser; version 2 has no such field;</item>
-/// <item>the DC step is eight at every quantiser, where the standard varies it by a table;</item>
-/// <item>the escape form is chosen by a code of its own — <c>1</c>, <c>01</c>, <c>00</c> for the three
-/// forms — where the standard spends one bit and then another;</item>
-/// <item>the second escape form adds nothing to the run it recovers, where the standard adds one.</item>
+/// an ordinary coefficient above some quantiser; none of the three has such a field;</item>
+/// <item>the DC step is eight at every quantiser in versions 1 and 2, and version 3 brings back a
+/// table of steps that varies with the quantiser;</item>
+/// <item>the escape form is chosen by a code of its own — <c>1</c>, <c>01</c>, <c>00</c> — where the
+/// standard spends one bit and then another, and version 1 has only the third form and spends nothing
+/// at all;</item>
+/// <item>the second escape form adds one to the run it recovers in versions 1 and 3 and adds nothing
+/// in version 2.</item>
 /// </list>
 /// That last one is a single <c>+ 1</c> and it is the kind of difference that produces a picture: the
 /// run lands one coefficient early, every coefficient after it in the block is one position out, and
 /// the block still decodes.
 /// </remarks>
-internal static class MsMpeg4BlockDecoder {
+internal sealed class MsMpeg4BlockDecoder {
 
-  /// <summary>The step an intra DC is quantised with, at every quantiser this format has.</summary>
+  /// <summary>The step an intra DC is quantised with in versions 1 and 2, at every quantiser.</summary>
   /// <remarks>
-  /// Constant, unlike ISO/IEC 14496-2 Table 7-3 and unlike Microsoft's own version 3, which brought
-  /// the standard's varying step back. It is why an intra picture of one flat grey codes the same bits
-  /// whatever quantiser it is given, which is how the constant was recognised in the first place.
+  /// Constant, unlike ISO/IEC 14496-2 Table 7-3 and unlike version 3, which brought the standard's
+  /// varying step back. It is why an intra picture of one flat grey codes the same bits whatever
+  /// quantiser it is given.
   /// </remarks>
-  internal const int DcStep = 8;
+  internal const int FixedDcStep = 8;
+
+  /// <summary>
+  /// How far past a block's last coefficient a scan position is pushed to say it is the last.
+  /// </summary>
+  /// <remarks>
+  /// The run of a code that ends its block is carried a hundred and ninety-two past where it belongs,
+  /// so that one comparison against sixty-two settles both "this is the last coefficient" and "this
+  /// block overran", and neither costs a branch of its own in the common case. Taking it off again is
+  /// what turns the flag back into a position.
+  /// </remarks>
+  private const int _LAST_COEFFICIENT_BIAS = 192;
+
+  private readonly MsMpeg4Version _version;
+  private readonly int _quantiser;
+  private readonly int _dcTableIndex;
+  private readonly MsMpeg4RunLevelTable _intraLuminanceCodes;
+  private readonly MsMpeg4RunLevelTable _chrominanceCodes;
+  private readonly MsMpeg4RunLevelTable _predictedCodes;
+
+  /// <summary>The DC of the last intra block of each plane, which is all version 1 predicts from.</summary>
+  private readonly int[] _lastDc = new int[3];
+
+  internal MsMpeg4BlockDecoder(MsMpeg4Version version, MsMpeg4PictureHeader header) {
+    ArgumentNullException.ThrowIfNull(header);
+
+    this._version = version;
+    this._quantiser = header.Quantiser;
+    this._dcTableIndex = header.DcTableIndex;
+    this._intraLuminanceCodes = MsMpeg4Tables.RunLevel[header.RunLevelTableIndex];
+    this._chrominanceCodes = MsMpeg4Tables.RunLevel[3 + header.ChromaRunLevelTableIndex];
+    this._predictedCodes = MsMpeg4Tables.RunLevel[3 + header.RunLevelTableIndex];
+
+    this.ResetLastDc();
+  }
+
+  /// <summary>The step the luminance DC of an intra block is quantised with.</summary>
+  internal int LuminanceDcStep => this._version == MsMpeg4Version.Version3
+    ? MsMpeg4Data.Version3LuminanceDcStep[this._quantiser]
+    : FixedDcStep;
+
+  /// <summary>The same for a chrominance block.</summary>
+  internal int ChrominanceDcStep => this._version == MsMpeg4Version.Version3
+    ? MsMpeg4Data.Version3ChrominanceDcStep[this._quantiser]
+    : FixedDcStep;
+
+  /// <summary>
+  /// Forgets what version 1 predicts a DC from, which happens at the start of every macroblock row.
+  /// </summary>
+  /// <remarks>
+  /// Every row and not every slice, which is the one place version 1's prediction is coarser than the
+  /// slice structure around it. Mid-grey is what it starts from, in the quantised units the DC is
+  /// carried in.
+  /// </remarks>
+  internal void ResetLastDc() {
+    var absent = MsMpeg4IntraPrediction.AbsentDc(FixedDcStep);
+    this._lastDc[0] = absent;
+    this._lastDc[1] = absent;
+    this._lastDc[2] = absent;
+  }
 
   /// <summary>
   /// Reads an intra block and reconstructs its samples.
@@ -43,168 +106,273 @@ internal static class MsMpeg4BlockDecoder {
   /// <param name="prediction">The picture's record of what the neighbouring intra blocks decoded to.</param>
   /// <param name="address">The macroblock, counted in raster order from zero.</param>
   /// <param name="index">Which of the macroblock's six blocks.</param>
-  /// <param name="quantiser">The quantiser the picture states.</param>
   /// <param name="predictAc">Whether the macroblock asked for the first row or column to be predicted.</param>
   /// <param name="hasCoefficients">Whether the coded block pattern says this block carries any.</param>
-  internal static void ReadIntra(
+  internal void ReadIntra(
     ref Mpeg4BitReader reader, scoped Span<int> samples, MsMpeg4IntraPrediction prediction,
-    int address, int index, int quantiser, bool predictAc, bool hasCoefficients) {
+    int address, int index, bool predictAc, bool hasCoefficients) {
     Span<int> levels = stackalloc int[64];
     levels.Clear();
 
-    // Settled before anything is read, because it chooses the scan the coefficients are written in as
-    // well as where the prediction comes from.
-    var fromAbove = prediction.PredictsFromAbove(address, index);
-    var scan = !predictAc
-      ? Mpeg4Quantisation.ZigZag
-      : fromAbove ? Mpeg4Quantisation.AlternateHorizontal : Mpeg4Quantisation.AlternateVertical;
+    var isLuminance = index < 4;
+    var step = isLuminance ? this.LuminanceDcStep : this.ChrominanceDcStep;
+    var codes = isLuminance ? this._intraLuminanceCodes : this._chrominanceCodes;
 
-    levels[0] = _ReadDcDifferential(ref reader, index < 4);
+    if (this._version == MsMpeg4Version.Version1) {
+      this._ReadVersion1Intra(ref reader, levels, prediction, address, index, hasCoefficients, codes);
+    } else {
+      // Settled before anything is read, because the gradient chooses the scan the coefficients are
+      // written in as well as where the prediction comes from.
+      var absentDc = MsMpeg4IntraPrediction.AbsentDc(step);
+      var fromAbove = prediction.PredictsFromAbove(address, index, absentDc);
+      var scan = !predictAc
+        ? Mpeg4Quantisation.ZigZag
+        : fromAbove ? Mpeg4Quantisation.AlternateHorizontal : Mpeg4Quantisation.AlternateVertical;
 
-    if (hasCoefficients)
-      _ReadCoefficients(ref reader, levels, scan, first: 1, intra: index < 4);
+      levels[0] = this._ReadDcDifferential(ref reader, isLuminance);
 
-    prediction.Apply(address, index, levels, predictAc, fromAbove);
+      if (hasCoefficients)
+        this._ReadCoefficients(ref reader, levels, scan, codes, intra: true);
 
-    for (var i = 0; i < 64; ++i)
-      levels[i] = Mpeg4Quantisation.Clamp(levels[i]);
+      prediction.Apply(address, index, levels, predictAc, fromAbove, absentDc);
+    }
 
-    samples[0] = Mpeg4Quantisation.Clamp(DcStep * levels[0]);
-    for (var i = 1; i < 64; ++i)
-      samples[i] = Mpeg4Quantisation.DequantiseH263(levels[i], quantiser);
+    if (levels[0] < 0 || levels[0] > 256 * step)
+      throw new InvalidDataException(
+        $"An intra block of this Microsoft MPEG-4 picture reconstructs a DC of {levels[0]}, which is outside the "
+        + $"nought to {256 * step} a DC quantised with a step of {step} can hold. The stream is corrupt, or it is "
+        + "not the version the container says it is.");
 
+    this._Dequantise(levels, samples, step);
     Mpeg4InverseDct.Transform(samples);
   }
 
   /// <summary>Reads the residual of a block of a predicted macroblock.</summary>
-  internal static void ReadInter(ref Mpeg4BitReader reader, scoped Span<int> samples, int quantiser) {
+  internal void ReadInter(ref Mpeg4BitReader reader, scoped Span<int> samples) {
     Span<int> levels = stackalloc int[64];
     levels.Clear();
 
-    _ReadCoefficients(ref reader, levels, Mpeg4Quantisation.ZigZag, first: 0, intra: false);
+    // Reconstructed as they are read rather than afterwards: the codes of a predicted block state a
+    // level already multiplied by the step, because the table a picture reads is chosen per quantiser.
+    this._ReadCoefficients(ref reader, levels, Mpeg4Quantisation.ZigZag, this._predictedCodes, intra: false);
 
-    for (var i = 0; i < 64; ++i)
-      samples[i] = Mpeg4Quantisation.DequantiseH263(levels[i], quantiser);
+    levels.CopyTo(samples);
 
-    // No mismatch control: that belongs to the standard's weighted quantisation method, which this
-    // format does not have. The H.263 method's reconstruction levels are odd multiples of the step
-    // size, which is what stops two conforming transforms drifting apart without it.
+    // No mismatch control: that belongs to the standard's weighted quantisation method, which none of
+    // these three has. The H.263 method's reconstruction levels are odd multiples of the step size,
+    // which is what stops two conforming transforms drifting apart without it.
     Mpeg4InverseDct.Transform(samples);
   }
+
+  // ============================================================================================
+  // Version 1's intra blocks
+  // ============================================================================================
+
+  /// <summary>
+  /// Reads an intra block the way version 1 does, which is the way MPEG-1 does.
+  /// </summary>
+  /// <remarks>
+  /// The DC is a difference from the last one decoded in the same plane rather than from a neighbour
+  /// chosen by a gradient, there is no alternating current prediction, and the scan is always the
+  /// zig-zag. What the block decodes to is still recorded, because a picture may mix version 1's
+  /// macroblocks with nothing else and the record costs nothing — but nothing reads it.
+  /// </remarks>
+  private void _ReadVersion1Intra(
+    ref Mpeg4BitReader reader, scoped Span<int> levels, MsMpeg4IntraPrediction prediction,
+    int address, int index, bool hasCoefficients, MsMpeg4RunLevelTable codes) {
+    var plane = index < 4 ? 0 : index - 3;
+    levels[0] = this._ReadDcDifferential(ref reader, index < 4) + this._lastDc[plane];
+    this._lastDc[plane] = levels[0];
+
+    if (hasCoefficients)
+      this._ReadCoefficients(ref reader, levels, Mpeg4Quantisation.ZigZag, codes, intra: true);
+
+    prediction.Record(address, index, levels);
+  }
+
+  // ============================================================================================
+  // The DC
+  // ============================================================================================
 
   /// <summary>
   /// Reads an intra block's DC differential.
   /// </summary>
   /// <remarks>
-  /// The size names how many bits the value occupies and the value's top bit names its sign, in the
-  /// mapping JPEG uses. A size past eight is followed by a marker bit, the same as in ISO/IEC 14496-2.
-  /// The tables are the standard's with every bit inverted — see
-  /// <see cref="MsMpeg4VlcTables.LuminanceDcSize"/>.
+  /// Two forms. Versions 1 and 2 read one codeword that stands for the whole differential, out of a
+  /// table built from ISO/IEC 14496-2's by inverting every bit and pulling the magnitude bits inside
+  /// the codeword. Version 3 reads a magnitude out of one of two tables of its own and then a sign
+  /// bit, with the largest entry an escape into eight plain bits and a sign — which is how it reaches
+  /// a differential no table entry stands for.
   /// </remarks>
-  private static int _ReadDcDifferential(ref Mpeg4BitReader reader, bool isLuminance) {
-    var size = (isLuminance ? MsMpeg4VlcTables.LuminanceDcSize : MsMpeg4VlcTables.ChrominanceDcSize).Read(ref reader);
-    if (size == 0)
+  private int _ReadDcDifferential(ref Mpeg4BitReader reader, bool isLuminance) {
+    if (this._version != MsMpeg4Version.Version3)
+      return MsMpeg4Tables.V2Dc[isLuminance ? 0 : 1].Read(ref reader) - MsMpeg4Tables.V2DcBias;
+
+    var level = MsMpeg4Tables.Dc[this._dcTableIndex][isLuminance ? 0 : 1].Read(ref reader);
+    if (level == MsMpeg4Tables.V3DcEscape)
+      level = reader.ReadBits(8);
+    else if (level == 0)
       return 0;
 
-    var bits = reader.ReadBits(size);
-    if (size > 8)
-      reader.ReadMarkerBit("after a DC differential of more than eight bits");
-
-    return bits >= 1 << (size - 1) ? bits : bits - (1 << size) + 1;
+    return reader.ReadBit() == 1 ? -level : level;
   }
+
+  // ============================================================================================
+  // The coefficients
+  // ============================================================================================
 
   /// <summary>
   /// Reads coefficient codes until one says it is the last of its block.
   /// </summary>
-  /// <param name="first">
-  /// The scan position the first coefficient may occupy: one for an intra block, whose DC was read
-  /// separately, and nought for a block of a predicted macroblock.
-  /// </param>
-  /// <param name="intra">
-  /// Whether to read Table B-16 rather than Table B-17. Only an intra <i>luminance</i> block reads
-  /// B-16: an intra chrominance block reads B-17, the same table every block of a predicted
-  /// macroblock reads. That split is not something a reader of the standard would guess — there the
-  /// table follows the macroblock — and it was found by putting a single known coefficient in one
-  /// chrominance block and reading the codeword back out.
-  /// </param>
-  private static void _ReadCoefficients(
-    ref Mpeg4BitReader reader, scoped Span<int> levels, int[] scan, int first, bool intra) {
-    var table = intra ? Mpeg4VlcTables.IntraCoefficient : Mpeg4VlcTables.InterCoefficient;
-    var position = first - 1;
+  /// <remarks>
+  /// Whether the block is an intra one decides two things at once: where its first coefficient may sit
+  /// — one, because the DC was read separately, against nought for a predicted block — and whether the
+  /// levels come out quantised or already reconstructed. An intra block's stay quantised because the
+  /// alternating current prediction is applied to them before anything is reconstructed.
+  /// </remarks>
+  private void _ReadCoefficients(
+    ref Mpeg4BitReader reader, scoped Span<int> levels, int[] scan, MsMpeg4RunLevelTable codes, bool intra) {
+    // An intra block's levels stay quantised, because the alternating current prediction is applied to
+    // them before anything is reconstructed. A predicted block's are reconstructed here, because
+    // nothing is predicted into them and the multiplication is one pass fewer.
+    var multiplier = intra ? 1 : 2 * this._quantiser;
+    var offset = intra ? 0 : (this._quantiser - 1) | 1;
+
+    // The second escape form's run is one short in versions 1 and 3 and exact in version 2. One added
+    // integer, and every coefficient after it lands one position out when it is wrong.
+    var runOffset = intra || this._version == MsMpeg4Version.Version2 ? 0 : 1;
+
+    var position = intra ? 0 : -1;
 
     for (; ; ) {
-      var code = table.Read(ref reader);
+      var index = codes.Codes.Read(ref reader);
+      int advance;
+      int level;
 
-      bool last;
-      int run, level;
-      if (code == Mpeg4VlcTables.CoefficientEscape)
-        (last, run, level) = _ReadEscape(ref reader, table, intra);
-      else
-        (last, run, level) = _Row(ref reader, code, intra);
+      if (index != codes.EscapeIndex) {
+        advance = _Advance(codes, index, 0);
+        level = _Sign(ref reader, codes.LevelOf(index) * multiplier + offset);
+      } else if (this._version == MsMpeg4Version.Version1 || reader.NextBits(1) == 0) {
+        if (this._version == MsMpeg4Version.Version1 || reader.NextBits(2) == 0) {
+          (advance, level) = _ReadThirdEscape(ref reader, this._version, multiplier, offset);
+        } else {
+          reader.Skip(2);
+          (advance, level) = _ReadSecondEscape(ref reader, codes, multiplier, offset, runOffset);
+        }
+      } else {
+        reader.Skip(1);
+        (advance, level) = _ReadFirstEscape(ref reader, codes, multiplier, offset);
+      }
 
-      position += run + 1;
+      position += advance;
+
+      // One comparison for two questions. A code that ends its block carries the bias, so it lands
+      // here and nowhere else; a code that does not and still lands here has overrun its block, which
+      // taking the bias off turns into a position outside nought to sixty-three.
+      if (position <= 62) {
+        levels[scan[position]] = level;
+        continue;
+      }
+
+      position -= _LAST_COEFFICIENT_BIAS;
       if ((uint)position > 63)
         throw new InvalidDataException(
-          $"The run-level codes of a Microsoft MPEG-4 version 2 block reach scan position {position}, past the "
-          + "sixty-four a block holds.");
+          $"The run-level codes of a block of this Microsoft MPEG-4 picture reach scan position "
+          + $"{position + _LAST_COEFFICIENT_BIAS}, past the sixty-four a block holds, without stating a last "
+          + "coefficient.");
 
       levels[scan[position]] = level;
-
-      if (last)
-        return;
+      return;
     }
   }
 
-  private static (bool Last, int Run, int Level) _Row(ref Mpeg4BitReader reader, int code, bool intra) {
-    var last = intra ? Mpeg4VlcTables.IntraIsLast[code] : Mpeg4VlcTables.InterIsLast[code];
-    var run = intra ? Mpeg4VlcTables.IntraRun[code] : Mpeg4VlcTables.InterRun[code];
-    int level = intra ? Mpeg4VlcTables.IntraLevel[code] : Mpeg4VlcTables.InterLevel[code];
+  /// <summary>How far one table row moves the scan position, with the bias where the row ends its block.</summary>
+  private static int _Advance(MsMpeg4RunLevelTable codes, int index, int extraRun)
+    => codes.RunOf(index) + 1 + extraRun + (codes.IsLast(index) ? _LAST_COEFFICIENT_BIAS : 0);
 
-    return (last, run, reader.ReadBit() == 1 ? -level : level);
+  /// <summary>
+  /// The first escape: the level is this table entry's plus the largest the table can state for the
+  /// same run.
+  /// </summary>
+  private static (int Advance, int Level) _ReadFirstEscape(
+    ref Mpeg4BitReader reader, MsMpeg4RunLevelTable codes, int multiplier, int offset) {
+    var index = codes.Codes.Read(ref reader);
+    _RefuseNestedEscape(codes, index);
+
+    var level = codes.LevelOf(index) + codes.LargestLevel(codes.IsLast(index), codes.RunOf(index));
+
+    return (_Advance(codes, index, 0), _Sign(ref reader, level * multiplier + offset));
   }
 
   /// <summary>
-  /// Reads one of the three escape forms.
+  /// The second escape: the run is this table entry's plus the longest the table can state for the
+  /// same level.
+  /// </summary>
+  private static (int Advance, int Level) _ReadSecondEscape(
+    ref Mpeg4BitReader reader, MsMpeg4RunLevelTable codes, int multiplier, int offset, int runOffset) {
+    var index = codes.Codes.Read(ref reader);
+    _RefuseNestedEscape(codes, index);
+
+    var extra = codes.LargestRun(codes.IsLast(index), codes.LevelOf(index)) + runOffset;
+
+    return (_Advance(codes, index, extra), _Sign(ref reader, codes.LevelOf(index) * multiplier + offset));
+  }
+
+  /// <summary>
+  /// The third escape: the whole triple written out, and the only form version 1 has.
   /// </summary>
   /// <remarks>
-  /// The same three the standard has and the same idea behind the first two — say how far past the
-  /// table's largest level, or its largest run, the real one is, and spend an ordinary code on the
-  /// remainder — but reached by a code of their own rather than by a bit and then another, and with
-  /// the second form's <c>+ 1</c> absent.
-  /// <para/>
-  /// The bounds are derived from the coefficient tables rather than transcribed beside them, which is
-  /// what the MPEG-4 decoder does for the same reason: the two would be two statements of the same
-  /// hundred and two rows and could disagree.
+  /// The level is eight bits two's complement and carries its own sign, so no sign bit follows. The
+  /// step is applied here rather than by the caller because the sign has to be taken off first: a
+  /// level of <c>-n</c> reconstructs as <c>-(n * step + offset)</c> and not as
+  /// <c>-n * step + offset</c>, and a level of nought reconstructs as minus the offset — which is what
+  /// the reference decoder produces and what an encoder's own reconstruction loop was built against.
   /// </remarks>
-  private static (bool Last, int Run, int Level) _ReadEscape(
-    ref Mpeg4BitReader reader, Mpeg4VlcTable table, bool intra) {
-    if (reader.ReadBit() == 1) {
-      var nested = table.Read(ref reader);
-      Mpeg4VlcTables.RefuseNestedEscape(nested);
-      var (last, run, level) = _Row(ref reader, nested, intra);
-      var largest = Mpeg4VlcTables.LargestLevel(intra, last, run);
-      var magnitude = (level < 0 ? -level : level) + largest;
-      return (last, run, level < 0 ? -magnitude : magnitude);
-    }
+  private static (int Advance, int Level) _ReadThirdEscape(
+    ref Mpeg4BitReader reader, MsMpeg4Version version, int multiplier, int offset) {
+    if (version != MsMpeg4Version.Version1)
+      reader.Skip(2);
 
-    if (reader.ReadBit() == 1) {
-      var nested = table.Read(ref reader);
-      Mpeg4VlcTables.RefuseNestedEscape(nested);
-      var (last, run, level) = _Row(ref reader, nested, intra);
-      var largest = Mpeg4VlcTables.LargestRun(intra, last, level < 0 ? -level : level);
+    var last = reader.ReadBit() == 1;
+    var run = reader.ReadBits(6);
+    var level = reader.ReadBits(8);
+    if (level >= 1 << 7)
+      level -= 1 << 8;
 
-      // No "+ 1" here, which is where this parts company with ISO/IEC 14496-2 7.4.1.3.
-      return (last, run + largest, level);
-    }
+    return (run + 1 + (last ? _LAST_COEFFICIENT_BIAS : 0),
+      level > 0 ? level * multiplier + offset : level * multiplier - offset);
+  }
 
-    {
-      var last = reader.ReadBit() == 1;
-      var run = reader.ReadBits(6);
-      var level = reader.ReadBits(8);
-      if (level >= 1 << 7)
-        level -= 1 << 8;
+  private static int _Sign(ref Mpeg4BitReader reader, int magnitude) => reader.ReadBit() == 1 ? -magnitude : magnitude;
 
-      return (last, run, level);
+  private static void _RefuseNestedEscape(MsMpeg4RunLevelTable codes, int index) {
+    if (index == codes.EscapeIndex)
+      throw new InvalidDataException(
+        $"An escape code of {codes.Name} is followed by another escape code. The escape forms state how far past the "
+        + "table one value is and take an ordinary code for the rest, so a second escape inside one is not a "
+        + "codeword any encoder can produce.");
+  }
+
+  // ============================================================================================
+  // Reconstruction
+  // ============================================================================================
+
+  /// <summary>
+  /// Turns an intra block's quantised levels into coefficients.
+  /// </summary>
+  /// <remarks>
+  /// The DC by its own step and the rest by the H.263 rule, which is the split that makes the DC finer
+  /// than the coefficients around it — an error in the DC spreads sideways into every block that
+  /// predicts from it, where an error in a coefficient stays in its own block.
+  /// </remarks>
+  private void _Dequantise(scoped ReadOnlySpan<int> levels, scoped Span<int> samples, int step) {
+    var multiplier = 2 * this._quantiser;
+    var offset = (this._quantiser - 1) | 1;
+
+    samples[0] = levels[0] * step;
+    for (var i = 1; i < 64; ++i) {
+      var level = levels[i];
+      samples[i] = level == 0 ? 0 : level < 0 ? level * multiplier - offset : level * multiplier + offset;
     }
   }
 }
