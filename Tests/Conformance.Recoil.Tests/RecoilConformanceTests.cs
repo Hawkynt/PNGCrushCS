@@ -87,6 +87,7 @@ public sealed class RecoilConformanceTests {
     new(ImageFormat.GraphSaurus6, "Graph Saurus Screen 6", 512, 212, ".sr6"),
     new(ImageFormat.BkScreen, "BK colour screen", 256, 256, ".bks"),
     new(ImageFormat.HcbEditor, "HCB Editor", 296, 200, ".hcb"),
+    new(ImageFormat.EciGraphicEditor, "ECI Graphic Editor", 296, 200, ".eci"),
     new(ImageFormat.BlazingPaddlesWindow, "Blazing Paddles window", 120, 192, ".wnd"),
     new(ImageFormat.ArtStudioWindow, "Art Studio window", 160, 200, ".mwi"),
     new(ImageFormat.AtariGraphicsStudio, "Atari Graphics Studio", 320, 192, ".ags"),
