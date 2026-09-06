@@ -80,7 +80,7 @@ quietly come to mean "some of it". How each codec was measured is in
 
 Every codec the package registers has a row, and the name in the first column is the codec's own
 `CodecName` — the same string a refusal message names it by. `Decode` is what
-[`VideoFormatRegistry.CreateDecoder`](https://github.com/Hawkynt/PNGCrushCS/blob/main/Hawkynt.FileFormats.Video/VideoFormatRegistry.cs) builds, 94 of them; `Encode` is
+[`VideoFormatRegistry.CreateDecoder`](https://github.com/Hawkynt/PNGCrushCS/blob/main/Hawkynt.FileFormats.Video/VideoFormatRegistry.cs) builds, 96 of them; `Encode` is
 what [`VideoFormatRegistry.CreateEncoder`](https://github.com/Hawkynt/PNGCrushCS/blob/main/Hawkynt.FileFormats.Video/VideoFormatRegistry.cs) builds, 35 of them. The two
 are separate tables in the registry because they are looked up by different things: a decoder by a
 whole stream description, an encoder by the four-character code a caller wants written.
@@ -159,6 +159,8 @@ to fit, the encoder refuses it by name instead. Codec-by-codec provenance and me
 | innoHeim/Rsupport Screen Capture Codec | ✅ | — | `RSCC`, `ISCC`; 8, 16, 24 and 32 bits, tiles applied to a persistent picture. Other depths, and an indexed stream with no static palette, refused. No neutral overview is published. Adapted from FFmpeg's LGPL-2.1-or-later decoder | [FFmpeg `rscc.c`](https://github.com/FFmpeg/FFmpeg/blob/master/libavcodec/rscc.c) |
 | Screenpresso | ✅ | — | `SPV1`; full frames and additive deltas behind zlib. No neutral overview of this format is published. Adapted from FFmpeg's LGPL-2.1-or-later decoder | [FFmpeg `screenpresso.c`](https://github.com/FFmpeg/FFmpeg/blob/master/libavcodec/screenpresso.c) |
 | WinCAM Motion Video | ✅ | — | `WCMV`; 16, 24 and 32 bits as rectangular updates onto a persistent picture. Other depths refused. No neutral overview is published. Adapted from FFmpeg's LGPL-2.1-or-later decoder | [FFmpeg `wcmv.c`](https://github.com/FFmpeg/FFmpeg/blob/master/libavcodec/wcmv.c) |
+| VMware Screen Codec / VMware Video | ⚠️ | — | `VMnc`; RFB rectangles at 16 and 32 stored bits (a container stating 24 means 32), raw and Hextile, with the AND/XOR cursor sprite composited onto the returned picture and never into the reference canvas. 8-bit indexed screens refused — the codec packet carries no palette to draw them with. Adapted from FFmpeg's LGPL-2.1-or-later decoder | [FFmpeg `vmnc.c`](https://github.com/FFmpeg/FFmpeg/blob/master/libavcodec/vmnc.c) |
+| TDSC | ✅ | — | `TDSC`; raw and JPEG tiles onto a persistent BGR24 canvas behind zlib, with monochrome, BGRA and RGBA cursors composited onto the returned picture only. JPEG tiles go through the image package's own JPEG reader. Adapted from FFmpeg's LGPL-2.1-or-later decoder | [FFmpeg `tdsc.c`](https://github.com/FFmpeg/FFmpeg/blob/master/libavcodec/tdsc.c) |
 | [Uncompressed (BI_RGB)](https://en.wikipedia.org/wiki/BMP_file_format) | ✅ | ✅ | Codec tag 0 / `vfw`; device-independent bitmap pixel arrays at 1, 4, 8, 16, 24 and 32 bits, laid out by the `BITMAPINFOHEADER` the container carried. Other depths refused. The encoder writes the same pixel arrays at 8, 16, 24 and 32 bits with the `BITMAPINFOHEADER` a container needs | [BITMAPINFOHEADER](https://learn.microsoft.com/windows/win32/api/wingdi/ns-wingdi-bitmapinfoheader) |
 | [Planar raw YUV](https://wiki.multimedia.cx/index.php/YUV4MPEG2) | ⚠️ | ✅ | `YUV `, `rawvideo`; the YUV4MPEG2 chroma tokens `mono`, `420`, `422` and `444` at 8, 10, 12 and 16 bits. `420mpeg2` and `420paldv` refused — their chroma siting has no faithful pixel format here. The encoder writes the same tokens back | [MultimediaWiki YUV4MPEG2](https://wiki.multimedia.cx/index.php/YUV4MPEG2) |
 | [Uncompressed 4:2:2 10-bit (v210)](https://wiki.multimedia.cx/index.php/V210) | ✅ | ✅ | 10-bit 4:2:2, six luma samples to a sixteen-byte group, rows padded to 128 bytes. The encoder writes the same groups and the same 128-byte row padding | [MultimediaWiki v210](https://wiki.multimedia.cx/index.php/V210) |
@@ -245,17 +247,17 @@ nothing could be verified even with a description in hand.
 
 ### Adapted from somebody else's code, and named
 
-Fourteen decoders are adaptations of FFmpeg's own LGPL-2.1-or-later decoders rather than
+Sixteen decoders are adaptations of FFmpeg's own LGPL-2.1-or-later decoders rather than
 implementations from a published description: Escape 124, LCL MSZH's back-reference parser, LOCO,
 Canopus Lossless, Matrox M101, VBLE, MidiVid Archive, MS Screen 1, RemotelyAnywhere, MSCC, MWSC,
-RSCC, Screenpresso and WinCAM. Eleven of the encoders are as well: CLJR, FFV1, Flash Screen
+RSCC, Screenpresso, WinCAM, VMware Screen Codec and TDSC. Eleven of the encoders are as well: CLJR, FFV1, Flash Screen
 Video, HuffYUV, LCL ZLIB, MagicYUV, Microsoft RLE, Microsoft Video 1's mode decision, QuickTime
 Animation, Ut Video and ZMBV. Every one
 of those files
 carries the original author and the licence notice it came under; LGPL-2.1-or-later permits
 redistribution under this package's LGPL-3.0-or-later.
 
-Each of those fourteen sat among the undecoded above, and for the same reason the entries there give:
+Each of those sixteen sat among the undecoded above, and for the same reason the entries there give:
 the missing piece existed nowhere but an implementation. Reading a licence-compatible implementation
 is what closed them. The entries recording why they could not be closed the other way are kept,
 because that reasoning still holds for everything reached without one.
@@ -375,7 +377,7 @@ Those rules exist because “find a familiar marker and split there” works on 
 
 <!-- API:BEGIN generated by Hawkynt/RepositoryTemplate/package-readme — edit the XML docs in source, not here -->
 
-Every public and protected member of all 385 types, generated from the built assembly and its XML documentation, is in [REFERENCE.md](https://github.com/Hawkynt/PNGCrushCS/blob/main/Hawkynt.FileFormats.Video/REFERENCE.md).
+Every public and protected member of all 387 types, generated from the built assembly and its XML documentation, is in [REFERENCE.md](https://github.com/Hawkynt/PNGCrushCS/blob/main/Hawkynt.FileFormats.Video/REFERENCE.md).
 
 <!-- API:END -->
 
@@ -398,7 +400,7 @@ Every public and protected member of all 385 types, generated from the built ass
 - Large RealVideo pictures require preserved slice offsets when they must be split across 16-bit RealMedia packet lengths, and RoQ sound requires its original predictor argument.
 - Several advanced codecs intentionally implement well-defined subsets (for example H.264 progressive 8-bit 4:2:0, HEVC Main profile, and VC-1 Simple/Main intra pictures). Every row marked ⚠️ in the codec table names its own subset. Unsupported profiles/features are refused by name rather than silently misdecoded.
 - Codec support is more precise than a single green check can express; consult [`codec-notes.md`](https://github.com/Hawkynt/PNGCrushCS/blob/main/Hawkynt.FileFormats.Video/codec-notes.md) before relying on a profile/level/feature not named in this README.
-- Encoding is a smaller domain than decoding on purpose: 35 codecs of the 94 read can also be written. Most are lossless; two are not, and each says so in its own row. Motion JPEG writes baseline JPEG, whose loss is a matter of degree, and Microsoft Video 1's two-colours-to-a-block coding has no lossless form at all — a picture that codec can hold exactly comes back exactly, and one it cannot does not. What is still not written back is the modern lossy codecs: a stream read as H.264 cannot be written back as H.264.
+- Encoding is a smaller domain than decoding on purpose: 35 codecs of the 96 read can also be written. Most are lossless; two are not, and each says so in its own row. Motion JPEG writes baseline JPEG, whose loss is a matter of degree, and Microsoft Video 1's two-colours-to-a-block coding has no lossless form at all — a picture that codec can hold exactly comes back exactly, and one it cannot does not. What is still not written back is the modern lossy codecs: a stream read as H.264 cannot be written back as H.264.
 - Video correctness depends on real-world packetization as much as codec math. The project therefore validates packet counts, sizes, timestamps, and key-frame flags against external tools where samples are available.
 
 ## ❤️ Support
