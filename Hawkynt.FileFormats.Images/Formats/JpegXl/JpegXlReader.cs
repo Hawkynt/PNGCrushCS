@@ -769,19 +769,23 @@ public static class JpegXlReader {
       return true;
     }
 
+    // An extra channel states its own sample depth. A sixteen-bit picture states
+    // a sixteen-bit alpha beside it, and that used to be passed over here — so a
+    // file this package had just written came back without the alpha plane it
+    // put in.
     var alphaIndex = -1;
     for (var i = 0; i < imageMetadata.ExtraChannelInfo.Length; ++i) {
       var extra = imageMetadata.ExtraChannelInfo[i];
-      if (extra.Type == 0 && extra.DimShift == 0 && extra.BitDepth.BitsPerSample <= 8) {
-        alphaIndex = baseChannels + i;
-        break;
-      }
+      if (extra.Type != 0 || extra.DimShift != 0)
+        continue;
+      var extraBits = (int)extra.BitDepth.BitsPerSample;
+      if (extraBits > 8 && extraBits != metadata.BitsPerSample)
+        continue;
+
+      alphaIndex = baseChannels + i;
+      break;
     }
     var components = baseChannels + (alphaIndex >= 0 ? 1 : 0);
-    // Two components at sixteen bits is Gray+Alpha, which has no deep format
-    // here, so that one combination stays refused rather than narrowed.
-    if (deep && components == 2)
-      return false;
 
     var pixels = new byte[checked(pixelCount * components * bytesPerSample)];
     for (var i = 0; i < pixelCount; ++i) {
