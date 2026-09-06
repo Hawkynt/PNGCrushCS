@@ -9,10 +9,11 @@ namespace FileFormat.JpegXl;
 /// implements the real modular and VarDCT paths and refuses unsupported syntax instead of returning
 /// placeholders.
 /// <para/>
-/// The writer emits a lossless modular codestream: one frame in one group, samples predicted from
-/// their neighbours and entropy-coded, no colour transform and nothing quantised. That covers grey
-/// and colour at eight and sixteen bits, with or without alpha, up to a thousand and twenty-four
-/// pixels a side — the largest picture a single group holds. Lossy coding is read but not written.
+/// The writer emits a lossless modular codestream: one frame, samples predicted from their
+/// neighbours and entropy-coded, no colour transform and nothing quantised. That covers grey and
+/// colour at eight and sixteen bits, with or without alpha, at any size — a picture larger than a
+/// group is stated a group at a time, which is what the format asks for. Lossy coding is read but
+/// not written.
 /// </remarks>
 public readonly record struct JpegXlFile
   : IImageFormatReader<JpegXlFile>, IImageFormatWriter<JpegXlFile>,
@@ -70,6 +71,7 @@ public readonly record struct JpegXlFile
       (3, false) => PixelFormat.Rgb24,
       (4, false) => PixelFormat.Rgba32,
       (1, true) => PixelFormat.Gray16,
+      (2, true) => PixelFormat.GrayAlpha32,
       (3, true) => PixelFormat.Rgb48,
       (4, true) => PixelFormat.Rgba64,
       _ => throw new NotSupportedException(
