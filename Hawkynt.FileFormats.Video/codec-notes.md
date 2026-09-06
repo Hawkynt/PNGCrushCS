@@ -1020,6 +1020,60 @@ of compression ID 1260 — 4:2:0 sampling, a macroblock coded in RGB mode, an al
 macroblock whose quantisation scale factor is zero, and any structure whose stated size does not fit
 inside the one containing it.
 
+### DV (IEC 61834 / SMPTE 314M)
+
+Converted from FFmpeg's LGPL-2.1-or-later DV codec — rung 1 of the sourcing ladder, since
+LGPL-2.1-or-later goes into this package's LGPL-3.0-or-later without further argument. Provenance is
+in `Codecs/Dv/THIRD-PARTY-NOTICE.FFmpeg.txt`.
+
+**Everything about a DV frame is fixed in advance.** It is a tape format: a frame is a whole number
+of 80-byte DIF blocks because that is what fits between two edits, and there are exactly six
+standard-definition arrangements. 525/60 at 25 Mbit is 120000 bytes, 720x480, 4:1:1. 625/50 at 25
+Mbit is 144000 bytes, 720x576, and either 4:2:0 (IEC 61834) or 4:1:1 (SMPTE 314M) — the same size and
+the same signal type, separated only by the track application ID. DVCPRO50 is the same two rasters at
+4:2:2 in twice the space and two DIF channels. So the profile is read out of the frame and never
+inferred, and a signal type outside the table is refused rather than approximated. The tag in the
+container decides nothing: `dvsd` is as likely on a DVCPRO50 file as `dv50` is.
+
+**Blocks are not stored where they are shown, and the shuffle is not derivable.** The five
+macroblocks of a video segment come from five widely separated parts of the picture and the segments
+walk it in a serpentine, which is a recorder's answer to a tape dropout — a lost DIF block costs five
+scattered macroblocks rather than a stripe. Getting the table wrong produces a picture made of the
+right blocks in the wrong places, so it is copied exactly and checked by a test that the coordinates
+tile every sample of every profile's raster once.
+
+**The three passes are the whole difficulty.** Every block has a fixed bit budget — 112 bits for
+luma, 80 for colour — and a block that needs more takes what its neighbours in the macroblock did not
+use, then what the other four macroblocks of the segment did not use. A codeword may be cut in half
+by one of those boundaries, so an unfinished block carries its dangling bits forward and the first
+code of its continuation is read out of the prefix and the new stream together. **That window is
+built at the position the continued stream has already reached, not at the start of its buffer** —
+reading it from the start instead decodes correctly until a block overruns its budget and then walks
+into the `0xff` an encoder pads unused space with. It cost 5% of samples on a detailed frame and
+nothing at all on a flat one, which is precisely the shape of bug a smooth test picture will not
+find.
+
+**The inverse transform is FFmpeg's `simple_idct`, coefficient for coefficient.** An inverse DCT is
+only specified to a tolerance, and two implementations inside that tolerance still differ by a level
+here and there; matching one exactly is what makes a sample-for-sample comparison meaningful. Its
+row pass has a shortcut for a row whose only non-zero coefficient is the first, and that shortcut is
+**not** arithmetically identical to the general path — above 1023 they differ by one, and a DV block's
+first coefficient reaches 2044.
+
+Measured against ffmpeg on the planes, frame by frame, sample by sample, at `-pix_fmt yuv411p`,
+`yuv420p` and `yuv422p`: **no sample differs anywhere.** All six profiles, both transform modes
+(`-flags +ildct`), synthetic frames and real recordings — `pond.dv`, `dvcpro50.avi`,
+`codec_fcc_CDVC.avi` and `dv420_misdetected_as_411.mkv` from the FFmpeg sample archive. ffmpeg's own
+SIMD and C inverse transforms were checked against each other first, so the comparison is against
+one decode and not against a build option.
+
+What refuses, by name: DVCPRO HD — the 100 Mbit 1080i and 720p profiles of SMPTE 370M, whose
+macroblocks carry eight blocks rather than six and whose quantiser is a different table; a signal
+type no standard defines; a packet shorter than the six DIF blocks a profile is read from or than the
+profile it claims; and a frame whose raster is not the one the container described. Error concealment
+is deliberately not carried across, so a damaged frame decodes to what its bits say rather than to
+the picture ffmpeg repairs.
+
 ### VC-1 / Windows Media Video 9
 
 Intra pictures of the Simple and Main profiles, which is the first rung of SMPTE 421M and where this
