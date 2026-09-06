@@ -18558,13 +18558,17 @@ Implements `IEquatable<IffAnim8File>`, `IImageFormatMetadata<IffAnim8File>`, `II
 
 #### `IffDctvFile`
 
-Implements `IEquatable<IffDctvFile>`, `IImageFormatMetadata<IffDctvFile>`, `IImageFormatReader<IffDctvFile>`, `IImageFormatWriter<IffDctvFile>`, `IImageToRawImage<IffDctvFile>`.
+Implements `IEquatable<IffDctvFile>`, `IImageFormatMetadata<IffDctvFile>`, `IImageFormatReader<IffDctvFile>`, `IImageFormatWriter<IffDctvFile>`, `IImageFromRawImage<IffDctvFile>`, `IImageToRawImage<IffDctvFile>`.
 
 | Member | Signature | Summary |
 | --- | --- | --- |
-| `Height` | `int Height { get; init; }` |  |
-| `RawData` | `byte[] RawData { get; init; }` |  |
+| `ContentHeight` | `int ContentHeight { get; init; }` |  |
+| `Height` | `int Height { get; }` |  |
+| `Interlaced` | `bool Interlaced { get; init; }` |  |
+| `PlaneCount` | `int PlaneCount { get; init; }` |  |
+| `Samples` | `byte[] Samples { get; init; }` |  |
 | `Width` | `int Width { get; init; }` |  |
+| `FromRawImage` | `static IffDctvFile FromRawImage(RawImage image)` |  |
 | `ToRawImage` | `static RawImage ToRawImage(IffDctvFile file)` |  |
 
 #### `IffDctvReader`
@@ -18581,6 +18585,8 @@ Implements `IEquatable<IffDctvFile>`, `IImageFormatMetadata<IffDctvFile>`, `IIma
 | Member | Signature | Summary |
 | --- | --- | --- |
 | `ToBytes` | `static byte[] ToBytes(IffDctvFile file)` |  |
+| `ToFile` | `static void ToFile(IffDctvFile file, FileInfo target)` |  |
+| `ToStream` | `static void ToStream(IffDctvFile file, Stream stream)` |  |
 
 ### Namespace `FileFormat.IffDeep`
 
@@ -21931,7 +21937,7 @@ Implements `IEquatable<MamutFile>`, `IImageFormatMetadata<MamutFile>`, `IImageFo
 
 ### Namespace `FileFormat.Mapletown`
 
-[`MapletownDecoder`](#mapletowndecoder) · [`MapletownEncoder`](#mapletownencoder) · [`MapletownStream`](#mapletownstream)
+[`MapletownDecoder`](#mapletowndecoder) · [`MapletownEncoder`](#mapletownencoder) · [`MapletownPicture`](#mapletownpicture) · [`MapletownStream`](#mapletownstream)
 
 #### `MapletownDecoder`
 
@@ -21948,14 +21954,30 @@ Implements `IEquatable<MamutFile>`, `IImageFormatMetadata<MamutFile>`, `IImageFo
 | Member | Signature | Summary |
 | --- | --- | --- |
 | `MapletownEncoder` | `MapletownEncoder()` |  |
+| `BitsPerByte` | `const int BitsPerByte` |  |
 | `BitsPerCharacter` | `const int BitsPerCharacter` |  |
 | `MaxLength` | `const int MaxLength` |  |
+| `Binary` | `static MapletownEncoder Binary()` |  |
 | `Bit` | `void Bit(int bit)` |  |
 | `Bits` | `void Bits(int value, int count)` |  |
 | `Flush` | `void Flush()` |  |
 | `Length` | `void Length(int value)` |  |
 | `Text` | `void Text(string text)` |  |
 | `ToArray` | `byte[] ToArray()` |  |
+
+#### `MapletownPicture`
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `Levels` | `const int Levels` |  |
+| `MaxDimension` | `const int MaxDimension` |  |
+| `MaxPixels` | `const int MaxPixels` |  |
+| `PaletteSize` | `const int PaletteSize` |  |
+| `Channel` | `static byte Channel(int level)` |  |
+| `Expand` | `static ValueTuple<byte, byte, byte> Expand(int color)` |  |
+| `Level` | `static int Level(int channel)` |  |
+| `Reduce` | `static ValueTuple<int[], int[]> Reduce(ReadOnlySpan<byte> rgb, int pixels)` |  |
+| `WriteImage` | `static void WriteImage(MapletownEncoder encoder, int width, int height, ReadOnlySpan<byte> rgb)` |  |
 
 #### `MapletownStream`
 
@@ -21972,17 +21994,20 @@ Implements `IEquatable<MamutFile>`, `IImageFormatMetadata<MamutFile>`, `IImageFo
 
 ### Namespace `FileFormat.MapletownMl1`
 
-[`MapletownMl1File`](#mapletownml1file) · [`MapletownMl1Reader`](#mapletownml1reader)
+[`MapletownMl1File`](#mapletownml1file) · [`MapletownMl1Reader`](#mapletownml1reader) · [`MapletownMl1Writer`](#mapletownml1writer)
 
 #### `MapletownMl1File`
 
-Implements `IEquatable<MapletownMl1File>`, `IImageFormatMetadata<MapletownMl1File>`, `IImageFormatReader<MapletownMl1File>`, `IImageToRawImage<MapletownMl1File>`.
+Implements `IEquatable<MapletownMl1File>`, `IImageFormatMetadata<MapletownMl1File>`, `IImageFormatReader<MapletownMl1File>`, `IImageFormatWriter<MapletownMl1File>`, `IImageFromRawImage<MapletownMl1File>`, `IImageToRawImage<MapletownMl1File>`.
 
 | Member | Signature | Summary |
 | --- | --- | --- |
+| `MaxDimension` | `const int MaxDimension` |  |
+| `MaxPixels` | `const int MaxPixels` |  |
 | `Height` | `int Height { get; init; }` |  |
 | `Pixels` | `byte[] Pixels { get; init; }` |  |
 | `Width` | `int Width { get; init; }` |  |
+| `FromRawImage` | `static MapletownMl1File FromRawImage(RawImage image)` |  |
 | `ToRawImage` | `static RawImage ToRawImage(MapletownMl1File file)` |  |
 
 #### `MapletownMl1Reader`
@@ -21993,6 +22018,12 @@ Implements `IEquatable<MapletownMl1File>`, `IImageFormatMetadata<MapletownMl1Fil
 | `FromFile` | `static MapletownMl1File FromFile(FileInfo file)` |  |
 | `FromSpan` | `static MapletownMl1File FromSpan(ReadOnlySpan<byte> data)` |  |
 | `FromStream` | `static MapletownMl1File FromStream(Stream stream)` |  |
+
+#### `MapletownMl1Writer`
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `ToBytes` | `static byte[] ToBytes(MapletownMl1File file)` |  |
 
 ### Namespace `FileFormat.MapletownMx1`
 
@@ -32708,14 +32739,20 @@ Implements `IEquatable<Spectrum512ExtFile>`, `IImageFormatMetadata<Spectrum512Ex
 
 #### `Spectrum512SmooshFile`
 
-Implements `IEquatable<Spectrum512SmooshFile>`, `IImageFormatMetadata<Spectrum512SmooshFile>`, `IImageFormatReader<Spectrum512SmooshFile>`, `IImageFormatWriter<Spectrum512SmooshFile>`, `IImageToRawImage<Spectrum512SmooshFile>`.
+Implements `IEquatable<Spectrum512SmooshFile>`, `IImageFormatMetadata<Spectrum512SmooshFile>`, `IImageFormatReader<Spectrum512SmooshFile>`, `IImageFormatWriter<Spectrum512SmooshFile>`, `IImageFromRawImage<Spectrum512SmooshFile>`, `IImageToRawImage<Spectrum512SmooshFile>`.
 
 | Member | Signature | Summary |
 | --- | --- | --- |
+| `DecompressedSize` | `const int DecompressedSize` |  |
+| `HeaderSize` | `const int HeaderSize` |  |
+| `MaxColorsPerScanline` | `const int MaxColorsPerScanline` |  |
 | `MinFileSize` | `const int MinFileSize` |  |
+| `PaletteEntriesPerLine` | `const int PaletteEntriesPerLine` |  |
 | `Height` | `int Height { get; }` |  |
 | `RawData` | `byte[] RawData { get; init; }` |  |
 | `Width` | `int Width { get; }` |  |
+| `FromExactRawImage` | `static Spectrum512SmooshFile FromExactRawImage(RawImage image)` |  |
+| `FromRawImage` | `static Spectrum512SmooshFile FromRawImage(RawImage image)` |  |
 | `ToRawImage` | `static RawImage ToRawImage(Spectrum512SmooshFile file)` |  |
 
 #### `Spectrum512SmooshReader`
