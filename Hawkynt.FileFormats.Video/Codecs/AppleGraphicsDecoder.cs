@@ -146,14 +146,18 @@ public sealed class AppleGraphicsDecoder : IVideoCodecDecoder<AppleGraphicsDecod
 
   /// <summary>Decodes one packet, which for this codec is always exactly one whole frame.</summary>
   /// <remarks>
-  /// The three colour caches are reset here, before the canvas is touched, because they belong to the
-  /// packet and not to the picture: a cached-colour opcode of one frame must never reach a colour set
-  /// only the frame before it stated.
+  /// Each packet restarts the three colour caches' write positions but leaves what they hold
+  /// standing, so a cached-colour opcode may name a set some earlier frame stated. This used to clear
+  /// the contents too, on the reasoning that a cache belongs to the packet rather than to the
+  /// picture. Nothing published settles it, and the two readings cannot be told apart on real
+  /// streams: on the eight downloaded above, 950 frames, both give the same pictures, which is only
+  /// possible because no real encoder here ever reaches back past a chunk boundary. They can be told
+  /// apart on what FFmpeg's own SMC encoder writes, which does reach back — clearing the contents
+  /// costs 83,459 differing samples of 632,580 over 57 frames, at up to the full range, and keeping
+  /// them gives zero. So the more forgiving reading is the one kept: it decodes everything the
+  /// stricter one did, plus files the stricter one turned into a wrong picture.
   /// </remarks>
   public bool TryDecode(CodedPacket packet, out RawImage frame) {
-    Array.Clear(this._pairCache);
-    Array.Clear(this._quadCache);
-    Array.Clear(this._octetCache);
     this._pairNext = this._quadNext = this._octetNext = 0;
 
     this._DecodeFrame(packet.Data.Span);

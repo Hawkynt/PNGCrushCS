@@ -644,6 +644,45 @@ last block, and a chunk that stops before every block is accounted for. A skip o
 on the very first frame — the canvas a freshly built decoder starts with is black, which is exactly
 the picture a skip paints when nothing has been decoded yet, so an encoder using one there is stating
 a black block rather than pointing at a frame that does not exist.
+
+**Writing it.** The encoder is FFmpeg's `libavcodec/rpzaenc.c` carried across — LGPL-2.1-or-later, so
+this package can absorb it, with the attribution beside the code — at the thresholds that file
+defaults to. It writes three of the format's four codings: a run of skipped blocks, a run of one
+colour, and a block stating all sixteen of its pixels, chosen in the reference's own order. A run
+stops at thirty-two blocks, which is all its opcode's count bits can say, and at the end of a block
+row.
+
+The fourth coding, the four-colour block, is read and written by nothing here, and that is a decision
+rather than an unfinished corner. The reference's own path for it never runs at the reference's own
+thresholds: six lavfi sources over eighteen frames, and separately every frame of twenty-one real
+streams, coded without a single four-colour block between them. Forcing it with a raised threshold
+shows why that went unnoticed. The path indexes its colour triple the way the bitstream numbers
+channels, blue first, and hands it to a packer that reads the same triple red first, so the block it
+writes carries red and blue exchanged; and it clips the two endpoints of its least-squares fit to
+eight bits before shifting them into a five-bit field, which measures as a channel error of 31 out of
+31. A block that would have been coded that way is written as sixteen colours instead, which is exact
+and costs twenty-four bytes more. Reinventing the coding was not attempted either: a four-colour
+block wants a quantiser, and choosing one is a decision with no evidence behind it.
+
+What that leaves is a loss with a bound rather than an average. Eight-bit colour is rounded to the
+five bits the format stores, and after that a pixel moves at most one level further: a sixteen-colour
+block states every pixel exactly, a skip is written only where every pixel still equals what was coded
+there before, and a one-colour run stays open only while every pixel of it is within one of the run's
+own average. Nothing accumulates over a stream, since a skip is exact by construction.
+
+Both directions were measured against ffmpeg, which has an `rpza` encoder as well as an `rpza`
+decoder, and in RGB555 rather than RGB — comparing RGB would compare two colour conversions as much
+as two codecs. ffmpeg is fed and read as `rgb555le` raw video so that swscale never runs, and the
+five-bit values are widened and narrowed here by bit replication, which is exactly invertible; bit 15
+is masked off on both sides, being no part of any channel. First the reader was calibrated on files
+neither side wrote: twenty-one real streams — the eight at `samples.ffmpeg.org/V-codecs/RPZA` and the
+thirteen in its `odd_sizes/` directory, 3,830 frames and 108,728,920 pixels, 60x64 up to 574x252 —
+decode identically here and in ffmpeg, not one pixel apart. Then the same pictures were re-coded by
+both encoders, and this one writes byte for byte what ffmpeg's writes: all 3,830 frames of those
+streams, 42,032,609 bytes, and 149 further frames of thirteen clips ffmpeg generated, geometry that is
+and is not a whole number of blocks and down to four pixels wide included. ffmpeg's decode of what
+this encoder writes is identical to this package's decode of it on every one of those pixels, and
+against the pictures handed in no channel of any pixel moved by more than one level of thirty-two.
 ### Apple Graphics (SMC)
 
 A vector quantizer over 4x4 blocks of eight-bit palettised pixels, named after its author Sean M.
@@ -653,8 +692,9 @@ left alone; the last block, or the last two blocks together, is repeated forward
 eight colours are chosen per pixel by packed indices; or sixteen raw palette indices arrive with
 nothing shared between them at all. Two, four and eight colours each have two spellings — a set of
 colours given in the stream, or a number naming one of three small circular caches the decoder keeps
-of the most recently given sets — and the caches are not part of the picture: they are reset empty at
-the start of every chunk, where the picture itself is not.
+of the most recently given sets. Each chunk restarts those caches' write positions but leaves their
+contents standing, so a chunk may name a set an earlier one stated; this reader used to clear them,
+and the paragraph on writing below says what settled it.
 
 The eight-colour block's index bytes are not six bytes of four pixels apiece. They are permuted:
 twelve nibbles come out of the six bytes and two 24-bit numbers are built by picking six of those
@@ -695,6 +735,56 @@ does not refuse either but answers with palette index zero — not a reading of 
 states, and not reproduced here. A skip opcode is not refused on the very first frame: the canvas a
 freshly built decoder starts with is already what a skip states, so an encoder using one there is
 stating that canvas rather than pointing at a frame that does not exist.
+
+**Writing it.** The encoder is converted from FFmpeg's `libavcodec/smcenc.c`, which is
+LGPL-2.1-or-later and so takeable — the first rung of the ladder — with the attribution beside the
+code in `Codecs/AppleGraphics/THIRD-PARTY-NOTICE.FFmpeg.txt`. What is taken is the block walk: at
+every block four runs are measured — how many blocks from here are unchanged since the frame before,
+how many repeat the block just written, how many share one set of distinct colours, and how many
+colours that set holds — and the longest of them is spent. The picture is coded over a canvas padded
+out to whole blocks with its last row and column repeated into the padding, which the decoder crops
+off again, so a width or height that is not a whole number of blocks costs compression at the edges
+and nothing else.
+
+It is lossless, and that is a property of the format rather than of the effort spent: one distinct
+colour in a block is the one-colour opcode, two the two-colour, three or four the four-colour, five to
+eight the eight-colour, and anything above that the sixteen raw indices, which hold any block
+whatever. There is nothing here to round. The other side of that is that an eight-bit palettised
+picture is the only thing it takes — a true-colour picture would have to be reduced to 256 colours
+first, and which 256 is not a codec's decision — so every other pixel format is refused by name, as
+are a depth other than eight (including the greyscale spelling, depth 40, which is written back as
+ordinary eight bits with the ramp stated as a colour table), a palettised picture carrying no palette,
+a palette or a picture size that changes between frames, and an index past the end of the palette.
+
+**The one thing the two readings of this format disagree about, measured.** Fourteen movies written by
+ffmpeg's own SMC encoder — 262 frames, 6x4 up to 640x480, test patterns, noise, gradients and a still —
+were decoded by ffmpeg and by this decoder and the index planes compared. Three of the fourteen agree
+and eleven do not. The whole of the difference is the colour caches: this decoder resets them at every
+packet, where ffmpeg's leaves the previous chunk's contents standing and only restarts the write
+pointer, and ffmpeg's encoder relies on that, matching a run against a set of colours an earlier frame
+wrote. Leaving the caches standing here makes all fourteen files agree with ffmpeg on every one of the
+262 frames, byte for byte, which locates the disagreement exactly and nowhere else. Nothing published
+about the format settles which reading is meant, and the eight real Apple-authored streams above agree
+with both, because none of them ever names an entry its own chunk has not written.
+
+So the encoder does not write one either: it resets the caches with every packet and only ever emits a
+cached-colour opcode for an entry the same packet has already written. Such a stream reads identically
+under either reading, which is the only kind worth writing while the question is open.
+
+**What ffmpeg makes of what this writes.** The 262 index planes above, written by this encoder, muxed
+into QuickTime and handed to ffmpeg: every frame of all fourteen comes back with the index plane
+identical byte for byte and the 256-entry colour table identical to the one handed in. Thirteen further
+geometries went the same way round — 1x1, 3x1, 1x7, 5x3, 7x5, 17x13, 63x47, 65x49, 4x4, 16x16, 255x129,
+301x3 and 640x480, 132 frames, sizes ffmpeg's own pal8 conversion will not produce because it rounds
+odd dimensions down — and ffmpeg decodes every one of them exactly as well. That is 27 files this
+encoder wrote and 394 frames read back by the other tool, against 14 files and 262 frames that tool
+wrote itself; the two counts are of different things and are not added together. Between them they
+exercise every opcode this encoder emits: both spellings of skip, both of repeat, both of one colour,
+and the stated and cached spellings of the two-, four- and eight-colour blocks, plus the sixteen raw
+indices. The two "repeat the last two blocks" opcodes are never written, since nothing they can say is
+cheaper than what is written instead.
+
+On the same 262 pictures this encoder's packets total 802,858 bytes against ffmpeg's 827,671.
 ### VP8
 
 The codec WebM was built around, and all of it: the boolean entropy decoder, segmentation, both loop
@@ -3106,11 +3196,48 @@ than growing, which is the shape of the shared inverse transform's own rounding 
 same residual this library's MPEG-1, H.263 and H.261 decoders measure against the same oracle, for the
 same reason: none of these formats specifies the transform as an algorithm, only as a formula.
 
+**Writing it.** The encoder is the decoder read backwards and nothing else: the same two variable-length
+code tables inverted at start-up rather than transcribed a second time, the same coefficient-group scan,
+the same macroblock walk, and the same word byte-swap — which is its own inverse, so applying it is
+literally the call the decoder makes to undo it. The forward transform is the adjoint of the inverse
+this package evaluates, so a coefficient quantised at the finest step comes back to what went in. What
+the document leaves to the encoder, this settles once: one quantisation parameter of eight for the whole
+file, every picture whole (there is nothing else it could be), trailing empty coefficient groups never
+written because End Of Block ends the block anyway, and a level chosen by evaluating the decoder's own
+`(level * f) >> 4` for the two candidates that can win — that shift rounds down on both signs, so the
+plain quotient would reconstruct half a step low everywhere.
+
+**Forty positions of sixty-four.** Clause 3.3 states coefficient groups ten to fifteen "cannot be coded
+(they must be 0)", and End Of Block is why: there is no way to reach a later group without writing every
+earlier one. So the twenty-four highest-frequency positions are dropped before quantisation decides
+anything rather than written and then refused. That is the whole of what ASV1's coding cannot express
+and the whole of why its pictures are coarser than ASV2's at the same effective step.
+
+**Measured, the other way round.** A writer checked only by its own reader is worth less than no writer,
+because the two can share a misunderstanding. So the reading direction was re-confirmed first: eight
+streams **ffmpeg's own encoder** wrote — 34x18 to 352x288, quantisers 1 to 31, 72 frames — decoded here
+and by ffmpeg and compared plane by plane, every plane of every frame within one level and two of the
+eight identical. Only then is this package's decode admissible as the second opinion below.
+
+Ten streams written here — 34x18 to 352x288, four of them not a whole
+number of macroblocks, content from a flat colour through `testsrc2`, `mandelbrot`, `smptebars`,
+`rgbtestsrc` and a gradient to uniform noise, 82 frames in all — were muxed to AVI by this package's own
+writer and handed to ffmpeg 9.0.1. It accepted every frame of every file with no message at all and
+produced all 82 pictures. Compared **plane by plane** against this package's own decode of the same
+bytes: 14838 differing samples of 2869164, none by more than one level, which is the same
+transform-rounding residual the read direction shows. Against the pictures that went in, the mean peak
+signal-to-noise ratio over the nine non-flat streams is 37.2 dB and the flat one is exact. On the same
+ten clips at the same quantiser, ffmpeg's own ASV1 encoder writes 331868 bytes of AVI where this one
+writes 261704, and is closer to the source on two of the ten (by 0.05 dB and 0.01 dB), further on five
+and level on the other three.
+
 What refuses, by name: a quantisation parameter of zero, which the dequantisation divides by; a
 coefficient group's pattern naming the block's own DC position, which the document states must always be
 coded as zero and read from the separate DC field instead; a block reading an eleventh coefficient group
 without having reached End Of Block first; and codec-private data shorter than the eight-byte global
-header the document's own bitstream clause needs.
+header the document's own bitstream clause needs. The encoder refuses a stream that is not video, a
+picture size the container never stated, and a picture of a size other than the one the stream was
+opened at — the bitstream carries no picture size, so a stream cannot change one.
 
 ### ASUS V2
 
@@ -3157,8 +3284,41 @@ ffmpeg and compared **plane by plane**, sampling every frame. Every plane of eve
 ffmpeg's decode by at most one level, flat across every stream, the same transform-rounding residual
 ASV1 and this library's MPEG-1, H.263 and H.261 decoders already measure against the same oracle.
 
+**Writing it.** As with ASV1, the encoder is the decoder read backwards: the same three variable-length
+code tables inverted at start-up, the same scan, the same macroblock walk, and the same byte-wide bit
+reversal — its own inverse, so applying it is the decoder's own call. The fixed-width fields need their
+second reversal on the way out exactly as they need it on the way in. What the document leaves to the
+encoder: one quantisation parameter of sixteen for the whole file, which against ASV2's scale of a
+hundred and twenty-eight is the same effective step ASV1's eight gives against sixty-four, so the two
+encoders code a picture at the same fineness and what differs between their outputs is the coding rather
+than the quality. The coefficient-group count is the serial number of the last group holding anything,
+so an empty group in the middle costs its pattern code and a trailing one costs nothing.
+
+**All sixteen groups.** ASV2 reaches every block position, which is the one place the two codings differ
+in what they can express: a checkerboard puts its whole energy in the last coefficient group, which ASV1
+states must be nought and this carries.
+
+**Measured, the other way round.** The reading direction was re-confirmed first, the same way ASV1's
+was: eight streams **ffmpeg's own encoder** wrote — 34x18 to 352x288, quantisers 1 to 31, 72 frames —
+decoded here and by ffmpeg and compared plane by plane, every plane of every frame within one level and
+two of the eight identical. Only then is this package's decode admissible as the second opinion below.
+
+Ten streams written here — the same sizes and sources as ASV1's, 82
+frames in all — were muxed to AVI by this package's own writer and handed to ffmpeg 9.0.1. It accepted
+every frame of every file with no message at all. Compared **plane by plane** against this package's own
+decode of the same bytes: 15233 differing samples of 2869164, none by more than one level. Against the
+pictures that went in, the mean peak signal-to-noise ratio over the nine non-flat streams is 42.8 dB and
+the flat one is exact. On the same ten clips at the same quantiser, ffmpeg's own ASV2 encoder writes
+331188 bytes of AVI where this one writes 266454, and is closer to the source on two of the ten (by 0.17
+dB and 0.01 dB) and further on seven — furthest by a long way on uniform noise, 19.84 dB against 33.91,
+where the coefficients are loud enough that what an encoder does with a level too large for the
+eight-bit escape decides the picture. This one clamps such a level; whatever the reference does with it,
+a sample there comes back up to 107 levels out where the worst here is 23.
+
 What refuses, by name: a quantisation parameter of zero, which the dequantisation divides by; and
 codec-private data shorter than the eight-byte global header the document's own bitstream clause needs.
+The encoder refuses a stream that is not video, a picture size the container never stated, and a picture
+of a size other than the one the stream was opened at.
 
 ### Creative YUV
 
