@@ -1,0 +1,52 @@
+The code tables in MsMpeg4Data.cs, and the bitstream syntax the rest of this
+directory implements, are taken from FFmpeg (https://ffmpeg.org), which is
+where Microsoft's three MPEG-4 variants were reverse-engineered and where the
+only authoritative statement of their tables exists. Microsoft published no
+specification for any of them.
+
+Files used, all from libavcodec:
+
+  msmpeg4data.c        run-level tables 0, 1, 3 and 4; the predicted-picture
+                       macroblock table of version 3; the macroblock type and
+                       intra chrominance pattern tables of version 2; both
+                       motion vector tables of version 3
+  msmpeg4_vc1_data.c   the intra-picture coded block pattern table and both
+                       DC tables of version 3
+  h263data.c           run-level table 5; CBPY; the motion vector magnitudes;
+                       the intra and inter MCBPC tables version 1 borrows
+  mpeg4data.h          run-level table 2; the DC size tables versions 1 and 2
+                       invert to make their own
+  msmpeg4.c            the DC predictor, the coded block pattern predictor and
+                       the construction of the version 1 and 2 DC tables
+  msmpeg4dec.c         the picture header, the macroblock layer of all three
+                       versions, the block layer and its three escape forms,
+                       and the motion vector decoding
+  msmpeg4enc.c         the encoder's table choices, its coded block pattern
+                       prediction and its escape selection
+  rl.c                 the derivation of the largest level per run and the
+                       largest run per level from a run-level table
+  h263.c               the motion vector predictor
+  h263dec.c            the slice loop and the trailing extension header
+
+Copyright (c) 2001 Fabrice Bellard
+Copyright (c) 2002-2013 Michael Niedermayer <michaelni@gmx.at>
+Copyright (c) 2000-2002 Fabrice Bellard, Michael Niedermayer (rl.c)
+Copyright (c) 2007 Aurelien Jacobs <aurel@gnuage.org>
+
+FFmpeg is free software; you can redistribute it and/or modify it under the
+terms of the GNU Lesser General Public License as published by the Free
+Software Foundation; either version 2.1 of the License, or (at your option)
+any later version.
+
+FFmpeg is distributed in the hope that it will be useful, but WITHOUT ANY
+WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
+A PARTICULAR PURPOSE.  See the GNU Lesser General Public License for more
+details.
+
+You should have received a copy of the GNU Lesser General Public License along
+with FFmpeg; if not, write to the Free Software Foundation, Inc., 51 Franklin
+Street, Fifth Floor, Boston, MA 02110-1301 USA.
+
+This library is licensed LGPL-3.0-or-later, which is a permitted "any later
+version" of the LGPL-2.1 FFmpeg offers, so the two are compatible in this
+direction and in no other.
