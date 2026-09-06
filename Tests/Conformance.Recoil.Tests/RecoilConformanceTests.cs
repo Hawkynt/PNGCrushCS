@@ -68,6 +68,9 @@ public sealed class RecoilConformanceTests {
     new(ImageFormat.HiresC64, "Hires-Bitmap", 320, 200, ".hbm"),
     new(ImageFormat.GigaPaint, "Run Paint", 320, 200, ".gih"),
     new(ImageFormat.ImageSystem, "Image System multicolour", 160, 200, ".ism"),
+    // Interlaced FLI: two screens blended, so RECOIL and we both report the displayed 296x200
+    // rather than the 160 a single multicolour screen stores.
+    new(ImageFormat.FunPainter, "Funpaint", 296, 200, ".fp2"),
     new(ImageFormat.AdvancedArtStudio, "Advanced Art Studio", 160, 200),
     new(ImageFormat.PaintMagic, "Paint Magic", 160, 200),
     new(ImageFormat.InterPaintMc, "InterPaint multicolour", 160, 200),
