@@ -2156,6 +2156,73 @@ bit this decoder reads and rejects rather than silently ignoring; a picture size
 while a picture predicted from the old size is still held as the reference; and, as in every codec here,
 there is no `catch` anywhere that hands back a blank, a copied or a zero-filled picture.
 
+**Encoding is the decoder's own walk run backwards, and the decisions are the test model's.** The same
+group numbering off Figure 6, the same macroblock geometry off Figures 8 and 10, the same vector
+predictor of 4.2.3.4 and the same loop filter in the same place in the pipeline; where the decoder reads
+a field the encoder writes one. Every codeword comes out of the very tables `H261VlcTables` decodes
+with, inverted rather than transcribed a second time — a table typed twice can disagree with itself, and
+that disagreement is precisely the failure a round trip through this library alone cannot see, because
+both halves would be wrong in the same way. What H.261 leaves open is chosen the way the ITU's own test
+model chooses it: the vector by a logarithmic search of the reference over the ±15 whole pixels clause
+3.2.2 allows, narrowed so every referenced pel lies inside the coded picture; whether to spend a vector
+at all by the model's bias of 100 towards standing still; whether the macroblock is better coded on its
+own by the model's comparison of the prediction error against the source macroblock's spread about its
+own mean, less 500; and the quantiser by `|LEVEL| = |COF| / (2 × QUANT)` truncated towards zero, which
+never overshoots, so a residual coded this way cannot amplify itself through a run of predicted
+pictures. A macroblock whose residual quantises away entirely and whose prediction is the co-located one
+is simply not transmitted, which is the whole of H.261's skip machinery — the Recommendation has no
+"coded with nothing" macroblock and no picture-level skip either.
+
+**The loop filter is written, which nothing else here writes.** ffmpeg's own H.261 encoder was measured
+never to emit it, so a stream that uses it exercises a path in ffmpeg's decoder that no ffmpeg-written
+file reaches. Across the corpus below, 9,411 of 23,624 transmitted macroblocks carry one of the two
+filtered macroblock types, and ffmpeg decodes every one of them to the same samples this library
+reconstructs — which is what turns clause 3.2.3's ordering, filter the prediction *then* add the
+residual, from a reading of the text into a measured fact in both directions.
+
+**Measured, in both directions and on the 4:2:0 planes rather than after a colour conversion.** The
+first direction calibrates the oracle: **two streams written by ffmpeg's own H.261 encoder**, a QCIF and
+a CIF clip of sixty frames each, decoded here and by ffmpeg and compared sample by sample. Against
+`-idct faani` the QCIF stream differs in **5 samples of 2,280,960** and the CIF stream in **31 of
+9,123,840**, every one of them by exactly one level; against ffmpeg's default integer transform the
+figures are 43,423 and 57,652 capped at two levels, which is the same size as the gap between ffmpeg's
+own two transforms and is Annex A's accuracy bound rather than a disagreement about the bitstream.
+
+The second direction is the one that matters. **Six streams written here** — `testsrc2` at QCIF and CIF
+of sixty frames each, and `smptebars` QCIF, `life` QCIF, `mandelbrot` CIF and `rgbtestsrc` CIF of thirty
+each, 240 pictures and 22,809,600 samples in all — were handed to ffmpeg's own H.261 decoder, which
+accepted every picture of every one without a warning and produced the frame count written. Compared
+against this encoder's own reconstruction, plane by plane and again against `-idct faani`: **79
+differing samples of 22,809,600, none by more than one level**, and two of the six streams identical on
+every sample. Against ffmpeg's default integer transform the same QCIF stream differs in 33,835 samples
+capped at two levels — the same signature, and the same size, as the gap measured above between this
+decoder and ffmpeg over ffmpeg's own encoded streams. Per stream, ffmpeg's decode against our
+reconstruction and against the source planes:
+
+| Stream | Coded | ffmpeg vs our reconstruction | ffmpeg vs the source planes |
+| --- | ---: | ---: | ---: |
+| `testsrc2` QCIF, 60 frames | 117,934 B | 13 of 2,280,960, all ±1 | 36.17 dB |
+| `testsrc2` CIF, 60 frames | 253,381 B | 4 of 9,123,840, all ±1 | 39.48 dB |
+| `smptebars` QCIF, 30 frames | 6,543 B | none of 1,140,480 | 45.32 dB |
+| `life` QCIF, 30 frames | 119,805 B | 12 of 1,140,480, all ±1 | 31.70 dB |
+| `mandelbrot` CIF, 30 frames | 167,802 B | 50 of 4,561,920, all ±1 | 37.59 dB |
+| `rgbtestsrc` CIF, 30 frames | 10,944 B | none of 4,561,920 | 48.04 dB |
+
+Those 240 pictures transmit 23,624 macroblocks and leave 35,776 untransmitted, spend 8,752 non-zero
+motion vectors, and escape 13,461 coefficients out of Table 5 — so the address-difference layer, the
+vector layer and clause 4.2.4.1's escape are each exercised thousands of times over rather than argued
+about. The one like-for-like quality comparison the corpus allows is the QCIF `testsrc2` clip, where
+ffmpeg's own encoder produced 117,929 bytes from the same sixty pictures against this encoder's 117,934:
+**35.14 dB there against 36.17 dB here**, so the mode decisions are at least not costing anything.
+
+What the encoder refuses, by name: any picture size other than QCIF and CIF, because clause 3.1 defines
+exactly those two and 4.2.1.3 names one of them in a single bit — a 320x240 picture written as CIF would
+decode, and would be the wrong picture — a stream that is not video, and a picture whose size is not the
+stream's. What it never writes: the four macroblock types carrying MQUANT (Table 2 rows 2, 4, 7 and 10),
+since there is no rate control here for a mid-group quantiser change to serve and a fixed step is what
+makes the same picture code to the same bytes; the bit-stuffing codeword of 4.2.3.1, which exists to
+fill a channel this encoder is not driving; and Annex D, which the decoder beside it will not read.
+
 ### id RoQ
 
 The FMV format Graeme Devine wrote for The 11th Hour, carried into Quake III and Return to Castle
