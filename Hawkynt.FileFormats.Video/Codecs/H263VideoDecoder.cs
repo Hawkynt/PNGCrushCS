@@ -52,14 +52,24 @@ public sealed class H263VideoDecoder : IVideoCodecDecoder<H263VideoDecoder> {
   /// <summary>The four-character codes containers name ITU-T H.263 with.</summary>
   /// <remarks>
   /// <c>s263</c> is the sample entry an ISO base media file — an MP4 or a 3GP — names H.263 with, and
-  /// <c>H263</c> is what an AVI and a Matroska file use. The vendor codes that other encoders wrote
-  /// into AVI files are deliberately absent: several of them are not baseline H.263 and claiming them
+  /// <c>H263</c> is what an AVI and a Matroska file use. <c>U263</c>, <c>L263</c>, <c>M263</c> and
+  /// <c>X263</c> are the vendor spellings of the same bitstream that encoders wrote into AVI files,
+  /// and each is here because it was checked rather than because a table said so: the same three
+  /// elementary streams were muxed under every one of them and decoded here and by ffmpeg, and every
+  /// tag produced the picture the <c>H263</c> spelling of the identical stream produces, to the
+  /// sample.
+  /// <para/>
+  /// The vendor codes still absent are absent deliberately. Several of them are not baseline H.263 —
+  /// <c>I263</c> is Intel's own bitstream and <c>VSM4</c> is interlaced — and claiming one of those
   /// would turn a clean "no codec for this stream" into a decode that starts and then stops.
   /// </remarks>
   private static readonly CodecTag[] _Tags = [
     CodecTag.FromCharacters("H263"),
     CodecTag.FromCharacters("s263"),
     CodecTag.FromCharacters("U263"),
+    CodecTag.FromCharacters("L263"),
+    CodecTag.FromCharacters("M263"),
+    CodecTag.FromCharacters("X263"),
   ];
 
   /// <summary>The four-character codes containers name Sorenson Spark with.</summary>

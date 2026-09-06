@@ -43,6 +43,26 @@ public sealed class MotionJpegDecoder : IVideoCodecDecoder<MotionJpegDecoder> {
   /// are byte for byte the same JPEGs. Three spellings and one codec is exactly the case the
   /// demux/decode split is for: the codec collects the spellings, and no container has to know what
   /// the others call it.
+  /// <para/>
+  /// <b>Two codes that look like a fourth spelling are not one, and are refused.</b> ffmpeg folds
+  /// both into the one decoder it has, so a table copied from it would put them here; each was tried
+  /// against this decoder instead, and each mis-decodes rather than fails.
+  /// <list type="bullet">
+  /// <item><c>LJPG</c> is lossless JPEG, which is a different coding process and not a different
+  /// container's word for this one. Its pictures carry an <c>SOF3</c> frame header, no quantisation
+  /// table at all, and a scan header naming a predictor rather than a coefficient range — predictive
+  /// coding where this reads the DCT. ffmpeg has a second codec id for exactly that reason, and its
+  /// own AVI muxer refuses to write <c>MJPG</c> over such a stream.</item>
+  /// <item><c>MJPA</c> is QuickTime Motion JPEG-A, whose unit is a field and not a picture. Each
+  /// field is a complete JPEG behind an <c>APP1</c> marker beginning <c>mjpg</c> that states the
+  /// field's size and where its own headers and data start, and interlaced material — which is what
+  /// the format exists for — puts two of them in one packet, each of half the frame's height. The
+  /// reader below stops at the first <c>EOI</c>, so such a packet yields the first field: a picture
+  /// of half the height, with no error anywhere, which is the one outcome worse than refusing the
+  /// stream. Nothing in the code says which of the two a file holds, so taking the tag would mean
+  /// halving every interlaced one. Motion JPEG-B is already a decoder of its own here, and A needs
+  /// one too.</item>
+  /// </list>
   /// </remarks>
   public static bool Accepts(MediaStreamInfo stream) {
     System.ArgumentNullException.ThrowIfNull(stream);
