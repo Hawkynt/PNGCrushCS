@@ -4,24 +4,22 @@ using FileFormat.Core;
 namespace FileFormat.Avif;
 
 /// <summary>In-memory representation of an AVIF (AV1 Image File Format) image.</summary>
-[FormatMimeType("image/avif", "image/avif-sequence")]
 /// <remarks>
-/// This reads and does not write, and the writer beside it is not registered.
-/// <para/>
-/// There is no AV1 encoder here — only a decoder. What the writer produced was an ISO base media
-/// container with the picture's own bytes inside it and no av1C box that states the codec configuration,
-/// which is not AVIF: nothing that reads AVIF can read one, and the reference tool says so. It
-/// round-tripped only because our own reader took the same bytes back out again, which is the exact
-/// thing the writer-acceptance fixture exists to catch.
-/// <para/>
-/// Registering it would count a format as writable on the strength of a file no other program will
-/// open. The encoder is the missing piece, and until there is one this reads.
+/// Reading covers what AVIF still pictures actually contain: an AV1 key frame, 8 to 12 bits,
+/// monochrome or 4:2:0, 4:2:2 or 4:4:4, with an alpha auxiliary item when the file carries one.
+/// Writing produces a lossless 4:4:4 key frame with the identity colour matrix, so the file
+/// round-trips exactly and other AV1 decoders read it back sample for sample. Anything outside that
+/// — inter prediction, film grain, scalability, super-resolution, palette blocks, intra block copy —
+/// is refused by name rather than approximated.
 /// </remarks>
-public readonly record struct AvifFile : IImageFormatReader<AvifFile>, IImageToRawImage<AvifFile> {
+[FormatMimeType("image/avif", "image/avif-sequence")]
+public readonly record struct AvifFile
+  : IImageFormatReader<AvifFile>, IImageToRawImage<AvifFile>, IImageFromRawImage<AvifFile>, IImageFormatWriter<AvifFile> {
 
   static string IImageFormatMetadata<AvifFile>.PrimaryExtension => ".avif";
   static string[] IImageFormatMetadata<AvifFile>.FileExtensions => [".avif"];
   static AvifFile IImageFormatReader<AvifFile>.FromSpan(ReadOnlySpan<byte> data) => AvifReader.FromSpan(data);
+  static byte[] IImageFormatWriter<AvifFile>.ToBytes(AvifFile file) => AvifWriter.ToBytes(file);
 
   static bool? IImageFormatMetadata<AvifFile>.MatchesSignature(ReadOnlySpan<byte> header) {
     if (header.Length < 12 || header[4] != 0x66 || header[5] != 0x74 || header[6] != 0x79 || header[7] != 0x70)
@@ -39,34 +37,40 @@ public readonly record struct AvifFile : IImageFormatReader<AvifFile>, IImageToR
   /// <summary>Image height in pixels.</summary>
   public int Height { get; init; }
 
-  /// <summary>Raw RGB pixel data (3 bytes per pixel).</summary>
+  /// <summary>Pixel data, RGB24 or RGBA32 depending on <see cref="HasAlpha"/>.</summary>
   public byte[] PixelData { get; init; }
 
-  /// <summary>Major brand from the ftyp box (e.g. "avif" or "avis").</summary>
+  /// <summary>Whether the file carried an alpha auxiliary item, making <see cref="PixelData"/> RGBA32.</summary>
+  public bool HasAlpha { get; init; }
+
+  /// <summary>Major brand from the ftyp box, "avif" or "avis".</summary>
   public string Brand { get; init; }
 
-  /// <summary>Raw image data bytes from the mdat box (AV1 OBUs when read from an external file, or raw pixels when created by us).</summary>
+  /// <summary>The primary item's coded AV1 bytes, as read from or written to the file.</summary>
   public byte[] RawImageData { get; init; }
 
   public static RawImage ToRawImage(AvifFile file) {
     return new() {
       Width = file.Width,
       Height = file.Height,
-      Format = PixelFormat.Rgb24,
+      Format = file.HasAlpha ? PixelFormat.Rgba32 : PixelFormat.Rgb24,
       PixelData = file.PixelData[..],
     };
   }
 
   public static AvifFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
+
+    // The writer codes three planes. An image with alpha loses it here rather than in the encoder,
+    // where the loss would be silent.
     image = image.EnsureFormat(PixelFormat.Rgb24);
 
-    var pixelData = image.PixelData[..];
     return new() {
       Width = image.Width,
       Height = image.Height,
-      PixelData = pixelData,
-      RawImageData = pixelData[..],
+      PixelData = image.PixelData[..],
+      Brand = "avif",
+      RawImageData = [],
     };
   }
 }
