@@ -12725,16 +12725,24 @@ Implements `IEquatable<EccHeaderFile>`, `IImageFormatMetadata<EccHeaderFile>`, `
 
 #### `EciGraphicEditorFile`
 
-Implements `IEquatable<EciGraphicEditorFile>`, `IImageFormatMetadata<EciGraphicEditorFile>`, `IImageFormatReader<EciGraphicEditorFile>`, `IImageFormatWriter<EciGraphicEditorFile>`, `IImageToRawImage<EciGraphicEditorFile>`.
+Implements `IEquatable<EciGraphicEditorFile>`, `IImageFormatMetadata<EciGraphicEditorFile>`, `IImageFormatReader<EciGraphicEditorFile>`, `IImageFormatWriter<EciGraphicEditorFile>`, `IImageFromRawImage<EciGraphicEditorFile>`, `IImageToRawImage<EciGraphicEditorFile>`.
 
 | Member | Signature | Summary |
 | --- | --- | --- |
+| `BlendedColorCount` | `const int BlendedColorCount` |  |
+| `FileSize` | `const int FileSize` |  |
 | `FixedHeight` | `const int FixedHeight` |  |
 | `FixedWidth` | `const int FixedWidth` |  |
+| `VisibleWidth` | `const int VisibleWidth` |  |
+| `FirstBitmap` | `byte[] FirstBitmap { get; init; }` |  |
+| `FirstScreens` | `byte[] FirstScreens { get; init; }` |  |
 | `Height` | `int Height { get; }` |  |
 | `LoadAddress` | `ushort LoadAddress { get; init; }` |  |
-| `RawData` | `byte[] RawData { get; init; }` |  |
+| `SecondBitmap` | `byte[] SecondBitmap { get; init; }` |  |
+| `SecondScreens` | `byte[] SecondScreens { get; init; }` |  |
 | `Width` | `int Width { get; }` |  |
+| `FromRawImageExact` | `static EciGraphicEditorFile FromRawImageExact(RawImage image)` |  |
+| `FromRawImage` | `static EciGraphicEditorFile FromRawImage(RawImage image)` |  |
 | `ToRawImage` | `static RawImage ToRawImage(EciGraphicEditorFile file)` |  |
 
 #### `EciGraphicEditorReader`
@@ -15156,20 +15164,44 @@ Implements `IEquatable<FunGraphicsMachineFile>`, `IImageFormatMetadata<FunGraphi
 
 ### Namespace `FileFormat.FunPainter`
 
-[`FunPainterFile`](#funpainterfile) · [`FunPainterReader`](#funpainterreader) · [`FunPainterWriter`](#funpainterwriter)
+[`FunPainterEncoder`](#funpainterencoder) · [`FunPainterFile`](#funpainterfile) · [`FunPainterReader`](#funpainterreader) · [`FunPainterWriter`](#funpainterwriter)
 
-#### `FunPainterFile`
-
-Implements `IEquatable<FunPainterFile>`, `IImageFormatMetadata<FunPainterFile>`, `IImageFormatReader<FunPainterFile>`, `IImageFormatWriter<FunPainterFile>`, `IImageToRawImage<FunPainterFile>`.
+#### `FunPainterEncoder`
 
 | Member | Signature | Summary |
 | --- | --- | --- |
-| `FixedHeight` | `const int FixedHeight` |  |
-| `FixedWidth` | `const int FixedWidth` |  |
-| `Height` | `int Height { get; }` |  |
-| `LoadAddress` | `ushort LoadAddress { get; init; }` |  |
-| `RawData` | `byte[] RawData { get; init; }` |  |
-| `Width` | `int Width { get; }` |  |
+| `EncodeExact` | `static byte[] EncodeExact(ReadOnlySpan<byte> rgb)` |  |
+| `Encode` | `static byte[] Encode(ReadOnlySpan<byte> rgb)` |  |
+
+#### `FunPainterFile`
+
+Implements `IEquatable<FunPainterFile>`, `IImageFormatMetadata<FunPainterFile>`, `IImageFormatReader<FunPainterFile>`, `IImageFormatWriter<FunPainterFile>`, `IImageFromRawImage<FunPainterFile>`, `IImageToRawImage<FunPainterFile>`.
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `ColorRamOffset` | `const int ColorRamOffset` |  |
+| `DefaultLoadAddress` | `const ushort DefaultLoadAddress` |  |
+| `EscapeOffset` | `const int EscapeOffset` |  |
+| `FileSize` | `const int FileSize` |  |
+| `FirstBitmapOffset` | `const int FirstBitmapOffset` |  |
+| `FirstMatrixOffset` | `const int FirstMatrixOffset` |  |
+| `Height` | `const int Height` |  |
+| `MatrixStride` | `const int MatrixStride` |  |
+| `PackedFlagOffset` | `const int PackedFlagOffset` |  |
+| `PayloadOffset` | `const int PayloadOffset` |  |
+| `SecondBitmapOffset` | `const int SecondBitmapOffset` |  |
+| `SecondFieldShift` | `const int SecondFieldShift` |  |
+| `SecondMatrixOffset` | `const int SecondMatrixOffset` |  |
+| `SignatureOffset` | `const int SignatureOffset` |  |
+| `Signature` | `const string Signature` |  |
+| `StrideColumns` | `const int StrideColumns` |  |
+| `VisibleColumns` | `const int VisibleColumns` |  |
+| `Width` | `const int Width` |  |
+| `Data` | `byte[] Data { get; init; }` |  |
+| `LoadAddress` | `ushort LoadAddress { get; }` |  |
+| `Packed` | `bool Packed { get; init; }` |  |
+| `FromRawImageExact` | `static FunPainterFile FromRawImageExact(RawImage image)` |  |
+| `FromRawImage` | `static FunPainterFile FromRawImage(RawImage image)` |  |
 | `ToRawImage` | `static RawImage ToRawImage(FunPainterFile file)` |  |
 
 #### `FunPainterReader`
@@ -16405,17 +16437,20 @@ Implements `IEquatable<Graph2FontMchFile>`, `IImageFormatMetadata<Graph2FontMchF
 
 ### Namespace `FileFormat.Graph2FontScroll`
 
-[`Graph2FontScrollFile`](#graph2fontscrollfile) · [`Graph2FontScrollReader`](#graph2fontscrollreader)
+[`Graph2FontScrollFile`](#graph2fontscrollfile) · [`Graph2FontScrollReader`](#graph2fontscrollreader) · [`Graph2FontScrollWriter`](#graph2fontscrollwriter)
 
 #### `Graph2FontScrollFile`
 
-Implements `IEquatable<Graph2FontScrollFile>`, `IImageFormatMetadata<Graph2FontScrollFile>`, `IImageFormatReader<Graph2FontScrollFile>`, `IImageToRawImage<Graph2FontScrollFile>`.
+Implements `IEquatable<Graph2FontScrollFile>`, `IImageFormatMetadata<Graph2FontScrollFile>`, `IImageFormatReader<Graph2FontScrollFile>`, `IImageFormatWriter<Graph2FontScrollFile>`, `IImageFromRawImage<Graph2FontScrollFile>`, `IImageToRawImage<Graph2FontScrollFile>`.
 
 | Member | Signature | Summary |
 | --- | --- | --- |
 | `FrameHeight` | `const int FrameHeight` |  |
 | `Width` | `const int Width` |  |
 | `Frames` | `IReadOnlyList<byte[]> Frames { get; init; }` |  |
+| `Names` | `IReadOnlyList<string> Names { get; init; }` |  |
+| `FromRawImage` | `static Graph2FontScrollFile FromRawImage(RawImage image)` |  |
+| `FromRawImage` | `static Graph2FontScrollFile FromRawImage(RawImage image, FileInfo target)` |  |
 | `ToRawImage` | `static RawImage ToRawImage(Graph2FontScrollFile file)` |  |
 
 #### `Graph2FontScrollReader`
@@ -16426,6 +16461,17 @@ Implements `IEquatable<Graph2FontScrollFile>`, `IImageFormatMetadata<Graph2FontS
 | `FromFile` | `static Graph2FontScrollFile FromFile(FileInfo file)` |  |
 | `FromSpan` | `static Graph2FontScrollFile FromSpan(ReadOnlySpan<byte> data)` |  |
 | `FromStream` | `static Graph2FontScrollFile FromStream(Stream stream)` |  |
+
+#### `Graph2FontScrollWriter`
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `DefaultStem` | `const string DefaultStem` |  |
+| `ProjectExtension` | `const string ProjectExtension` |  |
+| `Encode` | `static Graph2FontScrollFile Encode(RawImage image, string stem)` |  |
+| `StemFor` | `static string StemFor(FileInfo target)` |  |
+| `ToBytes` | `static byte[] ToBytes(Graph2FontScrollFile file)` |  |
+| `WriteCompanions` | `static void WriteCompanions(Graph2FontScrollFile file, FileInfo target)` |  |
 
 ### Namespace `FileFormat.GraphLogo`
 
