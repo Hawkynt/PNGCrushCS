@@ -2556,6 +2556,122 @@ public sealed class RecoilDecodeAgreementTests {
   }
 
   /// <summary>
+  /// The same comparison from the other end: a scroll we wrote, plus the projects we wrote beside
+  /// it, read back by RECOIL and by us.
+  /// </summary>
+  /// <remarks>
+  /// A writer for this format has more to get wrong than an encoder usually does, because most of
+  /// what it writes is not in the file it names. The list can be well formed and name projects that
+  /// are not there, or name them in an order nothing else agrees with, and our own reader would
+  /// resolve either exactly the way it wrote them. RECOIL resolves the names itself, from the path,
+  /// so it is the one that can tell.
+  /// </remarks>
+  [TestCase(1)]
+  [TestCase(2)]
+  [TestCase(4)]
+  [Category("Conformance")]
+  public void Graph2FontScroll_WhatWeWrite_MatchesRecoilPixelForPixel(int frames) {
+    RecoilOracle.RequireAvailable();
+
+    var directory = Path.Combine(Path.GetTempPath(), $"recoilvscw_{Guid.NewGuid():N}");
+    Directory.CreateDirectory(directory);
+
+    try {
+      var scroll = new FileInfo(Path.Combine(directory, "written.vsc"));
+      Assert.That(FormatRegistry.Write(_ScrollPicture(frames), ImageFormat.Graph2FontScroll, scroll), Is.True);
+
+      var (png, output) = RecoilOracle.TryDecodeToPng(scroll.FullName);
+      Assert.That(png, Is.Not.Null, $"RECOIL rejected what we wrote — {output}");
+
+      var theirs = _AsRgb(FormatRegistry.Read(png!));
+      var ours = _AsRgb(FormatRegistry.GetEntry(ImageFormat.Graph2FontScroll)!.LoadRawImageOrThrow!(scroll));
+
+      Assert.That((ours.Width, ours.Height), Is.EqualTo((theirs.Width, theirs.Height)));
+
+      for (var i = 0; i < theirs.PixelData.Length; ++i) {
+        if (ours.PixelData[i] == theirs.PixelData[i])
+          continue;
+
+        var pixel = i / 3;
+        Assert.Fail(
+          $"pixel {pixel % theirs.Width},{pixel / theirs.Width} channel {i % 3} — " +
+          $"ours {ours.PixelData[i]}, RECOIL {theirs.PixelData[i]}");
+      }
+    } finally {
+      try { Directory.Delete(directory, true); } catch { /* best effort */ }
+    }
+  }
+
+  /// <summary>
+  /// The control for the comparison above: RECOIL has to notice a project we spoiled, or its
+  /// agreement was never a measurement.
+  /// </summary>
+  /// <remarks>
+  /// Two ways of spoiling one, because they fail differently. A column count no ANTIC display can
+  /// have is a project RECOIL refuses outright, which shows it parses what we write rather than
+  /// reading the list and stopping there. One flipped byte in a colour table is a project it accepts
+  /// and draws differently, which shows the pixel comparison reaches the projects and not only the
+  /// scroll that names them.
+  /// </remarks>
+  [Test]
+  [Category("Conformance")]
+  public void Graph2FontScroll_ASpoiledProject_IsNoticed() {
+    RecoilOracle.RequireAvailable();
+
+    var directory = Path.Combine(Path.GetTempPath(), $"recoilvscn_{Guid.NewGuid():N}");
+    Directory.CreateDirectory(directory);
+
+    try {
+      var scroll = new FileInfo(Path.Combine(directory, "control.vsc"));
+      Assert.That(FormatRegistry.Write(_ScrollPicture(2), ImageFormat.Graph2FontScroll, scroll), Is.True);
+
+      var intact = RecoilOracle.TryDecodeToPng(scroll.FullName).Png;
+      Assert.That(intact, Is.Not.Null, "RECOIL rejected the file the control is measured against");
+      var theirs = _AsRgb(FormatRegistry.Read(intact!));
+
+      var project = Path.Combine(directory, "control0.g2f");
+      var original = File.ReadAllBytes(project);
+
+      // One flipped byte in the first project's colour table: still a project, a different picture.
+      var spoiled = (byte[])original.Clone();
+      spoiled[FileFormat.Graph2Font.Graph2FontEncoder.FontNumberOffset + 30 + 100] ^= 0x1E;
+      File.WriteAllBytes(project, spoiled);
+
+      var altered = RecoilOracle.TryDecodeToPng(scroll.FullName).Png;
+      Assert.That(altered, Is.Not.Null, "RECOIL refused a project that is still well formed");
+      Assert.That(_AsRgb(FormatRegistry.Read(altered!)).PixelData, Is.Not.EqualTo(theirs.PixelData),
+        "RECOIL drew the same picture from a different colour table, so the comparison proves nothing");
+
+      // A width no display mode has: not a project at all, and the whole scroll goes with it.
+      var broken = (byte[])original.Clone();
+      broken[0] = 41;
+      File.WriteAllBytes(project, broken);
+
+      Assert.That(RecoilOracle.TryDecodeToPng(scroll.FullName).Png, Is.Null,
+        "RECOIL accepted a project stating 41 columns, so it is not reading the projects at all");
+    } finally {
+      try { Directory.Delete(directory, true); } catch { /* best effort */ }
+    }
+  }
+
+  /// <summary>A picture a scroll can hold: full colour, and as tall as the frame count asks for.</summary>
+  private static RawImage _ScrollPicture(int frames) {
+    const int width = FileFormat.Graph2FontScroll.Graph2FontScrollFile.Width;
+    var height = FileFormat.Graph2FontScroll.Graph2FontScrollFile.FrameHeight * frames;
+    var rgb = new byte[width * height * 3];
+
+    for (var y = 0; y < height; ++y)
+    for (var x = 0; x < width; ++x) {
+      var at = (y * width + x) * 3;
+      rgb[at] = (byte)(x * 255 / (width - 1));
+      rgb[at + 1] = (byte)(y * 255 / (height - 1));
+      rgb[at + 2] = (byte)((x / 8 + y / 8) % 2 == 0 ? 255 : 0);
+    }
+
+    return new() { Width = width, Height = height, Format = PixelFormat.Rgb24, PixelData = rgb };
+  }
+
+  /// <summary>
   /// A Mode 5 file holds only colours; its bitmap is in the .gfx beside it, so the pair is the
   /// only arrangement in which either is a picture.
   /// </summary>

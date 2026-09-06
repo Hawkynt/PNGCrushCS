@@ -17,8 +17,9 @@ public static class Graph2FontScrollReader {
     var directory = file.DirectoryName
       ?? throw new InvalidDataException("A scroll names files beside it, so it needs a directory to be beside.");
 
+    var names = _ReadNames(File.ReadAllBytes(file.FullName));
     var frames = new List<byte[]>();
-    foreach (var name in _ReadNames(File.ReadAllBytes(file.FullName))) {
+    foreach (var name in names) {
       var named = new FileInfo(Path.Combine(directory, name));
       if (!named.Exists)
         throw new FileNotFoundException($"The scroll names {name}, which is not beside it.", named.FullName);
@@ -31,7 +32,7 @@ public static class Graph2FontScrollReader {
     if (frames.Count == 0)
       throw new InvalidDataException("A scroll naming no projects is not a picture.");
 
-    return new() { Frames = frames };
+    return new() { Frames = frames, Names = names };
   }
 
   public static Graph2FontScrollFile FromStream(Stream stream) {
@@ -51,11 +52,8 @@ public static class Graph2FontScrollReader {
   /// Reads the list, which is all a scroll contains — so from bytes alone there is nothing to
   /// resolve the names against and the result carries no frames.
   /// </summary>
-  public static Graph2FontScrollFile FromSpan(ReadOnlySpan<byte> data) {
-    _ReadNames(data);
-
-    return new() { Frames = [] };
-  }
+  public static Graph2FontScrollFile FromSpan(ReadOnlySpan<byte> data)
+    => new() { Frames = [], Names = _ReadNames(data) };
 
   /// <summary>
   /// Reads the file names, rejecting anything a name cannot contain.
