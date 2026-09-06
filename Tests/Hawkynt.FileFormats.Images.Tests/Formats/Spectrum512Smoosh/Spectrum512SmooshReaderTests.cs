@@ -77,25 +77,32 @@ public sealed class Spectrum512SmooshReaderTests {
     Assert.That(result.RawData[0], Is.EqualTo(0x42));
   }
 
-  [Test]
-  [Category("Unit")]
   /// <summary>
-  /// A picture that has not been decoded is refused rather than returned black.
+  /// Bytes too short to be a picture are refused rather than returned black.
   /// </summary>
   /// <remarks>
   /// This used to assert the black picture, which is what the reader returned: the right size, every
   /// pixel nought, and nothing anywhere marking it as undecoded. That counted as a decode, so
   /// converting one of these would have written the black out as though it were the picture.
-  /// <para/>
-  /// The packing keeps a palette per scanline and codes the two apart from one another, and none of
-  /// that is implemented here.
   /// </remarks>
-  public void ToRawImage_RefusesWhatItCannotDecode() {
+  [Test]
+  [Category("Unit")]
+  public void ToRawImage_RefusesWhatIsNotAPicture() {
     var file = new Spectrum512SmooshFile {
       RawData = new byte[10]
     };
 
-    Assert.Throws<NotSupportedException>(() => Spectrum512SmooshFile.ToRawImage(file));
+    Assert.Throws<InvalidDataException>(() => Spectrum512SmooshFile.ToRawImage(file));
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void ToRawImage_RefusesTheWrongSignature() {
+    var file = new Spectrum512SmooshFile {
+      RawData = new byte[64]
+    };
+
+    Assert.Throws<InvalidDataException>(() => Spectrum512SmooshFile.ToRawImage(file));
   }
   [Test]
   [Category("Integration")]
