@@ -402,6 +402,11 @@ public sealed class RecoilDecodeAgreementTests {
     new("Mapletown MX1, one image", ImageFormat.MapletownMx1, ".mx1", () => _MapletownMx1(1)),
     new("Mapletown MX1, stacked", ImageFormat.MapletownMx1, ".mx1", () => _MapletownMx1(3)),
     new("Mapletown MX1, four tiles", ImageFormat.MapletownMx1, ".mx1", () => _MapletownMx1(4)),
+    new("ECI Graphic Editor", ImageFormat.EciGraphicEditor, ".eci", () => _Eci(1)),
+    new("ECI Graphic Editor, second seed", ImageFormat.EciGraphicEditor, ".eci", () => _Eci(2)),
+    new("ECI Graphic Editor, twin frames", ImageFormat.EciGraphicEditor, ".eci", _EciTwinFrames),
+    new("ECI Graphic Editor compressed", ImageFormat.EciGraphicEditor, ".ecp", () => _Ecp(_Eci(3))),
+    new("ECI Graphic Editor compressed, twin frames", ImageFormat.EciGraphicEditor, ".ecp", () => _Ecp(_EciTwinFrames())),
   ];
 
   /// <summary>
@@ -2743,6 +2748,71 @@ public sealed class RecoilDecodeAgreementTests {
       Format = image.Format,
       PixelData = doubled,
     };
+  }
+
+  /// <summary>
+  /// A whole ECI Graphic Editor file of pseudo-random bytes: two banks, each a bitmap and eight
+  /// video matrices.
+  /// </summary>
+  /// <remarks>
+  /// Noise is the strongest probe this format admits. Every bitmap bit pattern and every nibble of
+  /// every video matrix appears in both frames and in all eight of a cell's raster lines, so a
+  /// decoder that reads one matrix a frame instead of one a line, or takes the nibbles the wrong way
+  /// round, or misplaces either bank, disagrees at once. The generator is a fixed sequence rather
+  /// than <see cref="Random"/> so the probe is the same file on every runtime.
+  /// </remarks>
+  private static byte[] _Eci(uint seed) {
+    var data = new byte[32770];
+    data[0] = 0x00;
+    data[1] = 0x40;
+
+    var state = seed * 2654435761u + 1;
+    for (var i = 2; i < data.Length; ++i) {
+      state ^= state << 13;
+      state ^= state >> 17;
+      state ^= state << 5;
+      data[i] = (byte)(state >> 16);
+    }
+
+    return data;
+  }
+
+  /// <summary>An ECI whose two frames are the same, so the blend is the identity and it draws AFLI.</summary>
+  /// <remarks>
+  /// This pins the blend down from the other side. Any averaging rule agrees with any other where
+  /// the two operands are equal, so a probe that passes here and fails the noise probes has the
+  /// geometry right and the rounding wrong, and one that fails here has the geometry wrong.
+  /// </remarks>
+  private static byte[] _EciTwinFrames() {
+    var data = _Eci(4);
+    Array.Copy(data, 2, data, 2 + 16384, 16384);
+    return data;
+  }
+
+  /// <summary>Packs a file into the .ecp form: one chosen byte value introduces a run.</summary>
+  private static byte[] _Ecp(byte[] unpacked) {
+    const byte escape = 0xC0;
+    var packed = new List<byte> { unpacked[0], unpacked[1], escape };
+
+    for (var at = 2; at < unpacked.Length;) {
+      var value = unpacked[at];
+      var run = 1;
+      while (run < 255 && at + run < unpacked.Length && unpacked[at + run] == value)
+        ++run;
+
+      // The escape value cannot stand for itself, so even a single one is written as a run of one.
+      if (run >= 3 || value == escape) {
+        packed.Add(escape);
+        packed.Add((byte)run);
+        packed.Add(value);
+        at += run;
+      } else {
+        packed.Add(value);
+        ++at;
+      }
+    }
+
+    return packed.ToArray();
   }
 
   private static RawImage _AsRgb(RawImage? image) {
