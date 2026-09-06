@@ -46,6 +46,30 @@ internal static class RoqColorConversion {
     return pixels;
   }
 
+  /// <summary>Fills a frame's three planes from interleaved RGB, the exact reverse of <see cref="ToRgb24"/>.</summary>
+  /// <remarks>
+  /// The forward half of the same full-range matrix — <c>Y = 0.299R + 0.587G + 0.114B</c>,
+  /// <c>Cb = 128 - 0.168736R - 0.331264G + 0.5B</c>, <c>Cr = 128 + 0.5R - 0.418688G - 0.081312B</c> —
+  /// so a picture handed to the encoder as colour is put into the samples RoQ actually states. A
+  /// picture that arrives as <c>Yuv444P8</c> never comes through here at all: those are already the
+  /// samples, and converting them to colour and back would round twice for nothing.
+  /// </remarks>
+  internal static void FromRgb24(ReadOnlySpan<byte> pixels, RoqFrame frame) {
+    var y = frame.Y;
+    var cb = frame.Cb;
+    var cr = frame.Cr;
+
+    for (int i = 0, o = 0; i < y.Length; ++i, o += 3) {
+      double red = pixels[o];
+      double green = pixels[o + 1];
+      double blue = pixels[o + 2];
+
+      y[i] = _Clamp(0.299 * red + 0.587 * green + 0.114 * blue);
+      cb[i] = _Clamp(128 - 0.168736 * red - 0.331264 * green + 0.5 * blue);
+      cr[i] = _Clamp(128 + 0.5 * red - 0.418688 * green - 0.081312 * blue);
+    }
+  }
+
   private static byte _Clamp(double value) {
     var rounded = Math.Round(value, MidpointRounding.ToEven);
     return rounded switch {
