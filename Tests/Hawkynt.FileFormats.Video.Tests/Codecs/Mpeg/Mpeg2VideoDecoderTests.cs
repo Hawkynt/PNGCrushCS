@@ -344,8 +344,41 @@ public sealed class Mpeg2VideoDecoderTests {
   }
 
   // ============================================================================================
+  // Identity
+  // ============================================================================================
+
+  [TestCase("MPG2", true)]
+  [TestCase("mpg2", true)]
+  [TestCase("MPEG", true)]
+  [TestCase("mp2v", true)]
+  [TestCase("hdv2", true)]
+  [TestCase("EM2V", true)]
+  [TestCase("MMES", true)]
+  [TestCase("MPG1", false, TestName = "MPEG-1, which has a decoder of its own")]
+  [TestCase("mp4v", false)]
+  [Category("Unit")]
+  public void TheCodecTakesTheStreamsItsContainersName(string tag, bool expected)
+    => Assert.That(Mpeg2VideoDecoder.Accepts(_Stream(tag)), Is.EqualTo(expected));
+
+  [Test]
+  [Category("Unit")]
+  public void TheMatroskaNameIsTakenAndAnAudioStreamIsNotWhateverItsTag() {
+    Assert.Multiple(() => {
+      Assert.That(
+        Mpeg2VideoDecoder.Accepts(new() { Index = 0, Kind = MediaStreamKind.Video, CodecId = "V_MPEG2" }),
+        Is.True);
+      Assert.That(
+        Mpeg2VideoDecoder.Accepts(new() { Index = 0, Kind = MediaStreamKind.Audio, Codec = CodecTag.FromCharacters("MPG2") }),
+        Is.False);
+    });
+  }
+
+  // ============================================================================================
   // Helpers
   // ============================================================================================
+
+  private static MediaStreamInfo _Stream(string tag)
+    => new() { Index = 0, Kind = MediaStreamKind.Video, Codec = CodecTag.FromCharacters(tag) };
 
   private static List<RawImage> _Decode(byte[] stream) {
     var decoder = new Mpeg2VideoDecoder();
