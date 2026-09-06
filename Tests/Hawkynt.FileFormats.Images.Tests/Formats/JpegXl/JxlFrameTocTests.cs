@@ -126,9 +126,15 @@ internal sealed class JxlFrameTocTests {
     Assert.That(toc.SectionSizes[0], Is.EqualTo(17413));
   }
 
+  /// <summary>
+  /// The four ranges abut, so the last selector starts where the third one ends
+  /// rather than at nothing. Reading it as nothing puts every section after a
+  /// four-megabyte one four megabytes early, which is where a lossless picture
+  /// of any size lands.
+  /// </summary>
   [Test]
-  public void Decode_SingleGroup_NoPermutation_Selector3_FullBits30() {
-    // selector 3: Bits(30) → size = 0 + payload. payload = 1_000_000 → 1_000_000.
+  public void Decode_SingleGroup_NoPermutation_Selector3_AddsOffset4211712() {
+    // selector 3: BitsOffset(30, 4211712) → size = 4211712 + payload.
     var bits = new BitsBuilder()
       .Add(0u, 1)
       .Add(0u, 7)               // byte-align
@@ -139,7 +145,7 @@ internal sealed class JxlFrameTocTests {
     var reader = new JxlBitReader(bits, 0);
     var toc = JxlFrameToc.Decode(reader, 1, 1);
 
-    Assert.That(toc.SectionSizes[0], Is.EqualTo(1_000_000));
+    Assert.That(toc.SectionSizes[0], Is.EqualTo(5_211_712));
   }
 
   [Test]
