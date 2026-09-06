@@ -17,12 +17,14 @@ namespace FileFormat.JpegXl;
 /// </remarks>
 public readonly record struct JpegXlFile
   : IImageFormatReader<JpegXlFile>, IImageFormatWriter<JpegXlFile>,
-    IImageToRawImage<JpegXlFile>, IImageFromRawImage<JpegXlFile> {
+    IImageToRawImage<JpegXlFile>, IImageFromRawImage<JpegXlFile>,
+    IMultiImageFileFormat<JpegXlFile> {
 
   static string IImageFormatMetadata<JpegXlFile>.PrimaryExtension => ".jxl";
   static string[] IImageFormatMetadata<JpegXlFile>.FileExtensions => [".jxl"];
   static JpegXlFile IImageFormatReader<JpegXlFile>.FromSpan(ReadOnlySpan<byte> data) => JpegXlReader.FromSpan(data);
   static byte[] IImageFormatWriter<JpegXlFile>.ToBytes(JpegXlFile file) => JpegXlWriter.ToBytes(file);
+  static FormatCapability IImageFormatMetadata<JpegXlFile>.Capabilities => FormatCapability.MultiImage;
 
   static bool? IImageFormatMetadata<JpegXlFile>.MatchesSignature(ReadOnlySpan<byte> header) {
     if (header.Length >= 2 && header[0] == 0xFF && header[1] == 0x0A)
@@ -60,8 +62,31 @@ public readonly record struct JpegXlFile
   /// <summary>Interleaved pixels, at <see cref="BitsPerSample"/> per component.</summary>
   public byte[] PixelData { get; init; }
 
+  /// <summary>
+  /// Every moment of an animation, in order and each the whole picture at that
+  /// moment, laid out exactly as <see cref="PixelData"/> is. Empty for a still
+  /// picture, and <see cref="PixelData"/> is the first of these when it is not.
+  /// </summary>
+  /// <remarks>
+  /// A frame the file states with no duration is a layer of the one after it
+  /// rather than a moment of its own, so these are the frames a viewer would
+  /// actually show and not every frame the file contains.
+  /// </remarks>
+  public byte[][] Frames { get; init; }
+
   /// <summary>Container major brand, or <c>"jxl "</c> for a bare codestream.</summary>
   public string Brand { get; init; }
+
+  /// <summary>How many moments this file states: one for a still picture.</summary>
+  public static int ImageCount(JpegXlFile file) => file.Frames is { Length: > 0 } frames ? frames.Length : 1;
+
+  /// <summary>The picture at one moment of an animation.</summary>
+  public static RawImage ToRawImage(JpegXlFile file, int index) {
+    if ((uint)index >= (uint)ImageCount(file))
+      throw new ArgumentOutOfRangeException(nameof(index), $"This JPEG XL file states {ImageCount(file)} moments, so there is no moment {index}.");
+
+    return ToRawImage(file.Frames is { Length: > 0 } frames ? file with { PixelData = frames[index] } : file);
+  }
 
   public static RawImage ToRawImage(JpegXlFile file) {
     var deep = file.BitsPerSample == 16;

@@ -196,7 +196,9 @@ public static class JpegXlReader {
       // caller should see is every frame composed in order, with the blending
       // each states.
       if (!frame.IsLast) {
-        image = _DecodeComposed(codestream, imageMetadata, width, height);
+        image = imageMetadata.HaveAnimation
+          ? _DecodeAnimation(codestream, imageMetadata, width, height)
+          : _DecodeComposed(codestream, imageMetadata, width, height);
         return image != null;
       }
 
@@ -331,7 +333,18 @@ public static class JpegXlReader {
   /// before the colour transform, and nothing here has been measured against
   /// libjxl doing that, so such a file is refused by name instead.</para>
   /// </remarks>
-  private static object? _DecodeComposed(byte[] codestream, JxlImageMetadata imageMetadata, int width, int height) {
+  /// <param name="stopAtFirstShownFrame">
+  /// Whether to stop at the first frame an animation would show, which is the
+  /// still picture such a file stands for. Passing false reads the animation to
+  /// its end and returns every moment of it.
+  /// </param>
+  private static object? _DecodeComposed(
+    byte[] codestream,
+    JxlImageMetadata imageMetadata,
+    int width,
+    int height,
+    bool stopAtFirstShownFrame = true
+  ) {
     var isGray = imageMetadata.ColorEncoding.ColorSpace == 1;
     var baseChannels = isGray ? 1 : 3;
     var extraChannels = (int)imageMetadata.NumExtraChannels;
@@ -348,6 +361,7 @@ public static class JpegXlReader {
 
     var references = new float[_ReferenceSlots][][];
     float[][]? composed = null;
+    var shown = new List<float[][]>();
 
     var at = 0;
     for (var frameIndex = 0; ; ++frameIndex) {
@@ -419,15 +433,20 @@ public static class JpegXlReader {
       if (frame.SaveAsReference != 0)
         references[frame.SaveAsReference % _ReferenceSlots] = composed;
 
+      // An animation is not a stack of layers: its frames follow one another in
+      // time, and each frame with a duration is the whole picture at the moment
+      // it is shown. A frame of no duration is a layer of the next one, so
+      // composition carries on through those and a moment is taken at every
+      // frame that is actually shown.
+      if (imageMetadata.HaveAnimation && frame.Duration > 0)
+        shown.Add(composed);
+
       if (frame.IsLast)
         break;
 
-      // An animation is not a stack of layers: its frames follow one another in
-      // time, and what a still picture means for one is the first frame a
-      // viewer would show. A frame of no duration is a layer of the next one,
-      // so composition carries on through those and stops at the first frame
-      // that is actually shown.
-      if (imageMetadata.HaveAnimation && frame.Duration > 0)
+      // What a still picture means for an animation is the first frame a viewer
+      // would show, so that is where reading stops unless every moment is wanted.
+      if (stopAtFirstShownFrame && shown.Count > 0)
         break;
 
       var total = 0;
@@ -443,9 +462,42 @@ public static class JpegXlReader {
       : new JxlComposedImage {
         Width = width,
         Height = height,
-        Planes = composed,
+        // The still picture stays what it was: the first frame a viewer would
+        // show, which is where the loop stops when only that was asked for and
+        // the first moment gathered when it was not.
+        Planes = shown.Count > 0 ? shown[0] : composed,
         AlphaPlane = alphaPlane,
+        Frames = stopAtFirstShownFrame ? [] : shown.ToArray(),
       };
+  }
+
+  /// <summary>
+  /// Read an animation to its end and hand back the still picture with every
+  /// moment of it beside it.
+  /// </summary>
+  /// <remarks>
+  /// A file whose later frames use syntax this decoder refuses still opens as
+  /// the picture it stands for, because the first frame a viewer would show is
+  /// reachable without any of them — and it opens with no moments rather than a
+  /// count that is short, since a caller stepping through a truncated animation
+  /// has no way to tell that is what it is. That second attempt is only made
+  /// when the first fails, so a file that reads whole is read once.
+  /// </remarks>
+  private static object? _DecodeAnimation(byte[] codestream, JxlImageMetadata imageMetadata, int width, int height) {
+    try {
+      if (_DecodeComposed(codestream, imageMetadata, width, height, stopAtFirstShownFrame: false) is JxlComposedImage whole)
+        return whole;
+    } catch (Exception thrown) when (thrown
+                                       is InvalidDataException
+                                       or InvalidOperationException
+                                       or NotImplementedException
+                                       or NotSupportedException
+                                       or ArgumentOutOfRangeException
+                                       or OverflowException) {
+      // Whatever stopped a later frame, the first one is still reachable.
+    }
+
+    return _DecodeComposed(codestream, imageMetadata, width, height);
   }
 
   /// <summary>
@@ -653,6 +705,29 @@ public static class JpegXlReader {
     modular.ColorPlanes = planes;
   }
 
+  /// <summary>
+  /// Round one composed picture out of float and into the raster a caller gets:
+  /// the three colour planes, and the alpha beside them where there is one.
+  /// </summary>
+  private static byte[] _PackPlanes(float[][] planes, int alphaPlane, int pixelCount, int parts, bool deep) {
+    var bytesPerSample = deep ? 2 : 1;
+    var maximum = deep ? 65535.0f : 255.0f;
+    var packed = new byte[checked(pixelCount * parts * bytesPerSample)];
+    for (var i = 0; i < pixelCount; ++i)
+    for (var c = 0; c < parts; ++c) {
+      var plane = c < 3 ? c : alphaPlane;
+      var value = Math.Clamp(planes[plane][i], 0.0f, 1.0f) * maximum + 0.5f;
+      var at = (i * parts + c) * bytesPerSample;
+      if (deep) {
+        var sample = (ushort)Math.Clamp((int)value, 0, 65535);
+        packed[at] = (byte)(sample >> 8);
+        packed[at + 1] = (byte)sample;
+      } else
+        packed[at] = (byte)Math.Clamp((int)value, 0, 255);
+    }
+    return packed;
+  }
+
   private static bool _ValidateDecodedImage(object? image, int width, int height, int channels) {
     if (image is not JxlModularImage modular || modular.Channels.Length < channels)
       return false;
@@ -707,27 +782,24 @@ public static class JpegXlReader {
     if (decoded is JxlComposedImage composed) {
       var keepsAlpha = composed.AlphaPlane >= 3;
       var parts = keepsAlpha ? 4 : 3;
-      var maximum = deep ? 65535.0f : 255.0f;
-      var blended = new byte[checked(pixelCount * parts * bytesPerSample)];
-      for (var i = 0; i < pixelCount; ++i)
-      for (var c = 0; c < parts; ++c) {
-        var plane = c < 3 ? c : composed.AlphaPlane;
-        var value = Math.Clamp(composed.Planes[plane][i], 0.0f, 1.0f) * maximum + 0.5f;
-        var at = (i * parts + c) * bytesPerSample;
-        if (deep) {
-          var sample = (ushort)Math.Clamp((int)value, 0, 65535);
-          blended[at] = (byte)(sample >> 8);
-          blended[at + 1] = (byte)sample;
-        } else
-          blended[at] = (byte)Math.Clamp((int)value, 0, 255);
-      }
+
+      // An animation's moments are rounded the same way its still picture is,
+      // so a caller stepping through them gets the same rasters it would get by
+      // opening each frame on its own — and the still picture is the first of
+      // them rather than a second rounding of the same planes.
+      var frames = new byte[composed.Frames.Length][];
+      for (var i = 0; i < frames.Length; ++i)
+        frames[i] = _PackPlanes(composed.Frames[i], composed.AlphaPlane, pixelCount, parts, deep);
 
       file = new JpegXlFile {
         Width = metadata.Width,
         Height = metadata.Height,
         ComponentCount = parts,
         BitsPerSample = deep ? 16 : 8,
-        PixelData = blended,
+        PixelData = frames.Length > 0
+          ? frames[0]
+          : _PackPlanes(composed.Planes, composed.AlphaPlane, pixelCount, parts, deep),
+        Frames = frames,
         Brand = brand,
       };
       return true;

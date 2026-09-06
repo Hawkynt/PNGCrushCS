@@ -103,6 +103,63 @@ public sealed class JxlMultiFrameTests {
   }
 
   /// <summary>
+  /// An animation is every moment it is shown at, not only the first.
+  /// </summary>
+  /// <remarks>
+  /// A file used to be read to its first shown frame and no further, so a caller
+  /// had no way to reach the rest of an animation at all. The four moments of
+  /// the traffic light are now each the whole picture as it stands at that
+  /// moment, and each of the four is byte for byte what libjxl decodes it to.
+  /// Its alpha plane is opaque throughout, which is why these fixtures carry
+  /// only the colour; the alpha was measured against libjxl beside them.
+  /// </remarks>
+  [Test]
+  public void AnAnimationIsReadToItsEnd() {
+    var file = JpegXlReader.FromBytes(_Fixture("cropped_traffic_light.jxl"));
+
+    Assert.That(JpegXlFile.ImageCount(file), Is.EqualTo(4), "the file states four moments");
+    Assert.That(file.Frames, Has.Length.EqualTo(4));
+
+    string[] expectedFrames = [
+      "cropped_traffic_light.ppm",
+      "cropped_traffic_light.frame1.ppm",
+      "cropped_traffic_light.frame2.ppm",
+      "cropped_traffic_light.frame3.ppm",
+    ];
+
+    for (var index = 0; index < expectedFrames.Length; ++index) {
+      var (width, height, expected) = _ReadPpm(_Fixture(expectedFrames[index]));
+      var moment = file.Frames[index];
+      for (var i = 0; i < width * height; ++i)
+      for (var c = 0; c < 3; ++c) {
+        var mine = moment[i * file.ComponentCount + c];
+        var theirs = expected[i * 3 + c];
+        if (mine != theirs)
+          Assert.Fail($"moment {index}, sample {i}, channel {c} is {mine}, libjxl decodes it to {theirs}");
+      }
+    }
+
+    // The still picture stays the first moment, which is what a caller that
+    // knows nothing of animation gets.
+    Assert.That(file.PixelData, Is.EqualTo(file.Frames[0]));
+  }
+
+  /// <summary>
+  /// A still picture in several frames is one image, however many frames it took
+  /// to state it: those frames are layers and only their composition is a
+  /// picture.
+  /// </summary>
+  [Test]
+  public void AStillPictureInSeveralFramesIsStillOneImage() {
+    var file = JpegXlReader.FromBytes(_Fixture("spline_on_first_frame.jxl"));
+
+    Assert.Multiple(() => {
+      Assert.That(JpegXlFile.ImageCount(file), Is.EqualTo(1));
+      Assert.That(file.Frames, Is.Empty);
+    });
+  }
+
+  /// <summary>
   /// A frame that covers less than the picture states which older frame it is
   /// drawn over, even when it replaces rather than blends.
   /// </summary>
