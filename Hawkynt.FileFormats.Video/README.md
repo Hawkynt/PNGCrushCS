@@ -80,8 +80,8 @@ quietly come to mean "some of it". How each codec was measured is in
 
 Every codec the package registers has a row, and the name in the first column is the codec's own
 `CodecName` — the same string a refusal message names it by. `Decode` is what
-[`VideoFormatRegistry.CreateDecoder`](https://github.com/Hawkynt/PNGCrushCS/blob/main/Hawkynt.FileFormats.Video/VideoFormatRegistry.cs) builds, 96 of them; `Encode` is
-what [`VideoFormatRegistry.CreateEncoder`](https://github.com/Hawkynt/PNGCrushCS/blob/main/Hawkynt.FileFormats.Video/VideoFormatRegistry.cs) builds, 35 of them. The two
+[`VideoFormatRegistry.CreateDecoder`](https://github.com/Hawkynt/PNGCrushCS/blob/main/Hawkynt.FileFormats.Video/VideoFormatRegistry.cs) builds, 97 of them; `Encode` is
+what [`VideoFormatRegistry.CreateEncoder`](https://github.com/Hawkynt/PNGCrushCS/blob/main/Hawkynt.FileFormats.Video/VideoFormatRegistry.cs) builds, 37 of them. The two
 are separate tables in the registry because they are looked up by different things: a decoder by a
 whole stream description, an encoder by the four-character code a caller wants written.
 
@@ -89,9 +89,11 @@ whole stream description, an encoder by the four-character code a caller wants w
 mode a conforming encoder may write — and the Notes column says which. **✅ means every layout the
 format defines is decoded**; such a codec still refuses malformed input, undefined field values and
 forms no encoder produces, because a plausible wrong picture is worse than a refusal. No codec
-silently misdecodes what it will not read. An `Encode` tick is a lossless or format-faithful writer,
-never a re-quantisation of something the codec cannot hold: where a picture would have to be reduced
-to fit, the encoder refuses it by name instead. Codec-by-codec provenance and measurement notes are in
+silently misdecodes what it will not read. An `Encode` tick is a lossless or format-faithful writer.
+Where the codec has a lossless form the encoder writes it and refuses by name any picture it would
+have to reduce to fit; where the format itself is lossy — Motion JPEG, Microsoft Video 1, DV — the
+row says so, because there is nothing else such an encoder could write. Codec-by-codec provenance and
+measurement notes are in
 [`codec-notes.md`](https://github.com/Hawkynt/PNGCrushCS/blob/main/Hawkynt.FileFormats.Video/codec-notes.md).
 
 | Codec | Decode | Encode | Implemented scope / note | Reference |
@@ -116,6 +118,7 @@ to fit, the encoder refuses it by name instead. Codec-by-codec provenance and me
 | [FFV1 (RFC 9043)](https://en.wikipedia.org/wiki/FFV1) | ⚠️ | ✅ | Versions 0, 1 and 3, both entropy coders, slices and checksums; 8-bit samples only. Version 2 and deeper samplings refused. The encoder writes version 3 with the range coder, the small context model, a slice checksum on every slice and every frame a key frame — what `ffmpeg -c:v ffv1 -level 3 -coder 1 -context 0 -slicecrc 1 -g 1` writes | [RFC 9043](https://www.rfc-editor.org/rfc/rfc9043) |
 | [Apple ProRes](https://en.wikipedia.org/wiki/Apple_ProRes) | ⚠️ | — | `apco`, `apcs`, `apcn`, `apch` at 4:2:2 and `ap4h`, `ap4x` at 4:4:4; bitstream versions 0 and 1. Reserved chroma formats, reserved interlace mode and reserved alpha types refused | [Apple ProRes white paper](https://www.apple.com/final-cut-pro/docs/Apple_ProRes_White_Paper.pdf) |
 | [Avid DNxHD / DNxHR (SMPTE VC-3)](https://en.wikipedia.org/wiki/DNxHD_codec) | ⚠️ | — | SMPTE VC-3 header versions 1-3, progressive 4:2:2 and 4:4:4. Interlaced frames, 4:2:0, alpha-bearing compression IDs and RGB-mode macroblocks refused | [SMPTE VC-3 overview](https://ieeexplore.ieee.org/document/7290708) |
+| [DV (IEC 61834 / SMPTE 314M)](https://en.wikipedia.org/wiki/DV_%28video_format%29) | ⚠️ | ✅ | `dvsd`, `dv25`, `dv50`, `dvsl`, `cdvc`, `CDV5`, `dvis`, `pdvc`, `SL25`, `SLDV` and QuickTime's nine spellings (`dvc `, `dvcp`, `dvcs`, `dvl `, `dvlp`, `dvpp`, `dv5n`, `dv5p`, `AVdv`); the six standard-definition profiles — 525/60 and 625/50 at 25 Mbit in 4:1:1 and 4:2:0, and DVCPRO50 at 4:2:2 — with both transform modes. The profile comes from the frame, never from the tag. DVCPRO HD (SMPTE 370M, `dvhd`, `dvh1`-`dvh6`, `dvhq`, `dvhp`, `CDVH`) is accepted and then refused by name. The encoder writes five of the six profiles, the picture's own colour sampling choosing which — 4:2:2 planar asks for DVCPRO50 — and is lossy because DV is: a frame is a fixed length whatever is in it, so a picture that will not fit is quantised until it does. Handed the same planes it writes byte for byte what ffmpeg's own DV encoder writes | [SMPTE 314M](https://ieeexplore.ieee.org/document/7291838) |
 | [GoPro CineForm](https://en.wikipedia.org/wiki/CineForm) | ⚠️ | — | SMPTE VC-5 three-channel layouts: 10-bit 4:2:2 YUV and 12-bit RGB. Alpha-bearing channel counts and lowpass precisions other than 16 bits refused | [LOC CineForm overview](https://www.loc.gov/preservation/digital/formats/fdd/fdd000458.shtml) |
 | Hap | ⚠️ | — | `Hap1`, `Hap5`, `HapY`, `HapM`, `HapA`, `Hap7`, `HapH`. Texture formats and second-stage compressors the codec does not know, and image combinations Hap does not define, refused. Neither Wikipedia nor MultimediaWiki carries a page for this format; the format's own documentation is the overview | [Vidvox Hap `HapVideoDRAFT.md`](https://github.com/Vidvox/hap/blob/master/documentation/HapVideoDRAFT.md) |
 | Matrox Uncompressed SD | ✅ | — | `M101`; 8- and 10-bit 4:2:2 read from the 24-byte Matrox AVI trailer. Odd widths and other sample depths refused. Adapted from FFmpeg's LGPL-2.1-or-later decoder. No neutral overview of this format is published | [FFmpeg `m101.c`](https://github.com/FFmpeg/FFmpeg/blob/master/libavcodec/m101.c) |
@@ -123,7 +126,7 @@ to fit, the encoder refuses it by name instead. Codec-by-codec provenance and me
 | [Avid Meridien Uncompressed (avui)](https://wiki.multimedia.cx/index.php/AVUI) | ⚠️ | — | `AVUI`; UYVY 4:2:2 behind a fixed run of blank lines. Only 720x486 and 720x576 accepted, the two geometries the format's own encoder writes | [MultimediaWiki AVUI](https://wiki.multimedia.cx/index.php/AVUI) |
 | [Microsoft Video 1](https://wiki.multimedia.cx/index.php/Microsoft_Video_1) | ✅ | ✅ | `CRAM`, `MSVC`, `WHAM` at 8-bit palettised and 16-bit 5-5-5. Other depths, and pictures that are not a whole number of 4x4 blocks, refused. The encoder writes `MSVC` at both depths, choosing per block between one colour, two, eight and a skip run; the coding is lossy by construction — two colours to a block — so only a picture the format can hold exactly comes back exactly | [MultimediaWiki](https://wiki.multimedia.cx/index.php/Microsoft_Video_1) |
 | [Microsoft RLE](https://wiki.multimedia.cx/index.php/Microsoft_RLE) | ✅ | ✅ | `MRLE`, `BI_RLE8`, `BI_RLE4`; 4- and 8-bit bottom-up frames with delta and skip escapes. Top-down heights and other depths refused. The encoder writes 4- and 8-bit palettised frames from indexed pictures only, using the delta escapes for what did not change; a picture that is not palettised is refused rather than quantised | [MultimediaWiki Microsoft RLE](https://wiki.multimedia.cx/index.php/Microsoft_RLE) |
-| [Cinepak](https://en.wikipedia.org/wiki/Cinepak) | ✅ | — | `cvid`, `CVID`; QuickTime and AVI alike. Strips that are not a whole number of 4x4 blocks, unknown chunk types and mid-stream size changes refused | [MultimediaWiki Cinepak](https://wiki.multimedia.cx/index.php/Cinepak) |
+| [Cinepak](https://en.wikipedia.org/wiki/Cinepak) | ✅ | ✅ | `cvid`, `CVID`; QuickTime and AVI alike. Strips that are not a whole number of 4x4 blocks, unknown chunk types and mid-stream size changes refused. The encoder writes `cvid`, pricing each strip's blocks between one codebook entry, four and a skip; the coding is lossy by construction — four luminances and one chrominance pair to sixteen pixels — and its colour space can state only 2669700 of the 16777216 colours exactly, all 256 greys and all eight corners of the colour cube among them | [MultimediaWiki Cinepak](https://wiki.multimedia.cx/index.php/Cinepak) |
 | [Intel Indeo 2](https://wiki.multimedia.cx/index.php/Indeo_2) | ✅ | — | `RT21`; Huffman-coded sample pairs against one of four delta tables, intra frames predicting from the line above and inter frames from the frame before. The picture's width must divide by eight and its height by four, which is what coding pairs into quarter-size chrominance planes means | [MultimediaWiki Indeo 2](https://wiki.multimedia.cx/index.php/Indeo_2) |
 | [Intel Indeo 3](https://wiki.multimedia.cx/index.php/Indeo_3) | ⚠️ | — | `IV31`, `IV32`; a binary tree cutting each plane into cells, motion compensation, and vector quantisation over 4x4 to 8x8 blocks. Eight-bit samples and half-sample motion vectors are flagged in a frame header and refused — no encoder is known to have written either — as is the "skip cell" null code, whose effect on the two frame buffers is stated nowhere | [MultimediaWiki Indeo 3](https://wiki.multimedia.cx/index.php/Indeo_3) |
 | [QuickTime Animation (RLE)](https://en.wikipedia.org/wiki/QuickTime_Animation) | ✅ | ✅ | `rle `; depths 1, 2, 4, 8, 16, 24 and 32, plus greyscale 33, 34, 36 and 40. A palettised stream with no colour table is refused rather than drawn through a guessed palette. The encoder writes 8-bit palettised, 24- and 32-bit frames, choosing each line's opcodes by the reference encoder's own dynamic programme. 16-bit is not written | [MultimediaWiki QuickTime RLE](https://wiki.multimedia.cx/index.php/Apple_QuickTime_RLE) |
@@ -250,9 +253,9 @@ nothing could be verified even with a description in hand.
 Sixteen decoders are adaptations of FFmpeg's own LGPL-2.1-or-later decoders rather than
 implementations from a published description: Escape 124, LCL MSZH's back-reference parser, LOCO,
 Canopus Lossless, Matrox M101, VBLE, MidiVid Archive, MS Screen 1, RemotelyAnywhere, MSCC, MWSC,
-RSCC, Screenpresso, WinCAM, VMware Screen Codec and TDSC. Eleven of the encoders are as well: CLJR, FFV1, Flash Screen
-Video, HuffYUV, LCL ZLIB, MagicYUV, Microsoft RLE, Microsoft Video 1's mode decision, QuickTime
-Animation, Ut Video and ZMBV. Every one
+RSCC, Screenpresso, WinCAM, VMware Screen Codec and TDSC. Thirteen of the encoders are as well:
+Cinepak's bitstream, CLJR, DV, FFV1, Flash Screen Video, HuffYUV, LCL ZLIB, MagicYUV, Microsoft
+RLE, Microsoft Video 1's mode decision, QuickTime Animation, Ut Video and ZMBV. Every one
 of those files
 carries the original author and the licence notice it came under; LGPL-2.1-or-later permits
 redistribution under this package's LGPL-3.0-or-later.
@@ -377,7 +380,7 @@ Those rules exist because “find a familiar marker and split there” works on 
 
 <!-- API:BEGIN generated by Hawkynt/RepositoryTemplate/package-readme — edit the XML docs in source, not here -->
 
-Every public and protected member of all 387 types, generated from the built assembly and its XML documentation, is in [REFERENCE.md](https://github.com/Hawkynt/PNGCrushCS/blob/main/Hawkynt.FileFormats.Video/REFERENCE.md).
+Every public and protected member of all 390 types, generated from the built assembly and its XML documentation, is in [REFERENCE.md](https://github.com/Hawkynt/PNGCrushCS/blob/main/Hawkynt.FileFormats.Video/REFERENCE.md).
 
 <!-- API:END -->
 
@@ -400,7 +403,7 @@ Every public and protected member of all 387 types, generated from the built ass
 - Large RealVideo pictures require preserved slice offsets when they must be split across 16-bit RealMedia packet lengths, and RoQ sound requires its original predictor argument.
 - Several advanced codecs intentionally implement well-defined subsets (for example H.264 progressive 8-bit 4:2:0, HEVC Main profile, and VC-1 Simple/Main intra pictures). Every row marked ⚠️ in the codec table names its own subset. Unsupported profiles/features are refused by name rather than silently misdecoded.
 - Codec support is more precise than a single green check can express; consult [`codec-notes.md`](https://github.com/Hawkynt/PNGCrushCS/blob/main/Hawkynt.FileFormats.Video/codec-notes.md) before relying on a profile/level/feature not named in this README.
-- Encoding is a smaller domain than decoding on purpose: 35 codecs of the 96 read can also be written. Most are lossless; two are not, and each says so in its own row. Motion JPEG writes baseline JPEG, whose loss is a matter of degree, and Microsoft Video 1's two-colours-to-a-block coding has no lossless form at all — a picture that codec can hold exactly comes back exactly, and one it cannot does not. What is still not written back is the modern lossy codecs: a stream read as H.264 cannot be written back as H.264.
+- Encoding is a smaller domain than decoding on purpose: 37 codecs of the 97 read can also be written. Most are lossless; four are not, and each says so in its own row. Motion JPEG writes baseline JPEG, whose loss is a matter of degree, and Microsoft Video 1's two-colours-to-a-block coding and Cinepak's vector quantisation have no lossless form at all — a picture that codec can hold exactly comes back exactly, and one it cannot does not. What is still not written back is the modern lossy codecs: a stream read as H.264 cannot be written back as H.264.
 - Video correctness depends on real-world packetization as much as codec math. The project therefore validates packet counts, sizes, timestamps, and key-frame flags against external tools where samples are available.
 
 ## ❤️ Support

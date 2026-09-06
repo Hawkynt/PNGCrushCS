@@ -30,8 +30,37 @@ namespace FileFormat.Codecs.Cinepak;
 /// right, which for a negative odd difference is a different number. That is worth a sentence because
 /// it is invisible in any single frame and wrong in 319 of those same 5120 samples, by one level
 /// each.
+/// <para/>
+/// <b>The way in is not the way out reversed.</b> The matrix above inverts exactly in real arithmetic,
+/// so there is a forward transform and <see cref="ChromaOf"/> is its chrominance half — but rounded to
+/// whole bytes it stops being an inverse, and only 2669700 of the 16777216 RGB colours can be stated
+/// exactly by any triple of luminance and chrominance at all. So the encoder uses the forward
+/// transform to find where to look and not what to write; what it writes is settled by measuring the
+/// way out. The luminance half is not here at all, for that reason: nothing needs to guess a
+/// luminance when <see cref="CinepakEntrySolver"/> can work out the best one exactly.
 /// </remarks>
 internal static class CinepakColorConversion {
+
+  /// <summary>
+  /// The forward matrix, in the fixed point the reference encoder computes it in: 2^23 times each
+  /// coefficient, so the shift below is the whole of the scaling.
+  /// </summary>
+  /// <remarks>
+  /// FFmpeg's <c>libavcodec/cinepakenc.c</c>, verbatim. The comments there give the coefficients as
+  /// -0.1429, -0.2857, 0.4286 for the blue difference and 0.3571, -0.2857, -0.0714 for the red —
+  /// sevenths, which is what makes the inverse a matrix of halves and doubles — and the rounded
+  /// integers are what every file that encoder wrote was made with, so they are copied rather than
+  /// re-derived from the fractions.
+  /// </remarks>
+  private const int _FIXED_POINT_SHIFT = 23;
+
+  private const int _BLUE_DIFFERENCE_RED = -299683;
+  private const int _BLUE_DIFFERENCE_GREEN = -599156;
+  private const int _BLUE_DIFFERENCE_BLUE = 898839;
+
+  private const int _RED_DIFFERENCE_RED = 748893;
+  private const int _RED_DIFFERENCE_GREEN = -599156;
+  private const int _RED_DIFFERENCE_BLUE = -149737;
 
   /// <summary>
   /// Turns one codebook entry's four luminances and one chrominance pair into four RGB triplets.
@@ -77,5 +106,23 @@ internal static class CinepakColorConversion {
     }
   }
 
+  /// <summary>
+  /// The chrominance pair four colours average to, from the sums of their channels.
+  /// </summary>
+  /// <remarks>
+  /// The sums and not the means, because that is what the reference encoder feeds the matrix: one
+  /// chrominance pair always covers four samples, and scaling down before the multiply throws away two
+  /// bits that the fixed point is there to keep. The division by four is already inside the
+  /// coefficients, which is why the chrominance rows look a quarter the size of the luminance ones.
+  /// </remarks>
+  internal static (int BlueDifference, int RedDifference) ChromaOf(int redSum, int greenSum, int blueSum) {
+    var blueDifference = (_BLUE_DIFFERENCE_RED * redSum + _BLUE_DIFFERENCE_GREEN * greenSum + _BLUE_DIFFERENCE_BLUE * blueSum) >> _FIXED_POINT_SHIFT;
+    var redDifference = (_RED_DIFFERENCE_RED * redSum + _RED_DIFFERENCE_GREEN * greenSum + _RED_DIFFERENCE_BLUE * blueSum) >> _FIXED_POINT_SHIFT;
+
+    return (_ClampDifference(blueDifference), _ClampDifference(redDifference));
+  }
+
   private static byte _Clamp(int value) => value < 0 ? (byte)0 : value > 255 ? (byte)255 : (byte)value;
+
+  private static int _ClampDifference(int value) => value < -128 ? -128 : value > 127 ? 127 : value;
 }
