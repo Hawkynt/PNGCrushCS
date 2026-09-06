@@ -154,6 +154,34 @@ internal static class HapBlockDecoding {
     return output;
   }
 
+  /// <summary>
+  /// The four colours one eight-byte colour block decodes to, which is what an encoder has to
+  /// reproduce for a block to come back as it went in.
+  /// </summary>
+  public static void BuildPalette(ReadOnlySpan<byte> block, Span<byte> palR, Span<byte> palG, Span<byte> palB)
+    => _DecodeColourBlock(block, palR, palG, palB);
+
+  /// <summary>
+  /// The 5-6-5 word that expands back to exactly this colour, where one exists.
+  /// </summary>
+  /// <remarks>
+  /// The inverse of <see cref="_DecodeRgb565"/>, and derived from the same two tables rather than
+  /// from a formula, so that "this colour survives a block that names it as an endpoint" means
+  /// exactly what this decoder does and not what some other reading of S3TC would do.
+  /// </remarks>
+  public static bool TryPack565(byte r, byte g, byte b, out ushort word) {
+    var r5 = _Quantised5[r];
+    var g6 = _Quantised6[g];
+    var b5 = _Quantised5[b];
+    if (r5 < 0 || g6 < 0 || b5 < 0) {
+      word = 0;
+      return false;
+    }
+
+    word = (ushort)((r5 << 11) | (g6 << 5) | b5);
+    return true;
+  }
+
   private static void _DecodeColourBlock(ReadOnlySpan<byte> block, Span<byte> palR, Span<byte> palG, Span<byte> palB) {
     var c0Raw = (ushort)(block[0] | (block[1] << 8));
     var c1Raw = (ushort)(block[2] | (block[3] << 8));
@@ -228,6 +256,19 @@ internal static class HapBlockDecoding {
     130, 134, 138, 142, 146, 150, 154, 158, 162, 166, 170, 174, 178, 182, 186, 190,
     194, 198, 202, 206, 210, 214, 219, 223, 227, 231, 235, 239, 243, 247, 251, 255,
   ];
+
+  private static readonly sbyte[] _Quantised5 = _Invert(_Expand5);
+  private static readonly sbyte[] _Quantised6 = _Invert(_Expand6);
+
+  /// <summary>Which table entry produces each eight-bit value, or -1 where none does.</summary>
+  private static sbyte[] _Invert(byte[] table) {
+    var inverse = new sbyte[256];
+    Array.Fill(inverse, (sbyte)-1);
+    for (var i = 0; i < table.Length; ++i)
+      inverse[table[i]] = (sbyte)i;
+
+    return inverse;
+  }
 
   private static void _DecodeRgb565(ushort value, out byte r, out byte g, out byte b) {
     var r5 = (value >> 11) & 0x1F;
