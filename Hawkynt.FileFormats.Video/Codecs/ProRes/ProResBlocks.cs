@@ -107,10 +107,18 @@ internal static class ProResBlocks {
   /// The narrower bounds are the right ones for a decoder whose output is a video signal, and they
   /// cost nothing downstream: the studio-swing expansion in <see cref="ProResColorConversion"/> maps
   /// everything below the black level to zero anyway, so the samples the two choices disagree about
-  /// are ones that convert to the same colour either way. They are also what ffmpeg produces, which
-  /// is why choosing the wider bounds shows up in a plane comparison as a scatter of samples exactly
-  /// four levels apart at the extremes of a heavily quantised picture — 2135 of them across ten
-  /// frames of ProRes 422 Proxy — and nowhere else.
+  /// are ones that convert to the same colour either way. At ten bits they are also what ffmpeg
+  /// produces, which is why choosing the wider bounds shows up in a plane comparison as a scatter of
+  /// samples exactly four levels apart at the extremes of a heavily quantised picture — 2135 of them
+  /// across ten frames of ProRes 422 Proxy — and nowhere else.
+  /// <para/>
+  /// <b>At twelve bits ffmpeg does not scale them and this does.</b> Its <c>CLIP_MIN</c> is the
+  /// constant 4 at both depths, so a 4:4:4 frame it decodes is clamped to 4 and 4091 where 7.5.1 asks
+  /// for 16 and 4079. Measured over twenty of its own <c>ap4h</c> and <c>ap4x</c> files, every sample
+  /// where the two differ by more than one is a sample clamped here to exactly 16 or exactly 4079 —
+  /// 66133 of 75152640, largest difference twelve, and no third case. The specification is followed
+  /// rather than the reference decoder, because 7.5.1 states the bounds as the permissible video
+  /// levels of the depth and those are what scale.
   /// </remarks>
   internal static int LowestSample(int bitDepth) => 1 << (bitDepth - 8);
 

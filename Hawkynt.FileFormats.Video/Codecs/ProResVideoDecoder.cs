@@ -36,11 +36,16 @@ namespace FileFormat.Codecs;
 /// replicates and a comparison of the two would measure that instead.
 /// <para/>
 /// Progressive and interlaced in both field orders, sizes that are and are not a whole number of
-/// macroblocks, from 40x24 to 1280x718: <b>every sample of every plane is within one level, and one
-/// is the only difference that ever occurs.</b> That residue is the inverse transform and nothing
+/// macroblocks, from 40x24 to 1280x718: <b>every sample of every 4:2:2 plane is within one level, and
+/// one is the only difference that ever occurs.</b> That residue is the inverse transform and nothing
 /// else — see <see cref="ProResInverseDct"/>. <b>Alpha is exact</b>, at both of its depths, with no
 /// sample differing anywhere; it should be, since RDD 36 codes alpha losslessly with no transform in
 /// the path.
+/// <para/>
+/// The 4:4:4 profiles carry one further difference and it is a clamping rule rather than a decode:
+/// ffmpeg holds its lower clamp at 4 whatever the depth where 7.5.1 scales the permissible video
+/// levels with it, so a twelve-bit sample at the extremes of the range comes out 16 or 4079 here and
+/// 4 or 4091 there. See <see cref="ProResBlocks.LowestSample"/> for the measurement.
 /// <para/>
 /// <b>What refuses.</b> A bitstream version later than 1, whose decoding process this specification
 /// does not describe; a reserved <c>chroma_format</c>, <c>interlace_mode</c> or
