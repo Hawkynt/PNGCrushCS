@@ -81,7 +81,7 @@ quietly come to mean "some of it". How each codec was measured is in
 Every codec the package registers has a row, and the name in the first column is the codec's own
 `CodecName` — the same string a refusal message names it by. `Decode` is what
 [`VideoFormatRegistry.CreateDecoder`](https://github.com/Hawkynt/PNGCrushCS/blob/main/Hawkynt.FileFormats.Video/VideoFormatRegistry.cs) builds, 97 of them; `Encode` is
-what [`VideoFormatRegistry.CreateEncoder`](https://github.com/Hawkynt/PNGCrushCS/blob/main/Hawkynt.FileFormats.Video/VideoFormatRegistry.cs) builds, 43 of them. The two
+what [`VideoFormatRegistry.CreateEncoder`](https://github.com/Hawkynt/PNGCrushCS/blob/main/Hawkynt.FileFormats.Video/VideoFormatRegistry.cs) builds, 46 of them. The two
 are separate tables in the registry because they are looked up by different things: a decoder by a
 whole stream description, an encoder by the four-character code a caller wants written.
 
@@ -92,7 +92,7 @@ forms no encoder produces, because a plausible wrong picture is worse than a ref
 silently misdecodes what it will not read. An `Encode` tick is a lossless or format-faithful writer.
 Where the codec has a lossless form the encoder writes it and refuses by name any picture it would
 have to reduce to fit; where the format itself is lossy — Motion JPEG, Microsoft Video 1, Cinepak, DV,
-Microsoft's MPEG-4, ASUS V1 and V2, Apple Video, H.261 — the row says so, because there is nothing else such an encoder
+Microsoft's MPEG-4, ASUS V1 and V2, Apple Video, H.261, Hap, Apple ProRes, id RoQ — the row says so, because there is nothing else such an encoder
 could write. Codec-by-codec provenance and
 measurement notes are in
 [`codec-notes.md`](https://github.com/Hawkynt/PNGCrushCS/blob/main/Hawkynt.FileFormats.Video/codec-notes.md).
@@ -254,11 +254,15 @@ nothing could be verified even with a description in hand.
 Sixteen decoders are adaptations of FFmpeg's own LGPL-2.1-or-later decoders rather than
 implementations from a published description: Escape 124, LCL MSZH's back-reference parser, LOCO,
 Canopus Lossless, Matrox M101, VBLE, MidiVid Archive, MS Screen 1, RemotelyAnywhere, MSCC, MWSC,
-RSCC, Screenpresso, WinCAM, VMware Screen Codec and TDSC. Fifteen of the encoders are as well:
-Apple Graphics, Apple Video, Cinepak's bitstream, CLJR, DV, FFV1, Flash Screen Video, HuffYUV, LCL
-ZLIB, MagicYUV, Microsoft RLE, Microsoft Video 1's mode decision, QuickTime Animation, Ut Video and
-ZMBV. The ASUS encoders are not among them: those were written from the published description and
-take nothing from FFmpeg's code. Every one of those files
+RSCC, Screenpresso, WinCAM, VMware Screen Codec and TDSC. Sixteen of the encoders are as well:
+Apple Graphics, Apple Video, Cinepak's bitstream, CLJR, DV, FFV1, Flash Screen Video, Hap's block
+compression, HuffYUV, LCL ZLIB, MagicYUV, Microsoft RLE, Microsoft Video 1's mode decision,
+QuickTime Animation, Ut Video and ZMBV. Hap's is the one of those not under the LGPL: FFmpeg's
+`texturedspenc.c` carries its own MIT grant and states it derives from public-domain code, and the
+notice beside it says so. The ASUS, H.261, id RoQ and Apple ProRes encoders are not among them at
+all: those were written from published descriptions. ProRes takes FFmpeg's quantisation matrices,
+which RDD 36 prints nowhere, but constants are not expression and the notice beside it records
+where they came from. Every one of those files
 carries the original author and the licence notice it came under; LGPL-2.1-or-later permits
 redistribution under this package's LGPL-3.0-or-later.
 
@@ -405,7 +409,7 @@ Every public and protected member of all 395 types, generated from the built ass
 - Large RealVideo pictures require preserved slice offsets when they must be split across 16-bit RealMedia packet lengths, and RoQ sound requires its original predictor argument.
 - Several advanced codecs intentionally implement well-defined subsets (for example H.264 progressive 8-bit 4:2:0, HEVC Main profile, and VC-1 Simple/Main intra pictures). Every row marked ⚠️ in the codec table names its own subset. Unsupported profiles/features are refused by name rather than silently misdecoded.
 - Codec support is more precise than a single green check can express; consult [`codec-notes.md`](https://github.com/Hawkynt/PNGCrushCS/blob/main/Hawkynt.FileFormats.Video/codec-notes.md) before relying on a profile/level/feature not named in this README.
-- Encoding is a smaller domain than decoding on purpose: 43 codecs of the 97 read can also be written. Most are lossless; nine are not, and each says so in its own row. Motion JPEG writes baseline JPEG, whose loss is a matter of degree, and DV's fixed-length frames, Microsoft Video 1's two-colours-to-a-block coding, Cinepak's vector quantisation, Microsoft's MPEG-4 transform, the ASUS codecs' quantised DCT, Apple Video's 15-bit blocks and H.261's quantised transform have no lossless form at all — a picture that codec can hold exactly comes back exactly, and one it cannot does not. What is still not written back is the modern lossy codecs: a stream read as H.264 cannot be written back as H.264.
+- Encoding is a smaller domain than decoding on purpose: 46 codecs of the 97 read can also be written. Most are lossless; twelve are not, and each says so in its own row. Motion JPEG writes baseline JPEG, whose loss is a matter of degree, and DV's fixed-length frames, Microsoft Video 1's two-colours-to-a-block coding, Cinepak's vector quantisation, Microsoft's MPEG-4 transform, the ASUS codecs' quantised DCT, Apple Video's 15-bit blocks, H.261's and Apple ProRes's quantised transforms, Hap's texture blocks and id RoQ's vector quantisation have no lossless form at all — a picture that codec can hold exactly comes back exactly, and one it cannot does not. What is still not written back is the modern lossy codecs: a stream read as H.264 cannot be written back as H.264.
 - Video correctness depends on real-world packetization as much as codec math. The project therefore validates packet counts, sizes, timestamps, and key-frame flags against external tools where samples are available.
 
 ## ❤️ Support

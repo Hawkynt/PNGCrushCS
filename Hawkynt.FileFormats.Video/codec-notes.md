@@ -2852,12 +2852,13 @@ than only by construction. ffmpeg's own top-level section headers are all eight 
 size, so the four-byte form and an explicit chunk offset table are reached only by hand-built frames in
 this codec's own tests.
 
-**Hap R (BC7) and Hap HDR (BC6U/BC6S) refuse by name**, at `Create`, before a single frame is read —
-not for want of a block decoder, since this package already has one for each, reused by the image
-formats that carry them, but because BC6 is half-float HDR data and this package's `RawImage` has no
-floating-point pixel format to receive it in, and because ffmpeg's own Hap encoder — what this decoder
-is measured against — writes none of the four HDR or BC7 variants, so there would be no oracle to
-check a decode against even if one were written.
+**Hap R (BC7) and Hap HDR (BC6U/BC6S) are decoded**, through the block decoders this package already
+has for each and shares with the image formats that carry them. This paragraph used to say they were
+refused by name at `Create`; that stopped being true when those paths went in and the entry was not
+brought with it, which the codec table above has said all along. What remains true is the reason
+they are worth treating carefully: ffmpeg's own Hap encoder writes none of the HDR or BC7 variants,
+so there is no oracle to measure a decode of one against, and the numbers quoted here cover the
+three formats the encoder below writes and nothing else.
 
 What else refuses, by name: a section whose header does not fit, a size that runs past the data
 holding it, a top-level type byte naming no pixel format and no multiple-image marker, a "consult
