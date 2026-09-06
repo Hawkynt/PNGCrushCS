@@ -2226,6 +2226,106 @@ one; and a motion vector reaching outside the picture, which nothing measured th
 Sound (`RoQ_SOUND_MONO`, `RoQ_SOUND_STEREO`) is demuxed onto its own stream, DPCM-coded and unread past
 that — decoding it is future work.
 
+**Writing it.** The encoder is written against the decoder above rather than against anybody else's
+encoder: every code it emits is one that walk reads, in the order that walk reads it, and the picture it
+paints into its own buffers is the picture that walk paints. That is worth stating because the walk was
+not read out of a description — it was settled sample for sample against ffmpeg over 1338 pictures — so
+it is the strongest statement of this format available here.
+
+A picture is more than one chunk, which is the one place this codec does not fit the shape the rest of
+the package uses. Cinepak's frame is one chunk and Microsoft Video 1's is one packet; a RoQ picture is a
+`QUAD_VQ` chunk, the `QUAD_CODEBOOK` chunk it needs wherever the cells it names have changed, and — once,
+at the head of the film — an `INFO` chunk stating the size. `TryEncode` hands back one packet a picture,
+so a packet here carries that whole run of chunks, headers and all, exactly as they are to appear in the
+file; `RoqWriter` walks the run rather than trusting the first header for the whole of it, and reading the
+file back splits it into one packet a chunk again, which is what the demuxer always did.
+
+**The decision.** Every 8x8 quadrant is priced at a skip, a motion vector, one 4x4 cell doubled to fill
+it, and subdivision; every 4x4 block below a subdivision at a skip, a motion vector, one 4x4 cell at its
+own size, and four raw 2x2 cells. The price is the squared error the coding leaves over the block's own
+samples — luminance and both chrominances at full resolution, since that is where this format's motion
+compensation leaves them — plus two units of that error for every bit it costs, the codebook cells it
+newly refers to included. Two was picked by measurement. Swept at 2, 4, 8, 16 and 32 over five sequences,
+every value writes fewer bytes than ffmpeg's own encoder does on all five, so the choice is not between
+being smaller and not; it is how much quality to give up for the rest of the saving, and past two the
+answer is too much. On a 128x96 colour grid, two gives 54.51 dB in 3018 bytes against ffmpeg's 53.19 in
+3244; four gives 50.60 in 2412, already 2.6 dB below ffmpeg for a fifth fewer bytes; sixteen gives 47.39
+in 1568, 5.8 dB below for half.
+
+**A skip has to be priced against the right picture.** The two-buffer finding above is not a decoder
+detail an encoder can ignore: what a `MOT` block leaves showing is the target buffer's own stale content,
+two pictures back and not one. An encoder modelling a single buffer would price a skip against the picture
+immediately before and be wrong about it on every other frame — and, worse, would be wrong in a way its
+own decoder would agree with. So the alternation is performed here too, and the price of a skip is read
+out of the buffer being built.
+
+**Sizing the codebook.** 256 2x2 cells and 256 4x4 ones cost 2560 bytes, which is more than a whole 64x64
+picture is worth, so the size has to be chosen rather than assumed. The farthest-point seeding is nested —
+the first *k* seeds of a 256-seed run are the seeds a *k*-seed run would have picked — so one seeding
+gives every size worth trying at no extra cost, and the picture is priced at 2, 8, 32, 128 and 256. Only
+the winner is then refined by Lloyd's rule, twelve rounds rather than the four Cinepak's quantiser here
+settles for, because a RoQ codebook is worked much harder: it serves a whole picture rather than one strip
+of one, and serves it at two sizes at once. On a 320x240 fractal the twelfth round is worth 0.31 dB and 3
+per cent fewer bytes against the fourth, and the twentieth another 0.07 dB for 2 per cent more. The
+refinement is kept only where it prices better, since a codebook fitting its training set more closely
+leaves the blocks free to choose again.
+
+**An exact error, cheaply.** A 2x2 cell painted over a 4x4 or an 8x8 square spreads each of its six
+numbers over an area of pixels, so what it leaves is `Σ(pixel − sample)²` over that area, which expands to
+`n·sample² − 2·sample·Σpixel + Σpixel²`. Only the first two terms depend on the cell, so a whole codebook
+is priced against a block from six sums rather than from its pixels — the same number the pixels would
+give, at a twentieth of the arithmetic, and an exact integer either way rather than a sampled
+approximation.
+
+**Measured, and measured on both sides separately.** ffmpeg 9.0.1 has both a `roqvideo` encoder and a RoQ
+decoder, so the two halves are measured against different things and the counts are kept apart.
+
+*What ffmpeg wrote.* Ten RoQ files written by ffmpeg's own `roqvideo` encoder — 64x48 to 512x512, 108
+pictures — were decoded here and by ffmpeg and compared plane by plane against ffmpeg's own `yuvj444p`
+output: all 17246208 samples identical, no differing plane on any picture of any file. An eleventh file
+ffmpeg wrote, from a wholly static 176x144 sequence, is corrupt — after its first picture chunk the file
+is no longer chunk-structured at all, and ffmpeg's own demuxer rejects it with "unknown RoQ chunk (020A)".
+This decoder refuses it too, one chunk earlier, because that first picture's `QUAD_VQ` chunk already ends
+where a block's own argument byte should be. Reproducible; it is ffmpeg's file, not a reading of it, and
+the same sequence encoded here reads back in ffmpeg with no complaint.
+
+*What this encoder wrote.* Eleven sequences — 64x48 to 512x512, 118 pictures, covering flat colour, test
+patterns, a fractal, a pan, a still, cellular automata, a repeating cell pattern and genuine per-pixel
+noise — were encoded here, written into RoQ files, and decoded by ffmpeg. It accepted every picture of
+every file and its `yuvj444p` planes are identical to this package's own decode of the same files, sample
+for sample: 0 differing of 18006528. The comparison is on the planes rather than on colour, deliberately:
+RGB would compare two chroma paths and two colour matrices as much as two codecs, and this package has
+been caught out by exactly that before.
+
+*Against ffmpeg's own encoder*, from the same source planes, ten of the eleven can be compared at all —
+the static one cannot, ffmpeg's file for it being the corrupt one above. On those ten this encoder writes
+fewer bytes on eight, the same on one and more on one, and is closer to the source on five, level on one
+and behind on four. The two 320x240 sequences: `testsrc2` 67168 bytes at 34.90 dB against ffmpeg's 72451
+at 34.49, and `mandelbrot` 84946 at 28.29 against 110983 at 28.45. The one it loses on size is cellular
+automata at 160x112, 44467 against 43067, where it is 0.24 dB ahead; the four it is behind on in quality
+are 0.01 dB (colour bars), 0.16 (the fractal), 0.27 (512x512 test pattern) and 2.22 (flat grey) — and the
+last of those is the source's own chroma fringe rather than the picture, ffmpeg spending the extra third
+of its bytes to state a two-pixel border its own conversion invented. Encoding costs six to fourteen
+times what ffmpeg's encoder costs, measured against its best of three runs on four sequences.
+
+ffmpeg's figures move a little from run to run, which is worth saying since these are quoted to the byte:
+its quantiser is ELBG seeded from a pseudo-random generator, so the same source need not produce the same
+file twice — the cellular-automata sequence came out 43359 bytes at 23.79 dB on one run and 43067 at 24.26
+on the next. This encoder has no random state and writes the same bytes for the same pictures every time.
+
+**What is lossy about it, precisely.** RoQ has no lossless form and nothing here pretends otherwise. Only
+a picture the codebook can hold outright — at most 256 distinct 2x2 cells, arranged so that no coarser
+coding prices better than an exact one — comes back sample for sample. A flat picture does, and so does a
+picture built of whole 8x8 or whole 4x4 squares of a few dozen levels; both are asserted in
+`RoqVideoEncoderTests`. Anything richer is quantised, which is the format.
+
+**What it refuses, by name.** A picture whose sides are not a whole number of 16-pixel macroblocks — the
+same size this package's own decoder and ffmpeg's own muxer refuse; a picture larger than the two bytes
+`INFO` states each side in; a picture size that changes part way through a stream, the buffer a skipped
+block leaves showing being the size it was; and a non-video stream. Motion vectors whose source would
+leave the picture are never searched, because the decoder refuses those rather than clamping and an
+encoder writing one would be writing a file it cannot read back.
+
 ### Flash Screen Video 2
 
 Lossless, and despite the name a genuinely different bitstream from FSV1 rather than a variant of it —
