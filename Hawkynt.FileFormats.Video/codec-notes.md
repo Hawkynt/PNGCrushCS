@@ -3106,11 +3106,48 @@ than growing, which is the shape of the shared inverse transform's own rounding 
 same residual this library's MPEG-1, H.263 and H.261 decoders measure against the same oracle, for the
 same reason: none of these formats specifies the transform as an algorithm, only as a formula.
 
+**Writing it.** The encoder is the decoder read backwards and nothing else: the same two variable-length
+code tables inverted at start-up rather than transcribed a second time, the same coefficient-group scan,
+the same macroblock walk, and the same word byte-swap — which is its own inverse, so applying it is
+literally the call the decoder makes to undo it. The forward transform is the adjoint of the inverse
+this package evaluates, so a coefficient quantised at the finest step comes back to what went in. What
+the document leaves to the encoder, this settles once: one quantisation parameter of eight for the whole
+file, every picture whole (there is nothing else it could be), trailing empty coefficient groups never
+written because End Of Block ends the block anyway, and a level chosen by evaluating the decoder's own
+`(level * f) >> 4` for the two candidates that can win — that shift rounds down on both signs, so the
+plain quotient would reconstruct half a step low everywhere.
+
+**Forty positions of sixty-four.** Clause 3.3 states coefficient groups ten to fifteen "cannot be coded
+(they must be 0)", and End Of Block is why: there is no way to reach a later group without writing every
+earlier one. So the twenty-four highest-frequency positions are dropped before quantisation decides
+anything rather than written and then refused. That is the whole of what ASV1's coding cannot express
+and the whole of why its pictures are coarser than ASV2's at the same effective step.
+
+**Measured, the other way round.** A writer checked only by its own reader is worth less than no writer,
+because the two can share a misunderstanding. So the reading direction was re-confirmed first: eight
+streams **ffmpeg's own encoder** wrote — 34x18 to 352x288, quantisers 1 to 31, 72 frames — decoded here
+and by ffmpeg and compared plane by plane, every plane of every frame within one level and two of the
+eight identical. Only then is this package's decode admissible as the second opinion below.
+
+Ten streams written here — 34x18 to 352x288, four of them not a whole
+number of macroblocks, content from a flat colour through `testsrc2`, `mandelbrot`, `smptebars`,
+`rgbtestsrc` and a gradient to uniform noise, 82 frames in all — were muxed to AVI by this package's own
+writer and handed to ffmpeg 9.0.1. It accepted every frame of every file with no message at all and
+produced all 82 pictures. Compared **plane by plane** against this package's own decode of the same
+bytes: 14838 differing samples of 2869164, none by more than one level, which is the same
+transform-rounding residual the read direction shows. Against the pictures that went in, the mean peak
+signal-to-noise ratio over the nine non-flat streams is 37.2 dB and the flat one is exact. On the same
+ten clips at the same quantiser, ffmpeg's own ASV1 encoder writes 331868 bytes of AVI where this one
+writes 261704, and is closer to the source on two of the ten (by 0.05 dB and 0.01 dB), further on five
+and level on the other three.
+
 What refuses, by name: a quantisation parameter of zero, which the dequantisation divides by; a
 coefficient group's pattern naming the block's own DC position, which the document states must always be
 coded as zero and read from the separate DC field instead; a block reading an eleventh coefficient group
 without having reached End Of Block first; and codec-private data shorter than the eight-byte global
-header the document's own bitstream clause needs.
+header the document's own bitstream clause needs. The encoder refuses a stream that is not video, a
+picture size the container never stated, and a picture of a size other than the one the stream was
+opened at — the bitstream carries no picture size, so a stream cannot change one.
 
 ### ASUS V2
 
@@ -3157,8 +3194,41 @@ ffmpeg and compared **plane by plane**, sampling every frame. Every plane of eve
 ffmpeg's decode by at most one level, flat across every stream, the same transform-rounding residual
 ASV1 and this library's MPEG-1, H.263 and H.261 decoders already measure against the same oracle.
 
+**Writing it.** As with ASV1, the encoder is the decoder read backwards: the same three variable-length
+code tables inverted at start-up, the same scan, the same macroblock walk, and the same byte-wide bit
+reversal — its own inverse, so applying it is the decoder's own call. The fixed-width fields need their
+second reversal on the way out exactly as they need it on the way in. What the document leaves to the
+encoder: one quantisation parameter of sixteen for the whole file, which against ASV2's scale of a
+hundred and twenty-eight is the same effective step ASV1's eight gives against sixty-four, so the two
+encoders code a picture at the same fineness and what differs between their outputs is the coding rather
+than the quality. The coefficient-group count is the serial number of the last group holding anything,
+so an empty group in the middle costs its pattern code and a trailing one costs nothing.
+
+**All sixteen groups.** ASV2 reaches every block position, which is the one place the two codings differ
+in what they can express: a checkerboard puts its whole energy in the last coefficient group, which ASV1
+states must be nought and this carries.
+
+**Measured, the other way round.** The reading direction was re-confirmed first, the same way ASV1's
+was: eight streams **ffmpeg's own encoder** wrote — 34x18 to 352x288, quantisers 1 to 31, 72 frames —
+decoded here and by ffmpeg and compared plane by plane, every plane of every frame within one level and
+two of the eight identical. Only then is this package's decode admissible as the second opinion below.
+
+Ten streams written here — the same sizes and sources as ASV1's, 82
+frames in all — were muxed to AVI by this package's own writer and handed to ffmpeg 9.0.1. It accepted
+every frame of every file with no message at all. Compared **plane by plane** against this package's own
+decode of the same bytes: 15233 differing samples of 2869164, none by more than one level. Against the
+pictures that went in, the mean peak signal-to-noise ratio over the nine non-flat streams is 42.8 dB and
+the flat one is exact. On the same ten clips at the same quantiser, ffmpeg's own ASV2 encoder writes
+331188 bytes of AVI where this one writes 266454, and is closer to the source on two of the ten (by 0.17
+dB and 0.01 dB) and further on seven — furthest by a long way on uniform noise, 19.84 dB against 33.91,
+where the coefficients are loud enough that what an encoder does with a level too large for the
+eight-bit escape decides the picture. This one clamps such a level; whatever the reference does with it,
+a sample there comes back up to 107 levels out where the worst here is 23.
+
 What refuses, by name: a quantisation parameter of zero, which the dequantisation divides by; and
 codec-private data shorter than the eight-byte global header the document's own bitstream clause needs.
+The encoder refuses a stream that is not video, a picture size the container never stated, and a picture
+of a size other than the one the stream was opened at.
 
 ### Creative YUV
 
