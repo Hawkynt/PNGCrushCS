@@ -1,23 +1,31 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using FileFormat.Core;
 using FileFormat.OfficeOpenXml;
 
 namespace FileFormat.Word;
 
-/// <summary>The picture carried by a Word Open XML document or template.</summary>
+/// <summary>The images carried by a Word Open XML document or template.</summary>
 /// <remarks>
-/// The image library models the first raster under <c>word/media</c>. Writing creates a native,
-/// minimal WordprocessingML package whose body contains that picture as an inline drawing. The
-/// extension selects document versus template and ordinary versus macro-capable main-part content
-/// types; macro-capable output intentionally contains no VBA project when the source is only pixels.
+/// Reading enumerates every decodable image part in the OPC package, not just the first item under
+/// <c>word/media</c>. That includes ordinary document/background pictures and any image-typed package
+/// thumbnail, icon or object/control preview a producer stores elsewhere. The ordinary
+/// <see cref="ToRawImage(WordFile)"/> API remains first-image compatibility; multi-image callers can
+/// enumerate them all through <see cref="IMultiImageFileFormat{TSelf}"/>.
+/// <para/>
+/// Writing creates a native minimal WordprocessingML package whose body contains the source picture
+/// as an inline drawing. The extension selects document versus template and ordinary versus
+/// macro-capable main-part content types; macro-capable output intentionally contains no VBA project
+/// when the source is only pixels.
 /// </remarks>
 public readonly record struct WordFile
   : IImageFormatReader<WordFile>, IImageToRawImage<WordFile>,
-    IImageFromRawImage<WordFile>, IImageFormatWriter<WordFile> {
+    IImageFromRawImage<WordFile>, IImageFormatWriter<WordFile>, IMultiImageFileFormat<WordFile> {
 
   static string IImageFormatMetadata<WordFile>.PrimaryExtension => ".docx";
   static string[] IImageFormatMetadata<WordFile>.FileExtensions => [".docx", ".docm", ".dotx", ".dotm"];
+  static FormatCapability IImageFormatMetadata<WordFile>.Capabilities => FormatCapability.MultiImage;
   static WordFile IImageFormatReader<WordFile>.FromSpan(ReadOnlySpan<byte> data) => WordReader.FromSpan(data);
   static WordFile IImageFromRawImage<WordFile>.FromRawImage(RawImage image, string extension) => FromRawImage(image, extension);
   static byte[] IImageFormatWriter<WordFile>.ToBytes(WordFile file) => WordWriter.ToBytes(file);
@@ -28,17 +36,39 @@ public readonly record struct WordFile
     return header[0] == 0x50 && header[1] == 0x4B && header[2] == 0x03 && header[3] == 0x04 ? null : false;
   }
 
+  /// <summary>Compatibility dimensions of the first image.</summary>
   public int Width { get; init; }
   public int Height { get; init; }
-  public byte[] PixelData { get; init; }
+  public byte[] PixelData { get; init; } = [];
+
+  /// <summary>Every decodable image carried by the package, in package order with Word media first.</summary>
+  public IReadOnlyList<RawImage> Images { get; init; } = [];
+
   internal WordOpenXmlKind Kind { get; init; }
 
-  public static RawImage ToRawImage(WordFile file) => new() {
-    Width = file.Width,
-    Height = file.Height,
-    Format = PixelFormat.Rgb24,
-    PixelData = file.PixelData[..],
-  };
+  public static int ImageCount(WordFile file)
+    => file.Images.Count > 0 ? file.Images.Count : _HasCompatibilityImage(file) ? 1 : 0;
+
+  public static RawImage ToRawImage(WordFile file, int index) {
+    var count = ImageCount(file);
+    if ((uint)index >= (uint)count)
+      throw new ArgumentOutOfRangeException(nameof(index));
+    if (file.Images.Count > 0)
+      return file.Images[index];
+
+    return new() {
+      Width = file.Width,
+      Height = file.Height,
+      Format = PixelFormat.Rgb24,
+      PixelData = file.PixelData[..checked(file.Width * file.Height * 3)],
+    };
+  }
+
+  public static RawImage ToRawImage(WordFile file) {
+    if (ImageCount(file) == 0)
+      throw new InvalidDataException("The Word document contains no decodable images.");
+    return ToRawImage(file, 0);
+  }
 
   public static WordFile FromRawImage(RawImage image) => FromRawImage(image, ".docx");
 
@@ -52,12 +82,29 @@ public readonly record struct WordFile
 
     var converted = image.EnsureFormat(PixelFormat.Rgb24);
     var pixelLength = checked(converted.Width * converted.Height * 3);
-    return new() {
+    var stored = new RawImage {
       Width = converted.Width,
       Height = converted.Height,
+      Format = PixelFormat.Rgb24,
       PixelData = converted.PixelData[..pixelLength],
+    };
+    return new() {
+      Width = stored.Width,
+      Height = stored.Height,
+      PixelData = stored.PixelData[..],
+      Images = [stored],
       Kind = WordOpenXmlKindExtensions.FromExtension(extension),
     };
+  }
+
+  private static bool _HasCompatibilityImage(WordFile file) {
+    if (file.Width <= 0 || file.Height <= 0 || file.PixelData is null)
+      return false;
+    try {
+      return file.PixelData.Length >= checked(file.Width * file.Height * 3);
+    } catch (OverflowException) {
+      return false;
+    }
   }
 }
 
@@ -102,20 +149,23 @@ public static class WordReader {
     if (data.Length < 4 || data[0] != 0x50 || data[1] != 0x4B || data[2] != 0x03 || data[3] != 0x04)
       throw new InvalidDataException("Not a Word Open XML document: ZIP/OPC signature is missing.");
 
-    var (image, contentType) = OfficeOpenXmlImagePackage.ReadFirstImage(data, "word/media/", "/word/document.xml");
+    var result = OfficeOpenXmlImageReader.ReadAll(data, "word/media/", "/word/document.xml");
+    var first = result.Images.Count > 0 ? result.Images[0].EnsureFormat(PixelFormat.Rgb24) : null;
     return new() {
-      Width = image.Width,
-      Height = image.Height,
-      PixelData = image.PixelData,
-      Kind = WordOpenXmlKindExtensions.FromContentType(contentType),
+      Width = first?.Width ?? 0,
+      Height = first?.Height ?? 0,
+      PixelData = first?.PixelData[..] ?? [],
+      Images = result.Images,
+      Kind = WordOpenXmlKindExtensions.FromContentType(result.MainContentType),
     };
   }
 }
 
 public static class WordWriter {
   public static byte[] ToBytes(WordFile file) {
-    if (file.PixelData is null)
-      throw new InvalidDataException("Word pixel data is missing.");
-    return OfficeOpenXmlImagePackage.WriteWord(file.Width, file.Height, file.PixelData, file.Kind.ContentType());
+    var image = WordFile.ImageCount(file) > 0
+      ? WordFile.ToRawImage(file, 0).EnsureFormat(PixelFormat.Rgb24)
+      : throw new InvalidDataException("Word document contains no picture to write.");
+    return OfficeOpenXmlImagePackage.WriteWord(image.Width, image.Height, image.PixelData, file.Kind.ContentType());
   }
 }
