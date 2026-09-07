@@ -4,16 +4,19 @@ using System.IO;
 using System.IO.Compression;
 using System.Linq;
 using System.Text;
+using System.Xml;
 using System.Xml.Linq;
 using FileFormat.Core;
 using FileFormat.Emf;
 using FileFormat.EmbeddedPicture;
 using FileFormat.Gif;
 using FileFormat.Ico;
+using FileFormat.Jpeg2000;
 using FileFormat.Pcx;
 using FileFormat.Svg;
 using FileFormat.Tiff;
 using FileFormat.WebP;
+using FileFormat.Xbm;
 
 namespace FileFormat.OfficeOpenXml;
 
@@ -46,7 +49,7 @@ internal static class OfficeOpenXmlImageReader {
       using var memory = new MemoryStream(data.ToArray(), false);
       using var archive = new ZipArchive(memory, ZipArchiveMode.Read, false, Encoding.UTF8);
       var (defaults, overrides) = _ReadContentTypes(archive);
-      var mainContentType = overrides.TryGetValue(mainPartName, out var declared)
+      var mainContentType = overrides.TryGetValue(_PartName(mainPartName), out var declared)
         ? declared
         : throw new InvalidDataException($"The Office package does not declare the main part {mainPartName}.");
 
@@ -65,14 +68,13 @@ internal static class OfficeOpenXmlImageReader {
         if (candidate.Entry.Length > int.MaxValue)
           continue;
 
-        using var stream = candidate.Entry.Open();
-        using var image = new MemoryStream(checked((int)candidate.Entry.Length));
-        stream.CopyTo(image);
-        var bytes = image.ToArray();
-
         try {
-          _DecodeAll(bytes, candidate.ContentType!, result);
-        } catch (Exception exception) when (exception is InvalidDataException or NotSupportedException or ArgumentException) {
+          using var stream = candidate.Entry.Open();
+          using var image = new MemoryStream(checked((int)candidate.Entry.Length));
+          stream.CopyTo(image);
+          _DecodeAll(image.ToArray(), candidate.ContentType!, result);
+        } catch (Exception exception) when (
+          exception is InvalidDataException or IOException or NotSupportedException or ArgumentException or XmlException) {
           // One bad/unsupported preview must not hide the other images a valid Office package carries.
         }
       }
@@ -80,7 +82,7 @@ internal static class OfficeOpenXmlImageReader {
       return new(result.ToArray(), mainContentType);
     } catch (InvalidDataException) {
       throw;
-    } catch (Exception exception) when (exception is IOException or NotSupportedException or ArgumentException) {
+    } catch (Exception exception) when (exception is IOException or NotSupportedException or ArgumentException or XmlException) {
       throw new InvalidDataException("The Office Open XML package is malformed.", exception);
     }
   }
@@ -128,7 +130,7 @@ internal static class OfficeOpenXmlImageReader {
   }
 
   private static string _PartName(string path)
-    => path.StartsWith('/', StringComparison.Ordinal) ? path : "/" + path;
+    => path.StartsWith("/", StringComparison.Ordinal) ? path : "/" + path;
 
   private static void _DecodeAll(byte[] bytes, string contentType, List<RawImage> output) {
     if (_IsGif(bytes)) {
@@ -164,6 +166,13 @@ internal static class OfficeOpenXmlImageReader {
       return;
     }
 
+    if (_IsJpeg2000(bytes)
+        || contentType.Equals("image/jp2", StringComparison.OrdinalIgnoreCase)
+        || contentType.Equals("image/jpx", StringComparison.OrdinalIgnoreCase)) {
+      output.Add(Jpeg2000File.ToRawImage(Jpeg2000Reader.FromSpan(bytes)));
+      return;
+    }
+
     if (contentType.Equals("image/svg+xml", StringComparison.OrdinalIgnoreCase)) {
       output.Add(SvgFile.ToRawImage(SvgReader.FromSpan(bytes)));
       return;
@@ -172,6 +181,12 @@ internal static class OfficeOpenXmlImageReader {
     if (contentType.Equals("image/x-pcx", StringComparison.OrdinalIgnoreCase)
         || contentType.Equals("image/pcx", StringComparison.OrdinalIgnoreCase)) {
       output.Add(PcxFile.ToRawImage(PcxReader.FromSpan(bytes)));
+      return;
+    }
+
+    if (contentType.Equals("image/x-xbitmap", StringComparison.OrdinalIgnoreCase)
+        || contentType.Equals("image/x-xbm", StringComparison.OrdinalIgnoreCase)) {
+      output.Add(XbmFile.ToRawImage(XbmReader.FromSpan(bytes)));
       return;
     }
 
@@ -196,4 +211,9 @@ internal static class OfficeOpenXmlImageReader {
     => data.Length >= 44
       && data[0] == 1 && data[1] == 0 && data[2] == 0 && data[3] == 0
       && data.Slice(40, 4).SequenceEqual([0x20, 0x45, 0x4D, 0x46]);
+
+  private static bool _IsJpeg2000(ReadOnlySpan<byte> data)
+    => data.Length >= 12
+      && data[..12].SequenceEqual([0x00, 0x00, 0x00, 0x0C, 0x6A, 0x50, 0x20, 0x20, 0x0D, 0x0A, 0x87, 0x0A])
+      || data.Length >= 2 && data[0] == 0xFF && data[1] == 0x4F;
 }
