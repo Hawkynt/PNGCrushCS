@@ -10,6 +10,7 @@ using FileFormat.EmbeddedDib;
 using FileFormat.EmbeddedPicture;
 using FileFormat.Fpx;
 using FileFormat.Pict;
+using FileFormat.Tiff;
 
 namespace FileFormat.PowerPoint;
 
@@ -18,9 +19,9 @@ namespace FileFormat.PowerPoint;
 /// A real binary PowerPoint file carries its OfficeArtBStoreDelay in the CFB <c>Pictures</c> stream.
 /// That stream may contain raster BLIPs (JPEG, PNG, DIB, TIFF) or metafile BLIPs (EMF, WMF, PICT),
 /// and an FBSE may inline one of those same records. All supported records are returned in stream
-/// order. The historical raw walk behind the 512-byte compound header is retained only for old
-/// compatibility fixtures whose bytes look like the original XnView-oriented reader input but do
-/// not form a complete CFB directory/FAT.
+/// order; a multi-page TIFF BLIP contributes every page. The historical raw walk behind the
+/// 512-byte compound header is retained only for old compatibility fixtures whose bytes look like
+/// the original XnView-oriented reader input but do not form a complete CFB directory/FAT.
 /// </remarks>
 public static class PowerPointReader {
 
@@ -139,10 +140,14 @@ public static class PowerPointReader {
     }
 
     var instance = versionAndInstance >> 4;
+    if (type == _TiffBlip) {
+      _DecodeTiff(body, _RasterPrefix(instance, type), images);
+      return;
+    }
+
     RawImage? decoded = type switch {
       PowerPointFile.JpegBlipType or _JpegBlip2 => _DecodeRaster(body, _RasterPrefix(instance, type), RasterKind.Encoded),
       PowerPointFile.PngBlipType => _DecodeRaster(body, _RasterPrefix(instance, type), RasterKind.Encoded),
-      _TiffBlip => _DecodeRaster(body, _RasterPrefix(instance, type), RasterKind.Encoded),
       _DibBlip => _DecodeRaster(body, _RasterPrefix(instance, type), RasterKind.Dib),
       _EmfBlip => _DecodeMetafile(body, instance, MetafileKind.Emf),
       _WmfBlip => _DecodeMetafile(body, instance, MetafileKind.Wmf),
@@ -188,6 +193,15 @@ public static class PowerPointReader {
     return kind == RasterKind.Dib
       ? EmbeddedDibReader.DecodeHeaderless(body[prefix..])
       : EmbeddedPictureReader.Decode(body[prefix..]);
+  }
+
+  private static void _DecodeTiff(ReadOnlySpan<byte> body, int prefix, List<RawImage> images) {
+    if (prefix >= body.Length)
+      throw new InvalidDataException("The OfficeArt TIFF BLIP ends before its picture begins.");
+
+    var tiff = TiffReader.FromSpan(body[prefix..]);
+    for (var i = 0; i < TiffFile.ImageCount(tiff); ++i)
+      images.Add(TiffFile.ToRawImage(tiff, i));
   }
 
   private static RawImage _DecodeMetafile(ReadOnlySpan<byte> body, int instance, MetafileKind kind) {
