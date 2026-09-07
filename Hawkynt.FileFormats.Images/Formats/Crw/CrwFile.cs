@@ -17,11 +17,14 @@ namespace FileFormat.Crw;
 /// left, Huffman-coded in blocks of sixty-four in the manner of JPEG's AC coefficients, with the
 /// low two bits of each sample held apart in a plane of their own on the twelve-bit bodies.
 /// </remarks>
-public readonly record struct CrwFile : IImageFormatReader<CrwFile>, IImageToRawImage<CrwFile> {
+public readonly record struct CrwFile
+  : IImageFormatReader<CrwFile>, IImageToRawImage<CrwFile>,
+    IImageFromRawImage<CrwFile>, IImageFormatWriter<CrwFile> {
 
   static string IImageFormatMetadata<CrwFile>.PrimaryExtension => ".crw";
   static string[] IImageFormatMetadata<CrwFile>.FileExtensions => [".crw"];
   static CrwFile IImageFormatReader<CrwFile>.FromSpan(ReadOnlySpan<byte> data) => CrwReader.FromSpan(data);
+  static byte[] IImageFormatWriter<CrwFile>.ToBytes(CrwFile file) => CrwWriter.ToBytes(file);
 
   static bool? IImageFormatMetadata<CrwFile>.MatchesSignature(ReadOnlySpan<byte> header) {
     if (header.Length < 14)
@@ -51,10 +54,22 @@ public readonly record struct CrwFile : IImageFormatReader<CrwFile>, IImageToRaw
   /// <summary>Height of the sensor.</summary>
   public int SensorHeight { get; init; }
 
+  /// <summary>Horizontal offset of the developed picture inside <see cref="Sensor"/>.</summary>
+  public int ImageLeft { get; init; }
+
+  /// <summary>Vertical offset of the developed picture inside <see cref="Sensor"/>.</summary>
+  public int ImageTop { get; init; }
+
+  /// <summary>Raw sensor precision, either 10 or 12 bits per sample.</summary>
+  /// <remarks>A value of zero is accepted by the writer for old callers and inferred from the samples.</remarks>
+  public int BitsPerSample { get; init; }
+
   public static RawImage ToRawImage(CrwFile file) => new() {
     Width = file.Width,
     Height = file.Height,
     Format = PixelFormat.Rgb24,
     PixelData = file.PixelData[..],
   };
+
+  public static CrwFile FromRawImage(RawImage image) => CrwWriter.FromRawImage(image);
 }
