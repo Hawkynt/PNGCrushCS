@@ -36,13 +36,8 @@ jobs:
           path = Path("Hawkynt.FileFormats.Images/README.md")
           text = path.read_text(encoding="utf-8-sig")
 
-          old_count = "These 29 entries read but have no writer;"
-          old_list = "PeResource, PowerPoint, Fpx, PocketPcTheme"
-          if old_count not in text or old_list not in text:
-              raise SystemExit("PowerPoint read-only paragraph no longer matches the branch base")
-
-          text = text.replace(old_count, "These 28 entries read but have no writer;", 1)
-          text = text.replace(old_list, "PeResource, Fpx, PocketPcTheme", 1)
+          text = text.replace("These 29 entries read but have no writer;", "These 28 entries read but have no writer;", 1)
+          text = text.replace("PeResource, PowerPoint, Fpx, PocketPcTheme", "PeResource, Fpx, PocketPcTheme", 1)
 
           heading = "### Registered but read-only"
           rationale = (
@@ -53,7 +48,12 @@ jobs:
               "not a claim that this package authors complete slide decks."
           )
           if rationale not in text:
+              if heading not in text:
+                  raise SystemExit("PowerPoint support rationale insertion point is missing")
               text = text.replace(heading, rationale + "\n\n" + heading, 1)
+
+          if "These 28 entries read but have no writer;" not in text or "PeResource, Fpx, PocketPcTheme" not in text:
+              raise SystemExit("PowerPoint read-only paragraph did not update as expected")
 
           path.write_text(text, encoding="utf-8")
 
