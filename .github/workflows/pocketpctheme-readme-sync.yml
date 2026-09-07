@@ -10,52 +10,52 @@ permissions:
 jobs:
   sync:
     if: github.head_ref == 'feature/pocketpctheme-writer' && github.event.pull_request.head.repo.full_name == github.repository
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.head_ref }}
+          path: PNGCrushCS
           fetch-depth: 0
 
-      - name: Update generated capability state
-        shell: python
-        run: |
-          from pathlib import Path
+      - name: Check out CompressionWorkbench sibling
+        uses: actions/checkout@v4
+        with:
+          repository: Hawkynt/CompressionWorkbench
+          path: CompressionWorkbench
+          fetch-depth: 1
 
-          path = Path('Hawkynt.FileFormats.Images/README.md')
-          text = path.read_text(encoding='utf-8')
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.x
+            10.0.x
 
-          replacements = {
-              '| PocketPcTheme | `.tsk` | ✅ | — | — | — | — |':
-                  '| PocketPcTheme | `.tsk` | ✅ | ✅ | — | — | — |',
-              'These 29 entries read but have no writer;':
-                  'These 28 entries read but have no writer;',
-              'PeResource, PowerPoint, Fpx, PocketPcTheme (executable, OLE and CAB containers)':
-                  'PeResource, PowerPoint, Fpx (executable and OLE containers)',
-          }
+      - name: Restore package
+        working-directory: PNGCrushCS
+        run: dotnet restore Hawkynt.FileFormats.Images/Hawkynt.FileFormats.Images.csproj -p:EnableWindowsTargeting=true
 
-          changed = False
-          for old, new in replacements.items():
-              count = text.count(old)
-              if count == 1:
-                  text = text.replace(old, new)
-                  changed = True
-              elif count == 0 and new in text:
-                  pass
-              else:
-                  raise SystemExit(f'expected exactly one README occurrence of: {old!r}; found {count}')
+      - name: Build package
+        working-directory: PNGCrushCS
+        run: dotnet build Hawkynt.FileFormats.Images/Hawkynt.FileFormats.Images.csproj --configuration Release --no-restore -p:EnableWindowsTargeting=true
 
-          if changed:
-              path.write_text(text, encoding='utf-8', newline='\n')
+      - name: Regenerate package README and API reference
+        uses: Hawkynt/RepositoryTemplate/package-readme@v1
+        with:
+          mode: write
+          root: PNGCrushCS
+          configuration: Release
+          project: Hawkynt.FileFormats.Images/Hawkynt.FileFormats.Images.csproj
 
-      - name: Commit README update
+      - name: Commit generated package documentation
         shell: bash
+        working-directory: PNGCrushCS
         run: |
-          if git diff --quiet -- Hawkynt.FileFormats.Images/README.md; then
+          if git diff --quiet -- Hawkynt.FileFormats.Images/README.md Hawkynt.FileFormats.Images/REFERENCE.md; then
             exit 0
           fi
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-          git add Hawkynt.FileFormats.Images/README.md
-          git commit -m "Update Pocket PC theme write coverage"
+          git add Hawkynt.FileFormats.Images/README.md Hawkynt.FileFormats.Images/REFERENCE.md
+          git commit -m "* regenerate Pocket PC package documentation"
           git push origin HEAD:${GITHUB_HEAD_REF}
