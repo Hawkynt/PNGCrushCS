@@ -1,37 +1,41 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using FileFormat.Core;
 using FileFormat.OfficeOpenXml;
 
 namespace FileFormat.PowerPoint;
 
-/// <summary>The picture inside a PowerPoint presentation, slide show, or template.</summary>
+/// <summary>The images inside a PowerPoint presentation, slide show, or template.</summary>
 /// <remarks>
 /// Legacy <c>.ppt</c>, <c>.pps</c> and <c>.pot</c> files use Microsoft Compound File Binary and
-/// OfficeArt BLIP records. The compatibility reader intentionally keeps the historical XnView-style
-/// raw OfficeArt walk used by this image format. Its legacy writer likewise emits the image-level
-/// CFB <c>Pictures</c> carrier rather than claiming to implement the whole binary presentation model.
+/// OfficeArt BLIP records. Reading exposes every supported BLIP from the Pictures stream, while the
+/// compatibility <see cref="ToRawImage(PowerPointFile)"/> call returns the first one. Its legacy
+/// writer emits the image-level CFB <c>Pictures</c> carrier rather than claiming to implement the
+/// whole binary presentation model.
 /// <para/>
 /// Modern <c>.pptx</c>/<c>.ppsx</c>/<c>.potx</c> and macro-capable
-/// <c>.pptm</c>/<c>.ppsm</c>/<c>.potm</c> are native PresentationML packages. Those variants are
-/// written as complete minimum presentations: presentation properties, slide master, blank layout,
-/// theme, one slide, relationships, and the supplied picture as a PNG on that slide. Macro-capable
-/// output uses the correct main-part content type but contains no fabricated VBA project.
+/// <c>.pptm</c>/<c>.ppsm</c>/<c>.potm</c> are native PresentationML packages. Reading enumerates all
+/// decodable image parts, including slide/master/background media and package thumbnails/icons/object
+/// previews stored outside <c>ppt/media</c>. Writing creates a complete minimum presentation with one
+/// picture-only slide. Macro-capable output uses the correct main-part content type but contains no
+/// fabricated VBA project.
 /// </remarks>
 public readonly record struct PowerPointFile
   : IImageFormatReader<PowerPointFile>, IImageToRawImage<PowerPointFile>,
-    IImageFromRawImage<PowerPointFile>, IImageFormatWriter<PowerPointFile> {
+    IImageFromRawImage<PowerPointFile>, IImageFormatWriter<PowerPointFile>,
+    IMultiImageFileFormat<PowerPointFile> {
 
   /// <summary>The eight bytes a Microsoft compound document opens with.</summary>
   public static ReadOnlySpan<byte> Signature => [0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1];
 
-  /// <summary>Where the legacy OfficeArt record walk begins, behind the CFB header.</summary>
+  /// <summary>Where the historical raw OfficeArt fallback begins, behind the CFB header.</summary>
   public const int ScanStart = 512;
 
   /// <summary>Version, instance, type and length.</summary>
   public const int RecordHeaderSize = 8;
 
-  /// <summary>A checksum and a tag byte stand between a BLIP's header and the picture in it.</summary>
+  /// <summary>A one-UID raster BLIP has a sixteen-byte UID and one tag byte before its image.</summary>
   public const int BlipPrefixSize = 17;
 
   public const ushort JpegBlipType = 0xF01D;
@@ -45,6 +49,7 @@ public readonly record struct PowerPointFile
     ".pptx", ".ppsx", ".potx",
     ".pptm", ".ppsm", ".potm",
   ];
+  static FormatCapability IImageFormatMetadata<PowerPointFile>.Capabilities => FormatCapability.MultiImage;
   static PowerPointFile IImageFormatReader<PowerPointFile>.FromSpan(ReadOnlySpan<byte> data)
     => _FromSpan(data);
   static PowerPointFile IImageFromRawImage<PowerPointFile>.FromRawImage(RawImage image, string extension)
@@ -65,17 +70,39 @@ public readonly record struct PowerPointFile
     return header[..Signature.Length].SequenceEqual(Signature) ? null : false;
   }
 
+  /// <summary>Compatibility dimensions and RGB data of the first extracted image.</summary>
   public int Width { get; init; }
   public int Height { get; init; }
-  public byte[] PixelData { get; init; }
+  public byte[] PixelData { get; init; } = [];
+
+  /// <summary>Every decodable picture carried by the file.</summary>
+  public IReadOnlyList<RawImage> Images { get; init; } = [];
+
   internal PowerPointKind Kind { get; init; }
 
-  public static RawImage ToRawImage(PowerPointFile file) => new() {
-    Width = file.Width,
-    Height = file.Height,
-    Format = PixelFormat.Rgb24,
-    PixelData = file.PixelData[..],
-  };
+  public static int ImageCount(PowerPointFile file)
+    => file.Images.Count > 0 ? file.Images.Count : _HasCompatibilityImage(file) ? 1 : 0;
+
+  public static RawImage ToRawImage(PowerPointFile file, int index) {
+    var count = ImageCount(file);
+    if ((uint)index >= (uint)count)
+      throw new ArgumentOutOfRangeException(nameof(index));
+    if (file.Images.Count > 0)
+      return file.Images[index];
+
+    return new() {
+      Width = file.Width,
+      Height = file.Height,
+      Format = PixelFormat.Rgb24,
+      PixelData = file.PixelData[..checked(file.Width * file.Height * 3)],
+    };
+  }
+
+  public static RawImage ToRawImage(PowerPointFile file) {
+    if (ImageCount(file) == 0)
+      throw new InvalidDataException("The PowerPoint file contains no decodable images.");
+    return ToRawImage(file, 0);
+  }
 
   /// <summary>Creates the historical .ppt image carrier when no target extension is supplied.</summary>
   public static PowerPointFile FromRawImage(RawImage image) => FromRawImage(image, ".ppt");
@@ -90,10 +117,17 @@ public readonly record struct PowerPointFile
 
     var converted = image.EnsureFormat(PixelFormat.Rgb24);
     var pixelLength = checked(converted.Width * converted.Height * 3);
-    return new() {
+    var stored = new RawImage {
       Width = converted.Width,
       Height = converted.Height,
+      Format = PixelFormat.Rgb24,
       PixelData = converted.PixelData[..pixelLength],
+    };
+    return new() {
+      Width = stored.Width,
+      Height = stored.Height,
+      PixelData = stored.PixelData[..],
+      Images = [stored],
       Kind = PowerPointKindExtensions.FromExtension(extension),
     };
   }
@@ -102,23 +136,37 @@ public readonly record struct PowerPointFile
     if (!_IsZip(data))
       return PowerPointReader.FromSpan(data);
 
-    var (image, contentType) = OfficeOpenXmlImagePackage.ReadFirstImage(data, "ppt/media/", "/ppt/presentation.xml");
+    var result = OfficeOpenXmlImageReader.ReadAll(data, "ppt/media/", "/ppt/presentation.xml");
+    var first = result.Images.Count > 0 ? result.Images[0].EnsureFormat(PixelFormat.Rgb24) : null;
     return new() {
-      Width = image.Width,
-      Height = image.Height,
-      PixelData = image.PixelData,
-      Kind = PowerPointKindExtensions.FromContentType(contentType),
+      Width = first?.Width ?? 0,
+      Height = first?.Height ?? 0,
+      PixelData = first?.PixelData[..] ?? [],
+      Images = result.Images,
+      Kind = PowerPointKindExtensions.FromContentType(result.MainContentType),
     };
   }
 
   private static byte[] _ToBytes(PowerPointFile file) {
     if (!file.Kind.IsOpenXml())
       return PowerPointWriter.ToBytes(file);
-    if (file.PixelData is null)
-      throw new InvalidDataException("PowerPoint pixel data is missing.");
+
+    var image = ImageCount(file) > 0
+      ? ToRawImage(file, 0).EnsureFormat(PixelFormat.Rgb24)
+      : throw new InvalidDataException("PowerPoint file contains no picture to write.");
 
     return OfficeOpenXmlImagePackage.WritePowerPoint(
-      file.Width, file.Height, file.PixelData, file.Kind.ContentType());
+      image.Width, image.Height, image.PixelData, file.Kind.ContentType());
+  }
+
+  private static bool _HasCompatibilityImage(PowerPointFile file) {
+    if (file.Width <= 0 || file.Height <= 0 || file.PixelData is null)
+      return false;
+    try {
+      return file.PixelData.Length >= checked(file.Width * file.Height * 3);
+    } catch (OverflowException) {
+      return false;
+    }
   }
 
   private static bool _IsZip(ReadOnlySpan<byte> data)
