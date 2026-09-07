@@ -17,8 +17,10 @@ namespace FileFormat.Dxf;
 /// A raster converted to DXF is represented by filled SOLID entities. Adjacent equal pixels are
 /// coalesced horizontally and then vertically, so flat areas become rectangles rather than one
 /// entity per pixel. Group 420 stores each rectangle's true colour as the 0x00RRGGBB value the
-/// reference defines. Fully white rectangles are omitted because the renderer's paper is white;
-/// source alpha is composited onto the same white paper before the RGB value is written.
+/// reference defines. Group 62 also carries the nearest one of the nine ACI colours whose RGB values
+/// Autodesk specifies, as the compatibility fallback conventional true-colour DXF data carries.
+/// Fully white rectangles are omitted because the renderer's paper is white; source alpha is
+/// composited onto the same white paper before the RGB value is written.
 /// </remarks>
 public static class DxfWriter {
 
@@ -35,6 +37,20 @@ public static class DxfWriter {
   private const int _MaxSolids = 1 << 20;
 
   private const int _White = 0x00ffffff;
+
+  /// <summary>ACI 1..9, in the RGB values Autodesk fixes in the reference.</summary>
+  private static readonly int[] _AciColours = [
+    0,
+    0x00ff0000,
+    0x00ffff00,
+    0x0000ff00,
+    0x0000ffff,
+    0x000000ff,
+    0x00ff00ff,
+    0x00000000,
+    0x00414141,
+    0x00808080
+  ];
 
   private readonly record struct Run(int Left, int Right, int Colour);
 
@@ -163,12 +179,38 @@ public static class DxfWriter {
     pairs.AddRange([
       new(0, "SOLID"),
       new(8, "0"),
+      new(62, _Text(_NearestAci(rectangle.Colour))),
       new(420, _Text(rectangle.Colour)),
       new(10, left), new(20, bottom),
       new(11, right), new(21, bottom),
       new(12, left), new(22, top),
       new(13, right), new(23, top)
     ]);
+  }
+
+  private static int _NearestAci(int colour) {
+    var red = colour >> 16 & byte.MaxValue;
+    var green = colour >> 8 & byte.MaxValue;
+    var blue = colour & byte.MaxValue;
+    var best = 1;
+    var bestDistance = int.MaxValue;
+
+    for (var index = 1; index < _AciColours.Length; ++index) {
+      var candidate = _AciColours[index];
+      var dr = red - (candidate >> 16 & byte.MaxValue);
+      var dg = green - (candidate >> 8 & byte.MaxValue);
+      var db = blue - (candidate & byte.MaxValue);
+      var distance = dr * dr + dg * dg + db * db;
+      if (distance >= bestDistance)
+        continue;
+
+      best = index;
+      bestDistance = distance;
+      if (distance == 0)
+        break;
+    }
+
+    return best;
   }
 
   private static string _Text(int value) => value.ToString(CultureInfo.InvariantCulture);
