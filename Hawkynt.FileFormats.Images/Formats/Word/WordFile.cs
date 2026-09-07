@@ -19,7 +19,7 @@ namespace FileFormat.Word;
 /// macro-capable main-part content types; macro-capable output intentionally contains no VBA project
 /// when the source is only pixels.
 /// </remarks>
-public readonly record struct WordFile
+public readonly record struct WordFile()
   : IImageFormatReader<WordFile>, IImageToRawImage<WordFile>,
     IImageFromRawImage<WordFile>, IImageFormatWriter<WordFile>, IMultiImageFileFormat<WordFile> {
 
@@ -47,14 +47,14 @@ public readonly record struct WordFile
   internal WordOpenXmlKind Kind { get; init; }
 
   public static int ImageCount(WordFile file)
-    => file.Images.Count > 0 ? file.Images.Count : _HasCompatibilityImage(file) ? 1 : 0;
+    => file.Images is { Count: > 0 } images ? images.Count : _HasCompatibilityImage(file) ? 1 : 0;
 
   public static RawImage ToRawImage(WordFile file, int index) {
     var count = ImageCount(file);
     if ((uint)index >= (uint)count)
       throw new ArgumentOutOfRangeException(nameof(index));
-    if (file.Images.Count > 0)
-      return file.Images[index];
+    if (file.Images is { Count: > 0 } images)
+      return images[index];
 
     return new() {
       Width = file.Width,
