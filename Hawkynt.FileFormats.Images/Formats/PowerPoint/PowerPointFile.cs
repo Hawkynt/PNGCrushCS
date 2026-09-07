@@ -46,11 +46,11 @@ public readonly record struct PowerPointFile
     ".pptm", ".ppsm", ".potm",
   ];
   static PowerPointFile IImageFormatReader<PowerPointFile>.FromSpan(ReadOnlySpan<byte> data)
-    => PowerPointReader.FromSpan(data);
+    => _FromSpan(data);
   static PowerPointFile IImageFromRawImage<PowerPointFile>.FromRawImage(RawImage image, string extension)
     => FromRawImage(image, extension);
   static byte[] IImageFormatWriter<PowerPointFile>.ToBytes(PowerPointFile file)
-    => PowerPointWriter.ToBytes(file);
+    => _ToBytes(file);
 
   static VideoMode[] IImageFormatMetadata<PowerPointFile>.VideoModes => [
     new("Default", [(IntegerRange.Any, IntegerRange.Any)], [16777216])
@@ -58,7 +58,7 @@ public readonly record struct PowerPointFile
 
   /// <summary>CFB and ZIP are both shared containers, so either signature only means “possible”.</summary>
   static bool? IImageFormatMetadata<PowerPointFile>.MatchesSignature(ReadOnlySpan<byte> header) {
-    if (header.Length >= 4 && header[0] == 0x50 && header[1] == 0x4B && header[2] == 0x03 && header[3] == 0x04)
+    if (_IsZip(header))
       return null;
     if (header.Length < Signature.Length)
       return null;
@@ -97,6 +97,32 @@ public readonly record struct PowerPointFile
       Kind = PowerPointKindExtensions.FromExtension(extension),
     };
   }
+
+  private static PowerPointFile _FromSpan(ReadOnlySpan<byte> data) {
+    if (!_IsZip(data))
+      return PowerPointReader.FromSpan(data);
+
+    var (image, contentType) = OfficeOpenXmlImagePackage.ReadFirstImage(data, "ppt/media/", "/ppt/presentation.xml");
+    return new() {
+      Width = image.Width,
+      Height = image.Height,
+      PixelData = image.PixelData,
+      Kind = PowerPointKindExtensions.FromContentType(contentType),
+    };
+  }
+
+  private static byte[] _ToBytes(PowerPointFile file) {
+    if (!file.Kind.IsOpenXml())
+      return PowerPointWriter.ToBytes(file);
+    if (file.PixelData is null)
+      throw new InvalidDataException("PowerPoint pixel data is missing.");
+
+    return OfficeOpenXmlImagePackage.WritePowerPoint(
+      file.Width, file.Height, file.PixelData, file.Kind.ContentType());
+  }
+
+  private static bool _IsZip(ReadOnlySpan<byte> data)
+    => data.Length >= 4 && data[0] == 0x50 && data[1] == 0x4B && data[2] == 0x03 && data[3] == 0x04;
 }
 
 internal enum PowerPointKind {
