@@ -1,0 +1,61 @@
+name: PocketPcTheme README sync
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    if: github.head_ref == 'feature/pocketpctheme-writer' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+          fetch-depth: 0
+
+      - name: Update generated capability state
+        shell: python
+        run: |
+          from pathlib import Path
+
+          path = Path('Hawkynt.FileFormats.Images/README.md')
+          text = path.read_text(encoding='utf-8')
+
+          replacements = {
+              '| PocketPcTheme | `.tsk` | ✅ | — | — | — | — |':
+                  '| PocketPcTheme | `.tsk` | ✅ | ✅ | — | — | — |',
+              'These 29 entries read but have no writer;':
+                  'These 28 entries read but have no writer;',
+              'PeResource, PowerPoint, Fpx, PocketPcTheme (executable, OLE and CAB containers)':
+                  'PeResource, PowerPoint, Fpx (executable and OLE containers)',
+          }
+
+          changed = False
+          for old, new in replacements.items():
+              count = text.count(old)
+              if count == 1:
+                  text = text.replace(old, new)
+                  changed = True
+              elif count == 0 and new in text:
+                  pass
+              else:
+                  raise SystemExit(f'expected exactly one README occurrence of: {old!r}; found {count}')
+
+          if changed:
+              path.write_text(text, encoding='utf-8', newline='\n')
+
+      - name: Commit README update
+        shell: bash
+        run: |
+          if git diff --quiet -- Hawkynt.FileFormats.Images/README.md; then
+            exit 0
+          fi
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add Hawkynt.FileFormats.Images/README.md
+          git commit -m "Update Pocket PC theme write coverage"
+          git push origin HEAD:${GITHUB_HEAD_REF}
