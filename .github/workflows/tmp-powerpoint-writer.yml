@@ -27,6 +27,36 @@ jobs:
         with:
           dotnet-version: 10.0.x
 
+      - name: Refresh hand-written PowerPoint support rationale
+        working-directory: PNGCrushCS
+        shell: python
+        run: |
+          from pathlib import Path
+
+          path = Path("Hawkynt.FileFormats.Images/README.md")
+          text = path.read_text(encoding="utf-8-sig")
+
+          old_count = "These 29 entries read but have no writer;"
+          old_list = "PeResource, PowerPoint, Fpx, PocketPcTheme"
+          if old_count not in text or old_list not in text:
+              raise SystemExit("PowerPoint read-only paragraph no longer matches the branch base")
+
+          text = text.replace(old_count, "These 28 entries read but have no writer;", 1)
+          text = text.replace(old_list, "PeResource, Fpx, PocketPcTheme", 1)
+
+          heading = "### Registered but read-only"
+          rationale = (
+              "PowerPoint is writable at the same image boundary its reader exposes: arbitrary pixels are "
+              "encoded losslessly as a PNG OfficeArt BLIP in a valid CFB `Pictures` stream. The writer does "
+              "not synthesize slides, text, transitions or the rest of the PowerPoint document model, so the "
+              "Write tick means the same `PowerPoint (images)` carrier the compatibility reader understands, "
+              "not a claim that this package authors complete slide decks."
+          )
+          if rationale not in text:
+              text = text.replace(heading, rationale + "\n\n" + heading, 1)
+
+          path.write_text(text, encoding="utf-8")
+
       - name: Run focused writer and support-table tests
         working-directory: PNGCrushCS
         env:
