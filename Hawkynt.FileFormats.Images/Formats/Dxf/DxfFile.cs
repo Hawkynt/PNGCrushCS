@@ -7,16 +7,17 @@ namespace FileFormat.Dxf;
 /// <summary>An AutoCAD Drawing Exchange File (.dxf).</summary>
 /// <remarks>
 /// Built from Autodesk's own DXF Reference: <em>About the General DXF File Structure</em>,
-/// <em>Header Section Group Codes</em>, <em>Common Group Codes for Entities</em> and the entity
-/// pages for LINE, LWPOLYLINE, POLYLINE, VERTEX, SEQEND, CIRCLE, ARC, ELLIPSE, SOLID, TRACE,
-/// 3DFACE, POINT and INSERT, at <c>help.autodesk.com</c> under <c>ENU/AutoCAD-DXF</c>.
+/// <em>Writing a DXF File</em>, <em>Header Section Group Codes</em>, <em>Common Group Codes for
+/// Entities</em> and the entity pages for LINE, LWPOLYLINE, POLYLINE, VERTEX, SEQEND, CIRCLE, ARC,
+/// ELLIPSE, SOLID, TRACE, 3DFACE, POINT and INSERT, at <c>help.autodesk.com</c> under
+/// <c>ENU/AutoCAD-DXF</c>.
 /// <para/>
 /// The whole file is pairs of lines: an integer group code, then the value it labels. Code 0 names
 /// a thing — <c>SECTION</c>, <c>ENDSEC</c>, an entity's type, <c>EOF</c> — code 2 names a section or
 /// a block, code 9 names a header variable, and the numeric codes carry the geometry: 10/20/30 is a
 /// point, 11/21/31 a second one, 40 a radius or a height, 50 and 51 angles in degrees.
 /// <para/>
-/// Only the ASCII form is read. The binary form opens with the sentinel
+/// Only the ASCII form is read and written. The binary form opens with the sentinel
 /// <c>AutoCAD Binary DXF</c> and is recognised so it can be refused by name rather than
 /// misparsed. The entities drawn are the ones that are geometry on their own: LINE, POINT,
 /// LWPOLYLINE and POLYLINE with their bulged arc segments, CIRCLE, ARC, ELLIPSE, SOLID and TRACE
@@ -35,13 +36,20 @@ namespace FileFormat.Dxf;
 /// here and for the same reason. A drawing that is nothing but annotation therefore comes out empty
 /// rather than wrong.
 /// <para/>
-/// Colour is the AutoCAD Color Index, resolved through the LAYER table where an entity says
-/// BYLAYER. Only indices 1 to 9 have colours that the DXF Reference itself fixes, so anything
-/// outside that range is drawn in black rather than guessed at.
+/// Colour uses group 420 true colour where it is present; Autodesk defines it as 0x00RRGGBB and says
+/// it takes precedence over the older AutoCAD Color Index in group 62. ACI still resolves through
+/// the LAYER table where an entity says BYLAYER. Only indices 1 to 9 have colours that the DXF
+/// Reference itself fixes, so an indexed colour outside that range is drawn in black rather than
+/// guessed at.
 /// <para/>
-/// It does not write.
+/// Writing an existing <see cref="DxfFile"/> preserves its group-code/value stream in the ASCII
+/// representation. Converting a <see cref="RawImage"/> writes a self-contained AutoCAD 2004 DXF:
+/// equal pixel runs are merged into filled SOLID rectangles carrying group-420 RGB colours, with
+/// transparency composited onto the same white paper the renderer uses.
 /// </remarks>
-public readonly record struct DxfFile : IImageFormatReader<DxfFile>, IImageToRawImage<DxfFile> {
+public readonly record struct DxfFile
+  : IImageFormatReader<DxfFile>, IImageToRawImage<DxfFile>,
+    IImageFromRawImage<DxfFile>, IImageFormatWriter<DxfFile> {
 
   /// <summary>The sentinel a binary DXF file opens with, which this reader refuses.</summary>
   public const string BinarySentinel = "AutoCAD Binary DXF";
@@ -49,6 +57,7 @@ public readonly record struct DxfFile : IImageFormatReader<DxfFile>, IImageToRaw
   static string IImageFormatMetadata<DxfFile>.PrimaryExtension => ".dxf";
   static string[] IImageFormatMetadata<DxfFile>.FileExtensions => [".dxf"];
   static DxfFile IImageFormatReader<DxfFile>.FromSpan(ReadOnlySpan<byte> data) => DxfReader.FromSpan(data);
+  static byte[] IImageFormatWriter<DxfFile>.ToBytes(DxfFile file) => DxfWriter.ToBytes(file);
   static VideoMode[] IImageFormatMetadata<DxfFile>.VideoModes => [
     new("Drawing", [(IntegerRange.Any, IntegerRange.Any)], [16777216])
   ];
@@ -57,6 +66,8 @@ public readonly record struct DxfFile : IImageFormatReader<DxfFile>, IImageToRaw
   public IReadOnlyList<DxfPair> Pairs { get; init; }
 
   public static RawImage ToRawImage(DxfFile file) => DxfRenderer.Render(file);
+
+  public static DxfFile FromRawImage(RawImage image) => DxfWriter.FromRawImage(image);
 }
 
 /// <summary>One group code and the value that follows it.</summary>
