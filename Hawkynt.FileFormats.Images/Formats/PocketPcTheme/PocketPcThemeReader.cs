@@ -53,7 +53,7 @@ public static class PocketPcThemeReader {
     if (_TryFindPictureInStoredFolder(data, out var storedPicture))
       return _Decode(storedPicture);
 
-    var found = _FindFirstPicture(data);
+    var found = _FindFirstPicture(data, PocketPcThemeFile.ScanStart);
     if (found < 0)
       throw new InvalidDataException("A Pocket PC theme stores no GIF, PNG or JFIF this can reach without unpacking the cabinet.");
 
@@ -116,7 +116,7 @@ public static class PocketPcThemeReader {
         continue;
 
       var folderBytes = folder.ToArray();
-      var found = _FindFirstPicture(folderBytes);
+      var found = _FindFirstPicture(folderBytes, 0);
       if (found < 0)
         continue;
 
@@ -128,8 +128,8 @@ public static class PocketPcThemeReader {
   }
 
   /// <summary>Where the first picture stored whole begins, or -1 when there is none.</summary>
-  private static int _FindFirstPicture(ReadOnlySpan<byte> data) {
-    for (var at = PocketPcThemeFile.ScanStart; at + 4 <= data.Length; ++at) {
+  private static int _FindFirstPicture(ReadOnlySpan<byte> data, int start) {
+    for (var at = start; at + 4 <= data.Length; ++at) {
       var window = data.Slice(at, 4);
       if (window.SequenceEqual(PocketPcThemeFile.GifSignature)
           || window.SequenceEqual(PocketPcThemeFile.PngSignature)
