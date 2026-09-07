@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.PowerPoint;
@@ -25,11 +26,16 @@ namespace FileFormat.PowerPoint;
 /// bytes further along, and XnView reads none of them — which was confirmed by handing its converter
 /// a file of each shape.
 /// <para/>
+/// Writing mirrors that image-level contract rather than pretending this model contains a slide
+/// editor. The requested picture is encoded losslessly as a PNG BLIP in a real CFB <c>Pictures</c>
+/// stream; slides, text, animation and the rest of a presentation are not invented around it.
+/// <para/>
 /// Nothing else in the file is a picture as far as this is concerned, so a presentation of nothing
 /// but text and shapes is refused rather than drawn empty.
 /// </remarks>
 public readonly record struct PowerPointFile
-  : IImageFormatReader<PowerPointFile>, IImageToRawImage<PowerPointFile> {
+  : IImageFormatReader<PowerPointFile>, IImageToRawImage<PowerPointFile>,
+    IImageFromRawImage<PowerPointFile>, IImageFormatWriter<PowerPointFile> {
 
   /// <summary>The eight bytes a Microsoft compound document opens with.</summary>
   public static ReadOnlySpan<byte> Signature => [0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1];
@@ -59,6 +65,8 @@ public readonly record struct PowerPointFile
   static string[] IImageFormatMetadata<PowerPointFile>.FileExtensions => [".ppt", ".pps"];
   static PowerPointFile IImageFormatReader<PowerPointFile>.FromSpan(ReadOnlySpan<byte> data)
     => PowerPointReader.FromSpan(data);
+  static byte[] IImageFormatWriter<PowerPointFile>.ToBytes(PowerPointFile file)
+    => PowerPointWriter.ToBytes(file);
 
   static VideoMode[] IImageFormatMetadata<PowerPointFile>.VideoModes => [
     new("Default", [(IntegerRange.Any, IntegerRange.Any)], [16777216])
@@ -90,4 +98,21 @@ public readonly record struct PowerPointFile
     Format = PixelFormat.Rgb24,
     PixelData = file.PixelData[..],
   };
+
+  /// <summary>Creates the picture model that will be carried in the presentation's Pictures stream.</summary>
+  public static PowerPointFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+    if (image.Width <= 0 || image.Height <= 0)
+      throw new ArgumentOutOfRangeException(nameof(image), $"A PowerPoint picture needs positive dimensions, not {image.Width}x{image.Height}.");
+    if (!image.HasEnoughPixelData)
+      throw new InvalidDataException($"The {image.Width}x{image.Height} {image.Format} source does not contain enough pixel data.");
+
+    var converted = image.EnsureFormat(PixelFormat.Rgb24);
+    var pixelLength = checked(converted.Width * converted.Height * 3);
+    return new() {
+      Width = converted.Width,
+      Height = converted.Height,
+      PixelData = converted.PixelData[..pixelLength],
+    };
+  }
 }
