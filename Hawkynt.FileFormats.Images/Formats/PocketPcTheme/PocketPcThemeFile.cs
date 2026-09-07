@@ -16,12 +16,17 @@ namespace FileFormat.PocketPcTheme;
 /// does for a file that would not get smaller; anything MSZIP or LZX packed is invisible to it. This
 /// reader does the same thing, so it reads the themes XnView reads and no others.
 /// <para/>
+/// The writer deliberately uses CAB's uncompressed folder type and puts the picture in as PNG, so a
+/// file written here remains readable by that same scanner as well as by a real cabinet extractor.
+/// It installs the same lossless picture as both the Today and Start-menu backgrounds.
+/// <para/>
 /// The JPEG test is on all four bytes and not three. A JPEG carrying an Exif segment opens
 /// <c>FF D8 FF E1</c> and is not matched — checked against XnView's converter, which refuses such a
 /// file under this format's name and falls through to its own general JPEG scan instead.
 /// </remarks>
 public readonly record struct PocketPcThemeFile
-  : IImageFormatReader<PocketPcThemeFile>, IImageToRawImage<PocketPcThemeFile> {
+  : IImageFormatReader<PocketPcThemeFile>, IImageToRawImage<PocketPcThemeFile>,
+    IImageFromRawImage<PocketPcThemeFile>, IImageFormatWriter<PocketPcThemeFile> {
 
   /// <summary>The four bytes a Microsoft cabinet opens with.</summary>
   public static ReadOnlySpan<byte> Signature => "MSCF"u8;
@@ -42,6 +47,8 @@ public readonly record struct PocketPcThemeFile
   static string[] IImageFormatMetadata<PocketPcThemeFile>.FileExtensions => [".tsk"];
   static PocketPcThemeFile IImageFormatReader<PocketPcThemeFile>.FromSpan(ReadOnlySpan<byte> data)
     => PocketPcThemeReader.FromSpan(data);
+  static byte[] IImageFormatWriter<PocketPcThemeFile>.ToBytes(PocketPcThemeFile file)
+    => PocketPcThemeWriter.ToBytes(file);
 
   static VideoMode[] IImageFormatMetadata<PocketPcThemeFile>.VideoModes => [
     new("Default", [(IntegerRange.Any, IntegerRange.Any)], [16777216])
@@ -73,4 +80,15 @@ public readonly record struct PocketPcThemeFile
     Format = PixelFormat.Rgb24,
     PixelData = file.PixelData[..],
   };
+
+  public static PocketPcThemeFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+    image = image.EnsureFormat(PixelFormat.Rgb24);
+
+    return new() {
+      Width = image.Width,
+      Height = image.Height,
+      PixelData = image.PixelData[..],
+    };
+  }
 }
