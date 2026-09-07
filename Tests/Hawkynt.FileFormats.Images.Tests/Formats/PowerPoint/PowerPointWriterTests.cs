@@ -58,15 +58,15 @@ public sealed class PowerPointWriterTests {
     var source = _Picture(5, 4);
     var expectedPng = PngWriter.ToBytes(PngFile.FromRawImage(source));
     var bytes = PowerPointWriter.ToBytes(PowerPointFile.FromRawImage(source));
-    var blip = bytes.AsSpan(PowerPointFile.ScanStart);
+    var blip = bytes[PowerPointFile.ScanStart..];
 
     Assert.Multiple(() => {
       Assert.That(BinaryPrimitives.ReadUInt16LittleEndian(blip), Is.EqualTo(PowerPointFile.PngBlipVersionAndInstance));
-      Assert.That(BinaryPrimitives.ReadUInt16LittleEndian(blip[2..]), Is.EqualTo(PowerPointFile.PngBlipType));
-      Assert.That(BinaryPrimitives.ReadUInt32LittleEndian(blip[4..]), Is.EqualTo((uint)(expectedPng.Length + PowerPointFile.BlipPrefixSize)));
+      Assert.That(BinaryPrimitives.ReadUInt16LittleEndian(blip.AsSpan(2)), Is.EqualTo(PowerPointFile.PngBlipType));
+      Assert.That(BinaryPrimitives.ReadUInt32LittleEndian(blip.AsSpan(4)), Is.EqualTo((uint)(expectedPng.Length + PowerPointFile.BlipPrefixSize)));
       Assert.That(blip[PowerPointFile.RecordHeaderSize + 16], Is.EqualTo(0xFF));
       Assert.That(
-        blip.Slice(PowerPointFile.RecordHeaderSize + PowerPointFile.BlipPrefixSize, expectedPng.Length).ToArray(),
+        blip.AsSpan(PowerPointFile.RecordHeaderSize + PowerPointFile.BlipPrefixSize, expectedPng.Length).ToArray(),
         Is.EqualTo(expectedPng));
     });
   }
@@ -82,9 +82,9 @@ public sealed class PowerPointWriterTests {
     var miniFatCount = BinaryPrimitives.ReadUInt32LittleEndian(bytes.AsSpan(64));
     var firstFatSector = BinaryPrimitives.ReadUInt32LittleEndian(bytes.AsSpan(76));
     var directory = bytes.AsSpan(PowerPointFile.ScanStart + checked((int)directorySector) * 512, 512);
-    var root = directory[..128];
-    var pictures = directory.Slice(128, 128);
-    var streamSize = BinaryPrimitives.ReadUInt64LittleEndian(pictures[120..]);
+    var root = directory[..128].ToArray();
+    var pictures = directory.Slice(128, 128).ToArray();
+    var streamSize = BinaryPrimitives.ReadUInt64LittleEndian(pictures.AsSpan(120));
     var streamSectors = checked((int)((streamSize + 511) / 512));
 
     Assert.Multiple(() => {
@@ -100,22 +100,22 @@ public sealed class PowerPointWriterTests {
       Assert.That(fatSectorCount, Is.EqualTo(1));
       Assert.That(_DirectoryName(root), Is.EqualTo("Root Entry"));
       Assert.That(root[66], Is.EqualTo(5));
-      Assert.That(BinaryPrimitives.ReadUInt32LittleEndian(root[76..]), Is.EqualTo(1));
+      Assert.That(BinaryPrimitives.ReadUInt32LittleEndian(root.AsSpan(76)), Is.EqualTo(1));
       Assert.That(_DirectoryName(pictures), Is.EqualTo("Pictures"));
       Assert.That(pictures[66], Is.EqualTo(2));
-      Assert.That(BinaryPrimitives.ReadUInt32LittleEndian(pictures[116..]), Is.Zero);
+      Assert.That(BinaryPrimitives.ReadUInt32LittleEndian(pictures.AsSpan(116)), Is.Zero);
       Assert.That(streamSize, Is.GreaterThanOrEqualTo(4096));
       Assert.That(directorySector, Is.EqualTo((uint)streamSectors));
     });
 
-    var fat = bytes.AsSpan(PowerPointFile.ScanStart + checked((int)firstFatSector) * 512, 512);
+    var fat = bytes.AsSpan(PowerPointFile.ScanStart + checked((int)firstFatSector) * 512, 512).ToArray();
     for (var sector = 0; sector < streamSectors - 1; ++sector)
-      Assert.That(BinaryPrimitives.ReadUInt32LittleEndian(fat[(sector * sizeof(uint))..]), Is.EqualTo((uint)(sector + 1)), $"stream FAT entry {sector}");
+      Assert.That(BinaryPrimitives.ReadUInt32LittleEndian(fat.AsSpan(sector * sizeof(uint))), Is.EqualTo((uint)(sector + 1)), $"stream FAT entry {sector}");
 
     Assert.Multiple(() => {
-      Assert.That(BinaryPrimitives.ReadUInt32LittleEndian(fat[((streamSectors - 1) * sizeof(uint))..]), Is.EqualTo(_END_OF_CHAIN));
-      Assert.That(BinaryPrimitives.ReadUInt32LittleEndian(fat[(checked((int)directorySector) * sizeof(uint))..]), Is.EqualTo(_END_OF_CHAIN));
-      Assert.That(BinaryPrimitives.ReadUInt32LittleEndian(fat[(checked((int)firstFatSector) * sizeof(uint))..]), Is.EqualTo(_FAT_SECTOR));
+      Assert.That(BinaryPrimitives.ReadUInt32LittleEndian(fat.AsSpan((streamSectors - 1) * sizeof(uint))), Is.EqualTo(_END_OF_CHAIN));
+      Assert.That(BinaryPrimitives.ReadUInt32LittleEndian(fat.AsSpan(checked((int)directorySector) * sizeof(uint))), Is.EqualTo(_END_OF_CHAIN));
+      Assert.That(BinaryPrimitives.ReadUInt32LittleEndian(fat.AsSpan(checked((int)firstFatSector) * sizeof(uint))), Is.EqualTo(_FAT_SECTOR));
     });
   }
 
