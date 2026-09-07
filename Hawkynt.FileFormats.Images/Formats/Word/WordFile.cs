@@ -56,7 +56,7 @@ public readonly record struct WordFile
       Width = converted.Width,
       Height = converted.Height,
       PixelData = converted.PixelData[..pixelLength],
-      Kind = WordOpenXmlKind.FromExtension(extension),
+      Kind = WordOpenXmlKindExtensions.FromExtension(extension),
     };
   }
 }
