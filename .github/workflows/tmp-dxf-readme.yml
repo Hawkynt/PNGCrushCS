@@ -10,7 +10,7 @@ permissions:
 jobs:
   regenerate:
     if: github.actor != 'github-actions[bot]'
-    runs-on: windows-latest
+    runs-on: ubuntu-latest
     steps:
       - name: Check out PNGCrushCS
         uses: actions/checkout@v4
