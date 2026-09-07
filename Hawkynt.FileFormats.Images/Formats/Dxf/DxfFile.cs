@@ -36,16 +36,18 @@ namespace FileFormat.Dxf;
 /// here and for the same reason. A drawing that is nothing but annotation therefore comes out empty
 /// rather than wrong.
 /// <para/>
-/// Colour uses group 420 true colour where it is present; Autodesk defines it as 0x00RRGGBB and says
-/// it takes precedence over the older AutoCAD Color Index in group 62. ACI still resolves through
-/// the LAYER table where an entity says BYLAYER. Only indices 1 to 9 have colours that the DXF
-/// Reference itself fixes, so an indexed colour outside that range is drawn in black rather than
-/// guessed at.
+/// Rendering uses the AutoCAD Color Index in group 62, resolved through the LAYER table where an
+/// entity says BYLAYER. Only indices 1 to 9 have colours that the DXF Reference itself fixes, so an
+/// indexed colour outside that range is drawn in black rather than guessed at. Raster conversion
+/// additionally writes the exact 24-bit colour in group 420. Autodesk defines that as 0x00RRGGBB
+/// and says it takes precedence over group 62 in AutoCAD 2004 and later, so contemporary CAD tools
+/// receive exact RGB while this deliberately bounded renderer has the nearest defined ACI fallback.
 /// <para/>
 /// Writing an existing <see cref="DxfFile"/> preserves its group-code/value stream in the ASCII
 /// representation. Converting a <see cref="RawImage"/> writes a self-contained AutoCAD 2004 DXF:
-/// equal pixel runs are merged into filled SOLID rectangles carrying group-420 RGB colours, with
-/// transparency composited onto the same white paper the renderer uses.
+/// equal pixel runs are merged into filled SOLID rectangles carrying exact group-420 RGB plus the
+/// nearest defined ACI fallback, with transparency composited onto the same white paper the renderer
+/// uses.
 /// </remarks>
 public readonly record struct DxfFile
   : IImageFormatReader<DxfFile>, IImageToRawImage<DxfFile>,
