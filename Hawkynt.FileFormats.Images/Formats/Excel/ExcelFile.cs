@@ -18,7 +18,7 @@ namespace FileFormat.Excel;
 /// macro-capable main-part content types; no VBA project is invented for macro-capable output when
 /// the source contains only pixels.
 /// </remarks>
-public readonly record struct ExcelFile
+public readonly record struct ExcelFile()
   : IImageFormatReader<ExcelFile>, IImageToRawImage<ExcelFile>,
     IImageFromRawImage<ExcelFile>, IImageFormatWriter<ExcelFile>, IMultiImageFileFormat<ExcelFile> {
 
@@ -46,14 +46,14 @@ public readonly record struct ExcelFile
   internal ExcelOpenXmlKind Kind { get; init; }
 
   public static int ImageCount(ExcelFile file)
-    => file.Images.Count > 0 ? file.Images.Count : _HasCompatibilityImage(file) ? 1 : 0;
+    => file.Images is { Count: > 0 } images ? images.Count : _HasCompatibilityImage(file) ? 1 : 0;
 
   public static RawImage ToRawImage(ExcelFile file, int index) {
     var count = ImageCount(file);
     if ((uint)index >= (uint)count)
       throw new ArgumentOutOfRangeException(nameof(index));
-    if (file.Images.Count > 0)
-      return file.Images[index];
+    if (file.Images is { Count: > 0 } images)
+      return images[index];
 
     return new() {
       Width = file.Width,
