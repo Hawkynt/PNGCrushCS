@@ -63,7 +63,7 @@ public static class PowerPointWriter {
     BinaryPrimitives.WriteUInt16LittleEndian(result.AsSpan(2), PowerPointFile.PngBlipType);
     BinaryPrimitives.WriteUInt32LittleEndian(result.AsSpan(4), checked((uint)payloadLength));
 
-    _Md4(png).CopyTo(result, PowerPointFile.RecordHeaderSize);
+    ComputeBlipUid(png).CopyTo(result, PowerPointFile.RecordHeaderSize);
     result[PowerPointFile.RecordHeaderSize + 16] = 0xFF;
     png.CopyTo(result.AsSpan(PowerPointFile.RecordHeaderSize + PowerPointFile.BlipPrefixSize));
     return result;
@@ -120,8 +120,8 @@ public static class PowerPointWriter {
     int firstFatSector) {
 
     PowerPointFile.Signature.CopyTo(result);
-    BinaryPrimitives.WriteUInt16LittleEndian(result[24..], 0x003E); // CFB minor version 3.62
-    BinaryPrimitives.WriteUInt16LittleEndian(result[26..], 0x0003); // 512-byte-sector major version
+    BinaryPrimitives.WriteUInt16LittleEndian(result[24..], 0x003E);
+    BinaryPrimitives.WriteUInt16LittleEndian(result[26..], 0x0003); // version 3, 512-byte sectors
     BinaryPrimitives.WriteUInt16LittleEndian(result[28..], 0xFFFE); // little-endian byte order
     BinaryPrimitives.WriteUInt16LittleEndian(result[30..], 0x0009); // 2^9 = 512-byte sectors
     BinaryPrimitives.WriteUInt16LittleEndian(result[32..], 0x0006); // 2^6 = 64-byte mini sectors
@@ -129,7 +129,7 @@ public static class PowerPointWriter {
     BinaryPrimitives.WriteUInt32LittleEndian(result[44..], checked((uint)fatSectorCount));
     BinaryPrimitives.WriteUInt32LittleEndian(result[48..], checked((uint)directorySector));
     BinaryPrimitives.WriteUInt32LittleEndian(result[52..], 0);      // no transactions
-    BinaryPrimitives.WriteUInt32LittleEndian(result[56..], _MINI_STREAM_CUTOFF);
+    BinaryPrimitives.WriteUInt32LittleEndian(result[56..], checked((uint)_MINI_STREAM_CUTOFF));
     BinaryPrimitives.WriteUInt32LittleEndian(result[60..], _END_OF_CHAIN); // no mini FAT
     BinaryPrimitives.WriteUInt32LittleEndian(result[64..], 0);
     BinaryPrimitives.WriteUInt32LittleEndian(result[68..], firstDifatSector < 0 ? _END_OF_CHAIN : checked((uint)firstDifatSector));
@@ -227,10 +227,10 @@ public static class PowerPointWriter {
   private static int _SectorOffset(int sector) => checked(PowerPointFile.ScanStart + sector * _SECTOR_SIZE);
 
   private static int _DivideRoundUp(int value, int divisor)
-    => checked((value + divisor - 1) / divisor);
+    => checked((int)(((long)value + divisor - 1) / divisor));
 
   /// <summary>RFC 1320 MD4, used by OfficeArt as the BLIP UID.</summary>
-  private static byte[] _Md4(ReadOnlySpan<byte> data) {
+  internal static byte[] ComputeBlipUid(ReadOnlySpan<byte> data) {
     var a = 0x67452301u;
     var b = 0xEFCDAB89u;
     var c = 0x98BADCFEu;
