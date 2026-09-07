@@ -1,0 +1,54 @@
+name: Temporary PowerPoint writer validation
+
+on:
+  push:
+    branches: [image/powerpoint-writer]
+
+permissions:
+  contents: write
+
+jobs:
+  validate-and-refresh-readme:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout PNGCrushCS
+        uses: actions/checkout@v4
+        with:
+          path: PNGCrushCS
+
+      - name: Checkout CompressionWorkbench sibling
+        uses: actions/checkout@v4
+        with:
+          repository: Hawkynt/CompressionWorkbench
+          path: CompressionWorkbench
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Run focused writer and support-table tests
+        working-directory: PNGCrushCS
+        env:
+          UPDATE_IMAGE_FORMAT_README: "1"
+        run: >-
+          dotnet test Tests/Hawkynt.FileFormats.Images.Tests/Hawkynt.FileFormats.Images.Tests.csproj
+          -p:EnableWindowsTargeting=true
+          --filter "FullyQualifiedName~PowerPoint|FullyQualifiedName~FormatSupportReadmeTests"
+
+      - name: Build solution
+        working-directory: PNGCrushCS
+        run: dotnet build PngCrush.slnx -c Release -p:EnableWindowsTargeting=true
+
+      - name: Commit regenerated README
+        working-directory: PNGCrushCS
+        shell: bash
+        run: |
+          if git diff --quiet -- Hawkynt.FileFormats.Images/README.md; then
+            exit 0
+          fi
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add Hawkynt.FileFormats.Images/README.md
+          git commit -m "Regenerate image format support table"
+          git push origin HEAD:image/powerpoint-writer
