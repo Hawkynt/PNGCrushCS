@@ -113,11 +113,12 @@ public static class DxfWriter {
 
     for (var row = 0; row < image.Height; ++row) {
       Dictionary<Run, Rectangle> current = [];
+      var rowOffset = checked(row * image.Width);
       var x = 0;
       while (x < image.Width) {
-        var colour = _Colour(rgba, row * image.Width + x);
+        var colour = _Colour(rgba, checked(rowOffset + x));
         var right = x + 1;
-        while (right < image.Width && _Colour(rgba, row * image.Width + right) == colour)
+        while (right < image.Width && _Colour(rgba, checked(rowOffset + right)) == colour)
           ++right;
 
         if (colour != _White) {
