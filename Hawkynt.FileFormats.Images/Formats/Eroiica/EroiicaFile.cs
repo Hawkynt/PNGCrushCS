@@ -31,12 +31,16 @@ namespace FileFormat.Eroiica;
 /// whole document are the same 259x197 picture on every byte, which is what says the streams are
 /// standalone TIFFs rather than something that merely starts like one.
 /// <para/>
-/// Nothing is written: a document is a page list, a set description and the text on the pages, and
-/// none of that is modelled here.
+/// The writer is deliberately narrower than the historical application: it emits the verified
+/// raster-bearing subset only, the eight identifying bytes followed by one or more complete TIFF
+/// streams. It does not invent the set description, page-list records or page text that this model
+/// does not represent. A <see cref="RawImage"/> therefore becomes a one-page document containing a
+/// standards-valid TIFF; a parsed multi-page file can be serialised from the TIFF pages it exposes.
 /// </remarks>
 [FormatMagicBytes([0x7C, 0x3E, 0x24, 0x24, 0x27, 0x58, 0x21, 0x01])]
 public sealed class EroiicaFile
   : IImageFormatReader<EroiicaFile>, IImageToRawImage<EroiicaFile>,
+    IImageFromRawImage<EroiicaFile>, IImageFormatWriter<EroiicaFile>,
     IMultiImageFileFormat<EroiicaFile> {
 
   /// <summary>The eight bytes a document opens with.</summary>
@@ -45,6 +49,7 @@ public sealed class EroiicaFile
   static string IImageFormatMetadata<EroiicaFile>.PrimaryExtension => ".eif";
   static string[] IImageFormatMetadata<EroiicaFile>.FileExtensions => [".eif"];
   static EroiicaFile IImageFormatReader<EroiicaFile>.FromSpan(ReadOnlySpan<byte> data) => EroiicaReader.FromSpan(data);
+  static byte[] IImageFormatWriter<EroiicaFile>.ToBytes(EroiicaFile file) => EroiicaWriter.ToBytes(file);
   static FormatCapability IImageFormatMetadata<EroiicaFile>.Capabilities => FormatCapability.MultiImage;
   static VideoMode[] IImageFormatMetadata<EroiicaFile>.VideoModes => [
     new("Default", [(IntegerRange.Any, IntegerRange.Any)], [2, 256, 16777216])
@@ -75,5 +80,13 @@ public sealed class EroiicaFile
       throw new InvalidDataException("An Eroiica document with no raster page in it.");
 
     return ToRawImage(file, 0);
+  }
+
+  /// <summary>Builds the raster-bearing one-page form from an arbitrary picture.</summary>
+  public static EroiicaFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+    return new() {
+      Pages = [TiffWriter.ToBytes(TiffFile.FromRawImage(image))],
+    };
   }
 }
