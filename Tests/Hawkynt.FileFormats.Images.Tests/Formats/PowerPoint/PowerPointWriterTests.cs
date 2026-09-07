@@ -26,6 +26,17 @@ public sealed class PowerPointWriterTests {
     return new() { Width = width, Height = height, Format = PixelFormat.Rgb24, PixelData = pixels };
   }
 
+  [TestCase("", "31D6CFE0D16AE931B73C59D7E0C089C0")]
+  [TestCase("a", "BDE52CB31DE33E46245E05FBDBD6FB24")]
+  [TestCase("abc", "A448017AAF21D8525FC10AE87AA6729D")]
+  [TestCase("message digest", "D9130A8164549FE818874806E1C7014B")]
+  [Category("Unit")]
+  public void BlipUid_MatchesRfc1320Md4Vectors(string text, string expected) {
+    var actual = PowerPointWriter.ComputeBlipUid(Encoding.ASCII.GetBytes(text));
+
+    Assert.That(Convert.ToHexString(actual), Is.EqualTo(expected));
+  }
+
   [Test]
   [Category("Integration")]
   public void RoundTrip_ArbitraryRgbPicture_IsLossless() {
