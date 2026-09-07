@@ -11,4 +11,13 @@ public sealed class PesStitchBlock {
 
   /// <summary>Where the needle went, in the file's own units.</summary>
   public required (int X, int Y)[] Points { get; init; }
+
+  /// <summary>
+  /// Indices into <see cref="Points"/> reached by a jump rather than by a sewing stitch.
+  /// </summary>
+  /// <remarks>
+  /// A jump changes the current needle position without drawing thread between the previous point
+  /// and this one. Index zero is useful for positioning the first stitch of a block.
+  /// </remarks>
+  public int[] JumpIndices { get; init; } = [];
 }
