@@ -1,4 +1,4 @@
-name: Temporary PowerPoint writer validation
+name: Temporary Office image writers validation
 
 on:
   push:
@@ -27,7 +27,7 @@ jobs:
         with:
           dotnet-version: 10.0.x
 
-      - name: Refresh hand-written PowerPoint support rationale
+      - name: Refresh hand-written Office support rationale
         working-directory: PNGCrushCS
         shell: python
         run: |
@@ -36,35 +36,40 @@ jobs:
           path = Path("Hawkynt.FileFormats.Images/README.md")
           text = path.read_text(encoding="utf-8-sig")
 
-          text = text.replace("These 29 entries read but have no writer;", "These 28 entries read but have no writer;", 1)
-          text = text.replace("PeResource, PowerPoint, Fpx, PocketPcTheme", "PeResource, Fpx, PocketPcTheme", 1)
-
-          heading = "### Registered but read-only"
-          rationale = (
+          old = (
               "PowerPoint is writable at the same image boundary its reader exposes: arbitrary pixels are "
               "encoded losslessly as a PNG OfficeArt BLIP in a valid CFB `Pictures` stream. The writer does "
               "not synthesize slides, text, transitions or the rest of the PowerPoint document model, so the "
               "Write tick means the same `PowerPoint (images)` carrier the compatibility reader understands, "
               "not a claim that this package authors complete slide decks."
           )
-          if rationale not in text:
+          new = (
+              "Office document image carriers are writable without external Office libraries. Word Open XML "
+              "documents/templates contain the picture as an inline drawing; Excel Open XML workbooks/templates "
+              "contain it in a worksheet drawing anchored at A1; and modern PowerPoint presentations/slideshows/"
+              "templates contain it on a real slide with a master, layout, and theme. Macro-capable variants use "
+              "their native package content types but do not fabricate a VBA project. Legacy `.ppt`/`.pps`/`.pot` "
+              "remain the compatibility image-carrier boundary and store the PNG as an OfficeArt BLIP in a CFB "
+              "`Pictures` stream."
+          )
+          if old in text:
+              text = text.replace(old, new, 1)
+          elif new not in text:
+              heading = "### Registered but read-only"
               if heading not in text:
-                  raise SystemExit("PowerPoint support rationale insertion point is missing")
-              text = text.replace(heading, rationale + "\n\n" + heading, 1)
-
-          if "These 28 entries read but have no writer;" not in text or "PeResource, Fpx, PocketPcTheme" not in text:
-              raise SystemExit("PowerPoint read-only paragraph did not update as expected")
+                  raise SystemExit("Office support rationale insertion point is missing")
+              text = text.replace(heading, new + "\n\n" + heading, 1)
 
           path.write_text(text, encoding="utf-8")
 
-      - name: Run focused writer and support-table tests
+      - name: Run focused Office writer and support-table tests
         working-directory: PNGCrushCS
         env:
           UPDATE_IMAGE_FORMAT_README: "1"
         run: >-
           dotnet test Tests/Hawkynt.FileFormats.Images.Tests/Hawkynt.FileFormats.Images.Tests.csproj
           -p:EnableWindowsTargeting=true
-          --filter "FullyQualifiedName~PowerPoint|FullyQualifiedName~FormatSupportReadmeTests"
+          --filter "FullyQualifiedName~PowerPoint|FullyQualifiedName~Word|FullyQualifiedName~Excel|FullyQualifiedName~OfficeOpenXml|FullyQualifiedName~FormatSupportReadmeTests"
 
       - name: Build solution
         working-directory: PNGCrushCS
@@ -80,5 +85,5 @@ jobs:
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
           git add Hawkynt.FileFormats.Images/README.md
-          git commit -m "Regenerate image format support table"
+          git commit -m "Regenerate Office image format support table"
           git push origin HEAD:image/powerpoint-writer
