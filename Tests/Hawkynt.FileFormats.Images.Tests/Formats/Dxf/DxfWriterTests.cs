@@ -137,7 +137,7 @@ public sealed class DxfWriterTests {
     Assert.Multiple(() => {
       Assert.That(drawing.Entities, Has.Count.EqualTo(2));
       Assert.That(drawing.Entities.All(static entity => entity.Type == "SOLID"));
-      Assert.That(parsed.Variable("$ACADVER"), Is.Null);
+      Assert.That(drawing.Variable("$ACADVER")?.Text(1), Is.EqualTo("AC1018"));
       Assert.That(parsed.Pairs.Any(static pair => pair is { Code: 1, Value: "AC1018" }));
     });
   }
