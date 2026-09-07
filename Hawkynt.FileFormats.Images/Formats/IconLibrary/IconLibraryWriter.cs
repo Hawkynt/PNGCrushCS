@@ -25,7 +25,7 @@ public static class IconLibraryWriter {
   private const int _RtIcon = 3;
   private const int _RtGroupIcon = 14;
   private const int _ResourceId = 1;
-  private const int _LanguageEnglishUnitedStates = 0x0409;
+  private const int _LanguageNeutral = 0;
 
   /// <summary>Serializes an icon library.</summary>
   public static byte[] ToBytes(IconLibraryFile file) {
@@ -68,10 +68,10 @@ public static class IconLibraryWriter {
     _WriteDirectoryEntry(span, 0x48, _ResourceId, 0x68, isDirectory: true);
 
     _WriteDirectory(span, 0x50, 1);
-    _WriteDirectoryEntry(span, 0x60, _LanguageEnglishUnitedStates, 0x80, isDirectory: false);
+    _WriteDirectoryEntry(span, 0x60, _LanguageNeutral, 0x80, isDirectory: false);
 
     _WriteDirectory(span, 0x68, 1);
-    _WriteDirectoryEntry(span, 0x78, _LanguageEnglishUnitedStates, 0x90, isDirectory: false);
+    _WriteDirectoryEntry(span, 0x78, _LanguageNeutral, 0x90, isDirectory: false);
 
     _WriteDataEntry(span, 0x80, _ResourceRva + iconOffset, icon.Data.Length);
     _WriteDataEntry(span, 0x90, _ResourceRva + groupOffset, group.Length);
@@ -114,7 +114,7 @@ public static class IconLibraryWriter {
     BinaryPrimitives.WriteUInt16LittleEndian(coff, 0x014C);
     BinaryPrimitives.WriteUInt16LittleEndian(coff[2..], 1);
     BinaryPrimitives.WriteUInt16LittleEndian(coff[16..], _OptionalHeaderSize);
-    BinaryPrimitives.WriteUInt16LittleEndian(coff[18..], 0x2102);
+    BinaryPrimitives.WriteUInt16LittleEndian(coff[18..], 0x2103); // executable, relocations stripped, 32-bit, DLL
 
     var optional = coff[20..];
     BinaryPrimitives.WriteUInt16LittleEndian(optional, 0x010B);
