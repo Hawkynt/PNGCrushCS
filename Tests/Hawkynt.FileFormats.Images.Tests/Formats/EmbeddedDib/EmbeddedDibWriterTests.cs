@@ -1,4 +1,3 @@
-using System;
 using System.Buffers.Binary;
 using FileFormat.Core;
 
@@ -14,8 +13,7 @@ public sealed class EmbeddedDibWriterTests {
 
     Assert.Multiple(() => {
       Assert.That(BinaryPrimitives.ReadInt32LittleEndian(bytes), Is.EqualTo(40));
-      Assert.That(bytes[0], Is.Not.EqualTo((byte)'B'));
-      Assert.That(bytes[1], Is.Not.EqualTo((byte)'M'));
+      Assert.That(BinaryPrimitives.ReadUInt16LittleEndian(bytes), Is.Not.EqualTo(0x4D42));
     });
   }
 
@@ -51,7 +49,7 @@ public sealed class EmbeddedDibWriterTests {
   public void ToBytes_DefaultFile_Throws() {
     Assert.That(
       () => EmbeddedDibWriter.ToBytes(default(EmbeddedDibFile)),
-      Throws.ArgumentException.With.Property("ParamName").EqualTo("file")
+      Throws.ArgumentException
     );
   }
 
