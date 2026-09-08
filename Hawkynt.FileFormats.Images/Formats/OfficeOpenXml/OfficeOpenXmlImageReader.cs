@@ -198,8 +198,8 @@ internal static class OfficeOpenXmlImageReader {
 
   private static bool _IsTiff(ReadOnlySpan<byte> data)
     => data.Length >= 4
-      && (data[..4].SequenceEqual([(byte)0x49, 0x49, 0x2A, 0x00])
-        || data[..4].SequenceEqual([(byte)0x4D, 0x4D, 0x00, 0x2A]));
+      && ((data[0] == 0x49 && data[1] == 0x49 && data[2] == 0x2A && data[3] == 0x00)
+        || (data[0] == 0x4D && data[1] == 0x4D && data[2] == 0x00 && data[3] == 0x2A));
 
   private static bool _IsIco(ReadOnlySpan<byte> data)
     => data.Length >= 6 && data[0] == 0 && data[1] == 0 && data[2] == 1 && data[3] == 0;
@@ -210,10 +210,12 @@ internal static class OfficeOpenXmlImageReader {
   private static bool _IsEmf(ReadOnlySpan<byte> data)
     => data.Length >= 44
       && data[0] == 1 && data[1] == 0 && data[2] == 0 && data[3] == 0
-      && data.Slice(40, 4).SequenceEqual([(byte)0x20, 0x45, 0x4D, 0x46]);
+      && data[40] == 0x20 && data[41] == 0x45 && data[42] == 0x4D && data[43] == 0x46;
 
   private static bool _IsJpeg2000(ReadOnlySpan<byte> data)
     => data.Length >= 12
-      && data[..12].SequenceEqual([(byte)0x00, 0x00, 0x00, 0x0C, 0x6A, 0x50, 0x20, 0x20, 0x0D, 0x0A, 0x87, 0x0A])
+      && data[0] == 0x00 && data[1] == 0x00 && data[2] == 0x00 && data[3] == 0x0C
+      && data[4] == 0x6A && data[5] == 0x50 && data[6] == 0x20 && data[7] == 0x20
+      && data[8] == 0x0D && data[9] == 0x0A && data[10] == 0x87 && data[11] == 0x0A
       || data.Length >= 2 && data[0] == 0xFF && data[1] == 0x4F;
 }
