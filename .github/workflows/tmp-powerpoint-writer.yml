@@ -64,12 +64,23 @@ jobs:
 
       - name: Run focused Office writer and support-table tests
         working-directory: PNGCrushCS
+        shell: bash
         env:
           UPDATE_IMAGE_FORMAT_README: "1"
-        run: >-
-          dotnet test Tests/Hawkynt.FileFormats.Images.Tests/Hawkynt.FileFormats.Images.Tests.csproj
-          -p:EnableWindowsTargeting=true
-          --filter "FullyQualifiedName~PowerPoint|FullyQualifiedName~Word|FullyQualifiedName~Excel|FullyQualifiedName~OfficeOpenXml|FullyQualifiedName~FormatSupportReadmeTests"
+        run: |
+          set -o pipefail
+          dotnet test Tests/Hawkynt.FileFormats.Images.Tests/Hawkynt.FileFormats.Images.Tests.csproj \
+            -p:EnableWindowsTargeting=true \
+            --filter "FullyQualifiedName~PowerPoint|FullyQualifiedName~Word|FullyQualifiedName~Excel|FullyQualifiedName~OfficeOpenXml|FullyQualifiedName~FormatSupportReadmeTests" \
+            2>&1 | tee office-focused-tests.log
+
+      - name: Upload focused test log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: office-focused-tests
+          path: PNGCrushCS/office-focused-tests.log
+          if-no-files-found: ignore
 
       - name: Build solution
         working-directory: PNGCrushCS
