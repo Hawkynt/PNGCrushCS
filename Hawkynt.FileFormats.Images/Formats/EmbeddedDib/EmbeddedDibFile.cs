@@ -3,17 +3,19 @@ using FileFormat.Core;
 
 namespace FileFormat.EmbeddedDib;
 
-/// <summary>The Windows bitmap preview carried inside a drawing or a project file.</summary>
+/// <summary>The Windows bitmap preview carried inside a drawing or a project file whose container is not yet bounded.</summary>
 /// <remarks>
-/// A whole family of formats are not pictures at all — metafiles, sketches, drawings, jigsaw and
-/// button projects — and each carries a preview so a file chooser has something to show. That preview
-/// is a plain Windows DIB dropped into the file: a 40-byte <c>BITMAPINFOHEADER</c>, its palette, and
-/// its rows bottom-up and padded to four bytes, with no <c>BM</c> file header in front because it is
-/// not a file.
+/// This is deliberately a heuristic preview reader, not a claim that the remaining extensions share
+/// a container format. Each name stays here only until its own structure can be verified well enough
+/// to identify the container before looking for a DIB.
 /// <para/>
-/// The extensions registered here expose the same payload through different, still-unmodelled
-/// containers, which is why this remains a heuristic preview reader rather than a set of guessed
-/// container layouts. Formats move out of this list as dedicated container readers are implemented.
+/// <c>.zmf</c> version 2 is known to be an OLE2 compound file and PRONOM identifies it by the
+/// <c>Callisto_doc.zmf</c> stream, but no source checked for this implementation identifies the
+/// preview stream/layout; libzmf covers the later Zoner Draw generations instead. <c>.skf</c> and
+/// <c>.cad</c> are externally identified as Autodesk SKETCH and QuickCAD thumbnails, and <c>.btn</c>
+/// as a JustButtons animated bitmap, but their enclosing layouts are not published well enough to
+/// replace a byte search with a container parser. They therefore remain here rather than inheriting
+/// guessed structures from CDR, CMX, SDG or IPG.
 /// <para/>
 /// A related <c>.jig</c> is left out deliberately. It carries a header of the right shape at 14 and
 /// its picture where one would expect, but it states no colour count and keeps no palette anywhere
@@ -34,9 +36,8 @@ public readonly record struct EmbeddedDibFile
   /// <summary>No picture in these previews comes near this, and it keeps a false match cheap.</summary>
   public const int MaxDimension = 20000;
 
-  static string IImageFormatMetadata<EmbeddedDibFile>.PrimaryExtension => ".cmx";
-  static string[] IImageFormatMetadata<EmbeddedDibFile>.FileExtensions =>
-    [".cmx", ".zmf", ".skf", ".cad", ".sdg", ".ipg", ".btn"];
+  static string IImageFormatMetadata<EmbeddedDibFile>.PrimaryExtension => ".zmf";
+  static string[] IImageFormatMetadata<EmbeddedDibFile>.FileExtensions => [".zmf", ".skf", ".cad", ".btn"];
   static EmbeddedDibFile IImageFormatReader<EmbeddedDibFile>.FromSpan(ReadOnlySpan<byte> data)
     => EmbeddedDibReader.FromSpan(data);
   static VideoMode[] IImageFormatMetadata<EmbeddedDibFile>.VideoModes => [
