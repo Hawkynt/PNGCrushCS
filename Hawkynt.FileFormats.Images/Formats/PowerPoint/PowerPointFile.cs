@@ -81,14 +81,14 @@ public readonly record struct PowerPointFile
   internal PowerPointKind Kind { get; init; }
 
   public static int ImageCount(PowerPointFile file)
-    => file.Images.Count > 0 ? file.Images.Count : _HasCompatibilityImage(file) ? 1 : 0;
+    => file.Images is { Count: > 0 } images ? images.Count : _HasCompatibilityImage(file) ? 1 : 0;
 
   public static RawImage ToRawImage(PowerPointFile file, int index) {
     var count = ImageCount(file);
     if ((uint)index >= (uint)count)
       throw new ArgumentOutOfRangeException(nameof(index));
-    if (file.Images.Count > 0)
-      return file.Images[index];
+    if (file.Images is { Count: > 0 } images)
+      return images[index];
 
     return new() {
       Width = file.Width,
