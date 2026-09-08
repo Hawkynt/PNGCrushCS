@@ -21,7 +21,7 @@ namespace FileFormat.PowerPoint;
 /// picture-only slide. Macro-capable output uses the correct main-part content type but contains no
 /// fabricated VBA project.
 /// </remarks>
-public readonly record struct PowerPointFile
+public readonly record struct PowerPointFile()
   : IImageFormatReader<PowerPointFile>, IImageToRawImage<PowerPointFile>,
     IImageFromRawImage<PowerPointFile>, IImageFormatWriter<PowerPointFile>,
     IMultiImageFileFormat<PowerPointFile> {
