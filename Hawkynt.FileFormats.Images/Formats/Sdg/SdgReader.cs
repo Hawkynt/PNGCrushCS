@@ -36,7 +36,7 @@ public static class SdgReader {
         var image = _DecodeBitmap(data[(at + _ObjectHeaderSize)..], out var encodedLength);
         images.Add(image);
         at += Math.Max(0, encodedLength + _ObjectHeaderSize - 1);
-      } catch (Exception exception) when (exception is InvalidDataException or ArgumentException or NotSupportedException) {
+      } catch (Exception exception) when (exception is IOException or ArgumentException or NotSupportedException) {
         // SGA3 may occur inside unrelated payload bytes. Only a structurally valid bitmap counts.
       }
     }
