@@ -15,6 +15,7 @@ namespace FileFormat.GedPicture;
 /// and pokes them, which is what lets a picture change a sprite's position or the priority ranking
 /// part way down the screen.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct GedPictureFile
   : IImageFormatReader<GedPictureFile>, IImageToRawImage<GedPictureFile>,
     IImageFromRawImage<GedPictureFile>, IImageFormatWriter<GedPictureFile> {

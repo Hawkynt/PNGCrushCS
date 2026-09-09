@@ -16,6 +16,7 @@ namespace FileFormat.Hp48Grob;
 /// are little-endian and printing them as a byte reverses the pair — so the bit order there is
 /// 4, 5, 6, 7, 0, 1, 2, 3.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct Hp48GrobFile
   : IImageFormatReader<Hp48GrobFile>, IImageToRawImage<Hp48GrobFile>,
     IImageFromRawImage<Hp48GrobFile>, IImageFormatWriter<Hp48GrobFile> {

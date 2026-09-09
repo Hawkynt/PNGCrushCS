@@ -4,6 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.Pict;
 
 /// <summary>In-memory representation of a PICT image (raster subset).</summary>
+[VerifiedBy(ConformanceOracle.ImageMagick, ConformanceOracle.FFmpeg)]
 public readonly record struct PictFile : IImageFormatReader<PictFile>, IImageToRawImage<PictFile>, IImageFromRawImage<PictFile>, IImageFormatWriter<PictFile> {
 
   /// <summary>Bytes of Macintosh file header before the picture itself.</summary>

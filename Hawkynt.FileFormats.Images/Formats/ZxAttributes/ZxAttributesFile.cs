@@ -10,6 +10,7 @@ namespace FileFormat.ZxAttributes;
 /// over a fixed dither so both colours of every cell stay visible — without one the file would
 /// render as flat paper.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct ZxAttributesFile
   : IImageFormatReader<ZxAttributesFile>, IImageToRawImage<ZxAttributesFile>,
     IImageFromRawImage<ZxAttributesFile>, IImageFormatWriter<ZxAttributesFile> {

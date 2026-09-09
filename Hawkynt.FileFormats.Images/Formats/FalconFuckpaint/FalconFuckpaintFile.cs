@@ -13,6 +13,7 @@ namespace FileFormat.FalconFuckpaint;
 /// The extensions are borrowed from the Atari TT and Graphics 9 formats, so only content
 /// distinguishes them.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct FalconFuckpaintFile
   : IImageFormatReader<FalconFuckpaintFile>, IImageToRawImage<FalconFuckpaintFile>,
     IImageFromRawImage<FalconFuckpaintFile>, IImageFormatWriter<FalconFuckpaintFile> {

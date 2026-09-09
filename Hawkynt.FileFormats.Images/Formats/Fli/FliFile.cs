@@ -6,6 +6,7 @@ namespace FileFormat.Fli;
 
 /// <summary>In-memory representation of a FLI/FLC animation file.</summary>
 [FormatMimeType("video/x-fli", "video/x-flc")]
+[VerifiedBy(ConformanceOracle.FFmpeg)]
 public sealed class FliFile
   : IImageFormatReader<FliFile>, IImageToRawImage<FliFile>,
     IImageFromRawImage<FliFile>, IImageFormatWriter<FliFile>, IMultiImageFileFormat<FliFile> {

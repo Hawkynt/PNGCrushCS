@@ -5,6 +5,7 @@ namespace FileFormat.Xcf;
 
 /// <summary>In-memory representation of an XCF image (flat composite of first layer).</summary>
 [FormatMagicBytes([0x67, 0x69, 0x6D, 0x70, 0x20, 0x78, 0x63, 0x66])]
+[VerifiedBy(ConformanceOracle.ImageMagick)]
 public readonly record struct XcfFile : IImageFormatReader<XcfFile>, IImageToRawImage<XcfFile>, IImageFromRawImage<XcfFile>, IImageFormatWriter<XcfFile> {
 
   static string IImageFormatMetadata<XcfFile>.PrimaryExtension => ".xcf";

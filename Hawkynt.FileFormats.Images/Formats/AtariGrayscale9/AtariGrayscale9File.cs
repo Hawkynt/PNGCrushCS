@@ -10,6 +10,7 @@ namespace FileFormat.AtariGrayscale9;
 /// stored nibble covers four screen pixels and each stored row four screen rows, so the picture is
 /// displayed at 320x192.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct AtariGrayscale9File
   : IImageFormatReader<AtariGrayscale9File>, IImageToRawImage<AtariGrayscale9File>,
     IImageFromRawImage<AtariGrayscale9File>, IImageFormatWriter<AtariGrayscale9File> {

@@ -45,6 +45,7 @@ namespace FileFormat.Codecs;
 /// two transforms disagreeing, not the two codecs. Against the pictures that went in, the mean peak
 /// signal-to-noise ratio is 36.4 dB for versions 1 and 2 and 36.2 dB for version 3.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.FFmpeg)]
 public sealed class MsMpeg4VideoEncoder : IVideoCodecEncoder<MsMpeg4VideoEncoder> {
 
   /// <summary>The code the registry routes to this encoder, and what it writes unless told otherwise.</summary>

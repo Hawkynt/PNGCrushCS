@@ -5,6 +5,7 @@ using FileFormat.Core;
 namespace FileFormat.BigTiff;
 
 /// <summary>In-memory representation of a BigTIFF (.btf/.tf8) image file.</summary>
+[VerifiedBy(ConformanceOracle.ImageMagick)]
 public sealed class BigTiffFile : IImageFormatReader<BigTiffFile>, IImageToRawImage<BigTiffFile>, IImageFromRawImage<BigTiffFile>, IImageFormatWriter<BigTiffFile>, IMultiImageFileFormat<BigTiffFile> {
 
   /// <summary>BigTIFF version number (43).</summary>

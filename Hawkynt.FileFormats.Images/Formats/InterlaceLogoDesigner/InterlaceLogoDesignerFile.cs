@@ -10,6 +10,7 @@ namespace FileFormat.InterlaceLogoDesigner;
 /// what interlacing buys here is not more colours but the mixtures between the four it has —
 /// enough for a logo, which is all the program was for.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct InterlaceLogoDesignerFile
   : IImageFormatReader<InterlaceLogoDesignerFile>, IImageToRawImage<InterlaceLogoDesignerFile>,
     IImageFromRawImage<InterlaceLogoDesignerFile>, IImageFormatWriter<InterlaceLogoDesignerFile> {

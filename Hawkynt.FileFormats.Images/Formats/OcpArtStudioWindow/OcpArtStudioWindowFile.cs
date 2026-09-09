@@ -14,6 +14,7 @@ namespace FileFormat.OcpArtStudioWindow;
 /// screen mode the palette was made for; a window is only a window of a mode 0 screen, so a
 /// palette naming any other mode belongs to a different picture.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct OcpArtStudioWindowFile
   : IImageFormatReader<OcpArtStudioWindowFile>, IImageToRawImage<OcpArtStudioWindowFile>,
     IImageFromRawImage<OcpArtStudioWindowFile>, IImageFormatWriter<OcpArtStudioWindowFile> {

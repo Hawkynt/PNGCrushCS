@@ -5,6 +5,7 @@ namespace FileFormat.Wpg;
 
 /// <summary>In-memory representation of a WPG (WordPerfect Graphics) raster image.</summary>
 [FormatMagicBytes([0xFF, 0x57, 0x50, 0x43])]
+[VerifiedBy(ConformanceOracle.ImageMagick)]
 public readonly record struct WpgFile : IImageFormatReader<WpgFile>, IImageToRawImage<WpgFile>, IImageFromRawImage<WpgFile>, IImageFormatWriter<WpgFile> {
 
   static string IImageFormatMetadata<WpgFile>.PrimaryExtension => ".wpg";

@@ -4,6 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.DuneGraph;
 
 /// <summary>In-memory representation of an Atari Falcon DuneGraph (.dg1/.dc1) indexed image.</summary>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct DuneGraphFile : IImageFormatReader<DuneGraphFile>, IImageToRawImage<DuneGraphFile>, IImageFromRawImage<DuneGraphFile>, IImageFormatWriter<DuneGraphFile> {
 
   /// <summary>Fixed image width.</summary>

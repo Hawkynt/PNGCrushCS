@@ -7,6 +7,7 @@ namespace FileFormat.Png;
 /// <summary>Data model representing a PNG file</summary>
 [FormatMagicBytes([0x89, 0x50, 0x4E, 0x47])]
 [FormatMimeType("image/png", "image/x-png")]
+[VerifiedBy(ConformanceOracle.ImageMagick, ConformanceOracle.FFmpeg)]
 public readonly partial record struct PngFile :
   IImageFormatReader<PngFile>, IImageToRawImage<PngFile>, IImageFromRawImage<PngFile>, IImageFormatWriter<PngFile>,
   IFormatChunkLayout<PngFile>, IFormatChunkRewriter<PngFile>, IFormatChunkPlanRewriter<PngFile> {

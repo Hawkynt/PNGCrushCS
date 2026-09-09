@@ -21,6 +21,7 @@ namespace FileFormat.RawGreyscale;
 /// A stream matching none of them is refused rather than shown at a shape picked out of the air. A
 /// wrong shape is worse than no picture: it is a picture that looks like a reading and is not one.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.ImageMagick)]
 public readonly record struct RawGreyscaleFile : IImageFormatReader<RawGreyscaleFile>, IImageToRawImage<RawGreyscaleFile>, IImageFromRawImage<RawGreyscaleFile>, IImageFormatWriter<RawGreyscaleFile> {
 
   /// <summary>Bytes one pixel takes.</summary>

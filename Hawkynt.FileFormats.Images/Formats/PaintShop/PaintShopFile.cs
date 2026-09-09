@@ -9,6 +9,7 @@ namespace FileFormat.PaintShop;
 /// the ST's monochrome screen because PaintShop drew for a printer rather than a monitor, so the
 /// 64000 bytes are exactly one sheet. A set bit is ink on white paper.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct PaintShopFile
   : IImageFormatReader<PaintShopFile>, IImageToRawImage<PaintShopFile>,
     IImageFromRawImage<PaintShopFile>, IImageFormatWriter<PaintShopFile> {

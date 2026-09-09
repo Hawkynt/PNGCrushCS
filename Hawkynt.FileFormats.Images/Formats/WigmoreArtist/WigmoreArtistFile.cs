@@ -12,6 +12,7 @@ namespace FileFormat.WigmoreArtist;
 /// <para/>
 /// A multicolour screen rather than a high-resolution one, with each section on its own page boundary and the background register in the very last byte.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct WigmoreArtistFile
   : IImageFormatReader<WigmoreArtistFile>, IImageToRawImage<WigmoreArtistFile>,
     IImageFromRawImage<WigmoreArtistFile>, IImageFormatWriter<WigmoreArtistFile> {

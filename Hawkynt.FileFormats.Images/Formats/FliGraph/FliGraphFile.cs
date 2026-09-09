@@ -18,6 +18,7 @@ namespace FileFormat.FliGraph;
 /// It is multicolour, two bits a pixel, so the picture is 148 across drawn at 296. The leftmost
 /// three character cells cannot be coloured in time and are not part of it.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct FliGraphFile
   : IImageFormatReader<FliGraphFile>, IImageToRawImage<FliGraphFile>,
     IImageFromRawImage<FliGraphFile>, IImageFormatWriter<FliGraphFile> {

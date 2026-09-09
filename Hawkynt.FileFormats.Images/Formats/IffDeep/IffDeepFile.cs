@@ -5,6 +5,7 @@ namespace FileFormat.IffDeep;
 
 /// <summary>In-memory representation of an IFF DEEP (Deep Paint) image.</summary>
 [FormatMagicBytes([0x46, 0x4F, 0x52, 0x4D])]
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.FFmpeg)]
 public readonly record struct IffDeepFile : IImageFormatReader<IffDeepFile>, IImageToRawImage<IffDeepFile>, IImageFromRawImage<IffDeepFile>, IImageFormatWriter<IffDeepFile> {
 
   static string IImageFormatMetadata<IffDeepFile>.PrimaryExtension => ".deep";

@@ -12,6 +12,7 @@ namespace FileFormat.BbcMicroScreen;
 /// of a pixel are not adjacent, they are spread one per nibble-plane across the byte, which is why
 /// each mode reassembles its index from scattered bits.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct BbcMicroScreenFile
   : IImageFormatReader<BbcMicroScreenFile>, IImageToRawImage<BbcMicroScreenFile>,
     IImageFromRawImage<BbcMicroScreenFile>, IImageFormatWriter<BbcMicroScreenFile> {

@@ -14,6 +14,7 @@ namespace FileFormat.CommodoreGrafix;
 /// are laid out as a grid whose shape the header states. The whole point is that a game's animation
 /// lives in one file rather than one file per frame.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct CommodoreGrafixFile
   : IImageFormatReader<CommodoreGrafixFile>, IImageToRawImage<CommodoreGrafixFile>,
     IImageFromRawImage<CommodoreGrafixFile>, IImageFormatWriter<CommodoreGrafixFile> {

@@ -10,6 +10,7 @@ namespace FileFormat.Zoom4;
 /// stored nibble covers four screen pixels and each stored row four screen rows, so the picture is
 /// displayed at 256x256.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct Zoom4File
   : IImageFormatReader<Zoom4File>, IImageToRawImage<Zoom4File>,
     IImageFromRawImage<Zoom4File>, IImageFormatWriter<Zoom4File> {

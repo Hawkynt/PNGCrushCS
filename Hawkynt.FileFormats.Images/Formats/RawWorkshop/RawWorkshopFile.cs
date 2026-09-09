@@ -13,6 +13,7 @@ namespace FileFormat.RawWorkshop;
 /// can afford to store nothing beside it — but it runs the other way round from what that suggests:
 /// zero is white and 255 is black, so the value is an amount of ink rather than of light.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct RawWorkshopFile
   : IImageFormatReader<RawWorkshopFile>, IImageToRawImage<RawWorkshopFile>,
     IImageFromRawImage<RawWorkshopFile>, IImageFormatWriter<RawWorkshopFile> {

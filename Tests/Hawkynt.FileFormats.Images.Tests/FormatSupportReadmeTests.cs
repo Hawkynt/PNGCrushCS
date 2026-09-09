@@ -106,8 +106,8 @@ public sealed class FormatSupportReadmeTests {
 
   private static string _BuildMatrix() {
     var builder = new StringBuilder();
-    builder.Append("| Format | Extensions | Read | Write | Info | Multi | Optimizer |\n");
-    builder.Append("| --- | --- | :---: | :---: | :---: | :---: | :---: |\n");
+    builder.Append("| Format | Extensions | Read | Write | Info | Multi | Optimizer | Oracle |\n");
+    builder.Append("| --- | --- | :---: | :---: | :---: | :---: | :---: | --- |\n");
 
     foreach (var entry in FormatRegistry.AllFormats
                .OrderBy(static entry => entry.Name, StringComparer.OrdinalIgnoreCase)
@@ -130,10 +130,69 @@ public sealed class FormatSupportReadmeTests {
         .Append(entry.SupportsMultiImage ? "✅" : "—")
         .Append(" | ")
         .Append((entry.Capabilities & FormatCapability.HasDedicatedOptimizer) != 0 ? "✅" : "—")
+        .Append(" | ")
+        .Append(_OracleCell(entry))
         .Append(" |\n");
     }
 
+    builder.Append('\n').Append(_BuildLegend());
+
     return builder.ToString().TrimEnd('\n');
+  }
+
+  /// <summary>What the Oracle column says about one format.</summary>
+  /// <remarks>
+  /// Three answers, and they mean three different things. A tool's name is a claim that that program
+  /// has read what this writer produced. <c>none</c> is a writer nothing outside this repository has
+  /// ever looked at, which is the answer that matters most and the one a blank cell would hide. An
+  /// em dash is no writer at all, so there is nothing for an oracle to have read.
+  /// </remarks>
+  private static string _OracleCell(FormatEntry entry) {
+    if (!entry.SupportsWrite)
+      return "—";
+
+    return entry.VerifiedBy.Length == 0
+      ? "none"
+      : string.Join(", ", entry.VerifiedBy.Select(static oracle => oracle.DisplayName()));
+  }
+
+  /// <summary>
+  /// The one place each oracle is linked, generated from the oracles the table actually names.
+  /// </summary>
+  /// <remarks>
+  /// A link in every cell would put several hundred copies of the same URL into a table of nearly a
+  /// thousand rows and make the column unreadable in the raw file, which is where most of this
+  /// README is read. So the cells carry the tool's name and the names are resolved once, here.
+  /// </remarks>
+  private static string _BuildLegend() {
+    var used = FormatRegistry.AllFormats
+      .SelectMany(static entry => entry.VerifiedBy)
+      .Distinct()
+      .OrderBy(static oracle => oracle.DisplayName(), StringComparer.OrdinalIgnoreCase)
+      .ToList();
+
+    var builder = new StringBuilder();
+    builder.Append(
+      "**Oracle** — the tool outside this repository that has read what the writer produces. "
+      + "`none` means nothing but this package's own reader ever has, and a reader agreeing with the "
+      + "writer beside it proves only that the two share one reading of the format; `—` means there "
+      + "is no writer, so there is nothing for anything to have read. What a name in this column "
+      + "states exactly: handed a file this writer produced, under one of the format's own "
+      + "extensions and at one of the sizes the format declares, that tool decoded it back to a "
+      + "picture of the same size which is not a blank canvas. That is weaker than the pixel-for-pixel "
+      + "comparisons in `Tests/Conformance.Recoil.Tests` and in the codec evidence below, and it is "
+      + "the one thing that could be asked of every writer here rather than of a chosen few. It does "
+      + "not prove the pixels agree, and where two unrelated formats share an extension and a "
+      + "geometry it can be a tool reading the other one.");
+
+    if (used.Count == 0)
+      return builder.Append('\n').ToString();
+
+    builder.Append(" The tools: ");
+    builder.Append(string.Join(" · ", used.Select(static oracle => $"[{oracle.DisplayName()}]({oracle.HomePage()})")));
+    builder.Append(".\n");
+
+    return builder.ToString();
   }
 
   private static string _RewriteSupportSection(string readme, string matrix) {

@@ -15,6 +15,7 @@ namespace FileFormat.AtariPicture;
 /// borrows the average of its neighbours, which is why an APAC picture is sharp in colour and soft
 /// in brightness.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct AtariPictureFile
   : IImageFormatReader<AtariPictureFile>, IImageToRawImage<AtariPictureFile>,
     IImageFromRawImage<AtariPictureFile>, IImageFormatWriter<AtariPictureFile> {

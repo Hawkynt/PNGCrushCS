@@ -4,6 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.ZxUlaPlus;
 
 /// <summary>In-memory representation of a ZX Spectrum ULAplus file (6976 bytes: 6144 bitmap + 768 attributes + 64 palette entries).</summary>
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.ImageMagick)]
 public readonly record struct ZxUlaPlusFile
   : IImageFormatReader<ZxUlaPlusFile>, IImageToRawImage<ZxUlaPlusFile>,
     IImageFromRawImage<ZxUlaPlusFile>, IImageFormatWriter<ZxUlaPlusFile> {

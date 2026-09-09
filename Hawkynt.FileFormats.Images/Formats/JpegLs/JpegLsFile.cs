@@ -5,6 +5,7 @@ namespace FileFormat.JpegLs;
 
 /// <summary>In-memory representation of a JPEG-LS (ITU-T T.87) image.</summary>
 [FormatDetectionPriority(10)]
+[VerifiedBy(ConformanceOracle.FFmpeg)]
 public readonly record struct JpegLsFile : IImageFormatReader<JpegLsFile>, IImageToRawImage<JpegLsFile>, IImageFromRawImage<JpegLsFile>, IImageFormatWriter<JpegLsFile> {
 
   static string IImageFormatMetadata<JpegLsFile>.PrimaryExtension => ".jls";

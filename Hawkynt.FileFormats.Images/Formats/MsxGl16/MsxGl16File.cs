@@ -14,6 +14,7 @@ namespace FileFormat.MsxGl16;
 /// The palette is not in the file either — it lives in a companion <c>.PL5</c> or <c>.PL7</c> — so a
 /// picture read on its own shows the sixteen colours an MSX2 starts up with.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct MsxGl16File
   : IImageFormatReader<MsxGl16File>, IImageToRawImage<MsxGl16File>,
     IImageFromRawImage<MsxGl16File>, IImageFormatWriter<MsxGl16File> {

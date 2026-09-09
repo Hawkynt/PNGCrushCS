@@ -10,6 +10,7 @@ namespace FileFormat.VerticalHiresInterlace;
 /// field and not the other, so the eye sees the two mixed as well as each alone — three shades from
 /// two colours, at full resolution and with no extra colour memory.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct VerticalHiresInterlaceFile
   : IImageFormatReader<VerticalHiresInterlaceFile>, IImageToRawImage<VerticalHiresInterlaceFile>,
     IImageFromRawImage<VerticalHiresInterlaceFile>, IImageFormatWriter<VerticalHiresInterlaceFile> {

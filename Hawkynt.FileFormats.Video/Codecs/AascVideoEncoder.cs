@@ -42,6 +42,7 @@ namespace FileFormat.Codecs;
 /// FFmpeg's <c>libavcodec/msrleenc.c</c>, copyright (c) 2023 Tomas Härdin, distributed there under
 /// LGPL-2.1-or-later. This adaptation is distributed with PNGCrushCS under LGPL-3.0-or-later.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.FFmpeg)]
 public sealed class AascVideoEncoder : IVideoCodecEncoder<AascVideoEncoder> {
 
   private static readonly CodecTag _Tag = CodecTag.FromCharacters("AASC");

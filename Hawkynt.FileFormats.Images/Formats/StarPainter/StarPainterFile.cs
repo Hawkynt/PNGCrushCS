@@ -12,6 +12,7 @@ namespace FileFormat.StarPainter;
 /// No colours are stored at all. The picture is black on white, and where an ordinary C64 hires
 /// screen would consult its video matrix this one has a constant standing in for it.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct StarPainterFile
   : IImageFormatReader<StarPainterFile>, IImageToRawImage<StarPainterFile>,
     IImageFromRawImage<StarPainterFile>, IImageFormatWriter<StarPainterFile> {

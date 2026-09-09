@@ -12,6 +12,7 @@ namespace FileFormat.MadStudioTile;
 /// <para/>
 /// The four colours are Mad Studio's own; the file stores none.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct MadStudioTileFile
   : IImageFormatReader<MadStudioTileFile>, IImageToRawImage<MadStudioTileFile>,
     IImageFromRawImage<MadStudioTileFile>, IImageFormatWriter<MadStudioTileFile> {

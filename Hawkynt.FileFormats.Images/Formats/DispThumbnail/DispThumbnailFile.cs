@@ -17,6 +17,7 @@ namespace FileFormat.DispThumbnail;
 /// that layout is read by it at the size it was built with, and the bytes it hands back are the ones
 /// written.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.FFmpeg)]
 public readonly record struct DispThumbnailFile
   : IImageFormatReader<DispThumbnailFile>, IImageToRawImage<DispThumbnailFile>, IImageFromRawImage<DispThumbnailFile>, IImageFormatWriter<DispThumbnailFile> {
 

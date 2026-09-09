@@ -49,6 +49,7 @@ namespace FileFormat.Codecs;
 /// flagged as a key frame only when it happened to reach the end without a single skip — in which
 /// case a decoder really can start there.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.FFmpeg)]
 public sealed class AppleGraphicsEncoder : IVideoCodecEncoder<AppleGraphicsEncoder> {
 
   /// <summary>The code every container names this codec with, trailing space and all.</summary>

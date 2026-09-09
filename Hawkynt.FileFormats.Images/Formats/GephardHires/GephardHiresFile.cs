@@ -13,6 +13,7 @@ namespace FileFormat.GephardHires;
 /// 9002 bytes. The one real sample is 2923, which is 3 plus 20 bytes a row for 146 rows, and states
 /// 158 by 146 in its first three bytes. None of the C64 model was in it.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct GephardHiresFile
   : IImageFormatReader<GephardHiresFile>, IImageToRawImage<GephardHiresFile>,
     IImageFromRawImage<GephardHiresFile>, IImageFormatWriter<GephardHiresFile> {

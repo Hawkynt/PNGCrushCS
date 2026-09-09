@@ -5,6 +5,7 @@ using FileFormat.Core;
 namespace FileFormat.ScitexCt;
 
 /// <summary>In-memory representation of a Scitex CT (Continuous Tone) image.</summary>
+[VerifiedBy(ConformanceOracle.ImageMagick)]
 public readonly record struct ScitexCtFile : IImageFormatReader<ScitexCtFile>, IImageToRawImage<ScitexCtFile>, IImageFromRawImage<ScitexCtFile>, IImageFormatWriter<ScitexCtFile> {
 
   static string IImageFormatMetadata<ScitexCtFile>.PrimaryExtension => ".sct";

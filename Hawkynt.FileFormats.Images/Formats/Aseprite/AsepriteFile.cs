@@ -10,6 +10,7 @@ namespace FileFormat.Aseprite;
 /// </remarks>
 [FormatDetectionPriority(300)]
 [FormatMimeType("image/x-aseprite", "application/x-aseprite")]
+[VerifiedBy(ConformanceOracle.ImageMagick)]
 public readonly record struct AsepriteFile : IImageFormatReader<AsepriteFile>, IImageToRawImage<AsepriteFile>, IImageFromRawImage<AsepriteFile>, IImageFormatWriter<AsepriteFile> {
 
   static string IImageFormatMetadata<AsepriteFile>.PrimaryExtension => ".aseprite";

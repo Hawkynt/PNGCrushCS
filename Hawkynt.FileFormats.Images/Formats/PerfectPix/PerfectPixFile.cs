@@ -16,6 +16,7 @@ namespace FileFormat.PerfectPix;
 /// with the fields offset a pixel from each other, and four colours whose palette is rewritten down
 /// the screen at intervals the file states.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct PerfectPixFile
   : IImageFormatReader<PerfectPixFile>, IImageToRawImage<PerfectPixFile>,
     IImageFromRawImage<PerfectPixFile>, IImageFormatWriter<PerfectPixFile> {

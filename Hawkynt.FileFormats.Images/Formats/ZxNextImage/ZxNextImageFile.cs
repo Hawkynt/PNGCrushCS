@@ -10,6 +10,7 @@ namespace FileFormat.ZxNextImage;
 /// the top two bits of blue as 3-3-2, and the low bit of the second byte supplies blue's third
 /// bit, giving three bits per channel.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct ZxNextImageFile
   : IImageFormatReader<ZxNextImageFile>, IImageToRawImage<ZxNextImageFile>,
     IImageFromRawImage<ZxNextImageFile>, IImageFormatWriter<ZxNextImageFile> {

@@ -5,6 +5,7 @@ namespace FileFormat.IffRgbn;
 
 /// <summary>In-memory representation of an IFF RGBN (13-bit RGB + genlock) image.</summary>
 [FormatMagicBytes([0x46, 0x4F, 0x52, 0x4D])]
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.FFmpeg)]
 public readonly record struct IffRgbnFile : IImageFormatReader<IffRgbnFile>, IImageToRawImage<IffRgbnFile>, IImageFromRawImage<IffRgbnFile>, IImageFormatWriter<IffRgbnFile> {
 
   static string IImageFormatMetadata<IffRgbnFile>.PrimaryExtension => ".rgbn";

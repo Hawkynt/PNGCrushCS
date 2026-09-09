@@ -33,6 +33,7 @@ namespace FileFormat.Codecs;
 /// refuses the same width and for the same reason — and a frame whose geometry differs from the
 /// stream's.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.FFmpeg)]
 public sealed class Yuy2VideoEncoder : IVideoCodecEncoder<Yuy2VideoEncoder> {
 
   private static readonly CodecTag _Tag = CodecTag.FromCharacters("YUY2");

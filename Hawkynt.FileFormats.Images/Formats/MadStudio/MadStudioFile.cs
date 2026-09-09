@@ -13,6 +13,7 @@ namespace FileFormat.MadStudio;
 /// characters happen to look most like it. The encoder does exactly that, trying every code in
 /// every cell.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct MadStudioFile
   : IImageFormatReader<MadStudioFile>, IImageToRawImage<MadStudioFile>,
     IImageFromRawImage<MadStudioFile>, IImageFormatWriter<MadStudioFile> {

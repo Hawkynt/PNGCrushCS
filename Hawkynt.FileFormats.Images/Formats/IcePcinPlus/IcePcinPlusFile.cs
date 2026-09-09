@@ -14,6 +14,7 @@ namespace FileFormat.IcePcinPlus;
 /// Both fields read the same screen; what differs is which character set they draw it from and how
 /// the bits of a cell are interpreted, which is why one file gives two quite different pictures.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct IcePcinPlusFile
   : IImageFormatReader<IcePcinPlusFile>, IImageToRawImage<IcePcinPlusFile>,
     IImageFromRawImage<IcePcinPlusFile>, IImageFormatWriter<IcePcinPlusFile> {

@@ -15,6 +15,7 @@ namespace FileFormat.Jnx;
 /// </remarks>
 [FormatDetectionPriority(920)]
 [FormatMimeType("application/x-garmin-jnx")]
+[VerifiedBy(ConformanceOracle.ImageMagick)]
 public sealed class JnxFile : IImageFormatReader<JnxFile>, IImageToRawImage<JnxFile>, IImageFromRawImage<JnxFile>, IImageFormatWriter<JnxFile>, IMultiImageFileFormat<JnxFile> {
 
   static string IImageFormatMetadata<JnxFile>.PrimaryExtension => ".jnx";

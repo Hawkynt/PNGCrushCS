@@ -11,6 +11,7 @@ namespace FileFormat.AtariFalconXga;
 /// a shape no Falcon program writes and none can read. The size comes from the length instead, and
 /// only the two lengths the format actually has are a picture.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct AtariFalconXgaFile : IImageFormatReader<AtariFalconXgaFile>, IImageToRawImage<AtariFalconXgaFile>, IImageFromRawImage<AtariFalconXgaFile>, IImageFormatWriter<AtariFalconXgaFile> {
 
   static string IImageFormatMetadata<AtariFalconXgaFile>.PrimaryExtension => ".xga";

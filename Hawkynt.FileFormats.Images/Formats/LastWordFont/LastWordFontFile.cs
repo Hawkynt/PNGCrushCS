@@ -9,6 +9,7 @@ namespace FileFormat.LastWordFont;
 /// significant bit leftmost. Viewers lay the glyphs out sixteen to a row, giving a 128x32 sheet
 /// drawn in the text mode's two colours.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct LastWordFontFile
   : IImageFormatReader<LastWordFontFile>, IImageToRawImage<LastWordFontFile>,
     IImageFromRawImage<LastWordFontFile>, IImageFormatWriter<LastWordFontFile> {

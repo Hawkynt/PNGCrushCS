@@ -12,6 +12,7 @@ namespace FileFormat.Codecs;
 /// existing pure-managed writer, keeping the video codec as a thin adapter rather than a second JPEG
 /// implementation.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.FFmpeg)]
 public sealed class MotionJpegVideoEncoder : IVideoCodecEncoder<MotionJpegVideoEncoder> {
 
   private static readonly CodecTag _codec = CodecTag.FromCharacters("MJPG");

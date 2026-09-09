@@ -4,6 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.ZxTimex;
 
 /// <summary>In-memory representation of a Timex HiColor file (12288 bytes: 6144 bitmap + 6144 per-scanline-row extended attributes).</summary>
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.ImageMagick)]
 public readonly record struct ZxTimexFile
   : IImageFormatReader<ZxTimexFile>, IImageToRawImage<ZxTimexFile>,
     IImageFromRawImage<ZxTimexFile>, IImageFormatWriter<ZxTimexFile> {

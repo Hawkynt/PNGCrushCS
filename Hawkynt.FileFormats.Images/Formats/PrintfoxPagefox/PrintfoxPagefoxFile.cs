@@ -4,6 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.PrintfoxPagefox;
 
 /// <summary>In-memory representation of a Printfox/Pagefox hires image.</summary>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct PrintfoxPagefoxFile : IImageFormatReader<PrintfoxPagefoxFile>, IImageToRawImage<PrintfoxPagefoxFile>, IImageFromRawImage<PrintfoxPagefoxFile>, IImageFormatWriter<PrintfoxPagefoxFile> {
 
   static string IImageFormatMetadata<PrintfoxPagefoxFile>.PrimaryExtension => ".bs";

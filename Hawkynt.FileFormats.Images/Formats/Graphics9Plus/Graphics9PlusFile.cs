@@ -10,6 +10,7 @@ namespace FileFormat.Graphics9Plus;
 /// stored nibble covers four screen pixels and each stored row four screen rows, so the picture is
 /// displayed at 320x240.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct Graphics9PlusFile
   : IImageFormatReader<Graphics9PlusFile>, IImageToRawImage<Graphics9PlusFile>,
     IImageFromRawImage<Graphics9PlusFile>, IImageFormatWriter<Graphics9PlusFile> {

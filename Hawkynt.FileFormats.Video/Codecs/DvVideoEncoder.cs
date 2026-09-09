@@ -39,6 +39,7 @@ namespace FileFormat.Codecs;
 /// the stream's; and a stream that changes sampling part way through, since that would change the
 /// frame size and no container describes a stream whose frames are two different lengths.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.FFmpeg)]
 public sealed class DvVideoEncoder : IVideoCodecEncoder<DvVideoEncoder> {
 
   /// <summary>

@@ -17,6 +17,7 @@ namespace FileFormat.AwardBmp;
 /// on its size.
 /// </remarks>
 [FormatMagicBytes([0x41, 0x57, 0x42, 0x4D])]
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct AwardBmpFile : IImageFormatReader<AwardBmpFile>, IImageToRawImage<AwardBmpFile>, IImageFromRawImage<AwardBmpFile>, IImageFormatWriter<AwardBmpFile> {
 
   /// <summary>The four letters every one of these begins with.</summary>

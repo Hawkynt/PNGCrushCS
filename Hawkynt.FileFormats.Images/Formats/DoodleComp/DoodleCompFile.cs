@@ -4,6 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.DoodleComp;
 
 /// <summary>In-memory representation of a Commodore 64 Doodle Compressed hires image.</summary>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct DoodleCompFile
   : IImageFormatReader<DoodleCompFile>, IImageToRawImage<DoodleCompFile>,
     IImageFromRawImage<DoodleCompFile>, IImageFormatWriter<DoodleCompFile> {

@@ -14,6 +14,7 @@ namespace FileFormat.VdcBitmap;
 /// file and listed in the header, so that a picture can reserve whichever byte values it happens
 /// not to use as literals.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct VdcBitmapFile
   : IImageFormatReader<VdcBitmapFile>, IImageToRawImage<VdcBitmapFile>,
     IImageFromRawImage<VdcBitmapFile>, IImageFormatWriter<VdcBitmapFile> {

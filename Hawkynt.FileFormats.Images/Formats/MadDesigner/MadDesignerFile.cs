@@ -10,6 +10,7 @@ namespace FileFormat.MadDesigner;
 /// GTIA colour 14 on colour 0, so the file is exactly the 16384 bytes of the bitmap and its length
 /// is the only thing that identifies it.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct MadDesignerFile
   : IImageFormatReader<MadDesignerFile>, IImageToRawImage<MadDesignerFile>,
     IImageFromRawImage<MadDesignerFile>, IImageFormatWriter<MadDesignerFile> {

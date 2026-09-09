@@ -44,6 +44,7 @@ namespace FileFormat.Codecs;
 /// without a single skip — in which case a decoder really can start there. A frame identical to the
 /// one before it is the format's seven-byte "nothing changed" frame.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.FFmpeg)]
 public sealed class QuickTimeRleEncoder : IVideoCodecEncoder<QuickTimeRleEncoder> {
 
   /// <summary>The code every container names this codec with, trailing space and all.</summary>

@@ -37,6 +37,7 @@ namespace FileFormat.Codecs;
 /// frame whether it was the first one or merely a frame in which every pixel happened to change.
 /// The reference encoder does the same.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.FFmpeg)]
 public sealed class MicrosoftRleEncoder : IVideoCodecEncoder<MicrosoftRleEncoder> {
 
   /// <summary>The four-character code containers name this codec with where they name it at all.</summary>

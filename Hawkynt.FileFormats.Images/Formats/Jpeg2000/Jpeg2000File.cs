@@ -5,6 +5,7 @@ namespace FileFormat.Jpeg2000;
 
 /// <summary>In-memory representation of a JPEG 2000 image.</summary>
 [FormatMagicBytes([0x00, 0x00, 0x00, 0x0C, 0x6A, 0x50])]
+[VerifiedBy(ConformanceOracle.ImageMagick, ConformanceOracle.OpjDecompress, ConformanceOracle.FFmpeg)]
 public readonly record struct Jpeg2000File : IImageFormatReader<Jpeg2000File>, IImageToRawImage<Jpeg2000File>, IImageFromRawImage<Jpeg2000File>, IImageFormatWriter<Jpeg2000File> {
 
   static string IImageFormatMetadata<Jpeg2000File>.PrimaryExtension => ".jp2";

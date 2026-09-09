@@ -5,6 +5,7 @@ using FileFormat.Ilbm;
 namespace FileFormat.IffMultiPalette;
 
 /// <summary>In-memory representation of an IFF ILBM image with PCHG line-by-line palette changes.</summary>
+[VerifiedBy(ConformanceOracle.FFmpeg)]
 public readonly record struct IffMultiPaletteFile : IImageFormatReader<IffMultiPaletteFile>, IImageToRawImage<IffMultiPaletteFile>, IImageFromRawImage<IffMultiPaletteFile>, IImageFormatWriter<IffMultiPaletteFile> {
 
   /// <summary>Minimum valid file size (FORM header plus form type).</summary>

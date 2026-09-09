@@ -1,9 +1,10 @@
-﻿using System;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.Tiny;
 
 /// <summary>In-memory representation of a Tiny Stuff compressed Atari ST screen image.</summary>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct TinyFile : IImageFormatReader<TinyFile>, IImageToRawImage<TinyFile>, IImageFromRawImage<TinyFile>, IImageFormatWriter<TinyFile> {
 
   /// <summary>Bytes of Atari ST screen memory represented by every Tiny Stuff picture.</summary>

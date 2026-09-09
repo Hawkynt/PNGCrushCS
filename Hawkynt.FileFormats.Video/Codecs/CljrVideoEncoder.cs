@@ -43,6 +43,7 @@ namespace FileFormat.Codecs;
 /// refuses the same width, and so does ffmpeg's encoder — and a frame whose geometry differs from the
 /// stream's.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.FFmpeg)]
 public sealed class CljrVideoEncoder : IVideoCodecEncoder<CljrVideoEncoder> {
 
   private static readonly CodecTag _Tag = CodecTag.FromCharacters("CLJR");

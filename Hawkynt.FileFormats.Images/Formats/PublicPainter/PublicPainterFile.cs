@@ -4,6 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.PublicPainter;
 
 /// <summary>In-memory representation of a Public Painter compressed monochrome image (Atari ST, 640x400).</summary>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct PublicPainterFile : IImageFormatReader<PublicPainterFile>, IImageToRawImage<PublicPainterFile>, IImageFromRawImage<PublicPainterFile>, IImageFormatWriter<PublicPainterFile> {
 
   /// <summary>Decompressed bitmap size: 640x400 / 8 bits per byte = 32000 bytes.</summary>

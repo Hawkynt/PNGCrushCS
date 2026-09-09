@@ -11,6 +11,7 @@ namespace FileFormat.CompuServeRle;
 /// </remarks>
 [FormatMagicBytes([0x1B, (byte)'G', (byte)'M'])]
 [FormatMagicBytes([0x1B, (byte)'G', (byte)'H'])]
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct CompuServeRleFile
   : IImageFormatReader<CompuServeRleFile>, IImageToRawImage<CompuServeRleFile>,
     IImageFromRawImage<CompuServeRleFile>, IImageFormatWriter<CompuServeRleFile> {

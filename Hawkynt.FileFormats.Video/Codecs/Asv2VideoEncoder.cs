@@ -36,6 +36,7 @@ namespace FileFormat.Codecs;
 /// ffmpeg's own ASV2 decoder and compared against this package's decode of the same bytes plane by
 /// plane, on the 4:2:0 samples rather than in RGB.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.FFmpeg)]
 public sealed class Asv2VideoEncoder : IVideoCodecEncoder<Asv2VideoEncoder> {
 
   private static readonly CodecTag _Tag = CodecTag.FromCharacters("ASV2");

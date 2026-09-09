@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.JpegXl;
@@ -15,6 +15,7 @@ namespace FileFormat.JpegXl;
 /// group is stated a group at a time, which is what the format asks for. Lossy coding is read but
 /// not written.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.ImageMagick, ConformanceOracle.Djxl, ConformanceOracle.FFmpeg)]
 public readonly record struct JpegXlFile
   : IImageFormatReader<JpegXlFile>, IImageFormatWriter<JpegXlFile>,
     IImageToRawImage<JpegXlFile>, IImageFromRawImage<JpegXlFile>,

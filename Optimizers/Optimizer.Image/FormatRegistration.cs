@@ -55,9 +55,11 @@ internal static partial class FormatRegistration {
     MagicSignature[] magic,
     int priority,
     string[] mimeTypes,
-    RawImageWriteCapability[] typedWriteCapabilities
+    RawImageWriteCapability[] typedWriteCapabilities,
+    ConformanceOracle[] verifiedBy
   ) where T : IImageFormatReader<T>, IImageToRawImage<T>, IImageFromRawImage<T>, IImageFormatWriter<T> {
     _ = mimeTypes; // legacy registration ignores MIME (Optimizer.Image doesn't use it)
+    _ = verifiedBy; // the optimizer registry documents nothing, so it has no use for the claim
     Func<byte[], bool?>? matchSig = null;
     try {
       matchSig = header => T.MatchesSignature(header);

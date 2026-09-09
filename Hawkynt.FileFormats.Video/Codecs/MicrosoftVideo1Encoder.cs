@@ -49,6 +49,7 @@ namespace FileFormat.Codecs;
 /// does survive exactly at sixteen bits is any colour already on the 5-5-5 grid, since the eight-bit
 /// samples are quantised by rounding and widened back by repeating the five bits.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.FFmpeg)]
 public sealed class MicrosoftVideo1Encoder : IVideoCodecEncoder<MicrosoftVideo1Encoder> {
 
   /// <summary>The four-character code containers name this codec with.</summary>

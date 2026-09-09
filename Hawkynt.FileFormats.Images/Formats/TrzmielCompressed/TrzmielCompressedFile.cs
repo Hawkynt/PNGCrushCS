@@ -12,6 +12,7 @@ namespace FileFormat.TrzmielCompressed;
 /// The two colours are the opposite way round from the usual: a clear bit draws light grey and a
 /// set one black, so the picture is ink on paper rather than light on a dark screen.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct TrzmielCompressedFile
   : IImageFormatReader<TrzmielCompressedFile>, IImageToRawImage<TrzmielCompressedFile>,
     IImageFromRawImage<TrzmielCompressedFile>, IImageFormatWriter<TrzmielCompressedFile> {

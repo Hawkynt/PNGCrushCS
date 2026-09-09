@@ -6,6 +6,7 @@ namespace FileFormat.Miff;
 
 /// <summary>In-memory representation of a MIFF (ImageMagick) image.</summary>
 [FormatMagicBytes([0x69, 0x64, 0x3D, 0x49, 0x6D, 0x61, 0x67, 0x65, 0x4D, 0x61, 0x67, 0x69, 0x63, 0x6B])]
+[VerifiedBy(ConformanceOracle.ImageMagick)]
 public readonly record struct MiffFile : IImageFormatReader<MiffFile>, IImageToRawImage<MiffFile>, IImageFromRawImage<MiffFile>, IImageFormatWriter<MiffFile> {
 
   static string IImageFormatMetadata<MiffFile>.PrimaryExtension => ".miff";

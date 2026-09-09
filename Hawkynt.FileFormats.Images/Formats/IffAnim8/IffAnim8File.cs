@@ -4,6 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.IffAnim8;
 
 /// <summary>In-memory representation of an IFF ANIM method-8 (short/long vertical delta) file.</summary>
+[VerifiedBy(ConformanceOracle.FFmpeg)]
 public readonly record struct IffAnim8File : IImageFormatReader<IffAnim8File>, IImageToRawImage<IffAnim8File>, IImageFromRawImage<IffAnim8File>, IImageFormatWriter<IffAnim8File> {
 
   /// <summary>Minimum valid file size (FORM header = 12 bytes).</summary>

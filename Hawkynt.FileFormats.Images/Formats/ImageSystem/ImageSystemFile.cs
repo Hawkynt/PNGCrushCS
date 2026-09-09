@@ -9,6 +9,7 @@ namespace FileFormat.ImageSystem;
 /// bitmap out across eight whole pages and puts the video matrix after them; the multicolour one
 /// puts the colour RAM first, the bitmap after its page, and the matrix last.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct ImageSystemFile
   : IImageFormatReader<ImageSystemFile>, IImageToRawImage<ImageSystemFile>,
     IImageFromRawImage<ImageSystemFile>, IImageFormatWriter<ImageSystemFile> {

@@ -22,6 +22,7 @@ namespace FileFormat.CfliDesigner;
 /// pixels it is wrong at are the odd columns and nothing else — which is what identified the
 /// pattern.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct CfliDesignerFile
   : IImageFormatReader<CfliDesignerFile>, IImageToRawImage<CfliDesignerFile>,
     IImageFromRawImage<CfliDesignerFile>, IImageFormatWriter<CfliDesignerFile> {

@@ -15,6 +15,7 @@ namespace FileFormat.FunWithArt;
 /// executed: the routine saves two registers, waits for the beam, then loads and stores colours
 /// until it returns. Anything else means the file is not one Fun with Art wrote.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct FunWithArtFile
   : IImageFormatReader<FunWithArtFile>, IImageToRawImage<FunWithArtFile>,
     IImageFromRawImage<FunWithArtFile>, IImageFormatWriter<FunWithArtFile> {

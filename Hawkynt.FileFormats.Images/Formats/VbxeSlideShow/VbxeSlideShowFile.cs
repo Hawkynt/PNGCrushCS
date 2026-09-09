@@ -11,6 +11,7 @@ namespace FileFormat.VbxeSlideShow;
 /// planes rather than as triplets — every red, then every green, then every blue — which is the
 /// order the hardware's three colour registers are loaded in.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct VbxeSlideShowFile
   : IImageFormatReader<VbxeSlideShowFile>, IImageToRawImage<VbxeSlideShowFile>,
     IImageFromRawImage<VbxeSlideShowFile>, IImageFormatWriter<VbxeSlideShowFile> {

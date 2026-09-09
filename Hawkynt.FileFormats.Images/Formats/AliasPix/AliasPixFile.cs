@@ -4,6 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.AliasPix;
 
 /// <summary>In-memory representation of an Alias/Wavefront PIX image.</summary>
+[VerifiedBy(ConformanceOracle.ImageMagick, ConformanceOracle.FFmpeg)]
 public readonly record struct AliasPixFile : IImageFormatReader<AliasPixFile>, IImageToRawImage<AliasPixFile>, IImageFromRawImage<AliasPixFile>, IImageFormatWriter<AliasPixFile> {
 
   static string IImageFormatMetadata<AliasPixFile>.PrimaryExtension => ".pix";

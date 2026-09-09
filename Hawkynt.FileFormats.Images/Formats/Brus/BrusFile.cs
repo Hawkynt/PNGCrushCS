@@ -13,6 +13,7 @@ namespace FileFormat.Brus;
 /// The run-length coding is the plain kind: a byte under 128 introduces that many literals, and one
 /// above it repeats the next byte that many times less 128.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct BrusFile
   : IImageFormatReader<BrusFile>, IImageToRawImage<BrusFile>,
     IImageFromRawImage<BrusFile>, IImageFormatWriter<BrusFile> {

@@ -10,6 +10,7 @@ namespace FileFormat.KssPaint;
 /// mode D, but draws one screen row per stored row instead of two, so 160 stored rows fill a
 /// 320x160 display.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct KssPaintFile
   : IImageFormatReader<KssPaintFile>, IImageToRawImage<KssPaintFile>,
     IImageFromRawImage<KssPaintFile>, IImageFormatWriter<KssPaintFile> {

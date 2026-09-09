@@ -16,6 +16,7 @@ namespace FileFormat.AtariIce;
 /// arrangement, coloured by a multiplier that changes down the picture, and the two fields take
 /// that multiplier in different orders.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct AtariIceFile
   : IImageFormatReader<AtariIceFile>, IImageToRawImage<AtariIceFile>,
     IImageFromRawImage<AtariIceFile>, IImageFormatWriter<AtariIceFile> {

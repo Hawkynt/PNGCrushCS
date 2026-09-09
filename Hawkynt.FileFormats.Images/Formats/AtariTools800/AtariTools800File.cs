@@ -10,6 +10,7 @@ namespace FileFormat.AtariTools800;
 /// files show all four of one or both kinds side by side, each sprite at the fixed position the
 /// dump gives it, on black — so the gaps between them are part of the image, not padding.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct AtariTools800File
   : IImageFormatReader<AtariTools800File>, IImageToRawImage<AtariTools800File>,
     IImageFromRawImage<AtariTools800File>, IImageFormatWriter<AtariTools800File> {

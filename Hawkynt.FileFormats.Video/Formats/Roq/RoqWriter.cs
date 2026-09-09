@@ -8,6 +8,7 @@ using Hawkynt.FileFormats.Video;
 namespace FileFormat.RoqVideo;
 
 /// <summary>Writes RoQ video chunks verbatim and sound chunks with their preserved predictor arguments.</summary>
+[VerifiedBy(ConformanceOracle.FFmpeg)]
 public sealed class RoqWriter : IVideoContainerWriter<RoqWriter> {
 
   private readonly IReadOnlyList<MediaStreamInfo> _streams;

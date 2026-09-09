@@ -14,6 +14,7 @@ namespace FileFormat.PetDraw;
 /// The character code's top bit inverts the glyph rather than selecting one, which is how the
 /// screen draws solid blocks of colour from a character set that has no solid block.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct PetDrawFile
   : IImageFormatReader<PetDrawFile>, IImageToRawImage<PetDrawFile>,
     IImageFromRawImage<PetDrawFile>, IImageFormatWriter<PetDrawFile> {

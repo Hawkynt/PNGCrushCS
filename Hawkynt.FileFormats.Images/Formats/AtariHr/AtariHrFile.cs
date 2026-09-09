@@ -13,6 +13,7 @@ namespace FileFormat.AtariHr;
 /// It used to be read as a single 320-by-192 screen of 7680 bytes: half the size, the wrong shape,
 /// and without the second field there are no greys at all.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct AtariHrFile : IImageFormatReader<AtariHrFile>, IImageToRawImage<AtariHrFile>, IImageFromRawImage<AtariHrFile>, IImageFormatWriter<AtariHrFile> {
 
   /// <summary>Fixed width in pixels.</summary>

@@ -6,6 +6,7 @@ using Hawkynt.FileFormats.Video;
 namespace FileFormat.Mjpeg;
 
 /// <summary>Writes complete JPEG frames one after another as a raw Motion JPEG stream.</summary>
+[VerifiedBy(ConformanceOracle.FFmpeg)]
 public sealed class MjpegWriter : IVideoContainerWriter<MjpegWriter> {
 
   private readonly ElementaryStreamMuxer _muxer;

@@ -14,6 +14,7 @@ namespace FileFormat.MsxGlYjk;
 /// <c>.PLA</c> file, while <c>.glc</c>, <c>.gls</c> and <c>.shc</c> are Screen 12 and spend every
 /// bit on colour.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct MsxGlYjkFile
   : IImageFormatReader<MsxGlYjkFile>, IImageToRawImage<MsxGlYjkFile>,
     IImageFromRawImage<MsxGlYjkFile>, IImageFormatWriter<MsxGlYjkFile> {

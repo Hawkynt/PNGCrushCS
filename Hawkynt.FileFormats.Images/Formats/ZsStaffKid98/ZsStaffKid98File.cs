@@ -16,6 +16,7 @@ namespace FileFormat.ZsStaffKid98;
 /// do arrive are then differenced twice, once against the byte before and once against the byte
 /// two back, which is what makes a dithered plane compress at all.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct ZsStaffKid98File
   : IImageFormatReader<ZsStaffKid98File>, IImageToRawImage<ZsStaffKid98File>,
     IImageFromRawImage<ZsStaffKid98File>, IImageFormatWriter<ZsStaffKid98File> {

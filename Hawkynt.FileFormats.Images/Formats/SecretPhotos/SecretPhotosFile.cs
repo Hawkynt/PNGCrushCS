@@ -18,6 +18,7 @@ namespace FileFormat.SecretPhotos;
 /// decode. A file of any other shape under this name is refused rather than read at an offset it
 /// never meant.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.FFmpeg)]
 public readonly record struct SecretPhotosFile
   : IImageFormatReader<SecretPhotosFile>, IImageToRawImage<SecretPhotosFile>, IImageFromRawImage<SecretPhotosFile>, IImageFormatWriter<SecretPhotosFile> {
 

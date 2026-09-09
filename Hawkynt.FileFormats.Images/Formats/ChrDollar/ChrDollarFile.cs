@@ -12,6 +12,7 @@ namespace FileFormat.ChrDollar;
 /// machine has no way to show more than two colours in a cell, so a font that wants more flickers
 /// between two versions of itself.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct ChrDollarFile
   : IImageFormatReader<ChrDollarFile>, IImageToRawImage<ChrDollarFile>,
     IImageFromRawImage<ChrDollarFile>, IImageFormatWriter<ChrDollarFile> {

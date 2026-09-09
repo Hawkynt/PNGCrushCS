@@ -9,6 +9,7 @@ namespace FileFormat.Mtv;
 /// byte per pixel. PRT and Rayshade use the same raster layout.
 /// </remarks>
 [FormatDetectionPriority(999)]
+[VerifiedBy(ConformanceOracle.ImageMagick)]
 public readonly record struct MtvFile :
   IImageFormatReader<MtvFile>, IImageToRawImage<MtvFile>,
   IImageFromRawImage<MtvFile>, IImageFormatWriter<MtvFile> {

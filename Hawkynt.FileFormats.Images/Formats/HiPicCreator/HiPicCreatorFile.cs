@@ -9,6 +9,7 @@ namespace FileFormat.HiPicCreator;
 /// video matrix naming the two colours each cell may show. The load address comes first, the bitmap
 /// after it, and the matrix after the bitmap's eight thousand bytes.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct HiPicCreatorFile : IImageFormatReader<HiPicCreatorFile>, IImageToRawImage<HiPicCreatorFile>, IImageFromRawImage<HiPicCreatorFile>, IImageFormatWriter<HiPicCreatorFile> {
 
   static string IImageFormatMetadata<HiPicCreatorFile>.PrimaryExtension => ".hpc";

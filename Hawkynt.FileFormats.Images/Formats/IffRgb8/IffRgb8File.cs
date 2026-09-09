@@ -5,6 +5,7 @@ namespace FileFormat.IffRgb8;
 
 /// <summary>In-memory representation of an IFF RGB8 (24-bit RGB) image.</summary>
 [FormatMagicBytes([0x46, 0x4F, 0x52, 0x4D])]
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.FFmpeg)]
 public readonly record struct IffRgb8File : IImageFormatReader<IffRgb8File>, IImageToRawImage<IffRgb8File>, IImageFromRawImage<IffRgb8File>, IImageFormatWriter<IffRgb8File> {
 
   static string IImageFormatMetadata<IffRgb8File>.PrimaryExtension => ".rgb8";

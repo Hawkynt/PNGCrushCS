@@ -13,6 +13,7 @@ namespace FileFormat.BlazingPaddlesWindow;
 /// No colours are stored. A window was meant to be pasted back into a picture that has its own, so
 /// what it carries are the four registers Blazing Paddles itself worked in.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct BlazingPaddlesWindowFile
   : IImageFormatReader<BlazingPaddlesWindowFile>, IImageToRawImage<BlazingPaddlesWindowFile>,
     IImageFromRawImage<BlazingPaddlesWindowFile>, IImageFormatWriter<BlazingPaddlesWindowFile> {
