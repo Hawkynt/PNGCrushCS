@@ -52,12 +52,6 @@ public sealed record FormatEntry(
   Action<RawImage, FileInfo>? WriteToFile = null
 ) {
 
-  /// <summary>
-  /// Exact raw representations this writer explicitly accepts through typed contracts. Empty means
-  /// the format still uses only the legacy runtime-tagged write path and has not been migrated yet.
-  /// </summary>
-  public RawImageWriteCapability[] TypedWriteCapabilities { get; init; } = [];
-
   /// <summary>The first/preferred MIME type, or <c>"application/octet-stream"</c> if none is registered.</summary>
   public string PrimaryMimeType => this.MimeTypes.Length > 0 ? this.MimeTypes[0] : "application/octet-stream";
 
@@ -67,8 +61,6 @@ public sealed record FormatEntry(
   /// <summary>True if this format can encode from a <see cref="RawImage"/>.</summary>
   public bool SupportsWrite => this.ConvertFromRawImage != null;
 
-  /// <summary>True if this format advertises at least one exact compile-time raw writer contract.</summary>
-  public bool SupportsTypedWrite => this.TypedWriteCapabilities.Length != 0;
 
   /// <summary>True if this format exposes multiple sub-images (animated GIF, multi-page TIFF, ICO sets, etc.).</summary>
   public bool SupportsMultiImage => this.GetImageCount != null;

@@ -33,9 +33,7 @@ internal static class FormatRegistry {
     Func<byte[], IReadOnlyList<ChunkSpan>>? EnumerateChunks = null,
     Func<byte[], IReadOnlyList<ChunkRewriteRule>, byte[]>? RewriteChunks = null,
     Func<byte[], ChunkRewritePlan, ChunkRewriteResult>? ApplyChunkPlan = null
-  ) {
-    internal RawImageWriteCapability[] TypedWriteCapabilities { get; init; } = [];
-  }
+  );
 
 
   private static readonly Dictionary<ImageFormat, FormatEntry> _byFormat = new();

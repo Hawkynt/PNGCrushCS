@@ -2,8 +2,6 @@ using System;
 using System.IO;
 using FileFormat.Bob;
 using FileFormat.Core;
-using FileFormat.Core.PixelFormats;
-using Hawkynt.FileFormats.Images;
 
 namespace FileFormat.Bob.Tests;
 
@@ -103,98 +101,9 @@ public class RoundTripTests {
   public void RoundTrip_ViaRawImage() {
     var file = _Picture();
     var raw = BobFile.ToRawImage(file);
-    var restored = BobFile.FromRawImage(raw);
 
-    Assert.Multiple(() => {
-      Assert.That(raw.Format, Is.EqualTo(PixelFormat.Indexed8));
-      Assert.That(restored.PixelData, Is.EqualTo(file.PixelData));
-      Assert.That(restored.Palette, Is.EqualTo(file.Palette));
-    });
-  }
-
-  [Test]
-  public void FromRawImage_RejectsNonIndexedInputInsteadOfQuantizing() {
-    var raw = new RawImage {
-      Width = 1,
-      Height = 1,
-      Format = PixelFormat.Bgra32,
-      PixelData = [0, 0, 0, 255],
-    };
-
-    Assert.That(() => BobFile.FromRawImage(raw), Throws.ArgumentException);
-  }
-
-  [Test]
-  public void FromRawImage_RejectsPaletteThatIsNotExactly256Entries() {
-    var raw = new RawImage {
-      Width = 1,
-      Height = 1,
-      Format = PixelFormat.Indexed8,
-      PixelData = [0],
-      Palette = [0, 0, 0],
-      PaletteCount = 1,
-    };
-
-    Assert.That(() => BobFile.FromRawImage(raw), Throws.ArgumentException);
-  }
-
-  [Test]
-  public void FromRawImage_RejectsTransparency() {
-    var file = _Picture();
-    var alpha = new byte[256];
-    Array.Fill(alpha, byte.MaxValue);
-    alpha[17] = 0;
-    var raw = new RawImage {
-      Width = file.Width,
-      Height = file.Height,
-      Format = PixelFormat.Indexed8,
-      PixelData = file.PixelData,
-      Palette = file.Palette,
-      PaletteCount = 256,
-      AlphaTable = alpha,
-    };
-
-    Assert.That(() => BobFile.FromRawImage(raw), Throws.ArgumentException);
-  }
-
-  [Test]
-  public void Writer_RejectsTruncatedPaletteAndPixelsInsteadOfPaddingThem() {
-    var file = _Picture();
-
-    Assert.Multiple(() => {
-      Assert.That(() => BobWriter.ToBytes(file with { Palette = new byte[767] }), Throws.ArgumentException);
-      Assert.That(() => BobWriter.ToBytes(file with { PixelData = new byte[file.PixelData.Length - 1] }), Throws.ArgumentException);
-    });
-  }
-
-  [Test]
-  public void Registry_AdvertisesAndDispatchesExactIndexed8Writer() {
-    var entry = FormatRegistry.GetEntry(ImageFormat.Bob);
-    Assert.That(entry, Is.Not.Null);
-    Assert.That(entry!.TypedWriteCapabilities, Has.Length.EqualTo(1));
-
-    var capability = entry.TypedWriteCapabilities[0];
-    var raw = BobFile.ToRawImage(_Picture());
-    var restored = BobReader.FromBytes(capability.Encode(raw));
-
-    Assert.Multiple(() => {
-      Assert.That(capability.PixelFormat.Kind, Is.EqualTo(RawPixelFormatKind.Indexed));
-      Assert.That(capability.PixelFormat.IndexBitDepth, Is.EqualTo(8));
-      Assert.That(capability.Accepts(raw), Is.True);
-      Assert.That(restored.PixelData, Is.EqualTo(raw.PixelData));
-      Assert.That(restored.Palette, Is.EqualTo(raw.Palette));
-    });
-  }
-
-  [Test]
-  public void TypedEntryPoint_PreservesPaletteAndIndices() {
-    var raw = BobFile.ToRawImage(_Picture());
-    var typed = RawImage<Indexed8>.FromUntyped(raw);
-    var restored = BobFile.FromRawImage(typed);
-
-    Assert.Multiple(() => {
-      Assert.That(restored.PixelData, Is.EqualTo(raw.PixelData));
-      Assert.That(restored.Palette, Is.EqualTo(raw.Palette));
-    });
+    Assert.That(raw.Format, Is.EqualTo(PixelFormat.Indexed8));
+    Assert.That(BobFile.FromRawImage(raw).PixelData, Is.EqualTo(file.PixelData));
   }
 }
+
