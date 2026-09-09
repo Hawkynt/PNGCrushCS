@@ -46,33 +46,37 @@ internal sealed class Vp8LPredictorTransform : Vp8LTransform {
     var blockSize = 1 << this._blockBits;
     var blocksPerRow = _DivRoundUp(width, blockSize);
 
-    // First pixel: add black predictor (no change since predictor is 0x00000000 for color channels)
-    // Actually mode 0 predicts 0xFF000000, but only alpha=0xFF; RGB=0
-    // The first pixel row uses left predictor after the first pixel
-    // First pixel: predict as 0xFF000000
-    pixels[0] = _AddPixels(pixels[0], 0xFF000000);
+    // The top-left pixel has no neighbour at all and takes opaque black; the rest of the first row
+    // predicts from the left, and the first pixel of every later row predicts from above. Those
+    // three rules are fixed, so the per-tile predictor only ever applies from the second column of
+    // the second row onwards.
+    pixels[0] = _AddPixels(pixels[0], _ARGB_BLACK);
 
-    // Rest of first row: use left predictor
     for (var x = 1; x < width; ++x)
       pixels[x] = _AddPixels(pixels[x], pixels[x - 1]);
 
-    // Remaining rows
     for (var y = 1; y < height; ++y) {
       var rowOffset = y * width;
       var blockY = y >> this._blockBits;
 
-      // First pixel of row: use top predictor
       pixels[rowOffset] = _AddPixels(pixels[rowOffset], pixels[rowOffset - width]);
 
       for (var x = 1; x < width; ++x) {
         var blockX = x >> this._blockBits;
         var transformIdx = (blockY * blocksPerRow) + blockX;
-        var mode = (int)((this._transformData[transformIdx] >> 8) & 0xFF); // green channel = mode
+
+        // The mode lives in the green channel's low four bits. Modes 14 and 15 exist only to pad
+        // the table to a power of two and predict black, the same as mode 0.
+        var mode = (int)((this._transformData[transformIdx] >> 8) & 0x0F);
 
         var left = pixels[rowOffset + x - 1];
         var top = pixels[rowOffset + x - width];
         var topLeft = pixels[rowOffset + x - width - 1];
-        var topRight = x + 1 < width ? pixels[rowOffset + x - width + 1] : top;
+
+        // "Top-right" is literally the pixel one place after the one above, which in the last
+        // column is the first pixel of the row being reconstructed rather than anything above it.
+        // Rows are contiguous, so the same index expression states both cases.
+        var topRight = pixels[rowOffset + x - width + 1];
 
         var predicted = _Predict(mode, left, top, topRight, topLeft);
         pixels[rowOffset + x] = _AddPixels(pixels[rowOffset + x], predicted);
@@ -80,23 +84,33 @@ internal sealed class Vp8LPredictorTransform : Vp8LTransform {
     }
   }
 
+  private const uint _ARGB_BLACK = 0xFF000000;
+
+  /// <summary>The fourteen VP8L predictors, in the neighbour pairings the format defines.</summary>
+  /// <remarks>
+  /// Naming the neighbours <c>TL T TR</c> for the row above and <c>L</c> for the pixel just passed,
+  /// these are black, L, T, TR, TL, average(L,T,TR), average(L,TL), average(L,T), average(TL,T),
+  /// average(T,TR), average(L,TL,T,TR), select, and the two clamped add-subtract forms. The
+  /// three-way and four-way averages are built from pairwise averages in a fixed order, because
+  /// each pairwise step truncates and a different association rounds differently.
+  /// </remarks>
   [MethodImpl(MethodImplOptions.AggressiveInlining)]
   private static uint _Predict(int mode, uint left, uint top, uint topRight, uint topLeft) => mode switch {
-    0 => 0xFF000000,
+    0 => _ARGB_BLACK,
     1 => left,
     2 => top,
     3 => topRight,
     4 => topLeft,
-    5 => _Average(left, topRight),
-    6 => _Average(left, top),
-    7 => _Average(left, topLeft),
-    8 => _Average(top, topRight),
-    9 => _Average(top, topLeft),
+    5 => _Average(_Average(left, topRight), top),
+    6 => _Average(left, topLeft),
+    7 => _Average(left, top),
+    8 => _Average(topLeft, top),
+    9 => _Average(top, topRight),
     10 => _Average(_Average(left, topLeft), _Average(top, topRight)),
-    11 => _Select(left, top, topLeft),
+    11 => _Select(top, left, topLeft),
     12 => _ClampAddSubtractFull(left, top, topLeft),
     13 => _ClampAddSubtractHalf(_Average(left, top), topLeft),
-    _ => 0xFF000000
+    _ => _ARGB_BLACK,
   };
 
   [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -120,12 +134,16 @@ internal sealed class Vp8LPredictorTransform : Vp8LTransform {
     return ((uint)avgA << 24) | ((uint)avgR << 16) | ((uint)avgG << 8) | (uint)avgB;
   }
 
+  /// <summary>
+  /// Returns whichever of <paramref name="a"/> and <paramref name="b"/> sits closer to the gradient
+  /// running through <paramref name="c"/>, measured channel by channel. Predictor 11 passes the
+  /// pixel above as <paramref name="a"/> and the pixel to the left as <paramref name="b"/>, and a
+  /// tie goes to <paramref name="a"/> — the argument order is the whole of the tie-break, so it is
+  /// kept here rather than being re-expressed as a comparison of distances.
+  /// </summary>
   [MethodImpl(MethodImplOptions.AggressiveInlining)]
-  private static uint _Select(uint left, uint top, uint topLeft) {
-    var dLeft = _ManhattanDistance(top, topLeft);
-    var dTop = _ManhattanDistance(left, topLeft);
-    return dLeft <= dTop ? left : top;
-  }
+  private static uint _Select(uint a, uint b, uint c)
+    => _ManhattanDistance(b, c) - _ManhattanDistance(a, c) <= 0 ? a : b;
 
   [MethodImpl(MethodImplOptions.AggressiveInlining)]
   private static int _ManhattanDistance(uint a, uint b) {

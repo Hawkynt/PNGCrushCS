@@ -106,6 +106,51 @@ public sealed class Vp8LHuffmanTreeTests {
     Assert.That(decodedSymbols, Does.Contain(2));
   }
 
+  /// <summary>
+  /// Codes longer than the primary table's 8 bits resolve through a secondary table, and every
+  /// symbol must still come back with the right number of bits consumed.
+  /// </summary>
+  /// <remarks>
+  /// Uses the canonical code that lengths 1,2,3,...,11,11 produce: symbol <c>k</c> is <c>k</c> one
+  /// bits followed by a zero, and the last symbol is eleven ones. Reading is LSB-first and a code
+  /// arrives most-significant bit first, so those bit sequences are exactly what gets written.
+  /// Every symbol from 8 upwards needs the secondary table, which is the case no other test here
+  /// reaches — the tree happily built such codes while <c>ReadSymbol</c> mistook the table pointer
+  /// for a symbol, so the trees themselves were never the thing that was broken.
+  /// </remarks>
+  [Test]
+  [Category("Unit")]
+  public void ReadSymbol_CodesLongerThanThePrimaryTable_DecodeThroughTheSecondaryTable() {
+    const int longestCode = 11;
+    var codeLengths = new int[longestCode + 1];
+    for (var k = 0; k < longestCode; ++k)
+      codeLengths[k] = k + 1;
+    codeLengths[longestCode] = longestCode;
+
+    var tree = Vp8LHuffmanTree.Build(codeLengths, codeLengths.Length);
+
+    for (var symbol = 0; symbol <= longestCode; ++symbol) {
+      var ones = symbol == longestCode ? longestCode : symbol;
+      var bits = new bool[ones + (symbol == longestCode ? 0 : 1)];
+      for (var i = 0; i < ones; ++i)
+        bits[i] = true;
+
+      var reader = new Vp8LBitReader(_PackLsbFirst(bits), 0);
+      Assert.That(tree.ReadSymbol(reader), Is.EqualTo(symbol), $"symbol {symbol}");
+    }
+  }
+
+  /// <summary>Packs <paramref name="bits"/> in the order a <see cref="Vp8LBitReader"/> reads them,
+  /// padding the tail so the reader always has a full window to peek at.</summary>
+  private static byte[] _PackLsbFirst(bool[] bits) {
+    var bytes = new byte[bits.Length / 8 + 9];
+    for (var i = 0; i < bits.Length; ++i)
+      if (bits[i])
+        bytes[i / 8] |= (byte)(1 << (i % 8));
+
+    return bytes;
+  }
+
   [Test]
   [Category("Unit")]
   public void Build_LargeAlphabet_DoesNotThrow() {

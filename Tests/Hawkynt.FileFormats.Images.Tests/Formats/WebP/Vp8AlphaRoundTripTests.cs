@@ -1,11 +1,13 @@
+using System.IO;
+using System.Linq;
 using FileFormat.Core;
+using FileFormat.Riff;
 
 namespace FileFormat.WebP.Tests;
 
 /// <summary>
-/// Verifies VP8 lossy now preserves the alpha channel via the ALPH chunk.
-/// Before this fix, FromRawImageLossy on Rgba32 silently dropped alpha;
-/// now alpha is preserved bit-exactly (RGB still goes through lossy DCT).
+/// Verifies VP8 lossy preserves the alpha channel via the ALPH chunk and chooses the smaller of the
+/// raw and VP8L representations without changing the decoded alpha samples.
 /// </summary>
 [TestFixture]
 public sealed class Vp8AlphaRoundTripTests {
@@ -41,10 +43,56 @@ public sealed class Vp8AlphaRoundTripTests {
       Assert.That(decoded.Features.HasAlpha, Is.True);
     });
 
-    // Alpha plane is stored uncompressed in ALPH method 0, so it must survive bit-exact.
     for (var i = 0; i < src.Width * src.Height; ++i)
       Assert.That(raw.PixelData[i * 4 + 3], Is.EqualTo(src.PixelData[i * 4 + 3]),
-        $"Alpha at pixel {i} differs (lossy VP8 should preserve alpha bit-exactly via ALPH method 0).");
+        $"Alpha at pixel {i} differs (ALPH compression must remain bit-exact).");
+  }
+
+  [Test]
+  public void Vp8Lossy_CompressibleAlpha_UsesHeaderlessVp8L() {
+    var src = _MakeRgbaPattern(64, 32);
+    var bytes = WebPFile.ToBytes(WebPFile.FromRawImageLossy(src, quality: 75));
+    var alph = RiffReader.FromBytes(bytes).Chunks.Single(chunk => chunk.Id.ToString() == "ALPH").Data;
+
+    Assert.Multiple(() => {
+      Assert.That(alph[0] & 0x03, Is.EqualTo(1), "compression bits must select VP8L");
+      Assert.That(alph.Length, Is.LessThan(1 + src.Width * src.Height),
+        "the writer should only choose VP8L when its headerless stream is smaller than the raw plane");
+    });
+
+    var decoded = WebPFile.ToRawImage(WebPFile.FromBytes(bytes));
+    for (var i = 0; i < src.Width * src.Height; ++i)
+      Assert.That(decoded.PixelData[i * 4 + 3], Is.EqualTo(src.PixelData[i * 4 + 3]));
+  }
+
+  [Test]
+  public void Writer_TinyAlphaPlane_UsesRawMethodWhenVp8LWouldBeLarger() {
+    var file = new WebPFile {
+      Features = new WebPFeatures(1, 1, HasAlpha: true, IsLossless: false, IsAnimated: false),
+      ImageData = [0],
+      IsLossless = false,
+      AlphaData = [0],
+    };
+
+    var alph = RiffReader.FromBytes(WebPWriter.ToBytes(file)).Chunks
+      .Single(chunk => chunk.Id.ToString() == "ALPH").Data;
+
+    Assert.That(alph, Is.EqualTo(new byte[] { 0, 0 }),
+      "method 0 has no entropy header and wins for a one-byte alpha plane");
+  }
+
+  [Test]
+  public void Writer_AlphaPlaneLengthMustMatchCanvas() {
+    var file = new WebPFile {
+      Features = new WebPFeatures(2, 2, HasAlpha: true, IsLossless: false, IsAnimated: false),
+      ImageData = [0],
+      IsLossless = false,
+      AlphaData = [0, 1, 2],
+    };
+
+    Assert.That(
+      () => WebPWriter.ToBytes(file),
+      Throws.TypeOf<InvalidDataException>().With.Message.Contains("requiring 4"));
   }
 
   [Test]

@@ -44,7 +44,7 @@ public static class PowerPointWriter {
     if (file.PixelData is not { } pixels || pixels.Length < pixelLength)
       throw new InvalidDataException($"PowerPoint pixel data is truncated: expected {pixelLength} RGB bytes.");
 
-    var png = PngWriter.ToBytes(PngFile.FromRawImage(new() {
+    var png = PngWriter.ToBytes(PngFile.FromRawImage(new RawImage {
       Width = file.Width,
       Height = file.Height,
       Format = PixelFormat.Rgb24,

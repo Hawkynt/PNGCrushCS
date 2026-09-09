@@ -404,7 +404,7 @@ internal static class OfficeOpenXmlImagePackage {
     if (rgb24.Length < expected)
       throw new InvalidDataException($"Office picture data is truncated: expected {expected} RGB bytes, got {rgb24.Length}.");
 
-    return PngWriter.ToBytes(PngFile.FromRawImage(new() {
+    return PngWriter.ToBytes(PngFile.FromRawImage(new RawImage {
       Width = width,
       Height = height,
       Format = PixelFormat.Rgb24,
