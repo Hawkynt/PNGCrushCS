@@ -6,6 +6,7 @@ namespace FileFormat.UtahRle;
 
 /// <summary>In-memory representation of a Utah RLE image.</summary>
 [FormatMagicBytes([0xCC, 0x52])]
+[VerifiedBy(ConformanceOracle.ImageMagick)]
 public readonly record struct UtahRleFile : IImageFormatReader<UtahRleFile>, IImageToRawImage<UtahRleFile>, IImageFromRawImage<UtahRleFile>, IImageFormatWriter<UtahRleFile> {
 
   static string IImageFormatMetadata<UtahRleFile>.PrimaryExtension => ".rle";

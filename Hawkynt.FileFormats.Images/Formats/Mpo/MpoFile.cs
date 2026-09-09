@@ -7,6 +7,7 @@ using FileFormat.Jpeg;
 namespace FileFormat.Mpo;
 
 /// <summary>In-memory representation of an MPO (Multi-Picture Object) file.</summary>
+[VerifiedBy(ConformanceOracle.ImageMagick, ConformanceOracle.FFmpeg)]
 public sealed class MpoFile : IImageFormatReader<MpoFile>, IImageToRawImage<MpoFile>, IImageFromRawImage<MpoFile>, IImageFormatWriter<MpoFile>, IMultiImageFileFormat<MpoFile> {
 
   static string IImageFormatMetadata<MpoFile>.PrimaryExtension => ".mpo";

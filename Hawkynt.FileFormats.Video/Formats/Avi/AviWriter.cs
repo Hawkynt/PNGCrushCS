@@ -9,6 +9,7 @@ using Hawkynt.FileFormats.Video;
 namespace FileFormat.Avi;
 
 /// <summary>Writes AVI with OpenDML indexes, using AVIX RIFF extensions when one RIFF would exceed the OpenDML size limit.</summary>
+[VerifiedBy(ConformanceOracle.FFmpeg)]
 public sealed class AviWriter : IVideoContainerWriter<AviWriter> {
 
   private const int _DEFAULT_MAX_RIFF_SIZE = 1 << 30;

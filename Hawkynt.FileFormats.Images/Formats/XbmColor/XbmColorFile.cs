@@ -14,6 +14,7 @@ namespace FileFormat.XbmColor;
 /// static unsigned char name_pixels[]  = { i0, i1, ... };
 /// </code>
 /// </summary>
+[VerifiedBy(ConformanceOracle.FFmpeg)]
 public readonly record struct XbmColorFile : IImageFormatReader<XbmColorFile>, IImageFormatWriter<XbmColorFile>, IImageToRawImage<XbmColorFile>, IImageFromRawImage<XbmColorFile> {
 
   static string IImageFormatMetadata<XbmColorFile>.PrimaryExtension => ".xbm";

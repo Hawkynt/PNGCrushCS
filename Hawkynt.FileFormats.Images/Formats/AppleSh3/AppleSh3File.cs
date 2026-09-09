@@ -13,6 +13,7 @@ namespace FileFormat.AppleSh3;
 /// <para/>
 /// Each palette is stored in reverse order, which is how the hardware's registers are addressed.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct AppleSh3File
   : IImageFormatReader<AppleSh3File>, IImageToRawImage<AppleSh3File>,
     IImageFromRawImage<AppleSh3File>, IImageFormatWriter<AppleSh3File> {

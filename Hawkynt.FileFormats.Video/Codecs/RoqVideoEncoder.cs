@@ -42,6 +42,7 @@ namespace FileFormat.Codecs;
 /// size and in error with what ffmpeg's own <c>roqvideo</c> encoder writes from the same source planes is
 /// in <c>Hawkynt.FileFormats.Video/codec-notes.md</c>.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.FFmpeg)]
 public sealed class RoqVideoEncoder : IVideoCodecEncoder<RoqVideoEncoder> {
 
   private static readonly CodecTag _ROQV = CodecTag.FromCharacters("RoQV");

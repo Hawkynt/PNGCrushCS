@@ -10,6 +10,7 @@ namespace FileFormat.SketchPaddles;
 /// exactly 7680 bytes and still be a complete picture: everything else about it was fixed by the
 /// editor rather than chosen by the artist.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct SketchPaddlesFile
   : IImageFormatReader<SketchPaddlesFile>, IImageToRawImage<SketchPaddlesFile>,
     IImageFromRawImage<SketchPaddlesFile>, IImageFormatWriter<SketchPaddlesFile> {

@@ -16,6 +16,7 @@ namespace FileFormat.BkScreen;
 /// four-colour sets they name; the sets are fixed in hardware, so a colour screen costs one byte
 /// more than a monochrome one.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct BkScreenFile
   : IImageFormatReader<BkScreenFile>, IImageToRawImage<BkScreenFile>,
     IImageFromRawImage<BkScreenFile>, IImageFormatWriter<BkScreenFile> {

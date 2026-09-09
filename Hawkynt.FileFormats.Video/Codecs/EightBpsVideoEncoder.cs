@@ -41,6 +41,7 @@ namespace FileFormat.Codecs;
 /// 65020 pixels has rows this format cannot state the length of. That is refused when the encoder is
 /// built rather than discovered on whichever frame first happens to be noisy.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.FFmpeg)]
 public sealed class EightBpsVideoEncoder : IVideoCodecEncoder<EightBpsVideoEncoder> {
 
   private static readonly CodecTag _Tag = CodecTag.FromCharacters("8BPS");

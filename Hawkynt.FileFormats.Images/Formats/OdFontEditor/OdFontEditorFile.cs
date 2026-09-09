@@ -12,6 +12,7 @@ namespace FileFormat.OdFontEditor;
 /// <para/>
 /// Shown as thirty-two glyphs across and four bands down, in the two colours the text mode uses.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct OdFontEditorFile
   : IImageFormatReader<OdFontEditorFile>, IImageToRawImage<OdFontEditorFile>,
     IImageFromRawImage<OdFontEditorFile>, IImageFormatWriter<OdFontEditorFile> {

@@ -4,6 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.Artist64;
 
 /// <summary>In-memory representation of a Commodore 64 Artist 64 multicolor image.</summary>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct Artist64File : IImageFormatReader<Artist64File>, IImageToRawImage<Artist64File>, IImageFromRawImage<Artist64File>, IImageFormatWriter<Artist64File> {
 
   static string IImageFormatMetadata<Artist64File>.PrimaryExtension => ".a64";

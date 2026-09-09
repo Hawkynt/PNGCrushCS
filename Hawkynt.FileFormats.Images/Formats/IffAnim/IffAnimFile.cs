@@ -5,6 +5,7 @@ namespace FileFormat.IffAnim;
 
 /// <summary>In-memory representation of an IFF ANIM animation container (first frame only).</summary>
 [FormatMagicBytes([0x46, 0x4F, 0x52, 0x4D])]
+[VerifiedBy(ConformanceOracle.FFmpeg)]
 public readonly record struct IffAnimFile : IImageFormatReader<IffAnimFile>, IImageToRawImage<IffAnimFile>, IImageFromRawImage<IffAnimFile>, IImageFormatWriter<IffAnimFile> {
 
   static string IImageFormatMetadata<IffAnimFile>.PrimaryExtension => ".anim";

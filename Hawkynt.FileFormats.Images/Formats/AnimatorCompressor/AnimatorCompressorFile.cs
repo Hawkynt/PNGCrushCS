@@ -14,6 +14,7 @@ namespace FileFormat.AnimatorCompressor;
 /// across every frame at that height — which is what makes an animation readable as a single
 /// picture.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct AnimatorCompressorFile
   : IImageFormatReader<AnimatorCompressorFile>, IImageToRawImage<AnimatorCompressorFile>,
     IImageFromRawImage<AnimatorCompressorFile>, IImageFormatWriter<AnimatorCompressorFile> {

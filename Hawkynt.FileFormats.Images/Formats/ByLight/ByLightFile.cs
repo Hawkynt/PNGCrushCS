@@ -16,6 +16,7 @@ namespace FileFormat.ByLight;
 /// and the record is kept here verbatim. The vendor's manual describes the format as multi-page, but
 /// only the one image at offset 374 is reachable — the converter reports a single page.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.FFmpeg)]
 public readonly record struct ByLightFile : IImageFormatReader<ByLightFile>, IImageToRawImage<ByLightFile>, IImageFromRawImage<ByLightFile>, IImageFormatWriter<ByLightFile> {
 
   static string IImageFormatMetadata<ByLightFile>.PrimaryExtension => ".bif";

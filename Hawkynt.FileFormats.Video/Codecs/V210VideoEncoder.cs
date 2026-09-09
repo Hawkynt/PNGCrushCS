@@ -43,6 +43,7 @@ namespace FileFormat.Codecs;
 /// a sample above 1023 — a <see cref="PixelFormat.Yuv422P10"/> sample is right-justified in its
 /// sixteen bits, and a value the ten bits cannot hold would be written wrong rather than clipped.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.FFmpeg)]
 public sealed class V210VideoEncoder : IVideoCodecEncoder<V210VideoEncoder> {
 
   private static readonly CodecTag _Tag = CodecTag.FromCharacters("v210");

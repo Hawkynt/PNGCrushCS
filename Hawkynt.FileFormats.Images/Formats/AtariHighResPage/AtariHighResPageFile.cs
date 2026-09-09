@@ -22,6 +22,7 @@ namespace FileFormat.AtariHighResPage;
 /// <c>.pg3</c> was claimed only by Atari Paintworks, which wants a signature this file does not
 /// carry and a length of 32128.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct AtariHighResPageFile
   : IImageFormatReader<AtariHighResPageFile>, IImageToRawImage<AtariHighResPageFile>,
     IImageFromRawImage<AtariHighResPageFile>, IImageFormatWriter<AtariHighResPageFile> {

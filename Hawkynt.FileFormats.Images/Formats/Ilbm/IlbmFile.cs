@@ -5,6 +5,7 @@ namespace FileFormat.Ilbm;
 
 /// <summary>In-memory representation of an IFF ILBM image.</summary>
 [FormatMagicBytes([0x46, 0x4F, 0x52, 0x4D])]
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.FFmpeg)]
 public readonly record struct IlbmFile : IImageFormatReader<IlbmFile>, IImageToRawImage<IlbmFile>, IImageFromRawImage<IlbmFile>, IImageFormatWriter<IlbmFile> {
 
   static string IImageFormatMetadata<IlbmFile>.PrimaryExtension => ".lbm";

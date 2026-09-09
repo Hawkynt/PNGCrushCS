@@ -12,6 +12,7 @@ namespace FileFormat.Sf3;
 /// with those bytes altered still decodes — so it is written as zero here rather than guessed at,
 /// which is honest about what this does and does not know.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.ImageMagick)]
 public readonly record struct Sf3File
   : IImageFormatReader<Sf3File>, IImageToRawImage<Sf3File>,
     IImageFromRawImage<Sf3File>, IImageFormatWriter<Sf3File> {

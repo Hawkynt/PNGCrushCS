@@ -34,6 +34,7 @@ namespace FileFormat.UleadImageLibrary;
 /// itself. The extra block goes out empty: what belongs in it is artwork in a form nothing here has
 /// worked out, and filling it with anything else would be inventing it.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.FFmpeg)]
 public sealed class UleadImageLibraryFile
   : IImageFormatReader<UleadImageLibraryFile>, IImageToRawImage<UleadImageLibraryFile>,
     IImageFromRawImage<UleadImageLibraryFile>, IImageFormatWriter<UleadImageLibraryFile>,

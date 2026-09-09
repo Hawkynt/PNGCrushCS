@@ -27,6 +27,7 @@ namespace FileFormat.UleadAlbumTemplate;
 /// have to add up to the file. What it does not state is the cell layout: that is a description of
 /// how a page is arranged, and a diagram this library was handed says nothing about one.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.FFmpeg)]
 public sealed class UleadAlbumTemplateFile
   : IImageFormatReader<UleadAlbumTemplateFile>, IImageToRawImage<UleadAlbumTemplateFile>,
     IImageFromRawImage<UleadAlbumTemplateFile>, IImageFormatWriter<UleadAlbumTemplateFile>,

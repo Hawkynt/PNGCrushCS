@@ -13,6 +13,7 @@ namespace FileFormat.AtariFontMaker;
 /// Drawn in Graphics 0's two colours, which take the hue from the background register and only the
 /// luminance from the foreground.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct AtariFontMakerFile
   : IImageFormatReader<AtariFontMakerFile>, IImageToRawImage<AtariFontMakerFile>,
     IImageFromRawImage<AtariFontMakerFile>, IImageFormatWriter<AtariFontMakerFile> {

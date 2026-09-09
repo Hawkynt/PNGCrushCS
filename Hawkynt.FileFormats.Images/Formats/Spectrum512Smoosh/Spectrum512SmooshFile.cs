@@ -19,6 +19,7 @@ namespace FileFormat.Spectrum512Smoosh;
 /// What neither settles is how a reader tells the two bitmap orders apart, because nothing in the
 /// file says — see <c>_Unpack</c>.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct Spectrum512SmooshFile : IImageFormatReader<Spectrum512SmooshFile>, IImageToRawImage<Spectrum512SmooshFile>, IImageFromRawImage<Spectrum512SmooshFile>, IImageFormatWriter<Spectrum512SmooshFile> {
 
   /// <summary>Minimum file size for validation.</summary>

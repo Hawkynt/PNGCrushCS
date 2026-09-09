@@ -10,6 +10,7 @@ namespace FileFormat.TextureEditorMikey;
 /// stored nibble covers four screen pixels and each stored row four screen rows, so the picture is
 /// displayed at 320x192.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct TextureEditorMikeyFile
   : IImageFormatReader<TextureEditorMikeyFile>, IImageToRawImage<TextureEditorMikeyFile>,
     IImageFromRawImage<TextureEditorMikeyFile>, IImageFormatWriter<TextureEditorMikeyFile> {

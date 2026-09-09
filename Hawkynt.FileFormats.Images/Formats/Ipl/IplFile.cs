@@ -9,6 +9,7 @@ namespace FileFormat.Ipl;
 /// than reading fixed offsets. The picture is stored one channel at a time rather than interleaved,
 /// and its samples are commonly sixteen bits.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.ImageMagick)]
 public readonly record struct IplFile : IImageFormatReader<IplFile>, IImageToRawImage<IplFile>, IImageFromRawImage<IplFile>, IImageFormatWriter<IplFile> {
 
   /// <summary>The tags and sizes that precede the samples.</summary>

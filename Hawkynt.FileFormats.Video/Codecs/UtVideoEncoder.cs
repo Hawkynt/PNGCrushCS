@@ -45,6 +45,7 @@ namespace FileFormat.Codecs;
 /// by name rather than quantised or resampled. A picture whose size differs from the stream's is
 /// refused too, as is an odd width or height for a code that subsamples across or down it.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.FFmpeg)]
 public sealed class UtVideoEncoder : IVideoCodecEncoder<UtVideoEncoder> {
 
   /// <summary>The size of the trailer at the end of every frame, which is what the reference encoder writes.</summary>

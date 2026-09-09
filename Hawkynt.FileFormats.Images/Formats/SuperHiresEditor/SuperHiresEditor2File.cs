@@ -14,6 +14,7 @@ namespace FileFormat.SuperHiresEditor;
 /// ones the way the hardware wants them, which is the only difference between the two readings
 /// beyond where everything sits.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct SuperHiresEditor2File
   : IImageFormatReader<SuperHiresEditor2File>, IImageToRawImage<SuperHiresEditor2File>,
     IImageFromRawImage<SuperHiresEditor2File>, IImageFormatWriter<SuperHiresEditor2File> {

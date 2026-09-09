@@ -58,6 +58,21 @@ public sealed record FormatEntry(
   /// </summary>
   public RawImageWriteCapability[] TypedWriteCapabilities { get; init; } = [];
 
+  /// <summary>
+  /// Tools from outside this repository that have read what this format's writer produces.
+  /// </summary>
+  /// <remarks>
+  /// Empty is the ordinary answer and the important one: nothing but our own reader has ever looked
+  /// at this writer's output, and a reader and a writer that agree only with each other can be
+  /// agreeing about the wrong thing. Declared by <see cref="VerifiedByAttribute"/> on the format
+  /// type and carried here by the registry generator, so the support table prints what the code
+  /// says rather than what somebody remembered.
+  /// </remarks>
+  public ConformanceOracle[] VerifiedBy { get; init; } = [];
+
+  /// <summary>True if any tool outside this repository has read this writer's output.</summary>
+  public bool HasWriterOracle => this.VerifiedBy.Length != 0;
+
   /// <summary>The first/preferred MIME type, or <c>"application/octet-stream"</c> if none is registered.</summary>
   public string PrimaryMimeType => this.MimeTypes.Length > 0 ? this.MimeTypes[0] : "application/octet-stream";
 

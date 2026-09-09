@@ -4,6 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.GodPaint;
 
 /// <summary>In-memory representation of a GodPaint (.gpn) screen dump.</summary>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct GodPaintFile : IImageFormatReader<GodPaintFile>, IImageToRawImage<GodPaintFile>, IImageFromRawImage<GodPaintFile>, IImageFormatWriter<GodPaintFile> {
 
   /// <summary>Header size: two reserved bytes, then big-endian width and height.</summary>

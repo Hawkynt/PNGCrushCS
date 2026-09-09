@@ -12,6 +12,7 @@ namespace FileFormat.Flv;
 /// so that what <see cref="FlvReader"/> reads out of one is what a remux writes back into the next.
 /// See <see cref="Amf0Writer"/> for which fields cross and which deliberately do not.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.FFmpeg)]
 public sealed class FlvWriter : IVideoContainerWriter<FlvWriter> {
 
   private readonly IReadOnlyList<MediaStreamInfo> _streams;

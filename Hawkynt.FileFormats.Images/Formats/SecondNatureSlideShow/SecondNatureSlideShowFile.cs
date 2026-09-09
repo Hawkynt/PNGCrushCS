@@ -31,6 +31,7 @@ namespace FileFormat.SecondNatureSlideShow;
   (byte)'S', (byte)'e', (byte)'c', (byte)'o', (byte)'n', (byte)'d', (byte)' ',
   (byte)'N', (byte)'a', (byte)'t', (byte)'u', (byte)'r', (byte)'e'
 ])]
+[VerifiedBy(ConformanceOracle.FFmpeg)]
 public sealed class SecondNatureSlideShowFile
   : IImageFormatReader<SecondNatureSlideShowFile>, IImageToRawImage<SecondNatureSlideShowFile>,
     IImageFromRawImage<SecondNatureSlideShowFile>, IImageFormatWriter<SecondNatureSlideShowFile>,

@@ -5,6 +5,7 @@ namespace FileFormat.Hrz;
 
 /// <summary>In-memory representation of a HRZ (slow-scan television) image.</summary>
 [FormatMimeType("image/x-hrz")]
+[VerifiedBy(ConformanceOracle.ImageMagick)]
 public readonly record struct HrzFile :
   IImageFormatReader<HrzFile>, IImageToRawImage<HrzFile>,
   IImageFromRawImage<HrzFile>, IImageFormatWriter<HrzFile>,

@@ -11,6 +11,7 @@ namespace FileFormat.InterlaceGraphicsEditor;
 /// flicker that gives the technique its name.
 /// </remarks>
 [FormatMagicBytes([0xFF, 0xFF, 0xF6, 0xA3, 0xFF, 0xBB, 0xFF, 0x5F])]
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct InterlaceGraphicsEditorFile
   : IImageFormatReader<InterlaceGraphicsEditorFile>, IImageToRawImage<InterlaceGraphicsEditorFile>,
     IImageFromRawImage<InterlaceGraphicsEditorFile>, IImageFormatWriter<InterlaceGraphicsEditorFile> {

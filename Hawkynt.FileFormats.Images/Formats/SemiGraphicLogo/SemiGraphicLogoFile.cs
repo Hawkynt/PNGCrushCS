@@ -12,6 +12,7 @@ namespace FileFormat.SemiGraphicLogo;
 /// logo can be built out of blocks the stock font has no shape for. Those four bytes are the whole
 /// of what makes it a drawing program rather than a text editor.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct SemiGraphicLogoFile
   : IImageFormatReader<SemiGraphicLogoFile>, IImageToRawImage<SemiGraphicLogoFile>,
     IImageFromRawImage<SemiGraphicLogoFile>, IImageFormatWriter<SemiGraphicLogoFile> {

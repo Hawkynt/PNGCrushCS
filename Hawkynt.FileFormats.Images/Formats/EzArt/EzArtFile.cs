@@ -4,6 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.EzArt;
 
 /// <summary>In-memory representation of an EZ-Art Professional image (Atari ST, 320x200, 16 colors).</summary>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct EzArtFile : IImageFormatReader<EzArtFile>, IImageToRawImage<EzArtFile>, IImageFromRawImage<EzArtFile>, IImageFormatWriter<EzArtFile> {
 
   /// <summary>Bytes before the packed screen.</summary>

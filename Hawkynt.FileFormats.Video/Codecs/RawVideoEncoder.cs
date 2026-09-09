@@ -48,6 +48,7 @@ namespace FileFormat.Codecs;
 /// arbitrary colour onto a fixed palette is quantisation, and quantising quietly is how a wrong
 /// picture gets written.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.FFmpeg)]
 public sealed class RawVideoEncoder : IVideoCodecEncoder<RawVideoEncoder> {
 
   /// <summary>The four-character code a writer puts in the stream handler beside a zero compression.</summary>

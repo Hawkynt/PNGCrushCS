@@ -11,6 +11,7 @@ namespace FileFormat.GraphLogo;
 /// rows is what lets a mode 4 screen carry more than 128 distinct shapes: each row gets its own
 /// alphabet.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct GraphLogoFile
   : IImageFormatReader<GraphLogoFile>, IImageToRawImage<GraphLogoFile>,
     IImageFromRawImage<GraphLogoFile>, IImageFormatWriter<GraphLogoFile> {

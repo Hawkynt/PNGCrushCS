@@ -5,6 +5,7 @@ namespace FileFormat.Fl32;
 
 /// <summary>In-memory representation of a FL32 (FilmLight 32-bit float) image.</summary>
 [FormatMagicBytes([0x46, 0x4C, 0x33, 0x32])]
+[VerifiedBy(ConformanceOracle.ImageMagick)]
 public readonly record struct Fl32File : IImageFormatReader<Fl32File>, IImageToRawImage<Fl32File>, IImageFromRawImage<Fl32File>, IImageFormatWriter<Fl32File> {
 
   /// <summary>Magic bytes "FL32" as a uint32 little-endian value (842222662).</summary>

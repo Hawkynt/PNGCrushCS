@@ -14,6 +14,7 @@ namespace FileFormat.Printfox;
 /// differently from the other two, so the letter has to be consulted while unpacking and not only
 /// before it.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct PrintfoxFile
   : IImageFormatReader<PrintfoxFile>, IImageToRawImage<PrintfoxFile>,
     IImageFromRawImage<PrintfoxFile>, IImageFormatWriter<PrintfoxFile> {

@@ -49,6 +49,7 @@ namespace FileFormat.Codecs;
 /// nobody wrote. That is the reference's own choice and its reason — a slow fade otherwise skips its
 /// way through every step of itself.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.FFmpeg)]
 public sealed class AppleVideoEncoder : IVideoCodecEncoder<AppleVideoEncoder> {
 
   /// <summary>The code a QuickTime file names this codec with.</summary>

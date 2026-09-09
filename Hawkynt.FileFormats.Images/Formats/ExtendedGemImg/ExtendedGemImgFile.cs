@@ -4,6 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.ExtendedGemImg;
 
 /// <summary>In-memory representation of an Extended GEM Bit Image (XIMG) raster image.</summary>
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.FFmpeg)]
 public readonly record struct ExtendedGemImgFile : IImageFormatReader<ExtendedGemImgFile>, IImageToRawImage<ExtendedGemImgFile>, IImageFromRawImage<ExtendedGemImgFile>, IImageFormatWriter<ExtendedGemImgFile> {
 
   static string IImageFormatMetadata<ExtendedGemImgFile>.PrimaryExtension => ".ximg";

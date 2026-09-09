@@ -7,6 +7,7 @@ namespace FileFormat.Msp;
 [FormatDetectionPriority(20)]
 [FormatMagicBytes([0x44, 0x61, 0x6E, 0x4D])]
 [FormatMagicBytes([0x4C, 0x69, 0x6E, 0x53])]
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.FFmpeg)]
 public readonly record struct MspFile : IImageFormatReader<MspFile>, IImageToRawImage<MspFile>, IImageFromRawImage<MspFile>, IImageFormatWriter<MspFile> {
 
   /// <summary>Largest decoded image accepted before allocating its raster.</summary>

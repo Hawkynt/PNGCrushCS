@@ -9,6 +9,7 @@ namespace FileFormat.DrawIt;
 /// GTIA colour registers PF0-PF3 and BAK. The bitmap holds 160x96 logical pixels, displayed at
 /// 320x192 with every pixel doubled in both directions.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct DrawItFile : IImageFormatReader<DrawItFile>, IImageToRawImage<DrawItFile>, IImageFromRawImage<DrawItFile>, IImageFormatWriter<DrawItFile> {
 
   /// <summary>Logical bitmap width.</summary>

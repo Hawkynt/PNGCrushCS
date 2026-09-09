@@ -14,6 +14,7 @@ namespace FileFormat.Pgx;
 /// are stored biased so that the darkest is the smallest, which is what makes them displayable
 /// without knowing the sign in advance.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.ImageMagick, ConformanceOracle.FFmpeg)]
 public readonly record struct PgxFile
   : IImageFormatReader<PgxFile>, IImageToRawImage<PgxFile>,
     IImageFromRawImage<PgxFile>, IImageFormatWriter<PgxFile> {

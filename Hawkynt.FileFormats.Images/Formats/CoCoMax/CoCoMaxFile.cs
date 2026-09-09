@@ -10,6 +10,7 @@ namespace FileFormat.CoCoMax;
 /// lengths are legal, the bytes past the picture being whatever the program's buffer happened to
 /// hold.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct CoCoMaxFile : IImageFormatReader<CoCoMaxFile>, IImageToRawImage<CoCoMaxFile>, IImageFromRawImage<CoCoMaxFile>, IImageFormatWriter<CoCoMaxFile> {
 
   static string IImageFormatMetadata<CoCoMaxFile>.PrimaryExtension => ".max";

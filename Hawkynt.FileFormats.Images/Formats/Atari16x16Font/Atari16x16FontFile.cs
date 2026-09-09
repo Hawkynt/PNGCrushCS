@@ -13,6 +13,7 @@ namespace FileFormat.Atari16x16Font;
 /// quarters of each large glyph next to each other, which is why the sheet is 32 characters across
 /// and only four rows deep.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct Atari16x16FontFile
   : IImageFormatReader<Atari16x16FontFile>, IImageToRawImage<Atari16x16FontFile>,
     IImageFromRawImage<Atari16x16FontFile>, IImageFormatWriter<Atari16x16FontFile> {

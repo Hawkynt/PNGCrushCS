@@ -5,6 +5,7 @@ using FileFormat.Core;
 namespace FileFormat.Tim2;
 
 /// <summary>In-memory representation of a PlayStation 2/PSP TIM2 texture file.</summary>
+[VerifiedBy(ConformanceOracle.ImageMagick)]
 public readonly record struct Tim2File : IImageFormatReader<Tim2File>, IImageToRawImage<Tim2File>, IImageFromRawImage<Tim2File>, IImageFormatWriter<Tim2File> {
 
   static string IImageFormatMetadata<Tim2File>.PrimaryExtension => ".tm2";

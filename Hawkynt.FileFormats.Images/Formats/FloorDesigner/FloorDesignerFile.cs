@@ -10,6 +10,7 @@ namespace FileFormat.FloorDesigner;
 /// stored nibble covers four screen pixels and each stored row four screen rows, so the picture is
 /// displayed at 256x160.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct FloorDesignerFile
   : IImageFormatReader<FloorDesignerFile>, IImageToRawImage<FloorDesignerFile>,
     IImageFromRawImage<FloorDesignerFile>, IImageFormatWriter<FloorDesignerFile> {

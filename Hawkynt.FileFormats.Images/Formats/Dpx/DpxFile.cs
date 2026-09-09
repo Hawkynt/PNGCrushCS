@@ -7,6 +7,7 @@ namespace FileFormat.Dpx;
 /// <summary>In-memory representation of a DPX image.</summary>
 [FormatMagicBytes([0x53, 0x44, 0x50, 0x58])]
 [FormatMagicBytes([0x58, 0x50, 0x44, 0x53])]
+[VerifiedBy(ConformanceOracle.ImageMagick, ConformanceOracle.FFmpeg)]
 public readonly record struct DpxFile : IImageFormatReader<DpxFile>, IImageToRawImage<DpxFile>, IImageFromRawImage<DpxFile>, IImageFormatWriter<DpxFile> {
 
   static string IImageFormatMetadata<DpxFile>.PrimaryExtension => ".dpx";

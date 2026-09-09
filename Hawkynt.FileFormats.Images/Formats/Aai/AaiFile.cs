@@ -5,6 +5,7 @@ namespace FileFormat.Aai;
 
 /// <summary>In-memory representation of an AAI (Dune HD) image.</summary>
 [FormatMimeType("application/x-aai")]
+[VerifiedBy(ConformanceOracle.ImageMagick)]
 public readonly record struct AaiFile : IImageFormatReader<AaiFile>, IImageToRawImage<AaiFile>, IImageFromRawImage<AaiFile>, IImageFormatWriter<AaiFile> {
 
   static string IImageFormatMetadata<AaiFile>.PrimaryExtension => ".aai";

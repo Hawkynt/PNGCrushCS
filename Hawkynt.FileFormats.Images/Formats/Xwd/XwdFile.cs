@@ -4,6 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.Xwd;
 
 /// <summary>In-memory representation of an XWD (X Window Dump) image.</summary>
+[VerifiedBy(ConformanceOracle.ImageMagick, ConformanceOracle.FFmpeg)]
 public readonly record struct XwdFile : IImageFormatReader<XwdFile>, IImageToRawImage<XwdFile>, IImageFromRawImage<XwdFile>, IImageFormatWriter<XwdFile> {
 
   static string IImageFormatMetadata<XwdFile>.PrimaryExtension => ".xwd";

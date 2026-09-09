@@ -9,6 +9,7 @@ using Hawkynt.FileFormats.Video;
 namespace FileFormat.Mp4;
 
 /// <summary>Writes an ISO base media file with one chunk per coded sample and complete classic sample tables.</summary>
+[VerifiedBy(ConformanceOracle.FFmpeg)]
 public sealed class Mp4Writer : IVideoContainerWriter<Mp4Writer> {
 
   private sealed class TrackState(MediaStreamInfo info) {

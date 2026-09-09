@@ -10,6 +10,7 @@ namespace FileFormat.TextureMaker0;
 /// block. As in the Graphics 9 modes the stored values carry luminance only, so the trailing
 /// colour byte is what decides the hue the whole texture appears in.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct TextureMaker0File
   : IImageFormatReader<TextureMaker0File>, IImageToRawImage<TextureMaker0File>,
     IImageFromRawImage<TextureMaker0File>, IImageFormatWriter<TextureMaker0File> {

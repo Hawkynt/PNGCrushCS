@@ -36,6 +36,7 @@ namespace FileFormat.PhotoParade;
 /// worked out, and the backdrop and the border tile in front of the first photograph belong to it. So
 /// the file holds the album and is not a slide show anything would run.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.FFmpeg)]
 public sealed class PhotoParadeFile
   : IImageFormatReader<PhotoParadeFile>, IImageToRawImage<PhotoParadeFile>,
     IImageFromRawImage<PhotoParadeFile>, IImageFormatWriter<PhotoParadeFile>,

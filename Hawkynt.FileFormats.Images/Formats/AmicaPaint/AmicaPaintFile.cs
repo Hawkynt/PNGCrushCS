@@ -4,6 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.AmicaPaint;
 
 /// <summary>In-memory representation of a Commodore 64 Amica Paint multicolor image.</summary>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct AmicaPaintFile : IImageFormatReader<AmicaPaintFile>, IImageToRawImage<AmicaPaintFile>, IImageFromRawImage<AmicaPaintFile>, IImageFormatWriter<AmicaPaintFile> {
 
   static string IImageFormatMetadata<AmicaPaintFile>.PrimaryExtension => ".ami";

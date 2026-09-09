@@ -30,6 +30,7 @@ namespace FileFormat.Codecs;
 /// <b>What refuses.</b> A stream that is not video or has no pixels, a frame whose geometry differs
 /// from the stream's, and a picture with too little pixel data for its own declared size.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.FFmpeg)]
 public sealed class Y800VideoEncoder : IVideoCodecEncoder<Y800VideoEncoder> {
 
   private static readonly CodecTag _Tag = CodecTag.FromCharacters("Y800");

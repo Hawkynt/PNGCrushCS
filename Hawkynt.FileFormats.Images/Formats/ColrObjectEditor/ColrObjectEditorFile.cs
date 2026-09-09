@@ -15,6 +15,7 @@ namespace FileFormat.ColrObjectEditor;
 /// by where it sits in hardware, so the entries have to be permuted before a bitplane index finds
 /// them.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct ColrObjectEditorFile
   : IImageFormatReader<ColrObjectEditorFile>, IImageToRawImage<ColrObjectEditorFile>,
     IImageFromRawImage<ColrObjectEditorFile>, IImageFormatWriter<ColrObjectEditorFile> {

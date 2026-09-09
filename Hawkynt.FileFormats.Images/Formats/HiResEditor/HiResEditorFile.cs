@@ -11,6 +11,7 @@ namespace FileFormat.HiResEditor;
 /// background in the low one. Hires-Editor and Run Paint write the same bytes and differ only in
 /// the extension.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct HiResEditorFile
   : IImageFormatReader<HiResEditorFile>, IImageToRawImage<HiResEditorFile>,
     IImageFromRawImage<HiResEditorFile>, IImageFormatWriter<HiResEditorFile> {

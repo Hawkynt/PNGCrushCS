@@ -9,6 +9,7 @@ namespace FileFormat.HandyScanner;
 /// for — a hand scanner produces whatever length the operator rolled it over, so the height is the
 /// file size divided by the 105 bytes a row takes. A set bit is what the scanner saw as light.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct HandyScannerFile
   : IImageFormatReader<HandyScannerFile>, IImageToRawImage<HandyScannerFile>,
     IImageFromRawImage<HandyScannerFile>, IImageFormatWriter<HandyScannerFile> {

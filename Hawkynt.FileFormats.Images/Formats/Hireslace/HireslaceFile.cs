@@ -7,6 +7,7 @@ namespace FileFormat.Hireslace;
 /// Two interlaced hires frames (320x200) blended together.
 /// Payload: LoadAddress(2) + bitmap1(8000) + screen1(1000) + bitmap2(8000) + screen2(1000) = 18002 bytes.
 /// </summary>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct HireslaceFile : IImageFormatReader<HireslaceFile>, IImageToRawImage<HireslaceFile>, IImageFromRawImage<HireslaceFile>, IImageFormatWriter<HireslaceFile> {
 
   static string IImageFormatMetadata<HireslaceFile>.PrimaryExtension => ".hle";

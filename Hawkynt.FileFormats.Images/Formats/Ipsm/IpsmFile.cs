@@ -16,6 +16,7 @@ namespace FileFormat.Ipsm;
 /// <c>BTMP</c> chunk's offset and length together account for everything after the directory, which
 /// is what says the entries are being read as the format means them.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.FFmpeg)]
 public readonly record struct IpsmFile
   : IImageFormatReader<IpsmFile>, IImageToRawImage<IpsmFile>,
     IImageFromRawImage<IpsmFile>, IImageFormatWriter<IpsmFile> {

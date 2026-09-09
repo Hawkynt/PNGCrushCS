@@ -47,6 +47,7 @@ namespace FileFormat.Codecs;
 /// right-justified in its sixteen bits, and a value the ten bits cannot hold would be written wrong
 /// rather than clipped.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.FFmpeg)]
 public sealed class Uncompressed012vVideoEncoder : IVideoCodecEncoder<Uncompressed012vVideoEncoder> {
 
   private static readonly CodecTag _Tag = CodecTag.FromCharacters("012v");

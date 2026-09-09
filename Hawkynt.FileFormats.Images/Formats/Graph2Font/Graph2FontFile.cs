@@ -13,6 +13,7 @@ namespace FileFormat.Graph2Font;
 /// So the picture is not stored anywhere. What is stored is every input the chip needs, and the
 /// only way to see the result is to run them through it.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct Graph2FontFile
   : IImageFormatReader<Graph2FontFile>, IImageToRawImage<Graph2FontFile>,
     IImageFromRawImage<Graph2FontFile>, IImageFormatWriter<Graph2FontFile> {

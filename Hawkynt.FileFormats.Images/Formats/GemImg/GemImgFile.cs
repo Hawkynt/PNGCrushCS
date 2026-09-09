@@ -4,6 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.GemImg;
 
 /// <summary>In-memory representation of a GEM IMG raster image.</summary>
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.FFmpeg)]
 public readonly record struct GemImgFile : IImageFormatReader<GemImgFile>, IImageToRawImage<GemImgFile>, IImageFromRawImage<GemImgFile>, IImageFormatWriter<GemImgFile> {
 
   static string IImageFormatMetadata<GemImgFile>.PrimaryExtension => ".img";

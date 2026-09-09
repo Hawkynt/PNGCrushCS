@@ -17,6 +17,7 @@ namespace FileFormat.Graph2FontScroll;
 /// picture; the read and the write that name a file are the ones that can find, and put, the
 /// projects the names point at.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct Graph2FontScrollFile
   : IImageFormatReader<Graph2FontScrollFile>, IImageToRawImage<Graph2FontScrollFile>,
     IImageFromRawImage<Graph2FontScrollFile>, IImageFormatWriter<Graph2FontScrollFile> {

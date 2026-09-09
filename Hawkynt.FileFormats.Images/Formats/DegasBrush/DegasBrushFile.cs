@@ -10,6 +10,7 @@ namespace FileFormat.DegasBrush;
 /// self-identifying — nothing else of that length is made only of those two values — and it is why
 /// there is no header at all.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct DegasBrushFile
   : IImageFormatReader<DegasBrushFile>, IImageToRawImage<DegasBrushFile>,
     IImageFromRawImage<DegasBrushFile>, IImageFormatWriter<DegasBrushFile> {

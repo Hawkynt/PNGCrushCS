@@ -13,6 +13,7 @@ namespace FileFormat.CentauriLogoEditor;
 /// two have a byte each, which is how the C64's registers happen to sit in memory rather than
 /// anything the format chose.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct CentauriLogoEditorFile
   : IImageFormatReader<CentauriLogoEditorFile>, IImageToRawImage<CentauriLogoEditorFile>,
     IImageFromRawImage<CentauriLogoEditorFile>, IImageFormatWriter<CentauriLogoEditorFile> {

@@ -4,6 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.Atari8Bit;
 
 /// <summary>In-memory representation of an Atari 8-bit ANTIC mode screen dump.</summary>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct Atari8BitFile : IImageFormatReader<Atari8BitFile>, IImageToRawImage<Atari8BitFile>, IImageFromRawImage<Atari8BitFile>, IImageFormatWriter<Atari8BitFile> {
 
   static string IImageFormatMetadata<Atari8BitFile>.PrimaryExtension => ".gr8";

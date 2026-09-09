@@ -28,6 +28,7 @@ namespace FileFormat.PcPaint;
 /// is described two different ways in the sources that describe it at all, and there is no sample
 /// here to tell them apart.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.FFmpeg)]
 public readonly record struct PcPaintFile : IImageFormatReader<PcPaintFile>, IImageToRawImage<PcPaintFile>, IImageFromRawImage<PcPaintFile>, IImageFormatWriter<PcPaintFile> {
 
   /// <summary>The word every one of these opens with.</summary>

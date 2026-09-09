@@ -4,6 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.IndyPaint;
 
 /// <summary>In-memory representation of an IndyPaint (.ipn) screen dump.</summary>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct IndyPaintFile : IImageFormatReader<IndyPaintFile>, IImageToRawImage<IndyPaintFile>, IImageFromRawImage<IndyPaintFile>, IImageFormatWriter<IndyPaintFile> {
 
   /// <summary>The exact file size: 320 x 240 x 2 bytes per pixel.</summary>

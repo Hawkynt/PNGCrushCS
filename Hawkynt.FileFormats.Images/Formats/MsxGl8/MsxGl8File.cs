@@ -10,6 +10,7 @@ namespace FileFormat.MsxGl8;
 /// colour itself rather than on an index, so the picture is already true colour of a sort — three
 /// bits of green, three of red, two of blue.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct MsxGl8File
   : IImageFormatReader<MsxGl8File>, IImageToRawImage<MsxGl8File>,
     IImageFromRawImage<MsxGl8File>, IImageFormatWriter<MsxGl8File> {

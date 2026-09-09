@@ -12,6 +12,7 @@ namespace FileFormat.Commodore64Font;
 /// There are no colours in the file. A character set is not a picture: the machine draws it in
 /// whatever the screen's registers happen to hold, so it is shown as white on black.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct Commodore64FontFile
   : IImageFormatReader<Commodore64FontFile>, IImageToRawImage<Commodore64FontFile>,
     IImageFromRawImage<Commodore64FontFile>, IImageFormatWriter<Commodore64FontFile> {

@@ -5,6 +5,7 @@ namespace FileFormat.Xbm;
 
 /// <summary>In-memory representation of an XBM (X BitMap) image.</summary>
 [FormatMimeType("image/x-xbitmap", "image/x-xbm")]
+[VerifiedBy(ConformanceOracle.ImageMagick, ConformanceOracle.FFmpeg)]
 public readonly record struct XbmFile : IImageFormatReader<XbmFile>, IImageToRawImage<XbmFile>, IImageFromRawImage<XbmFile>, IImageFormatWriter<XbmFile> {
 
   static string IImageFormatMetadata<XbmFile>.PrimaryExtension => ".xbm";

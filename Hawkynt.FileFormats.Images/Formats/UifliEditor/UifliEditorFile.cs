@@ -13,6 +13,7 @@ namespace FileFormat.UifliEditor;
 /// colour a cell takes comes from a bank chosen by two bits of the row, not three. That halves the
 /// colour data for a picture already being averaged against a second one.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct UifliEditorFile
   : IImageFormatReader<UifliEditorFile>, IImageToRawImage<UifliEditorFile>,
     IImageFromRawImage<UifliEditorFile>, IImageFormatWriter<UifliEditorFile> {

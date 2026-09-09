@@ -6,6 +6,7 @@ namespace FileFormat.Hdr;
 /// <summary>In-memory representation of a Radiance HDR image.</summary>
 [FormatMagicBytes([0x23, 0x3F])]
 [FormatMimeType("image/vnd.radiance", "image/x-hdr")]
+[VerifiedBy(ConformanceOracle.ImageMagick, ConformanceOracle.FFmpeg)]
 public readonly record struct HdrFile : IImageFormatReader<HdrFile>, IImageToRawImage<HdrFile>, IImageFromRawImage<HdrFile>, IImageFormatWriter<HdrFile> {
 
   static string IImageFormatMetadata<HdrFile>.PrimaryExtension => ".hdr";

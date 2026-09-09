@@ -15,6 +15,7 @@ namespace FileFormat.Svgz;
 /// see the document inside. That is what <see cref="MatchesSignature"/> does, and why it answers
 /// for a gzipped drawing and not for a gzipped anything-else.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.ImageMagick, ConformanceOracle.FFmpeg)]
 public readonly record struct SvgzFile
   : IImageFormatReader<SvgzFile>, IImageToRawImage<SvgzFile>,
     IImageFromRawImage<SvgzFile>, IImageFormatWriter<SvgzFile> {

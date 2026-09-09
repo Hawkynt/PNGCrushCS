@@ -4,6 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.CameraRaw;
 
 /// <summary>In-memory representation of a Camera RAW image (CR2/NEF/ARW/ORF/RW2/PEF/RAF). Stores the embedded preview image as RGB24 pixel data.</summary>
+[VerifiedBy(ConformanceOracle.ImageMagick, ConformanceOracle.FFmpeg)]
 public readonly record struct CameraRawFile : IImageFormatReader<CameraRawFile>, IImageToRawImage<CameraRawFile>, IImageFromRawImage<CameraRawFile>, IImageFormatWriter<CameraRawFile> {
 
   static string IImageFormatMetadata<CameraRawFile>.PrimaryExtension => ".cr2";

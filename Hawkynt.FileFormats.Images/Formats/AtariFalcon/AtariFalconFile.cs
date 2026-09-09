@@ -4,6 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.AtariFalcon;
 
 /// <summary>In-memory representation of an Atari Falcon true-color (.ftc) screen dump.</summary>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct AtariFalconFile : IImageFormatReader<AtariFalconFile>, IImageToRawImage<AtariFalconFile>, IImageFromRawImage<AtariFalconFile>, IImageFormatWriter<AtariFalconFile> {
 
   /// <summary>Pixels across. Not 320 — that is the size the other Falcon dump here holds.</summary>

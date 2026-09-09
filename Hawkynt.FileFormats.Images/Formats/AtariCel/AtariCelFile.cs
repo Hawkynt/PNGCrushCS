@@ -12,6 +12,7 @@ namespace FileFormat.AtariCel;
 /// It is a third thing called CEL: the others here are the paper-doll cells of KiSS and the
 /// Autodesk Animator's frames, and none of the three can be read as either of the others.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct AtariCelFile
   : IImageFormatReader<AtariCelFile>, IImageToRawImage<AtariCelFile>,
     IImageFromRawImage<AtariCelFile>, IImageFormatWriter<AtariCelFile> {

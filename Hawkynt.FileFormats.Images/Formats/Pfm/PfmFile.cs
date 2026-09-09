@@ -5,6 +5,7 @@ namespace FileFormat.Pfm;
 
 /// <summary>In-memory representation of a PFM (Portable Float Map) image.</summary>
 [FormatMimeType("image/x-portable-floatmap")]
+[VerifiedBy(ConformanceOracle.ImageMagick, ConformanceOracle.FFmpeg)]
 public readonly record struct PfmFile : IImageFormatReader<PfmFile>, IImageToRawImage<PfmFile>, IImageFromRawImage<PfmFile>, IImageFormatWriter<PfmFile> {
 
   static string IImageFormatMetadata<PfmFile>.PrimaryExtension => ".pfm";

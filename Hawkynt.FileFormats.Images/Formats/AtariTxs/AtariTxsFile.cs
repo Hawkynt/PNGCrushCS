@@ -10,6 +10,7 @@ namespace FileFormat.AtariTxs;
 /// and drawn so large: each stored value covers a 4x4 block, giving 64x64 on screen.
 /// </remarks>
 [FormatMagicBytes([0xFF, 0xFF, 0x00, 0x06, 0xFF, 0x06])]
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct AtariTxsFile
   : IImageFormatReader<AtariTxsFile>, IImageToRawImage<AtariTxsFile>,
     IImageFromRawImage<AtariTxsFile>, IImageFormatWriter<AtariTxsFile> {

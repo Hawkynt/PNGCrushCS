@@ -14,6 +14,7 @@ namespace FileFormat.Picasso;
 /// Every cell's colour byte must have its multicolour bit set, because a picture using both
 /// character modes at once is not one this program made.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct PicassoFile
   : IImageFormatReader<PicassoFile>, IImageToRawImage<PicassoFile>,
     IImageFromRawImage<PicassoFile>, IImageFormatWriter<PicassoFile> {

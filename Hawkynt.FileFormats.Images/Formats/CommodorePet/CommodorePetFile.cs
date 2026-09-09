@@ -6,6 +6,7 @@ using FileFormat.TextMode;
 namespace FileFormat.CommodorePet;
 
 /// <summary>Commodore PET PETSCII screen dump data model.</summary>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public sealed class CommodorePetFile : IImageFormatReader<CommodorePetFile>, IImageToRawImage<CommodorePetFile>, IImageFromRawImage<CommodorePetFile>, IImageFormatWriter<CommodorePetFile> {
 
   public const int FileSize = 1000;

@@ -10,6 +10,7 @@ namespace FileFormat.Anime4Ever;
 /// only a command naming a destination lets it start, which is what a packer built to load straight
 /// into video memory produces: it is describing where the bytes go, not what order they come in.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct Anime4EverFile
   : IImageFormatReader<Anime4EverFile>, IImageToRawImage<Anime4EverFile>,
     IImageFromRawImage<Anime4EverFile>, IImageFormatWriter<Anime4EverFile> {

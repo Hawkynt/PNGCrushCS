@@ -4,6 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.TruePaint;
 
 /// <summary>In-memory representation of a True Paint interlace multicolor image (.mci).</summary>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct TruePaintFile : IImageFormatReader<TruePaintFile>, IImageToRawImage<TruePaintFile>, IImageFromRawImage<TruePaintFile>, IImageFormatWriter<TruePaintFile> {
 
   static string IImageFormatMetadata<TruePaintFile>.PrimaryExtension => ".mci";

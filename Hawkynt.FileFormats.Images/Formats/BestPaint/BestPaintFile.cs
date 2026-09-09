@@ -14,6 +14,7 @@ namespace FileFormat.BestPaint;
 /// that is the order the character set occupies memory when a program defines one cell per screen
 /// position.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct BestPaintFile
   : IImageFormatReader<BestPaintFile>, IImageToRawImage<BestPaintFile>,
     IImageFromRawImage<BestPaintFile>, IImageFormatWriter<BestPaintFile> {

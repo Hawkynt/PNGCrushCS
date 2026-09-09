@@ -4,6 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.Cheese;
 
 /// <summary>In-memory representation of a Commodore 64 Cheese paint image.</summary>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct CheeseFile : IImageFormatReader<CheeseFile>, IImageToRawImage<CheeseFile>, IImageFromRawImage<CheeseFile>, IImageFormatWriter<CheeseFile> {
 
   static string IImageFormatMetadata<CheeseFile>.PrimaryExtension => ".che";

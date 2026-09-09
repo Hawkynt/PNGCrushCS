@@ -38,6 +38,7 @@ namespace FileFormat.Codecs;
 /// whose size differs from the one the stream was created for, since every delta frame's unchanged
 /// cells are read against a canvas of exactly that size.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.FFmpeg)]
 public sealed class FlashSvVideoEncoder : IVideoCodecEncoder<FlashSvVideoEncoder> {
 
   private static readonly CodecTag _Tag = CodecTag.FromCharacters("FSV1");

@@ -4,6 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.Zoomatic;
 
 /// <summary>In-memory representation of a C64 Zoomatic (.zom) multicolor art image.</summary>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct ZoomaticFile
   : IImageFormatReader<ZoomaticFile>, IImageToRawImage<ZoomaticFile>,
     IImageFromRawImage<ZoomaticFile>, IImageFormatWriter<ZoomaticFile> {

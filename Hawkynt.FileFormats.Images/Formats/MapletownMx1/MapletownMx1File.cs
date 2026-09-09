@@ -11,6 +11,7 @@ namespace FileFormat.MapletownMx1;
 /// apiece, and what they add up to depends on their sizes: four of one size are a two-by-two grid
 /// and sixteen are four-by-four, while anything else is stacked one above the next.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct MapletownMx1File
   : IImageFormatReader<MapletownMx1File>, IImageToRawImage<MapletownMx1File>,
     IImageFromRawImage<MapletownMx1File>, IImageFormatWriter<MapletownMx1File> {

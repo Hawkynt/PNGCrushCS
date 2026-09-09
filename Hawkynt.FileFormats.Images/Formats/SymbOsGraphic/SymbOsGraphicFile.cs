@@ -16,6 +16,7 @@ namespace FileFormat.SymbOsGraphic;
 /// does, with a byte holding the low bits of four pixels in one nibble and their high bits in the
 /// other, rather than two bits of each pixel side by side.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct SymbOsGraphicFile
   : IImageFormatReader<SymbOsGraphicFile>, IImageToRawImage<SymbOsGraphicFile>,
     IImageFromRawImage<SymbOsGraphicFile>, IImageFormatWriter<SymbOsGraphicFile> {

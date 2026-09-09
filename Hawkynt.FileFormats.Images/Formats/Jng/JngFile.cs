@@ -6,6 +6,7 @@ namespace FileFormat.Jng;
 
 /// <summary>In-memory representation of a JNG image.</summary>
 [FormatMagicBytes([0x8B, 0x4A, 0x4E, 0x47])]
+[VerifiedBy(ConformanceOracle.ImageMagick, ConformanceOracle.FFmpeg)]
 public readonly record struct JngFile : IImageFormatReader<JngFile>, IImageToRawImage<JngFile>, IImageFromRawImage<JngFile>, IImageFormatWriter<JngFile> {
 
   static string IImageFormatMetadata<JngFile>.PrimaryExtension => ".jng";
