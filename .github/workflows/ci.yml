@@ -29,7 +29,7 @@ jobs:
         8.x
         10.0.x
       os-matrix: '["ubuntu-latest","windows-latest"]'
-      build-args: '-p:EnableWindowsTargeting=true'
+      build-args: '-p:EnableWindowsTargeting=true -flp:"logfile=docs/TestResults/build.trx;verbosity=normal"'
       test-args: '--filter "TestCategory!=Regression&TestCategory!=Performance"'
       # Wall-clock timings must not redden a pull request on a slow shared runner.
       advisory-test-args: '--filter "TestCategory=Performance"'
