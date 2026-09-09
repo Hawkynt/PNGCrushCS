@@ -114,10 +114,25 @@ internal static class WriterOracleTool {
     return end < 0 ? trimmed : trimmed[..end].Trim();
   }
 
+  /// <summary>
+  /// Whether the tool declined to look rather than looked and disagreed.
+  /// </summary>
+  /// <remarks>
+  /// The difference is the whole value of the oracle column, and it is not always obvious from the
+  /// exit code: a tool that reads a format by shelling out to another program reports a missing
+  /// helper the same way it reports a corrupt file. ImageMagick reads PDF through Ghostscript and
+  /// says <c>FailedToExecuteCommand</c> when it is not installed, which is what the Windows runner
+  /// does — the same file it accepts on a machine that has it. Counting that as a rejection would
+  /// make the claim look false on one platform and true on another, when nothing about the bytes
+  /// changed.
+  /// </remarks>
   private static bool _IsNoOpinion(string diagnostics)
     => diagnostics.Contains("no decode delegate", StringComparison.OrdinalIgnoreCase)
       || diagnostics.Contains("must specify image size", StringComparison.OrdinalIgnoreCase)
       || diagnostics.Contains("delegate failed", StringComparison.OrdinalIgnoreCase)
+      || diagnostics.Contains("FailedToExecuteCommand", StringComparison.OrdinalIgnoreCase)
+      || diagnostics.Contains("DelegateLibrarySupportNotBuiltIn", StringComparison.OrdinalIgnoreCase)
+      || diagnostics.Contains("NoDecodeDelegateForThisImageFormat", StringComparison.OrdinalIgnoreCase)
       || diagnostics.Contains("UnableToOpenBlob", StringComparison.OrdinalIgnoreCase);
 
   private static string[] _Arguments(ConformanceOracle oracle, string input, string output) => oracle switch {
