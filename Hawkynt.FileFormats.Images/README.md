@@ -435,6 +435,9 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | IffAcbm | `.acbm`, `.iff`, `.blk` | ✅ | ✅ | — | — | — |
 | IffAnim | `.anim` | ✅ | ✅ | — | ✅ | — |
 | IffAnim8 | `.an8`, `.anim8` | ✅ | — | — | — | — |
+
+| IffAnim | `.anim` | ✅ | ✅ | — | — | — |
+| IffAnim8 | `.an8`, `.anim8` | ✅ | ✅ | — | — | — |
 | IffDctv | `.dctv` | ✅ | ✅ | — | — | — |
 | IffDeep | `.deep`, `.iff`, `.blk` | ✅ | ✅ | — | — | — |
 | IffDpan | `.dpan` | ✅ | — | — | — | — |
