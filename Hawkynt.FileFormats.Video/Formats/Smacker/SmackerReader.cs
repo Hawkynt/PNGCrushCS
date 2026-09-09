@@ -17,21 +17,31 @@ namespace FileFormat.SmackerVideo;
 /// trees shared by the whole file, then the frames themselves back to back with no header of their own
 /// beyond what those two arrays already said about them.
 /// <para/>
-/// <b>A frame's stated length is used exactly as stored, bit zero included.</b> RAD's own description
-/// calls that bit a keyframe flag and says "you don't need to shift this bit out to get the length" —
-/// which reads two ways until it is checked. Summing every frame's stated length, plus the header, the
-/// two arrays and the tree section, against the real byte count of five files (3 KB to 325 KB, none of
-/// them agreeing with any other on tree size or frame count) lands on the file's exact size every time
-/// with nothing left over and nothing short — so the value is the byte count outright, not a byte count
-/// with a flag folded into a low bit that then has to be masked off, and reading it any other way loses
-/// the file part way through the last frame.
+/// <b>A frame's stated length carries flags in its low bits, and a frame is a whole number of four
+/// bytes.</b> RAD's own description calls bit zero a keyframe flag and then says "you don't need to
+/// shift this bit out to get the length", which reads two ways. Summing every frame's stated length,
+/// plus the header, the two arrays and the tree section, against the real byte count of a file settles
+/// it — but only on a file that has the bit set somewhere, and for a long time none of the samples this
+/// reader was measured against did. On eight such files the raw sum lands on the file's exact size, and
+/// the sentence looks like it means what it says. On <c>ticket2728_test.smk</c>, whose 303 frames set
+/// bit zero on 31 of them, the raw sum overshoots the file by exactly 31 bytes and the masked sum lands
+/// on 2,661,496 exactly, which is the file. So the low bits are flags after all, and the length is the
+/// field with them cleared: what RAD's sentence means is that the flag does not shift the length, not
+/// that the flag is part of it.
 /// <para/>
-/// <b>What a "keyframe" bit turns out not to mean.</b> Across two of those files — 100 and 270 frames,
-/// between them not one frame with that bit set anywhere — ffmpeg's own demuxer still reports exactly
-/// one keyframe each, the first frame. So this reader does the same thing every other self-contained
-/// FMV container here does: the first picture is the keyframe because nothing else can be, and RAD's
-/// bit is read as part of a frame's stated length and not interpreted as anything else, because nothing
-/// measured against this ties it to any observable behaviour beyond that.
+/// Two bits are cleared rather than one, which is what ffmpeg's own demuxer does. Bit one has never
+/// been seen set on any file measured here, so nothing distinguishes clearing one bit from clearing
+/// two on the evidence available; clearing two is what a twenty-year-old reference implementation has
+/// been doing to these files, and a frame that is a whole number of four bytes is what every file
+/// measured actually contains.
+/// <para/>
+/// <b>And bit zero really is the keyframe flag.</b> The same file settles this too, where the earlier
+/// samples could not: ffprobe reports exactly 31 key packets on its video stream, which are exactly the
+/// 31 frames whose stated size has bit zero set — its own first frame among them, so the count is 31
+/// and not 32. On a file with the bit set nowhere, ffmpeg still reports the first frame as a key
+/// packet, which is the rule it applies on top: frame zero always, plus every frame the bit names.
+/// That is what this reader now reports, rather than the first-frame-only rule the earlier corpus could
+/// not see past.
 /// <para/>
 /// <b>A frame's own bytes are not self-describing on their own.</b> Whether a frame carries a palette
 /// update and which of up to seven audio tracks contribute a chunk to it is stated once, per frame, in
@@ -61,6 +71,7 @@ internal static class SmackerReader {
   private const int _AUDIO_TRACK_COUNT = 7;
   private const uint _FLAG_HAS_RING_FRAME = 1;
   private const uint _FRAME_TYPE_HAS_PALETTE = 1;
+  private const uint _FRAME_SIZE_KEY_FRAME = 1;
   // RAD's own description numbers these bits within the dword's upper byte alone; a real file's
   // upper byte of 0xC0 (bits 7 and 6 of that byte, "compressed" and "data presence") checked out
   // against ffprobe's report of that track as compressed mono 8-bit at the frequency the lower three
@@ -78,6 +89,7 @@ internal static class SmackerReader {
     int VideoFrameCount,
     Rational VideoTimeBase,
     int[] FrameSizes,
+    bool[] FrameKeyFrames,
     byte[] FrameTypes,
     ReadOnlyMemory<byte> CodecPrivateData,
     int FramesDataOffset,
@@ -97,6 +109,7 @@ internal static class SmackerReader {
       VideoFrameCount = summary.VideoFrameCount,
       VideoTimeBase = summary.VideoTimeBase,
       FrameSizes = summary.FrameSizes,
+      FrameKeyFrames = summary.FrameKeyFrames,
       FrameTypes = summary.FrameTypes,
       CodecPrivateData = summary.CodecPrivateData,
       FramesDataOffset = summary.FramesDataOffset,
@@ -157,8 +170,12 @@ internal static class SmackerReader {
     var videoFrameCount = (int)videoFrameCountLong;
 
     var frameSizes = new int[videoFrameCount];
-    for (var i = 0; i < videoFrameCount; ++i)
-      frameSizes[i] = (int)BinaryPrimitives.ReadUInt32LittleEndian(data.Span[((int)frameSizesOffset + i * 4)..]);
+    var frameKeyFrames = new bool[videoFrameCount];
+    for (var i = 0; i < videoFrameCount; ++i) {
+      var stated = BinaryPrimitives.ReadUInt32LittleEndian(data.Span[((int)frameSizesOffset + i * 4)..]);
+      frameSizes[i] = (int)(stated & ~3u);
+      frameKeyFrames[i] = i == 0 || (stated & _FRAME_SIZE_KEY_FRAME) != 0;
+    }
 
     var frameTypes = data.Span.Slice((int)frameTypesOffset, videoFrameCount).ToArray();
 
@@ -174,7 +191,7 @@ internal static class SmackerReader {
     typeSize.CopyTo(codecPrivateData.AsSpan(12));
     data.Span.Slice((int)treesOffset, (int)treesSize).CopyTo(codecPrivateData.AsSpan(16));
 
-    return new(signature, width, height, videoFrameCount, videoTimeBase, frameSizes, frameTypes, codecPrivateData, (int)framesDataOffset, audioTrackRates);
+    return new(signature, width, height, videoFrameCount, videoTimeBase, frameSizes, frameKeyFrames, frameTypes, codecPrivateData, (int)framesDataOffset, audioTrackRates);
   }
 
   /// <summary>
@@ -217,6 +234,7 @@ internal static class SmackerReader {
   internal static IEnumerable<CodedPacket> ReadPackets(SmackerContainer container) {
     var data = container.Data;
     var frameSizes = container.FrameSizes;
+    var frameKeyFrames = container.FrameKeyFrames;
     var frameTypes = container.FrameTypes;
     var audioStreamIndex = new int[_AUDIO_TRACK_COUNT];
     var nextAudioStreamIndex = 1;
@@ -314,7 +332,7 @@ internal static class SmackerReader {
         PresentationTimestamp: i,
         DecodeTimestamp: i,
         Duration: 1,
-        IsKeyFrame: i == 0);
+        IsKeyFrame: frameKeyFrames[i]);
 
       offset += blobLength;
     }

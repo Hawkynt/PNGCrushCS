@@ -204,9 +204,9 @@ public sealed class SmackerReaderTests {
 
   [Test]
   [Category("Unit")]
-  public void OnlyTheFirstFrameIsAKeyFrame() {
-    var frames = new[] { _Frame(false, [1, 2, 3]), _Frame(false, [4, 5]), _Frame(false, [6]) };
-    var container = _Open(3, frames);
+  public void WithTheKeyFrameBitSetNowhereOnlyTheFirstFrameIsAKeyFrame() {
+    var blobs = new[] { new byte[] { 1, 2, 3, 4 }, new byte[] { 4, 5, 6, 7 }, new byte[] { 6, 7, 8, 9 } };
+    var container = _OpenRaw(3, blobs);
 
     var video = SmackerContainer.ReadPackets(container).Where(p => p.StreamIndex == 0).ToArray();
     Assert.That(video, Has.Length.EqualTo(3));
@@ -215,25 +215,41 @@ public sealed class SmackerReaderTests {
     Assert.That(video[2].IsKeyFrame, Is.False);
   }
 
+  /// <summary>Bit zero of a frame's stated size is the key-frame flag, and it is not part of the
+  /// length — a frame that sets it is still exactly as long as the rest of the field says.</summary>
+  [Test]
+  [Category("Unit")]
+  public void AFrameSettingBitZeroOfItsSizeIsAKeyFrameAndKeepsItsLength() {
+    var blobs = new[] { new byte[] { 1, 2, 3, 4 }, new byte[] { 4, 5, 6, 7 }, new byte[] { 6, 7, 8, 9 } };
+    var container = _OpenRaw(3, blobs, sizeFlags: [0, 0, 1]);
+
+    var video = SmackerContainer.ReadPackets(container).Where(p => p.StreamIndex == 0).ToArray();
+    Assert.That(video, Has.Length.EqualTo(3));
+    Assert.That(video[0].IsKeyFrame, Is.True);
+    Assert.That(video[1].IsKeyFrame, Is.False);
+    Assert.That(video[2].IsKeyFrame, Is.True);
+    Assert.That(video[2].Data.ToArray(), Is.EqualTo(new byte[] { 0, 6, 7, 8, 9 }));
+  }
+
   [Test]
   [Category("Unit")]
   public void AVideoPacketCarriesItsFrameTypeByteThenTheVideoBytes() {
-    var frames = new[] { _Frame(false, [0xAA, 0xBB, 0xCC]) };
+    var frames = new[] { _Frame(false, [0xAA, 0xBB, 0xCC, 0xDD]) };
     var container = _Open(1, frames);
 
     var packet = SmackerContainer.ReadPackets(container).Single(p => p.StreamIndex == 0);
-    Assert.That(packet.Data.ToArray(), Is.EqualTo(new byte[] { 0, 0xAA, 0xBB, 0xCC }));
+    Assert.That(packet.Data.ToArray(), Is.EqualTo(new byte[] { 0, 0xAA, 0xBB, 0xCC, 0xDD }));
   }
 
   [Test]
   [Category("Unit")]
   public void APaletteChunkIsCarriedInFrontOfTheVideoBytesWithTheFrameTypeBitSet() {
     var palette = _PaletteChunk([0x00, 0x11, 0x22]); // one "copy previous" block, three bytes total
-    var frames = new[] { _Frame(true, [0xDD, 0xEE], palette) };
+    var frames = new[] { _Frame(true, [0xDD, 0xEE, 0xFF, 0x11], palette) };
     var container = _Open(1, frames);
 
     var packet = SmackerContainer.ReadPackets(container).Single(p => p.StreamIndex == 0);
-    var expected = new byte[] { 1 }.Concat(palette).Concat(new byte[] { 0xDD, 0xEE }).ToArray();
+    var expected = new byte[] { 1 }.Concat(palette).Concat(new byte[] { 0xDD, 0xEE, 0xFF, 0x11 }).ToArray();
     Assert.That(packet.Data.ToArray(), Is.EqualTo(expected));
   }
 
@@ -243,11 +259,11 @@ public sealed class SmackerReaderTests {
     var audioRates = new uint[7];
     audioRates[0] = _AudioRate(8000, compressed: false, dataPresent: true);
     var audioChunk = _RawAudioChunk([1, 2, 3, 4]); // uncompressed: length dword, then four raw bytes
-    var frames = new[] { _Frame(false, [0x99], audio: [(0, audioChunk)]) };
+    var frames = new[] { _Frame(false, [0x99, 0x98, 0x97, 0x96], audio: [(0, audioChunk)]) };
     var container = _Open(1, frames, audioRates);
 
     var videoPacket = SmackerContainer.ReadPackets(container).Single(p => p.StreamIndex == 0);
-    Assert.That(videoPacket.Data.ToArray(), Is.EqualTo(new byte[] { 0b0000_0010, 0x99 }));
+    Assert.That(videoPacket.Data.ToArray(), Is.EqualTo(new byte[] { 0b0000_0010, 0x99, 0x98, 0x97, 0x96 }));
   }
 
   [Test]
@@ -256,7 +272,7 @@ public sealed class SmackerReaderTests {
     var audioRates = new uint[7];
     audioRates[0] = _AudioRate(8000, compressed: false, dataPresent: true);
     var audioChunk = _RawAudioChunk([9, 8, 7, 6, 5]);
-    var frames = new[] { _Frame(false, [0x01], audio: [(0, audioChunk)]) };
+    var frames = new[] { _Frame(false, [0x01, 0x02, 0x03], audio: [(0, audioChunk)]) };
     var container = _Open(1, frames, audioRates);
 
     var audioPacket = SmackerContainer.ReadPackets(container).Single(p => p.StreamIndex == 1);
@@ -271,7 +287,7 @@ public sealed class SmackerReaderTests {
     audioRates[3] = _AudioRate(8000, compressed: false, dataPresent: true);
     var track0 = _RawAudioChunk([1, 1]);
     var track3 = _RawAudioChunk([3, 3, 3]);
-    var frames = new[] { _Frame(false, [0x01], audio: [(0, track0), (3, track3)]) };
+    var frames = new[] { _Frame(false, [0x01, 0x02, 0x03], audio: [(0, track0), (3, track3)]) };
     var container = _Open(1, frames, audioRates);
 
     var packets = SmackerContainer.ReadPackets(container).ToArray();
@@ -286,8 +302,8 @@ public sealed class SmackerReaderTests {
   public void AnUncompressedAudioPacketsTimestampAdvancesByItsOwnByteCount() {
     var audioRates = new uint[7];
     audioRates[0] = _AudioRate(8000, compressed: false, dataPresent: true); // mono, 8-bit: one byte a sample
-    var frame0 = _Frame(false, [0x01], audio: [(0, _RawAudioChunk([1, 2, 3, 4]))]);
-    var frame1 = _Frame(false, [0x01], audio: [(0, _RawAudioChunk([5, 6]))]);
+    var frame0 = _Frame(false, [0x01, 0x02, 0x03, 0x04], audio: [(0, _RawAudioChunk([1, 2, 3, 4]))]);
+    var frame1 = _Frame(false, [0x01, 0x02], audio: [(0, _RawAudioChunk([5, 6]))]);
     var container = _Open(2, [frame0, frame1], audioRates);
 
     var audioPackets = SmackerContainer.ReadPackets(container).Where(p => p.StreamIndex == 1).ToArray();
@@ -305,8 +321,8 @@ public sealed class SmackerReaderTests {
     var unpackedLength = new byte[4];
     BinaryPrimitives.WriteUInt32LittleEndian(unpackedLength, 100);
     var compressedPayload = unpackedLength.Concat(new byte[] { 0x00, 0x00 }).ToArray();
-    var frame0 = _Frame(false, [0x01], audio: [(0, _RawAudioChunk(compressedPayload))]);
-    var frame1 = _Frame(false, [0x01], audio: [(0, _RawAudioChunk(compressedPayload))]);
+    var frame0 = _Frame(false, [0x01, 0x02], audio: [(0, _RawAudioChunk(compressedPayload))]);
+    var frame1 = _Frame(false, [0x01, 0x02], audio: [(0, _RawAudioChunk(compressedPayload))]);
     var container = _Open(2, [frame0, frame1], audioRates);
 
     var audioPackets = SmackerContainer.ReadPackets(container).Where(p => p.StreamIndex == 1).ToArray();
@@ -322,7 +338,7 @@ public sealed class SmackerReaderTests {
   [Category("Unit")]
   public void APaletteChunkRunningPastTheFrameRefuses() {
     // A palette length byte of 200 states an 800-byte chunk in a frame that holds far less.
-    var blob = new byte[] { 200, 1, 2 };
+    var blob = new byte[] { 200, 1, 2, 3 };
     var container = _OpenRaw(1, [blob], frameTypes: [1]);
 
     var failure = Assert.Throws<InvalidDataException>(() => SmackerContainer.ReadPackets(container).ToArray());
@@ -334,8 +350,10 @@ public sealed class SmackerReaderTests {
   public void AnAudioChunkTooShortForItsOwnLengthCounterRefuses() {
     var audioRates = new uint[7];
     audioRates[0] = _AudioRate(8000, compressed: false, dataPresent: true);
-    var blob = new byte[] { 1, 2 }; // fewer than the four bytes a length counter needs
-    var container = _OpenRaw(1, [blob], frameTypes: [0b0000_0010], audioRates);
+    // A four-byte palette chunk consumes the whole frame, leaving nothing for the audio chunk's own
+    // four-byte length counter that the frame type says follows it.
+    var blob = new byte[] { 1, 0, 0, 0 };
+    var container = _OpenRaw(1, [blob], frameTypes: [0b0000_0011], audioRates);
 
     Assert.Throws<InvalidDataException>(() => SmackerContainer.ReadPackets(container).ToArray());
   }
@@ -388,13 +406,64 @@ public sealed class SmackerReaderTests {
   [Test]
   [Category("Unit")]
   public void AFileThatStopsMidRecordingYieldsWhatItHasRatherThanRefusing() {
-    var frames = new[] { _Frame(false, [1, 2]), _Frame(false, [3, 4]) };
+    var frames = new[] { _Frame(false, [1, 2, 3, 4]), _Frame(false, [5, 6, 7, 8]) };
     var container = _Open(2, frames);
     // Truncate the file to inside the second frame's stated bytes.
     var truncated = SmackerContainer.FromBytes(container.Data.ToArray()[..^1]);
 
     var video = SmackerContainer.ReadPackets(truncated).Where(p => p.StreamIndex == 0).ToArray();
     Assert.That(video, Has.Length.EqualTo(1));
+  }
+
+  // ============================================================================================
+  // Round trip through the writer
+  // ============================================================================================
+
+  /// <summary>A frame whose bytes are not a whole number of four is padded to one by the writer rather
+  /// than written at its own length, because the low two bits of the size a file states are flags: a
+  /// frame written unpadded would lose up to three bytes and put every frame after it in the wrong
+  /// place.</summary>
+  [Test]
+  [Category("Unit")]
+  public void AFrameOfAnAwkwardLengthIsPaddedRatherThanLosingItsTail() {
+    // Packets muxed in from somewhere else, rather than read back out of a Smacker file, are where a
+    // frame of an awkward length actually arises: nothing upstream owes Smacker a multiple of four.
+    var video = new MediaStreamInfo {
+      Index = 0, Kind = MediaStreamKind.Video, Codec = CodecTag.FromCharacters("SMK2"),
+      Width = 16, Height = 16, TimeBase = new(1, 10), CodecPrivateData = new byte[20],
+    };
+
+    var writer = SmackerWriter.Create([video], new());
+    writer.WritePacket(new(0, new byte[] { 0, 0xA1, 0xA2, 0xA3 }, IsKeyFrame: true));
+    writer.WritePacket(new(0, new byte[] { 0, 0xB1, 0xB2, 0xB3, 0xB4, 0xB5 }));
+
+    var round = SmackerContainer.FromBytes(writer.Finish());
+    var packets = SmackerContainer.ReadPackets(round).Where(p => p.StreamIndex == 0).ToArray();
+
+    Assert.That(packets, Has.Length.EqualTo(2));
+    // Three payload bytes become four, and five become eight — the tail is padding, never lost bytes,
+    // and the second frame is still found where the first one ends.
+    Assert.That(packets[0].Data.ToArray(), Is.EqualTo(new byte[] { 0, 0xA1, 0xA2, 0xA3, 0x00 }));
+    Assert.That(packets[1].Data.ToArray(), Is.EqualTo(new byte[] { 0, 0xB1, 0xB2, 0xB3, 0xB4, 0xB5, 0x00, 0x00, 0x00 }));
+  }
+
+  /// <summary>The key-frame flag is bit zero of a frame's stated size, so a writer that dropped it
+  /// would silently turn every picture after the first into a non-key frame.</summary>
+  [Test]
+  [Category("Unit")]
+  public void TheKeyFrameFlagSurvivesAWriteAndReadBack() {
+    var blobs = new[] { new byte[] { 1, 2, 3, 4 }, new byte[] { 5, 6, 7, 8 }, new byte[] { 9, 10, 11, 12 } };
+    var source = _OpenRaw(3, blobs, sizeFlags: [0, 0, 1]);
+    var streams = SmackerContainer.Streams(source);
+
+    var writer = SmackerWriter.Create(streams, SmackerContainer.Metadata(source));
+    foreach (var packet in SmackerContainer.ReadPackets(source))
+      writer.WritePacket(packet);
+
+    var round = SmackerContainer.FromBytes(writer.Finish());
+    var video = SmackerContainer.ReadPackets(round).Where(p => p.StreamIndex == 0).ToArray();
+
+    Assert.That(video.Select(p => p.IsKeyFrame), Is.EqualTo(new[] { true, false, true }));
   }
 
   // ============================================================================================
@@ -482,7 +551,7 @@ public sealed class SmackerReaderTests {
     return _OpenRaw(frames, blobs.ToArray(), frameTypes.ToArray(), audioRates);
   }
 
-  private static SmackerContainer _OpenRaw(int frames, byte[][] blobs, byte[]? frameTypes = null, uint[]? audioRates = null) {
+  private static SmackerContainer _OpenRaw(int frames, byte[][] blobs, byte[]? frameTypes = null, uint[]? audioRates = null, uint[]? sizeFlags = null) {
     var header = new byte[_HeaderLength];
     var span = header.AsSpan();
     "SMK2"u8.CopyTo(span);
@@ -497,8 +566,14 @@ public sealed class SmackerReaderTests {
       BinaryPrimitives.WriteUInt32LittleEndian(span[(72 + t * 4)..], audioRates[t]);
 
     var frameSizesBytes = new byte[blobs.Length * 4];
-    for (var i = 0; i < blobs.Length; ++i)
-      BinaryPrimitives.WriteUInt32LittleEndian(frameSizesBytes.AsSpan(i * 4), (uint)blobs[i].Length);
+    for (var i = 0; i < blobs.Length; ++i) {
+      // A real Smacker frame is a whole number of four bytes, because the low two bits of the stated
+      // size are flags rather than length — see SmackerReader. A fixture that is not would have those
+      // bits read as flags and lose up to three of its own bytes, so it is refused here rather than
+      // silently measuring something other than what the test meant.
+      Assert.That(blobs[i].Length % 4, Is.Zero, $"frame {i}'s bytes are not a whole number of four");
+      BinaryPrimitives.WriteUInt32LittleEndian(frameSizesBytes.AsSpan(i * 4), (uint)blobs[i].Length | (sizeFlags?[i] ?? 0));
+    }
 
     var frameTypeBytes = frameTypes ?? new byte[blobs.Length];
 
