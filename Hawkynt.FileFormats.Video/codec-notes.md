@@ -545,6 +545,71 @@ format defines; a picture outside 16x16 to 640x480; a header failing its own che
 outside the frame; a cell reaching outside its plane or a motion vector off the picture; and a tree
 deeper than twenty levels or one that runs out of bits.
 
+### Intel Indeo Video Interactive 4 and 5
+
+One codec with two picture headers, which is why `Codecs/Indeo/` holds the layer below them once: the
+bit reader, the generated codebooks, the run-value maps, planes, wavelet bands, tiles, macroblocks,
+blocks, the slant and Haar transforms, motion compensation and the wavelet recompositions. Only
+`Indeo4Decoder` and `Indeo5Decoder` differ, and only in how a picture states its geometry, its
+quantisation and its transform.
+
+A plane is one band or four. Four means a wavelet: the low band carries the picture at half size in
+each direction and the other three carry what recomposing it needs, and the recomposition is Haar in
+Indeo 4 and five-three in Indeo 5. A band divides into tiles, a tile into macroblocks and a macroblock
+into blocks of eight or four samples; a block's coefficients are run-value coded against one of nine
+maps, scanned by one of the format's scan patterns, dequantised by a matrix the band header names, and
+transformed by a transform the band header names too.
+
+**None of it is in the file.** A band header names its transform, its scan, its quantisation matrix
+and its codebook by index; the smallest Indeo 4 frame in the corpus below is fourteen bytes for a
+360x288 picture, and the smallest Indeo 5 frame is two. What those indices name exists only in a
+decoder, which is the whole reason this one carries the tables and copies them exactly rather than
+deriving them: see `Codecs/Indeo/THIRD-PARTY-NOTICE.FFmpeg.txt`.
+
+**Measured.** Twenty-one real files from `samples.ffmpeg.org/V-codecs/IV41/` and `V-codecs/IV50/` —
+twenty of them matching the archive's own `md5sum` and the twenty-first, `00186002.avi`, having none
+published — were decoded here and by ffmpeg 9.0.1 and compared against ffmpeg's own decoded `yuv410p`
+planes, sample for sample, on every frame:
+
+| | streams compared | pictures | samples | differing |
+| --- | ---: | ---: | ---: | ---: |
+| Indeo 4 | 5 | 17,261 | 1,910,624,004 | 0 |
+| Indeo 5 | 15 | 5,516 | 936,074,736 | 0 |
+
+176x144 to 836x500, 40 to 15,363 packets apiece, one QuickTime file among the AVIs, and one clip whose
+picture is 300x228 where its container says 225 — the picture header is believed over the container, as
+ffmpeg believes it. Where a picture came out of fewer packets than the file holds, the missing ones are
+empty frames, which state that nothing changed and which neither decoder turns into a picture; ffmpeg
+drops the same packets on the same files. `00186002.avi` is the one that matters, because its 153
+dropped packets are empty frames inside a scalable stream, where what an empty frame would repeat is
+wavelet bands that no buffer still holds: both decoders refuse those 153 and agree on all 15,210 of the
+rest. Three files in the corpus are damaged — `crashtest.avi` and `sample.avi` stop mid-frame and
+`miss_congeniality_cryptedindeo5_sbcaudio.avi` is password-protected — and on all three this package and
+ffmpeg give up on the same packet.
+
+Two of the twenty-one, `cat_attack.avi` and `volcano.avi`, write their video chunks as `00iv` instead
+of `00dc`, which the AVI reader in this package does not take, so neither could be read through its own
+container. Both were remuxed with `ffmpeg -c:v copy`, which rewrites the container and leaves the coded
+frames untouched, and the figures above include them decoded from the remux. That is a limitation of
+the AVI reader and not of these decoders.
+
+The planes and not RGB settle it, as with Indeo 2 and 3: the RGB is a display convention this package
+chose, and the planes are the decode.
+
+What refuses, by name. Indeo 4: a band selecting one of the five transforms the format numbers and
+Intel never shipped — the four discrete cosine transforms and the four-by-four pass-through; a band
+spelling out a scan pattern or a dequantisation matrix of its own, both of which the format reserves an
+index for and no clip uses; and a clip stating a chrominance subsampling other than YVU9. Indeo 5: a
+password-protected clip, whose frame data is scrambled with a key the file does not carry; a clip
+stating the YV12 picture format or coding its luminance in four-by-four blocks, both defined by the
+format and neither ever written by an encoder; and a band header carrying extended transform
+information. Both, for malformed input: a coded block running past its last coefficient without ending,
+a band whose block size disagrees with its transform or its scan, a frame carrying picture data before
+any header has said how the picture divides, a block sitting past the end of its band's buffer, a tile
+whose blocks account for a different number of bytes than it states, a frame predicting from a band
+buffer the picture layout does not have, and an empty frame opening a stream or standing in for wavelet
+bands no buffer still holds.
+
 ### QuickTime Animation (RLE)
 
 Lossless, and line-based rather than block-based: a frame names the band of lines it touches and

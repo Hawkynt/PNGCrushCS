@@ -105,6 +105,45 @@ Implements `IVideoContainerWriter<AsfWriter>`, `IVideoFormatMetadata<AsfWriter>`
 | `Finish` | `byte[] Finish()` |  |
 | `WritePacket` | `void WritePacket(CodedPacket packet)` |  |
 
+### Namespace `FileFormat.Av1Video`
+
+[`Av1VideoContainer`](#av1videocontainer) · [`Av1VideoWriter`](#av1videowriter)
+
+#### `Av1VideoContainer`
+
+An AV1 low-overhead OBU elementary stream split at temporal delimiter OBUs.
+
+Implements `IVideoContainerReader<Av1VideoContainer>`, `IVideoFormatMetadata<Av1VideoContainer>`.
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `Av1VideoContainer` | `Av1VideoContainer()` |  |
+| `Data` | `ReadOnlyMemory<byte> Data { get; init; }` |  |
+| `FileExtensions` | `static string[] FileExtensions { get; }` |  |
+| `PrimaryExtension` | `static string PrimaryExtension { get; }` |  |
+| `FromBytes` | `static Av1VideoContainer FromBytes(byte[] data)` |  |
+| `FromFile` | `static Av1VideoContainer FromFile(FileInfo file)` |  |
+| `FromSpan` | `static Av1VideoContainer FromSpan(ReadOnlySpan<byte> data)` |  |
+| `MatchesSignature` | `static bool? MatchesSignature(ReadOnlySpan<byte> header)` |  |
+| `Metadata` | `static VideoMetadata Metadata(Av1VideoContainer container)` |  |
+| `ReadPackets` | `static IEnumerable<CodedPacket> ReadPackets(Av1VideoContainer container)` |  |
+| `ReadPackets` | `static IEnumerable<CodedPacket> ReadPackets(Av1VideoContainer container, int streamIndex)` |  |
+| `Streams` | `static IReadOnlyList<MediaStreamInfo> Streams(Av1VideoContainer container)` |  |
+
+#### `Av1VideoWriter`
+
+Writes AV1 temporal units as a low-overhead OBU elementary stream.
+
+Implements `IVideoContainerWriter<Av1VideoWriter>`, `IVideoFormatMetadata<Av1VideoWriter>`.
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `FileExtensions` | `static string[] FileExtensions { get; }` |  |
+| `PrimaryExtension` | `static string PrimaryExtension { get; }` |  |
+| `Create` | `static Av1VideoWriter Create(IReadOnlyList<MediaStreamInfo> streams, VideoMetadata metadata)` |  |
+| `Finish` | `byte[] Finish()` |  |
+| `WritePacket` | `void WritePacket(CodedPacket packet)` |  |
+
 ### Namespace `FileFormat.Avi`
 
 [`AviContainer`](#avicontainer) · [`AviMainHeader`](#avimainheader) · [`AviReader`](#avireader) · [`AviStreamHeader`](#avistreamheader) · [`AviWriter`](#aviwriter)
@@ -311,7 +350,7 @@ Implements `IVideoContainerWriter<CdxlWriter>`, `IVideoFormatMetadata<CdxlWriter
 
 ### Namespace `FileFormat.Codecs`
 
-[`AascVideoDecoder`](#aascvideodecoder) · [`AascVideoEncoder`](#aascvideoencoder) · [`AnimVideoDecoder`](#animvideodecoder) · [`AppleGraphicsDecoder`](#applegraphicsdecoder) · [`AppleGraphicsEncoder`](#applegraphicsencoder) · [`AppleVideoDecoder`](#applevideodecoder) · [`AppleVideoEncoder`](#applevideoencoder) · [`Asv1VideoDecoder`](#asv1videodecoder) · [`Asv1VideoEncoder`](#asv1videoencoder) · [`Asv2VideoDecoder`](#asv2videodecoder) · [`Asv2VideoEncoder`](#asv2videoencoder) · [`AvrnVideoDecoder`](#avrnvideodecoder) · [`AvrpVideoDecoder`](#avrpvideodecoder) · [`AvrpVideoEncoder`](#avrpvideoencoder) · [`AvuiVideoDecoder`](#avuivideodecoder) · [`AyuvVideoDecoder`](#ayuvvideodecoder) · [`AyuvVideoEncoder`](#ayuvvideoencoder) · [`BfiVideoDecoder`](#bfivideodecoder) · [`CanopusLosslessVideoDecoder`](#canopuslosslessvideodecoder) · [`CdxlVideoDecoder`](#cdxlvideodecoder) · [`CineFormVideoDecoder`](#cineformvideodecoder) · [`CinepakVideoDecoder`](#cinepakvideodecoder) · [`CinepakVideoEncoder`](#cinepakvideoencoder) · [`CljrVideoDecoder`](#cljrvideodecoder) · [`CljrVideoEncoder`](#cljrvideoencoder) · [`CreativeYuvVideoDecoder`](#creativeyuvvideodecoder) · [`CscdVideoDecoder`](#cscdvideodecoder) · [`DnxHdVideoDecoder`](#dnxhdvideodecoder) · [`DvVideoDecoder`](#dvvideodecoder) · [`DvVideoEncoder`](#dvvideoencoder) · [`EaCmvVideoDecoder`](#eacmvvideodecoder) · [`EightBpsVideoDecoder`](#eightbpsvideodecoder) · [`EightBpsVideoEncoder`](#eightbpsvideoencoder) · [`Escape124VideoDecoder`](#escape124videodecoder) · [`Escape130VideoDecoder`](#escape130videodecoder) · [`Ffv1Decoder`](#ffv1decoder) · [`Ffv1Encoder`](#ffv1encoder) · [`FlashSv2VideoDecoder`](#flashsv2videodecoder) · [`FlashSvVideoDecoder`](#flashsvvideodecoder) · [`FlashSvVideoEncoder`](#flashsvvideoencoder) · [`FlicVideoDecoder`](#flicvideodecoder) · [`H261VideoDecoder`](#h261videodecoder) · [`H261VideoEncoder`](#h261videoencoder) · [`H263VideoDecoder`](#h263videodecoder) · [`H264VideoDecoder`](#h264videodecoder) · [`H265VideoDecoder`](#h265videodecoder) · [`HapDecoder`](#hapdecoder) · [`HapVideoEncoder`](#hapvideoencoder) · [`HuffYuvDecoder`](#huffyuvdecoder) · [`HuffYuvEncoder`](#huffyuvencoder) · [`HuffYuvPredictionMethod`](#huffyuvpredictionmethod) · [`I420VideoDecoder`](#i420videodecoder) · [`I420VideoEncoder`](#i420videoencoder) · [`IdcinVideoDecoder`](#idcinvideodecoder) · [`Indeo2VideoDecoder`](#indeo2videodecoder) · [`Indeo3VideoDecoder`](#indeo3videodecoder) · [`IyuvVideoDecoder`](#iyuvvideodecoder) · [`IyuvVideoEncoder`](#iyuvvideoencoder) · [`LclZlibVideoDecoder`](#lclzlibvideodecoder) · [`LclZlibVideoEncoder`](#lclzlibvideoencoder) · [`LocoVideoDecoder`](#locovideodecoder) · [`M101VideoDecoder`](#m101videodecoder) · [`MagicYuvDecoder`](#magicyuvdecoder) · [`MagicYuvEncoder`](#magicyuvencoder) · [`MagicYuvEncoder.Predictor`](#magicyuvencoderpredictor) · [`MicrosoftRleDecoder`](#microsoftrledecoder) · [`MicrosoftRleEncoder`](#microsoftrleencoder) · [`MicrosoftVideo1Decoder`](#microsoftvideo1decoder) · [`MicrosoftVideo1Encoder`](#microsoftvideo1encoder) · [`MjpegBVideoDecoder`](#mjpegbvideodecoder) · [`MotionJpegDecoder`](#motionjpegdecoder) · [`MotionJpegVideoEncoder`](#motionjpegvideoencoder) · [`Mpeg1VideoDecoder`](#mpeg1videodecoder) · [`Mpeg2VideoDecoder`](#mpeg2videodecoder) · [`Mpeg4VideoDecoder`](#mpeg4videodecoder) · [`MsMpeg4VideoDecoder`](#msmpeg4videodecoder) · [`MsMpeg4VideoEncoder`](#msmpeg4videoencoder) · [`MsccVideoDecoder`](#msccvideodecoder) · [`Mss1VideoDecoder`](#mss1videodecoder) · [`MszhVideoDecoder`](#mszhvideodecoder) · [`MveVideoDecoder`](#mvevideodecoder) · [`MvhaVideoDecoder`](#mvhavideodecoder) · [`MwscVideoDecoder`](#mwscvideodecoder) · [`Nv12VideoDecoder`](#nv12videodecoder) · [`Nv12VideoEncoder`](#nv12videoencoder) · [`Nv21VideoDecoder`](#nv21videodecoder) · [`Nv21VideoEncoder`](#nv21videoencoder) · [`ProResVideoDecoder`](#proresvideodecoder) · [`ProResVideoEncoder`](#proresvideoencoder) · [`QpegVideoDecoder`](#qpegvideodecoder) · [`QuickTimeRleDecoder`](#quicktimerledecoder) · [`QuickTimeRleEncoder`](#quicktimerleencoder) · [`R10kVideoDecoder`](#r10kvideodecoder) · [`R10kVideoEncoder`](#r10kvideoencoder) · [`R210VideoDecoder`](#r210videodecoder) · [`R210VideoEncoder`](#r210videoencoder) · [`RascVideoDecoder`](#rascvideodecoder) · [`RawPlanarVideoDecoder`](#rawplanarvideodecoder) · [`RawPlanarVideoEncoder`](#rawplanarvideoencoder) · [`RawVideoDecoder`](#rawvideodecoder) · [`RawVideoEncoder`](#rawvideoencoder) · [`RealVideoDecoder`](#realvideodecoder) · [`RoqVideoDecoder`](#roqvideodecoder) · [`RoqVideoEncoder`](#roqvideoencoder) · [`RsccVideoDecoder`](#rsccvideodecoder) · [`ScreenpressoVideoDecoder`](#screenpressovideodecoder) · [`TdscVideoDecoder`](#tdscvideodecoder) · [`TheoraVideoDecoder`](#theoravideodecoder) · [`TsccVideoDecoder`](#tsccvideodecoder) · [`Uncompressed012vVideoDecoder`](#uncompressed012vvideodecoder) · [`Uncompressed012vVideoEncoder`](#uncompressed012vvideoencoder) · [`UtVideoDecoder`](#utvideodecoder) · [`UtVideoEncoder`](#utvideoencoder) · [`UyvyVideoDecoder`](#uyvyvideodecoder) · [`UyvyVideoEncoder`](#uyvyvideoencoder) · [`V210VideoDecoder`](#v210videodecoder) · [`V210VideoEncoder`](#v210videoencoder) · [`V308VideoDecoder`](#v308videodecoder) · [`V308VideoEncoder`](#v308videoencoder) · [`V408VideoDecoder`](#v408videodecoder) · [`V408VideoEncoder`](#v408videoencoder) · [`VbleVideoDecoder`](#vblevideodecoder) · [`Vc1VideoDecoder`](#vc1videodecoder) · [`VmdVideoDecoder`](#vmdvideodecoder) · [`VmncVideoDecoder`](#vmncvideodecoder) · [`Vp3VideoDecoder`](#vp3videodecoder) · [`Vp8VideoDecoder`](#vp8videodecoder) · [`Vp9VideoDecoder`](#vp9videodecoder) · [`VqaVideoDecoder`](#vqavideodecoder) · [`VyuyVideoDecoder`](#vyuyvideodecoder) · [`VyuyVideoEncoder`](#vyuyvideoencoder) · [`WcmvVideoDecoder`](#wcmvvideodecoder) · [`Y41pVideoDecoder`](#y41pvideodecoder) · [`Y41pVideoEncoder`](#y41pvideoencoder) · [`Y800VideoDecoder`](#y800videodecoder) · [`Y800VideoEncoder`](#y800videoencoder) · [`Yuy2VideoDecoder`](#yuy2videodecoder) · [`Yuy2VideoEncoder`](#yuy2videoencoder) · [`Yv12VideoDecoder`](#yv12videodecoder) · [`Yv12VideoEncoder`](#yv12videoencoder) · [`YvyuVideoDecoder`](#yvyuvideodecoder) · [`YvyuVideoEncoder`](#yvyuvideoencoder) · [`ZeroCodecVideoDecoder`](#zerocodecvideodecoder) · [`ZmbvVideoDecoder`](#zmbvvideodecoder) · [`ZmbvVideoEncoder`](#zmbvvideoencoder)
+[`AascVideoDecoder`](#aascvideodecoder) · [`AascVideoEncoder`](#aascvideoencoder) · [`AnimVideoDecoder`](#animvideodecoder) · [`AppleGraphicsDecoder`](#applegraphicsdecoder) · [`AppleGraphicsEncoder`](#applegraphicsencoder) · [`AppleVideoDecoder`](#applevideodecoder) · [`AppleVideoEncoder`](#applevideoencoder) · [`Asv1VideoDecoder`](#asv1videodecoder) · [`Asv1VideoEncoder`](#asv1videoencoder) · [`Asv2VideoDecoder`](#asv2videodecoder) · [`Asv2VideoEncoder`](#asv2videoencoder) · [`AvrnVideoDecoder`](#avrnvideodecoder) · [`AvrpVideoDecoder`](#avrpvideodecoder) · [`AvrpVideoEncoder`](#avrpvideoencoder) · [`AvuiVideoDecoder`](#avuivideodecoder) · [`AyuvVideoDecoder`](#ayuvvideodecoder) · [`AyuvVideoEncoder`](#ayuvvideoencoder) · [`BfiVideoDecoder`](#bfivideodecoder) · [`CanopusLosslessVideoDecoder`](#canopuslosslessvideodecoder) · [`CdxlVideoDecoder`](#cdxlvideodecoder) · [`CineFormVideoDecoder`](#cineformvideodecoder) · [`CinepakVideoDecoder`](#cinepakvideodecoder) · [`CinepakVideoEncoder`](#cinepakvideoencoder) · [`CljrVideoDecoder`](#cljrvideodecoder) · [`CljrVideoEncoder`](#cljrvideoencoder) · [`CreativeYuvVideoDecoder`](#creativeyuvvideodecoder) · [`CscdVideoDecoder`](#cscdvideodecoder) · [`DnxHdVideoDecoder`](#dnxhdvideodecoder) · [`DvVideoDecoder`](#dvvideodecoder) · [`DvVideoEncoder`](#dvvideoencoder) · [`EaCmvVideoDecoder`](#eacmvvideodecoder) · [`EightBpsVideoDecoder`](#eightbpsvideodecoder) · [`EightBpsVideoEncoder`](#eightbpsvideoencoder) · [`Escape124VideoDecoder`](#escape124videodecoder) · [`Escape130VideoDecoder`](#escape130videodecoder) · [`Ffv1Decoder`](#ffv1decoder) · [`Ffv1Encoder`](#ffv1encoder) · [`FlashSv2VideoDecoder`](#flashsv2videodecoder) · [`FlashSvVideoDecoder`](#flashsvvideodecoder) · [`FlashSvVideoEncoder`](#flashsvvideoencoder) · [`FlicVideoDecoder`](#flicvideodecoder) · [`H261VideoDecoder`](#h261videodecoder) · [`H261VideoEncoder`](#h261videoencoder) · [`H263VideoDecoder`](#h263videodecoder) · [`H264VideoDecoder`](#h264videodecoder) · [`H265VideoDecoder`](#h265videodecoder) · [`HapDecoder`](#hapdecoder) · [`HapVideoEncoder`](#hapvideoencoder) · [`HuffYuvDecoder`](#huffyuvdecoder) · [`HuffYuvEncoder`](#huffyuvencoder) · [`HuffYuvPredictionMethod`](#huffyuvpredictionmethod) · [`I420VideoDecoder`](#i420videodecoder) · [`I420VideoEncoder`](#i420videoencoder) · [`IdcinVideoDecoder`](#idcinvideodecoder) · [`Indeo2VideoDecoder`](#indeo2videodecoder) · [`Indeo3VideoDecoder`](#indeo3videodecoder) · [`Indeo4VideoDecoder`](#indeo4videodecoder) · [`Indeo5VideoDecoder`](#indeo5videodecoder) · [`IyuvVideoDecoder`](#iyuvvideodecoder) · [`IyuvVideoEncoder`](#iyuvvideoencoder) · [`LclZlibVideoDecoder`](#lclzlibvideodecoder) · [`LclZlibVideoEncoder`](#lclzlibvideoencoder) · [`LocoVideoDecoder`](#locovideodecoder) · [`M101VideoDecoder`](#m101videodecoder) · [`MagicYuvDecoder`](#magicyuvdecoder) · [`MagicYuvEncoder`](#magicyuvencoder) · [`MagicYuvEncoder.Predictor`](#magicyuvencoderpredictor) · [`MicrosoftRleDecoder`](#microsoftrledecoder) · [`MicrosoftRleEncoder`](#microsoftrleencoder) · [`MicrosoftVideo1Decoder`](#microsoftvideo1decoder) · [`MicrosoftVideo1Encoder`](#microsoftvideo1encoder) · [`MjpegBVideoDecoder`](#mjpegbvideodecoder) · [`MotionJpegDecoder`](#motionjpegdecoder) · [`MotionJpegVideoEncoder`](#motionjpegvideoencoder) · [`Mpeg1VideoDecoder`](#mpeg1videodecoder) · [`Mpeg2VideoDecoder`](#mpeg2videodecoder) · [`Mpeg4VideoDecoder`](#mpeg4videodecoder) · [`MsMpeg4VideoDecoder`](#msmpeg4videodecoder) · [`MsMpeg4VideoEncoder`](#msmpeg4videoencoder) · [`MsccVideoDecoder`](#msccvideodecoder) · [`Mss1VideoDecoder`](#mss1videodecoder) · [`MszhVideoDecoder`](#mszhvideodecoder) · [`MveVideoDecoder`](#mvevideodecoder) · [`MvhaVideoDecoder`](#mvhavideodecoder) · [`MwscVideoDecoder`](#mwscvideodecoder) · [`Nv12VideoDecoder`](#nv12videodecoder) · [`Nv12VideoEncoder`](#nv12videoencoder) · [`Nv21VideoDecoder`](#nv21videodecoder) · [`Nv21VideoEncoder`](#nv21videoencoder) · [`ProResVideoDecoder`](#proresvideodecoder) · [`ProResVideoEncoder`](#proresvideoencoder) · [`QpegVideoDecoder`](#qpegvideodecoder) · [`QuickTimeRleDecoder`](#quicktimerledecoder) · [`QuickTimeRleEncoder`](#quicktimerleencoder) · [`R10kVideoDecoder`](#r10kvideodecoder) · [`R10kVideoEncoder`](#r10kvideoencoder) · [`R210VideoDecoder`](#r210videodecoder) · [`R210VideoEncoder`](#r210videoencoder) · [`RascVideoDecoder`](#rascvideodecoder) · [`RawPlanarVideoDecoder`](#rawplanarvideodecoder) · [`RawPlanarVideoEncoder`](#rawplanarvideoencoder) · [`RawVideoDecoder`](#rawvideodecoder) · [`RawVideoEncoder`](#rawvideoencoder) · [`RealVideoDecoder`](#realvideodecoder) · [`RoqVideoDecoder`](#roqvideodecoder) · [`RoqVideoEncoder`](#roqvideoencoder) · [`RsccVideoDecoder`](#rsccvideodecoder) · [`ScreenpressoVideoDecoder`](#screenpressovideodecoder) · [`TdscVideoDecoder`](#tdscvideodecoder) · [`TheoraVideoDecoder`](#theoravideodecoder) · [`TsccVideoDecoder`](#tsccvideodecoder) · [`Uncompressed012vVideoDecoder`](#uncompressed012vvideodecoder) · [`Uncompressed012vVideoEncoder`](#uncompressed012vvideoencoder) · [`UtVideoDecoder`](#utvideodecoder) · [`UtVideoEncoder`](#utvideoencoder) · [`UyvyVideoDecoder`](#uyvyvideodecoder) · [`UyvyVideoEncoder`](#uyvyvideoencoder) · [`V210VideoDecoder`](#v210videodecoder) · [`V210VideoEncoder`](#v210videoencoder) · [`V308VideoDecoder`](#v308videodecoder) · [`V308VideoEncoder`](#v308videoencoder) · [`V408VideoDecoder`](#v408videodecoder) · [`V408VideoEncoder`](#v408videoencoder) · [`VbleVideoDecoder`](#vblevideodecoder) · [`Vc1VideoDecoder`](#vc1videodecoder) · [`VmdVideoDecoder`](#vmdvideodecoder) · [`VmncVideoDecoder`](#vmncvideodecoder) · [`Vp3VideoDecoder`](#vp3videodecoder) · [`Vp8VideoDecoder`](#vp8videodecoder) · [`Vp9VideoDecoder`](#vp9videodecoder) · [`VqaVideoDecoder`](#vqavideodecoder) · [`VyuyVideoDecoder`](#vyuyvideodecoder) · [`VyuyVideoEncoder`](#vyuyvideoencoder) · [`WcmvVideoDecoder`](#wcmvvideodecoder) · [`Y41pVideoDecoder`](#y41pvideodecoder) · [`Y41pVideoEncoder`](#y41pvideoencoder) · [`Y800VideoDecoder`](#y800videodecoder) · [`Y800VideoEncoder`](#y800videoencoder) · [`Yuy2VideoDecoder`](#yuy2videodecoder) · [`Yuy2VideoEncoder`](#yuy2videoencoder) · [`Yv12VideoDecoder`](#yv12videodecoder) · [`Yv12VideoEncoder`](#yv12videoencoder) · [`YvyuVideoDecoder`](#yvyuvideodecoder) · [`YvyuVideoEncoder`](#yvyuvideoencoder) · [`ZeroCodecVideoDecoder`](#zerocodecvideodecoder) · [`ZmbvVideoDecoder`](#zmbvvideodecoder) · [`ZmbvVideoEncoder`](#zmbvvideoencoder)
 
 #### `AascVideoDecoder`
 
@@ -1068,6 +1107,33 @@ Implements `IVideoCodecDecoder<Indeo3VideoDecoder>`, `IVideoFrameDecoder`.
 | `Accepts` | `static bool Accepts(MediaStreamInfo stream)` |  |
 | `Create` | `static Indeo3VideoDecoder Create(MediaStreamInfo stream)` | Builds a decoder for one stream. |
 | `TryDecode` | `bool TryDecode(CodedPacket packet, out RawImage frame)` | Decodes one packet, which is one whole frame or a sync frame carrying no picture at all. |
+
+#### `Indeo4VideoDecoder`
+
+Decodes Intel Indeo Video Interactive 4.
+
+Implements `IVideoCodecDecoder<Indeo4VideoDecoder>`, `IVideoFrameDecoder`.
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `Indeo4VideoDecoder` | `Indeo4VideoDecoder()` |  |
+| `CodecName` | `static string CodecName { get; }` |  |
+| `Accepts` | `static bool Accepts(MediaStreamInfo stream)` |  |
+| `Create` | `static Indeo4VideoDecoder Create(MediaStreamInfo stream)` | Builds a decoder for one stream. |
+| `TryDecode` | `bool TryDecode(CodedPacket packet, out RawImage frame)` | Decodes one packet. |
+
+#### `Indeo5VideoDecoder`
+
+Decodes Intel Indeo Video Interactive 5, the last of the Indeo line.
+
+Implements `IVideoCodecDecoder<Indeo5VideoDecoder>`, `IVideoFrameDecoder`.
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `CodecName` | `static string CodecName { get; }` |  |
+| `Accepts` | `static bool Accepts(MediaStreamInfo stream)` |  |
+| `Create` | `static Indeo5VideoDecoder Create(MediaStreamInfo stream)` | Builds a decoder for one stream. |
+| `TryDecode` | `bool TryDecode(CodedPacket packet, out RawImage frame)` | Decodes one packet. |
 
 #### `IyuvVideoDecoder`
 
@@ -2289,7 +2355,7 @@ The four ways a sample can be predicted from the ones already decoded.
 
 ### Namespace `FileFormat.Core`
 
-[`AdditionalImageFormatAttribute`](#additionalimageformatattribute) · [`AllowedZones`](#allowedzones) · [`AmigaColourMap`](#amigacolourmap) · [`AmigaRgbRuns`](#amigargbruns) · [`AmstradGraphics`](#amstradgraphics) · [`AnticMode`](#anticmode) · [`AppleIIGSGraphics`](#appleiigsgraphics) · [`Atari8BitGraphics`](#atari8bitgraphics) · [`AtariKoalaRle`](#atarikoalarle) · [`AtariStCaRle`](#ataristcarle) · [`AtariStGraphics`](#ataristgraphics) · [`BilevelRows`](#bilevelrows) · [`CaseAttribute`](#caseattribute) · [`ChannelScaling`](#channelscaling) · [`CharacterRoms`](#characterroms) · [`ChunkKind`](#chunkkind) · [`ChunkMobility`](#chunkmobility) · [`ChunkOptimizer`](#chunkoptimizer) · [`ChunkPlacement`](#chunkplacement) · [`ChunkPlacementDirective`](#chunkplacementdirective) · [`ChunkReference`](#chunkreference) · [`ChunkRewriteFailure`](#chunkrewritefailure) · [`ChunkRewritePlan`](#chunkrewriteplan) · [`ChunkRewriteResult`](#chunkrewriteresult) · [`ChunkRewriteRule`](#chunkrewriterule) · [`ChunkSpan`](#chunkspan) · [`ChunkZone`](#chunkzone) · [`CodecTag`](#codectag) · [`CodedPacket`](#codedpacket) · [`ColorQuantizer`](#colorquantizer) · [`ColorQuantizer.Result`](#colorquantizerresult) · [`Commodore16Graphics`](#commodore16graphics) · [`Commodore64Graphics`](#commodore64graphics) · [`CoverArt`](#coverart) · [`DecodedFrame`](#decodedframe) · [`DisplayFilter`](#displayfilter) · [`EndianAttribute`](#endianattribute) · [`Endianness`](#endianness) · [`ExifCodec`](#exifcodec) · [`ExifData`](#exifdata) · [`ExifIfd`](#exififd) · [`ExifRational`](#exifrational) · [`ExifSRational`](#exifsrational) · [`ExifTagEntry`](#exiftagentry) · [`ExifTagType`](#exiftagtype) · [`FastRawImageConverter`](#fastrawimageconverter) · [`FieldAttribute`](#fieldattribute) · [`FieldOffsetAttribute`](#fieldoffsetattribute) · [`FillerAttribute`](#fillerattribute) · [`FixedPalette`](#fixedpalette) · [`FixedValue`](#fixedvalue) · [`FormatCapability`](#formatcapability) · [`FormatDetectionPriorityAttribute`](#formatdetectionpriorityattribute) · [`FormatIO`](#formatio) · [`FormatMagicBytesAttribute`](#formatmagicbytesattribute) · [`FormatMimeTypeAttribute`](#formatmimetypeattribute) · [`FrameBlend`](#frameblend) · [`GenerateSerializerAttribute`](#generateserializerattribute) · [`GlyphSheet`](#glyphsheet) · [`GtiaRenderer`](#gtiarenderer) · [`HeaderFieldDescriptor`](#headerfielddescriptor) · [`HeaderFieldMapper`](#headerfieldmapper) · [`HeaderSerializer`](#headerserializer) · [`IBinarySerializable<TSelf>`](#ibinaryserializabletself) · [`IFormatChunkLayout<TSelf>`](#iformatchunklayouttself) · [`IFormatChunkPlanRewriter<TSelf>`](#iformatchunkplanrewritertself) · [`IFormatChunkRewriter<TSelf>`](#iformatchunkrewritertself) · [`IImageFormatMetadata<TSelf>`](#iimageformatmetadatatself) · [`IImageFormatReader<TSelf>`](#iimageformatreadertself) · [`IImageFormatWriter<TSelf>`](#iimageformatwritertself) · [`IImageFromRawImage<TSelf>`](#iimagefromrawimagetself) · [`IImageInfoReader<TSelf>`](#iimageinforeadertself) · [`IImageToRawImage<TSelf>`](#iimagetorawimagetself) · [`IMultiImageFileFormat<TSelf>`](#imultiimagefileformattself) · [`IVideoCodecDecoder<TSelf>`](#ivideocodecdecodertself) · [`IVideoCodecEncoder<TSelf>`](#ivideocodecencodertself) · [`IVideoContainerReader<TSelf>`](#ivideocontainerreadertself) · [`IVideoContainerWriter<TSelf>`](#ivideocontainerwritertself) · [`IVideoFormatMetadata<TSelf>`](#ivideoformatmetadatatself) · [`IVideoFrameDecoder`](#ivideoframedecoder) · [`IVideoPacketEncoder`](#ivideopacketencoder) · [`IfAttribute`](#ifattribute) · [`ImageInfo`](#imageinfo) · [`ImageMetadata`](#imagemetadata) · [`ImageResampler`](#imageresampler) · [`IndexedPalette`](#indexedpalette) · [`IntegerRange`](#integerrange) · [`IptcCodec`](#iptccodec) · [`IptcData`](#iptcdata) · [`IptcDataSet`](#iptcdataset) · [`LayoutMode`](#layoutmode) · [`Lz4Frame`](#lz4frame) · [`MediaStreamInfo`](#mediastreaminfo) · [`MediaStreamKind`](#mediastreamkind) · [`MediaStreamMetadata`](#mediastreammetadata) · [`MonochromePage`](#monochromepage) · [`MsxGraphics`](#msxgraphics) · [`Op`](#op) · [`PackBits`](#packbits) · [`PackBytesStream`](#packbytesstream) · [`PackedRows`](#packedrows) · [`PaletteQuantizer`](#palettequantizer) · [`PaletteSidecar`](#palettesidecar) · [`PixelAspectRatio`](#pixelaspectratio) · [`PixelConverter`](#pixelconverter) · [`PixelFormat`](#pixelformat) · [`PixelRect`](#pixelrect) · [`PlanarConverter`](#planarconverter) · [`Rational`](#rational) · [`RawBytesAttribute`](#rawbytesattribute) · [`RawChromaLocation`](#rawchromalocation) · [`RawColorPrimaries`](#rawcolorprimaries) · [`RawColorRange`](#rawcolorrange) · [`RawImage`](#rawimage) · [`RawImageColorInfo`](#rawimagecolorinfo) · [`RawImageConverter`](#rawimageconverter) · [`RawImageExtensions`](#rawimageextensions) · [`RawImageFactory`](#rawimagefactory) · [`RawMatrixCoefficients`](#rawmatrixcoefficients) · [`RawTransferCharacteristic`](#rawtransfercharacteristic) · [`RepeatAttribute`](#repeatattribute) · [`RepeatEosAttribute`](#repeateosattribute) · [`RepeatUntilAttribute`](#repeatuntilattribute) · [`Resampling`](#resampling) · [`Rgba32`](#rgba32) · [`SeqFieldAttribute`](#seqfieldattribute) · [`SfdnDecompressor`](#sfdndecompressor) · [`SizedByAttribute`](#sizedbyattribute) · [`StringAttribute`](#stringattribute) · [`StringEncoding`](#stringencoding) · [`StringZAttribute`](#stringzattribute) · [`StructSizeAttribute`](#structsizeattribute) · [`SwitchOnAttribute`](#switchonattribute) · [`TextMetadataEntry`](#textmetadataentry) · [`TypeOverrideAttribute`](#typeoverrideattribute) · [`ValidAnyOfAttribute`](#validanyofattribute) · [`ValidAttribute`](#validattribute) · [`ValidRangeAttribute`](#validrangeattribute) · [`VgaPalette`](#vgapalette) · [`Vic20Graphics`](#vic20graphics) · [`VideoIO`](#videoio) · [`VideoMetadata`](#videometadata) · [`VideoMode`](#videomode) · [`WireType`](#wiretype) · [`Zx81Graphics`](#zx81graphics) · [`ZxSpectrumGraphics`](#zxspectrumgraphics)
+[`AdditionalImageFormatAttribute`](#additionalimageformatattribute) · [`AllowedZones`](#allowedzones) · [`AmigaColourMap`](#amigacolourmap) · [`AmigaRgbRuns`](#amigargbruns) · [`AmstradGraphics`](#amstradgraphics) · [`AnticMode`](#anticmode) · [`AppleIIGSGraphics`](#appleiigsgraphics) · [`Atari8BitGraphics`](#atari8bitgraphics) · [`AtariKoalaRle`](#atarikoalarle) · [`AtariStCaRle`](#ataristcarle) · [`AtariStGraphics`](#ataristgraphics) · [`BilevelRows`](#bilevelrows) · [`CaseAttribute`](#caseattribute) · [`ChannelScaling`](#channelscaling) · [`CharacterRoms`](#characterroms) · [`ChunkKind`](#chunkkind) · [`ChunkMobility`](#chunkmobility) · [`ChunkOptimizer`](#chunkoptimizer) · [`ChunkPlacement`](#chunkplacement) · [`ChunkPlacementDirective`](#chunkplacementdirective) · [`ChunkReference`](#chunkreference) · [`ChunkRewriteFailure`](#chunkrewritefailure) · [`ChunkRewritePlan`](#chunkrewriteplan) · [`ChunkRewriteResult`](#chunkrewriteresult) · [`ChunkRewriteRule`](#chunkrewriterule) · [`ChunkSpan`](#chunkspan) · [`ChunkZone`](#chunkzone) · [`CodecTag`](#codectag) · [`CodedPacket`](#codedpacket) · [`ColorQuantizer`](#colorquantizer) · [`ColorQuantizer.Result`](#colorquantizerresult) · [`Commodore16Graphics`](#commodore16graphics) · [`Commodore64Graphics`](#commodore64graphics) · [`CoverArt`](#coverart) · [`DecodedFrame`](#decodedframe) · [`DisplayFilter`](#displayfilter) · [`EndianAttribute`](#endianattribute) · [`Endianness`](#endianness) · [`ExifCodec`](#exifcodec) · [`ExifData`](#exifdata) · [`ExifIfd`](#exififd) · [`ExifRational`](#exifrational) · [`ExifSRational`](#exifsrational) · [`ExifTagEntry`](#exiftagentry) · [`ExifTagType`](#exiftagtype) · [`FastRawImageConverter`](#fastrawimageconverter) · [`FieldAttribute`](#fieldattribute) · [`FieldOffsetAttribute`](#fieldoffsetattribute) · [`FillerAttribute`](#fillerattribute) · [`FixedPalette`](#fixedpalette) · [`FixedValue`](#fixedvalue) · [`FormatCapability`](#formatcapability) · [`FormatDetectionPriorityAttribute`](#formatdetectionpriorityattribute) · [`FormatIO`](#formatio) · [`FormatMagicBytesAttribute`](#formatmagicbytesattribute) · [`FormatMimeTypeAttribute`](#formatmimetypeattribute) · [`FrameBlend`](#frameblend) · [`GenerateSerializerAttribute`](#generateserializerattribute) · [`GlyphSheet`](#glyphsheet) · [`GtiaRenderer`](#gtiarenderer) · [`HeaderFieldDescriptor`](#headerfielddescriptor) · [`HeaderFieldMapper`](#headerfieldmapper) · [`HeaderSerializer`](#headerserializer) · [`IBinarySerializable<TSelf>`](#ibinaryserializabletself) · [`IFormatChunkLayout<TSelf>`](#iformatchunklayouttself) · [`IFormatChunkPlanRewriter<TSelf>`](#iformatchunkplanrewritertself) · [`IFormatChunkRewriter<TSelf>`](#iformatchunkrewritertself) · [`IImageFormatMetadata<TSelf>`](#iimageformatmetadatatself) · [`IImageFormatReader<TSelf>`](#iimageformatreadertself) · [`IImageFormatWriter<TSelf>`](#iimageformatwritertself) · [`IImageFromRawImage<TSelf, TPixel>`](#iimagefromrawimagetself-tpixel) · [`IImageFromRawImage<TSelf>`](#iimagefromrawimagetself) · [`IImageInfoReader<TSelf>`](#iimageinforeadertself) · [`IImageToRawImage<TSelf>`](#iimagetorawimagetself) · [`IMultiImageFileFormat<TSelf>`](#imultiimagefileformattself) · [`IRawPixelFormat<TSelf>`](#irawpixelformattself) · [`IVideoCodecDecoder<TSelf>`](#ivideocodecdecodertself) · [`IVideoCodecEncoder<TSelf>`](#ivideocodecencodertself) · [`IVideoContainerReader<TSelf>`](#ivideocontainerreadertself) · [`IVideoContainerWriter<TSelf>`](#ivideocontainerwritertself) · [`IVideoFormatMetadata<TSelf>`](#ivideoformatmetadatatself) · [`IVideoFrameDecoder`](#ivideoframedecoder) · [`IVideoPacketEncoder`](#ivideopacketencoder) · [`IfAttribute`](#ifattribute) · [`ImageInfo`](#imageinfo) · [`ImageMetadata`](#imagemetadata) · [`ImageResampler`](#imageresampler) · [`IndexedPalette`](#indexedpalette) · [`IntegerRange`](#integerrange) · [`IptcCodec`](#iptccodec) · [`IptcData`](#iptcdata) · [`IptcDataSet`](#iptcdataset) · [`LayoutMode`](#layoutmode) · [`Lz4Frame`](#lz4frame) · [`MediaStreamInfo`](#mediastreaminfo) · [`MediaStreamKind`](#mediastreamkind) · [`MediaStreamMetadata`](#mediastreammetadata) · [`MonochromePage`](#monochromepage) · [`MsxGraphics`](#msxgraphics) · [`Op`](#op) · [`PackBits`](#packbits) · [`PackBytesStream`](#packbytesstream) · [`PackedRows`](#packedrows) · [`PaletteQuantizer`](#palettequantizer) · [`PaletteSidecar`](#palettesidecar) · [`PixelAspectRatio`](#pixelaspectratio) · [`PixelConverter`](#pixelconverter) · [`PixelFormat`](#pixelformat) · [`PixelRect`](#pixelrect) · [`PlanarConverter`](#planarconverter) · [`Rational`](#rational) · [`RawBytesAttribute`](#rawbytesattribute) · [`RawChromaLocation`](#rawchromalocation) · [`RawColorPrimaries`](#rawcolorprimaries) · [`RawColorRange`](#rawcolorrange) · [`RawImage`](#rawimage) · [`RawImage<TPixel>`](#rawimagetpixel) · [`RawImageColorInfo`](#rawimagecolorinfo) · [`RawImageConverter`](#rawimageconverter) · [`RawImageExactConverter`](#rawimageexactconverter) · [`RawImageExtensions`](#rawimageextensions) · [`RawImageFactory`](#rawimagefactory) · [`RawMatrixCoefficients`](#rawmatrixcoefficients) · [`RawPalette`](#rawpalette) · [`RawPaletteEntry`](#rawpaletteentry) · [`RawPixelAlphaKind`](#rawpixelalphakind) · [`RawPixelFormatKind`](#rawpixelformatkind) · [`RawPixelFormatTraits`](#rawpixelformattraits) · [`RawPixelFormats`](#rawpixelformats) · [`RawTransferCharacteristic`](#rawtransfercharacteristic) · [`RepeatAttribute`](#repeatattribute) · [`RepeatEosAttribute`](#repeateosattribute) · [`RepeatUntilAttribute`](#repeatuntilattribute) · [`Resampling`](#resampling) · [`Rgba32`](#rgba32) · [`SeqFieldAttribute`](#seqfieldattribute) · [`SfdnDecompressor`](#sfdndecompressor) · [`SizedByAttribute`](#sizedbyattribute) · [`StringAttribute`](#stringattribute) · [`StringEncoding`](#stringencoding) · [`StringZAttribute`](#stringzattribute) · [`StructSizeAttribute`](#structsizeattribute) · [`SwitchOnAttribute`](#switchonattribute) · [`TextMetadataEntry`](#textmetadataentry) · [`TypeOverrideAttribute`](#typeoverrideattribute) · [`ValidAnyOfAttribute`](#validanyofattribute) · [`ValidAttribute`](#validattribute) · [`ValidRangeAttribute`](#validrangeattribute) · [`VgaPalette`](#vgapalette) · [`Vic20Graphics`](#vic20graphics) · [`VideoIO`](#videoio) · [`VideoMetadata`](#videometadata) · [`VideoMode`](#videomode) · [`WireType`](#wiretype) · [`Zx81Graphics`](#zx81graphics) · [`ZxSpectrumGraphics`](#zxspectrumgraphics)
 
 #### `AdditionalImageFormatAttribute`
 
@@ -3062,7 +3128,9 @@ Zero-cost generic entry points for format I/O. All convenience overloads (byte[]
 | `Decode` | `static RawImage Decode<T>(ReadOnlySpan<byte> data)` |  |
 | `Decode` | `static RawImage Decode<T>(Stream stream)` |  |
 | `Decode` | `static RawImage Decode<T>(byte[] data)` |  |
+| `Encode` | `static byte[] Encode<T, TPixel>(RawImage<TPixel> image)` | Encodes a raw representation that the format explicitly declares as supported. Unlike the legacy runtime-tagged overload, this entry point cannot ask the writer to coerce another raw representation until it happens to fit. |
 | `Encode` | `static byte[] Encode<T>(RawImage image)` |  |
+| `Encode` | `static void Encode<T, TPixel>(RawImage<TPixel> image, Stream stream)` | Typed exact-write overload for streams. |
 | `Encode` | `static void Encode<T>(RawImage image, Stream stream)` |  |
 | `FileExtensions` | `static string[] FileExtensions<T>()` |  |
 | `MatchesSignature` | `static bool? MatchesSignature<T>(ReadOnlySpan<byte> header)` |  |
@@ -3075,6 +3143,7 @@ Zero-cost generic entry points for format I/O. All convenience overloads (byte[]
 | `Read` | `static T Read<T>(ReadOnlySpan<byte> data)` |  |
 | `Read` | `static T Read<T>(Stream stream)` |  |
 | `Read` | `static T Read<T>(byte[] data)` |  |
+| `WriteToFile` | `static void WriteToFile<T, TPixel>(RawImage<TPixel> image, FileInfo target)` | Typed exact-write overload for named files and companion-file formats. |
 | `WriteToFile` | `static void WriteToFile<T>(RawImage image, FileInfo target)` | Writes a picture to a file, with whatever else that format keeps beside it. |
 | `Write` | `static byte[] Write<T>(T file)` |  |
 | `Write` | `static void Write<T>(T file, Stream stream)` |  |
@@ -3264,6 +3333,16 @@ Serializes the in-memory file representation to bytes. Use `FormatIO` for Stream
 | `ToBytes` | `static byte[] ToBytes(TSelf file)` | Serializes the format to a byte array. |
 | `WriteCompanions` | `static void WriteCompanions(TSelf file, FileInfo target)` | Writes whatever else belongs beside a file that has just been written. |
 
+#### `IImageFromRawImage<TSelf, TPixel>`
+
+Declares one exact raw representation a format can serialize without quantization, dithering, resampling, or other content adaptation. A format may implement this interface multiple times for different `TPixel` descriptors.
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `FromRawImage` | `static TSelf FromRawImage(RawImage<TPixel> image)` | Creates the in-memory file representation from an already-supported raw representation. |
+| `FromRawImage` | `static TSelf FromRawImage(RawImage<TPixel> image, FileInfo target)` | Creates the representation for a named target without changing pixel semantics. |
+| `FromRawImage` | `static TSelf FromRawImage(RawImage<TPixel> image, string extension)` | Creates the representation for a target extension without changing pixel semantics. |
+
 #### `IImageFromRawImage<TSelf>`
 
 Creates the in-memory file representation from a platform-independent `RawImage`. Optional — read-only formats omit this.
@@ -3299,6 +3378,14 @@ Companion interface for file formats that contain multiple images (e.g. ICO, APN
 | `ImageCount` | `static int ImageCount(TSelf file)` | Returns the number of images/frames/pages in the file. |
 | `ToRawImage` | `static RawImage ToRawImage(TSelf file, int index)` | Converts a specific image at the given index to a `RawImage`. |
 | `ToRawImages` | `static IReadOnlyList<RawImage> ToRawImages(TSelf file)` | Converts all images to a list of `RawImage` instances. |
+
+#### `IRawPixelFormat<TSelf>`
+
+Compile-time descriptor for a raw pixel representation. The generic parameter deliberately describes representation semantics rather than requiring one CLR value of `TSelf` per pixel.
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `Traits` | `static RawPixelFormatTraits Traits { get; }` |  |
 
 #### `IVideoCodecDecoder<TSelf>`
 
@@ -3941,6 +4028,40 @@ Platform-independent pixel buffer that serves as the intermediate type for cross
 | `YuvBitDepth` | `static int YuvBitDepth(PixelFormat format)` | Effective precision of a YUV component sample. |
 | `YuvSubsampling` | `static ValueTuple<int, int> YuvSubsampling(PixelFormat format)` | Returns horizontal and vertical chroma subsampling factors for a planar YUV format. |
 
+#### `RawImage<TPixel>`
+
+Compile-time typed view of a `RawImage`. The type parameter declares the semantic raw pixel representation while the wrapped legacy image keeps current readers, converters, and writers working during migration.
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `RawImage` | `RawImage(int width, int height, byte[] pixelData, RawImageColorInfo colorInfo = null, byte[] palette = null, int paletteCount = 0, byte[] alphaTable = null, ImageMetadata metadata = null)` | Creates a typed raw image using the compatibility storage declared by `TPixel`. |
+| `AlphaTable` | `byte[] AlphaTable { get; }` |  |
+| `ColorInfo` | `RawImageColorInfo ColorInfo { get; }` |  |
+| `Format` | `PixelFormat Format { get; }` | Compatibility runtime format used by the current non-generic pipeline. |
+| `HasAlpha` | `bool HasAlpha { get; }` |  |
+| `HasEnoughPixelData` | `bool HasEnoughPixelData { get; }` |  |
+| `Height` | `int Height { get; }` |  |
+| `IsFloatingPoint` | `bool IsFloatingPoint { get; }` |  |
+| `IsIndexed` | `bool IsIndexed { get; }` |  |
+| `IsPlanarYuv` | `bool IsPlanarYuv { get; }` |  |
+| `Metadata` | `ImageMetadata Metadata { get; }` |  |
+| `MinimumPixelDataLength` | `long MinimumPixelDataLength { get; }` |  |
+| `PaletteCount` | `int PaletteCount { get; }` |  |
+| `Palette` | `byte[] Palette { get; }` |  |
+| `PixelData` | `byte[] PixelData { get; }` |  |
+| `PixelTraits` | `static RawPixelFormatTraits PixelTraits { get; }` | Static traits of the representation carried in the generic type. |
+| `PlaneCount` | `int PlaneCount { get; }` |  |
+| `Untyped` | `RawImage Untyped { get; }` | Legacy view of this image. Conversion is zero-copy: the same pixel/palette/metadata arrays are used. This property is transitional and lets typed adoption proceed before every current API is generic. |
+| `Width` | `int Width { get; }` |  |
+| `FromUntyped` | `static RawImage<TPixel> FromUntyped(RawImage image)` | Adds a typed view to an existing legacy image without copying its buffers. Narrow logical indexed types such as `Indexed6` are checked so an Indexed8 buffer containing index 200 cannot be mislabeled as six-bit data. |
+| `GetPlaneData` | `ReadOnlySpan<byte> GetPlaneData(int plane)` |  |
+| `GetPlaneDimensions` | `ValueTuple<int, int> GetPlaneDimensions(int plane)` |  |
+| `GetPlaneLength` | `int GetPlaneLength(int plane)` |  |
+| `GetPlaneOffset` | `int GetPlaneOffset(int plane)` |  |
+| `TryFromUntyped` | `static bool TryFromUntyped(RawImage image, out RawImage<TPixel> result)` |  |
+| `Validate` | `void Validate()` | Validates value-level invariants not expressible solely by the generic type. |
+| `implicit operator RawImage` | `static implicit operator RawImage(RawImage<TPixel> image)` | Implicitly enters the legacy runtime-tagged pipeline without copying pixel data. |
+
 #### `RawImageColorInfo`
 
 Describes how the numbers in a `RawImage` are meant to be interpreted as colour.
@@ -3966,6 +4087,14 @@ High-level conversion entry point for `RawImage`.
 | Member | Signature | Summary |
 | --- | --- | --- |
 | `Convert` | `static RawImage Convert(RawImage source, PixelFormat target)` | Converts an image while preserving its metadata and colour interpretation where meaningful. |
+
+#### `RawImageExactConverter`
+
+Exact raw-representation conversions. This layer is deliberately incapable of quantization, dithering, nearest-colour mapping, resampling, or other policy-bearing transformations.
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `TryConvertIndexed` | `static bool TryConvertIndexed<TSource, TTarget>(RawImage<TSource> source, out RawImage<TTarget> result)` | Tries to convert between indexed raw representations while preserving every index, palette entry, palette order, alpha entry, colour interpretation, and metadata item. A conversion that would need to drop palette entries or remap an out-of-range index fails instead of approximating the image. |
 
 #### `RawImageExtensions`
 
@@ -4008,6 +4137,92 @@ Matrix used to derive Y/Cb/Cr from primary colour components.
 | `YCgCo` | `6` |  |
 | `Bt2020NonConstantLuminance` | `7` |  |
 | `Bt2020ConstantLuminance` | `8` |  |
+
+#### `RawPalette`
+
+Format-independent palette representation. Palette entries are kept at 16-bit RGBA precision so formats with 16-bit colour maps do not have to collapse through the legacy RGB8 palette arrays. Quantization and approximate sample-depth reduction are deliberately not palette responsibilities.
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `RawPalette` | `RawPalette(ReadOnlySpan<RawPaletteEntry> entries)` |  |
+| `Count` | `int Count { get; }` | Number of entries in this palette. |
+| `Entries` | `ReadOnlySpan<RawPaletteEntry> Entries { get; }` | Read-only span over the canonical palette entries. |
+| `HasAlpha` | `bool HasAlpha { get; }` | Whether at least one palette entry is not fully opaque. |
+| `Item` | `RawPaletteEntry this[int index] { get; }` | Gets one palette entry by index. |
+| `FromRawImage` | `static RawPalette FromRawImage(RawImage image)` | Converts the legacy palette attached to an indexed `RawImage`. Returns `null` when no palette is attached. The conversion itself is exact; it does not quantize or reorder entries. |
+| `FromRgb24` | `static RawPalette FromRgb24(ReadOnlySpan<byte> rgb, int count, ReadOnlySpan<byte> alpha = null)` | Converts legacy RGB triplets plus an optional 8-bit alpha table into the canonical RGBA64 representation without loss. Only the first `count` entries are consumed. |
+| `ToRgb24Exact` | `ValueTuple<byte[], byte[]> ToRgb24Exact()` | Expresses this palette in the legacy RGB8 + optional alpha-table representation, throwing when doing so would require precision reduction. |
+| `TryToRgb24Exact` | `bool TryToRgb24Exact(out byte[] rgb, out byte[] alpha)` | Tries to express this palette exactly in the legacy RGB8 + optional alpha-table representation. The operation fails rather than reducing 16-bit values approximately. |
+
+#### `RawPaletteEntry`
+
+One unassociated RGBA palette entry in canonical 16-bit full-range form. Eight-bit palette values are represented exactly by multiplying each component by 257, so converting 8-bit palettes into this representation is lossless and exactly reversible.
+
+Implements `IEquatable<RawPaletteEntry>`.
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `RawPaletteEntry` | `RawPaletteEntry(ushort Red, ushort Green, ushort Blue, ushort Alpha = 65535)` | One unassociated RGBA palette entry in canonical 16-bit full-range form. Eight-bit palette values are represented exactly by multiplying each component by 257, so converting 8-bit palettes into this representation is lossless and exactly reversible. |
+| `Alpha` | `ushort Alpha { get; init; }` |  |
+| `Blue` | `ushort Blue { get; init; }` |  |
+| `Green` | `ushort Green { get; init; }` |  |
+| `Red` | `ushort Red { get; init; }` |  |
+
+#### `RawPixelAlphaKind`
+
+How alpha, when supported, is represented by a raw pixel format.
+
+| Value | Numeric | Summary |
+| --- | --- | --- |
+| `None` | `0` |  |
+| `Channel` | `1` |  |
+| `Palette` | `2` |  |
+
+#### `RawPixelFormatKind`
+
+Broad storage/interpretation family of a typed raw pixel representation.
+
+| Value | Numeric | Summary |
+| --- | --- | --- |
+| `PackedInteger` | `0` |  |
+| `Indexed` | `1` |  |
+| `FloatingPoint` | `2` |  |
+| `PlanarYuv` | `3` |  |
+
+#### `RawPixelFormatTraits`
+
+Static facts about one raw pixel representation. These facts describe the semantic representation and its current in-memory storage; they do not describe file-format-specific packing.
+
+Implements `IEquatable<RawPixelFormatTraits>`.
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `RawPixelFormatTraits` | `RawPixelFormatTraits(PixelFormat LegacyFormat, RawPixelFormatKind Kind, int StorageBitsPerPixel, int BytesPerPixel, int ComponentBitDepth, RawPixelAlphaKind Alpha = 0, int PlaneCount = 1, int IndexBitDepth = 0, int ChromaSubsampleX = 1, int ChromaSubsampleY = 1)` | Static facts about one raw pixel representation. These facts describe the semantic representation and its current in-memory storage; they do not describe file-format-specific packing. |
+| `Alpha` | `RawPixelAlphaKind Alpha { get; init; }` | How alpha can be represented. |
+| `BytesPerPixel` | `int BytesPerPixel { get; init; }` | Whole bytes per packed pixel, or zero for sub-byte/planar layouts. |
+| `CanRepresentAlpha` | `bool CanRepresentAlpha { get; }` |  |
+| `ChromaSubsampleX` | `int ChromaSubsampleX { get; init; }` | Horizontal chroma subsampling factor for planar YUV. |
+| `ChromaSubsampleY` | `int ChromaSubsampleY { get; init; }` | Vertical chroma subsampling factor for planar YUV. |
+| `ComponentBitDepth` | `int ComponentBitDepth { get; init; }` | Nominal component precision where one value describes every component; zero for mixed layouts. |
+| `IndexBitDepth` | `int IndexBitDepth { get; init; }` | Logical index width for indexed formats, otherwise zero. |
+| `IsFloatingPoint` | `bool IsFloatingPoint { get; }` |  |
+| `IsIndexed` | `bool IsIndexed { get; }` |  |
+| `IsPlanarYuv` | `bool IsPlanarYuv { get; }` |  |
+| `Kind` | `RawPixelFormatKind Kind { get; init; }` | Broad storage/interpretation family. |
+| `LegacyFormat` | `PixelFormat LegacyFormat { get; init; }` | Closest representation in the legacy runtime `PixelFormat` model. |
+| `MaximumPaletteEntries` | `int MaximumPaletteEntries { get; }` | Maximum number of distinct palette entries addressable by this indexed representation. |
+| `PlaneCount` | `int PlaneCount { get; init; }` | Number of physical sample planes. |
+| `StorageBitsPerPixel` | `int StorageBitsPerPixel { get; init; }` | Physical in-memory storage bits per pixel used by the compatibility representation. |
+
+#### `RawPixelFormats`
+
+Central compatibility map between the legacy runtime enum and typed raw-pixel traits.
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `Get` | `static RawPixelFormatTraits Get(PixelFormat format)` |  |
+| `Indexed` | `static RawPixelFormatTraits Indexed(int bitDepth)` | Describes a logical indexed representation from one through sixteen bits without extending the legacy enum. Widths that have no legacy packed form use the next lossless whole-byte storage type: 2/3/5/6/7-bit indices use `Indexed8`, and 9-15-bit indices use `Indexed16`. |
+| `ValidateDeclaredRepresentation` | `static void ValidateDeclaredRepresentation(RawImage image, RawPixelFormatTraits traits)` | Checks value-level invariants that are stricter than the compatibility storage type. This is currently needed by logical indexed widths such as Indexed6 that are stored as legacy Indexed8. |
 
 #### `RawTransferCharacteristic`
 
@@ -4526,6 +4741,442 @@ Decodes PVRTC (PowerVR Texture Compression) 2bpp and 4bpp blocks to RGBA32 pixel
 | --- | --- | --- |
 | `Decode2Bpp` | `static void Decode2Bpp(ReadOnlySpan<byte> data, int width, int height, Span<byte> output)` | Decodes a PVRTC 2bpp compressed image (8x4 block footprint) to RGBA32 pixel data. |
 | `Decode4Bpp` | `static void Decode4Bpp(ReadOnlySpan<byte> data, int width, int height, Span<byte> output)` | Decodes a PVRTC 4bpp compressed image (4x4 block footprint) to RGBA32 pixel data. |
+
+### Namespace `FileFormat.Core.PixelFormats`
+
+[`Argb32`](#argb32) · [`Bgr24`](#bgr24) · [`Bgra32`](#bgra32) · [`Gray10`](#gray10) · [`Gray16`](#gray16) · [`Gray8`](#gray8) · [`GrayAlpha16`](#grayalpha16) · [`GrayAlpha32`](#grayalpha32) · [`GrayAlphaF16`](#grayalphaf16) · [`GrayAlphaF32`](#grayalphaf32) · [`GrayF16`](#grayf16) · [`GrayF32`](#grayf32) · [`Indexed1`](#indexed1) · [`Indexed10`](#indexed10) · [`Indexed11`](#indexed11) · [`Indexed12`](#indexed12) · [`Indexed13`](#indexed13) · [`Indexed14`](#indexed14) · [`Indexed15`](#indexed15) · [`Indexed16`](#indexed16) · [`Indexed2`](#indexed2) · [`Indexed3`](#indexed3) · [`Indexed4`](#indexed4) · [`Indexed5`](#indexed5) · [`Indexed6`](#indexed6) · [`Indexed7`](#indexed7) · [`Indexed8`](#indexed8) · [`Indexed9`](#indexed9) · [`Rgb24`](#rgb24) · [`Rgb30`](#rgb30) · [`Rgb48`](#rgb48) · [`Rgb565`](#rgb565) · [`RgbF16`](#rgbf16) · [`RgbF32`](#rgbf32) · [`Rgba32`](#rgba32) · [`Rgba64`](#rgba64) · [`RgbaF16`](#rgbaf16) · [`RgbaF32`](#rgbaf32) · [`Yuv420P10`](#yuv420p10) · [`Yuv420P12`](#yuv420p12) · [`Yuv420P16`](#yuv420p16) · [`Yuv420P8`](#yuv420p8) · [`Yuv422P10`](#yuv422p10) · [`Yuv422P12`](#yuv422p12) · [`Yuv422P16`](#yuv422p16) · [`Yuv422P8`](#yuv422p8) · [`Yuv440P10`](#yuv440p10) · [`Yuv440P12`](#yuv440p12) · [`Yuv440P16`](#yuv440p16) · [`Yuv440P8`](#yuv440p8) · [`Yuv444P10`](#yuv444p10) · [`Yuv444P12`](#yuv444p12) · [`Yuv444P16`](#yuv444p16) · [`Yuv444P8`](#yuv444p8)
+
+#### `Argb32`
+
+Implements `IRawPixelFormat<Argb32>`.
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `Traits` | `static RawPixelFormatTraits Traits { get; }` |  |
+
+#### `Bgr24`
+
+Implements `IRawPixelFormat<Bgr24>`.
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `Traits` | `static RawPixelFormatTraits Traits { get; }` |  |
+
+#### `Bgra32`
+
+Implements `IRawPixelFormat<Bgra32>`.
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `Traits` | `static RawPixelFormatTraits Traits { get; }` |  |
+
+#### `Gray10`
+
+Implements `IRawPixelFormat<Gray10>`.
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `Traits` | `static RawPixelFormatTraits Traits { get; }` |  |
+
+#### `Gray16`
+
+Implements `IRawPixelFormat<Gray16>`.
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `Traits` | `static RawPixelFormatTraits Traits { get; }` |  |
+
+#### `Gray8`
+
+Implements `IRawPixelFormat<Gray8>`.
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `Traits` | `static RawPixelFormatTraits Traits { get; }` |  |
+
+#### `GrayAlpha16`
+
+Implements `IRawPixelFormat<GrayAlpha16>`.
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `Traits` | `static RawPixelFormatTraits Traits { get; }` |  |
+
+#### `GrayAlpha32`
+
+Implements `IRawPixelFormat<GrayAlpha32>`.
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `Traits` | `static RawPixelFormatTraits Traits { get; }` |  |
+
+#### `GrayAlphaF16`
+
+Implements `IRawPixelFormat<GrayAlphaF16>`.
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `Traits` | `static RawPixelFormatTraits Traits { get; }` |  |
+
+#### `GrayAlphaF32`
+
+Implements `IRawPixelFormat<GrayAlphaF32>`.
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `Traits` | `static RawPixelFormatTraits Traits { get; }` |  |
+
+#### `GrayF16`
+
+Implements `IRawPixelFormat<GrayF16>`.
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `Traits` | `static RawPixelFormatTraits Traits { get; }` |  |
+
+#### `GrayF32`
+
+Implements `IRawPixelFormat<GrayF32>`.
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `Traits` | `static RawPixelFormatTraits Traits { get; }` |  |
+
+#### `Indexed1`
+
+Implements `IRawPixelFormat<Indexed1>`.
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `Traits` | `static RawPixelFormatTraits Traits { get; }` |  |
+
+#### `Indexed10`
+
+Implements `IRawPixelFormat<Indexed10>`.
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `Traits` | `static RawPixelFormatTraits Traits { get; }` |  |
+
+#### `Indexed11`
+
+Implements `IRawPixelFormat<Indexed11>`.
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `Traits` | `static RawPixelFormatTraits Traits { get; }` |  |
+
+#### `Indexed12`
+
+Implements `IRawPixelFormat<Indexed12>`.
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `Traits` | `static RawPixelFormatTraits Traits { get; }` |  |
+
+#### `Indexed13`
+
+Implements `IRawPixelFormat<Indexed13>`.
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `Traits` | `static RawPixelFormatTraits Traits { get; }` |  |
+
+#### `Indexed14`
+
+Implements `IRawPixelFormat<Indexed14>`.
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `Traits` | `static RawPixelFormatTraits Traits { get; }` |  |
+
+#### `Indexed15`
+
+Implements `IRawPixelFormat<Indexed15>`.
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `Traits` | `static RawPixelFormatTraits Traits { get; }` |  |
+
+#### `Indexed16`
+
+Implements `IRawPixelFormat<Indexed16>`.
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `Traits` | `static RawPixelFormatTraits Traits { get; }` |  |
+
+#### `Indexed2`
+
+Implements `IRawPixelFormat<Indexed2>`.
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `Traits` | `static RawPixelFormatTraits Traits { get; }` |  |
+
+#### `Indexed3`
+
+Implements `IRawPixelFormat<Indexed3>`.
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `Traits` | `static RawPixelFormatTraits Traits { get; }` |  |
+
+#### `Indexed4`
+
+Implements `IRawPixelFormat<Indexed4>`.
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `Traits` | `static RawPixelFormatTraits Traits { get; }` |  |
+
+#### `Indexed5`
+
+Implements `IRawPixelFormat<Indexed5>`.
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `Traits` | `static RawPixelFormatTraits Traits { get; }` |  |
+
+#### `Indexed6`
+
+Implements `IRawPixelFormat<Indexed6>`.
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `Traits` | `static RawPixelFormatTraits Traits { get; }` |  |
+
+#### `Indexed7`
+
+Implements `IRawPixelFormat<Indexed7>`.
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `Traits` | `static RawPixelFormatTraits Traits { get; }` |  |
+
+#### `Indexed8`
+
+Implements `IRawPixelFormat<Indexed8>`.
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `Traits` | `static RawPixelFormatTraits Traits { get; }` |  |
+
+#### `Indexed9`
+
+Implements `IRawPixelFormat<Indexed9>`.
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `Traits` | `static RawPixelFormatTraits Traits { get; }` |  |
+
+#### `Rgb24`
+
+Implements `IRawPixelFormat<Rgb24>`.
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `Traits` | `static RawPixelFormatTraits Traits { get; }` |  |
+
+#### `Rgb30`
+
+Implements `IRawPixelFormat<Rgb30>`.
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `Traits` | `static RawPixelFormatTraits Traits { get; }` |  |
+
+#### `Rgb48`
+
+Implements `IRawPixelFormat<Rgb48>`.
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `Traits` | `static RawPixelFormatTraits Traits { get; }` |  |
+
+#### `Rgb565`
+
+Implements `IRawPixelFormat<Rgb565>`.
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `Traits` | `static RawPixelFormatTraits Traits { get; }` |  |
+
+#### `RgbF16`
+
+Implements `IRawPixelFormat<RgbF16>`.
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `Traits` | `static RawPixelFormatTraits Traits { get; }` |  |
+
+#### `RgbF32`
+
+Implements `IRawPixelFormat<RgbF32>`.
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `Traits` | `static RawPixelFormatTraits Traits { get; }` |  |
+
+#### `Rgba32`
+
+Implements `IRawPixelFormat<Rgba32>`.
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `Traits` | `static RawPixelFormatTraits Traits { get; }` |  |
+
+#### `Rgba64`
+
+Implements `IRawPixelFormat<Rgba64>`.
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `Traits` | `static RawPixelFormatTraits Traits { get; }` |  |
+
+#### `RgbaF16`
+
+Implements `IRawPixelFormat<RgbaF16>`.
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `Traits` | `static RawPixelFormatTraits Traits { get; }` |  |
+
+#### `RgbaF32`
+
+Implements `IRawPixelFormat<RgbaF32>`.
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `Traits` | `static RawPixelFormatTraits Traits { get; }` |  |
+
+#### `Yuv420P10`
+
+Implements `IRawPixelFormat<Yuv420P10>`.
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `Traits` | `static RawPixelFormatTraits Traits { get; }` |  |
+
+#### `Yuv420P12`
+
+Implements `IRawPixelFormat<Yuv420P12>`.
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `Traits` | `static RawPixelFormatTraits Traits { get; }` |  |
+
+#### `Yuv420P16`
+
+Implements `IRawPixelFormat<Yuv420P16>`.
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `Traits` | `static RawPixelFormatTraits Traits { get; }` |  |
+
+#### `Yuv420P8`
+
+Implements `IRawPixelFormat<Yuv420P8>`.
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `Traits` | `static RawPixelFormatTraits Traits { get; }` |  |
+
+#### `Yuv422P10`
+
+Implements `IRawPixelFormat<Yuv422P10>`.
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `Traits` | `static RawPixelFormatTraits Traits { get; }` |  |
+
+#### `Yuv422P12`
+
+Implements `IRawPixelFormat<Yuv422P12>`.
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `Traits` | `static RawPixelFormatTraits Traits { get; }` |  |
+
+#### `Yuv422P16`
+
+Implements `IRawPixelFormat<Yuv422P16>`.
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `Traits` | `static RawPixelFormatTraits Traits { get; }` |  |
+
+#### `Yuv422P8`
+
+Implements `IRawPixelFormat<Yuv422P8>`.
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `Traits` | `static RawPixelFormatTraits Traits { get; }` |  |
+
+#### `Yuv440P10`
+
+Implements `IRawPixelFormat<Yuv440P10>`.
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `Traits` | `static RawPixelFormatTraits Traits { get; }` |  |
+
+#### `Yuv440P12`
+
+Implements `IRawPixelFormat<Yuv440P12>`.
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `Traits` | `static RawPixelFormatTraits Traits { get; }` |  |
+
+#### `Yuv440P16`
+
+Implements `IRawPixelFormat<Yuv440P16>`.
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `Traits` | `static RawPixelFormatTraits Traits { get; }` |  |
+
+#### `Yuv440P8`
+
+Implements `IRawPixelFormat<Yuv440P8>`.
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `Traits` | `static RawPixelFormatTraits Traits { get; }` |  |
+
+#### `Yuv444P10`
+
+Implements `IRawPixelFormat<Yuv444P10>`.
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `Traits` | `static RawPixelFormatTraits Traits { get; }` |  |
+
+#### `Yuv444P12`
+
+Implements `IRawPixelFormat<Yuv444P12>`.
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `Traits` | `static RawPixelFormatTraits Traits { get; }` |  |
+
+#### `Yuv444P16`
+
+Implements `IRawPixelFormat<Yuv444P16>`.
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `Traits` | `static RawPixelFormatTraits Traits { get; }` |  |
+
+#### `Yuv444P8`
+
+Implements `IRawPixelFormat<Yuv444P8>`.
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `Traits` | `static RawPixelFormatTraits Traits { get; }` |  |
 
 ### Namespace `FileFormat.Core.Vector`
 
@@ -5972,60 +6623,62 @@ Supported video containers, auto-generated from discovered IVideoContainerReader
 | `AnimWriter` | `2` |  |
 | `Asf` | `3` |  |
 | `AsfWriter` | `4` |  |
-| `Avi` | `5` |  |
-| `AviWriter` | `6` |  |
-| `Bfi` | `7` |  |
-| `BfiWriter` | `8` |  |
-| `Cdxl` | `9` |  |
-| `CdxlWriter` | `10` |  |
-| `Ea` | `11` |  |
-| `EaWriter` | `12` |  |
-| `Fli` | `13` |  |
-| `FliWriter` | `14` |  |
-| `Flv` | `15` |  |
-| `FlvWriter` | `16` |  |
-| `H263Video` | `17` |  |
-| `H263VideoWriter` | `18` |  |
-| `H264Video` | `19` |  |
-| `H264VideoWriter` | `20` |  |
-| `H265Video` | `21` |  |
-| `H265VideoWriter` | `22` |  |
-| `Idcin` | `23` |  |
-| `IdcinWriter` | `24` |  |
-| `Ivf` | `25` |  |
-| `IvfWriter` | `26` |  |
-| `Matroska` | `27` |  |
-| `MatroskaWriter` | `28` |  |
-| `Mjpeg` | `29` |  |
-| `MjpegWriter` | `30` |  |
-| `Mp4` | `31` |  |
-| `Mp4Writer` | `32` |  |
-| `MpegProgramStream` | `33` |  |
-| `MpegProgramStreamWriter` | `34` |  |
-| `MpegVideo` | `35` |  |
-| `MpegVideoWriter` | `36` |  |
-| `Mve` | `37` |  |
-| `MveWriter` | `38` |  |
-| `Ogg` | `39` |  |
-| `OggWriter` | `40` |  |
-| `RealMedia` | `41` |  |
-| `RealMediaWriter` | `42` |  |
-| `Roq` | `43` |  |
-| `RoqWriter` | `44` |  |
-| `Rpl` | `45` |  |
-| `RplWriter` | `46` |  |
-| `Smacker` | `47` |  |
-| `SmackerWriter` | `48` |  |
-| `Str` | `49` |  |
-| `StrWriter` | `50` |  |
-| `TransportStream` | `51` |  |
-| `TransportStreamWriter` | `52` |  |
-| `Vmd` | `53` |  |
-| `VmdWriter` | `54` |  |
-| `Vqa` | `55` |  |
-| `VqaWriter` | `56` |  |
-| `Yuv4Mpeg` | `57` |  |
-| `Yuv4MpegWriter` | `58` |  |
+| `Av1Video` | `5` |  |
+| `Av1VideoWriter` | `6` |  |
+| `Avi` | `7` |  |
+| `AviWriter` | `8` |  |
+| `Bfi` | `9` |  |
+| `BfiWriter` | `10` |  |
+| `Cdxl` | `11` |  |
+| `CdxlWriter` | `12` |  |
+| `Ea` | `13` |  |
+| `EaWriter` | `14` |  |
+| `Fli` | `15` |  |
+| `FliWriter` | `16` |  |
+| `Flv` | `17` |  |
+| `FlvWriter` | `18` |  |
+| `H263Video` | `19` |  |
+| `H263VideoWriter` | `20` |  |
+| `H264Video` | `21` |  |
+| `H264VideoWriter` | `22` |  |
+| `H265Video` | `23` |  |
+| `H265VideoWriter` | `24` |  |
+| `Idcin` | `25` |  |
+| `IdcinWriter` | `26` |  |
+| `Ivf` | `27` |  |
+| `IvfWriter` | `28` |  |
+| `Matroska` | `29` |  |
+| `MatroskaWriter` | `30` |  |
+| `Mjpeg` | `31` |  |
+| `MjpegWriter` | `32` |  |
+| `Mp4` | `33` |  |
+| `Mp4Writer` | `34` |  |
+| `MpegProgramStream` | `35` |  |
+| `MpegProgramStreamWriter` | `36` |  |
+| `MpegVideo` | `37` |  |
+| `MpegVideoWriter` | `38` |  |
+| `Mve` | `39` |  |
+| `MveWriter` | `40` |  |
+| `Ogg` | `41` |  |
+| `OggWriter` | `42` |  |
+| `RealMedia` | `43` |  |
+| `RealMediaWriter` | `44` |  |
+| `Roq` | `45` |  |
+| `RoqWriter` | `46` |  |
+| `Rpl` | `47` |  |
+| `RplWriter` | `48` |  |
+| `Smacker` | `49` |  |
+| `SmackerWriter` | `50` |  |
+| `Str` | `51` |  |
+| `StrWriter` | `52` |  |
+| `TransportStream` | `53` |  |
+| `TransportStreamWriter` | `54` |  |
+| `Vmd` | `55` |  |
+| `VmdWriter` | `56` |  |
+| `Vqa` | `57` |  |
+| `VqaWriter` | `58` |  |
+| `Yuv4Mpeg` | `59` |  |
+| `Yuv4MpegWriter` | `60` |  |
 
 #### `VideoFormatEntry`
 

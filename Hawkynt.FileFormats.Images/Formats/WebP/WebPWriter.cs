@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Text;
 using FileFormat.Riff;
+using FileFormat.WebP.Vp8L;
 
 namespace FileFormat.WebP;
 
@@ -48,7 +49,10 @@ public static class WebPWriter {
     } else {
       // ALPH must directly precede its lossy VP8 picture.
       if (file.Features.HasAlpha && !file.IsLossless && file.AlphaData != null)
-        chunks.Add(new RiffChunk { Id = _CHUNK_ALPH, Data = _BuildAlphData(file.AlphaData) });
+        chunks.Add(new RiffChunk {
+          Id = _CHUNK_ALPH,
+          Data = _BuildAlphData(file.AlphaData, file.Features.Width, file.Features.Height)
+        });
 
       chunks.Add(new RiffChunk {
         Id = file.IsLossless ? _CHUNK_VP8L : _CHUNK_VP8,
@@ -122,11 +126,39 @@ public static class WebPWriter {
       stream.WriteByte(0);
   }
 
-  private static byte[] _BuildAlphData(byte[] alphaPlane) {
-    var data = new byte[1 + alphaPlane.Length];
-    data[0] = 0;
-    Buffer.BlockCopy(alphaPlane, 0, data, 1, alphaPlane.Length);
-    return data;
+  /// <summary>
+  /// Builds a lossless ALPH payload, choosing between raw method 0 and VP8L method 1 according to
+  /// which representation is smaller. Method 1 omits the normal five-byte VP8L image header because
+  /// ALPH inherits its dimensions from the VP8X canvas and carries each alpha sample in green.
+  /// </summary>
+  private static byte[] _BuildAlphData(byte[] alphaPlane, int width, int height) {
+    if (width <= 0 || height <= 0)
+      throw new InvalidDataException("WebP ALPH dimensions must be positive.");
+
+    var pixelCount = checked(width * height);
+    if (alphaPlane.Length != pixelCount)
+      throw new InvalidDataException(
+        $"WebP ALPH plane has {alphaPlane.Length} bytes for a {width}x{height} picture requiring {pixelCount}.");
+
+    var argb = new uint[pixelCount];
+    for (var i = 0; i < pixelCount; ++i)
+      argb[i] = 0xFF000000u | ((uint)alphaPlane[i] << 8);
+
+    var vp8l = Vp8LEncoder.Encode(argb, width, height, hasAlpha: false);
+    const int vp8lHeaderSize = 5;
+    var compressedSize = vp8l.Length - vp8lHeaderSize;
+
+    if (compressedSize >= alphaPlane.Length) {
+      var raw = new byte[1 + alphaPlane.Length];
+      raw[0] = 0; // compression=none, filter=none, preprocessing=none
+      Buffer.BlockCopy(alphaPlane, 0, raw, 1, alphaPlane.Length);
+      return raw;
+    }
+
+    var compressed = new byte[1 + compressedSize];
+    compressed[0] = 1; // compression=VP8L, filter=none, preprocessing=none
+    Buffer.BlockCopy(vp8l, vp8lHeaderSize, compressed, 1, compressedSize);
+    return compressed;
   }
 
   private static byte[] _BuildVp8XData(WebPFile file) {

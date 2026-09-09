@@ -6,17 +6,29 @@ namespace FileFormat.Bob;
 public static class BobWriter {
 
   public static byte[] ToBytes(BobFile file) {
-    var pixels = file.PixelData ?? [];
-    var result = new byte[BobFile.PixelOffset + file.Width * file.Height];
+    if (file.Width is <= 0 or > ushort.MaxValue)
+      throw new ArgumentException($"Bob width must be in the range 1..{ushort.MaxValue}; got {file.Width}.", nameof(file));
+    if (file.Height is <= 0 or > ushort.MaxValue)
+      throw new ArgumentException($"Bob height must be in the range 1..{ushort.MaxValue}; got {file.Height}.", nameof(file));
+
+    var pixelCount = checked(file.Width * file.Height);
+    var pixels = file.PixelData ?? throw new ArgumentException("Bob pixel data is required.", nameof(file));
+    if (pixels.Length != pixelCount)
+      throw new ArgumentException($"Bob requires exactly {pixelCount} pixel bytes; got {pixels.Length}.", nameof(file));
+
+    var palette = file.Palette ?? throw new ArgumentException("Bob palette data is required.", nameof(file));
+    if (palette.Length != BobFile.PaletteSize)
+      throw new ArgumentException($"Bob requires exactly {BobFile.PaletteSize} palette bytes; got {palette.Length}.", nameof(file));
+
+    var result = new byte[checked(BobFile.PixelOffset + pixelCount)];
 
     result[0] = (byte)file.Width;
     result[1] = (byte)(file.Width >> 8);
     result[2] = (byte)file.Height;
     result[3] = (byte)(file.Height >> 8);
 
-    var palette = file.Palette ?? [];
-    palette.AsSpan(0, Math.Min(palette.Length, BobFile.PaletteSize)).CopyTo(result.AsSpan(BobFile.HeaderSize));
-    pixels.AsSpan(0, Math.Min(pixels.Length, result.Length - BobFile.PixelOffset)).CopyTo(result.AsSpan(BobFile.PixelOffset));
+    palette.CopyTo(result, BobFile.HeaderSize);
+    pixels.CopyTo(result, BobFile.PixelOffset);
 
     return result;
   }

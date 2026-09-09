@@ -6,16 +6,17 @@ namespace FileFormat.Pes;
 
 /// <summary>In-memory representation of a Brother PES embroidery file.</summary>
 /// <remarks>
-/// A PES is a needle path. It is read here and not written, and that is a
-/// decision about what the file is rather than about the work: turning a picture
-/// into a PES means deciding where to put every stitch, which is a raster-to-
-/// needlework conversion and not a serialiser. Writing one from stitches that a
-/// caller already has is a different matter, and <see cref="PesWriter"/> does
-/// exactly that without claiming the registry's writer contract.
+/// A PES is a needle path rather than a raster. Reading therefore renders that path, while writing
+/// has to digitize pixels into stitches. The registry writer uses a deliberately small,
+/// deterministic scanline digitizer: transparent pixels are skipped, visible colours are mapped to
+/// the Brother PEC thread chart, and each same-colour horizontal run becomes one stitched segment.
+/// It is a baseline conversion rather than an attempt to replace embroidery-design software.
 /// </remarks>
 [FormatDetectionPriority(180)]
 [FormatMimeType("application/x-melco-pes", "image/x-pes")]
-public sealed class PesFile : IImageFormatReader<PesFile>, IImageToRawImage<PesFile> {
+public sealed class PesFile :
+  IImageFormatReader<PesFile>, IImageToRawImage<PesFile>,
+  IImageFromRawImage<PesFile>, IImageFormatWriter<PesFile> {
 
   static string IImageFormatMetadata<PesFile>.PrimaryExtension => ".pes";
   static string[] IImageFormatMetadata<PesFile>.FileExtensions => [".pes"];
@@ -54,4 +55,8 @@ public sealed class PesFile : IImageFormatReader<PesFile>, IImageToRawImage<PesF
       PixelData = PesRenderer.Render(file, width, height),
     };
   }
+
+  public static PesFile FromRawImage(RawImage image) => PesRasterDigitizer.FromRawImage(image);
+
+  public static byte[] ToBytes(PesFile file) => PesWriter.ToBytes(file);
 }

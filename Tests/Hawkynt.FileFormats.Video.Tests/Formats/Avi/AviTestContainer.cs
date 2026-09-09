@@ -40,7 +40,8 @@ internal static class AviTestContainer {
     string streamType = "vids",
     short language = 0,
     string? streamName = null,
-    IReadOnlyList<(string Id, string Text)>? info = null) {
+    IReadOnlyList<(string Id, string Text)>? info = null,
+    string frameChunkId = "00dc") {
 
     var strf = _BuildStreamFormat(compression, width, height, bitsPerPixel, palette);
     var strh = _BuildStreamHeader(compression, width, Math.Abs(height), frames.Count, streamType, language);
@@ -55,7 +56,7 @@ internal static class AviTestContainer {
 
     var movieParts = new List<byte[]>(frames.Count);
     foreach (var frame in frames)
-      movieParts.Add(_Chunk("00dc", frame));
+      movieParts.Add(_Chunk(frameChunkId, frame));
     var movi = _List("movi", movieParts);
 
     var body = new MemoryStream();

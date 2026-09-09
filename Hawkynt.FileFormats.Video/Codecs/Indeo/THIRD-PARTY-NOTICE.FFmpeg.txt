@@ -10,22 +10,43 @@ are converted from FFmpeg (https://ffmpeg.org/):
   Copyright (c) 2005        Konstantin Shishkov   (indeo2.c, indeo2data.h)
   Copyright (c) 2009 - 2011 Maxim Poliakovski     (indeo3.c, indeo3data.h)
 
-Those four files are licensed under the GNU Lesser General Public License,
-version 2.1 or (at your option) any later version. This work is distributed
-under the GNU Lesser General Public License version 3 or later, which the "or
-later" of their own licence permits; the text of that licence is in LICENSE at
-the root of this repository.
+The Indeo Video Interactive 4 and Indeo Video Interactive 5 decoders in this
+directory, and the decoders that use them (Codecs/Indeo4VideoDecoder.cs and
+Codecs/Indeo5VideoDecoder.cs), are converted from FFmpeg as well:
+
+  libavcodec/ivi.c         the layer both formats share: planes, bands, tiles,
+  libavcodec/ivi.h         macroblocks, blocks, motion compensation, the
+                           codebooks and the run-value maps
+  libavcodec/ivi_dsp.c     the slant and Haar transforms, the wavelet
+  libavcodec/ivi_dsp.h     recompositions and the block filters
+  libavcodec/indeo4.c      the Indeo 4 picture header
+  libavcodec/indeo4data.h  its scans, its eighteen quantisation matrices and
+                           the index map that names them
+  libavcodec/indeo5.c      the Indeo 5 picture header
+  libavcodec/indeo5data.h  its ten base quantisation matrices and eight scale
+                           tables
+  libavcodec/mathtables.c  the ff_zigzag_direct scan
+
+  Copyright (c) 2009 - 2011 Maxim Poliakovski
+
+All of the files named above are licensed under the GNU Lesser General Public
+License, version 2.1 or (at your option) any later version. This work is
+distributed under the GNU Lesser General Public License version 3 or later, which
+the "or later" of their own licence permits; the text of that licence is in
+LICENSE at the root of this repository.
 
 The algorithm was carried across rather than the source pasted: the code here is
 written to this repository's own conventions and its structure follows what the
 formats do rather than the layout of the C. What was copied exactly, because it
-has to be, is every constant. Neither codec transmits its tables — Indeo 2 names
-one of four delta tables in two bits of a frame header and Indeo 3 names one of
-twenty-four quantisation sets in four bits of a cell descriptor — so the numbers
-themselves are part of the codec, and a decoder holding different ones decodes a
-different picture. They are reproduced from the two data headers above without
-alteration, including the entries a formula in indeo3.c computes and then
-overwrites by hand for compatibility with Intel's own decoders.
+has to be, is every constant. None of the four codecs transmits its tables —
+Indeo 2 names one of four delta tables in two bits of a frame header, Indeo 3
+names one of twenty-four quantisation sets in four bits of a cell descriptor, and
+Indeo 4 and 5 name a codebook, a scan and a quantisation matrix by index in a
+band header — so the numbers themselves are part of the codec, and a decoder
+holding different ones decodes a different picture. They are reproduced from the
+data headers above without alteration, including the entries a formula in
+indeo3.c computes and then overwrites by hand for compatibility with Intel's own
+decoders.
 
 FFmpeg's own copyright and licence notices, and the full text of the LGPL, are
 available from the FFmpeg project at https://ffmpeg.org/legal.html and in the

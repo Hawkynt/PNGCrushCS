@@ -467,4 +467,43 @@ public sealed class AviReaderTests {
     var raw = new RawImage { Width = _WIDTH, Height = _HEIGHT, Format = PixelFormat.Rgb24, PixelData = pixels };
     return JpegWriter.ToBytes(JpegFile.FromRawImage(raw));
   }
+  /// <summary>
+  /// A movie chunk whose suffix is not one of the four the specification lists is still that
+  /// stream's payload.
+  /// </summary>
+  /// <remarks>
+  /// Intel's own Indeo 4 files spell their video chunks <c>00iv</c> rather than <c>00dc</c> — both
+  /// of the ones published on <c>samples.ffmpeg.org</c> do, and ffmpeg plays them. This reader used
+  /// to accept only <c>db</c>, <c>dc</c>, <c>wb</c> and <c>tx</c>, so those files produced no packets
+  /// at all and the read was reported as a success. Returning nothing and calling it a decode is the
+  /// one outcome worse than refusing.
+  /// </remarks>
+  [Test]
+  [Category("Unit")]
+  [TestCase("00iv", TestName = "Indeo 4's own spelling")]
+  [TestCase("00xy", TestName = "a suffix nothing defines")]
+  public void AVideoChunkSpelledAnUnusualWayIsStillRead(string chunkId) {
+    var avi = AviTestContainer.Build("MJPG", _WIDTH, _HEIGHT, 24, [_Jpeg(0), _Jpeg(1)], frameChunkId: chunkId);
+
+    Assert.That(_Frames(avi).Count, Is.EqualTo(2));
+  }
+
+  /// <summary>The two suffixes that are not payload stay out.</summary>
+  /// <remarks>
+  /// An OpenDML index points at chunks rather than being one, and a palette change alters how later
+  /// frames are shown without being a frame. Reading either as a picture would hand a decoder bytes
+  /// that are not a picture.
+  /// </remarks>
+  [Test]
+  [Category("Unit")]
+  [TestCase("00ix", TestName = "the OpenDML index")]
+  [TestCase("00pc", TestName = "a palette change")]
+  public void AChunkThatIsNotPayloadIsNotReadAsAFrame(string chunkId) {
+    var avi = AviTestContainer.Build("MJPG", _WIDTH, _HEIGHT, 24, [_Jpeg(0)], frameChunkId: chunkId);
+
+    // The movie list then holds nothing that is a picture, so no picture comes out — which is the
+    // point: these two carry bytes that would decode into something, and it would not be a frame.
+    Assert.That(_Frames(avi), Is.Empty);
+  }
+
 }

@@ -4,12 +4,9 @@ namespace FileFormat.Pes;
 
 /// <summary>Draws a PES's needle path.</summary>
 /// <remarks>
-/// The picture a PES makes is a rendering rather than something the file states:
-/// the file holds a path, and how wide the thread is drawn and what lies behind
-/// it are the reader's choice. What is drawn here is one path per colour block,
-/// a single pixel wide, on white, over a canvas the size of the stitch bounds —
-/// the same shape ImageMagick's coder draws, which turns the stitches into an
-/// SVG of one stroked path per block and rasterises that.
+/// The picture a PES makes is a rendering rather than something the file states: the file holds a
+/// path, and how wide the thread is drawn and what lies behind it are reader choices. This renders
+/// each sewing segment one pixel wide on white and deliberately omits jump moves.
 /// </remarks>
 internal static class PesRenderer {
 
@@ -22,7 +19,15 @@ internal static class PesRenderer {
       var g = (byte)(block.Color >> 8);
       var b = (byte)block.Color;
 
+      var jumps = new bool[block.Points.Length];
+      foreach (var jumpIndex in block.JumpIndices)
+        if ((uint)jumpIndex < (uint)jumps.Length)
+          jumps[jumpIndex] = true;
+
       for (var i = 1; i < block.Points.Length; ++i) {
+        if (jumps[i])
+          continue;
+
         var (x0, y0) = block.Points[i - 1];
         var (x1, y1) = block.Points[i];
         _Line(pixels, width, height, x0 - file.MinX, y0 - file.MinY, x1 - file.MinX, y1 - file.MinY, r, g, b);

@@ -10,9 +10,11 @@ internal sealed class Vp8LHuffmanTree {
   private const int _PRIMARY_SIZE = 1 << _PRIMARY_BITS; // 256
 
   /// <summary>
-  /// Packed lookup entry: low 16 bits = symbol or secondary table offset, high 16 bits = code length.
-  /// For primary table: if code length &lt;= PRIMARY_BITS, the entry is final (symbol + length).
-  /// Otherwise it points to a secondary table (offset + secondary bits in high word).
+  /// Packed lookup entry: low 16 bits = symbol or secondary table offset, high 16 bits = a length.
+  /// A primary entry whose length is at most <see cref="_PRIMARY_BITS"/> is final and carries the
+  /// symbol. Anything longer is a pointer into a secondary table, and its high word states
+  /// <see cref="_PRIMARY_BITS"/> plus the number of further bits that table is indexed by — so the
+  /// two cases stay distinguishable, since a secondary table always needs at least one extra bit.
   /// </summary>
   private readonly int[] _table;
   private readonly int _totalSize;
@@ -157,8 +159,9 @@ internal sealed class Vp8LHuffmanTree {
 
         secondaryBits[i] = maxSecBits[i];
         secondaryOffsets[i] = nextSecondary;
-        // Store secondary table pointer in primary: offset | (secBits << 16) with length = PRIMARY_BITS + 1 as sentinel
-        table[i] = secondaryOffsets[i] | (secondaryBits[i] << 16);
+        // The high word must exceed _PRIMARY_BITS for ReadSymbol to recognise a pointer, so store
+        // the total number of bits the lookup consumes rather than the secondary count alone.
+        table[i] = secondaryOffsets[i] | ((_PRIMARY_BITS + secondaryBits[i]) << 16);
         nextSecondary += 1 << maxSecBits[i];
       }
     }
@@ -203,6 +206,8 @@ internal sealed class Vp8LHuffmanTree {
 
     var bits = reader.PeekBits(_PRIMARY_BITS);
     var entry = this._table[(int)bits];
+    if (entry < 0)
+      throw new InvalidOperationException("VP8L Huffman code is not in the table the code lengths describe.");
 
     var len = entry >> 16;
     if (len <= _PRIMARY_BITS) {
@@ -210,13 +215,17 @@ internal sealed class Vp8LHuffmanTree {
       return entry & 0xFFFF;
     }
 
-    // Secondary table lookup
+    // Secondary table lookup: the entry states the total code length, so what is left to read is
+    // that minus the bits the primary lookup already accounted for.
     var secondaryOffset = entry & 0xFFFF;
-    var secondaryBits = len; // stored secBits in high word
+    var secondaryBits = len - _PRIMARY_BITS;
     reader.SkipBits(_PRIMARY_BITS);
 
     var secBits = reader.PeekBits(secondaryBits);
     var secEntry = this._table[secondaryOffset + (int)secBits];
+    if (secEntry < 0)
+      throw new InvalidOperationException("VP8L Huffman code is not in the table the code lengths describe.");
+
     var secLen = (secEntry >> 16) - _PRIMARY_BITS;
     reader.SkipBits(secLen);
     return secEntry & 0xFFFF;
