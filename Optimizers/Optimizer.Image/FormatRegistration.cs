@@ -50,8 +50,13 @@ internal static partial class FormatRegistration {
     FormatRegistry.Register(entry);
   }
 
-  private static void _RegisterReaderWriter<T>(ImageFormat format, MagicSignature[] magic, int priority, string[] mimeTypes)
-    where T : IImageFormatReader<T>, IImageToRawImage<T>, IImageFromRawImage<T>, IImageFormatWriter<T> {
+  private static void _RegisterReaderWriter<T>(
+    ImageFormat format,
+    MagicSignature[] magic,
+    int priority,
+    string[] mimeTypes,
+    RawImageWriteCapability[] typedWriteCapabilities
+  ) where T : IImageFormatReader<T>, IImageToRawImage<T>, IImageFromRawImage<T>, IImageFormatWriter<T> {
     _ = mimeTypes; // legacy registration ignores MIME (Optimizer.Image doesn't use it)
     Func<byte[], bool?>? matchSig = null;
     try {
@@ -71,10 +76,25 @@ internal static partial class FormatRegistration {
       MatchesSignature: matchSig,
       DetectionPriority: priority,
       VideoModes: T.VideoModes
-    );
+    ) {
+      TypedWriteCapabilities = typedWriteCapabilities,
+    };
 
     FormatRegistry.Register(entry);
   }
+
+  /// <summary>
+  /// Materializes one closed typed writer contract into the optimizer's dynamic registry without
+  /// runtime reflection. Generated call sites supply both generic arguments, preserving static dispatch.
+  /// </summary>
+  private static RawImageWriteCapability _TypedWriteCapability<T, TPixel>()
+    where T : IImageFromRawImage<T, TPixel>, IImageFormatWriter<T>
+    where TPixel : IRawPixelFormat<TPixel>
+    => new(
+      TPixel.Traits,
+      raw => FormatIO.Encode<T, TPixel>(RawImage<TPixel>.FromUntyped(raw)),
+      (raw, target) => FormatIO.WriteToFile<T, TPixel>(RawImage<TPixel>.FromUntyped(raw), target)
+    );
 
   private static void _RegisterMultiImageReader<T>(ImageFormat format)
     where T : IImageFormatReader<T>, IImageToRawImage<T>, IMultiImageFileFormat<T> {

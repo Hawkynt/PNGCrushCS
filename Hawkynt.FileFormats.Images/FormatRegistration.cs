@@ -57,8 +57,13 @@ internal static partial class FormatRegistration {
     FormatRegistry.Register(entry);
   }
 
-  private static void _RegisterReaderWriter<T>(ImageFormat format, MagicSignature[] magic, int priority, string[] mimeTypes)
-    where T : IImageFormatReader<T>, IImageToRawImage<T>, IImageFromRawImage<T>, IImageFormatWriter<T> {
+  private static void _RegisterReaderWriter<T>(
+    ImageFormat format,
+    MagicSignature[] magic,
+    int priority,
+    string[] mimeTypes,
+    RawImageWriteCapability[] typedWriteCapabilities
+  ) where T : IImageFormatReader<T>, IImageToRawImage<T>, IImageFromRawImage<T>, IImageFormatWriter<T> {
     Func<byte[], bool?>? matchSig = null;
     try { matchSig = header => T.MatchesSignature(header); } catch { /* type doesn't override */ }
 
@@ -77,9 +82,24 @@ internal static partial class FormatRegistration {
       ConvertFromRawImage: raw => FormatIO.Encode<T>(raw),
       VideoModes: T.VideoModes,
       LoadRawImageOrThrow: FormatIO.Decode<T>,
-      WriteToFile: FormatIO.WriteToFile<T>);
+      WriteToFile: FormatIO.WriteToFile<T>) {
+      TypedWriteCapabilities = typedWriteCapabilities,
+    };
     FormatRegistry.Register(entry);
   }
+
+  /// <summary>
+  /// Materializes one closed typed writer contract into the dynamic registry. The generated call site
+  /// supplies both generic arguments, so dispatch remains static and no interface scanning occurs at runtime.
+  /// </summary>
+  private static RawImageWriteCapability _TypedWriteCapability<T, TPixel>()
+    where T : IImageFromRawImage<T, TPixel>, IImageFormatWriter<T>
+    where TPixel : IRawPixelFormat<TPixel>
+    => new(
+      TPixel.Traits,
+      raw => FormatIO.Encode<T, TPixel>(RawImage<TPixel>.FromUntyped(raw)),
+      (raw, target) => FormatIO.WriteToFile<T, TPixel>(RawImage<TPixel>.FromUntyped(raw), target)
+    );
 
   private static void _RegisterMultiImageReader<T>(ImageFormat format)
     where T : IImageFormatReader<T>, IImageToRawImage<T>, IMultiImageFileFormat<T> {

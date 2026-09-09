@@ -61,6 +61,22 @@ public static class FormatIO {
   public static void Encode<T>(RawImage image, Stream stream) where T : IImageFromRawImage<T>, IImageFormatWriter<T>
     => stream.Write(T.ToBytes(T.FromRawImage(image)));
 
+  /// <summary>
+  /// Encodes a raw representation that the format explicitly declares as supported. Unlike the
+  /// legacy runtime-tagged overload, this entry point cannot ask the writer to coerce another raw
+  /// representation until it happens to fit.
+  /// </summary>
+  public static byte[] Encode<T, TPixel>(RawImage<TPixel> image)
+    where T : IImageFromRawImage<T, TPixel>, IImageFormatWriter<T>
+    where TPixel : IRawPixelFormat<TPixel>
+    => T.ToBytes(T.FromRawImage(image));
+
+  /// <summary>Typed exact-write overload for streams.</summary>
+  public static void Encode<T, TPixel>(RawImage<TPixel> image, Stream stream)
+    where T : IImageFromRawImage<T, TPixel>, IImageFormatWriter<T>
+    where TPixel : IRawPixelFormat<TPixel>
+    => stream.Write(T.ToBytes(T.FromRawImage(image)));
+
   /// <summary>Writes a picture to a file, with whatever else that format keeps beside it.</summary>
   /// <remarks>
   /// The encoding happens once and the companion is written from its result rather than from the
@@ -73,6 +89,17 @@ public static class FormatIO {
   /// </remarks>
   public static void WriteToFile<T>(RawImage image, FileInfo target)
     where T : IImageFromRawImage<T>, IImageFormatWriter<T> {
+    ArgumentNullException.ThrowIfNull(target);
+
+    var file = T.FromRawImage(image, target);
+    File.WriteAllBytes(target.FullName, T.ToBytes(file));
+    T.WriteCompanions(file, target);
+  }
+
+  /// <summary>Typed exact-write overload for named files and companion-file formats.</summary>
+  public static void WriteToFile<T, TPixel>(RawImage<TPixel> image, FileInfo target)
+    where T : IImageFromRawImage<T, TPixel>, IImageFormatWriter<T>
+    where TPixel : IRawPixelFormat<TPixel> {
     ArgumentNullException.ThrowIfNull(target);
 
     var file = T.FromRawImage(image, target);
