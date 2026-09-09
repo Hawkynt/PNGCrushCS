@@ -18,7 +18,8 @@ namespace FileFormat.PhotoSuiteProject;
 /// where XnView looks.
 /// </remarks>
 public readonly record struct PhotoSuiteProjectFile
-  : IImageFormatReader<PhotoSuiteProjectFile>, IImageToRawImage<PhotoSuiteProjectFile> {
+  : IImageFormatReader<PhotoSuiteProjectFile>, IImageToRawImage<PhotoSuiteProjectFile>,
+    IImageFromRawImage<PhotoSuiteProjectFile>, IImageFormatWriter<PhotoSuiteProjectFile> {
 
   /// <summary>The eight bytes a Microsoft compound document opens with.</summary>
   public static ReadOnlySpan<byte> Signature => [0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1];
@@ -36,6 +37,8 @@ public readonly record struct PhotoSuiteProjectFile
   static string[] IImageFormatMetadata<PhotoSuiteProjectFile>.FileExtensions => [".pzp"];
   static PhotoSuiteProjectFile IImageFormatReader<PhotoSuiteProjectFile>.FromSpan(ReadOnlySpan<byte> data)
     => PhotoSuiteProjectReader.FromSpan(data);
+  static byte[] IImageFormatWriter<PhotoSuiteProjectFile>.ToBytes(PhotoSuiteProjectFile file)
+    => PhotoSuiteProjectWriter.ToBytes(file);
 
   static VideoMode[] IImageFormatMetadata<PhotoSuiteProjectFile>.VideoModes => [
     new("Default", [(IntegerRange.Any, IntegerRange.Any)], [16777216])
@@ -67,4 +70,14 @@ public readonly record struct PhotoSuiteProjectFile
     Format = PixelFormat.Rgb24,
     PixelData = file.PixelData[..],
   };
+
+  public static PhotoSuiteProjectFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+    var rgb = PixelConverter.Convert(image, PixelFormat.Rgb24);
+    return new() {
+      Width = rgb.Width,
+      Height = rgb.Height,
+      PixelData = rgb.PixelData[..],
+    };
+  }
 }
