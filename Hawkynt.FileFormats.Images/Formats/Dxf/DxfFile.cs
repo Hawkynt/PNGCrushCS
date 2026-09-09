@@ -39,9 +39,14 @@ namespace FileFormat.Dxf;
 /// BYLAYER. Only indices 1 to 9 have colours that the DXF Reference itself fixes, so anything
 /// outside that range is drawn in black rather than guessed at.
 /// <para/>
-/// It does not write.
+/// Existing pair models serialize back to canonical ASCII DXF. Arbitrary raster images can also be
+/// authored: they are bounded, composited onto white, reduced to those same fixed ACI colours and
+/// represented by horizontally coalesced filled SOLID entities. That is intentionally ordinary DXF
+/// geometry, not a private raster payload.
 /// </remarks>
-public readonly record struct DxfFile : IImageFormatReader<DxfFile>, IImageToRawImage<DxfFile> {
+public readonly record struct DxfFile
+  : IImageFormatReader<DxfFile>, IImageToRawImage<DxfFile>,
+    IImageFromRawImage<DxfFile>, IImageFormatWriter<DxfFile> {
 
   /// <summary>The sentinel a binary DXF file opens with, which this reader refuses.</summary>
   public const string BinarySentinel = "AutoCAD Binary DXF";
@@ -49,6 +54,7 @@ public readonly record struct DxfFile : IImageFormatReader<DxfFile>, IImageToRaw
   static string IImageFormatMetadata<DxfFile>.PrimaryExtension => ".dxf";
   static string[] IImageFormatMetadata<DxfFile>.FileExtensions => [".dxf"];
   static DxfFile IImageFormatReader<DxfFile>.FromSpan(ReadOnlySpan<byte> data) => DxfReader.FromSpan(data);
+  static byte[] IImageFormatWriter<DxfFile>.ToBytes(DxfFile file) => DxfWriter.ToBytes(file);
   static VideoMode[] IImageFormatMetadata<DxfFile>.VideoModes => [
     new("Drawing", [(IntegerRange.Any, IntegerRange.Any)], [16777216])
   ];
@@ -57,6 +63,8 @@ public readonly record struct DxfFile : IImageFormatReader<DxfFile>, IImageToRaw
   public IReadOnlyList<DxfPair> Pairs { get; init; }
 
   public static RawImage ToRawImage(DxfFile file) => DxfRenderer.Render(file);
+
+  public static DxfFile FromRawImage(RawImage image) => DxfWriter.FromRawImage(image);
 }
 
 /// <summary>One group code and the value that follows it.</summary>
