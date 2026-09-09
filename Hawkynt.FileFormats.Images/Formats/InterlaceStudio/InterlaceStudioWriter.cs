@@ -9,7 +9,7 @@ public static class InterlaceStudioWriter {
     ArgumentNullException.ThrowIfNull(file.FirstFrame);
     ArgumentNullException.ThrowIfNull(file.SecondFrame);
 
-    var result = new byte[InterlaceStudioFile.MinimumFileSize];
+    var result = new byte[InterlaceStudioFile.FileSize];
 
     var header = file.Header ?? [];
     header.AsSpan(0, Math.Min(header.Length, InterlaceStudioFile.HeaderSize)).CopyTo(result);
@@ -18,6 +18,10 @@ public static class InterlaceStudioWriter {
       .CopyTo(result.AsSpan(InterlaceStudioFile.FirstFrameOffset));
     file.SecondFrame.AsSpan(0, Math.Min(file.SecondFrame.Length, InterlaceStudioFile.FrameSize))
       .CopyTo(result.AsSpan(InterlaceStudioFile.SecondFrameOffset));
+
+    var registers = file.Registers ?? [];
+    var tables = InterlaceStudioFile.RegisterTableCount * InterlaceStudioFile.RegisterTableSize;
+    registers.AsSpan(0, Math.Min(registers.Length, tables)).CopyTo(result.AsSpan(InterlaceStudioFile.RegistersOffset));
 
     return result;
   }

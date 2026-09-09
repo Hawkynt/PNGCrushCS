@@ -28,14 +28,17 @@ public static class InterlaceStudioReader {
   }
 
   public static InterlaceStudioFile FromSpan(ReadOnlySpan<byte> data) {
-    if (data.Length < InterlaceStudioFile.MinimumFileSize)
+    if (data.Length < InterlaceStudioFile.FileSize)
       throw new InvalidDataException(
-        $"An Interlace Studio picture takes at least {InterlaceStudioFile.MinimumFileSize} bytes; this file is {data.Length}.");
+        $"An Interlace Studio picture takes {InterlaceStudioFile.FileSize} bytes; this file is {data.Length}.");
 
     return new() {
       Header = data[..InterlaceStudioFile.HeaderSize].ToArray(),
       FirstFrame = data.Slice(InterlaceStudioFile.FirstFrameOffset, InterlaceStudioFile.FrameSize).ToArray(),
       SecondFrame = data.Slice(InterlaceStudioFile.SecondFrameOffset, InterlaceStudioFile.FrameSize).ToArray(),
+      Registers = data.Slice(
+        InterlaceStudioFile.RegistersOffset,
+        InterlaceStudioFile.RegisterTableCount * InterlaceStudioFile.RegisterTableSize).ToArray(),
     };
   }
 

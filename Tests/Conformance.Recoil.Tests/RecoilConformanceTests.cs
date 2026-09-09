@@ -242,6 +242,9 @@ public sealed class RecoilConformanceTests {
     // Interlace by not being FLI at all — so both are the whole 320 across.
     new(ImageFormat.FliProfi, "FLI Profi", 320, 200, ".fpr"),
     new(ImageFormat.HiresInterlaceFeniks, "Hires Interlace", 320, 200, ".hlf"),
+    new(ImageFormat.InterlaceStudio, "Interlace Studio", 320, 200, ".ist"),
+    new(ImageFormat.MultiLaceEditor, "Multi-Lace Editor", 320, 56, ".mle"),
+    new(ImageFormat.HighresMedium, "HighresMedium", 640, 400, ".hrm"),
   ];
 
   [Test]

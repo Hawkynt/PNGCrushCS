@@ -411,7 +411,7 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | HfImage | `.hf` | ✅ | ✅ | — | — | — | none |
 | HiEddi | `.hed` | ✅ | ✅ | — | — | — | recoil2png |
 | HighResAtari | `.hra` | ✅ | ✅ | — | — | — | none |
-| HighresMedium | `.hrm` | ✅ | ✅ | — | — | — | none |
+| HighresMedium | `.hrm` | ✅ | ✅ | — | — | — | recoil2png |
 | HighResST | `.hst`, `.hrs` | ✅ | ✅ | — | — | — | none |
 | HinterGrundBild | `.hgb` | ✅ | ✅ | — | — | — | none |
 | HiPicCreator | `.hpc`, `.aas` | ✅ | ✅ | — | — | — | recoil2png |
@@ -468,7 +468,7 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | InterlaceGraphicsEditor | `.ige` | ✅ | ✅ | — | — | — | recoil2png |
 | InterlaceHiresEditor | `.ihe` | ✅ | ✅ | — | — | — | none |
 | InterlaceLogoDesigner | `.ild` | ✅ | ✅ | — | — | — | recoil2png |
-| InterlaceStudio | `.ist` | ✅ | ✅ | — | — | — | none |
+| InterlaceStudio | `.ist` | ✅ | ✅ | — | — | — | recoil2png |
 | InterleafImage | `.iimg` | ✅ | ✅ | — | — | — | none |
 | InterPainter | `.inp`, `.ing`, `.ins` | ✅ | ✅ | — | — | — | recoil2png |
 | InterPaintHi | `.iph`, `.hre` | ✅ | ✅ | — | — | — | recoil2png |
@@ -577,7 +577,7 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | MsxView | `.mvw`, `.msv` | ✅ | ✅ | — | — | — | none |
 | Mtv | `.mtv`, `.pic` | ✅ | ✅ | — | — | — | ImageMagick |
 | MuifliEditor | `.muf`, `.mui`, `.mup` | ✅ | ✅ | — | — | — | none |
-| MultiLaceEditor | `.mle` | ✅ | ✅ | — | — | — | none |
+| MultiLaceEditor | `.mle` | ✅ | ✅ | — | — | — | recoil2png |
 | MultiPainter | `.mpt`, `.mlt64` | ✅ | ✅ | — | — | — | none |
 | MultiPalettePicture | `.mpp` | ✅ | ✅ | — | — | — | none |
 | NcrImage | `.ncr` | ✅ | ✅ | — | — | — | none |
