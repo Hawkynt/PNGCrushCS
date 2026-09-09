@@ -6,20 +6,20 @@ namespace FileFormat.Cr3;
 
 /// <summary>In-memory representation of a Canon CR3 raw file.</summary>
 /// <remarks>
-/// Read and not written. A CR3 is a camera's file: writing one from arbitrary
-/// pixels would state a sensor, a lens and an exposure that never happened, which
-/// is the same reason the other camera formats here are read-only.
-/// <see cref="Cr3Writer"/> builds the container around a preview so the reader
-/// can be checked against another tool, and stays off the registry's writer
-/// contract, which asks for a picture.
+/// Camera-authored CR3 files keep their sensor samples in Canon's CRX codec, which is not implemented
+/// here. Reading therefore exposes the JPEG preview and thumbnail stored beside that sensor data.
+/// Writing deliberately stops at the same boundary: an arbitrary <see cref="RawImage"/> is encoded as
+/// a JPEG preview inside a CR3 container, without inventing a CRX track, camera model, lens or exposure.
 /// </remarks>
 [FormatDetectionPriority(210)]
 [FormatMimeType("image/x-canon-cr3")]
-public sealed class Cr3File : IImageFormatReader<Cr3File>, IImageToRawImage<Cr3File> {
+public sealed class Cr3File :
+  IImageFormatReader<Cr3File>, IImageToRawImage<Cr3File>, IImageFromRawImage<Cr3File>, IImageFormatWriter<Cr3File> {
 
   static string IImageFormatMetadata<Cr3File>.PrimaryExtension => ".cr3";
   static string[] IImageFormatMetadata<Cr3File>.FileExtensions => [".cr3"];
   static Cr3File IImageFormatReader<Cr3File>.FromSpan(ReadOnlySpan<byte> data) => Cr3Reader.FromSpan(data);
+  static byte[] IImageFormatWriter<Cr3File>.ToBytes(Cr3File file) => Cr3Writer.ToBytes(file);
 
   /// <summary>
   /// Recognises a CR3 by the brand its <c>ftyp</c> states.
@@ -49,6 +49,23 @@ public sealed class Cr3File : IImageFormatReader<Cr3File>, IImageToRawImage<Cr3F
   public int ThumbnailWidth { get; init; }
   public int ThumbnailHeight { get; init; }
 
+  /// <summary>Builds a preview-only CR3 container representation from an arbitrary picture.</summary>
+  /// <remarks>
+  /// CR3 states preview dimensions as unsigned sixteen-bit values. The picture is JPEG-encoded through
+  /// this package's managed JPEG writer; no sensor-data track or camera-authored metadata is synthesised.
+  /// </remarks>
+  public static Cr3File FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+    _ValidateDimension(image.Width, nameof(image.Width));
+    _ValidateDimension(image.Height, nameof(image.Height));
+
+    return new() {
+      PreviewJpeg = FormatIO.Encode<JpegFile>(image),
+      PreviewWidth = image.Width,
+      PreviewHeight = image.Height,
+    };
+  }
+
   /// <summary>The largest picture the file carries outside its sensor data.</summary>
   public static RawImage ToRawImage(Cr3File file) {
     ArgumentNullException.ThrowIfNull(file);
@@ -57,5 +74,10 @@ public sealed class Cr3File : IImageFormatReader<Cr3File>, IImageToRawImage<Cr3F
                ?? throw new ArgumentException("CR3 carries no preview or thumbnail.", nameof(file));
 
     return JpegFile.ToRawImage(JpegReader.FromBytes(jpeg));
+  }
+
+  private static void _ValidateDimension(int value, string name) {
+    if (value is <= 0 or > ushort.MaxValue)
+      throw new ArgumentOutOfRangeException(name, value, $"CR3 preview dimensions must be between 1 and {ushort.MaxValue} pixels.");
   }
 }
