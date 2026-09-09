@@ -169,7 +169,7 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | BodyPaint3D | `.b3d`, `.b2d` | ✅ | ✅ | — | — | — |
 | BoogieDownPaint | `.bdp` | ✅ | ✅ | — | — | — |
 | Botticelli | `.p4i` | ✅ | ✅ | — | — | — |
-| Bpg | `.bpg` | ✅ | ✅ | — | — | — |
+| Bpg | `.bpg` | ✅ | — | — | — | — |
 | BrooktroutFax | `.brk`, `.301`, `.brt` | ✅ | ✅ | — | — | — |
 | BrotherFax | `.uni` | ✅ | ✅ | — | — | — |
 | Brus | `.brus` | ✅ | ✅ | — | — | — |
@@ -1042,7 +1042,7 @@ This list used to be far longer, and the entries that left it did so by argument
 
 ### Registered but read-only
 
-These 9 entries read but have no writer; each is a decision, not an oversight. **Not bounded** (an encoder or a model this package does not have): PeResource, Fpx (executable, OLE and compound-document containers). **Holders of other files rather than pictures of their own**: IconLibrary, Ipg, Sdg, Cdr, Cmx — an icon library, a tileset and a gallery carry whole files of other formats, and CorelDRAW's streams are vector scenes whose raster part is only an embedded preview, so writing any of them means deciding what belongs in a collection or composing a drawing, neither of which is serialising a picture. **Deliberately not written** because a file built from arbitrary pixels would not be what the name promises: EmbeddedDib, CartesMichelin.
+These 10 entries read but have no writer; each is a decision, not an oversight. **Not bounded** (an encoder or a model this package does not have): PeResource, Fpx (executable, OLE and compound-document containers), Bpg. A BPG picture is an HEVC intra frame in a small wrapper, so writing one needs an HEVC encoder, and this package has an HEVC decoder only. There used to be a `Bpg` writer and it did not do that: it stored the caller's RGB bytes under a `YCbCr444` label with no transform of any kind, and its round-trip test passed because the decode path caught its own failure and handed the stored bytes straight back. Two of ours agreeing with each other proves nothing, so it is gone and the format reads only. **Holders of other files rather than pictures of their own**: IconLibrary, Ipg, Sdg, Cdr, Cmx — an icon library, a tileset and a gallery carry whole files of other formats, and CorelDRAW's streams are vector scenes whose raster part is only an embedded preview, so writing any of them means deciding what belongs in a collection or composing a drawing, neither of which is serialising a picture. **Deliberately not written** because a file built from arbitrary pixels would not be what the name promises: EmbeddedDib, CartesMichelin.
 
 ## 🚀 Quick start
 
