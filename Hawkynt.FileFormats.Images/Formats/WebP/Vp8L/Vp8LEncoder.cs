@@ -307,6 +307,30 @@ internal static class Vp8LEncoder {
     }
   }
 
+  /// <summary>Ensures the code-length alphabet's own prefix code has at least two symbols, so that
+  /// reading one of its symbols costs exactly the number of bits this encoder writes for it.
+  /// <paramref name="storageOrder"/> supplies the order the lengths are transmitted in; the filler
+  /// symbol is taken from its front so that no extra length has to be transmitted for it.</summary>
+  private static void _MakeCodeLengthCodeDecodable(int[] lengths, int[] storageOrder) {
+    var used = 0;
+    var sole = -1;
+    for (var i = 0; i < lengths.Length; ++i)
+      if (lengths[i] > 0) {
+        ++used;
+        sole = i;
+      }
+
+    if (used != 1)
+      return;
+
+    lengths[sole] = 1;
+    foreach (var symbol in storageOrder)
+      if (symbol != sole && lengths[symbol] == 0) {
+        lengths[symbol] = 1;
+        return;
+      }
+  }
+
   private readonly struct ExtraBits {
     public readonly int Bits;
     public readonly uint Value;
@@ -514,6 +538,16 @@ internal static class Vp8LEncoder {
     // a complete code when exactly 8 symbols are used, and decoders reject incomplete codes.
     var clCodeLengths = _ComputeHuffmanLengths(clHist, 19, 7);
     _LimitCodeLengths(clCodeLengths, 7);
+
+    // A prefix code over a single symbol carries no information, so decoders resolve it without
+    // consuming a bit — the same rule the main trees follow above. The code-length alphabet
+    // collapses to one symbol whenever every symbol of this alphabet came out the same depth, as
+    // 256 literals at eight bits each do; emitting that symbol as a one-bit code would then shift
+    // every code length that follows. It cannot be dropped to zero bits either, because an
+    // all-zero code-length code is rejected outright, so give it a second, never-emitted symbol
+    // and keep a genuine one-bit code. The filler goes to the front of the storage order, where it
+    // costs nothing: those positions are transmitted regardless.
+    _MakeCodeLengthCodeDecodable(clCodeLengths, clOrder);
 
     // Find num_code_lengths: how many of the 19 positions we need to write
     var numCodeLengths = 4;
