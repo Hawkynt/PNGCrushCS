@@ -31,7 +31,8 @@ namespace FileFormat.Crd;
 /// depth of the JPEG inside, and pixels identical to what the same JPEG decodes to on its own.
 /// </remarks>
 [FormatMagicBytes([0x09, (byte)'C', (byte)'a', (byte)'r', (byte)'d', (byte)'M', (byte)'a', (byte)'k', (byte)'e', (byte)'r'])]
-public sealed class CrdFile : IImageFormatReader<CrdFile>, IImageToRawImage<CrdFile> {
+public sealed class CrdFile
+  : IImageFormatReader<CrdFile>, IImageToRawImage<CrdFile>, IImageFromRawImage<CrdFile>, IImageFormatWriter<CrdFile> {
 
   /// <summary>The length-prefixed name a file opens with.</summary>
   public static ReadOnlySpan<byte> Magic => [0x09, (byte)'C', (byte)'a', (byte)'r', (byte)'d', (byte)'M', (byte)'a', (byte)'k', (byte)'e', (byte)'r'];
@@ -45,6 +46,7 @@ public sealed class CrdFile : IImageFormatReader<CrdFile>, IImageToRawImage<CrdF
   static string IImageFormatMetadata<CrdFile>.PrimaryExtension => ".crd";
   static string[] IImageFormatMetadata<CrdFile>.FileExtensions => [".crd"];
   static CrdFile IImageFormatReader<CrdFile>.FromSpan(ReadOnlySpan<byte> data) => CrdReader.FromSpan(data);
+  static byte[] IImageFormatWriter<CrdFile>.ToBytes(CrdFile file) => CrdWriter.ToBytes(file);
 
   /// <summary>Where in the document the picture stands.</summary>
   public int PictureOffset { get; init; }
@@ -58,5 +60,14 @@ public sealed class CrdFile : IImageFormatReader<CrdFile>, IImageToRawImage<CrdF
       throw new InvalidOperationException("No picture was read.");
 
     return JpegFile.ToRawImage(JpegReader.FromBytes(file.PictureData));
+  }
+
+  /// <summary>Creates a canonical PowerCard maker document carrying a JFIF JPEG of the source image.</summary>
+  public static CrdFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+    return new() {
+      PictureOffset = HeaderSize,
+      PictureData = JpegWriter.ToBytes(JpegFile.FromRawImage(image)),
+    };
   }
 }

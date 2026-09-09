@@ -1,0 +1,59 @@
+name: CRD API reference maintenance
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    if: github.head_ref == 'feature/crd-writer'
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+          path: PNGCrushCS
+          fetch-depth: 0
+
+      - uses: actions/checkout@v4
+        with:
+          repository: Hawkynt/CompressionWorkbench
+          path: CompressionWorkbench
+          fetch-depth: 1
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.x
+            10.0.x
+
+      - name: Restore
+        working-directory: PNGCrushCS
+        run: dotnet restore PngCrush.slnx -p:EnableWindowsTargeting=true
+
+      - name: Build
+        working-directory: PNGCrushCS
+        run: dotnet build PngCrush.slnx --configuration Release --no-restore -p:EnableWindowsTargeting=true
+
+      - name: Generate package documentation
+        uses: Hawkynt/RepositoryTemplate/package-readme@v1
+        with:
+          mode: write
+          root: PNGCrushCS
+          configuration: Release
+
+      - name: Commit generated documentation
+        shell: bash
+        run: |
+          cd PNGCrushCS
+          if git diff --quiet; then
+            exit 0
+          fi
+          git config user.name "Hawkynt"
+          git config user.email "14230988+Hawkynt@users.noreply.github.com"
+          git add -- '*README.md' '*REFERENCE.md'
+          git commit -m "* regenerate image package reference for CRD writer"
+          git push origin HEAD:${{ github.head_ref }}
