@@ -5349,13 +5349,14 @@ Implements `IEquatable<BotticelliFile>`, `IImageFormatMetadata<BotticelliFile>`,
 | --- | --- | --- |
 | `YCbCrBT601` | `0` |  |
 | `Rgb` | `1` |  |
-| `YCbCrBT709` | `2` |  |
-| `YCbCrBT2020` | `3` |  |
-| `YCbCrBT2020NCL` | `4` |  |
+| `YCgCo` | `2` |  |
+| `YCbCrBT709` | `3` |  |
+| `YCbCrBT2020Ncl` | `4` |  |
+| `YCbCrBT2020Cl` | `5` |  |
 
 #### `BpgFile`
 
-Implements `IImageFormatMetadata<BpgFile>`, `IImageFormatReader<BpgFile>`, `IImageFormatWriter<BpgFile>`, `IImageToRawImage<BpgFile>`.
+Implements `IImageFormatMetadata<BpgFile>`, `IImageFormatReader<BpgFile>`, `IImageFormatWriter<BpgFile>`, `IImageFromRawImage<BpgFile>`, `IImageToRawImage<BpgFile>`.
 
 | Member | Signature | Summary |
 | --- | --- | --- |
@@ -5372,18 +5373,19 @@ Implements `IImageFormatMetadata<BpgFile>`, `IImageFormatReader<BpgFile>`, `IIma
 | `PixelData` | `byte[] PixelData { get; init; }` |  |
 | `PixelFormat` | `BpgPixelFormat PixelFormat { get; init; }` |  |
 | `Width` | `int Width { get; init; }` |  |
+| `FromRawImage` | `static BpgFile FromRawImage(RawImage image)` |  |
 | `ToRawImage` | `static RawImage ToRawImage(BpgFile file)` |  |
 
 #### `BpgPixelFormat`
 
 | Value | Numeric | Summary |
 | --- | --- | --- |
-| `YCbCr420` | `0` |  |
-| `YCbCr422` | `1` |  |
-| `YCbCr444` | `2` |  |
-| `Grayscale` | `3` |  |
-| `Cmyk` | `4` |  |
-| `YCbCr420Jpeg` | `5` |  |
+| `Grayscale` | `0` |  |
+| `YCbCr420` | `1` |  |
+| `YCbCr422` | `2` |  |
+| `YCbCr444` | `3` |  |
+| `YCbCr420Mpeg2` | `4` |  |
+| `YCbCr422Mpeg2` | `5` |  |
 
 #### `BpgReader`
 
@@ -5398,6 +5400,7 @@ Implements `IImageFormatMetadata<BpgFile>`, `IImageFormatReader<BpgFile>`, `IIma
 
 | Member | Signature | Summary |
 | --- | --- | --- |
+| `FromRawImage` | `static BpgFile FromRawImage(RawImage image)` |  |
 | `ToBytes` | `static byte[] ToBytes(BpgFile file)` |  |
 
 ### Namespace `FileFormat.BrooktroutFax`
