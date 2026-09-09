@@ -21,8 +21,14 @@ namespace FileFormat.X3f;
 /// A file whose largest readable picture is a small fraction of the size it claims is refused rather
 /// than answered with its preview, because a preview drawn as the picture is the wrong answer given
 /// confidently.
+/// <para/>
+/// Writing uses the public X3F 2.2 container's processed-image path: one full-size, uncompressed
+/// RGB24 <c>IMAG</c> section with four-byte row alignment. It deliberately does not invent Foveon
+/// sensor samples, lens/exposure metadata, or a camera-specific correction block.
 /// </remarks>
-public readonly record struct X3fFile : IImageFormatReader<X3fFile>, IImageToRawImage<X3fFile> {
+public readonly record struct X3fFile
+  : IImageFormatReader<X3fFile>, IImageToRawImage<X3fFile>,
+    IImageFromRawImage<X3fFile>, IImageFormatWriter<X3fFile> {
 
   /// <summary>The four bytes every one of these opens with.</summary>
   public static ReadOnlySpan<byte> Magic => [(byte)'F', (byte)'O', (byte)'V', (byte)'b'];
@@ -54,6 +60,7 @@ public readonly record struct X3fFile : IImageFormatReader<X3fFile>, IImageToRaw
   static string IImageFormatMetadata<X3fFile>.PrimaryExtension => ".x3f";
   static string[] IImageFormatMetadata<X3fFile>.FileExtensions => [".x3f"];
   static X3fFile IImageFormatReader<X3fFile>.FromSpan(ReadOnlySpan<byte> data) => X3fReader.FromSpan(data);
+  static byte[] IImageFormatWriter<X3fFile>.ToBytes(X3fFile file) => X3fWriter.ToBytes(file);
   static VideoMode[] IImageFormatMetadata<X3fFile>.VideoModes => [
     new("Default", [(IntegerRange.Any, IntegerRange.Any)], [16777216])
   ];
@@ -73,6 +80,17 @@ public readonly record struct X3fFile : IImageFormatReader<X3fFile>, IImageToRaw
       Height = file.Height,
       Format = PixelFormat.Rgb24,
       PixelData = file.PixelData[..],
+    };
+  }
+
+  public static X3fFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+    image = image.EnsureFormat(PixelFormat.Rgb24);
+
+    return new() {
+      Width = image.Width,
+      Height = image.Height,
+      PixelData = image.PixelData[..],
     };
   }
 }
