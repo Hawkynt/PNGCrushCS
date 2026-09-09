@@ -1868,6 +1868,16 @@ have to start from the container.
 
 # Smacker, where the tree algorithm is right and the thing built out of it is not
 
+> **Closed.** This entry is kept because its account of the published description still holds: RAD's
+> "Optimized Compression" prose does not describe what the files contain, and no independent
+> description of it was ever found. What closed it was the route this file's own
+> "Licence-compatible reference sources" section exists to catch and had not been applied here —
+> FFmpeg's `libavcodec/smacker.c` is LGPL-2.1-or-later, which this package can absorb. The four
+> things the prose omits, and the twelve readings' arithmetic they explain, are in `codec-notes.md`
+> under "Smacker Video"; the decoder is measured bit-exact against FFmpeg on every readable sample
+> that exists. Everything below is the record of where it stopped before that, and the finding under
+> "The finding worth more than the codec" is worth keeping on its own account.
+
 Smacker is RAD Game Tools' own FMV format, and its container is read here — `Formats/Smacker`, merged
 and measured against `ffprobe` packet for packet on six real files. The codec is not, and it stops in
 an unusual place: not at a missing description, and not at a table nobody printed, but at a
