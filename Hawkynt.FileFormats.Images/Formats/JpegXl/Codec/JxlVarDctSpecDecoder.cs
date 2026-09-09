@@ -225,8 +225,9 @@ internal static class JxlVarDctSpecDecoder {
     // skipping this went unnoticed until a picture with alpha turned up: there
     // the plane sits in the bitstream and everything after it was read a plane
     // too late.
+    var extraChannels = Array.Empty<JxlChannel>();
     if (numExtraChannels > 0) {
-      var extraChannels = new JxlChannel[numExtraChannels];
+      extraChannels = new JxlChannel[numExtraChannels];
       for (var i = 0; i < numExtraChannels; ++i)
         extraChannels[i] = new JxlChannel {
           Width = width,
@@ -236,13 +237,21 @@ internal static class JxlVarDctSpecDecoder {
           Pixels = new int[checked(width * height)],
         };
 
-      JxlModularSpecDecoder.DecodeStream(
+      // A plane bigger than a group is not carried here at all: the groups carry
+      // it a piece at a time, and this decoder does not follow it there. Leaving
+      // the transforms on then, and handing back nothing rather than the zeros
+      // the buffers still hold, is what stops a plane that was never read from
+      // being taken for one that was.
+      var carriedWhole = width <= groupSize && height <= groupSize;
+      var stream = JxlModularSpecDecoder.DecodeStream(
         reader, extraChannels, bitDepth, modularGlobalTree, modularGlobalEntropy,
         new JxlModularStreamOptions {
           MaxChannelSize = groupSize,
           StreamId = 0,
-          UndoTransforms = false,
+          UndoTransforms = carriedWhole,
         });
+
+      extraChannels = carriedWhole ? stream.Image.Channels : [];
     }
 
     // ProcessDCGroup for VarDCT (libjxl `dec_modular.cc::DecodeVarDCTDC`):
@@ -661,6 +670,7 @@ internal static class JxlVarDctSpecDecoder {
       Width = width,
       Height = height,
       Channels = channels,
+      ExtraChannels = extraChannels,
     };
   }
 

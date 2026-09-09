@@ -41,29 +41,9 @@ namespace FileFormat.JpegXl.Tests;
 [TestFixture]
 public sealed class LibjxlLossyParityTests {
 
-  private const int _DitherSize = 32;
-  private const int _DitherStride = 48;
+  private static byte[] _Fixture(string name) => TestHelper.Fixture(name);
 
-  private static byte[] _Fixture(string name) {
-    var path = Path.Combine(TestContext.CurrentContext.TestDirectory, "Fixtures", name);
-    Assert.That(File.Exists(path), Is.True, $"Test fixture missing: {path}");
-    return File.ReadAllBytes(path);
-  }
-
-  /// <summary>libjxl's <c>kDither</c>, kept beside the fixtures rather than
-  /// written out here because it is somebody else's table and reads as data.</summary>
-  private static float[] _Dither() {
-    var text = System.Text.Encoding.ASCII.GetString(_Fixture("libjxl_dither.txt"));
-    var values = text
-      .Split('\n')
-      .Where(line => !line.StartsWith('#'))
-      .SelectMany(line => line.Split(' ', StringSplitOptions.RemoveEmptyEntries))
-      .Select(token => float.Parse(token, CultureInfo.InvariantCulture))
-      .ToArray();
-
-    Assert.That(values, Has.Length.EqualTo(_DitherSize * _DitherStride));
-    return values;
-  }
+  private static float[] _Dither() => TestHelper.Dither();
 
   /// <param name="name">
   /// <c>cjxl_dct64_gradient</c> is one 64x64 transform from end to end,
@@ -109,9 +89,7 @@ public sealed class LibjxlLossyParityTests {
       for (var c = 0; c < 3; ++c) {
         // The pattern is offset per channel, which is why a grey picture does
         // not come out with all three channels moved the same way.
-        var dx = (x + c * 23) % _DitherSize;
-        var dy = (y + c * 13) % _DitherSize;
-        var value = gamma[c] * 255.0f + dither[dy * _DitherStride + dx];
+        var value = gamma[c] * 255.0f + TestHelper.DitherAt(dither, x, y, c);
         var got = (byte)Math.Clamp((int)(Math.Clamp(value, 0.0f, 255.0f) + 0.5f), 0, 255);
 
         var want = expected[at * 3 + c];

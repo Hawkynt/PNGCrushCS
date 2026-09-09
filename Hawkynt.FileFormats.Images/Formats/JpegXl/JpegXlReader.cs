@@ -329,9 +329,12 @@ public static class JpegXlReader {
   ///
   /// <para>Composition is in float over the colour planes followed by the extra
   /// ones, because the alpha a frame blends by is one of the extra channels.
-  /// Only modular frames are composed: blending VarDCT frames happens in XYB
-  /// before the colour transform, and nothing here has been measured against
-  /// libjxl doing that, so such a file is refused by name instead.</para>
+  /// The space it happens in is the picture's own, after the colour transform
+  /// and not before it: libjxl builds its pipeline as XYB, then out of linear,
+  /// and only then blending — a reference frame kept in XYB is refused as a
+  /// background there by name. So a lossy frame is taken all the way to the
+  /// colour the picture is stated in and blended there, which is the same space
+  /// a modular frame's samples are already in.</para>
   /// </remarks>
   /// <param name="stopAtFirstShownFrame">
   /// Whether to stop at the first frame an animation would show, which is the
@@ -351,6 +354,14 @@ public static class JpegXlReader {
     var totalChannels = checked(baseChannels + extraChannels);
     var bits = (int)imageMetadata.BitDepth.BitsPerSample;
     var scale = 1.0f / ((1 << Math.Clamp(bits, 1, 30)) - 1);
+
+    // An extra channel states its own depth, which need not be the colour's: a
+    // sixteen-bit picture may carry an eight-bit alpha and does so by default.
+    var extraScales = new float[extraChannels];
+    for (var i = 0; i < extraScales.Length; ++i) {
+      var stated = (int)imageMetadata.ExtraChannelInfo[i].BitDepth.BitsPerSample;
+      extraScales[i] = 1.0f / ((1 << Math.Clamp(stated > 0 ? stated : bits, 1, 30)) - 1);
+    }
 
     // Three colour planes even for a grey picture, so that a spline's colour
     // and a blend have somewhere to go.
@@ -381,9 +392,6 @@ public static class JpegXlReader {
         reader = new JxlBitReader(codestream, at);
 
       frame = JxlSpecFrameHeader.Decode(reader, imageMetadata, width, height);
-      if (frame.Encoding != JxlFrameEncoding.Modular)
-        throw new NotSupportedException(
-          "This JPEG XL file has several frames and at least one is lossy; composing those is not implemented.");
       if (frame.FrameType != JxlFrameType.Regular)
         throw new NotSupportedException(
           $"This JPEG XL file has a {frame.FrameType} frame, which this decoder does not compose.");
@@ -411,20 +419,51 @@ public static class JpegXlReader {
       if ((frame.Flags & _FlagNoise) != 0)
         throw new NotSupportedException("This JPEG XL frame adds noise, which this decoder does not read yet.");
 
-      JxlFrameQuantizer.ReadDcQuantization(reader);
+      var dcQuant = JxlFrameQuantizer.ReadDcQuantization(reader);
 
-      var decoded = numGroups == 1
-        ? JxlModularSpecDecoder.Decode(reader, frameWidth, frameHeight, totalChannels, bits, isTopLevelFrame: true)
-        : JxlModularSpecDecoder.DecodeMultiGroup(
-          codestream, reader, frameWidth, frameHeight, totalChannels, bits,
-          groupDim, numGroupsX, numGroupsY, numDcGroups, (int)frame.NumPasses, toc, frameBody);
-      if (!_ValidateDecodedImage(decoded, frameWidth, frameHeight, totalChannels))
-        return null;
+      float[][] foreground;
+      if (frame.Encoding == JxlFrameEncoding.Modular) {
+        var decoded = numGroups == 1
+          ? JxlModularSpecDecoder.Decode(reader, frameWidth, frameHeight, totalChannels, bits, isTopLevelFrame: true)
+          : JxlModularSpecDecoder.DecodeMultiGroup(
+            codestream, reader, frameWidth, frameHeight, totalChannels, bits,
+            groupDim, numGroupsX, numGroupsY, numDcGroups, (int)frame.NumPasses, toc, frameBody);
+        if (!_ValidateDecodedImage(decoded, frameWidth, frameHeight, totalChannels))
+          return null;
 
-      if (splines != null)
-        _DrawSplines((JxlModularImage)decoded!, splines, frameWidth, frameHeight, bits, isGray);
+        if (splines != null)
+          _DrawSplines((JxlModularImage)decoded!, splines, frameWidth, frameHeight, bits, isGray);
 
-      var foreground = _ToPlanes(decoded, frameWidth, frameHeight, planeCount, baseChannels, scale);
+        foreground = _ToPlanes(decoded, frameWidth, frameHeight, planeCount, baseChannels, scale);
+      } else {
+        // A lossy frame is drawn on nothing but its own samples: this decoder
+        // reads the splines a frame states and has nowhere to draw them on a
+        // frame kept in XYB, so saying so beats drawing the frame without them.
+        if (splines != null)
+          throw new NotSupportedException(
+            "This JPEG XL file has a lossy frame carrying splines, which this decoder does not draw.");
+
+        var lossy = JxlVarDctSpecDecoder.Decode(
+          reader,
+          frameWidth,
+          frameHeight,
+          bitDepth: bits,
+          gaborishParams: frame.GaborishParameters,
+          epfParams: frame.EpfParameters,
+          dcQuant: dcQuant,
+          xQmScale: frame.XQmScale,
+          bQmScale: frame.BQmScale,
+          codestream: codestream,
+          toc: toc,
+          frameBody: frameBody,
+          groupSizeOverride: groupDim,
+          numDcGroups: numDcGroups,
+          numExtraChannels: extraChannels,
+          frameFlags: frame.Flags);
+
+        foreground = _LossyPlanes(lossy, frameWidth, frameHeight, planeCount, extraScales);
+      }
+
       composed = JxlFrameComposer.Compose(
         references[frame.BlendSource % _ReferenceSlots], foreground, planeCount,
         width, height, frameWidth, frameHeight, frame.OriginX, frame.OriginY,
@@ -664,6 +703,61 @@ public static class JpegXlReader {
       var pixels = modular.Channels[source].Pixels;
       for (var i = 0; i < count && i < pixels.Length; ++i)
         planes[p][i] = pixels[i] * scale;
+    }
+
+    return planes;
+  }
+
+  /// <summary>
+  /// A decoded lossy frame as the same float planes a modular one gives: three
+  /// colour ones in the picture's own colour, followed by its extra channels.
+  /// </summary>
+  /// <remarks>
+  /// A lossy frame comes out of the coefficients in XYB, and XYB is not a space
+  /// two frames can be combined in — libjxl's blending stage refuses a
+  /// background that is still in it, and the pipeline that feeds that stage has
+  /// already run the inverse opsin transform and the transfer curve
+  /// (<c>dec_cache.cc</c>: XYB, then out of linear, then blending). So the
+  /// frame is taken the whole way here, to the fractions of full scale a
+  /// modular frame's samples already are, and the two kinds of frame meet in
+  /// one space.
+  /// </remarks>
+  private static float[][] _LossyPlanes(
+    JxlVarDctImage lossy, int frameWidth, int frameHeight, int planeCount, float[] extraScales
+  ) {
+    var count = checked(frameWidth * frameHeight);
+    if (lossy.Width != frameWidth || lossy.Height != frameHeight || lossy.Channels.Length < 3)
+      throw new InvalidDataException("A lossy frame did not decode to the size it states.");
+    for (var c = 0; c < 3; ++c)
+      if (lossy.Channels[c].Length < count)
+        throw new InvalidDataException("A lossy frame did not decode to the size it states.");
+
+    // A frame that states extra channels and did not hand them back has them in
+    // its groups rather than in its global stream, which this decoder does not
+    // follow — and an alpha of zeros would blend a frame away entirely.
+    if (extraScales.Length > 0 && lossy.ExtraChannels.Length < extraScales.Length)
+      throw new NotSupportedException(
+        "This JPEG XL file has a lossy frame whose extra channels are carried group by group, which this decoder does not read.");
+
+    var planes = new float[planeCount][];
+    for (var p = 0; p < planeCount; ++p)
+      planes[p] = new float[count];
+
+    var x = lossy.Channels[0];
+    var y = lossy.Channels[1];
+    var b = lossy.Channels[2];
+    for (var i = 0; i < count; ++i) {
+      var (r, g, bl) = JxlXybColorTransform.XybToLinearSrgb(x[i], y[i], b[i]);
+      planes[0][i] = JxlXybColorTransform.LinearSrgbToGammaUnclamped(r);
+      planes[1][i] = JxlXybColorTransform.LinearSrgbToGammaUnclamped(g);
+      planes[2][i] = JxlXybColorTransform.LinearSrgbToGammaUnclamped(bl);
+    }
+
+    for (var p = 3; p < planeCount; ++p) {
+      var source = lossy.ExtraChannels[p - 3].Pixels;
+      var extraScale = extraScales[p - 3];
+      for (var i = 0; i < count && i < source.Length; ++i)
+        planes[p][i] = source[i] * extraScale;
     }
 
     return planes;
