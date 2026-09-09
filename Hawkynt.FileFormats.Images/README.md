@@ -56,7 +56,7 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | AladdinPaint | `.alp` | ✅ | ✅ | — | — | — |
 | AliasPix | `.pix`, `.als`, `.alias`, `.img`, `.lux` | ✅ | ✅ | — | — | — |
 | AmicaPaint | `.ami` | ✅ | ✅ | — | — | — |
-| AmigaIcon | `.info` | ✅ | ✅ | — | — | — |
+| AmigaIcon | `.info` | ✅ | ✅ | — | ✅ | — |
 | AmosBank | `.abk` | ✅ | ✅ | — | — | — |
 | AmstradCpc | `.cpc` | ✅ | ✅ | — | — | — |
 | AmstradMode5 | `.cm5` | ✅ | ✅ | — | — | — |
@@ -296,7 +296,7 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | Ecw | `.ecw` | ✅ | ✅ | — | — | — |
 | EdmicsC4 | `.c4` | ✅ | ✅ | — | — | — |
 | EggPaint | `.trp` | ✅ | ✅ | — | — | — |
-| ElectricImage | `.ei`, `.eidi` | ✅ | — | — | ✅ | — |
+| ElectricImage | `.ei`, `.eidi` | ✅ | ✅ | — | ✅ | — |
 | Electronika | `.bk`, `.ekr` | ✅ | ✅ | — | — | — |
 | EmbeddedDib | `.cdr`, `.cmx`, `.zmf`, `.skf`, `.cad`, `.sdg`, `.ipg`, `.btn` | ✅ | — | — | — | — |
 | EmcEditor | `.emc` | ✅ | ✅ | — | — | — |
