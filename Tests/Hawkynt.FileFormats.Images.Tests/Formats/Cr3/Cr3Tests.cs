@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using FileFormat.Core;
 using FileFormat.Cr3;
+using Hawkynt.FileFormats.Images;
 using NUnit.Framework;
 
 namespace FileFormat.Cr3.Tests;
@@ -13,9 +14,9 @@ namespace FileFormat.Cr3.Tests;
 /// type as CR3, states the codec version out of the Canon box, and extracts the
 /// preview and the thumbnail byte for byte as they went in.
 ///
-/// <para>The sensor data itself is coded with CRX, which is not implemented, and
-/// a CR3 carrying nothing but sensor data is refused by name rather than
-/// approximated from the little that could be guessed.</para>
+/// <para>The sensor data itself is coded with CRX, which is not implemented. The
+/// registry writer therefore carries an arbitrary picture as the ordinary JPEG
+/// preview and does not synthesise a sensor track or camera-authored metadata.</para>
 /// </remarks>
 [TestFixture]
 public sealed class Cr3Tests {
@@ -27,6 +28,19 @@ public sealed class Cr3Tests {
   }
 
   private static Cr3File _Read() => Cr3Reader.FromBytes(_Fixture("canon_style.cr3"));
+
+  private static RawImage _Gradient(int width, int height) {
+    var pixels = new byte[width * height * 3];
+    for (var y = 0; y < height; ++y)
+    for (var x = 0; x < width; ++x) {
+      var offset = (y * width + x) * 3;
+      pixels[offset] = (byte)(x * 255 / Math.Max(1, width - 1));
+      pixels[offset + 1] = (byte)(y * 255 / Math.Max(1, height - 1));
+      pixels[offset + 2] = (byte)((x + y) * 255 / Math.Max(1, width + height - 2));
+    }
+
+    return new() { Width = width, Height = height, Format = PixelFormat.Rgb24, PixelData = pixels };
+  }
 
   [Test]
   public void TheCodecVersionAndBothPicturesComeOutOfTheBoxesTheyLiveIn() {
@@ -71,6 +85,53 @@ public sealed class Cr3Tests {
       Assert.That(again.PreviewWidth, Is.EqualTo(file.PreviewWidth));
       Assert.That(again.ThumbnailHeight, Is.EqualTo(file.ThumbnailHeight));
     });
+  }
+
+  [Test]
+  public void TheRegistryWritesAnArbitraryPictureAsAPreviewOnlyCr3() {
+    var source = _Gradient(32, 24);
+    var bytes = FormatRegistry.Write(source, ImageFormat.Cr3);
+
+    Assert.That(bytes, Is.Not.Null, "CR3 must be registered as writable");
+    Assert.That(FormatRegistry.DetectFromBytes(bytes!), Is.EqualTo(ImageFormat.Cr3));
+
+    var file = Cr3Reader.FromBytes(bytes!);
+    var decoded = Cr3File.ToRawImage(file);
+    Assert.Multiple(() => {
+      Assert.That(file.PreviewJpeg, Is.Not.Null);
+      Assert.That(file.ThumbnailJpeg, Is.Null);
+      Assert.That(file.PreviewWidth, Is.EqualTo(source.Width));
+      Assert.That(file.PreviewHeight, Is.EqualTo(source.Height));
+      Assert.That(decoded.Width, Is.EqualTo(source.Width));
+      Assert.That(decoded.Height, Is.EqualTo(source.Height));
+      Assert.That(decoded.Format, Is.EqualTo(PixelFormat.Rgb24));
+    });
+  }
+
+  [Test]
+  public void DimensionsThatDoNotFitTheCr3PreviewHeaderAreRefused() {
+    var source = new RawImage {
+      Width = ushort.MaxValue + 1,
+      Height = 1,
+      Format = PixelFormat.Rgb24,
+      PixelData = new byte[(ushort.MaxValue + 1) * 3],
+    };
+
+    var failure = Assert.Throws<ArgumentOutOfRangeException>(() => Cr3File.FromRawImage(source));
+    Assert.That(failure!.ParamName, Is.EqualTo("Width"));
+  }
+
+  [Test]
+  public void TheLowLevelWriterDoesNotSilentlyTruncatePreviewDimensions() {
+    var source = _Read();
+    var file = new Cr3File {
+      PreviewJpeg = source.PreviewJpeg,
+      PreviewWidth = ushort.MaxValue + 1,
+      PreviewHeight = 1,
+    };
+
+    var failure = Assert.Throws<ArgumentOutOfRangeException>(() => Cr3Writer.ToBytes(file));
+    Assert.That(failure!.ParamName, Is.EqualTo(nameof(Cr3File.PreviewWidth)));
   }
 
   [Test]
