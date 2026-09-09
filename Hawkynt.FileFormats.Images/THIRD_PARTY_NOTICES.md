@@ -100,3 +100,11 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 Sources:
 - https://github.com/SharpAstro/Codecs
 - https://github.com/4creators/jxrlib
+
+## DjVu ZP arithmetic coder
+
+`Formats/DjVu/Codec/ZpDecoder.cs` and `ZpEncoder.cs` are managed adaptations of the MIT-licensed clean-room `djvu-zp` crate from `matyushkin/djvu-rs`, pinned at commit `ae9b8434c077f6ecd65cec93f5ce8e167ddefa96`. The format-defined probability/state tables are interoperability constants from the public DjVu v3 material. DjVuLibre is used only as a behavioral oracle, not as an implementation source.
+
+The pinned MIT license is reproduced verbatim in `Formats/DjVu/Codec/DJVU_RS_LICENSE`; implementation and specification provenance is recorded in `Formats/DjVu/Codec/UPSTREAM.md`.
+
+Source: https://github.com/matyushkin/djvu-rs/tree/ae9b8434c077f6ecd65cec93f5ce8e167ddefa96/crates/djvu-zp
