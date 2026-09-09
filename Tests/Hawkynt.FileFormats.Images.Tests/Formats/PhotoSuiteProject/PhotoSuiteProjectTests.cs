@@ -1,5 +1,7 @@
 using System;
+using System.Buffers.Binary;
 using System.IO;
+using System.Text;
 using FileFormat.Core;
 using FileFormat.PhotoSuiteProject;
 using FileFormat.Png;
@@ -20,6 +22,7 @@ public sealed class PhotoSuiteProjectTests {
 
   private const int _WIDTH = 5;
   private const int _HEIGHT = 4;
+  private const uint _END_OF_CHAIN = 0xFFFFFFFE;
 
   private static byte[] _Png(int width = _WIDTH, int height = _HEIGHT) {
     var pixels = new byte[width * height * 3];
@@ -42,6 +45,19 @@ public sealed class PhotoSuiteProjectTests {
     PhotoSuiteProjectFile.Signature.CopyTo(data);
     png.CopyTo(data, PhotoSuiteProjectFile.ScanStart + gap);
     return data;
+  }
+
+  private static RawImage _NoiseImage(int width, int height) {
+    var pixels = new byte[width * height * 3];
+    var state = 0xA5C31E27u;
+    for (var i = 0; i < pixels.Length; ++i) {
+      state ^= state << 13;
+      state ^= state >> 17;
+      state ^= state << 5;
+      pixels[i] = (byte)(state >> 24);
+    }
+
+    return new() { Width = width, Height = height, Format = PixelFormat.Rgb24, PixelData = pixels };
   }
 
   [Test]
@@ -97,6 +113,69 @@ public sealed class PhotoSuiteProjectTests {
     Assert.Multiple(() => {
       Assert.That(image.Format, Is.EqualTo(PixelFormat.Rgb24));
       Assert.That(image.PixelData, Is.EqualTo(expected.PixelData));
+    });
+  }
+
+  [Test]
+  [Category("Integration")]
+  public void Writer_SmallPictureUsesMiniStreamAndRoundTripsExactly() {
+    var expected = new RawImage {
+      Width = _WIDTH,
+      Height = _HEIGHT,
+      Format = PixelFormat.Rgb24,
+      PixelData = PhotoSuiteProjectFile.ToRawImage(PhotoSuiteProjectReader.FromBytes(_Build())).PixelData,
+    };
+
+    var data = PhotoSuiteProjectWriter.ToBytes(PhotoSuiteProjectFile.FromRawImage(expected));
+    var actual = PhotoSuiteProjectFile.ToRawImage(PhotoSuiteProjectReader.FromBytes(data));
+
+    Assert.Multiple(() => {
+      Assert.That(data.AsSpan(0, 8).ToArray(), Is.EqualTo(PhotoSuiteProjectFile.Signature.ToArray()));
+      Assert.That(BinaryPrimitives.ReadUInt16LittleEndian(data.AsSpan(26, 2)), Is.EqualTo(3));
+      Assert.That(BinaryPrimitives.ReadUInt16LittleEndian(data.AsSpan(30, 2)), Is.EqualTo(9));
+      Assert.That(BinaryPrimitives.ReadUInt16LittleEndian(data.AsSpan(32, 2)), Is.EqualTo(6));
+      Assert.That(BinaryPrimitives.ReadUInt32LittleEndian(data.AsSpan(56, 4)), Is.EqualTo(4096u));
+      Assert.That(BinaryPrimitives.ReadUInt32LittleEndian(data.AsSpan(60, 4)), Is.Not.EqualTo(_END_OF_CHAIN));
+      Assert.That(BinaryPrimitives.ReadUInt32LittleEndian(data.AsSpan(64, 4)), Is.GreaterThan(0u));
+      Assert.That(actual.PixelData, Is.EqualTo(expected.PixelData));
+    });
+  }
+
+  [Test]
+  [Category("Integration")]
+  public void Writer_LargePictureUsesNormalFatAndRoundTripsExactly() {
+    var expected = _NoiseImage(96, 96);
+
+    var data = PhotoSuiteProjectWriter.ToBytes(PhotoSuiteProjectFile.FromRawImage(expected));
+    var actual = PhotoSuiteProjectFile.ToRawImage(PhotoSuiteProjectReader.FromBytes(data));
+    var directorySector = BinaryPrimitives.ReadUInt32LittleEndian(data.AsSpan(48, 4));
+    var directoryOffset = checked((int)(directorySector + 1) * 512);
+    var imageEntry = data.AsSpan(directoryOffset + 128, 128);
+    var nameLength = BinaryPrimitives.ReadUInt16LittleEndian(imageEntry.Slice(64, 2));
+    var name = Encoding.Unicode.GetString(imageEntry[..(nameLength - 2)]);
+
+    Assert.Multiple(() => {
+      Assert.That(BinaryPrimitives.ReadUInt32LittleEndian(data.AsSpan(60, 4)), Is.EqualTo(_END_OF_CHAIN));
+      Assert.That(BinaryPrimitives.ReadUInt32LittleEndian(data.AsSpan(64, 4)), Is.Zero);
+      Assert.That(name, Is.EqualTo("Image"));
+      Assert.That(imageEntry[66], Is.EqualTo(2));
+      Assert.That(BinaryPrimitives.ReadUInt64LittleEndian(imageEntry.Slice(120, 8)), Is.GreaterThanOrEqualTo(4096ul));
+      Assert.That(actual.PixelData, Is.EqualTo(expected.PixelData));
+    });
+  }
+
+  [Test]
+  [Category("Integration")]
+  public void Writer_MultiFatProjectStillRoundTripsExactly() {
+    var expected = _NoiseImage(192, 192);
+
+    var data = PhotoSuiteProjectWriter.ToBytes(PhotoSuiteProjectFile.FromRawImage(expected));
+    var actual = PhotoSuiteProjectFile.ToRawImage(PhotoSuiteProjectReader.FromBytes(data));
+
+    Assert.Multiple(() => {
+      Assert.That(BinaryPrimitives.ReadUInt32LittleEndian(data.AsSpan(44, 4)), Is.GreaterThan(1u));
+      Assert.That(data.Length % 512, Is.Zero);
+      Assert.That(actual.PixelData, Is.EqualTo(expected.PixelData));
     });
   }
 }

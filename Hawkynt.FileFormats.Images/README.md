@@ -654,7 +654,7 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | PhotoPaint | `.cpt` | ✅ | ✅ | — | — | — |
 | PhotoParade | `.php` | ✅ | ✅ | — | ✅ | — |
 | PhotoStudio | `.psf` | ✅ | ✅ | — | — | — |
-| PhotoSuiteProject | `.pzp` | ✅ | — | — | — | — |
+| PhotoSuiteProject | `.pzp` | ✅ | ✅ | — | — | — |
 | Pi | `.pi` | ✅ | ✅ | — | — | — |
 | Pic2 | `.p2` | ✅ | ✅ | — | — | — |
 | Picasso | `.pic0` | ✅ | ✅ | — | — | — |
