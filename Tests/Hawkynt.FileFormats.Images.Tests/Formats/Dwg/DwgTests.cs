@@ -1,4 +1,5 @@
 using System;
+using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
@@ -10,6 +11,18 @@ namespace FileFormat.Dwg.Tests;
 
 [TestFixture]
 public sealed class DwgTests {
+
+  private static RawImage _Image(int width, int height) {
+    var pixels = new byte[width * height * 4];
+    for (var i = 0; i < pixels.Length; i += 4) {
+      pixels[i] = (byte)(i * 11);
+      pixels[i + 1] = (byte)(255 - i * 7);
+      pixels[i + 2] = (byte)(i * 3);
+      pixels[i + 3] = (byte)(64 + i % 192);
+    }
+
+    return new RawImage { Width = width, Height = height, Format = PixelFormat.Rgba32, PixelData = pixels };
+  }
 
   private static byte[] _Png(int width, int height) {
     var pixels = new byte[width * height * 3];
@@ -134,6 +147,49 @@ public sealed class DwgTests {
     var without = DwgFile.ToRawImage(DwgReader.FromBytes(_Drawing(_Png(7, 5), withTitle: false)));
 
     Assert.That((withTitle.Width, withTitle.Height), Is.EqualTo((without.Width, without.Height)));
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void ToBytes_WritesR2000WithALosslessPngPreview() {
+    var source = _Image(23, 11);
+    var bytes = DwgWriter.ToBytes(DwgFile.FromRawImage(source));
+    var file = DwgReader.FromBytes(bytes);
+    var actual = DwgFile.ToRawImage(file).EnsureFormat(PixelFormat.Rgba32);
+
+    Assert.Multiple(() => {
+      Assert.That(Encoding.ASCII.GetString(bytes, 0, 6), Is.EqualTo("AC1015"));
+      Assert.That(file.Version, Is.EqualTo("AC1015"));
+      Assert.That(file.ThumbnailType, Is.EqualTo(DwgFile.TypePng));
+      Assert.That((actual.Width, actual.Height), Is.EqualTo((source.Width, source.Height)));
+      Assert.That(actual.PixelData, Is.EqualTo(source.PixelData));
+    });
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void ToBytes_WritesR2000SectionDirectoryAndAbsolutePreviewSeeker() {
+    var bytes = DwgWriter.ToBytes(DwgFile.FromRawImage(_Image(17, 9)));
+    var recordCount = BinaryPrimitives.ReadInt32LittleEndian(bytes.AsSpan(0x15));
+    var first = 0x19;
+    var second = first + 9;
+    var classesAt = BinaryPrimitives.ReadInt32LittleEndian(bytes.AsSpan(first + 1));
+    var classesLength = BinaryPrimitives.ReadInt32LittleEndian(bytes.AsSpan(first + 5));
+    var handlesAt = BinaryPrimitives.ReadInt32LittleEndian(bytes.AsSpan(second + 1));
+    var handlesLength = BinaryPrimitives.ReadInt32LittleEndian(bytes.AsSpan(second + 5));
+    var previewAt = BinaryPrimitives.ReadInt32LittleEndian(bytes.AsSpan(DwgFile.ImageSeekerOffset));
+
+    Assert.Multiple(() => {
+      Assert.That(recordCount, Is.EqualTo(2));
+      Assert.That(bytes[first], Is.EqualTo(1), "record 1 is AcDb:Classes");
+      Assert.That(bytes[second], Is.EqualTo(2), "record 2 is AcDb:Handles");
+      Assert.That(classesAt, Is.GreaterThan(0x15));
+      Assert.That(classesLength, Is.GreaterThan(0));
+      Assert.That(handlesAt, Is.GreaterThanOrEqualTo(classesAt + classesLength));
+      Assert.That(handlesLength, Is.EqualTo(8), "empty handle block plus terminator");
+      Assert.That(previewAt, Is.GreaterThanOrEqualTo(handlesAt + handlesLength));
+      Assert.That(bytes.AsSpan(previewAt, DwgFile.ImageSentinel.Length).SequenceEqual(DwgFile.ImageSentinel), Is.True);
+    });
   }
 
   [Test]
