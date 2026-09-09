@@ -238,6 +238,10 @@ public sealed class RecoilConformanceTests {
     new(ImageFormat.EmcEditor, "EMC-editor", 296, 192, ".emc"),
     new(ImageFormat.HiresFliCrest, "Hires FLI Designer", 296, 112, ".hfc"),
     new(ImageFormat.HiresManager, "Hires Manager", 296, 192, ".him"),
+    // These two fill the left of the row instead of giving it up — FLI Profi with sprites, Hires
+    // Interlace by not being FLI at all — so both are the whole 320 across.
+    new(ImageFormat.FliProfi, "FLI Profi", 320, 200, ".fpr"),
+    new(ImageFormat.HiresInterlaceFeniks, "Hires Interlace", 320, 200, ".hlf"),
   ];
 
   [Test]

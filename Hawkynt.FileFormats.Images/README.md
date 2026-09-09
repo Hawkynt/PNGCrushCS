@@ -345,7 +345,7 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | FliGraph | `.flg`, `.bml`, `.fli` | ✅ | ✅ | — | — | — | recoil2png |
 | Flimatic | `.flm` | ✅ | ✅ | — | — | — | recoil2png |
 | Flip64 | `.fbi` | ✅ | ✅ | — | — | — | none |
-| FliProfi | `.fpr` | ✅ | ✅ | — | — | — | none |
+| FliProfi | `.fpr` | ✅ | ✅ | — | — | — | recoil2png |
 | FloorDesigner | `.fge` | ✅ | ✅ | — | — | — | recoil2png |
 | FmTowns | `.fmt` | ✅ | ✅ | — | — | — | none |
 | FontasyGrafik | `.bsg` | ✅ | ✅ | — | — | — | none |
@@ -418,7 +418,7 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | HiresC64 | `.hir`, `.hbm`, `.hpi` | ✅ | ✅ | — | — | — | recoil2png |
 | HiResEditor | `.het`, `.rph` | ✅ | ✅ | — | — | — | recoil2png |
 | HiresFliCrest | `.hfc`, `.hfd` | ✅ | ✅ | — | — | — | recoil2png |
-| HiresInterlaceFeniks | `.hlf`, `.hie` | ✅ | ✅ | — | — | — | none |
+| HiresInterlaceFeniks | `.hlf`, `.hie` | ✅ | ✅ | — | — | — | recoil2png |
 | Hireslace | `.hle` | ✅ | ✅ | — | — | — | recoil2png |
 | HiresManager | `.him` | ✅ | ✅ | — | — | — | recoil2png |
 | HomeworldLif | `.lif` | ✅ | ✅ | — | — | — | none |
