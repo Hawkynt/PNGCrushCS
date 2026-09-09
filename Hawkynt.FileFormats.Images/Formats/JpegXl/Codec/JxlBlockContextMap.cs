@@ -24,7 +24,7 @@ namespace FileFormat.JpegXl.Codec;
 ///
 /// <para>The 13 "orders" follow libjxl <c>kStrategyOrder</c>: each AC-strategy
 /// type is mapped to one of 13 size classes (DCT8 = 0, DCT8x16/16x8 = 4, etc.).
-/// See <see cref="_StrategyOrder"/>.</para>
+/// See <see cref="StrategyOrder"/>.</para>
 /// </summary>
 internal sealed class JxlBlockContextMap {
 
@@ -45,20 +45,21 @@ internal sealed class JxlBlockContextMap {
     7, 8, 9, 9, 10, 11, 12, 13, 14, 14, 14, 14, 14,
   };
 
-  /// <summary>libjxl <c>kStrategyOrder</c> mapping AcStrategyType (0..26) to
-  /// one of the 13 "orders" (size classes). Derived from
-  /// <c>lib/jxl/coeff_order.cc</c>:
-  /// <code>
-  /// constexpr uint8_t kStrategyOrder[] = {
-  ///   0, 0, 1, 1, 2, 3, 4, 4, 5, 5, 6, 6, 1, 1,
-  ///   1, 1, 1, 1, 7, 8, 8, 9, 10, 10, 11, 12, 12,
-  /// };
-  /// </code>
+  /// <summary>
+  /// libjxl <c>kStrategyOrder</c> (<c>lib/jxl/coeff_order.h</c>), mapping an
+  /// AC-strategy type (0..26) to one of the 13 size classes.
   /// </summary>
-  internal static readonly byte[] StrategyOrder = new byte[] {
-    0, 0, 1, 1, 2, 3, 4, 4, 5, 5, 6, 6, 1, 1,
-    1, 1, 1, 1, 7, 8, 8, 9, 10, 10, 11, 12, 12,
-  };
+  /// <remarks>
+  /// The one copy of it, because there used to be two and they did not agree:
+  /// this class kept its own, and its second entry — the shape libjxl calls
+  /// <c>IDENTITY</c> and this decoder calls Hornuss — said 0 where the table
+  /// says 1. Every entropy read for such a block then came from the histogram
+  /// of a plain 8x8, and the arithmetic decoder parted company with the encoder
+  /// from that block to the end of the group. It showed as a refusal in most
+  /// files and as a wrong picture in the ones where the count happened to come
+  /// out even, and it was invisible in every file that had no such block.
+  /// </remarks>
+  internal static byte[] StrategyOrder => JxlCoeffOrderDecoder.StrategyOrder;
 
   private readonly byte[] _ctxMap;
   private readonly int[][] _dcThresholds; // [channel][threshold_index]

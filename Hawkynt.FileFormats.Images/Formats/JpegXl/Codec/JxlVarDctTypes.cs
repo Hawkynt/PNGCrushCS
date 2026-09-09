@@ -115,4 +115,17 @@ internal sealed class JxlVarDctImage {
   public required int Height { get; init; }
   /// <summary>Per-channel float pixel data, length = Width * Height.</summary>
   public required float[][] Channels { get; init; } // [channel][y * Width + x]
+
+  /// <summary>
+  /// The frame's extra channels — an alpha plane among them — as whole samples
+  /// at the frame's own size, or empty when the picture states none.
+  /// </summary>
+  /// <remarks>
+  /// These are not part of the colour transform: they sit beside the three XYB
+  /// planes in the frame's global modular stream and come out of it unchanged.
+  /// A still picture never needed them, because what it hands back is only
+  /// colour; a frame drawn over another does, because the alpha it blends by is
+  /// one of them.
+  /// </remarks>
+  public JxlChannel[] ExtraChannels { get; init; } = [];
 }

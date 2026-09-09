@@ -50,6 +50,13 @@
       <Link>Fixtures\%(Filename)%(Extension)</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+    <!-- djxl's decode again, where the picture carries an alpha plane and a .ppm cannot hold it.
+         A grey picture is a third the size this way too, which is what makes an animation's every
+         moment affordable to keep. -->
+    <None Include="Formats\JpegXl\Fixtures\*.pam">
+      <Link>Fixtures\%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
     <!-- The blue-noise pattern libjxl adds to every eight-bit sample it writes. Comparing a lossy
          decode against one of those .ppm files means nothing without it. -->
     <None Include="Formats\JpegXl\Fixtures\*.txt">
