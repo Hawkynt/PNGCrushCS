@@ -24,8 +24,9 @@ namespace FileFormat.EmbeddedDib;
 /// entry, accounts for 13 of the 181 colours the tool draws. Whatever supplies the rest is not in
 /// the file, so it is refused rather than drawn in the wrong colours.
 /// <para/>
-/// It does not write. What it read was a preview inside somebody else's file, and emitting one alone
-/// would produce something no drawing program would open.
+/// It is not registered as a whole-file writer. What it read was a preview inside somebody else's
+/// file, and emitting one alone would produce something no drawing program would open. Container
+/// writers can use <see cref="EmbeddedDibWriter"/> to serialize the packed DIB payload they embed.
 /// </remarks>
 public readonly record struct EmbeddedDibFile
   : IImageFormatReader<EmbeddedDibFile>, IImageToRawImage<EmbeddedDibFile> {
