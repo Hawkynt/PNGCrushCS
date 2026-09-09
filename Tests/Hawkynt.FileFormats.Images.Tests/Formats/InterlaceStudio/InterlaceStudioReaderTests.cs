@@ -1,7 +1,6 @@
 using System;
 using System.IO;
 using FileFormat.Core;
-using FileFormat.InterlaceStudio;
 
 namespace FileFormat.InterlaceStudio.Tests;
 
@@ -10,25 +9,31 @@ namespace FileFormat.InterlaceStudio.Tests;
 /// </summary>
 /// <remarks>
 /// These used to build a Commodore 64 screen — bitmap, video matrix and colour memory twice over,
-/// 19003 bytes — and assert it came back. Interlace Studio is an Atari program. Every sample is
-/// 17184 bytes and all were refused, and the giveaway was not the length but the colours: of the
-/// seven the reference tool draws, two are in the Commodore's sixteen and all seven are in the
-/// Atari's, so no arrangement of a C64 screen could ever have matched.
+/// 19003 bytes — and assert it came back; then a pair of Atari screens of 16208 with a grey ramp
+/// stood in for the colours. Every sample is 17184, and the last 800 bytes are the reason: four
+/// tables of colour registers, one entry to a raster line, which is what the picture is coloured by.
 /// </remarks>
 [TestFixture]
 public sealed class InterlaceStudioReaderTests {
 
-  /// <summary>Builds a file whose two frames show different levels, so the blend is exercised.</summary>
+  /// <summary>Builds a file whose two frames show different registers, so the blend is exercised.</summary>
   private static byte[] _BuildValidFile() {
-    var data = new byte[InterlaceStudioFile.MinimumFileSize];
+    var data = new byte[InterlaceStudioFile.FileSize];
 
-    // Four bytes that look like colour registers, as every sample has.
     data[0] = 0x11;
     data[1] = 0x35;
 
-    // First frame: patterns 0,1,2,3 across the first four pixels. Second: all pattern 3.
+    // First frame: patterns 0,1,2,3 across the first four stored pixels. Second: all pattern 3.
     data[InterlaceStudioFile.FirstFrameOffset] = 0b00_01_10_11;
     data[InterlaceStudioFile.SecondFrameOffset] = 0b11_11_11_11;
+
+    // Background black, then three playfield registers a raster line apart from each other.
+    for (var y = 0; y < InterlaceStudioFile.RegisterTableSize; ++y) {
+      data[InterlaceStudioFile.RegistersOffset + y] = 0x00;
+      data[InterlaceStudioFile.RegistersOffset + InterlaceStudioFile.RegisterTableSize + y] = 0x24;
+      data[InterlaceStudioFile.RegistersOffset + 2 * InterlaceStudioFile.RegisterTableSize + y] = 0x88;
+      data[InterlaceStudioFile.RegistersOffset + 3 * InterlaceStudioFile.RegisterTableSize + y] = 0x0E;
+    }
 
     return data;
   }
@@ -53,14 +58,18 @@ public sealed class InterlaceStudioReaderTests {
 
   [Test]
   [Category("Unit")]
-  public void FromBytes_TooSmall_ThrowsInvalidDataException()
-    => Assert.Throws<InvalidDataException>(() => InterlaceStudioReader.FromBytes(new byte[16207]));
+  public void TheLengthWithoutTheRegisterTables_IsNoLongerWhatItWants()
+    => Assert.Throws<InvalidDataException>(() => InterlaceStudioReader.FromBytes(new byte[16208]));
 
   [Test]
   [Category("Unit")]
-  public void MinimumFileSize_FitsWhatEverySampleIs() {
-    // Sixteen of header, a frame taking a whole page, and a second frame: 16 + 8192 + 8000.
-    Assert.That(InterlaceStudioFile.MinimumFileSize, Is.EqualTo(16208));
+  public void ThePartsAreWhereTheMachineAddressesThem() {
+    Assert.Multiple(() => {
+      Assert.That(InterlaceStudioFile.FileSize, Is.EqualTo(17184));
+      Assert.That(InterlaceStudioFile.FirstFrameOffset, Is.EqualTo(16));
+      Assert.That(InterlaceStudioFile.SecondFrameOffset, Is.EqualTo(8208));
+      Assert.That(InterlaceStudioFile.RegistersOffset, Is.EqualTo(16384));
+    });
   }
 
   [Test]
@@ -76,11 +85,11 @@ public sealed class InterlaceStudioReaderTests {
 
   [Test]
   [Category("Unit")]
-  public void ToRawImage_IsTheStoredSize() {
+  public void ToRawImage_IsTheDisplayedSize() {
     var picture = InterlaceStudioFile.ToRawImage(InterlaceStudioReader.FromBytes(_BuildValidFile()));
 
     Assert.Multiple(() => {
-      Assert.That(picture.Width, Is.EqualTo(160));
+      Assert.That(picture.Width, Is.EqualTo(320));
       Assert.That(picture.Height, Is.EqualTo(200));
     });
   }
@@ -88,28 +97,31 @@ public sealed class InterlaceStudioReaderTests {
   [Test]
   [Category("Unit")]
   public void ToRawImage_AveragesTheTwoFrames() {
-    // Four levels a frame, blending to the seven the picture shows. Frame two is at level three
-    // throughout, so the first four pixels average (0,3), (1,3), (2,3) and (3,3).
+    // A stored pixel is drawn two wide, so the first four are eight columns. Both frames show
+    // pattern 3 at the fourth, and there the average is that register itself rather than a blend.
     var picture = InterlaceStudioFile.ToRawImage(InterlaceStudioReader.FromBytes(_BuildValidFile()));
-    var rgb = picture.PixelData;
+    var thirdRegisterRed = Atari8BitGraphics.Palette[0x0E * 3];
 
     Assert.Multiple(() => {
-      Assert.That(rgb[0], Is.EqualTo(102), "levels 0 and 3");
-      Assert.That(rgb[3], Is.EqualTo(136), "levels 1 and 3");
-      Assert.That(rgb[6], Is.EqualTo(170), "levels 2 and 3");
-      Assert.That(rgb[9], Is.EqualTo(204), "levels 3 and 3");
+      Assert.That(picture.PixelData[6 * 3], Is.EqualTo(thirdRegisterRed));
+      Assert.That(picture.PixelData[0], Is.Not.EqualTo(picture.PixelData[6 * 3]));
     });
   }
 
   [Test]
   [Category("Unit")]
-  public void ToRawImage_IsGrey() {
-    var rgb = InterlaceStudioFile.ToRawImage(InterlaceStudioReader.FromBytes(_BuildValidFile())).PixelData;
+  public void ThePictureIsColouredByTheRegisters() {
+    // Change one register table and the picture changes with it, which is what says the tables are
+    // read at all — a grey ramp standing in for them cannot show this.
+    var data = _BuildValidFile();
+    var before = InterlaceStudioFile.ToRawImage(InterlaceStudioReader.FromBytes(data)).PixelData[6 * 3];
 
-    Assert.Multiple(() => {
-      Assert.That(rgb[0], Is.EqualTo(rgb[1]));
-      Assert.That(rgb[1], Is.EqualTo(rgb[2]));
-    });
+    for (var y = 0; y < InterlaceStudioFile.RegisterTableSize; ++y)
+      data[InterlaceStudioFile.RegistersOffset + 3 * InterlaceStudioFile.RegisterTableSize + y] = 0x34;
+
+    var after = InterlaceStudioFile.ToRawImage(InterlaceStudioReader.FromBytes(data)).PixelData[6 * 3];
+
+    Assert.That(after, Is.Not.EqualTo(before));
   }
 
   [Test]
@@ -123,7 +135,7 @@ public sealed class InterlaceStudioRoundTripTests {
 
   [Test]
   [Category("Integration")]
-  public void RoundTrip_BothFramesAndTheHeaderComeBack() {
+  public void RoundTrip_BothFramesTheHeaderAndTheRegistersComeBack() {
     var first = new byte[InterlaceStudioFile.FrameSize];
     var second = new byte[InterlaceStudioFile.FrameSize];
     for (var i = 0; i < first.Length; ++i) {
@@ -131,18 +143,26 @@ public sealed class InterlaceStudioRoundTripTests {
       second[i] = (byte)(i * 7 % 256);
     }
 
+    var registers = new byte[InterlaceStudioFile.RegisterTableCount * InterlaceStudioFile.RegisterTableSize];
+    for (var i = 0; i < registers.Length; ++i)
+      registers[i] = (byte)(i * 2 % 256);
+
     var original = new InterlaceStudioFile {
       Header = [0x11, 0x35, 0xF7, 0x0B, .. new byte[12]],
       FirstFrame = first,
       SecondFrame = second,
+      Registers = registers,
     };
 
-    var restored = InterlaceStudioReader.FromBytes(InterlaceStudioWriter.ToBytes(original));
+    var bytes = InterlaceStudioWriter.ToBytes(original);
+    var restored = InterlaceStudioReader.FromBytes(bytes);
 
     Assert.Multiple(() => {
+      Assert.That(bytes, Has.Length.EqualTo(InterlaceStudioFile.FileSize));
       Assert.That(restored.Header, Is.EqualTo(original.Header));
       Assert.That(restored.FirstFrame, Is.EqualTo(original.FirstFrame));
       Assert.That(restored.SecondFrame, Is.EqualTo(original.SecondFrame));
+      Assert.That(restored.Registers, Is.EqualTo(original.Registers));
     });
   }
 }

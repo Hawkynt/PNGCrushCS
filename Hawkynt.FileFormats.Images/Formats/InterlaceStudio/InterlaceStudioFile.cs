@@ -5,23 +5,20 @@ namespace FileFormat.InterlaceStudio;
 
 /// <summary>In-memory representation of an Interlace Studio picture for the Atari 8-bit.</summary>
 /// <remarks>
-/// This was modelled on the Commodore 64 — bitmap, video matrix and colour memory twice over, 19003
-/// bytes — and Interlace Studio is an Atari program. Every sample is 17184 bytes and all were
-/// refused. The giveaway was not the length but the colours: of the seven RECOIL draws, two are in
-/// the Commodore's sixteen and all seven are in the Atari's, so no arrangement of a C64 screen could
-/// ever have matched.
+/// Two ANTIC mode E screens shown one after the other fast enough that the eye adds them, which is
+/// how four colours a line become a good many more. What makes this one worth the name is that the
+/// four colour registers are reloaded on every raster line: the file carries four tables of 200
+/// entries, one for the background and one for each playfield register, and a line takes its four
+/// colours from the same position in each.
 /// <para/>
-/// A file is a sixteen-byte header and two Atari four-colour screens, the first taking a whole
-/// eight-kilobyte page for the 8000 bytes it uses. They are shown one after the other fast enough
-/// that the eye adds them, so a pixel is the average of what the two frames give it — four levels
-/// each, blending to the seven that appear.
+/// A file is always 17184 bytes: a sixteen-byte header, the first screen, the second a whole
+/// eight-kilobyte page after it rather than 8000 bytes, and the four register tables at 16384.
 /// <para/>
-/// The four levels are a grey ramp of nought, 68, 136 and 204, which is the Atari's first hue at
-/// four luminances. The header does hold four bytes that look like colour registers and they differ
-/// between samples, but the reference tool draws all three in that same ramp regardless, so they are
-/// not what it colours by. Nothing else here reads this format, so the ramp is what is matched and
-/// this is said rather than dressed up as a choice.
+/// This was modelled on the Commodore 64 first — bitmap, video matrix and colour memory twice over,
+/// 19003 bytes — and then as a pair of grey ramps of 16208, neither of which is the format nor its
+/// length. The registers are what it colours by, and they were not being written at all.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct InterlaceStudioFile
   : IImageFormatReader<InterlaceStudioFile>, IImageToRawImage<InterlaceStudioFile>,
     IImageFromRawImage<InterlaceStudioFile>, IImageFormatWriter<InterlaceStudioFile> {
@@ -31,119 +28,119 @@ public readonly record struct InterlaceStudioFile
   static InterlaceStudioFile IImageFormatReader<InterlaceStudioFile>.FromSpan(ReadOnlySpan<byte> data) => InterlaceStudioReader.FromSpan(data);
   static byte[] IImageFormatWriter<InterlaceStudioFile>.ToBytes(InterlaceStudioFile file) => InterlaceStudioWriter.ToBytes(file);
   static VideoMode[] IImageFormatMetadata<InterlaceStudioFile>.VideoModes => [
-    new("Interlace Studio", [(ImageWidth, ImageHeight)], [7])
+    new("Interlace Studio", [(ImageWidth, ImageHeight)])
   ];
 
-  /// <summary>Pixels across as stored; the reference tool shows each twice.</summary>
-  public const int ImageWidth = 160;
+  /// <summary>Pixels across: 160 stored, each drawn two wide.</summary>
+  public const int ImageWidth = 320;
 
   /// <summary>Rows.</summary>
   public const int ImageHeight = 200;
 
-  /// <summary>Bytes a row takes at two bits a pixel.</summary>
-  internal const int BytesPerRow = ImageWidth / 4;
+  /// <summary>Bytes a row takes at two bits a stored pixel.</summary>
+  internal const int BytesPerRow = Atari8BitGraphics.Gr15BytesPerRow;
 
-  /// <summary>The bytes one frame uses.</summary>
+  /// <summary>The bytes one screen uses.</summary>
   internal const int FrameSize = BytesPerRow * ImageHeight;
 
-  /// <summary>The address space the first frame occupies, being a whole page.</summary>
+  /// <summary>The address space the first screen occupies, being a whole page.</summary>
   internal const int FrameStride = 8192;
 
-  /// <summary>The header before the first frame.</summary>
+  /// <summary>The header before the first screen.</summary>
   internal const int HeaderSize = 16;
 
-  /// <summary>Where the first frame starts.</summary>
+  /// <summary>Where the first screen starts.</summary>
   internal const int FirstFrameOffset = HeaderSize;
 
   /// <summary>Where the second starts: a page after the first, not 8000 bytes after it.</summary>
   internal const int SecondFrameOffset = HeaderSize + FrameStride;
 
-  /// <summary>The least a file takes, the tail past the second frame being the same in every sample.</summary>
-  public const int MinimumFileSize = SecondFrameOffset + FrameSize;
+  /// <summary>Where the four register tables start.</summary>
+  internal const int RegistersOffset = 16384;
 
-  /// <summary>
-  /// The four levels a frame can show, as grey.
-  /// </summary>
-  /// <remarks>
-  /// The Atari's first hue at four luminances. Two frames of these average to the seven levels the
-  /// picture actually shows.
-  /// </remarks>
-  internal const int LevelStep = 68;
+  /// <summary>Entries one register table holds, one for each raster line.</summary>
+  internal const int RegisterTableSize = ImageHeight;
 
-  /// <summary>Always 160.</summary>
+  /// <summary>Register tables: the background and the three playfield registers, in that order.</summary>
+  internal const int RegisterTableCount = Atari8BitGraphics.Gr15RegisterCount;
+
+  /// <summary>The length of a whole Interlace Studio picture, which is also what identifies it.</summary>
+  public const int FileSize = RegistersOffset + RegisterTableCount * RegisterTableSize;
+
+  /// <summary>Always 320.</summary>
   public int Width => ImageWidth;
 
   /// <summary>Always 200.</summary>
   public int Height => ImageHeight;
 
-  /// <summary>The sixteen bytes before the picture, four of which look like colour registers.</summary>
+  /// <summary>The sixteen bytes before the picture.</summary>
   public byte[] Header { get; init; }
 
-  /// <summary>The first frame, two bits a pixel.</summary>
+  /// <summary>The first screen, two bits a stored pixel.</summary>
   public byte[] FirstFrame { get; init; }
 
-  /// <summary>The second frame.</summary>
+  /// <summary>The second screen.</summary>
   public byte[] SecondFrame { get; init; }
+
+  /// <summary>
+  /// The four register tables end to end: background, PF0, PF1 and PF2, 200 entries apiece.
+  /// </summary>
+  public byte[] Registers { get; init; }
 
   /// <summary>Converts this picture to a platform-independent <see cref="RawImage"/>.</summary>
   public static RawImage ToRawImage(InterlaceStudioFile file) {
     var first = file.FirstFrame ?? [];
     var second = file.SecondFrame ?? [];
-    var rgb = new byte[ImageWidth * ImageHeight * 3];
+    var registers = file.Registers ?? [];
+    var firstRgb = new byte[ImageWidth * ImageHeight * 3];
+    var secondRgb = new byte[ImageWidth * ImageHeight * 3];
+    Span<byte> line = stackalloc byte[RegisterTableCount];
 
-    for (var y = 0; y < ImageHeight; ++y)
-      for (var x = 0; x < ImageWidth; ++x) {
-        var shift = (3 - x % 4) * 2;
-        var a = (first[y * BytesPerRow + x / 4] >> shift) & 3;
-        var b = (second[y * BytesPerRow + x / 4] >> shift) & 3;
-
-        // The eye averages the two frames, which is what turns four levels into seven.
-        var level = (byte)((a * LevelStep + b * LevelStep) / 2);
-        var at = (y * ImageWidth + x) * 3;
-        rgb[at] = level;
-        rgb[at + 1] = level;
-        rgb[at + 2] = level;
+    for (var y = 0; y < ImageHeight; ++y) {
+      for (var register = 0; register < RegisterTableCount; ++register) {
+        var at = register * RegisterTableSize + y;
+        line[register] = at < registers.Length ? registers[at] : (byte)0;
       }
+
+      _Row(first, y, line).CopyTo(firstRgb.AsSpan(y * ImageWidth * 3));
+      _Row(second, y, line).CopyTo(secondRgb.AsSpan(y * ImageWidth * 3));
+    }
 
     return new() {
       Width = ImageWidth,
       Height = ImageHeight,
       Format = PixelFormat.Rgb24,
-      PixelData = rgb,
+      PixelData = FrameBlend.Average(firstRgb, secondRgb),
     };
   }
 
-  /// <summary>Encodes a picture as an Interlace Studio pair, scaling it to 160x200 first.</summary>
+  private static byte[] _Row(ReadOnlySpan<byte> frame, int y, ReadOnlySpan<byte> registers)
+    => Atari8BitGraphics.DecodeGr15Frame(frame, y * BytesPerRow, BytesPerRow, ImageWidth, 1, registers);
+
+  /// <summary>Encodes a picture as an Interlace Studio pair, scaling it to 320x200 first.</summary>
   /// <remarks>
-  /// Two frames of four levels average to seven, spaced half a step apart, so a grey is rounded to
-  /// one of those seven and then split into the two frames that make it — the halves differing by at
-  /// most one, which is what keeps both inside the four levels a frame can show.
-  /// <para/>
-  /// The sixteen-byte header holds what look like colour registers, but the reference tool draws
-  /// every sample in the same grey ramp regardless, so nothing is written into them.
+  /// One set of four registers for the whole picture, repeated down both tables, and both screens
+  /// written the same so their average is the screen itself. Choosing a different four on every
+  /// raster line and then two screens whose average is nearer the original is what the format is for
+  /// and is a problem of its own; this writes a correct file rather than a bad attempt at that one.
   /// </remarks>
   public static InterlaceStudioFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
 
-    var rgb = image.SampleTo(ImageWidth, ImageHeight).PixelData;
-    var first = new byte[FrameSize];
-    var second = new byte[FrameSize];
+    var scaled = image.SampleTo(ImageWidth, ImageHeight);
+    var bgra = PixelConverter.Convert(scaled, PixelFormat.Bgra32).PixelData;
+    var registers = Atari8BitGraphics.ChooseGr15Registers(bgra, ImageWidth * ImageHeight, RegisterTableCount);
+    var frame = Atari8BitGraphics.PackGr15Frame(scaled.PixelData, BytesPerRow, ImageWidth, ImageHeight, registers);
 
-    for (var y = 0; y < ImageHeight; ++y)
-    for (var x = 0; x < ImageWidth; ++x) {
-      var at = (y * ImageWidth + x) * 3;
-      var luminance = (rgb[at] * 77 + rgb[at + 1] * 151 + rgb[at + 2] * 28) >> 8;
+    var tables = new byte[RegisterTableCount * RegisterTableSize];
+    for (var register = 0; register < RegisterTableCount; ++register)
+      tables.AsSpan(register * RegisterTableSize, RegisterTableSize).Fill((byte)(registers[register] & 254));
 
-      // Seven levels half a step apart, so the step between them is half of a frame's own.
-      var level = Math.Min(6, (luminance + LevelStep / 4) / (LevelStep / 2));
-      var a = (level + 1) / 2;
-      var b = level / 2;
-
-      var shift = (3 - x % 4) * 2;
-      first[y * BytesPerRow + x / 4] |= (byte)(a << shift);
-      second[y * BytesPerRow + x / 4] |= (byte)(b << shift);
-    }
-
-    return new() { Header = new byte[HeaderSize], FirstFrame = first, SecondFrame = second };
+    return new() {
+      Header = new byte[HeaderSize],
+      FirstFrame = frame,
+      SecondFrame = (byte[])frame.Clone(),
+      Registers = tables,
+    };
   }
 }

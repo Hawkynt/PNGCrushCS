@@ -1,5 +1,7 @@
 using System;
+using System.Buffers.Binary;
 using System.IO;
+using FileFormat.Core;
 
 namespace FileFormat.FliEditor;
 
@@ -21,26 +23,25 @@ public static class FliEditorReader {
       stream.ReadExactly(data);
       return FromBytes(data);
     }
+
     using var ms = new MemoryStream();
     stream.CopyTo(ms);
     return FromBytes(ms.ToArray());
   }
 
   public static FliEditorFile FromSpan(ReadOnlySpan<byte> data) {
-
-    if (data.Length < FliEditorFile.LoadAddressSize + FliEditorFile.MinPayloadSize)
-      throw new InvalidDataException($"Data too small for a valid FLI Editor file (expected at least {FliEditorFile.LoadAddressSize + FliEditorFile.MinPayloadSize} bytes, got {data.Length}).");
-
-    var loadAddress = (ushort)(data[0] | (data[1] << 8));
-
-    var rawData = new byte[data.Length - FliEditorFile.LoadAddressSize];
-    data.Slice(FliEditorFile.LoadAddressSize, rawData.Length).CopyTo(rawData.AsSpan(0));
+    if (data.Length < FliEditorFile.PictureSize)
+      throw new InvalidDataException(
+        $"A FLI Editor picture takes {FliEditorFile.FileSize} bytes; this file is {data.Length}.");
 
     return new() {
-      LoadAddress = loadAddress,
-      RawData = rawData,
+      LoadAddress = BinaryPrimitives.ReadUInt16LittleEndian(data),
+      Backgrounds = data.Slice(FliEditorFile.BackgroundsOffset, FliEditorFile.FixedHeight).ToArray(),
+      ColorRam = data.Slice(FliEditorFile.ColorRamOffset, Commodore64Fli.ColorRamSize).ToArray(),
+      Matrices = data.Slice(FliEditorFile.MatricesOffset, Commodore64Fli.MatrixAreaSize).ToArray(),
+      BitmapData = data.Slice(FliEditorFile.BitmapOffset, Commodore64Fli.BitmapSize).ToArray(),
     };
-    }
+  }
 
   public static FliEditorFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

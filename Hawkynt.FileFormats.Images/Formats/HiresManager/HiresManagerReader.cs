@@ -1,9 +1,16 @@
 using System;
+using System.Buffers.Binary;
 using System.IO;
+using FileFormat.Core;
 
 namespace FileFormat.HiresManager;
 
-/// <summary>Reads Hires Manager by Cosmos (.him) files from bytes, streams, or file paths.</summary>
+/// <summary>Reads Hires Manager (.him) files from bytes, streams, or file paths.</summary>
+/// <remarks>
+/// The eighth video matrix runs into the end of the bank, so it is read for as far as the file goes
+/// rather than for a whole page. Only 960 of its thousand entries are ever asked for — 192 rows is
+/// twenty-four character rows — so the tail that is missing is address space and not picture.
+/// </remarks>
 public static class HiresManagerReader {
 
   public static HiresManagerFile FromFile(FileInfo file) {
@@ -21,26 +28,29 @@ public static class HiresManagerReader {
       stream.ReadExactly(data);
       return FromBytes(data);
     }
+
     using var ms = new MemoryStream();
     stream.CopyTo(ms);
     return FromBytes(ms.ToArray());
   }
 
   public static HiresManagerFile FromSpan(ReadOnlySpan<byte> data) {
+    if (data.Length < HiresManagerFile.FileSize)
+      throw new InvalidDataException(
+        $"A Hires Manager picture takes {HiresManagerFile.FileSize} bytes; this file is {data.Length}.");
 
-    if (data.Length < HiresManagerFile.LoadAddressSize + HiresManagerFile.MinPayloadSize)
-      throw new InvalidDataException($"Data too small for a valid Hires Manager file (expected at least {HiresManagerFile.LoadAddressSize + HiresManagerFile.MinPayloadSize} bytes, got {data.Length}).");
-
-    var loadAddress = (ushort)(data[0] | (data[1] << 8));
-
-    var rawData = new byte[data.Length - HiresManagerFile.LoadAddressSize];
-    data.Slice(HiresManagerFile.LoadAddressSize, rawData.Length).CopyTo(rawData.AsSpan(0));
+    var matrices = new byte[Commodore64Fli.MatrixAreaSize];
+    for (var line = 0; line < Commodore64Fli.MatrixCount; ++line) {
+      var at = HiresManagerFile.MatricesOffset + line * Commodore64Fli.MatrixStride;
+      data.Slice(at, HiresManagerFile.MatrixEntries).CopyTo(matrices.AsSpan(line * Commodore64Fli.MatrixStride));
+    }
 
     return new() {
-      LoadAddress = loadAddress,
-      RawData = rawData,
+      LoadAddress = BinaryPrimitives.ReadUInt16LittleEndian(data),
+      BitmapData = data.Slice(HiresManagerFile.BitmapOffset, HiresManagerFile.BitmapSize).ToArray(),
+      Matrices = matrices,
     };
-    }
+  }
 
   public static HiresManagerFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

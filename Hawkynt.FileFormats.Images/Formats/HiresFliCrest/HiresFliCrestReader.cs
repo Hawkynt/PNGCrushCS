@@ -1,15 +1,17 @@
 using System;
+using System.Buffers.Binary;
 using System.IO;
+using FileFormat.Core;
 
 namespace FileFormat.HiresFliCrest;
 
-/// <summary>Reads Hires FLI by Crest (.hfc) files from bytes, streams, or file paths.</summary>
+/// <summary>Reads Hires FLI Designer (.hfc, .hfd) files from bytes, streams, or file paths.</summary>
 public static class HiresFliCrestReader {
 
   public static HiresFliCrestFile FromFile(FileInfo file) {
     ArgumentNullException.ThrowIfNull(file);
     if (!file.Exists)
-      throw new FileNotFoundException("Hires FLI Crest file not found.", file.FullName);
+      throw new FileNotFoundException("Hires FLI file not found.", file.FullName);
 
     return FromBytes(File.ReadAllBytes(file.FullName));
   }
@@ -21,26 +23,23 @@ public static class HiresFliCrestReader {
       stream.ReadExactly(data);
       return FromBytes(data);
     }
+
     using var ms = new MemoryStream();
     stream.CopyTo(ms);
     return FromBytes(ms.ToArray());
   }
 
   public static HiresFliCrestFile FromSpan(ReadOnlySpan<byte> data) {
-
-    if (data.Length < HiresFliCrestFile.LoadAddressSize + HiresFliCrestFile.MinPayloadSize)
-      throw new InvalidDataException($"Data too small for a valid Hires FLI Crest file (expected at least {HiresFliCrestFile.LoadAddressSize + HiresFliCrestFile.MinPayloadSize} bytes, got {data.Length}).");
-
-    var loadAddress = (ushort)(data[0] | (data[1] << 8));
-
-    var rawData = new byte[data.Length - HiresFliCrestFile.LoadAddressSize];
-    data.Slice(HiresFliCrestFile.LoadAddressSize, rawData.Length).CopyTo(rawData.AsSpan(0));
+    if (data.Length < HiresFliCrestFile.FileSize)
+      throw new InvalidDataException(
+        $"A Hires FLI picture takes {HiresFliCrestFile.FileSize} bytes; this file is {data.Length}.");
 
     return new() {
-      LoadAddress = loadAddress,
-      RawData = rawData,
+      LoadAddress = BinaryPrimitives.ReadUInt16LittleEndian(data),
+      BitmapData = data.Slice(HiresFliCrestFile.BitmapOffset, HiresFliCrestFile.BitmapAreaSize).ToArray(),
+      Matrices = data.Slice(HiresFliCrestFile.MatricesOffset, Commodore64Fli.MatrixAreaSize).ToArray(),
     };
-    }
+  }
 
   public static HiresFliCrestFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

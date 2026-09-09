@@ -52,6 +52,8 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | AdTechFax | `.adt` | ✅ | ✅ | — | — | — | none |
 | AdvancedArtStudio | `.ocp`, `.mpi`, `.mpic` | ✅ | ✅ | — | — | — | recoil2png |
 | Afli | `.afl` | ✅ | ✅ | — | — | — | recoil2png, XnView |
+
+| Afli | `.afl` | ✅ | ✅ | — | — | — | recoil2png |
 | Ai | `.ai` | ✅ | ✅ | — | — | — | none |
 | AimGreyScale | `.ima` | ✅ | ✅ | — | — | — | XnView |
 | AirNav | `.anv` | ✅ | ✅ | — | — | — | XnView |
@@ -303,7 +305,7 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | ElectricImage | `.ei`, `.eidi` | ✅ | ✅ | — | ✅ | — | XnView |
 | Electronika | `.bk`, `.ekr` | ✅ | ✅ | — | — | — | none |
 | EmbeddedDib | `.zmf`, `.skf`, `.cad`, `.btn` | ✅ | — | — | — | — | — |
-| EmcEditor | `.emc` | ✅ | ✅ | — | — | — | none |
+| EmcEditor | `.emc` | ✅ | ✅ | — | — | — | recoil2png |
 | Emf | `.emf` | ✅ | ✅ | — | — | — | none |
 | Enterprise128 | `.ep`, `.elan` | ✅ | ✅ | — | — | — | none |
 | Envi | `.hdr` | ✅ | ✅ | — | — | — | none |
@@ -332,20 +334,23 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | Fff | `.fff` | ✅ | ✅ | — | — | — | ffmpeg |
 | Ffli | `.ffli`, `.ffl` | ✅ | ✅ | — | — | — | none |
 | FirstPublisher | `.art` | ✅ | ✅ | — | — | — | XnView |
+
+| Ffli | `.ffli`, `.ffl` | ✅ | ✅ | — | — | — | recoil2png |
+| FirstPublisher | `.art` | ✅ | ✅ | — | — | — | none |
 | Fits | `.fits`, `.fit`, `.fts` | ✅ | ✅ | — | — | — | ImageMagick |
 | FitsDocument | `.fits`, `.fit`, `.fts` | ✅ | ✅ | — | ✅ | — | ImageMagick |
 | Fl32 | `.fl32` | ✅ | ✅ | — | — | — | ImageMagick |
 | FlashImage | `.fi` | ✅ | ✅ | — | — | — | XnView |
 | Fli | `.fli`, `.flc` | ✅ | ✅ | — | ✅ | — | ffmpeg |
 | Fli64 | `.fli64` | ✅ | ✅ | — | — | — | none |
-| FliDesigner | `.fd2` | ✅ | ✅ | — | — | — | none |
-| FliDesigner2 | `.fd2` | ✅ | ✅ | — | — | — | none |
-| FliEditor | `.fed` | ✅ | ✅ | — | — | — | none |
+| FliDesigner | `.fd2` | ✅ | ✅ | — | — | — | recoil2png |
+| FliDesigner2 | `.fd2` | ✅ | ✅ | — | — | — | recoil2png |
+| FliEditor | `.fed` | ✅ | ✅ | — | — | — | recoil2png |
 | Flif | `.flif` | ✅ | ✅ | — | — | — | none |
 | FliGraph | `.flg`, `.bml`, `.fli` | ✅ | ✅ | — | — | — | recoil2png |
-| Flimatic | `.flm` | ✅ | ✅ | — | — | — | none |
+| Flimatic | `.flm` | ✅ | ✅ | — | — | — | recoil2png |
 | Flip64 | `.fbi` | ✅ | ✅ | — | — | — | none |
-| FliProfi | `.fpr` | ✅ | ✅ | — | — | — | none |
+| FliProfi | `.fpr` | ✅ | ✅ | — | — | — | recoil2png |
 | FloorDesigner | `.fge` | ✅ | ✅ | — | — | — | recoil2png |
 | FmTowns | `.fmt` | ✅ | ✅ | — | — | — | none |
 | FontasyGrafik | `.bsg` | ✅ | ✅ | — | — | — | none |
@@ -411,16 +416,16 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | HfImage | `.hf` | ✅ | ✅ | — | — | — | none |
 | HiEddi | `.hed` | ✅ | ✅ | — | — | — | recoil2png |
 | HighResAtari | `.hra` | ✅ | ✅ | — | — | — | none |
-| HighresMedium | `.hrm` | ✅ | ✅ | — | — | — | none |
+| HighresMedium | `.hrm` | ✅ | ✅ | — | — | — | recoil2png |
 | HighResST | `.hst`, `.hrs` | ✅ | ✅ | — | — | — | none |
 | HinterGrundBild | `.hgb` | ✅ | ✅ | — | — | — | none |
 | HiPicCreator | `.hpc`, `.aas` | ✅ | ✅ | — | — | — | recoil2png |
 | HiresC64 | `.hir`, `.hbm`, `.hpi` | ✅ | ✅ | — | — | — | recoil2png |
 | HiResEditor | `.het`, `.rph` | ✅ | ✅ | — | — | — | recoil2png |
-| HiresFliCrest | `.hfc`, `.hfd` | ✅ | ✅ | — | — | — | none |
-| HiresInterlaceFeniks | `.hlf`, `.hie` | ✅ | ✅ | — | — | — | none |
+| HiresFliCrest | `.hfc`, `.hfd` | ✅ | ✅ | — | — | — | recoil2png |
+| HiresInterlaceFeniks | `.hlf`, `.hie` | ✅ | ✅ | — | — | — | recoil2png |
 | Hireslace | `.hle` | ✅ | ✅ | — | — | — | recoil2png |
-| HiresManager | `.him` | ✅ | ✅ | — | — | — | none |
+| HiresManager | `.him` | ✅ | ✅ | — | — | — | recoil2png |
 | HomeworldLif | `.lif` | ✅ | ✅ | — | — | — | none |
 | Hp48Grob | `.grb`, `.gro` | ✅ | ✅ | — | — | — | recoil2png |
 | Hpgl | `.hpgl`, `.hgl`, `.hpg`, `.prn`, `.prt`, `.spl` | ✅ | ✅ | — | — | — | none |
@@ -470,6 +475,9 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | InterlaceLogoDesigner | `.ild` | ✅ | ✅ | — | — | — | recoil2png |
 | InterlaceStudio | `.ist` | ✅ | ✅ | — | — | — | none |
 | InterleafImage | `.iimg` | ✅ | ✅ | — | — | — | XnView |
+
+| InterlaceStudio | `.ist` | ✅ | ✅ | — | — | — | recoil2png |
+| InterleafImage | `.iimg` | ✅ | ✅ | — | — | — | none |
 | InterPainter | `.inp`, `.ing`, `.ins` | ✅ | ✅ | — | — | — | recoil2png |
 | InterPaintHi | `.iph`, `.hre` | ✅ | ✅ | — | — | — | recoil2png |
 | InterPaintMc | `.ipt`, `.lre` | ✅ | ✅ | — | — | — | recoil2png |
@@ -577,7 +585,7 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | MsxView | `.mvw`, `.msv` | ✅ | ✅ | — | — | — | none |
 | Mtv | `.mtv`, `.pic` | ✅ | ✅ | — | — | — | ImageMagick |
 | MuifliEditor | `.muf`, `.mui`, `.mup` | ✅ | ✅ | — | — | — | none |
-| MultiLaceEditor | `.mle` | ✅ | ✅ | — | — | — | none |
+| MultiLaceEditor | `.mle` | ✅ | ✅ | — | — | — | recoil2png |
 | MultiPainter | `.mpt`, `.mlt64` | ✅ | ✅ | — | — | — | none |
 | MultiPalettePicture | `.mpp` | ✅ | ✅ | — | — | — | none |
 | NcrImage | `.ncr` | ✅ | ✅ | — | — | — | XnView |
@@ -799,7 +807,7 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | SunIcon | `.icon`, `.pr` | ✅ | ✅ | — | — | — | XnView |
 | SunRaster | `.ras`, `.sun`, `.rast`, `.rs`, `.sr` | ✅ | ✅ | — | — | — | ImageMagick, ffmpeg |
 | SuperHires | `.shi` | ✅ | ✅ | — | — | — | none |
-| SuperHiresEditor | `.she` | ✅ | ✅ | — | — | — | none |
+| SuperHiresEditor | `.she` | ✅ | ✅ | — | — | — | recoil2png |
 | SuperHiresEditor1 | `.sh1` | ✅ | ✅ | — | — | — | recoil2png |
 | SuperHiresEditor2 | `.sh2` | ✅ | ✅ | — | — | — | recoil2png |
 | SuperHiresFli | `.shf` | ✅ | ✅ | — | — | — | recoil2png |

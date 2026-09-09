@@ -1,42 +1,34 @@
 using System;
+using System.Buffers.Binary;
 
 namespace FileFormat.SuperHiresEditor;
 
-/// <summary>Assembles Super Hires Editor (.she) file bytes from a SuperHiresEditorFile.</summary>
+/// <summary>Assembles Super Hires Editor (.she) logo bytes from a <see cref="SuperHiresEditorFile"/>.</summary>
 public static class SuperHiresEditorWriter {
 
   public static byte[] ToBytes(SuperHiresEditorFile file) {
-    ArgumentNullException.ThrowIfNull(file);
+    ArgumentNullException.ThrowIfNull(file.BitmapData);
+    ArgumentNullException.ThrowIfNull(file.ScreenData);
 
-    var totalSize = SuperHiresEditorFile.LoadAddressSize + SuperHiresEditorFile.MinPayloadSize + (file.TrailingData ?? []).Length;
-    var result = new byte[totalSize];
-    var offset = 0;
+    var result = new byte[SuperHiresEditorFile.FileSize];
+    BinaryPrimitives.WriteUInt16LittleEndian(result, file.LoadAddress);
 
-    // Load address (2 bytes, little-endian)
-    result[offset] = (byte)(file.LoadAddress & 0xFF);
-    result[offset + 1] = (byte)(file.LoadAddress >> 8);
-    offset += SuperHiresEditorFile.LoadAddressSize;
+    _Copy(file.BitmapData, result, SuperHiresEditorFile.BitmapOffset, SuperHiresEditorFile.BitmapSize);
+    _Copy(file.ScreenData, result, SuperHiresEditorFile.ScreenOffset, SuperHiresEditorFile.ScreenSize);
+    if (file.Sprites != null)
+      _Copy(file.Sprites, result, SuperHiresEditorFile.BackSpritesOffset, SuperHiresEditorFile.SpriteAreaSize);
 
-    // Bitmap 1 (8000 bytes)
-    file.Bitmap1.AsSpan(0, SuperHiresEditorFile.BitmapDataSize).CopyTo(result.AsSpan(offset));
-    offset += SuperHiresEditorFile.BitmapDataSize;
+    result[SuperHiresEditorFile.BackColorOffset] = file.BackSpriteColor;
+    result[SuperHiresEditorFile.FrontColorOffset] = file.FrontSpriteColor;
 
-    // Screen 1 (1000 bytes)
-    file.Screen1.AsSpan(0, SuperHiresEditorFile.ScreenDataSize).CopyTo(result.AsSpan(offset));
-    offset += SuperHiresEditorFile.ScreenDataSize;
-
-    // Bitmap 2 (8000 bytes)
-    file.Bitmap2.AsSpan(0, SuperHiresEditorFile.BitmapDataSize).CopyTo(result.AsSpan(offset));
-    offset += SuperHiresEditorFile.BitmapDataSize;
-
-    // Screen 2 (1000 bytes)
-    file.Screen2.AsSpan(0, SuperHiresEditorFile.ScreenDataSize).CopyTo(result.AsSpan(offset));
-    offset += SuperHiresEditorFile.ScreenDataSize;
-
-    // Trailing data
-    if ((file.TrailingData ?? []).Length > 0)
-      (file.TrailingData ?? []).AsSpan().CopyTo(result.AsSpan(offset));
+    if (file.Trailer != null)
+      _Copy(
+        file.Trailer, result, SuperHiresEditorFile.FrontColorOffset + 1,
+        SuperHiresEditorFile.FileSize - SuperHiresEditorFile.FrontColorOffset - 1);
 
     return result;
   }
+
+  private static void _Copy(byte[] source, byte[] destination, int at, int length)
+    => source.AsSpan(0, Math.Min(source.Length, length)).CopyTo(destination.AsSpan(at));
 }
