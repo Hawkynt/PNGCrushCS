@@ -228,6 +228,16 @@ public sealed class RecoilConformanceTests {
     new(ImageFormat.Commodore64Font, "C64 8x8 font", 256, 64, ".64c"),
     new(ImageFormat.PaintShop, "PaintShop", 640, 800, ".da4"),
     new(ImageFormat.HandyScanner, "Handy Scanner 2000 POSTERING", 840, 120, ".hs2"),
+    // The C64 FLI family. All of them are 296 across because the raster switch that makes FLI work
+    // cannot be ready before the first three character cells of a row are drawn.
+    new(ImageFormat.FliDesigner, "FLI Designer", 296, 200, ".fd2"),
+    new(ImageFormat.FliDesigner2, "FLI Designer (whole bank)", 296, 200, ".fd2"),
+    new(ImageFormat.FliEditor, "FLI Editor", 296, 200, ".fed"),
+    new(ImageFormat.Flimatic, "Flimatic", 296, 200, ".flm"),
+    new(ImageFormat.Ffli, "Flash FLI", 296, 200, ".ffl"),
+    new(ImageFormat.EmcEditor, "EMC-editor", 296, 192, ".emc"),
+    new(ImageFormat.HiresFliCrest, "Hires FLI Designer", 296, 112, ".hfc"),
+    new(ImageFormat.HiresManager, "Hires Manager", 296, 192, ".him"),
   ];
 
   [Test]

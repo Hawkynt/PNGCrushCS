@@ -1,15 +1,17 @@
 using System;
+using System.Buffers.Binary;
 using System.IO;
+using FileFormat.Core;
 
 namespace FileFormat.EmcEditor;
 
-/// <summary>Reads Commodore 64 EMC Editor (.emc) files from bytes, streams, or file paths.</summary>
+/// <summary>Reads EMC-editor (.emc) files from bytes, streams, or file paths.</summary>
 public static class EmcEditorReader {
 
   public static EmcEditorFile FromFile(FileInfo file) {
     ArgumentNullException.ThrowIfNull(file);
     if (!file.Exists)
-      throw new FileNotFoundException("EMC Editor file not found.", file.FullName);
+      throw new FileNotFoundException("EMC-editor file not found.", file.FullName);
 
     return FromBytes(File.ReadAllBytes(file.FullName));
   }
@@ -21,26 +23,25 @@ public static class EmcEditorReader {
       stream.ReadExactly(data);
       return FromBytes(data);
     }
+
     using var ms = new MemoryStream();
     stream.CopyTo(ms);
     return FromBytes(ms.ToArray());
   }
 
   public static EmcEditorFile FromSpan(ReadOnlySpan<byte> data) {
-
-    if (data.Length < EmcEditorFile.LoadAddressSize + EmcEditorFile.MinPayloadSize)
-      throw new InvalidDataException($"Data too small for a valid EMC Editor file (expected at least {EmcEditorFile.LoadAddressSize + EmcEditorFile.MinPayloadSize} bytes, got {data.Length}).");
-
-    var loadAddress = (ushort)(data[0] | (data[1] << 8));
-
-    var rawData = new byte[data.Length - EmcEditorFile.LoadAddressSize];
-    data.Slice(EmcEditorFile.LoadAddressSize, rawData.Length).CopyTo(rawData.AsSpan(0));
+    if (data.Length < EmcEditorFile.FileSize)
+      throw new InvalidDataException(
+        $"An EMC-editor picture takes {EmcEditorFile.FileSize} bytes; this file is {data.Length}.");
 
     return new() {
-      LoadAddress = loadAddress,
-      RawData = rawData,
+      LoadAddress = BinaryPrimitives.ReadUInt16LittleEndian(data),
+      Matrices = data.Slice(EmcEditorFile.MatricesOffset, Commodore64Fli.MatrixAreaSize).ToArray(),
+      BitmapData = data.Slice(EmcEditorFile.BitmapOffset, Commodore64Fli.BitmapSize).ToArray(),
+      ColorRam = data.Slice(EmcEditorFile.ColorRamOffset, Commodore64Fli.ColorRamSize).ToArray(),
+      Background = data[EmcEditorFile.BackgroundOffset],
     };
-    }
+  }
 
   public static EmcEditorFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

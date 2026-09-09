@@ -3,104 +3,98 @@ using FileFormat.Core;
 
 namespace FileFormat.HiresManager;
 
-/// <summary>In-memory representation of a C64 Hires Manager by Cosmos (.him) image.</summary>
-public readonly record struct HiresManagerFile : IImageFormatReader<HiresManagerFile>, IImageToRawImage<HiresManagerFile>, IImageFromRawImage<HiresManagerFile>, IImageFormatWriter<HiresManagerFile> {
+/// <summary>In-memory representation of a Hires Manager picture for the Commodore 64.</summary>
+/// <remarks>
+/// A high-resolution FLI screen of 192 rows, saved as the whole sixteen-kilobyte bank it lived in:
+/// the file is always 16385 bytes and the length is part of what identifies it. The bitmap sits 320
+/// bytes into the bank and the eight video matrices 8232 bytes in, a page apart because that is the
+/// granularity of the VIC-II's matrix pointer — the eighth of them running into the end of the bank,
+/// which it can do because 192 rows need only 960 of its thousand entries.
+/// <para/>
+/// The first four bytes are not picture. Two are the load address, which is always $4000, and the
+/// fourth says whether what follows is packed: $FF means it is not, and anything else is a pointer
+/// to the end of a run-length stream. A file that leaves it out is read as a packed one and refused.
+/// <para/>
+/// The old model had a 320 by 200 screen with the matrices packed a thousand bytes apart, which is
+/// neither the geometry nor the layout.
+/// </remarks>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
+public readonly record struct HiresManagerFile
+  : IImageFormatReader<HiresManagerFile>, IImageToRawImage<HiresManagerFile>,
+    IImageFromRawImage<HiresManagerFile>, IImageFormatWriter<HiresManagerFile> {
 
   static string IImageFormatMetadata<HiresManagerFile>.PrimaryExtension => ".him";
   static string[] IImageFormatMetadata<HiresManagerFile>.FileExtensions => [".him"];
   static HiresManagerFile IImageFormatReader<HiresManagerFile>.FromSpan(ReadOnlySpan<byte> data) => HiresManagerReader.FromSpan(data);
   static byte[] IImageFormatWriter<HiresManagerFile>.ToBytes(HiresManagerFile file) => HiresManagerWriter.ToBytes(file);
+  static VideoMode[] IImageFormatMetadata<HiresManagerFile>.VideoModes => [
+    new("Hires Manager", [(FixedWidth, FixedHeight)], [Commodore64Graphics.ColorCount])
+  ];
 
-  /// <summary>The fixed width of the image in pixels.</summary>
-  public const int FixedWidth = 320;
+  /// <summary>Pixels across the picture, the hardware being unable to colour the first 24 of a row.</summary>
+  public const int FixedWidth = Commodore64Fli.VisibleWidth;
 
-  /// <summary>The fixed height of the image in pixels.</summary>
-  public const int FixedHeight = 200;
+  /// <summary>Rows.</summary>
+  public const int FixedHeight = 192;
+
+  /// <summary>Character rows the picture takes.</summary>
+  internal const int CellRows = FixedHeight / Commodore64Graphics.CellHeight;
 
   /// <summary>Size of the load address in bytes.</summary>
   internal const int LoadAddressSize = 2;
 
-  /// <summary>Size of the bitmap data section in bytes.</summary>
-  internal const int BitmapDataSize = 8000;
+  /// <summary>Where the byte that says the picture is not packed sits.</summary>
+  internal const int PackingFlagOffset = 3;
 
-  /// <summary>Size of the screen RAM section in bytes.</summary>
-  internal const int ScreenRamSize = 1000;
+  /// <summary>What that byte says when the picture is stored as it is.</summary>
+  internal const byte NotPacked = 0xFF;
 
-  /// <summary>Minimum payload size in bytes (bitmap + screen).</summary>
-  internal const int MinPayloadSize = BitmapDataSize + ScreenRamSize;
+  /// <summary>Where the bitmap starts.</summary>
+  internal const int BitmapOffset = 322;
 
-  /// <summary>Image width, always 320.</summary>
+  /// <summary>Bytes the bitmap takes for the rows this format shows.</summary>
+  internal const int BitmapSize = CellRows * Commodore64Graphics.Columns * Commodore64Graphics.CellHeight;
+
+  /// <summary>Where the video matrices start.</summary>
+  internal const int MatricesOffset = 8234;
+
+  /// <summary>Entries one matrix needs for the rows this format shows.</summary>
+  internal const int MatrixEntries = CellRows * Commodore64Graphics.Columns;
+
+  /// <summary>The length of a whole Hires Manager picture, which is also what identifies it.</summary>
+  public const int FileSize = 16385;
+
+  /// <summary>Load address, which is fixed: the reference decoder turns down anything else.</summary>
+  internal const ushort FixedLoadAddress = 0x4000;
+
+  /// <summary>Image width, always 296.</summary>
   public int Width => FixedWidth;
 
-  /// <summary>Image height, always 200.</summary>
+  /// <summary>Image height, always 192.</summary>
   public int Height => FixedHeight;
 
-  /// <summary>C64 memory load address (2 bytes, little-endian).</summary>
+  /// <summary>C64 memory load address, always $4000.</summary>
   public ushort LoadAddress { get; init; }
 
-  /// <summary>Raw payload data (entire file content after load address).</summary>
-  public byte[] RawData { get; init; }
+  /// <summary>The bitmap, a cell at a time.</summary>
+  public byte[] BitmapData { get; init; }
 
-  /// <summary>Converts this Hires Manager image to a platform-independent <see cref="RawImage"/> in Rgb24 format.</summary>
-  public static RawImage ToRawImage(HiresManagerFile file) {
+  /// <summary>The eight video matrices, one after another, a whole page apiece.</summary>
+  public byte[] Matrices { get; init; }
 
-    const int width = FixedWidth;
-    const int height = FixedHeight;
-    var rgb = new byte[width * height * 3];
+  /// <summary>Converts this picture to a platform-independent <see cref="RawImage"/>.</summary>
+  public static RawImage ToRawImage(HiresManagerFile file)
+    => Commodore64Fli.DecodeHires(
+      file.BitmapData ?? [], file.Matrices ?? [], Commodore64Fli.MatrixStride, FixedHeight);
 
-    var hasScreen = file.RawData.Length >= BitmapDataSize + ScreenRamSize;
-
-    for (var y = 0; y < height; ++y)
-      for (var x = 0; x < width; ++x) {
-        var cellX = x / 8;
-        var cellY = y / 8;
-        var cellIndex = cellY * 40 + cellX;
-        var byteInCell = y % 8;
-        var bitmapOffset = cellIndex * 8 + byteInCell;
-        var bitmapByte = bitmapOffset < file.RawData.Length ? file.RawData[bitmapOffset] : (byte)0;
-        var bitPosition = 7 - (x % 8);
-        var bitValue = (bitmapByte >> bitPosition) & 1;
-
-        int colorIndex;
-        if (hasScreen) {
-          var screenByte = file.RawData[BitmapDataSize + cellIndex];
-          colorIndex = bitValue == 1
-            ? (screenByte >> 4) & 0x0F
-            : screenByte & 0x0F;
-        } else
-          colorIndex = bitValue == 1 ? 1 : 0;
-
-        var color = Commodore64Graphics.HexColors[colorIndex];
-        var offset = (y * width + x) * 3;
-        rgb[offset] = (byte)((color >> 16) & 0xFF);
-        rgb[offset + 1] = (byte)((color >> 8) & 0xFF);
-        rgb[offset + 2] = (byte)(color & 0xFF);
-      }
-
-    return new() {
-      Width = width,
-      Height = height,
-      Format = PixelFormat.Rgb24,
-      PixelData = rgb,
-    };
-  }
-
-  /// <summary>Builds a Hires Manager screen, choosing two of the machine's colours per character cell.</summary>
-  /// <remarks>
-  /// The screen is 320 by 200 and nothing in the file says otherwise, so a picture of another size
-  /// is brought to that one. The payload is the bitmap followed by the video matrix, which is what
-  /// a real one holds behind its <c>$4000</c> load address.
-  /// </remarks>
+  /// <summary>Encodes a picture as a Hires Manager screen, scaling it to 296x192 first.</summary>
   public static HiresManagerFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
 
-    var rgb = image.SampleTo(FixedWidth, FixedHeight);
-    var payload = new byte[MinPayloadSize];
-    Commodore64Graphics.EncodeHires(
-      rgb.PixelData, FixedWidth, FixedHeight,
-      payload.AsSpan(0, BitmapDataSize), payload.AsSpan(BitmapDataSize, ScreenRamSize));
+    var bitmap = new byte[BitmapSize];
+    var matrices = new byte[Commodore64Fli.MatrixAreaSize];
+    Commodore64Fli.EncodeHires(image, FixedHeight, 0, bitmap, matrices, Commodore64Fli.MatrixStride);
 
-    return new() { LoadAddress = 0x4000, RawData = payload };
+    return new() { LoadAddress = FixedLoadAddress, BitmapData = bitmap, Matrices = matrices };
   }
-
 }

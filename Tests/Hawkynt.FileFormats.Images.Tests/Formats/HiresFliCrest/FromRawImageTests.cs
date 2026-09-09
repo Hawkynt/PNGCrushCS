@@ -37,12 +37,12 @@ public sealed class HiresFliCrestFromRawImageTests {
   [Test]
   [Category("Unit")]
   public void EncodeThenDecode_ReproducesAPictureTheFormatCanHold() {
-    var source = _Stripes(320, 200);
+    var source = _Stripes(296, 112);
     var decoded = HiresFliCrestFile.ToRawImage(HiresFliCrestFile.FromRawImage(source));
 
     Assert.Multiple(() => {
-      Assert.That(decoded.Width, Is.EqualTo(320));
-      Assert.That(decoded.Height, Is.EqualTo(200));
+      Assert.That(decoded.Width, Is.EqualTo(296));
+      Assert.That(decoded.Height, Is.EqualTo(112));
       Assert.That(_Rgb(decoded), Is.EqualTo(_Rgb(source)));
     });
   }
@@ -55,8 +55,8 @@ public sealed class HiresFliCrestFromRawImageTests {
     var decoded = HiresFliCrestFile.ToRawImage(HiresFliCrestFile.FromRawImage(_Stripes(96, 72)));
 
     Assert.Multiple(() => {
-      Assert.That(decoded.Width, Is.EqualTo(320));
-      Assert.That(decoded.Height, Is.EqualTo(200));
+      Assert.That(decoded.Width, Is.EqualTo(296));
+      Assert.That(decoded.Height, Is.EqualTo(112));
     });
   }
 
@@ -68,7 +68,7 @@ public sealed class HiresFliCrestFromRawImageTests {
   [Test]
   [Category("Unit")]
   public void WhatIsEncodedSurvivesTheWriterAndTheReader() {
-    var file = HiresFliCrestFile.FromRawImage(_Stripes(320, 200));
+    var file = HiresFliCrestFile.FromRawImage(_Stripes(296, 112));
     var restored = HiresFliCrestReader.FromBytes(HiresFliCrestWriter.ToBytes(file));
 
     Assert.That(_Rgb(HiresFliCrestFile.ToRawImage(restored)), Is.EqualTo(_Rgb(HiresFliCrestFile.ToRawImage(file))));

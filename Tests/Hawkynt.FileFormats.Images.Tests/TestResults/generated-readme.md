@@ -303,7 +303,7 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | ElectricImage | `.ei`, `.eidi` | ✅ | ✅ | — | ✅ | — | none |
 | Electronika | `.bk`, `.ekr` | ✅ | ✅ | — | — | — | none |
 | EmbeddedDib | `.zmf`, `.skf`, `.cad`, `.btn` | ✅ | — | — | — | — | — |
-| EmcEditor | `.emc` | ✅ | ✅ | — | — | — | none |
+| EmcEditor | `.emc` | ✅ | ✅ | — | — | — | recoil2png |
 | Emf | `.emf` | ✅ | ✅ | — | — | — | none |
 | Enterprise128 | `.ep`, `.elan` | ✅ | ✅ | — | — | — | none |
 | Envi | `.hdr` | ✅ | ✅ | — | — | — | none |
@@ -330,7 +330,7 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | FaxMan | `.fmf` | ✅ | ✅ | — | — | — | none |
 | Fbm | `.fbm` | ✅ | ✅ | — | — | — | none |
 | Fff | `.fff` | ✅ | ✅ | — | — | — | ffmpeg |
-| Ffli | `.ffli`, `.ffl` | ✅ | ✅ | — | — | — | none |
+| Ffli | `.ffli`, `.ffl` | ✅ | ✅ | — | — | — | recoil2png |
 | FirstPublisher | `.art` | ✅ | ✅ | — | — | — | none |
 | Fits | `.fits`, `.fit`, `.fts` | ✅ | ✅ | — | — | — | ImageMagick |
 | FitsDocument | `.fits`, `.fit`, `.fts` | ✅ | ✅ | — | ✅ | — | ImageMagick |
@@ -338,12 +338,12 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | FlashImage | `.fi` | ✅ | ✅ | — | — | — | none |
 | Fli | `.fli`, `.flc` | ✅ | ✅ | — | ✅ | — | ffmpeg |
 | Fli64 | `.fli64` | ✅ | ✅ | — | — | — | none |
-| FliDesigner | `.fd2` | ✅ | ✅ | — | — | — | none |
-| FliDesigner2 | `.fd2` | ✅ | ✅ | — | — | — | none |
-| FliEditor | `.fed` | ✅ | ✅ | — | — | — | none |
+| FliDesigner | `.fd2` | ✅ | ✅ | — | — | — | recoil2png |
+| FliDesigner2 | `.fd2` | ✅ | ✅ | — | — | — | recoil2png |
+| FliEditor | `.fed` | ✅ | ✅ | — | — | — | recoil2png |
 | Flif | `.flif` | ✅ | ✅ | — | — | — | none |
 | FliGraph | `.flg`, `.bml`, `.fli` | ✅ | ✅ | — | — | — | recoil2png |
-| Flimatic | `.flm` | ✅ | ✅ | — | — | — | none |
+| Flimatic | `.flm` | ✅ | ✅ | — | — | — | recoil2png |
 | Flip64 | `.fbi` | ✅ | ✅ | — | — | — | none |
 | FliProfi | `.fpr` | ✅ | ✅ | — | — | — | none |
 | FloorDesigner | `.fge` | ✅ | ✅ | — | — | — | recoil2png |
@@ -417,10 +417,10 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | HiPicCreator | `.hpc`, `.aas` | ✅ | ✅ | — | — | — | recoil2png |
 | HiresC64 | `.hir`, `.hbm`, `.hpi` | ✅ | ✅ | — | — | — | recoil2png |
 | HiResEditor | `.het`, `.rph` | ✅ | ✅ | — | — | — | recoil2png |
-| HiresFliCrest | `.hfc`, `.hfd` | ✅ | ✅ | — | — | — | none |
+| HiresFliCrest | `.hfc`, `.hfd` | ✅ | ✅ | — | — | — | recoil2png |
 | HiresInterlaceFeniks | `.hlf`, `.hie` | ✅ | ✅ | — | — | — | none |
 | Hireslace | `.hle` | ✅ | ✅ | — | — | — | recoil2png |
-| HiresManager | `.him` | ✅ | ✅ | — | — | — | none |
+| HiresManager | `.him` | ✅ | ✅ | — | — | — | recoil2png |
 | HomeworldLif | `.lif` | ✅ | ✅ | — | — | — | none |
 | Hp48Grob | `.grb`, `.gro` | ✅ | ✅ | — | — | — | recoil2png |
 | Hpgl | `.hpgl`, `.hgl`, `.hpg`, `.prn`, `.prt`, `.spl` | ✅ | ✅ | — | — | — | none |

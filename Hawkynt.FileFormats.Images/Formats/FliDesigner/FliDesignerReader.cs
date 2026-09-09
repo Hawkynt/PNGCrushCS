@@ -1,9 +1,16 @@
 using System;
+using System.Buffers.Binary;
 using System.IO;
+using FileFormat.Core;
 
 namespace FileFormat.FliDesigner;
 
 /// <summary>Reads FLI Designer (.fd2) files from bytes, streams, or file paths.</summary>
+/// <remarks>
+/// Two lengths, and the second is the first saved to the end of the sixteen-kilobyte bank it lives
+/// in rather than stopping at the last byte of the picture. Nothing between them is another format,
+/// so anything shorter than a whole picture is refused outright.
+/// </remarks>
 public static class FliDesignerReader {
 
   public static FliDesignerFile FromFile(FileInfo file) {
@@ -21,26 +28,26 @@ public static class FliDesignerReader {
       stream.ReadExactly(data);
       return FromBytes(data);
     }
+
     using var ms = new MemoryStream();
     stream.CopyTo(ms);
     return FromBytes(ms.ToArray());
   }
 
   public static FliDesignerFile FromSpan(ReadOnlySpan<byte> data) {
-
-    if (data.Length < FliDesignerFile.LoadAddressSize + FliDesignerFile.MinPayloadSize)
-      throw new InvalidDataException($"Data too small for a valid FLI Designer file (expected at least {FliDesignerFile.LoadAddressSize + FliDesignerFile.MinPayloadSize} bytes, got {data.Length}).");
-
-    var loadAddress = (ushort)(data[0] | (data[1] << 8));
-
-    var rawData = new byte[data.Length - FliDesignerFile.LoadAddressSize];
-    data.Slice(FliDesignerFile.LoadAddressSize, rawData.Length).CopyTo(rawData.AsSpan(0));
+    if (data.Length < FliDesignerFile.FileSize)
+      throw new InvalidDataException(
+        $"A FLI Designer picture takes {FliDesignerFile.FileSize} bytes, or {FliDesignerFile.PaddedFileSize} "
+        + $"saved to the end of its bank; this file is {data.Length}.");
 
     return new() {
-      LoadAddress = loadAddress,
-      RawData = rawData,
+      LoadAddress = BinaryPrimitives.ReadUInt16LittleEndian(data),
+      ColorRam = data.Slice(FliDesignerFile.ColorRamOffset, Commodore64Fli.ColorRamSize).ToArray(),
+      Matrices = data.Slice(FliDesignerFile.MatricesOffset, Commodore64Fli.MatrixAreaSize).ToArray(),
+      BitmapData = data.Slice(FliDesignerFile.BitmapOffset, Commodore64Fli.BitmapSize).ToArray(),
+      Padded = data.Length >= FliDesignerFile.PaddedFileSize,
     };
-    }
+  }
 
   public static FliDesignerFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
