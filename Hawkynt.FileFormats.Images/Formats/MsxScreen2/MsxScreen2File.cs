@@ -21,6 +21,7 @@ namespace FileFormat.MsxScreen2;
 // as their magic, and the registry consults magic before extension — so whichever it happened to
 // reach first took every MSX picture. A Screen 5 file, 256 by 212, was being opened as a Screen 6
 // one and drawn 512 by 424. The extension is what tells these apart, and it is what decides now.
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public sealed class MsxScreen2File : IImageFormatReader<MsxScreen2File>, IImageToRawImage<MsxScreen2File>, IImageFromRawImage<MsxScreen2File>, IImageFormatWriter<MsxScreen2File> {
 
   static string IImageFormatMetadata<MsxScreen2File>.PrimaryExtension => ".sc2";
@@ -28,6 +29,11 @@ public sealed class MsxScreen2File : IImageFormatReader<MsxScreen2File>, IImageT
   static MsxScreen2File IImageFormatReader<MsxScreen2File>.FromSpan(ReadOnlySpan<byte> data) => MsxScreen2Reader.FromSpan(data);
 
   static byte[] IImageFormatWriter<MsxScreen2File>.ToBytes(MsxScreen2File file) => MsxScreen2Writer.ToBytes(file);
+
+  /// <summary>The one picture the mode holds: 256 by 192 out of the TMS9918's fifteen colours.</summary>
+  static VideoMode[] IImageFormatMetadata<MsxScreen2File>.VideoModes => [
+    new("Screen 2", [(FixedWidth, FixedHeight)], [15])
+  ];
 
   /// <summary>Fixed width of an MSX Screen 2 image.</summary>
   public const int FixedWidth = 256;

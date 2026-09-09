@@ -4,6 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.DoodleAtari;
 
 /// <summary>In-memory representation of an Atari ST Doodle monochrome image (640x400, 1 bitplane).</summary>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct DoodleAtariFile : IImageFormatReader<DoodleAtariFile>, IImageToRawImage<DoodleAtariFile>, IImageFromRawImage<DoodleAtariFile>, IImageFormatWriter<DoodleAtariFile> {
 
   /// <summary>The exact file size: 80 bytes/line x 400 lines = 32000 bytes.</summary>
@@ -12,16 +13,27 @@ public readonly record struct DoodleAtariFile : IImageFormatReader<DoodleAtariFi
   static string IImageFormatMetadata<DoodleAtariFile>.PrimaryExtension => ".doo";
   static string[] IImageFormatMetadata<DoodleAtariFile>.FileExtensions => [".doo"];
   static DoodleAtariFile IImageFormatReader<DoodleAtariFile>.FromSpan(ReadOnlySpan<byte> data) => DoodleAtariReader.FromSpan(data);
+  /// <summary>The one screen the format holds: the ST's monochrome page, 640 by 400.</summary>
+  /// <remarks>
+  /// The file is 32000 bytes of that screen and nothing else, so the writer produced it whatever
+  /// size it was handed. Saying "any size" left nothing able to ask for the only one it writes.
+  /// </remarks>
   static VideoMode[] IImageFormatMetadata<DoodleAtariFile>.VideoModes => [
-    new("Default", [(IntegerRange.Any, IntegerRange.Any)], [2])
+    new("Monochrome", [(ScreenWidth, ScreenHeight)], [2])
   ];
   static byte[] IImageFormatWriter<DoodleAtariFile>.ToBytes(DoodleAtariFile file) => DoodleAtariWriter.ToBytes(file);
 
+  /// <summary>Pixels across the monochrome screen.</summary>
+  public const int ScreenWidth = 640;
+
+  /// <summary>Rows on the monochrome screen.</summary>
+  public const int ScreenHeight = 400;
+
   /// <summary>Always 640.</summary>
-  public int Width => 640;
+  public int Width => ScreenWidth;
 
   /// <summary>Always 400.</summary>
-  public int Height => 400;
+  public int Height => ScreenHeight;
 
   /// <summary>Raw monochrome bitmap data (1 bit per pixel, 32000 bytes total).</summary>
   public byte[] PixelData { get; init; }

@@ -16,16 +16,13 @@ public static class AppleIIgsWriter {
     file.PixelData.AsSpan(0, AppleIIgsReader.PixelDataSize).CopyTo(result.AsSpan(offset));
     offset += AppleIIgsReader.PixelDataSize;
 
-    // SCBs (200 bytes)
+    // SCBs (200 of the 256 bytes the block reserves; the other 56 stay zero)
     file.Scbs.AsSpan(0, AppleIIgsReader.ScbSize).CopyTo(result.AsSpan(offset));
-    offset += AppleIIgsReader.ScbSize;
 
-    // Palettes (256 x 16-bit LE values = 512 bytes)
-    var span = result.AsSpan(offset, AppleIIgsReader.PaletteSize);
+    // Palettes (256 x 16-bit LE values = 512 bytes), where the hardware keeps them
+    var span = result.AsSpan(AppleIIgsReader.PaletteOffset, AppleIIgsReader.PaletteSize);
     for (var i = 0; i < AppleIIgsReader.PaletteEntryCount; ++i)
       BinaryPrimitives.WriteInt16LittleEndian(span[(i * 2)..], file.Palettes[i]);
-
-    // Remaining 56 bytes are zero padding (already zeroed by array allocation)
 
     return result;
   }

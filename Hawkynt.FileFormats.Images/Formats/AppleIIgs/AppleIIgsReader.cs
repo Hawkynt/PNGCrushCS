@@ -7,7 +7,7 @@ namespace FileFormat.AppleIIgs;
 /// <summary>Reads Apple IIGS Super Hi-Res ($C1) files from bytes, streams, or file paths.</summary>
 public static class AppleIIgsReader {
 
-  /// <summary>Total file size: 32000 pixel + 200 SCB + 512 palette + 56 padding = 32768 bytes.</summary>
+  /// <summary>Total file size: 32000 pixel + 256 SCB block + 512 palette = 32768 bytes.</summary>
   internal const int FileSize = 32768;
 
   /// <summary>Pixel data size in bytes.</summary>
@@ -16,14 +16,31 @@ public static class AppleIIgsReader {
   /// <summary>Number of scan control bytes (one per scanline).</summary>
   internal const int ScbSize = 200;
 
+  /// <summary>
+  /// The bytes the scan control block occupies, which is more than the scanlines use.
+  /// </summary>
+  /// <remarks>
+  /// A $C1 file is a photograph of the three regions of the IIGS's screen memory, and those regions
+  /// sit at fixed addresses: pixels at $2000, the scan control bytes at $9D00, the palettes at
+  /// $9E00. Only 200 of the 256 bytes between the last two are scanlines; the other 56 are reserved
+  /// and belong where the hardware leaves them, before the palettes rather than after them.
+  /// <para/>
+  /// Putting them at the end instead shifts every palette 56 bytes down the file, and a decoder
+  /// looking where the palettes actually live finds the reserved zeroes. That is what happened: the
+  /// picture round-tripped through this package because the reader made the same mistake, and
+  /// RECOIL — reading palette 0 at $9E00, as the machine does — rebuilt every $C1 this wrote as a
+  /// canvas of black.
+  /// </remarks>
+  internal const int ScbBlockSize = 256;
+
+  /// <summary>Where the palettes begin: after the whole scan control block.</summary>
+  internal const int PaletteOffset = PixelDataSize + ScbBlockSize;
+
   /// <summary>Palette data size in bytes (16 palettes x 16 colors x 2 bytes).</summary>
   internal const int PaletteSize = 512;
 
   /// <summary>Number of palette entries (16 palettes x 16 colors).</summary>
   internal const int PaletteEntryCount = 256;
-
-  /// <summary>Padding size in bytes.</summary>
-  internal const int PaddingSize = 56;
 
   /// <summary>Number of scanlines.</summary>
   internal const int LineCount = 200;
@@ -48,14 +65,13 @@ public static class AppleIIgsReader {
     data.Slice(offset, PixelDataSize).CopyTo(pixelData);
     offset += PixelDataSize;
 
-    // SCBs (200 bytes)
+    // SCBs (200 of the 256 bytes the block reserves)
     var scbs = new byte[ScbSize];
     data.Slice(offset, ScbSize).CopyTo(scbs);
-    offset += ScbSize;
 
-    // Palettes (512 bytes = 256 x 16-bit LE values)
+    // Palettes (512 bytes = 256 x 16-bit LE values), after the whole block
     var palettes = new short[PaletteEntryCount];
-    var paletteSpan = data.Slice(offset, PaletteSize);
+    var paletteSpan = data.Slice(PaletteOffset, PaletteSize);
     for (var i = 0; i < PaletteEntryCount; ++i)
       palettes[i] = BinaryPrimitives.ReadInt16LittleEndian(paletteSpan[(i * 2)..]);
 
