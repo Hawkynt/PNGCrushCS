@@ -10,7 +10,7 @@ namespace FileFormat.AtariTt;
 /// exactly 153600 bytes of bitmap, so the mode byte and the palette size are what tell them apart.
 /// TT colours carry four bits per channel where the ST had three.
 /// </remarks>
-[VerifiedBy(ConformanceOracle.Recoil2Png)]
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.IrfanView)]
 public readonly record struct AtariTtFile
   : IImageFormatReader<AtariTtFile>, IImageToRawImage<AtariTtFile>,
     IImageFromRawImage<AtariTtFile>, IImageFormatWriter<AtariTtFile> {

@@ -14,7 +14,7 @@ namespace FileFormat.Duo;
 /// normal ST screen, at 416x273: the program drives the display beyond its usual borders, which is
 /// why the size is fixed here rather than read from a header the file does not have.
 /// </remarks>
-[VerifiedBy(ConformanceOracle.Recoil2Png)]
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.IrfanView)]
 public readonly record struct DuoFile
   : IImageFormatReader<DuoFile>, IImageToRawImage<DuoFile>,
     IImageFromRawImage<DuoFile>, IImageFormatWriter<DuoFile> {

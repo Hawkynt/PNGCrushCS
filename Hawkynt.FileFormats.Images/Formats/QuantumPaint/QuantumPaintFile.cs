@@ -4,7 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.QuantumPaint;
 
 /// <summary>In-memory representation of an Atari ST QuantumPaint image (320x200, 16 colors, 4 planes).</summary>
-[VerifiedBy(ConformanceOracle.Recoil2Png)]
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.IrfanView)]
 public readonly record struct QuantumPaintFile : IImageFormatReader<QuantumPaintFile>, IImageToRawImage<QuantumPaintFile>, IImageFromRawImage<QuantumPaintFile>, IImageFormatWriter<QuantumPaintFile> {
 
   /// <summary>Image width (always 320).</summary>

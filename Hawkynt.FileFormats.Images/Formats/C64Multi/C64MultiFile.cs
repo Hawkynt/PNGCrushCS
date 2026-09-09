@@ -4,7 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.C64Multi;
 
 /// <summary>In-memory representation of a C64 multiformat art program image.</summary>
-[VerifiedBy(ConformanceOracle.Recoil2Png)]
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.IrfanView)]
 public readonly record struct C64MultiFile : IImageFormatReader<C64MultiFile>, IImageToRawImage<C64MultiFile>, IImageFromRawImage<C64MultiFile>, IImageFormatWriter<C64MultiFile> {
 
   static string IImageFormatMetadata<C64MultiFile>.PrimaryExtension => ".ocp";

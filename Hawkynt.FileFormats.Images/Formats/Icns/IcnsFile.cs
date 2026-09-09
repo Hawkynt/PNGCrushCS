@@ -9,7 +9,7 @@ namespace FileFormat.Icns;
 
 /// <summary>In-memory representation of an Apple ICNS icon container file.</summary>
 [FormatMagicBytes([0x69, 0x63, 0x6E, 0x73])]
-[VerifiedBy(ConformanceOracle.XnView)]
+[VerifiedBy(ConformanceOracle.XnView, ConformanceOracle.IrfanView)]
 public sealed class IcnsFile : IImageFormatReader<IcnsFile>, IImageToRawImage<IcnsFile>, IImageFromRawImage<IcnsFile>, IImageFormatWriter<IcnsFile>, IMultiImageFileFormat<IcnsFile> {
 
   static string IImageFormatMetadata<IcnsFile>.PrimaryExtension => ".icns";

@@ -4,7 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.HiEddi;
 
 /// <summary>In-memory representation of a HiEddi C64 hires image (Doodle layout).</summary>
-[VerifiedBy(ConformanceOracle.Recoil2Png)]
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.IrfanView)]
 public readonly record struct HiEddiFile : IImageFormatReader<HiEddiFile>, IImageToRawImage<HiEddiFile>, IImageFromRawImage<HiEddiFile>, IImageFormatWriter<HiEddiFile> {
 
   static string IImageFormatMetadata<HiEddiFile>.PrimaryExtension => ".hed";

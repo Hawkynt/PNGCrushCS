@@ -10,7 +10,7 @@ namespace FileFormat.ZxRgb3;
 /// eight corners of the RGB cube are exactly the eight colours available — and unlike an ordinary
 /// Spectrum screen there are no attribute cells, so the colour can change every pixel.
 /// </remarks>
-[VerifiedBy(ConformanceOracle.Recoil2Png)]
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.IrfanView)]
 public readonly record struct ZxRgb3File
   : IImageFormatReader<ZxRgb3File>, IImageToRawImage<ZxRgb3File>,
     IImageFromRawImage<ZxRgb3File>, IImageFormatWriter<ZxRgb3File> {

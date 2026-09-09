@@ -67,6 +67,9 @@ public enum ConformanceOracle {
 
   /// <summary>The <c>olefile</c> Python package.</summary>
   Olefile,
+
+  /// <summary>Ghostscript, the PostScript and PDF interpreter, as <c>gs</c>.</summary>
+  Ghostscript,
 }
 
 /// <summary>Display names and home pages for <see cref="ConformanceOracle"/>.</summary>
@@ -95,6 +98,7 @@ public static class ConformanceOracles {
     ConformanceOracle.PyEmbroidery => "pyembroidery",
     ConformanceOracle.LibreOffice => "LibreOffice",
     ConformanceOracle.Olefile => "olefile",
+    ConformanceOracle.Ghostscript => "Ghostscript",
     _ => oracle.ToString(),
   };
 
@@ -117,6 +121,7 @@ public static class ConformanceOracles {
     ConformanceOracle.PyEmbroidery => "https://github.com/EmbroidePy/pyembroidery",
     ConformanceOracle.LibreOffice => "https://www.libreoffice.org/",
     ConformanceOracle.Olefile => "https://github.com/decalage2/olefile",
+    ConformanceOracle.Ghostscript => "https://www.ghostscript.com/",
     _ => null,
   };
 }

@@ -9,7 +9,7 @@ namespace FileFormat.Tga;
 // TGA 2.0 footer is the more specific of the two, so it gets to answer first; the check returns
 // "no opinion" when the footer is absent, leaving CUR its normal chance.
 [FormatDetectionPriority(50)]
-[VerifiedBy(ConformanceOracle.ImageMagick, ConformanceOracle.FFmpeg)]
+[VerifiedBy(ConformanceOracle.ImageMagick, ConformanceOracle.FFmpeg, ConformanceOracle.IrfanView)]
 public readonly record struct TgaFile : IImageFormatReader<TgaFile>, IImageToRawImage<TgaFile>, IImageFromRawImage<TgaFile>, IImageFormatWriter<TgaFile> {
 
   static string IImageFormatMetadata<TgaFile>.PrimaryExtension => ".tga";

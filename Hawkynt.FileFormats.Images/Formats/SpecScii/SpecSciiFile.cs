@@ -12,7 +12,7 @@ namespace FileFormat.SpecScii;
 /// The two cell maps are stored column by column rather than row by row, so consecutive bytes run
 /// down the screen and not across it.
 /// </remarks>
-[VerifiedBy(ConformanceOracle.Recoil2Png)]
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.IrfanView)]
 public readonly record struct SpecSciiFile
   : IImageFormatReader<SpecSciiFile>, IImageToRawImage<SpecSciiFile>,
     IImageFromRawImage<SpecSciiFile>, IImageFormatWriter<SpecSciiFile> {

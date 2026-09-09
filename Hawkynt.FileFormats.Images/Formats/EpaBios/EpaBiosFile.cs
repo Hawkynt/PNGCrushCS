@@ -14,7 +14,7 @@ namespace FileFormat.EpaBios;
 /// It used to be read here as 714 bytes of flat eight-bit indices — a picture of the right shape,
 /// the wrong length, and no relation to what a BIOS stores.
 /// </remarks>
-[VerifiedBy(ConformanceOracle.Recoil2Png)]
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.IrfanView)]
 public readonly record struct EpaBiosFile : IImageFormatReader<EpaBiosFile>, IImageToRawImage<EpaBiosFile>, IImageFromRawImage<EpaBiosFile>, IImageFormatWriter<EpaBiosFile> {
 
   /// <summary>Pixels across one character cell.</summary>

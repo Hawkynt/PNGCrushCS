@@ -15,7 +15,7 @@ namespace FileFormat.DaisyDotFont;
 /// ninety-first is through the ninety before it. Shown here as a sixteen-by-six grid in the machine's
 /// own character order, which is why the codes skip.
 /// </remarks>
-[VerifiedBy(ConformanceOracle.Recoil2Png)]
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.IrfanView)]
 public readonly record struct DaisyDotFontFile
   : IImageFormatReader<DaisyDotFontFile>, IImageToRawImage<DaisyDotFontFile>,
     IImageFromRawImage<DaisyDotFontFile>, IImageFormatWriter<DaisyDotFontFile> {

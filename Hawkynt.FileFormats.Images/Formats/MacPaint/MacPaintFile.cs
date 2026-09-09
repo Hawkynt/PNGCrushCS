@@ -4,7 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.MacPaint;
 
 /// <summary>In-memory representation of a MacPaint image.</summary>
-[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.ImageMagick)]
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.ImageMagick, ConformanceOracle.IrfanView)]
 public readonly record struct MacPaintFile : IImageFormatReader<MacPaintFile>, IImageToRawImage<MacPaintFile>, IImageFromRawImage<MacPaintFile>, IImageFormatWriter<MacPaintFile> {
 
   static string IImageFormatMetadata<MacPaintFile>.PrimaryExtension => ".mac";

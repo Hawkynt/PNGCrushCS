@@ -13,7 +13,7 @@ namespace FileFormat.Botticelli;
 /// <c>MULT</c> marker when they are multicolour; a 2050-byte file is the startup logo, which has no
 /// colour areas at all and draws from four fixed colours.
 /// </remarks>
-[VerifiedBy(ConformanceOracle.Recoil2Png)]
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.IrfanView)]
 public readonly record struct BotticelliFile
   : IImageFormatReader<BotticelliFile>, IImageToRawImage<BotticelliFile>,
     IImageFromRawImage<BotticelliFile>, IImageFormatWriter<BotticelliFile> {

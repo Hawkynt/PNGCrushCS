@@ -4,7 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.Gigacad;
 
 /// <summary>In-memory representation of an Atari ST GigaCAD monochrome image (640x400, 1 bitplane).</summary>
-[VerifiedBy(ConformanceOracle.Recoil2Png)]
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.IrfanView)]
 public readonly record struct GigacadFile : IImageFormatReader<GigacadFile>, IImageToRawImage<GigacadFile>, IImageFromRawImage<GigacadFile>, IImageFormatWriter<GigacadFile> {
 
   /// <summary>

@@ -13,7 +13,7 @@ namespace FileFormat.AtariTools800Font;
 /// arbitrary picture of this size encodes exactly rather than being fitted to a character set.
 /// </para>
 /// </remarks>
-[VerifiedBy(ConformanceOracle.Recoil2Png)]
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.IrfanView)]
 public readonly record struct AtariTools800FontFile
   : IImageFormatReader<AtariTools800FontFile>, IImageToRawImage<AtariTools800FontFile>,
     IImageFromRawImage<AtariTools800FontFile>, IImageFormatWriter<AtariTools800FontFile> {

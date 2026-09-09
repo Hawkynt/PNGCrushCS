@@ -11,7 +11,7 @@ namespace FileFormat.TurboRascal;
 /// the 320x200 chunky form: one palette index per pixel followed by an RGB palette, which is the
 /// mode that can carry an arbitrary image without imposing a host machine's colour constraints.
 /// </remarks>
-[VerifiedBy(ConformanceOracle.Recoil2Png)]
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.IrfanView)]
 public readonly record struct TurboRascalFile
   : IImageFormatReader<TurboRascalFile>, IImageToRawImage<TurboRascalFile>,
     IImageFromRawImage<TurboRascalFile>, IImageFormatWriter<TurboRascalFile> {

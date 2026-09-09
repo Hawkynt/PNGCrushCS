@@ -11,7 +11,7 @@ namespace FileFormat.ZxAttributesGigascreen;
 /// each cell is the mix of its two entries. The file opens with a short machine-code loader whose
 /// first bytes readers match on.
 /// </remarks>
-[VerifiedBy(ConformanceOracle.Recoil2Png)]
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.IrfanView)]
 public readonly record struct ZxAttributesGigascreenFile
   : IImageFormatReader<ZxAttributesGigascreenFile>, IImageToRawImage<ZxAttributesGigascreenFile>,
     IImageFromRawImage<ZxAttributesGigascreenFile>, IImageFormatWriter<ZxAttributesGigascreenFile> {

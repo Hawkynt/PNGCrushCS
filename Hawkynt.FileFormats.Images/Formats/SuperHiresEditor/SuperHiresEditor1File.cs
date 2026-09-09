@@ -14,7 +14,7 @@ namespace FileFormat.SuperHiresEditor;
 /// table, the foreground taking the high nibble and the background the low, which is a saving that
 /// only works because the two can never want more than sixteen colours between them.
 /// </remarks>
-[VerifiedBy(ConformanceOracle.Recoil2Png)]
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.IrfanView)]
 public readonly record struct SuperHiresEditor1File
   : IImageFormatReader<SuperHiresEditor1File>, IImageToRawImage<SuperHiresEditor1File>,
     IImageFromRawImage<SuperHiresEditor1File>, IImageFormatWriter<SuperHiresEditor1File> {

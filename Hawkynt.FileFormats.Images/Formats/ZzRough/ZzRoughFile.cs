@@ -15,7 +15,7 @@ namespace FileFormat.ZzRough;
 /// raster order, because the ST interleaves four bitplanes per sixteen pixels — so a four-byte group
 /// is one screen chunk, and a vertical run of them is what a flat-coloured area actually produces.
 /// </remarks>
-[VerifiedBy(ConformanceOracle.Recoil2Png)]
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.IrfanView)]
 public readonly record struct ZzRoughFile
   : IImageFormatReader<ZzRoughFile>, IImageToRawImage<ZzRoughFile>,
     IImageFromRawImage<ZzRoughFile>, IImageFormatWriter<ZzRoughFile> {

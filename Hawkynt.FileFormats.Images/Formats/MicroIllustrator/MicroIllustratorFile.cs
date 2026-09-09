@@ -4,7 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.MicroIllustrator;
 
 /// <summary>In-memory representation of a Commodore 64 Micro Illustrator multicolor image.</summary>
-[VerifiedBy(ConformanceOracle.Recoil2Png)]
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.IrfanView)]
 public readonly record struct MicroIllustratorFile : IImageFormatReader<MicroIllustratorFile>, IImageToRawImage<MicroIllustratorFile>, IImageFromRawImage<MicroIllustratorFile>, IImageFormatWriter<MicroIllustratorFile> {
 
   static string IImageFormatMetadata<MicroIllustratorFile>.PrimaryExtension => ".mil";

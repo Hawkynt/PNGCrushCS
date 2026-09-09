@@ -5,7 +5,7 @@ namespace FileFormat.SonyPmp;
 
 /// <summary>In-memory representation of a Sony Cyber-shot DSC-F1 picture (.pmp).</summary>
 /// <remarks>The format is a documented 124-byte camera header followed by one complete JPEG.</remarks>
-[VerifiedBy(ConformanceOracle.FFmpeg)]
+[VerifiedBy(ConformanceOracle.FFmpeg, ConformanceOracle.IrfanView)]
 public readonly record struct SonyPmpFile : IImageFormatReader<SonyPmpFile>, IImageToRawImage<SonyPmpFile>, IImageFromRawImage<SonyPmpFile>, IImageFormatWriter<SonyPmpFile> {
 
   public const int HeaderSize = 124;

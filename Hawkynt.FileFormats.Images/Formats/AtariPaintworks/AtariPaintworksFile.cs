@@ -4,7 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.AtariPaintworks;
 
 /// <summary>In-memory representation of an Atari ST Paintworks/GFA/DeskPic image file.</summary>
-[VerifiedBy(ConformanceOracle.Recoil2Png)]
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.IrfanView)]
 public readonly record struct AtariPaintworksFile : IImageFormatReader<AtariPaintworksFile>, IImageToRawImage<AtariPaintworksFile>, IImageFromRawImage<AtariPaintworksFile>, IImageFormatWriter<AtariPaintworksFile> {
 
   /// <summary>Offset of the 32-byte ST palette.</summary>

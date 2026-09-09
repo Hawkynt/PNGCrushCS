@@ -12,7 +12,7 @@ namespace FileFormat.MsxGl6;
 /// two scanlines and a picture is twice as tall as it is stored. The four colours come from a
 /// companion <c>.PL6</c> palette; a stamp has none and is simply black on white.
 /// </remarks>
-[VerifiedBy(ConformanceOracle.Recoil2Png)]
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.IrfanView)]
 public readonly record struct MsxGl6File
   : IImageFormatReader<MsxGl6File>, IImageToRawImage<MsxGl6File>,
     IImageFromRawImage<MsxGl6File>, IImageFormatWriter<MsxGl6File> {

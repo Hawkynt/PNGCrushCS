@@ -18,7 +18,7 @@ namespace FileFormat.Int95a;
 /// <para/>
 /// <c>.int</c> was claimed only by the plain Atari screen dump, which takes 7680 bytes or 1920.
 /// </remarks>
-[VerifiedBy(ConformanceOracle.Recoil2Png)]
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.IrfanView)]
 public readonly record struct Int95aFile
   : IImageFormatReader<Int95aFile>, IImageToRawImage<Int95aFile>,
     IImageFromRawImage<Int95aFile>, IImageFormatWriter<Int95aFile> {

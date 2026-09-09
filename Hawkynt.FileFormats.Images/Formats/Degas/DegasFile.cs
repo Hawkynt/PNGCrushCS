@@ -4,7 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.Degas;
 
 /// <summary>In-memory representation of a DEGAS/DEGAS Elite image.</summary>
-[VerifiedBy(ConformanceOracle.Recoil2Png)]
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.IrfanView)]
 public readonly record struct DegasFile : IImageFormatReader<DegasFile>, IImageToRawImage<DegasFile>, IImageFromRawImage<DegasFile>, IImageFormatWriter<DegasFile> {
 
   static string IImageFormatMetadata<DegasFile>.PrimaryExtension => ".pi1";
