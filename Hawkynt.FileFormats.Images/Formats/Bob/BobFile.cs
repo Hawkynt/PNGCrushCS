@@ -1,5 +1,6 @@
 using System;
 using FileFormat.Core;
+using FileFormat.Core.PixelFormats;
 
 namespace FileFormat.Bob;
 
@@ -13,7 +14,12 @@ namespace FileFormat.Bob;
 /// would try to allocate. Decoded as above it matches XnView's rendering of the same file to the
 /// byte.
 /// </remarks>
-public readonly record struct BobFile : IImageFormatReader<BobFile>, IImageToRawImage<BobFile>, IImageFromRawImage<BobFile>, IImageFormatWriter<BobFile> {
+public readonly record struct BobFile :
+  IImageFormatReader<BobFile>,
+  IImageToRawImage<BobFile>,
+  IImageFromRawImage<BobFile>,
+  IImageFromRawImage<BobFile, Indexed8>,
+  IImageFormatWriter<BobFile> {
 
   /// <summary>Bytes of size information before the palette.</summary>
   internal const int HeaderSize = 4;
@@ -54,23 +60,48 @@ public readonly record struct BobFile : IImageFormatReader<BobFile>, IImageToRaw
     PaletteCount = PaletteCount,
   };
 
+  /// <summary>
+  /// Legacy compatibility entry point. It no longer changes pixel representation or creates a palette;
+  /// callers that need adaptation must do that explicitly before asking the Bob writer to serialize.
+  /// </summary>
   public static BobFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
+    return FromRawImage(RawImage<Indexed8>.FromUntyped(image));
+  }
 
-    var indexed = image.EnsureIndexedAtMost(PaletteCount);
-    var palette = new byte[PaletteSize];
-    var source = indexed.Palette;
-    if (source != null)
-      source.AsSpan(0, Math.Min(source.Length, palette.Length)).CopyTo(palette);
+  /// <summary>Creates a Bob file from the exact raw representation the format stores.</summary>
+  public static BobFile FromRawImage(RawImage<Indexed8> image) {
+    ArgumentNullException.ThrowIfNull(image);
+    image.Validate();
 
-    var pixels = new byte[image.Width * image.Height];
-    indexed.PixelData.AsSpan(0, Math.Min(indexed.PixelData.Length, pixels.Length)).CopyTo(pixels);
+    if (image.Width is <= 0 or > ushort.MaxValue)
+      throw new ArgumentException($"Bob width must be in the range 1..{ushort.MaxValue}; got {image.Width}.", nameof(image));
+    if (image.Height is <= 0 or > ushort.MaxValue)
+      throw new ArgumentException($"Bob height must be in the range 1..{ushort.MaxValue}; got {image.Height}.", nameof(image));
+
+    var pixelCount = checked(image.Width * image.Height);
+    if (image.PixelData.Length != pixelCount)
+      throw new ArgumentException(
+        $"Bob requires exactly one byte per pixel ({pixelCount} bytes); got {image.PixelData.Length}.",
+        nameof(image));
+
+    if (image.PaletteCount != PaletteCount)
+      throw new ArgumentException($"Bob requires exactly {PaletteCount} palette entries; got {image.PaletteCount}.", nameof(image));
+
+    var palette = image.Palette;
+    if (palette is null || palette.Length != PaletteSize)
+      throw new ArgumentException($"Bob requires exactly {PaletteSize} RGB palette bytes.", nameof(image));
+
+    if (image.AlphaTable is { } alphaTable)
+      foreach (var alpha in alphaTable)
+        if (alpha != byte.MaxValue)
+          throw new ArgumentException("Bob cannot encode palette transparency.", nameof(image));
 
     return new() {
       Width = image.Width,
       Height = image.Height,
-      PixelData = pixels,
-      Palette = palette,
+      PixelData = image.PixelData[..],
+      Palette = palette[..],
     };
   }
 }
