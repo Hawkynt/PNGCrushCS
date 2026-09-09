@@ -1,4 +1,5 @@
 using System;
+using FileFormat.Codecs.H265;
 
 namespace FileFormat.Bpg.Codec;
 
@@ -17,8 +18,13 @@ internal static class BpgHevcDecoder {
     if (bpg.IsAnimation)
       throw new NotSupportedException("Animated BPG decoding is not supported.");
 
-    if (bpg.PixelFormat == BpgPixelFormat.Cmyk)
-      throw new NotSupportedException("CMYK pixel format is not supported for BPG decoding.");
+    // alpha1_flag clear with alpha2_flag set is how BPG says the extra plane holds CMYK's W rather
+    // than an alpha channel, which is a fourth ink and not a transparency.
+    if (bpg is { HasAlpha: false, HasAlpha2: true })
+      throw new NotSupportedException("A CMYK BPG picture is not supported for decoding.");
+
+    if (_TryDecodeUniformPcm(bpg, out var pcm))
+      return pcm;
 
     // Parse NAL units from the BPG HEVC data
     var (vps, sps, pps, sliceHeader, sliceData) = HevcNalParser.ParseBpgHevcData(bpg.PixelData);
@@ -101,6 +107,69 @@ internal static class BpgHevcDecoder {
       yPlane, cbPlane, crPlane, yStride, cStride,
       width, height, chromaFormat, bpg.ColorSpace, bitDepthY, bpg.LimitedRange
     );
+  }
+
+  /// <summary>
+  /// Decodes a picture whose coding units are all unsplit PCM ones, which is the shape this package
+  /// writes, and answers false for everything else so the general path still gets its turn.
+  /// </summary>
+  /// <remarks>
+  /// PCM coding units carry their samples verbatim, so this path needs none of the transform,
+  /// prediction or residual machinery the general decoder is made of — but it is not a shortcut
+  /// around it either. A stream it declines is one it has proved is not made of whole samples, not
+  /// one it merely failed to read.
+  /// </remarks>
+  private static bool _TryDecodeUniformPcm(BpgFile bpg, out byte[] pixels) {
+    pixels = [];
+    if (bpg.BitDepth != 8 || bpg.HasAlpha || bpg.HasAlpha2 || bpg.LimitedRange)
+      return false;
+
+    // 4:4:4 with no colour matrix is the one shape this path reads, and the one this package
+    // writes. Subsampled chroma and the YCbCr matrices go to the general decoder instead.
+    if (bpg is not { PixelFormat: BpgPixelFormat.YCbCr444, ColorSpace: BpgColorSpace.Rgb })
+      return false;
+
+    var header = BpgSequenceHeader.TryParse(bpg.PixelData);
+    if (header is not {
+          PcmEnabled: true, SaoEnabled: false,
+          PcmBitDepthLuma: 8, PcmBitDepthChroma: 8,
+          Log2CtbSize: _CODING_TREE_BLOCK_LOG2,
+          Log2MinLumaCodingBlockSize: _CODING_TREE_BLOCK_LOG2,
+        }
+        || header.Log2MinPcmCodingBlockSize > _CODING_TREE_BLOCK_LOG2
+        || header.Log2MaxPcmCodingBlockSize < _CODING_TREE_BLOCK_LOG2)
+      return false;
+
+    var block = 1 << _CODING_TREE_BLOCK_LOG2;
+    var codedWidth = (bpg.Width + block - 1) / block * block;
+    var codedHeight = (bpg.Height + block - 1) / block * block;
+    if (!H265PcmStillCodec.TryDecodeBpgStill(
+          bpg.PixelData.AsSpan(header.HevcDataOffset), codedWidth, codedHeight, out var planes))
+      return false;
+
+    pixels = _InterleaveGbr(planes, codedWidth, bpg.Width, bpg.Height);
+    return true;
+  }
+
+  /// <summary>
+  /// The tree block size <see cref="H265PcmStillCodec"/> writes, which clause 7.4.3.2.1 also caps
+  /// a PCM coding block at.
+  /// </summary>
+  private const int _CODING_TREE_BLOCK_LOG2 = 5;
+
+  /// <summary>Packs BPG's G, B and R planes into the interleaved RGB24 the rest of the package uses.</summary>
+  private static byte[] _InterleaveGbr(byte[][] planes, int stride, int width, int height) {
+    var result = new byte[width * height * 3];
+    for (var y = 0; y < height; ++y)
+      for (var x = 0; x < width; ++x) {
+        var from = y * stride + x;
+        var to = (y * width + x) * 3;
+        result[to] = planes[2][from];
+        result[to + 1] = planes[0][from];
+        result[to + 2] = planes[1][from];
+      }
+
+    return result;
   }
 
   private static int[] _CropPlane(int[] plane, int stride, int cropX, int cropY, int width, int height) {

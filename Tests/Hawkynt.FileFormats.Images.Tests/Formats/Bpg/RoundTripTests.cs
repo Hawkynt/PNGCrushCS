@@ -19,7 +19,8 @@ public sealed class RoundTripTests {
       Height = 3,
       PixelFormat = BpgPixelFormat.Grayscale,
       BitDepth = 8,
-      ColorSpace = BpgColorSpace.Rgb,
+      // A grayscale picture has one plane and so no colour matrix: BPG requires color_space zero.
+      ColorSpace = BpgColorSpace.YCbCrBT601,
       PixelData = pixelData,
     };
 
@@ -30,7 +31,7 @@ public sealed class RoundTripTests {
     Assert.That(restored.Height, Is.EqualTo(original.Height));
     Assert.That(restored.PixelFormat, Is.EqualTo(BpgPixelFormat.Grayscale));
     Assert.That(restored.BitDepth, Is.EqualTo(8));
-    Assert.That(restored.ColorSpace, Is.EqualTo(BpgColorSpace.Rgb));
+    Assert.That(restored.ColorSpace, Is.EqualTo(BpgColorSpace.YCbCrBT601));
     Assert.That(restored.PixelData, Is.EqualTo(original.PixelData));
   }
 
@@ -72,7 +73,8 @@ public sealed class RoundTripTests {
       Height = 10,
       PixelFormat = BpgPixelFormat.Grayscale,
       BitDepth = 8,
-      ColorSpace = BpgColorSpace.Rgb,
+      // A grayscale picture has one plane and so no colour matrix: BPG requires color_space zero.
+      ColorSpace = BpgColorSpace.YCbCrBT601,
       PixelData = pixelData,
     };
 
@@ -100,7 +102,8 @@ public sealed class RoundTripTests {
       Height = 3,
       PixelFormat = BpgPixelFormat.Grayscale,
       BitDepth = 8,
-      ColorSpace = BpgColorSpace.Rgb,
+      // A grayscale picture has one plane and so no colour matrix: BPG requires color_space zero.
+      ColorSpace = BpgColorSpace.YCbCrBT601,
       PixelData = [],
     };
 
@@ -115,7 +118,8 @@ public sealed class RoundTripTests {
       Height = 2,
       PixelFormat = BpgPixelFormat.Grayscale,
       BitDepth = 8,
-      ColorSpace = BpgColorSpace.Rgb,
+      // A grayscale picture has one plane and so no colour matrix: BPG requires color_space zero.
+      ColorSpace = BpgColorSpace.YCbCrBT601,
       PixelData = new byte[4],
     };
 
@@ -139,7 +143,8 @@ public sealed class RoundTripTests {
       Height = 16,
       PixelFormat = BpgPixelFormat.Grayscale,
       BitDepth = 8,
-      ColorSpace = BpgColorSpace.Rgb,
+      // A grayscale picture has one plane and so no colour matrix: BPG requires color_space zero.
+      ColorSpace = BpgColorSpace.YCbCrBT601,
       PixelData = pixelData,
     };
 
@@ -179,7 +184,7 @@ public sealed class RoundTripTests {
       Height = 8,
       PixelFormat = BpgPixelFormat.YCbCr420,
       BitDepth = 10,
-      ColorSpace = BpgColorSpace.YCbCrBT2020,
+      ColorSpace = BpgColorSpace.YCbCrBT2020Ncl,
       HasAlpha = true,
       HasAlpha2 = true,
       LimitedRange = true,
@@ -192,7 +197,7 @@ public sealed class RoundTripTests {
 
     Assert.That(restored.PixelFormat, Is.EqualTo(BpgPixelFormat.YCbCr420));
     Assert.That(restored.BitDepth, Is.EqualTo(10));
-    Assert.That(restored.ColorSpace, Is.EqualTo(BpgColorSpace.YCbCrBT2020));
+    Assert.That(restored.ColorSpace, Is.EqualTo(BpgColorSpace.YCbCrBT2020Ncl));
     Assert.That(restored.HasAlpha, Is.True);
     Assert.That(restored.HasAlpha2, Is.True);
     Assert.That(restored.LimitedRange, Is.True);
@@ -227,7 +232,8 @@ public sealed class RoundTripTests {
       Height = 2,
       PixelFormat = BpgPixelFormat.Grayscale,
       BitDepth = 8,
-      ColorSpace = BpgColorSpace.Rgb,
+      // A grayscale picture has one plane and so no colour matrix: BPG requires color_space zero.
+      ColorSpace = BpgColorSpace.YCbCrBT601,
       ExtensionPresent = true,
       ExtensionData = extensionData,
       PixelData = [0xAA],

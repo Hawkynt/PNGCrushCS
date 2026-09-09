@@ -65,6 +65,12 @@ public static class BpgReader {
       offset += extensionDataLength;
     }
 
+    // A stated length of zero is not an empty picture: the specification gives that value the
+    // meaning "the picture data runs to the end of the file", which is how an encoder that does not
+    // know the length in advance writes one.
+    if (pictureDataLength == 0)
+      pictureDataLength = data.Length - offset;
+
     var pixelDataLength = Math.Min(pictureDataLength, data.Length - offset);
     var pixelData = new byte[pixelDataLength > 0 ? pixelDataLength : 0];
     if (pixelDataLength > 0)

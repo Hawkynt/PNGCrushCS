@@ -37,11 +37,12 @@ internal static class HevcYuvToRgb {
     int chromaSubX, chromaSubY;
     switch (chromaFormat) {
       case BpgPixelFormat.YCbCr420:
-      case BpgPixelFormat.YCbCr420Jpeg:
+      case BpgPixelFormat.YCbCr420Mpeg2:
         chromaSubX = 2;
         chromaSubY = 2;
         break;
       case BpgPixelFormat.YCbCr422:
+      case BpgPixelFormat.YCbCr422Mpeg2:
         chromaSubX = 2;
         chromaSubY = 1;
         break;
@@ -161,8 +162,8 @@ internal static class HevcYuvToRgb {
         kr = 0.2126;
         kb = 0.0722;
         break;
-      case BpgColorSpace.YCbCrBT2020:
-      case BpgColorSpace.YCbCrBT2020NCL:
+      case BpgColorSpace.YCbCrBT2020Ncl:
+      case BpgColorSpace.YCbCrBT2020Cl:
         kr = 0.2627;
         kb = 0.0593;
         break;
