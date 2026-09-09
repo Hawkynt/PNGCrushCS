@@ -23,9 +23,14 @@ namespace FileFormat.Hpgl;
 /// Labels are not drawn. <c>LB</c> writes text with the plotter's own stick font, which is in the
 /// plotter and not in the file, so the string is consumed and passed over rather than approximated.
 /// <para/>
-/// It does not write.
+/// Writing an arbitrary raster is necessarily an approximation because HP-GL stores pen motion,
+/// not pixels. The writer samples large sources to a bounded plot, composites alpha onto white,
+/// maps colours to the same eight-pen model the renderer uses and joins equal horizontal runs into
+/// filled rectangles.
 /// </remarks>
-public readonly record struct HpglFile : IImageFormatReader<HpglFile>, IImageToRawImage<HpglFile> {
+public readonly record struct HpglFile
+  : IImageFormatReader<HpglFile>, IImageToRawImage<HpglFile>,
+    IImageFromRawImage<HpglFile>, IImageFormatWriter<HpglFile> {
 
   /// <summary>How long one plotter unit is, in millimetres.</summary>
   public const double MillimetresPerUnit = 0.025;
@@ -62,6 +67,7 @@ public readonly record struct HpglFile : IImageFormatReader<HpglFile>, IImageToR
   /// </remarks>
   static string[] IImageFormatMetadata<HpglFile>.FileExtensions => [".hpgl", ".hgl", ".hpg", ".prn", ".prt", ".spl"];
   static HpglFile IImageFormatReader<HpglFile>.FromSpan(ReadOnlySpan<byte> data) => HpglReader.FromSpan(data);
+  static byte[] IImageFormatWriter<HpglFile>.ToBytes(HpglFile file) => HpglWriter.ToBytes(file);
   static VideoMode[] IImageFormatMetadata<HpglFile>.VideoModes => [
     new("Plot", [(IntegerRange.Any, IntegerRange.Any)], [16777216])
   ];
@@ -70,6 +76,8 @@ public readonly record struct HpglFile : IImageFormatReader<HpglFile>, IImageToR
   public IReadOnlyList<HpglInstruction> Instructions { get; init; }
 
   public static RawImage ToRawImage(HpglFile file) => HpglRenderer.Render(file);
+
+  public static HpglFile FromRawImage(RawImage image) => HpglWriter.FromRawImage(image);
 }
 
 /// <summary>One instruction: its two-letter mnemonic and whatever followed it.</summary>
