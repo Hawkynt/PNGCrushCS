@@ -55,6 +55,7 @@ quietly come to mean "some of it". How each codec was measured is in
 | [H.264 Annex B byte stream](https://en.wikipedia.org/wiki/Advanced_Video_Coding) | `H264Video` | `.264`, `.h264`, `.avc`, `.x264` | ✅ | ✅ | [ITU-T H.264](https://www.itu.int/rec/T-REC-H.264) |
 | [H.265 / HEVC Annex B byte stream](https://en.wikipedia.org/wiki/High_Efficiency_Video_Coding) | `H265Video` | `.265`, `.h265`, `.hevc`, `.x265` | ✅ | ✅ | [ITU-T H.265](https://www.itu.int/rec/T-REC-H.265) |
 | [H.263 elementary byte stream](https://en.wikipedia.org/wiki/H.263) | `H263Video` | `.263`, `.h263` | ✅ | ✅ | [ITU-T H.263](https://www.itu.int/rec/T-REC-H.263) |
+| [AV1 low-overhead OBU byte stream](https://en.wikipedia.org/wiki/AV1) | `Av1Video` | `.obu` | ✅ | ✅ | [AV1 Bitstream & Decoding Process](https://aomediacodec.github.io/av1-spec/) |
 | [MPEG Program Stream](https://en.wikipedia.org/wiki/MPEG_program_stream) | `MpegProgramStream` | `.mpg`, `.mpeg`, `.vob`, `.m2p`, `.m2ps` | ✅ | ✅ | [MPEG-2 Systems](https://mpeg.chiariglione.org/standards/mpeg-2/systems) |
 | [MPEG Transport Stream](https://en.wikipedia.org/wiki/MPEG_transport_stream) | `TransportStream` | `.ts`, `.m2ts`, `.mts`, `.m2t`, `.tsv` | ✅ | ✅ | [MPEG-2 Systems](https://mpeg.chiariglione.org/standards/mpeg-2/systems) |
 | [Motion JPEG stream](https://en.wikipedia.org/wiki/Motion_JPEG) | `Mjpeg` | `.mjpg`, `.mjpeg` | ✅ | ✅ | [JPEG / ITU-T T.81](https://www.itu.int/rec/T-REC-T.81) |
