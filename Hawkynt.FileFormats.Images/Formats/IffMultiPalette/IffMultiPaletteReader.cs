@@ -1,15 +1,19 @@
-﻿using System;
+using System;
+using System.Buffers.Binary;
 using System.IO;
+using FileFormat.Ilbm;
 
 namespace FileFormat.IffMultiPalette;
 
-/// <summary>Reads IFF Multi-Palette images from bytes, streams, or file paths.</summary>
+/// <summary>Reads the PCHG specialization of IFF ILBM multi-palette pictures.</summary>
 public static class IffMultiPaletteReader {
+
+  private const int _MinimumIffSize = 12;
 
   public static IffMultiPaletteFile FromFile(FileInfo file) {
     ArgumentNullException.ThrowIfNull(file);
     if (!file.Exists)
-      throw new FileNotFoundException("Multi-Palette file not found.", file.FullName);
+      throw new FileNotFoundException("IFF multi-palette file not found.", file.FullName);
 
     return FromBytes(File.ReadAllBytes(file.FullName));
   }
@@ -21,9 +25,10 @@ public static class IffMultiPaletteReader {
       stream.ReadExactly(data);
       return FromBytes(data);
     }
-    using var ms = new MemoryStream();
-    stream.CopyTo(ms);
-    return FromBytes(ms.ToArray());
+
+    using var buffer = new MemoryStream();
+    stream.CopyTo(buffer);
+    return FromBytes(buffer.ToArray());
   }
 
   public static IffMultiPaletteFile FromBytes(byte[] data) {
@@ -31,54 +36,49 @@ public static class IffMultiPaletteReader {
     return FromSpan(data);
   }
 
-  /// <summary>
-  /// Reads a Multi-Palette picture.
-  /// </summary>
-  /// <remarks>
-  /// This used to take anything at all that was twelve bytes or longer: there was no check that the
-  /// file is an IFF one, and where no bitmap header could be found it invented a size and returned a
-  /// picture of it. So an unrelated 129-byte file opened as a blank 320 by 200 page and counted as a
-  /// decode, while the format that could have read it never saw it.
-  /// <para/>
-  /// One of these is an IFF file, so it begins with FORM, and it carries its size in a BMHD chunk.
-  /// Without both there is nothing here to read.
-  /// </remarks>
   public static IffMultiPaletteFile FromSpan(ReadOnlySpan<byte> data) {
-    if (data.Length < IffMultiPaletteFile.MinFileSize)
-      throw new InvalidDataException($"Invalid Multi-Palette data: expected at least {IffMultiPaletteFile.MinFileSize} bytes, got {data.Length}.");
+    if (data.Length < _MinimumIffSize)
+      throw new InvalidDataException("Data is too small for an IFF multi-palette picture.");
+    if (!data[..4].SequenceEqual("FORM"u8) || !data.Slice(8, 4).SequenceEqual("ILBM"u8))
+      throw new InvalidDataException("An IFF multi-palette picture is a FORM ILBM carrying a PCHG property chunk.");
+    if (!_ContainsChunk(data, "PCHG"u8))
+      throw new InvalidDataException("IFF ILBM contains no PCHG palette-change chunk.");
 
-    if (!data[..4].SequenceEqual("FORM"u8))
-      throw new InvalidDataException("Not a Multi-Palette picture: an IFF file begins with FORM.");
+    var ilbm = IlbmReader.FromSpan(data);
+    if (ilbm.NumPlanes is < 1 or > 4)
+      throw new InvalidDataException($"This IFF multi-palette reader supports one to four indexed bitplanes; the file carries {ilbm.NumPlanes}.");
+    if (ilbm.IsHam)
+      throw new InvalidDataException("HAM palette-change pictures belong to the sliced-HAM path; this multi-palette format is indexed.");
+    if (ilbm.ScanlinePalettes is not { } palettes)
+      throw new InvalidDataException("The PCHG chunk is compressed or uses a palette-change form this reader does not support.");
 
-    if (!_TryParseBmhd(data, out var width, out var height))
-      throw new InvalidDataException("Not a Multi-Palette picture: it carries no BMHD chunk to state its size.");
+    var expectedPaletteBytes = checked(ilbm.Height * IffMultiPaletteFile.PaletteByteSize);
+    if (palettes.Length < expectedPaletteBytes)
+      throw new InvalidDataException("PCHG palette data ends before the last scanline.");
 
-    return new() {
-      Width = width,
-      Height = height,
-      RawData = data.ToArray(),
+    var result = new IffMultiPaletteFile {
+      Width = ilbm.Width,
+      Height = ilbm.Height,
+      PixelData = ilbm.PixelData[..],
+      ScanlinePalettes = palettes.AsSpan(0, expectedPaletteBytes).ToArray(),
     };
+    IffMultiPaletteFile.Validate(result, nameof(data));
+    return result;
   }
 
-  /// <returns>Whether a bitmap header was found and stated a size.</returns>
-  private static bool _TryParseBmhd(ReadOnlySpan<byte> data, out int width, out int height) {
-    width = IffMultiPaletteFile.DefaultWidth;
-    height = IffMultiPaletteFile.DefaultHeight;
+  private static bool _ContainsChunk(ReadOnlySpan<byte> data, ReadOnlySpan<byte> wanted) {
+    var formSize = BinaryPrimitives.ReadUInt32BigEndian(data[4..]);
+    var end = (int)Math.Min((long)data.Length, 8L + formSize);
 
-    for (var i = 0; i < data.Length - 24; ++i) {
-      if (data[i] != 0x42 || data[i + 1] != 0x4D || data[i + 2] != 0x48 || data[i + 3] != 0x44)
-        continue;
-
-      var offset = i + 8;
-      if (offset + 4 > data.Length)
+    for (var offset = 12; offset + 8 <= end;) {
+      var size = BinaryPrimitives.ReadUInt32BigEndian(data[(offset + 4)..]);
+      var payload = offset + 8L;
+      var next = payload + size + (size & 1);
+      if (next > end)
         return false;
-
-      width = (data[offset] << 8) | data[offset + 1];
-      height = (data[offset + 2] << 8) | data[offset + 3];
-
-      // A header stating nothing usable is not a size, and inventing one in its place is what put
-      // blank pages where a refusal belonged.
-      return width > 0 && height > 0;
+      if (data.Slice(offset, 4).SequenceEqual(wanted))
+        return true;
+      offset = (int)next;
     }
 
     return false;
