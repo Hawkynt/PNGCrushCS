@@ -169,7 +169,7 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | BodyPaint3D | `.b3d`, `.b2d` | ✅ | ✅ | — | — | — |
 | BoogieDownPaint | `.bdp` | ✅ | ✅ | — | — | — |
 | Botticelli | `.p4i` | ✅ | ✅ | — | — | — |
-| Bpg | `.bpg` | ✅ | ✅ | — | — | — |
+| Bpg | `.bpg` | ✅ | — | — | — | — |
 | BrooktroutFax | `.brk`, `.301`, `.brt` | ✅ | ✅ | — | — | — |
 | BrotherFax | `.uni` | ✅ | ✅ | — | — | — |
 | Brus | `.brus` | ✅ | ✅ | — | — | — |
@@ -1032,7 +1032,7 @@ This list used to be far longer, and the entries that left it did so by argument
 
 ### Registered but read-only
 
-These 11 entries read but have no writer; each is a decision, not an oversight. **Not bounded** (an encoder or a model this package does not have): PeResource, PowerPoint, Fpx (executable, OLE and compound-document containers). **Holders of other files rather than pictures of their own**: IconLibrary, Ipg, Sdg, Cdr, Cmx — an icon library, a tileset and a gallery carry whole files of other formats, and CorelDRAW's streams are vector scenes whose raster part is only an embedded preview, so writing any of them means deciding what belongs in a collection or composing a drawing, neither of which is serialising a picture. **Deliberately not written** because a file built from arbitrary pixels would not be what the name promises: EmbeddedDib, CartesMichelin, Pes. The last is a needle path rather than a raster — a Brother embroidery file states where the needle goes and in which thread, and the picture is what those moves draw — so writing one from a picture means deciding where to put every stitch, which is needlework and not serialisation. Writing one from stitches a caller already has is a different thing and `PesWriter` does it; it stays off the registry's writer contract because that contract asks for a picture.
+These 11 entries read but have no writer; each is a decision, not an oversight. **Not bounded** (an encoder or a model this package does not have): PeResource, PowerPoint, Fpx (executable, OLE and compound-document containers). **Holders of other files rather than pictures of their own**: IconLibrary, Ipg, Sdg, Cdr, Cmx — an icon library, a tileset and a gallery carry whole files of other formats, and CorelDRAW's streams are vector scenes whose raster part is only an embedded preview, so writing any of them means deciding what belongs in a collection or composing a drawing, neither of which is serialising a picture. **Deliberately not written** because a file built from arbitrary pixels would not be what the name promises: EmbeddedDib, CartesMichelin, Pes. The last is a needle path rather than a raster — a Brother embroidery file states where the needle goes and in which thread, and the picture is what those moves draw — so writing one from a picture means deciding where to put every stitch, which is needlework and not serialisation. Writing one from stitches a caller already has is a different thing and `PesWriter` does it; it stays off the registry's writer contract because that contract asks for a picture. **Awaiting a conforming encoder**: Bpg. A BPG file is an HEVC still picture, and this package has no HEVC encoder; the entry point that used to exist stored the caller's RGB bytes under a `YCbCr444` label and produced a file no BPG decoder reads, which the round trip failed to notice only because the decode path caught its own failure and handed the stored bytes back. `BpgWriter` still re-serialises a `BpgFile` that already holds a valid picture, which is a different contract and an honest one.
 
 ## 🚀 Quick start
 
