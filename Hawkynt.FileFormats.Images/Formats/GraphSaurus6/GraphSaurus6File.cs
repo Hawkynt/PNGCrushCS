@@ -18,6 +18,7 @@ namespace FileFormat.GraphSaurus6;
 // as their magic, and the registry consults magic before extension — so whichever it happened to
 // reach first took every MSX picture. A Screen 5 file, 256 by 212, was being opened as a Screen 6
 // one and drawn 512 by 424. The extension is what tells these apart, and it is what decides now.
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct GraphSaurus6File
   : IImageFormatReader<GraphSaurus6File>, IImageToRawImage<GraphSaurus6File>,
     IImageFromRawImage<GraphSaurus6File>, IImageFormatWriter<GraphSaurus6File> {
@@ -43,8 +44,14 @@ public readonly record struct GraphSaurus6File
     => GraphSaurus6Reader.FromSpan(data);
   static byte[] IImageFormatWriter<GraphSaurus6File>.ToBytes(GraphSaurus6File file)
     => GraphSaurus6Writer.ToBytes(file);
+  /// <summary>The picture the mode displays: 512 across and the full 212 rows.</summary>
+  /// <remarks>
+  /// A shorter file is readable — the height comes from the BSAVE length — but the writer fills the
+  /// screen whatever it is handed, and leaving the height unbounded meant nothing ever asked for the
+  /// height it writes.
+  /// </remarks>
   static VideoMode[] IImageFormatMetadata<GraphSaurus6File>.VideoModes => [
-    new("Screen 6", [(Width, IntegerRange.Any)], [ColorCount])
+    new("Screen 6", [(Width, MaxHeight)], [ColorCount])
   ];
 
   /// <summary>Stored rows; the picture is drawn twice as tall.</summary>
