@@ -47,6 +47,16 @@ public sealed record VideoFormatEntry(
 
   /// <summary>The first/preferred media type, or <c>"application/octet-stream"</c> if none is registered.</summary>
   public string PrimaryMimeType => this.MimeTypes.Length > 0 ? this.MimeTypes[0] : "application/octet-stream";
+
+  /// <summary>
+  /// Tools from outside this repository that have read a file this container's muxer wrote.
+  /// </summary>
+  /// <remarks>
+  /// Declared by <see cref="VerifiedByAttribute"/> on the writer type and carried here by the
+  /// registry generator. Empty means nothing but this package's own demuxer has ever opened what
+  /// the muxer produces, which for the containers here is the ordinary answer.
+  /// </remarks>
+  public ConformanceOracle[] VerifiedBy { get; init; } = [];
 }
 
 /// <summary>
@@ -91,4 +101,17 @@ public sealed record VideoCodecEntry(
 public sealed record VideoCodecEncoderEntry(
   string CodecName,
   CodecTag Codec,
-  Func<MediaStreamInfo, IVideoPacketEncoder> CreateEncoder);
+  Func<MediaStreamInfo, IVideoPacketEncoder> CreateEncoder) {
+
+  /// <summary>
+  /// Tools from outside this repository that have read what this encoder produces.
+  /// </summary>
+  /// <remarks>
+  /// This package's own decoder is not one of them and never can be. An encoder and a decoder
+  /// written from the same reading of a format agree with each other whether or not that reading is
+  /// right, and the codecs here are mostly ones whose description had to be recovered by
+  /// measurement — exactly the case where a shared mistake is likeliest. Empty is the honest answer
+  /// wherever nothing else has looked.
+  /// </remarks>
+  public ConformanceOracle[] VerifiedBy { get; init; } = [];
+}

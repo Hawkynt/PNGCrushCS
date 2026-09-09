@@ -31,6 +31,7 @@ namespace FileFormat.Codecs;
 /// from the one the encoder was created for, a picture with too little pixel data for its own
 /// declared size, and any pixel format not named above.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.FFmpeg)]
 public sealed class V408VideoEncoder : IVideoCodecEncoder<V408VideoEncoder> {
 
   private static readonly CodecTag _Tag = CodecTag.FromCharacters("v408");

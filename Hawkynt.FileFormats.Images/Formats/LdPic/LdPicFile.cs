@@ -14,6 +14,7 @@ namespace FileFormat.LdPic;
 /// order — which lines up bytes that are eight scanlines apart in the machine's character-cell
 /// layout, so that a flat area of screen becomes a run rather than a stripe.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct LdPicFile
   : IImageFormatReader<LdPicFile>, IImageToRawImage<LdPicFile>,
     IImageFromRawImage<LdPicFile>, IImageFormatWriter<LdPicFile> {

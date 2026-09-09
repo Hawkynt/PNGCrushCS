@@ -31,6 +31,7 @@ namespace FileFormat.Crd;
 /// depth of the JPEG inside, and pixels identical to what the same JPEG decodes to on its own.
 /// </remarks>
 [FormatMagicBytes([0x09, (byte)'C', (byte)'a', (byte)'r', (byte)'d', (byte)'M', (byte)'a', (byte)'k', (byte)'e', (byte)'r'])]
+[VerifiedBy(ConformanceOracle.FFmpeg)]
 public sealed class CrdFile
   : IImageFormatReader<CrdFile>, IImageToRawImage<CrdFile>, IImageFromRawImage<CrdFile>, IImageFormatWriter<CrdFile> {
 

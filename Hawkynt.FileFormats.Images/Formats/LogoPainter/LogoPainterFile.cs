@@ -14,6 +14,7 @@ namespace FileFormat.LogoPainter;
 /// each character four pixels wide shown doubled. The screen takes a whole page for the 2000 bytes
 /// it uses and the character set follows it.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct LogoPainterFile
   : IImageFormatReader<LogoPainterFile>, IImageToRawImage<LogoPainterFile>,
     IImageFromRawImage<LogoPainterFile>, IImageFormatWriter<LogoPainterFile> {

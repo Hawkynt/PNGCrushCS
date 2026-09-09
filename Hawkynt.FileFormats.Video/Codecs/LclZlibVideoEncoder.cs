@@ -39,6 +39,7 @@ namespace FileFormat.Codecs;
 /// stream was created for is refused too: the geometry is in the stream header and the decoder
 /// sizes every frame from it.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.FFmpeg)]
 public sealed class LclZlibVideoEncoder : IVideoCodecEncoder<LclZlibVideoEncoder> {
 
   private static readonly CodecTag _Tag = CodecTag.FromCharacters("ZLIB");

@@ -14,6 +14,7 @@ namespace FileFormat.AmosBank;
 /// take the next byte of the second. Compressing the control stream as well is what makes the
 /// scheme worth its complexity on a machine where a screen is a hundred kilobytes.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct AmosBankFile
   : IImageFormatReader<AmosBankFile>, IImageToRawImage<AmosBankFile>,
     IImageFromRawImage<AmosBankFile>, IImageFormatWriter<AmosBankFile> {

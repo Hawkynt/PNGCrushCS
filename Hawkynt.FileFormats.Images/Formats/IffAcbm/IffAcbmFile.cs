@@ -5,6 +5,7 @@ namespace FileFormat.IffAcbm;
 
 /// <summary>In-memory representation of an IFF ACBM (Amiga Contiguous Bitmap) image.</summary>
 [FormatMagicBytes([0x46, 0x4F, 0x52, 0x4D])]
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.FFmpeg)]
 public readonly record struct IffAcbmFile : IImageFormatReader<IffAcbmFile>, IImageToRawImage<IffAcbmFile>, IImageFromRawImage<IffAcbmFile>, IImageFormatWriter<IffAcbmFile> {
 
   static string IImageFormatMetadata<IffAcbmFile>.PrimaryExtension => ".acbm";

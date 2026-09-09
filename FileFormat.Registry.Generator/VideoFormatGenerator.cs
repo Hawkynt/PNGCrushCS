@@ -37,6 +37,7 @@ public sealed class VideoFormatGenerator : IIncrementalGenerator {
   private const string _FORMAT_MAGIC_BYTES = "FileFormat.Core.FormatMagicBytesAttribute";
   private const string _FORMAT_DETECTION_PRIORITY = "FileFormat.Core.FormatDetectionPriorityAttribute";
   private const string _FORMAT_MIME_TYPE = "FileFormat.Core.FormatMimeTypeAttribute";
+  private const string _VERIFIED_BY = "FileFormat.Core.VerifiedByAttribute";
 
   private const string _NAMESPACE_PROPERTY = "build_property.FileFormatRegistryNamespace";
   private const string _DEFAULT_NAMESPACE = "Optimizer.Image";
@@ -64,6 +65,7 @@ public sealed class VideoFormatGenerator : IIncrementalGenerator {
     var magicBytesAttr = compilation.GetTypeByMetadataName(_FORMAT_MAGIC_BYTES);
     var detectionPriorityAttr = compilation.GetTypeByMetadataName(_FORMAT_DETECTION_PRIORITY);
     var mimeTypeAttr = compilation.GetTypeByMetadataName(_FORMAT_MIME_TYPE);
+    var verifiedByAttr = compilation.GetTypeByMetadataName(_VERIFIED_BY);
 
     var containers = new List<ContainerInfo>();
     var codecs = new List<CodecInfo>();
@@ -112,7 +114,7 @@ public sealed class VideoFormatGenerator : IIncrementalGenerator {
       if (isDecoder || isEncoder) {
         var codecId = _TrimSuffix(_TrimSuffix(type.Name, "Decoder"), "Encoder");
         if (seenCodecs.Add(fullName))
-          codecs.Add(new CodecInfo(codecId, fullName, isDecoder, isEncoder));
+          codecs.Add(new CodecInfo(codecId, fullName, isDecoder, isEncoder, OracleAttributeReader.Read(type, verifiedByAttr)));
       }
 
       if (!isContainerReader && !isContainerWriter)
@@ -129,7 +131,8 @@ public sealed class VideoFormatGenerator : IIncrementalGenerator {
         isContainerWriter,
         _ReadMagicBytes(type, magicBytesAttr),
         _ReadDetectionPriority(type, detectionPriorityAttr),
-        _ReadMimeTypes(type, mimeTypeAttr)));
+        _ReadMimeTypes(type, mimeTypeAttr),
+        OracleAttributeReader.Read(type, verifiedByAttr)));
     }
 
     containers.Sort(static (a, b) => StringComparer.Ordinal.Compare(a.FormatId, b.FormatId));
@@ -285,6 +288,12 @@ public sealed class VideoFormatGenerator : IIncrementalGenerator {
       _EmitMagicArray(sb, container.MagicSignatures);
       sb.Append(", ").Append(container.DetectionPriority).Append(", ");
       _EmitStringArray(sb, container.MimeTypes);
+      sb.Append(", ");
+
+      // The claim belongs to the muxer, which is a type of its own — AviWriter beside AviContainer —
+      // and the registered entry is the reader's. Carried across here so the one row the tables give
+      // a container can say who has read what its writer produced.
+      OracleAttributeReader.Emit(sb, _WriterOraclesFor(discovery, container.FormatId));
       sb.AppendLine(");");
     }
 
@@ -304,13 +313,28 @@ public sealed class VideoFormatGenerator : IIncrementalGenerator {
       if (!codec.HasEncoder)
         continue;
 
-      sb.Append("    _RegisterEncoder<").Append(codec.FullTypeName).AppendLine(">();");
+      sb.Append("    _RegisterEncoder<").Append(codec.FullTypeName).Append(">(");
+      OracleAttributeReader.Emit(sb, codec.VerifyingOracles);
+      sb.AppendLine(");");
     }
 
     sb.AppendLine("  }");
     sb.AppendLine("}");
 
     spc.AddSource("VideoFormatRegistration.g.cs", sb.ToString());
+  }
+
+  /// <summary>The oracles claimed by the muxer that goes with this container's reader.</summary>
+  /// <remarks>
+  /// The generator gives a writer its own entry under the reader's name plus "Writer", because a
+  /// muxer is a separate type implementing a separate contract. That naming is what joins them.
+  /// </remarks>
+  private static string[] _WriterOraclesFor(VideoDiscovery discovery, string formatId) {
+    foreach (var candidate in discovery.Containers)
+      if (candidate.FormatId == formatId + "Writer")
+        return candidate.VerifyingOracles;
+
+    return Array.Empty<string>();
   }
 
   private static void _EmitMagicArray(StringBuilder sb, MagicBytesInfo[] signatures) {
@@ -377,9 +401,13 @@ public sealed class VideoFormatGenerator : IIncrementalGenerator {
     public int DetectionPriority { get; }
     public string[] MimeTypes { get; }
 
+    /// <summary>The <c>ConformanceOracle</c> members this container's <c>[VerifiedBy]</c> names.</summary>
+    public string[] VerifyingOracles { get; }
+
     public ContainerInfo(
       string formatId, string fullTypeName, bool hasReader, bool hasWriter,
-      MagicBytesInfo[] magicSignatures, int detectionPriority, string[] mimeTypes) {
+      MagicBytesInfo[] magicSignatures, int detectionPriority, string[] mimeTypes,
+      string[] verifyingOracles) {
       this.FormatId = formatId;
       this.FullTypeName = fullTypeName;
       this.HasReader = hasReader;
@@ -387,6 +415,7 @@ public sealed class VideoFormatGenerator : IIncrementalGenerator {
       this.MagicSignatures = magicSignatures;
       this.DetectionPriority = detectionPriority;
       this.MimeTypes = mimeTypes;
+      this.VerifyingOracles = verifyingOracles;
     }
   }
 
@@ -397,11 +426,15 @@ public sealed class VideoFormatGenerator : IIncrementalGenerator {
     public bool HasDecoder { get; }
     public bool HasEncoder { get; }
 
-    public CodecInfo(string codecId, string fullTypeName, bool hasDecoder, bool hasEncoder) {
+    /// <summary>The <c>ConformanceOracle</c> members this codec's <c>[VerifiedBy]</c> names.</summary>
+    public string[] VerifyingOracles { get; }
+
+    public CodecInfo(string codecId, string fullTypeName, bool hasDecoder, bool hasEncoder, string[] verifyingOracles) {
       this.CodecId = codecId;
       this.FullTypeName = fullTypeName;
       this.HasDecoder = hasDecoder;
       this.HasEncoder = hasEncoder;
+      this.VerifyingOracles = verifyingOracles;
     }
   }
 

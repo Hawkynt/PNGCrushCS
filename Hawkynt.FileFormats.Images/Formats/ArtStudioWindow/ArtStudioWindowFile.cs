@@ -14,6 +14,7 @@ namespace FileFormat.ArtStudioWindow;
 /// picture starts. When it is not zero the window covers one more cell than its size implies, which
 /// is what makes the stored length depend on the offset rather than only on the dimensions.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct ArtStudioWindowFile
   : IImageFormatReader<ArtStudioWindowFile>, IImageToRawImage<ArtStudioWindowFile>,
     IImageFromRawImage<ArtStudioWindowFile>, IImageFormatWriter<ArtStudioWindowFile> {

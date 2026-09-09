@@ -14,6 +14,7 @@ namespace FileFormat.McPainter;
 /// The result of that averaging is what a decoder has to produce, so this decodes to RGB: the
 /// blended colours are not registers and cannot be named by an index.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct McPainterFile
   : IImageFormatReader<McPainterFile>, IImageToRawImage<McPainterFile>,
     IImageFromRawImage<McPainterFile>, IImageFormatWriter<McPainterFile> {

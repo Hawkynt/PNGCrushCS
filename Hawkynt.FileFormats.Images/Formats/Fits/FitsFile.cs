@@ -6,6 +6,7 @@ namespace FileFormat.Fits;
 
 /// <summary>In-memory representation of a FITS image.</summary>
 [FormatMagicBytes([0x53, 0x49, 0x4D, 0x50, 0x4C, 0x45])]
+[VerifiedBy(ConformanceOracle.ImageMagick)]
 public readonly record struct FitsFile : IImageFormatReader<FitsFile>, IImageToRawImage<FitsFile>, IImageFromRawImage<FitsFile>, IImageFormatWriter<FitsFile> {
 
   static string IImageFormatMetadata<FitsFile>.PrimaryExtension => ".fits";

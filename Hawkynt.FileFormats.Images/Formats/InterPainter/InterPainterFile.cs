@@ -10,6 +10,7 @@ namespace FileFormat.InterPainter;
 /// shades: the four registers themselves plus the six ways of pairing them. The file is the two
 /// 8000-byte bitmaps followed by the background and PF0-PF2 colour bytes.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct InterPainterFile
   : IImageFormatReader<InterPainterFile>, IImageToRawImage<InterPainterFile>,
     IImageFromRawImage<InterPainterFile>, IImageFormatWriter<InterPainterFile> {

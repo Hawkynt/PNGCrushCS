@@ -7,6 +7,7 @@ using FileFormat.Core;
 namespace FileFormat.Yuv4Mpeg;
 
 /// <summary>Writes uncompressed planar YUV frames as a YUV4MPEG2 stream.</summary>
+[VerifiedBy(ConformanceOracle.FFmpeg)]
 public sealed class Yuv4MpegWriter : IVideoContainerWriter<Yuv4MpegWriter> {
 
   private readonly MemoryStream _stream = new();

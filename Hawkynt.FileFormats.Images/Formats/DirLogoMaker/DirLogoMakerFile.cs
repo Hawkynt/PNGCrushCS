@@ -13,6 +13,7 @@ namespace FileFormat.DirLogoMaker;
 /// The characters are stored as ASCII and have to be translated into the machine's own order, which
 /// is not the same: its character set puts the punctuation before the letters.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct DirLogoMakerFile
   : IImageFormatReader<DirLogoMakerFile>, IImageToRawImage<DirLogoMakerFile>,
     IImageFromRawImage<DirLogoMakerFile>, IImageFormatWriter<DirLogoMakerFile> {

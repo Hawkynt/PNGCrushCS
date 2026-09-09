@@ -10,6 +10,7 @@ namespace FileFormat.PalmImageViewer;
 /// picture as a single record. It is a different format from the other .pdb pictures here, which is
 /// why it is a format of its own rather than a branch inside one.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.ImageMagick)]
 public readonly record struct PalmImageViewerFile
   : IImageFormatReader<PalmImageViewerFile>, IImageToRawImage<PalmImageViewerFile>,
     IImageFromRawImage<PalmImageViewerFile>, IImageFormatWriter<PalmImageViewerFile> {

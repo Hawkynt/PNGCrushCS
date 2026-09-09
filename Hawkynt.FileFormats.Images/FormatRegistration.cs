@@ -62,7 +62,8 @@ internal static partial class FormatRegistration {
     MagicSignature[] magic,
     int priority,
     string[] mimeTypes,
-    RawImageWriteCapability[] typedWriteCapabilities
+    RawImageWriteCapability[] typedWriteCapabilities,
+    ConformanceOracle[] verifiedBy
   ) where T : IImageFormatReader<T>, IImageToRawImage<T>, IImageFromRawImage<T>, IImageFormatWriter<T> {
     Func<byte[], bool?>? matchSig = null;
     try { matchSig = header => T.MatchesSignature(header); } catch { /* type doesn't override */ }
@@ -84,6 +85,7 @@ internal static partial class FormatRegistration {
       LoadRawImageOrThrow: FormatIO.Decode<T>,
       WriteToFile: FormatIO.WriteToFile<T>) {
       TypedWriteCapabilities = typedWriteCapabilities,
+      VerifiedBy = verifiedBy,
     };
     FormatRegistry.Register(entry);
   }

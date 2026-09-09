@@ -14,6 +14,7 @@ namespace FileFormat.PetsciiBot;
 /// a picture this small can be recognisable: a quarter-block or a diagonal is a pixel that happens
 /// to have a letter's name.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct PetsciiBotFile
   : IImageFormatReader<PetsciiBotFile>, IImageToRawImage<PetsciiBotFile>,
     IImageFromRawImage<PetsciiBotFile>, IImageFormatWriter<PetsciiBotFile> {

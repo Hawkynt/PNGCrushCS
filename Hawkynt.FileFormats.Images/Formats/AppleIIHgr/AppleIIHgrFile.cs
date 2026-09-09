@@ -4,6 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.AppleIIHgr;
 
 /// <summary>In-memory representation of an Apple II High-Resolution graphics screen dump.</summary>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct AppleIIHgrFile : IImageFormatReader<AppleIIHgrFile>, IImageToRawImage<AppleIIHgrFile>, IImageFromRawImage<AppleIIHgrFile>, IImageFormatWriter<AppleIIHgrFile> {
 
   /// <summary>Exact file size in bytes (8192 = 0x2000 memory region).</summary>

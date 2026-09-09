@@ -28,6 +28,7 @@ namespace FileFormat.TaquartInterlace;
 /// a picture is its colours, not its detail: both fields draw one hue at a column, so a displayed
 /// colour is the mean of two entries of one row of the palette and nothing else.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct TaquartInterlaceFile
   : IImageFormatReader<TaquartInterlaceFile>, IImageToRawImage<TaquartInterlaceFile>,
     IImageFromRawImage<TaquartInterlaceFile>, IImageFormatWriter<TaquartInterlaceFile> {

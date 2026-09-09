@@ -28,6 +28,7 @@ namespace FileFormat.EciGraphicEditor;
 /// Blending two frames of sixteen colours apiece yields 135 distinct colours rather than 16 or 256:
 /// the pairs are unordered, and several of them average to the same value.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct EciGraphicEditorFile
   : IImageFormatReader<EciGraphicEditorFile>, IImageToRawImage<EciGraphicEditorFile>,
     IImageFromRawImage<EciGraphicEditorFile>, IImageFormatWriter<EciGraphicEditorFile> {

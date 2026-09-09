@@ -13,6 +13,7 @@ namespace FileFormat.AtariPlayerEditor;
 /// The file is a fixed 1677 bytes whether it holds one frame or sixteen — the editor wrote its
 /// whole workspace out.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct AtariPlayerEditorFile
   : IImageFormatReader<AtariPlayerEditorFile>, IImageToRawImage<AtariPlayerEditorFile>,
     IImageFromRawImage<AtariPlayerEditorFile>, IImageFormatWriter<AtariPlayerEditorFile> {

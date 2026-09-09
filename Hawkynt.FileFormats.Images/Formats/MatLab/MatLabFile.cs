@@ -4,6 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.MatLab;
 
 /// <summary>In-memory representation of a MATLAB Level 5 image image.</summary>
+[VerifiedBy(ConformanceOracle.ImageMagick)]
 public readonly record struct MatLabFile : IImageFormatReader<MatLabFile>, IImageToRawImage<MatLabFile>, IImageFromRawImage<MatLabFile>, IImageFormatWriter<MatLabFile> {
 
   internal const int HeaderSize = 128;

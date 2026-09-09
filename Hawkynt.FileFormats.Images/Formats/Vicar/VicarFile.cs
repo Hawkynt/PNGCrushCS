@@ -5,6 +5,7 @@ using FileFormat.Core;
 namespace FileFormat.Vicar;
 
 /// <summary>In-memory representation of a NASA JPL VICAR image.</summary>
+[VerifiedBy(ConformanceOracle.ImageMagick)]
 public readonly record struct VicarFile : IImageFormatReader<VicarFile>, IImageToRawImage<VicarFile>, IImageFromRawImage<VicarFile>, IImageFormatWriter<VicarFile> {
 
   static string IImageFormatMetadata<VicarFile>.PrimaryExtension => ".vic";

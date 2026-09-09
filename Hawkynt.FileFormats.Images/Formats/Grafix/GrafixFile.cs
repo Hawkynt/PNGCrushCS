@@ -10,6 +10,7 @@ namespace FileFormat.Grafix;
 /// with a dictionary coder — and packed as two halves rather than one stream, so a decoder has to
 /// run it twice.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct GrafixFile
   : IImageFormatReader<GrafixFile>, IImageToRawImage<GrafixFile>,
     IImageFromRawImage<GrafixFile>, IImageFormatWriter<GrafixFile> {

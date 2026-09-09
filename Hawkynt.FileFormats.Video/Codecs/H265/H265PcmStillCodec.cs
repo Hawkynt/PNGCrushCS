@@ -170,6 +170,297 @@ internal static class H265PcmStillCodec {
     return true;
   }
 
+  /// <summary>
+  /// A still picture in the shape BPG's container carries one: the handful of sequence parameter
+  /// set fields BPG keeps in a header of its own, and the NALs that follow them.
+  /// </summary>
+  /// <remarks>
+  /// This is not the stream <see cref="Encode"/> writes with two NALs deleted. A BPG file carries no
+  /// video or sequence parameter set at all; its header states the fields a decoder cannot infer and
+  /// the format's specification fixes every other one, so the picture has to be coded to those fixed
+  /// choices rather than to any this encoder would otherwise prefer.
+  /// </remarks>
+  internal readonly record struct BpgEncodedImage(byte[] SequenceHeader, byte[] Data);
+
+  /// <summary>The number of component planes a BPG picture this codec writes or reads is made of.</summary>
+  /// <remarks>
+  /// Three, always. A BPG picture may state one plane instead, and this codec does not write or read
+  /// that one: <c>libbpg</c>'s own PCM path puts a coding unit's chroma blocks into planes a
+  /// monochrome frame has not allocated, so a monochrome PCM picture is one the reference decoder
+  /// cannot read — and this package will not write a file it can only check against itself.
+  /// </remarks>
+  private const int _BPG_PLANES = 3;
+
+  /// <summary>The bytes of PCM samples one 4:4:4 coding unit carries at eight bits a sample.</summary>
+  private const int _BPG_PCM_BYTES_PER_CTB = _BPG_PLANES * _CTB_SIZE * _CTB_SIZE;
+
+  /// <summary>
+  /// Encodes one still picture for a BPG container: 4:4:4 with the three planes holding G, B and R,
+  /// at eight bits a sample and losing nothing.
+  /// </summary>
+  /// <remarks>
+  /// The geometry is forced by what BPG leaves unsaid. Its header states
+  /// log2_min_luma_coding_block_size but never the coded picture size, which a decoder derives as
+  /// ceil(dimension / MinCbSizeY) * MinCbSizeY — so making the smallest coding block the same 32 by
+  /// 32 as the coding tree block rounds the coded picture to whole tree blocks, and every tree block
+  /// is then one unsplit coding unit whose samples all lie inside the picture. Clause 7.3.8.5 codes
+  /// split_cu_flag only while a coding block is larger than the smallest the sequence allows and
+  /// part_mode only once it is not, so that choice also decides which element precedes pcm_flag.
+  /// </remarks>
+  internal static BpgEncodedImage EncodeBpgStill(RawImage source) {
+    ArgumentNullException.ThrowIfNull(source);
+    if (source.Width <= 0 || source.Height <= 0)
+      throw new ArgumentOutOfRangeException(nameof(source), "HEVC requires a positive image size.");
+
+    var codedWidth = _RoundUp(source.Width, _CTB_SIZE);
+    var codedHeight = _RoundUp(source.Height, _CTB_SIZE);
+    _SmallestLevelFor(codedWidth, codedHeight); // refuses a picture past the largest defined level
+    var planes = _BuildBpgPlanes(source, codedWidth, codedHeight);
+
+    var pps = _MakeNal(H265NalUnitType.PictureParameterSet, _BuildPps());
+    var slice = _MakeNal(H265NalUnitType.IdrWithNoLeadingPictures,
+      _BuildBpgSlice(planes, codedWidth, codedHeight));
+
+    // BPG omits the start code in front of the first NAL only, and keeps it in front of every other.
+    var data = new byte[pps.Length + 3 + slice.Length];
+    pps.CopyTo(data, 0);
+    data[pps.Length + 2] = 1;
+    slice.CopyTo(data, pps.Length + 3);
+
+    return new(_BuildBpgSequenceHeader(), data);
+  }
+
+  /// <summary>
+  /// Decodes the picture <see cref="EncodeBpgStill"/> writes, at the coded size BPG's own header
+  /// implies. Answers false for anything outside that shape rather than returning invented samples.
+  /// </summary>
+  internal static bool TryDecodeBpgStill(
+    ReadOnlySpan<byte> hevcData,
+    int codedWidth,
+    int codedHeight,
+    out byte[][] planes
+  ) {
+    planes = [];
+    if (codedWidth <= 0 || codedHeight <= 0
+        || codedWidth % _CTB_SIZE != 0 || codedHeight % _CTB_SIZE != 0)
+      return false;
+
+    var annexB = new byte[3 + hevcData.Length];
+    annexB[2] = 1;
+    hevcData.CopyTo(annexB.AsSpan(3));
+
+    H265PictureParameterSet? pps = null;
+    H265NalUnit? coded = null;
+    foreach (var nal in H265NalReader.SplitAnnexB(annexB))
+      switch (nal.Type) {
+        case H265NalUnitType.PictureParameterSet:
+          pps = H265PictureParameterSet.Parse(nal.Payload);
+          break;
+        case H265NalUnitType.IdrWithNoLeadingPictures:
+        case H265NalUnitType.IdrWithRandomAccessDecodableLeading:
+          coded ??= nal;
+          break;
+      }
+
+    if (pps == null || coded == null
+        || !_BpgSliceHeaderIsUniformPcm(pps, coded, out var sliceQpY, out var dataOffset))
+      return false;
+
+    var samples = new byte[_BPG_PLANES][];
+    for (var plane = 0; plane < _BPG_PLANES; ++plane)
+      samples[plane] = new byte[codedWidth * codedHeight];
+
+    var contexts = new byte[H265CabacContexts.COUNT];
+    H265CabacContexts.Initialize(contexts, 0, sliceQpY);
+
+    var engine = new H265CabacEngine(coded.Payload, contexts);
+    try {
+      engine.Start(dataOffset);
+    } catch (InvalidDataException) {
+      return false;
+    }
+
+    var across = codedWidth >> _CTB_LOG2;
+    var total = across * (codedHeight >> _CTB_LOG2);
+
+    for (var index = 0; index < total; ++index) {
+      if (engine.DecodeBin(H265CabacContexts.PART_MODE) != 1) // part_mode: PART_2Nx2N
+        return false;
+      if (engine.DecodeTerminate() == 0) // pcm_flag
+        return false;
+
+      var at = (engine.BitPosition + 7) >> 3;
+      if (at > coded.Payload.Length - _BPG_PCM_BYTES_PER_CTB)
+        return false;
+
+      var x = (index % across) << _CTB_LOG2;
+      var y = (index / across) << _CTB_LOG2;
+      foreach (var plane in samples)
+        for (var row = 0; row < _CTB_SIZE; ++row) {
+          var to = (y + row) * codedWidth + x;
+          for (var column = 0; column < _CTB_SIZE; ++column)
+            plane[to + column] = coded.Payload[at++];
+        }
+
+      // pcm() initializes the arithmetic registers again but does not initialize the contexts.
+      engine = new H265CabacEngine(coded.Payload, contexts);
+      try {
+        engine.Start(at);
+      } catch (InvalidDataException) {
+        return false;
+      }
+
+      var end = engine.DecodeTerminate();
+      if (index + 1 == total) {
+        if (end == 0)
+          return false;
+      } else if (end != 0)
+        return false;
+    }
+
+    planes = samples;
+    return true;
+  }
+
+  /// <summary>
+  /// Reads the slice segment header of a candidate BPG picture and says whether its coding units are
+  /// the unsplit PCM ones this codec writes, leaving the byte the entropy-coded data starts at.
+  /// </summary>
+  private static bool _BpgSliceHeaderIsUniformPcm(
+    H265PictureParameterSet pps,
+    H265NalUnit coded,
+    out int sliceQpY,
+    out int dataOffset
+  ) {
+    sliceQpY = 0;
+    dataOffset = 0;
+    if (pps.DependentSliceSegmentsEnabled || pps.OutputFlagPresent || pps.ExtraSliceHeaderBits != 0
+        || pps.CabacInitPresent || pps.SliceChromaQpOffsetsPresent || pps.TilesEnabled
+        || pps.EntropyCodingSyncEnabled || pps.LoopFilterAcrossSlicesEnabled
+        || pps.DeblockingFilterOverrideEnabled || pps.SliceSegmentHeaderExtensionPresent
+        || pps.CuQpDeltaEnabled || pps.TransquantBypassEnabled)
+      return false;
+
+    var reader = new H265BitReader(coded.Payload);
+    if (reader.ReadBit() != 1) // first_slice_segment_in_pic_flag
+      return false;
+
+    reader.Skip(1); // no_output_of_prior_pics_flag: this NAL type is always an IRAP one
+    if (reader.ReadUnsignedExpGolomb() != pps.Id) // slice_pic_parameter_set_id
+      return false;
+    if (reader.ReadUnsignedExpGolomb() != 2) // slice_type: I
+      return false;
+
+    sliceQpY = pps.InitQp + reader.ReadSignedExpGolomb(); // slice_qp_delta
+    reader.Skip(1); // alignment_bit_equal_to_one
+    reader.AlignToByte();
+    dataOffset = reader.BytePosition;
+    return true;
+  }
+
+  /// <summary>The sequence parameter set fields BPG keeps in its own header, in its own order.</summary>
+  private static byte[] _BuildBpgSequenceHeader() {
+    var w = new Bits();
+    w.WriteUe(_CTB_LOG2 - 3); // log2_min_luma_coding_block_size_minus3 => 32
+    w.WriteUe(0); // log2_diff_max_min_luma_coding_block_size => the tree block is that same 32
+    w.WriteUe(0); // log2_min_transform_block_size_minus2 => 4
+    w.WriteUe(3); // log2_diff_max_min_transform_block_size => 32
+    w.WriteUe(0); // max_transform_hierarchy_depth_intra
+    w.WriteBit(0); // sample_adaptive_offset_enabled_flag
+    w.WriteBit(1); // pcm_enabled_flag
+    w.WriteBits(7, 4); // pcm_sample_bit_depth_luma_minus1
+    w.WriteBits(7, 4); // pcm_sample_bit_depth_chroma_minus1
+    w.WriteUe(_CTB_LOG2 - 3); // log2_min_pcm_luma_coding_block_size_minus3 => 32
+    w.WriteUe(0); // log2_diff_max_min_pcm_luma_coding_block_size
+    w.WriteBit(1); // pcm_loop_filter_disabled_flag
+    w.WriteBit(0); // strong_intra_smoothing_enabled_flag
+    w.WriteBit(0); // sps_extension_present_flag
+
+    // BPG's trailing_bits are zeroes to the next byte boundary. They are not rbsp_trailing_bits:
+    // there is no stop bit here, because this header is not a NAL unit and nothing scans back for
+    // the end of it — the length in front of it already said where it stops.
+    w.WriteZeroAlignment();
+    return w.ToArray();
+  }
+
+  private static byte[][] _BuildBpgPlanes(RawImage source, int width, int height) {
+    // BPG's RGB colour space is the absence of a colour transform, and its component order is
+    // HEVC's own: G in the luma plane, B in the first chroma plane and R in the second.
+    var rgb = source.ToRgb24();
+    var count = source.Width * source.Height;
+    var g = new byte[count];
+    var b = new byte[count];
+    var r = new byte[count];
+    for (var i = 0; i < count; ++i) {
+      r[i] = rgb[i * 3];
+      g[i] = rgb[i * 3 + 1];
+      b[i] = rgb[i * 3 + 2];
+    }
+
+    return [
+      _PadPlane(g, source.Width, source.Height, width, height),
+      _PadPlane(b, source.Width, source.Height, width, height),
+      _PadPlane(r, source.Width, source.Height, width, height),
+    ];
+  }
+
+  private static byte[] _BuildBpgSlice(byte[][] planes, int width, int height) {
+    var header = new Bits();
+    header.WriteBit(1); // first_slice_segment_in_pic_flag
+    header.WriteBit(0); // no_output_of_prior_pics_flag
+    header.WriteUe(0); // slice_pic_parameter_set_id
+    header.WriteUe(2); // slice_type = I
+    header.WriteSe(0); // slice_qp_delta
+    header.WriteByteAlignment();
+
+    var result = new List<byte>(header.ByteLength + planes.Length * width * height + 128);
+    result.AddRange(header.ToArray());
+
+    var contexts = new byte[H265CabacContexts.COUNT];
+    H265CabacContexts.Initialize(contexts, 0, 26);
+
+    var across = width >> _CTB_LOG2;
+    var total = across * (height >> _CTB_LOG2);
+
+    result.AddRange(_FindUniformCuPrefix(contexts, leadingEndFlag: null));
+
+    for (var index = 0; index < total; ++index) {
+      var x = (index % across) << _CTB_LOG2;
+      var y = (index / across) << _CTB_LOG2;
+      foreach (var plane in planes)
+        for (var row = 0; row < _CTB_SIZE; ++row) {
+          var at = (y + row) * width + x;
+          for (var column = 0; column < _CTB_SIZE; ++column)
+            result.Add(plane[at + column]);
+        }
+
+      result.AddRange(index + 1 == total
+        ? _SearchCabac(contexts, (ref H265CabacEngine engine) => engine.DecodeTerminate() != 0)
+        : _FindUniformCuPrefix(contexts, leadingEndFlag: false));
+    }
+
+    result.Add(0x80); // rbsp_slice_segment_trailing_bits()
+    return result.ToArray();
+  }
+
+  /// <summary>
+  /// Finds a code point that decodes as one unsplit PCM coding unit, optionally preceded by the
+  /// end-of-slice bin that separates it from the coding unit before it.
+  /// </summary>
+  /// <remarks>
+  /// The element in front of pcm_flag is not the one <see cref="_FindCabacPrefix"/> codes. A coding
+  /// block the size of the smallest the sequence allows has no split_cu_flag and does have
+  /// part_mode, whose first bin says PART_2Nx2N for an intra unit.
+  /// </remarks>
+  private static byte[] _FindUniformCuPrefix(byte[] contexts, bool? leadingEndFlag)
+    => _SearchCabac(contexts, (ref H265CabacEngine engine) => {
+      if (leadingEndFlag.HasValue && engine.DecodeTerminate() != (leadingEndFlag.Value ? 1 : 0))
+        return false;
+      if (engine.DecodeBin(H265CabacContexts.PART_MODE) != 1)
+        return false;
+      return engine.DecodeTerminate() != 0; // pcm_flag
+    });
+
   private static RawImage _PadRgbToEven(RawImage source, int width, int height) {
     var rgb = source.ToRgb24();
     if (source.Width == width && source.Height == height)
@@ -392,59 +683,66 @@ internal static class H265PcmStillCodec {
   }
 
   /// <summary>
-  /// Finds a two-byte code point that decodes as split_cu_flag=0, pcm_flag=1.
+  /// Finds a code point that decodes as split_cu_flag=0, pcm_flag=1.
   /// </summary>
-  private static byte[] _FindCabacPrefix(byte[] contexts, bool? leadingEndFlag) {
-    return _SearchCabac(contexts, candidateStates => {
-      var engine = candidateStates.Engine;
+  private static byte[] _FindCabacPrefix(byte[] contexts, bool? leadingEndFlag)
+    => _SearchCabac(contexts, (ref H265CabacEngine engine) => {
       if (leadingEndFlag.HasValue && engine.DecodeTerminate() != (leadingEndFlag.Value ? 1 : 0))
         return false;
       if (engine.DecodeBin(H265CabacContexts.SPLIT_CU_FLAG) != 0)
         return false;
       return engine.DecodeTerminate() != 0;
     });
-  }
 
   private static byte[] _FindCabacSuffix(byte[] contexts, bool final) {
     if (final)
-      return _SearchCabac(contexts, candidateStates => candidateStates.Engine.DecodeTerminate() != 0);
+      return _SearchCabac(contexts, (ref H265CabacEngine engine) => engine.DecodeTerminate() != 0);
     return _FindCabacPrefix(contexts, leadingEndFlag: false);
   }
 
-  private readonly ref struct CabacCandidate(H265CabacEngine engine) {
-    internal H265CabacEngine Engine { get; } = engine;
-  }
+  private delegate bool CabacProbe(ref H265CabacEngine engine);
 
-  private delegate bool CabacProbe(CabacCandidate candidate);
-
+  /// <summary>
+  /// Finds the shortest whole number of bytes that decodes as the bins <paramref name="probe"/>
+  /// asks for and is spent exactly by them.
+  /// </summary>
+  /// <remarks>
+  /// Two conditions, and the second carries as much weight as the first. The arithmetic decoder
+  /// holds nine bits of lookahead, so a code point can decode the right bins and still leave the
+  /// decoder's read pointer inside the byte the samples start in — and clause 9.3.4.3.5 puts
+  /// pcm_sample_luma at the first byte boundary at or after the last bit the arithmetic decoder
+  /// drew. A candidate whose lookahead crossed that boundary is one this encoder and a conforming
+  /// decoder would place the samples differently for, so it is rejected; when no two-byte code point
+  /// survives both conditions the search widens to three.
+  /// </remarks>
   private static byte[] _SearchCabac(byte[] contexts, CabacProbe probe) {
     var baseline = (byte[])contexts.Clone();
 
-    for (var value = 0; value <= ushort.MaxValue; ++value) {
-      Array.Copy(baseline, contexts, contexts.Length);
-      byte[] bytes = [(byte)(value >> 8), (byte)value];
-      var engine = new H265CabacEngine(bytes, contexts);
-      try {
-        engine.Start(0);
-      } catch (InvalidDataException) {
-        continue;
+    for (var length = 2; length <= 3; ++length) {
+      var limit = 1L << (length << 3);
+      for (var value = 0L; value < limit; ++value) {
+        Array.Copy(baseline, contexts, contexts.Length);
+
+        var bytes = new byte[length];
+        for (var i = 0; i < length; ++i)
+          bytes[i] = (byte)(value >> ((length - 1 - i) << 3));
+
+        var engine = new H265CabacEngine(bytes, contexts);
+        try {
+          engine.Start(0);
+        } catch (InvalidDataException) {
+          continue;
+        }
+
+        if (!probe(ref engine) || ((engine.BitPosition + 7) >> 3) != length)
+          continue;
+
+        return bytes;
       }
-
-      var candidate = new CabacCandidate(engine);
-      if (!probe(candidate))
-        continue;
-
-      // The arithmetic decoder deliberately reads ahead. A two-byte interval is useful for PCM only
-      // when its lookahead has not crossed the next byte boundary, because that boundary is where
-      // pcm_sample_luma/chroma begin.
-      if (((candidate.Engine.BitPosition + 7) >> 3) != 2)
-        continue;
-
-      return bytes;
     }
 
     Array.Copy(baseline, contexts, contexts.Length);
-    throw new InvalidOperationException("No two-byte HEVC CABAC interval represented the required PCM syntax.");
+    throw new InvalidOperationException("No short HEVC CABAC interval represented the required PCM syntax.");
   }
 
   private static void _WritePcmCtb(
@@ -640,6 +938,12 @@ internal static class H265PcmStillCodec {
     }
 
     internal void WriteRbspTrailingBits() => this.WriteByteAlignment();
+
+    /// <summary>Pads to the next byte boundary with zeroes, with no stop bit in front of them.</summary>
+    internal void WriteZeroAlignment() {
+      while (this._used != 0)
+        this.WriteBit(0);
+    }
 
     internal byte[] ToArray() {
       if (this._used == 0)

@@ -11,6 +11,7 @@ namespace FileFormat.Fff;
   (byte)' ', (byte)'&', (byte)' ',
   (byte)'c', (byte)'o', (byte)'s', (byte)'m', (byte)'e', (byte)'t', (byte)'i', (byte)'c', (byte)' ', (byte)' ', 0x00
 ], SignatureOffset)]
+[VerifiedBy(ConformanceOracle.FFmpeg)]
 public sealed class FffFile : IImageFormatReader<FffFile>, IImageToRawImage<FffFile>, IImageFromRawImage<FffFile>, IImageFormatWriter<FffFile> {
 
   public const int SignatureOffset = 0x1C4;

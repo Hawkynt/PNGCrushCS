@@ -45,6 +45,7 @@ namespace FileFormat.Codecs;
 /// eight bits; median prediction with the packed colour layout, which the reference encoder refuses
 /// too; and a 4:2:2 picture of odd width, which has no whole number of groups to a row.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.FFmpeg)]
 public sealed class HuffYuvEncoder : IVideoCodecEncoder<HuffYuvEncoder> {
 
   /// <summary>The Matroska name for a track described by a <c>BITMAPINFOHEADER</c>.</summary>

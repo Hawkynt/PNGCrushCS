@@ -4,6 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.HiresC64;
 
 /// <summary>In-memory representation of a Commodore 64 bare hires monochrome bitmap.</summary>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct HiresC64File : IImageFormatReader<HiresC64File>, IImageToRawImage<HiresC64File>, IImageFromRawImage<HiresC64File>, IImageFormatWriter<HiresC64File> {
 
   static string IImageFormatMetadata<HiresC64File>.PrimaryExtension => ".hir";

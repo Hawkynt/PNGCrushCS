@@ -15,6 +15,7 @@ namespace FileFormat.Apac3;
 /// extensions a file carries says nothing about its contents — they are the programs that wrote it,
 /// not the format.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct Apac3File
   : IImageFormatReader<Apac3File>, IImageToRawImage<Apac3File>,
     IImageFromRawImage<Apac3File>, IImageFormatWriter<Apac3File> {

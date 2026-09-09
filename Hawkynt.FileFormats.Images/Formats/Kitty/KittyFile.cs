@@ -13,6 +13,7 @@ namespace FileFormat.Kitty;
 /// Each channel is one bit, so a tile is three bytes for eight rows of colour — or six, in the mode
 /// that gives a tile four rows instead of two.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct KittyFile
   : IImageFormatReader<KittyFile>, IImageToRawImage<KittyFile>,
     IImageFromRawImage<KittyFile>, IImageFormatWriter<KittyFile> {

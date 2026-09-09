@@ -4,6 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.FunGraphicsMachine;
 
 /// <summary>In-memory representation of a Commodore 64 Fun Graphics Machine hires image.</summary>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct FunGraphicsMachineFile : IImageFormatReader<FunGraphicsMachineFile>, IImageToRawImage<FunGraphicsMachineFile>, IImageFromRawImage<FunGraphicsMachineFile>, IImageFormatWriter<FunGraphicsMachineFile> {
 
   static string IImageFormatMetadata<FunGraphicsMachineFile>.PrimaryExtension => ".fgs";

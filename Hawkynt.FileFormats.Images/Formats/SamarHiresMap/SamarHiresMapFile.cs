@@ -15,6 +15,7 @@ namespace FileFormat.SamarHiresMap;
 /// <para/>
 /// The extension is shared with the MSX2+ YJK format, which is unrelated.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct SamarHiresMapFile
   : IImageFormatReader<SamarHiresMapFile>, IImageToRawImage<SamarHiresMapFile>,
     IImageFromRawImage<SamarHiresMapFile>, IImageFormatWriter<SamarHiresMapFile> {

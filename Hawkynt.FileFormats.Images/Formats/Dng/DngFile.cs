@@ -4,6 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.Dng;
 
 /// <summary>In-memory representation of a DNG (Adobe Digital Negative) image.</summary>
+[VerifiedBy(ConformanceOracle.FFmpeg)]
 public sealed class DngFile : IImageFormatReader<DngFile>, IImageToRawImage<DngFile>, IImageFromRawImage<DngFile>, IImageFormatWriter<DngFile> {
 
   static string IImageFormatMetadata<DngFile>.PrimaryExtension => ".dng";

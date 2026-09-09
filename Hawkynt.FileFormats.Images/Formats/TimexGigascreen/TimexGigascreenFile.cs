@@ -13,6 +13,7 @@ namespace FileFormat.TimexGigascreen;
 /// Each screen is one byte of colour after its bitmap, and the pair sit back to back. The stored
 /// 192 rows are drawn on 384 scanlines, the mode having traded vertical resolution for horizontal.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct TimexGigascreenFile
   : IImageFormatReader<TimexGigascreenFile>, IImageToRawImage<TimexGigascreenFile>,
     IImageFromRawImage<TimexGigascreenFile>, IImageFormatWriter<TimexGigascreenFile> {

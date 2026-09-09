@@ -12,6 +12,7 @@ namespace FileFormat.Picasso64;
 /// <para/>
 /// The colour RAM comes first, the video matrix a page later and the bitmap after another, each on its own page boundary.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct Picasso64File
   : IImageFormatReader<Picasso64File>, IImageToRawImage<Picasso64File>,
     IImageFromRawImage<Picasso64File>, IImageFormatWriter<Picasso64File> {

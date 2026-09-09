@@ -5,6 +5,7 @@ using FileFormat.Core;
 namespace FileFormat.Spectrum512;
 
 /// <summary>In-memory representation of a Spectrum 512 image (Atari ST 512-color).</summary>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct Spectrum512File : IImageFormatReader<Spectrum512File>, IImageToRawImage<Spectrum512File>, IImageFromRawImage<Spectrum512File>, IImageFormatWriter<Spectrum512File> {
 
   static string IImageFormatMetadata<Spectrum512File>.PrimaryExtension => ".spu";

@@ -19,6 +19,7 @@ namespace FileFormat.SamCoupeScreen;
 /// sixteen colours — and so the decoded picture cannot be expressed as one indexed image with one
 /// palette. That is why these decode to RGB.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct SamCoupeScreenFile
   : IImageFormatReader<SamCoupeScreenFile>, IImageToRawImage<SamCoupeScreenFile>,
     IImageFromRawImage<SamCoupeScreenFile>, IImageFormatWriter<SamCoupeScreenFile> {

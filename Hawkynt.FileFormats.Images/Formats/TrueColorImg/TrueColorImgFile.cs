@@ -13,6 +13,7 @@ namespace FileFormat.TrueColorImg;
 /// One variant gives up on that and stores whole pixels instead, three bytes each behind a repeat
 /// marker. It is the only part of the format that looks like a true-colour format.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.FFmpeg)]
 public readonly record struct TrueColorImgFile
   : IImageFormatReader<TrueColorImgFile>, IImageToRawImage<TrueColorImgFile>,
     IImageFromRawImage<TrueColorImgFile>, IImageFormatWriter<TrueColorImgFile> {

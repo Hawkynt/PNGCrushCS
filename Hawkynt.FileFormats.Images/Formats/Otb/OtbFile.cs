@@ -4,6 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.Otb;
 
 /// <summary>In-memory representation of an OTB (Nokia Over-The-Air Bitmap) image.</summary>
+[VerifiedBy(ConformanceOracle.ImageMagick)]
 public readonly record struct OtbFile : IImageFormatReader<OtbFile>, IImageToRawImage<OtbFile>, IImageFromRawImage<OtbFile>, IImageFormatWriter<OtbFile> {
 
   static string IImageFormatMetadata<OtbFile>.PrimaryExtension => ".otb";

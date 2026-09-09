@@ -13,6 +13,7 @@ namespace FileFormat.Trs80;
 /// the machine has no mode for, under the extension that names the hi-res board. Nothing wrote such
 /// a file, and none of the ones that exist could be read.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct Trs80File : IImageFormatReader<Trs80File>, IImageToRawImage<Trs80File>, IImageFromRawImage<Trs80File>, IImageFormatWriter<Trs80File> {
 
   /// <summary>Pixels across.</summary>

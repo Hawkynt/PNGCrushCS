@@ -22,7 +22,8 @@ internal static partial class VideoFormatRegistration {
     VideoFormatRegistry.BuildDetectionOrder();
   }
 
-  private static void _RegisterContainer<T>(VideoFormat format, MagicSignature[] magic, int priority, string[] mimeTypes)
+  private static void _RegisterContainer<T>(
+    VideoFormat format, MagicSignature[] magic, int priority, string[] mimeTypes, ConformanceOracle[] verifiedBy)
     where T : IVideoContainerReader<T> {
     var entry = new VideoFormatEntry(
       Format: format,
@@ -38,7 +39,9 @@ internal static partial class VideoFormatRegistration {
       // time; nothing here materialises a film.
       ReadPackets: data => T.ReadPackets(VideoIO.Read<T>(data)),
       ReadStreamPackets: (data, index) => T.ReadPackets(VideoIO.Read<T>(data), index),
-      ReadMetadata: data => T.Metadata(VideoIO.Read<T>(data)));
+      ReadMetadata: data => T.Metadata(VideoIO.Read<T>(data))) {
+      VerifiedBy = verifiedBy,
+    };
 
     VideoFormatRegistry.Register(entry);
   }
@@ -49,9 +52,11 @@ internal static partial class VideoFormatRegistration {
       Accepts: static stream => T.Accepts(stream),
       CreateDecoder: static stream => T.Create(stream)));
 
-  private static void _RegisterEncoder<T>() where T : IVideoCodecEncoder<T>
+  private static void _RegisterEncoder<T>(ConformanceOracle[] verifiedBy) where T : IVideoCodecEncoder<T>
     => VideoFormatRegistry.RegisterEncoder(new(
       CodecName: T.CodecName,
       Codec: T.Codec,
-      CreateEncoder: static stream => T.Create(stream)));
+      CreateEncoder: static stream => T.Create(stream)) {
+      VerifiedBy = verifiedBy,
+    });
 }

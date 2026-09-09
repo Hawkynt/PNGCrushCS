@@ -33,6 +33,7 @@ namespace FileFormat.Tiff;
 /// calibration, which lives in private tags nothing here reads and nothing published describes.
 /// </remarks>
 [FormatMimeType("image/tiff", "image/tif", "image/x-tiff")]
+[VerifiedBy(ConformanceOracle.ImageMagick, ConformanceOracle.FFmpeg)]
 public sealed class TiffFile :
   IImageFormatReader<TiffFile>, IImageToRawImage<TiffFile>, IImageFromRawImage<TiffFile>, IImageFormatWriter<TiffFile>,
   IMultiImageFileFormat<TiffFile>, IFormatChunkLayout<TiffFile> {

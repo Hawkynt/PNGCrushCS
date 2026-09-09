@@ -11,6 +11,7 @@ namespace FileFormat.ShfXlEdit;
 /// made for its own convenience — three plain planes of bitmap, mask and colour — which is much
 /// simpler to read and could not have been displayed without being taken apart again.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct ShfXlEditFile
   : IImageFormatReader<ShfXlEditFile>, IImageToRawImage<ShfXlEditFile>,
     IImageFromRawImage<ShfXlEditFile>, IImageFormatWriter<ShfXlEditFile> {

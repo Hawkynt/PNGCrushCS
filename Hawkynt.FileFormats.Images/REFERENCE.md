@@ -5349,13 +5349,14 @@ Implements `IEquatable<BotticelliFile>`, `IImageFormatMetadata<BotticelliFile>`,
 | --- | --- | --- |
 | `YCbCrBT601` | `0` |  |
 | `Rgb` | `1` |  |
-| `YCbCrBT709` | `2` |  |
-| `YCbCrBT2020` | `3` |  |
-| `YCbCrBT2020NCL` | `4` |  |
+| `YCgCo` | `2` |  |
+| `YCbCrBT709` | `3` |  |
+| `YCbCrBT2020Ncl` | `4` |  |
+| `YCbCrBT2020Cl` | `5` |  |
 
 #### `BpgFile`
 
-Implements `IImageFormatMetadata<BpgFile>`, `IImageFormatReader<BpgFile>`, `IImageFormatWriter<BpgFile>`, `IImageToRawImage<BpgFile>`.
+Implements `IImageFormatMetadata<BpgFile>`, `IImageFormatReader<BpgFile>`, `IImageFormatWriter<BpgFile>`, `IImageFromRawImage<BpgFile>`, `IImageToRawImage<BpgFile>`.
 
 | Member | Signature | Summary |
 | --- | --- | --- |
@@ -5372,18 +5373,19 @@ Implements `IImageFormatMetadata<BpgFile>`, `IImageFormatReader<BpgFile>`, `IIma
 | `PixelData` | `byte[] PixelData { get; init; }` |  |
 | `PixelFormat` | `BpgPixelFormat PixelFormat { get; init; }` |  |
 | `Width` | `int Width { get; init; }` |  |
+| `FromRawImage` | `static BpgFile FromRawImage(RawImage image)` |  |
 | `ToRawImage` | `static RawImage ToRawImage(BpgFile file)` |  |
 
 #### `BpgPixelFormat`
 
 | Value | Numeric | Summary |
 | --- | --- | --- |
-| `YCbCr420` | `0` |  |
-| `YCbCr422` | `1` |  |
-| `YCbCr444` | `2` |  |
-| `Grayscale` | `3` |  |
-| `Cmyk` | `4` |  |
-| `YCbCr420Jpeg` | `5` |  |
+| `Grayscale` | `0` |  |
+| `YCbCr420` | `1` |  |
+| `YCbCr422` | `2` |  |
+| `YCbCr444` | `3` |  |
+| `YCbCr420Mpeg2` | `4` |  |
+| `YCbCr422Mpeg2` | `5` |  |
 
 #### `BpgReader`
 
@@ -5398,6 +5400,7 @@ Implements `IImageFormatMetadata<BpgFile>`, `IImageFormatReader<BpgFile>`, `IIma
 
 | Member | Signature | Summary |
 | --- | --- | --- |
+| `FromRawImage` | `static BpgFile FromRawImage(RawImage image)` |  |
 | `ToBytes` | `static byte[] ToBytes(BpgFile file)` |  |
 
 ### Namespace `FileFormat.BrooktroutFax`
@@ -8001,7 +8004,7 @@ Implements `IEquatable<ComputerEyesStFile>`, `IImageFormatMetadata<ComputerEyesS
 
 ### Namespace `FileFormat.Core`
 
-[`AdditionalImageFormatAttribute`](#additionalimageformatattribute) · [`AllowedZones`](#allowedzones) · [`AmigaColourMap`](#amigacolourmap) · [`AmigaRgbRuns`](#amigargbruns) · [`AmstradGraphics`](#amstradgraphics) · [`AnticMode`](#anticmode) · [`AppleIIGSGraphics`](#appleiigsgraphics) · [`Atari8BitGraphics`](#atari8bitgraphics) · [`AtariKoalaRle`](#atarikoalarle) · [`AtariStCaRle`](#ataristcarle) · [`AtariStGraphics`](#ataristgraphics) · [`BilevelRows`](#bilevelrows) · [`CaseAttribute`](#caseattribute) · [`ChannelScaling`](#channelscaling) · [`CharacterRoms`](#characterroms) · [`ChunkKind`](#chunkkind) · [`ChunkMobility`](#chunkmobility) · [`ChunkOptimizer`](#chunkoptimizer) · [`ChunkPlacement`](#chunkplacement) · [`ChunkPlacementDirective`](#chunkplacementdirective) · [`ChunkReference`](#chunkreference) · [`ChunkRewriteFailure`](#chunkrewritefailure) · [`ChunkRewritePlan`](#chunkrewriteplan) · [`ChunkRewriteResult`](#chunkrewriteresult) · [`ChunkRewriteRule`](#chunkrewriterule) · [`ChunkSpan`](#chunkspan) · [`ChunkZone`](#chunkzone) · [`CodecTag`](#codectag) · [`CodedPacket`](#codedpacket) · [`ColorQuantizer`](#colorquantizer) · [`ColorQuantizer.Result`](#colorquantizerresult) · [`Commodore16Graphics`](#commodore16graphics) · [`Commodore64Graphics`](#commodore64graphics) · [`CoverArt`](#coverart) · [`DecodedFrame`](#decodedframe) · [`DisplayFilter`](#displayfilter) · [`EndianAttribute`](#endianattribute) · [`Endianness`](#endianness) · [`ExifCodec`](#exifcodec) · [`ExifData`](#exifdata) · [`ExifIfd`](#exififd) · [`ExifRational`](#exifrational) · [`ExifSRational`](#exifsrational) · [`ExifTagEntry`](#exiftagentry) · [`ExifTagType`](#exiftagtype) · [`FastRawImageConverter`](#fastrawimageconverter) · [`FieldAttribute`](#fieldattribute) · [`FieldOffsetAttribute`](#fieldoffsetattribute) · [`FillerAttribute`](#fillerattribute) · [`FixedPalette`](#fixedpalette) · [`FixedValue`](#fixedvalue) · [`FormatCapability`](#formatcapability) · [`FormatDetectionPriorityAttribute`](#formatdetectionpriorityattribute) · [`FormatIO`](#formatio) · [`FormatMagicBytesAttribute`](#formatmagicbytesattribute) · [`FormatMimeTypeAttribute`](#formatmimetypeattribute) · [`FrameBlend`](#frameblend) · [`GenerateSerializerAttribute`](#generateserializerattribute) · [`GlyphSheet`](#glyphsheet) · [`GtiaRenderer`](#gtiarenderer) · [`HeaderFieldDescriptor`](#headerfielddescriptor) · [`HeaderFieldMapper`](#headerfieldmapper) · [`HeaderSerializer`](#headerserializer) · [`IBinarySerializable<TSelf>`](#ibinaryserializabletself) · [`IFormatChunkLayout<TSelf>`](#iformatchunklayouttself) · [`IFormatChunkPlanRewriter<TSelf>`](#iformatchunkplanrewritertself) · [`IFormatChunkRewriter<TSelf>`](#iformatchunkrewritertself) · [`IImageFormatMetadata<TSelf>`](#iimageformatmetadatatself) · [`IImageFormatReader<TSelf>`](#iimageformatreadertself) · [`IImageFormatWriter<TSelf>`](#iimageformatwritertself) · [`IImageFromRawImage<TSelf, TPixel>`](#iimagefromrawimagetself-tpixel) · [`IImageFromRawImage<TSelf>`](#iimagefromrawimagetself) · [`IImageInfoReader<TSelf>`](#iimageinforeadertself) · [`IImageToRawImage<TSelf>`](#iimagetorawimagetself) · [`IMultiImageFileFormat<TSelf>`](#imultiimagefileformattself) · [`IRawPixelFormat<TSelf>`](#irawpixelformattself) · [`IVideoCodecDecoder<TSelf>`](#ivideocodecdecodertself) · [`IVideoCodecEncoder<TSelf>`](#ivideocodecencodertself) · [`IVideoContainerReader<TSelf>`](#ivideocontainerreadertself) · [`IVideoContainerWriter<TSelf>`](#ivideocontainerwritertself) · [`IVideoFormatMetadata<TSelf>`](#ivideoformatmetadatatself) · [`IVideoFrameDecoder`](#ivideoframedecoder) · [`IVideoPacketEncoder`](#ivideopacketencoder) · [`IfAttribute`](#ifattribute) · [`ImageInfo`](#imageinfo) · [`ImageMetadata`](#imagemetadata) · [`ImageResampler`](#imageresampler) · [`IndexedPalette`](#indexedpalette) · [`IntegerRange`](#integerrange) · [`IptcCodec`](#iptccodec) · [`IptcData`](#iptcdata) · [`IptcDataSet`](#iptcdataset) · [`LayoutMode`](#layoutmode) · [`Lz4Frame`](#lz4frame) · [`MediaStreamInfo`](#mediastreaminfo) · [`MediaStreamKind`](#mediastreamkind) · [`MediaStreamMetadata`](#mediastreammetadata) · [`MonochromePage`](#monochromepage) · [`MsxGraphics`](#msxgraphics) · [`Op`](#op) · [`PackBits`](#packbits) · [`PackBytesStream`](#packbytesstream) · [`PackedRows`](#packedrows) · [`PaletteQuantizer`](#palettequantizer) · [`PaletteSidecar`](#palettesidecar) · [`PixelAspectRatio`](#pixelaspectratio) · [`PixelConverter`](#pixelconverter) · [`PixelFormat`](#pixelformat) · [`PixelRect`](#pixelrect) · [`PlanarConverter`](#planarconverter) · [`Rational`](#rational) · [`RawBytesAttribute`](#rawbytesattribute) · [`RawChromaLocation`](#rawchromalocation) · [`RawColorPrimaries`](#rawcolorprimaries) · [`RawColorRange`](#rawcolorrange) · [`RawImage`](#rawimage) · [`RawImage<TPixel>`](#rawimagetpixel) · [`RawImageColorInfo`](#rawimagecolorinfo) · [`RawImageConverter`](#rawimageconverter) · [`RawImageExactConverter`](#rawimageexactconverter) · [`RawImageExtensions`](#rawimageextensions) · [`RawImageFactory`](#rawimagefactory) · [`RawMatrixCoefficients`](#rawmatrixcoefficients) · [`RawPalette`](#rawpalette) · [`RawPaletteEntry`](#rawpaletteentry) · [`RawPixelAlphaKind`](#rawpixelalphakind) · [`RawPixelFormatKind`](#rawpixelformatkind) · [`RawPixelFormatTraits`](#rawpixelformattraits) · [`RawPixelFormats`](#rawpixelformats) · [`RawTransferCharacteristic`](#rawtransfercharacteristic) · [`RepeatAttribute`](#repeatattribute) · [`RepeatEosAttribute`](#repeateosattribute) · [`RepeatUntilAttribute`](#repeatuntilattribute) · [`Resampling`](#resampling) · [`Rgba32`](#rgba32) · [`SeqFieldAttribute`](#seqfieldattribute) · [`SfdnDecompressor`](#sfdndecompressor) · [`SizedByAttribute`](#sizedbyattribute) · [`StringAttribute`](#stringattribute) · [`StringEncoding`](#stringencoding) · [`StringZAttribute`](#stringzattribute) · [`StructSizeAttribute`](#structsizeattribute) · [`SwitchOnAttribute`](#switchonattribute) · [`TextMetadataEntry`](#textmetadataentry) · [`TypeOverrideAttribute`](#typeoverrideattribute) · [`ValidAnyOfAttribute`](#validanyofattribute) · [`ValidAttribute`](#validattribute) · [`ValidRangeAttribute`](#validrangeattribute) · [`VgaPalette`](#vgapalette) · [`Vic20Graphics`](#vic20graphics) · [`VideoIO`](#videoio) · [`VideoMetadata`](#videometadata) · [`VideoMode`](#videomode) · [`WireType`](#wiretype) · [`Zx81Graphics`](#zx81graphics) · [`ZxSpectrumGraphics`](#zxspectrumgraphics)
+[`AdditionalImageFormatAttribute`](#additionalimageformatattribute) · [`AllowedZones`](#allowedzones) · [`AmigaColourMap`](#amigacolourmap) · [`AmigaRgbRuns`](#amigargbruns) · [`AmstradGraphics`](#amstradgraphics) · [`AnticMode`](#anticmode) · [`AppleIIGSGraphics`](#appleiigsgraphics) · [`Atari8BitGraphics`](#atari8bitgraphics) · [`AtariKoalaRle`](#atarikoalarle) · [`AtariStCaRle`](#ataristcarle) · [`AtariStGraphics`](#ataristgraphics) · [`BilevelRows`](#bilevelrows) · [`CaseAttribute`](#caseattribute) · [`ChannelScaling`](#channelscaling) · [`CharacterRoms`](#characterroms) · [`ChunkKind`](#chunkkind) · [`ChunkMobility`](#chunkmobility) · [`ChunkOptimizer`](#chunkoptimizer) · [`ChunkPlacement`](#chunkplacement) · [`ChunkPlacementDirective`](#chunkplacementdirective) · [`ChunkReference`](#chunkreference) · [`ChunkRewriteFailure`](#chunkrewritefailure) · [`ChunkRewritePlan`](#chunkrewriteplan) · [`ChunkRewriteResult`](#chunkrewriteresult) · [`ChunkRewriteRule`](#chunkrewriterule) · [`ChunkSpan`](#chunkspan) · [`ChunkZone`](#chunkzone) · [`CodecTag`](#codectag) · [`CodedPacket`](#codedpacket) · [`ColorQuantizer`](#colorquantizer) · [`ColorQuantizer.Result`](#colorquantizerresult) · [`Commodore16Graphics`](#commodore16graphics) · [`Commodore64Graphics`](#commodore64graphics) · [`ConformanceOracle`](#conformanceoracle) · [`ConformanceOracles`](#conformanceoracles) · [`CoverArt`](#coverart) · [`DecodedFrame`](#decodedframe) · [`DisplayFilter`](#displayfilter) · [`EndianAttribute`](#endianattribute) · [`Endianness`](#endianness) · [`ExifCodec`](#exifcodec) · [`ExifData`](#exifdata) · [`ExifIfd`](#exififd) · [`ExifRational`](#exifrational) · [`ExifSRational`](#exifsrational) · [`ExifTagEntry`](#exiftagentry) · [`ExifTagType`](#exiftagtype) · [`FastRawImageConverter`](#fastrawimageconverter) · [`FieldAttribute`](#fieldattribute) · [`FieldOffsetAttribute`](#fieldoffsetattribute) · [`FillerAttribute`](#fillerattribute) · [`FixedPalette`](#fixedpalette) · [`FixedValue`](#fixedvalue) · [`FormatCapability`](#formatcapability) · [`FormatDetectionPriorityAttribute`](#formatdetectionpriorityattribute) · [`FormatIO`](#formatio) · [`FormatMagicBytesAttribute`](#formatmagicbytesattribute) · [`FormatMimeTypeAttribute`](#formatmimetypeattribute) · [`FrameBlend`](#frameblend) · [`GenerateSerializerAttribute`](#generateserializerattribute) · [`GlyphSheet`](#glyphsheet) · [`GtiaRenderer`](#gtiarenderer) · [`HeaderFieldDescriptor`](#headerfielddescriptor) · [`HeaderFieldMapper`](#headerfieldmapper) · [`HeaderSerializer`](#headerserializer) · [`IBinarySerializable<TSelf>`](#ibinaryserializabletself) · [`IFormatChunkLayout<TSelf>`](#iformatchunklayouttself) · [`IFormatChunkPlanRewriter<TSelf>`](#iformatchunkplanrewritertself) · [`IFormatChunkRewriter<TSelf>`](#iformatchunkrewritertself) · [`IImageFormatMetadata<TSelf>`](#iimageformatmetadatatself) · [`IImageFormatReader<TSelf>`](#iimageformatreadertself) · [`IImageFormatWriter<TSelf>`](#iimageformatwritertself) · [`IImageFromRawImage<TSelf, TPixel>`](#iimagefromrawimagetself-tpixel) · [`IImageFromRawImage<TSelf>`](#iimagefromrawimagetself) · [`IImageInfoReader<TSelf>`](#iimageinforeadertself) · [`IImageToRawImage<TSelf>`](#iimagetorawimagetself) · [`IMultiImageFileFormat<TSelf>`](#imultiimagefileformattself) · [`IRawPixelFormat<TSelf>`](#irawpixelformattself) · [`IVideoCodecDecoder<TSelf>`](#ivideocodecdecodertself) · [`IVideoCodecEncoder<TSelf>`](#ivideocodecencodertself) · [`IVideoContainerReader<TSelf>`](#ivideocontainerreadertself) · [`IVideoContainerWriter<TSelf>`](#ivideocontainerwritertself) · [`IVideoFormatMetadata<TSelf>`](#ivideoformatmetadatatself) · [`IVideoFrameDecoder`](#ivideoframedecoder) · [`IVideoPacketEncoder`](#ivideopacketencoder) · [`IfAttribute`](#ifattribute) · [`ImageInfo`](#imageinfo) · [`ImageMetadata`](#imagemetadata) · [`ImageResampler`](#imageresampler) · [`IndexedPalette`](#indexedpalette) · [`IntegerRange`](#integerrange) · [`IptcCodec`](#iptccodec) · [`IptcData`](#iptcdata) · [`IptcDataSet`](#iptcdataset) · [`LayoutMode`](#layoutmode) · [`Lz4Frame`](#lz4frame) · [`MediaStreamInfo`](#mediastreaminfo) · [`MediaStreamKind`](#mediastreamkind) · [`MediaStreamMetadata`](#mediastreammetadata) · [`MonochromePage`](#monochromepage) · [`MsxGraphics`](#msxgraphics) · [`Op`](#op) · [`PackBits`](#packbits) · [`PackBytesStream`](#packbytesstream) · [`PackedRows`](#packedrows) · [`PaletteQuantizer`](#palettequantizer) · [`PaletteSidecar`](#palettesidecar) · [`PixelAspectRatio`](#pixelaspectratio) · [`PixelConverter`](#pixelconverter) · [`PixelFormat`](#pixelformat) · [`PixelRect`](#pixelrect) · [`PlanarConverter`](#planarconverter) · [`Rational`](#rational) · [`RawBytesAttribute`](#rawbytesattribute) · [`RawChromaLocation`](#rawchromalocation) · [`RawColorPrimaries`](#rawcolorprimaries) · [`RawColorRange`](#rawcolorrange) · [`RawImage`](#rawimage) · [`RawImage<TPixel>`](#rawimagetpixel) · [`RawImageColorInfo`](#rawimagecolorinfo) · [`RawImageConverter`](#rawimageconverter) · [`RawImageExactConverter`](#rawimageexactconverter) · [`RawImageExtensions`](#rawimageextensions) · [`RawImageFactory`](#rawimagefactory) · [`RawMatrixCoefficients`](#rawmatrixcoefficients) · [`RawPalette`](#rawpalette) · [`RawPaletteEntry`](#rawpaletteentry) · [`RawPixelAlphaKind`](#rawpixelalphakind) · [`RawPixelFormatKind`](#rawpixelformatkind) · [`RawPixelFormatTraits`](#rawpixelformattraits) · [`RawPixelFormats`](#rawpixelformats) · [`RawTransferCharacteristic`](#rawtransfercharacteristic) · [`RepeatAttribute`](#repeatattribute) · [`RepeatEosAttribute`](#repeateosattribute) · [`RepeatUntilAttribute`](#repeatuntilattribute) · [`Resampling`](#resampling) · [`Rgba32`](#rgba32) · [`SeqFieldAttribute`](#seqfieldattribute) · [`SfdnDecompressor`](#sfdndecompressor) · [`SizedByAttribute`](#sizedbyattribute) · [`StringAttribute`](#stringattribute) · [`StringEncoding`](#stringencoding) · [`StringZAttribute`](#stringzattribute) · [`StructSizeAttribute`](#structsizeattribute) · [`SwitchOnAttribute`](#switchonattribute) · [`TextMetadataEntry`](#textmetadataentry) · [`TypeOverrideAttribute`](#typeoverrideattribute) · [`ValidAnyOfAttribute`](#validanyofattribute) · [`ValidAttribute`](#validattribute) · [`ValidRangeAttribute`](#validrangeattribute) · [`VerifiedByAttribute`](#verifiedbyattribute) · [`VgaPalette`](#vgapalette) · [`Vic20Graphics`](#vic20graphics) · [`VideoIO`](#videoio) · [`VideoMetadata`](#videometadata) · [`VideoMode`](#videomode) · [`WireType`](#wiretype) · [`Zx81Graphics`](#zx81graphics) · [`ZxSpectrumGraphics`](#zxspectrumgraphics)
 
 #### `AdditionalImageFormatAttribute`
 
@@ -8479,6 +8482,39 @@ Primitives shared by the Commodore 64 picture formats.
 | `EncodeMulticolor` | `static byte EncodeMulticolor(ReadOnlySpan<byte> rgb, int width, int height, Span<byte> bitmap, Span<byte> videoMatrix, Span<byte> colorRam, int fixedBackground = -1, int fixedThirdColor = -1)` | Encodes a standard multicolour screen: two bits a pixel, the video matrix holding two of the cell's colours and the colour RAM a third, with pattern 00 taken from the shared background. |
 | `FindNearestColorIndex` | `static int FindNearestColorIndex(byte red, byte green, byte blue)` | The index of the colour closest to a given one, by squared distance in RGB. |
 | `PackFourColor` | `static byte[] PackFourColor(ReadOnlySpan<byte> indices, int offset, int shift, int width, int height, int size)` | Decodes a four-colour bitmap in the C64's cell layout into RGB triplets. |
+
+#### `ConformanceOracle`
+
+A tool from outside this repository that has read what one of our writers produced.
+
+| Value | Numeric | Summary |
+| --- | --- | --- |
+| `None` | `0` | Nothing outside this repository has read what this writer produces. |
+| `Recoil2Png` | `1` | RECOIL's `recoil2png`, the reference decoder for the retro-computer formats. |
+| `ImageMagick` | `2` | ImageMagick's `identify` / `convert`. |
+| `XnView` | `3` | XnView's `nconvert`. |
+| `IrfanView` | `4` | IrfanView, driven headless. |
+| `TomsEditor` | `5` | Tom's Editor, the online converter, asked only where nothing installed has an opinion. |
+| `DWebp` | `6` | libwebp's `dwebp`. |
+| `Djxl` | `7` | libjxl's `djxl`. |
+| `OpjDecompress` | `8` | OpenJPEG's `opj_decompress`. |
+| `Dec265` | `9` | libde265's `dec265`. |
+| `HeifDec` | `10` | libheif's `heif-dec`. |
+| `AvifDec` | `11` | libavif's `avifdec`. |
+| `FFmpeg` | `12` | FFmpeg, as `ffmpeg` or `ffprobe`. |
+| `ExifTool` | `13` | ExifTool. |
+| `PyEmbroidery` | `14` | pyembroidery. |
+| `LibreOffice` | `15` | LibreOffice, driven headless as `soffice`. |
+| `Olefile` | `16` | The `olefile` Python package. |
+
+#### `ConformanceOracles`
+
+Display names and home pages for `ConformanceOracle`.
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `DisplayName` | `static string DisplayName(this ConformanceOracle oracle)` | The tool's name as a reader of a support table would recognise it. |
+| `HomePage` | `static string HomePage(this ConformanceOracle oracle)` | Where the tool lives, so a reader can go and get the one that judged us. |
 
 #### `CoverArt`
 
@@ -10127,6 +10163,17 @@ Inherits `Attribute`.
 | `ValidRangeAttribute` | `ValidRangeAttribute(object min, object max)` | Asserts that a field's value falls within an inclusive range after reading. |
 | `Max` | `object Max { get; }` |  |
 | `Min` | `object Min { get; }` |  |
+
+#### `VerifiedByAttribute`
+
+Names the tools outside this repository that have read what this format's writer produces.
+
+Inherits `Attribute`.
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `VerifiedByAttribute` | `VerifiedByAttribute(params ConformanceOracle[] oracles)` | Names the tools outside this repository that have read what this format's writer produces. |
+| `Oracles` | `ConformanceOracle[] Oracles { get; }` | The tools that have read this writer's output. |
 
 #### `VgaPalette`
 
@@ -40638,6 +40685,7 @@ Implements `IEquatable<FormatEntry>`.
 | `EnumerateChunks` | `Func<byte[], IReadOnlyList<ChunkSpan>> EnumerateChunks { get; init; }` |  |
 | `Format` | `ImageFormat Format { get; init; }` |  |
 | `GetImageCount` | `Func<FileInfo, int> GetImageCount { get; init; }` |  |
+| `HasWriterOracle` | `bool HasWriterOracle { get; }` |  |
 | `LoadAllRawImages` | `Func<FileInfo, IReadOnlyList<RawImage>> LoadAllRawImages { get; init; }` |  |
 | `LoadRawImageAtIndex` | `Func<FileInfo, int, RawImage> LoadRawImageAtIndex { get; init; }` |  |
 | `LoadRawImageFromBytes` | `Func<byte[], RawImage> LoadRawImageFromBytes { get; init; }` |  |
@@ -40659,6 +40707,7 @@ Implements `IEquatable<FormatEntry>`.
 | `SupportsTypedWrite` | `bool SupportsTypedWrite { get; }` |  |
 | `SupportsWrite` | `bool SupportsWrite { get; }` |  |
 | `TypedWriteCapabilities` | `RawImageWriteCapability[] TypedWriteCapabilities { get; init; }` |  |
+| `VerifiedBy` | `ConformanceOracle[] VerifiedBy { get; init; }` |  |
 | `VideoModes` | `VideoMode[] VideoModes { get; init; }` |  |
 | `WriteToFile` | `Action<RawImage, FileInfo> WriteToFile { get; init; }` |  |
 

@@ -40,6 +40,7 @@ namespace FileFormat.Codecs;
 /// stream's own state transition table, the large context model, and carrying the context model
 /// across frames. Each is a smaller stream or an older reader, not a different picture.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.FFmpeg)]
 public sealed class Ffv1Encoder : IVideoCodecEncoder<Ffv1Encoder> {
 
   private static readonly CodecTag _FFV1 = CodecTag.FromCharacters("FFV1");

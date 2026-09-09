@@ -13,6 +13,7 @@ namespace FileFormat.LarkaObjectEditor;
 /// The character codes are not stored in reading order. They are interleaved so that the two sets'
 /// halves sit apart, which is how the editor kept each set's codes contiguous in memory.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct LarkaObjectEditorFile
   : IImageFormatReader<LarkaObjectEditorFile>, IImageToRawImage<LarkaObjectEditorFile>,
     IImageFromRawImage<LarkaObjectEditorFile>, IImageFormatWriter<LarkaObjectEditorFile> {

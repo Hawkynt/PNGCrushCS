@@ -9,6 +9,7 @@ namespace FileFormat.Mamut;
 /// Mamut leaves the screen on the operating system's default register values. The 160x96 logical
 /// pixels are displayed at 320x192.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct MamutFile
   : IImageFormatReader<MamutFile>, IImageToRawImage<MamutFile>,
     IImageFromRawImage<MamutFile>, IImageFormatWriter<MamutFile> {

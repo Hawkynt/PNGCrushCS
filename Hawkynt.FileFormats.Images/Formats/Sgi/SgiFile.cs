@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using FileFormat.Core;
 
 namespace FileFormat.Sgi;
@@ -6,6 +6,7 @@ namespace FileFormat.Sgi;
 /// <summary>In-memory representation of an SGI image.</summary>
 [FormatMagicBytes([0x01, 0xDA])]
 [FormatMimeType("image/x-sgi", "image/sgi")]
+[VerifiedBy(ConformanceOracle.ImageMagick, ConformanceOracle.FFmpeg)]
 public readonly record struct SgiFile : IImageFormatReader<SgiFile>, IImageToRawImage<SgiFile>, IImageFromRawImage<SgiFile>, IImageFormatWriter<SgiFile> {
 
   static string IImageFormatMetadata<SgiFile>.PrimaryExtension => ".sgi";

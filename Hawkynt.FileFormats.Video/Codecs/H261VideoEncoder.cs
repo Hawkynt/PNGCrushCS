@@ -52,6 +52,7 @@ namespace FileFormat.Codecs;
 /// the noisiest of the six to 48.0 dB on the flattest. The stream-by-stream numbers are in
 /// <a href="https://github.com/Hawkynt/PNGCrushCS/blob/main/Hawkynt.FileFormats.Video/codec-notes.md">codec-notes.md</a>.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.FFmpeg)]
 public sealed class H261VideoEncoder : IVideoCodecEncoder<H261VideoEncoder> {
 
   /// <summary>The four-character code containers name ITU-T H.261 with.</summary>

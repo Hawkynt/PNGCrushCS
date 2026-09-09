@@ -14,6 +14,7 @@ namespace FileFormat.ProfiGrf;
 /// Attributes are stored interleaved with the bitmap, a byte of pixels then its attribute, rather
 /// than in a plane of their own.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct ProfiGrfFile
   : IImageFormatReader<ProfiGrfFile>, IImageToRawImage<ProfiGrfFile>,
     IImageFromRawImage<ProfiGrfFile>, IImageFormatWriter<ProfiGrfFile> {

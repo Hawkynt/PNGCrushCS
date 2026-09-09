@@ -40,6 +40,7 @@ namespace FileFormat.Codecs;
 /// <b>Measured against ffmpeg.</b> Numbers, and what was compared against what, are in
 /// <c>codec-notes.md</c>.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.FFmpeg)]
 public sealed class ProResVideoEncoder : IVideoCodecEncoder<ProResVideoEncoder> {
 
   /// <summary>The four-character codes of the 4:4:4 profiles, which this encoder refuses by name.</summary>

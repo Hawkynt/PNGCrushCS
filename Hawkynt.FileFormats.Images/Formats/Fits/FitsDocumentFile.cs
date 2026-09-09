@@ -34,6 +34,7 @@ public sealed class FitsHdu {
 /// container view for primary arrays, IMAGE extensions, arbitrary higher dimensions, random groups,
 /// tables, and extension HDUs that an image conversion does not understand but must not discard.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.ImageMagick)]
 public sealed class FitsDocumentFile :
   IImageFormatReader<FitsDocumentFile>, IImageToRawImage<FitsDocumentFile>,
   IImageFromRawImage<FitsDocumentFile>, IImageFormatWriter<FitsDocumentFile>,

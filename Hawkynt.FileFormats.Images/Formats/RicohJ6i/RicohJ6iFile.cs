@@ -12,6 +12,7 @@ namespace FileFormat.RicohJ6i;
 /// application markers JPEG provides for exactly this, which is why the file needs a reader of its
 /// own and why that reader has almost nothing to do.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.FFmpeg)]
 public readonly record struct RicohJ6iFile
   : IImageFormatReader<RicohJ6iFile>, IImageToRawImage<RicohJ6iFile>,
     IImageFromRawImage<RicohJ6iFile>, IImageFormatWriter<RicohJ6iFile> {

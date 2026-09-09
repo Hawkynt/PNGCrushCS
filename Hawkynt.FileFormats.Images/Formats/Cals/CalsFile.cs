@@ -4,6 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.Cals;
 
 /// <summary>In-memory representation of a CALS (MIL-STD-1840) raster image.</summary>
+[VerifiedBy(ConformanceOracle.ImageMagick)]
 public readonly record struct CalsFile() : IImageFormatReader<CalsFile>, IImageToRawImage<CalsFile>, IImageFromRawImage<CalsFile>, IImageFormatWriter<CalsFile> {
 
   static string IImageFormatMetadata<CalsFile>.PrimaryExtension => ".cal";

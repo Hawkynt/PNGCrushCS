@@ -14,6 +14,7 @@ namespace FileFormat.Graph2FontMch;
 /// file is long enough to carry them. A flag bit per cell can change the character's inverse
 /// halfway down its own height, which doubles the colours a single cell can show.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct Graph2FontMchFile
   : IImageFormatReader<Graph2FontMchFile>, IImageToRawImage<Graph2FontMchFile>,
     IImageFromRawImage<Graph2FontMchFile>, IImageFormatWriter<Graph2FontMchFile> {

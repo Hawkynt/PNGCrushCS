@@ -4,6 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.Phm;
 
 /// <summary>In-memory representation of a PHM (Portable Half Map) image — half-precision float variant of PFM.</summary>
+[VerifiedBy(ConformanceOracle.ImageMagick, ConformanceOracle.FFmpeg)]
 public readonly record struct PhmFile : IImageFormatReader<PhmFile>, IImageToRawImage<PhmFile>, IImageFromRawImage<PhmFile>, IImageFormatWriter<PhmFile> {
 
   static string IImageFormatMetadata<PhmFile>.PrimaryExtension => ".phm";

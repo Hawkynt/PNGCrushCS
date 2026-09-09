@@ -14,6 +14,7 @@ namespace FileFormat.DGraphCompressed;
 /// Both frames share one palette, stored between the first length and the first block, so the
 /// interlacing buys the mixtures between sixteen colours rather than more of them.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct DGraphCompressedFile
   : IImageFormatReader<DGraphCompressedFile>, IImageToRawImage<DGraphCompressedFile>,
     IImageFromRawImage<DGraphCompressedFile>, IImageFormatWriter<DGraphCompressedFile> {

@@ -4,6 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.SpookySpritesFalcon;
 
 /// <summary>In-memory representation of a Spooky Sprites Atari Falcon compressed 16-bit true color (.tre) image.</summary>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct SpookySpritesFalconFile : IImageFormatReader<SpookySpritesFalconFile>, IImageToRawImage<SpookySpritesFalconFile>, IImageFromRawImage<SpookySpritesFalconFile>, IImageFormatWriter<SpookySpritesFalconFile> {
 
   static string IImageFormatMetadata<SpookySpritesFalconFile>.PrimaryExtension => ".tre";

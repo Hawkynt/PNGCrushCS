@@ -5,6 +5,7 @@ namespace FileFormat.Cineon;
 
 /// <summary>In-memory representation of a Cineon image.</summary>
 [FormatMagicBytes([0x80, 0x2A, 0x5F, 0xD7])]
+[VerifiedBy(ConformanceOracle.ImageMagick)]
 public sealed class CineonFile :
   IImageFormatReader<CineonFile>, IImageToRawImage<CineonFile>,
   IImageFromRawImage<CineonFile>, IImageFormatWriter<CineonFile> {

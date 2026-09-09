@@ -4,6 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.ZxGigascreen;
 
 /// <summary>In-memory representation of a ZX Spectrum Gigascreen file (13824 bytes: two complete 6912-byte screens, averaged for more colors).</summary>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct ZxGigascreenFile
   : IImageFormatReader<ZxGigascreenFile>, IImageToRawImage<ZxGigascreenFile>,
     IImageFromRawImage<ZxGigascreenFile>, IImageFormatWriter<ZxGigascreenFile> {

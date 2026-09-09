@@ -4,6 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.AppleII;
 
 /// <summary>In-memory representation of an Apple II Hi-Res Graphics image.</summary>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public sealed class AppleIIFile :
   IImageFormatReader<AppleIIFile>, IImageToRawImage<AppleIIFile>,
   IImageFromRawImage<AppleIIFile>, IImageFormatWriter<AppleIIFile> {

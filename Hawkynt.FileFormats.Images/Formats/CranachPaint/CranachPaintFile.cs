@@ -12,6 +12,7 @@ namespace FileFormat.CranachPaint;
 /// The palette is present whatever the depth, so a monochrome or true-colour picture carries three
 /// quarters of a kilobyte it never reads.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct CranachPaintFile
   : IImageFormatReader<CranachPaintFile>, IImageToRawImage<CranachPaintFile>,
     IImageFromRawImage<CranachPaintFile>, IImageFormatWriter<CranachPaintFile> {

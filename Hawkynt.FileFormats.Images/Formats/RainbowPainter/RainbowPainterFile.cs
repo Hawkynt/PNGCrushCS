@@ -12,6 +12,7 @@ namespace FileFormat.RainbowPainter;
 /// <para/>
 /// The video matrix comes first, then the bitmap a page later, then the colour RAM. Nothing in the file names a background register, so pattern 00 is always black.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct RainbowPainterFile
   : IImageFormatReader<RainbowPainterFile>, IImageToRawImage<RainbowPainterFile>,
     IImageFromRawImage<RainbowPainterFile>, IImageFormatWriter<RainbowPainterFile> {

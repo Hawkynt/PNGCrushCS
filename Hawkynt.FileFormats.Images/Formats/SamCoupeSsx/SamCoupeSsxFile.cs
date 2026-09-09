@@ -16,6 +16,7 @@ namespace FileFormat.SamCoupeSsx;
 /// One further form is not a screen at all but a byte per pixel across the full 512, which is what
 /// a program produced when it rendered rather than displayed.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct SamCoupeSsxFile
   : IImageFormatReader<SamCoupeSsxFile>, IImageToRawImage<SamCoupeSsxFile>,
     IImageFromRawImage<SamCoupeSsxFile>, IImageFormatWriter<SamCoupeSsxFile> {

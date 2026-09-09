@@ -59,45 +59,50 @@ public sealed class H265VideoDecoderTests {
       Is.False);
   }
 
-  [TestCase(2, "4:2:2")]
-  [TestCase(3, "4:4:4")]
-  [Category("Unit")]
-  public void ASubsampledChromaFormatOtherThan420_IsRefusedByName(int chromaFormatIdc, string expected) {
-    var message = _Refusal(new H265TestStream()
-      .VideoParameterSet()
-      .SequenceParameterSet(chromaFormatIdc: chromaFormatIdc)
-      .ToArray());
-
-    Assert.That(message, Does.Contain(expected));
-    Assert.That(message, Does.Contain("4:2:0"));
-  }
-
   /// <summary>
-  /// Monochrome is not a subsampling and is not refused with the two that are.
+  /// Every chroma format the standard defines is decoded, and none is refused at its parameter set.
   /// </summary>
   /// <remarks>
-  /// A sequence with <c>chroma_format_idc</c> of zero codes no chrominance at all, so every place
-  /// that would read or reconstruct a chrominance sample simply has nothing to do — where 4:2:2 and
-  /// 4:4:4 change the transform tree, the chrominance intra modes, the quantiser mapping and the
-  /// deblocking grid. What this asserts is only that the parameter set is accepted; the pictures are
-  /// checked against libheif's own decode over on the HEIF side, where monochrome actually arrives.
+  /// Each of the four is a different decoding process rather than a different plane size. Monochrome
+  /// codes no chrominance at all, so everything that would read or reconstruct a chrominance sample
+  /// has nothing to do; 4:2:2 splits every chrominance transform block into two stacked squares with
+  /// a coded-block flag and a prediction of its own and bends every intra direction through Table
+  /// 8-4; 4:4:4 gives chrominance the luminance block sizes, its own prediction mode per prediction
+  /// block, the mode-dependent scan at 8x8 and the reference smoothing luminance gets. All four take
+  /// the quantiser mapping of clause 8.6.1 or the bound that replaces it, and each has its own
+  /// deblocking grid.
+  /// <para/>
+  /// What this asserts is only that the parameter set is accepted. The pictures are checked sample
+  /// for sample against ffmpeg and libde265 over encoded corpora, which is the only comparison that
+  /// can tell agreement from correctness.
   /// </remarks>
-  [Test]
+  [TestCase(0)]
+  [TestCase(1)]
+  [TestCase(2)]
+  [TestCase(3)]
   [Category("Unit")]
-  public void AMonochromeSequence_IsNotRefused() {
+  public void EveryChromaFormat_IsAccepted(int chromaFormatIdc) {
     var failure = _Decode(new H265TestStream()
       .VideoParameterSet()
-      .SequenceParameterSet(chromaFormatIdc: 0)
+      .SequenceParameterSet(chromaFormatIdc: chromaFormatIdc, profileIdc: chromaFormatIdc == 1 ? 1 : 4)
       .ToArray());
 
     Assert.That(failure, Is.Null, failure?.Message);
   }
 
   /// <summary>
-  /// Sixteen-bit samples need the extended precision the range extensions add, which nothing here
-  /// implements. Eight, ten and twelve are all decoded, so the refusal has to name the depth rather
-  /// than reject everything past eight.
+  /// Sixteen-bit samples belong to the range-extension profiles, which nothing here implements.
+  /// Eight, ten and twelve are all decoded, so the refusal has to name the depth rather than reject
+  /// everything past eight.
   /// </summary>
+  /// <remarks>
+  /// This one is refused for want of an oracle rather than for want of syntax. The profiles that
+  /// carry deeper samples — Main 4:4:4 16 Intra and its high-throughput sibling — are not something
+  /// any encoder to hand will write: x265 builds eight, ten and twelve bits and nothing else, and
+  /// libheif encodes HEVC through x265. Implementing a decoding process with nothing to check it
+  /// against would be writing code that compiles and looks plausible, which is what this repository
+  /// refuses instead.
+  /// </remarks>
   [Test]
   [Category("Unit")]
   public void SamplesDeeperThanTwelveBits_AreRefusedByTheirDepth() {

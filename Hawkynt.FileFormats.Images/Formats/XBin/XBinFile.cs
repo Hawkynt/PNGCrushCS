@@ -11,6 +11,7 @@ namespace FileFormat.XBin;
 /// Cells = width × height × (codepoint, attribute) pairs, optionally RLE-compressed.
 /// </summary>
 [FormatMagicBytes([(byte)'X', (byte)'B', (byte)'I', (byte)'N', 0x1A])]
+[VerifiedBy(ConformanceOracle.FFmpeg)]
 public readonly record struct XBinFile : IImageFormatReader<XBinFile>, IImageFormatWriter<XBinFile>, IImageToRawImage<XBinFile>, IImageFromRawImage<XBinFile> {
 
   static string IImageFormatMetadata<XBinFile>.PrimaryExtension => ".xb";

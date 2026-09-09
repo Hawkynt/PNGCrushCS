@@ -46,6 +46,7 @@ namespace FileFormat.Codecs;
 /// that packet's frame from that packet's bytes alone while the dictionary carries on across them —
 /// the stateful half of this format that <see cref="Zmbv.ZmbvInflater"/> describes from the other side.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.FFmpeg)]
 public sealed class ZmbvVideoEncoder : IVideoCodecEncoder<ZmbvVideoEncoder> {
 
   private static readonly CodecTag _Tag = CodecTag.FromCharacters("ZMBV");

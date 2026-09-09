@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
+using FileFormat.Core;
 
 namespace Hawkynt.FileFormats.Video.Tests;
 
@@ -74,6 +75,10 @@ public sealed class VideoReadmeStateTests {
       var documentedMux = row.Cell("Mux") == _SUPPORTED;
       if (documentedMux != writes)
         problems.Add($"{id}.Mux: documented={row.Cell("Mux")}, registered={(writes ? "a writer" : "no writer")}");
+
+      var oracle = _OracleCell(writes, entry.VerifiedBy);
+      if (row.Cell("Oracle") != oracle)
+        problems.Add($"{id}.Oracle: documented={row.Cell("Oracle")}, registered={oracle}");
     }
 
     Assert.That(problems, Is.Empty,
@@ -105,7 +110,7 @@ public sealed class VideoReadmeStateTests {
     var decoders = VideoFormatRegistry.AllCodecs.Select(c => c.CodecName).ToHashSet(StringComparer.Ordinal);
     var problems = new List<string>();
 
-    foreach (var (name, decode, encode) in _CodecRows()) {
+    foreach (var (name, decode, encode, oracleCell) in _CodecRows()) {
       // ✅ and ⚠️ both mean the registry builds a decoder; they differ over how much of the format
       // that decoder covers, which is prose and not something the registry knows.
       if (decode is not (_SUPPORTED or _PARTIAL))
@@ -117,10 +122,44 @@ public sealed class VideoReadmeStateTests {
         problems.Add($"{name}.Encode: '{encode}' is not one of {_SUPPORTED}, {_ABSENT}");
       else if ((encode == _SUPPORTED) != encoders.Contains(name))
         problems.Add($"{name}.Encode: documented={encode}, registered={(encoders.Contains(name) ? "an encoder" : "no encoder")}");
+
+      // The claim is about an encoder's output, so a codec that only decodes has nothing to claim
+      // and says so with a dash rather than with "none", which would read as a defect it cannot have.
+      var registered = VideoFormatRegistry.AllEncoders.FirstOrDefault(e => e.CodecName == name);
+      var oracle = _OracleCell(registered != null, registered?.VerifiedBy ?? []);
+      if (oracleCell != oracle)
+        problems.Add($"{name}.Oracle: documented={oracleCell}, registered={oracle}");
     }
 
     Assert.That(problems, Is.Empty,
       "README.md's codec table disagrees with the generated registry:\n" + string.Join("\n", problems));
+  }
+
+  /// <summary>
+  /// Every tool the two tables name has to be linked once, below them, and nowhere else.
+  /// </summary>
+  /// <remarks>
+  /// A link in every cell would repeat the same URL through a hundred rows and make the column
+  /// unreadable in the raw file. A name with no link anywhere is worse: the point of the column is
+  /// that a reader can go and get the tool that judged us.
+  /// </remarks>
+  [Test]
+  [Category("Unit")]
+  public void EveryOracleTheTablesNameIsLinkedInTheLegend() {
+    var readme = _Readme();
+
+    var named = VideoFormatRegistry.AllEncoders.SelectMany(static e => e.VerifiedBy)
+      .Concat(VideoFormatRegistry.AllFormats.SelectMany(static f => f.VerifiedBy))
+      .Distinct()
+      .ToList();
+
+    var unlinked = named
+      .Where(oracle => !readme.Contains($"[{oracle.DisplayName()}]({oracle.HomePage()})", StringComparison.Ordinal))
+      .Select(static oracle => oracle.DisplayName())
+      .ToList();
+
+    Assert.That(unlinked, Is.Empty,
+      "these tools are named in a support table and linked nowhere: " + string.Join(", ", unlinked));
   }
 
   [Test]
@@ -158,9 +197,25 @@ public sealed class VideoReadmeStateTests {
   // Reading the tables
   // ============================================================================================
 
-  private static IEnumerable<(string Name, string Decode, string Encode)> _CodecRows() {
+  private static IEnumerable<(string Name, string Decode, string Encode, string Oracle)> _CodecRows() {
     foreach (var row in _Rows("### Codec support", "### Not supported, and why"))
-      yield return (_LinkText(row.Cell("Codec")), row.Cell("Decode"), row.Cell("Encode"));
+      yield return (_LinkText(row.Cell("Codec")), row.Cell("Decode"), row.Cell("Encode"), row.Cell("Oracle"));
+  }
+
+  /// <summary>What the Oracle column says about one row.</summary>
+  /// <remarks>
+  /// Three answers meaning three different things. A tool's name is a claim that that program has
+  /// read what this writer produced; <c>none</c> is a writer nothing outside this repository has ever
+  /// looked at, which is the answer worth printing and the one a blank cell would hide; a dash is no
+  /// writer at all, so there is nothing for anything to have read.
+  /// </remarks>
+  private static string _OracleCell(bool writes, ConformanceOracle[] oracles) {
+    if (!writes)
+      return _ABSENT;
+
+    return oracles.Length == 0
+      ? "none"
+      : string.Join(", ", oracles.Select(static oracle => oracle.DisplayName()));
   }
 
   /// <summary>The text of a markdown link, or the cell itself where it carries none.</summary>

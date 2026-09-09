@@ -5,6 +5,7 @@ using FileFormat.Core;
 namespace FileFormat.IffDpan;
 
 /// <summary>In-memory representation of a Deluxe Paint DPAN animation, exposing its first frame as an image.</summary>
+[VerifiedBy(ConformanceOracle.FFmpeg)]
 public readonly record struct IffDpanFile : IImageFormatReader<IffDpanFile>, IImageToRawImage<IffDpanFile>, IImageFromRawImage<IffDpanFile>, IImageFormatWriter<IffDpanFile> {
 
   /// <summary>Minimum IFF container header size: <c>FORM</c>, a 32-bit size and the form type.</summary>

@@ -69,6 +69,7 @@ namespace FileFormat.Codecs;
 /// Snappy — which is what ffmpeg reads them with — accepted this package's block writer on 146 of
 /// them.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.FFmpeg)]
 public sealed class HapVideoEncoder : IVideoCodecEncoder<HapVideoEncoder> {
 
   private static readonly CodecTag _Hap1 = CodecTag.FromCharacters("Hap1");

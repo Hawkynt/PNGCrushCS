@@ -5,6 +5,7 @@ namespace FileFormat.Eps;
 
 /// <summary>In-memory representation of an EPS (Encapsulated PostScript) image with embedded TIFF preview.</summary>
 [FormatMagicBytes([0xC5, 0xD0, 0xD3, 0xC6])]
+[VerifiedBy(ConformanceOracle.ImageMagick)]
 public readonly record struct EpsFile : IImageFormatReader<EpsFile>, IImageToRawImage<EpsFile>, IImageFromRawImage<EpsFile>, IImageFormatWriter<EpsFile> {
 
   static string IImageFormatMetadata<EpsFile>.PrimaryExtension => ".eps";

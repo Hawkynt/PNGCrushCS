@@ -5,6 +5,7 @@ using FileFormat.Core;
 namespace FileFormat.DaliST;
 
 /// <summary>In-memory representation of an Atari ST Dali image (SD0/SD1/SD2).</summary>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct DaliSTFile : IImageFormatReader<DaliSTFile>, IImageToRawImage<DaliSTFile>, IImageFromRawImage<DaliSTFile>, IImageFormatWriter<DaliSTFile> {
 
   /// <summary>Bytes occupied by the required zero file identifier.</summary>

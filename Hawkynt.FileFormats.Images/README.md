@@ -40,899 +40,903 @@ This table is generated from `FormatRegistry.AllFormats`, which is the authorita
 
 The columns are the four things a caller can ask the registry for: **Read** decodes to a `RawImage`; **Write** encodes an arbitrary `RawImage` (a format that can only re-serialise a file it parsed counts as read-only); **Info** answers `ReadImageInfo` — dimensions, depth, colour mode, compression and frame count from the header alone, without decoding pixels; **Multi** exposes pages, frames or entries through the multi-image contract; **Optimizer** means the `Crush.Image` optimizer below rewrites the format losslessly in place instead of converting it.
 
+**Oracle** is a fifth thing, and it is not a capability: it names the program outside this repository that has read what the writer produces. A writer checked only by the reader beside it is worth less than no writer, because the two can share one reading of the format and agree with each other perfectly while nothing else on earth can open the file — which has happened here repeatedly. The claim is declared by `[VerifiedBy]` on the format type, carried into `FormatEntry.VerifiedBy` by the registry generator, and held to what it says: the format is written, the named tool is run over the result, and the picture it rebuilds has to be the picture that went in. `none` is the honest answer wherever nothing has looked, and it is the most useful entry in the column.
+
 <!-- IMAGE-FORMATS:BEGIN generated from FormatRegistry -- do not edit this table by hand -->
-| Format | Extensions | Read | Write | Info | Multi | Optimizer |
-| --- | --- | :---: | :---: | :---: | :---: | :---: |
-| Aai | `.aai` | ✅ | ✅ | — | — | — |
-| AccessFax | `.g4`, `.acc` | ✅ | ✅ | — | — | — |
-| Acorn | `.spr`, `.acorn` | ✅ | ✅ | — | — | — |
-| AdexImage | `.adx` | ✅ | ✅ | — | — | — |
-| AdTechFax | `.adt` | ✅ | ✅ | — | — | — |
-| AdvancedArtStudio | `.ocp`, `.mpi`, `.mpic` | ✅ | ✅ | — | — | — |
-| Afli | `.afl` | ✅ | ✅ | — | — | — |
-| Ai | `.ai` | ✅ | ✅ | — | — | — |
-| AimGreyScale | `.ima` | ✅ | ✅ | — | — | — |
-| AirNav | `.anv` | ✅ | ✅ | — | — | — |
-| AladdinPaint | `.alp` | ✅ | ✅ | — | — | — |
-| AliasPix | `.pix`, `.als`, `.alias`, `.img`, `.lux` | ✅ | ✅ | — | — | — |
-| AmicaPaint | `.ami` | ✅ | ✅ | — | — | — |
-| AmigaIcon | `.info` | ✅ | ✅ | — | — | — |
-| AmosBank | `.abk` | ✅ | ✅ | — | — | — |
-| AmstradCpc | `.cpc` | ✅ | ✅ | — | — | — |
-| AmstradMode5 | `.cm5` | ✅ | ✅ | — | — | — |
-| Analyze | `.hdr`, `.img` | ✅ | ✅ | — | — | — |
-| AndrewToolkit | `.atk` | ✅ | ✅ | — | — | — |
-| Ani | `.ani` | ✅ | ✅ | — | ✅ | ✅ |
-| AnimatorCompressor | `.kpr` | ✅ | ✅ | — | — | — |
-| Anime4Ever | `.a4r` | ✅ | ✅ | — | — | — |
-| AnimPainter | `.anp` | ✅ | ✅ | — | — | — |
-| AnsiArt | `.ans`, `.ansi` | ✅ | ✅ | — | — | — |
-| Apac3 | `.ap3`, `.apv`, `.dgi`, `.dgp`, `.esc`, `.ilc`, `.pzm`, `.app`, `.ils` | ✅ | ✅ | — | — | — |
-| Apng | `.apng` | ✅ | ✅ | — | ✅ | — |
-| ApolloHdru | `.hdru`, `.gn` | ✅ | ✅ | — | — | — |
-| Apple3201 | `.3201` | ✅ | ✅ | — | — | — |
-| AppleII | `.hgr`, `.dhgr` | ✅ | ✅ | — | — | — |
-| AppleIIDhr | `.dhr`, `.a2d` | ✅ | ✅ | — | — | — |
-| AppleIIgs | `.shr`, `.c1`, `.pic` | ✅ | ✅ | — | — | — |
-| AppleIIHgr | `.hgr` | ✅ | ✅ | — | — | — |
-| ApplePreferred | `.32k`, `.gs`, `.iigs`, `.shr` | ✅ | ✅ | — | — | — |
-| AppleSh3 | `.sh3`, `.3200` | ✅ | ✅ | — | — | — |
-| AppleShr | `.shr` | ✅ | ✅ | — | — | — |
-| Apx | `.apx` | ✅ | ✅ | — | — | — |
-| Arf | `.arf` | ✅ | ✅ | — | — | — |
-| Arn | `.arn` | ✅ | ✅ | — | — | — |
-| Art | `.art` | ✅ | ✅ | — | — | — |
-| ArtDirector | `.art` | ✅ | ✅ | — | — | — |
-| Artist64 | `.a64` | ✅ | ✅ | — | — | — |
-| ArtMaster88 | `.arv`, `.img` | ✅ | ✅ | — | — | — |
-| ArtStudio8 | `.as8` | ✅ | ✅ | — | — | — |
-| ArtStudioWindow | `.mwi`, `.mwin` | ✅ | ✅ | — | — | — |
-| AsciiMaker | `.asc`, `.gr0` | ✅ | ✅ | — | — | — |
-| Aseprite | `.aseprite`, `.ase` | ✅ | ✅ | — | — | — |
-| Astc | `.astc` | ✅ | ✅ | — | — | — |
-| Atari16x16Font | `.sxs` | ✅ | ✅ | — | — | — |
-| Atari2600 | `.a26`, `.tia` | ✅ | ✅ | — | — | — |
-| Atari7800 | `.a78`, `.a7800` | ✅ | ✅ | — | — | — |
-| Atari8Bit | `.gr7`, `.gr8`, `.gr9`, `.gr15`, `.hip`, `.mic`, `.int` | ✅ | ✅ | — | — | — |
-| Atari8Missile | `.mis` | ✅ | ✅ | — | — | — |
-| Atari8Player | `.pla` | ✅ | ✅ | — | — | — |
-| AtariAgp | `.agp` | ✅ | ✅ | — | — | — |
-| AtariAnimation | `.aan` | ✅ | ✅ | — | — | — |
-| AtariAnticMode | `.ame`, `.anm` | ✅ | ✅ | — | — | — |
-| AtariArtist | `.aat` | ✅ | ✅ | — | — | — |
-| AtariCAD | `.drg`, `.acd` | ✅ | ✅ | — | — | — |
-| AtariCel | `.cel` | ✅ | ✅ | — | — | — |
-| AtariChampionsInterlace | `.cin`, `.cci` | ✅ | ✅ | — | — | — |
-| AtariCompressed | `.acr`, `.acp` | ✅ | ✅ | — | — | — |
-| AtariDoodle | `.doo` | ✅ | ✅ | — | — | — |
-| AtariDump | `.asd`, `.adm` | ✅ | ✅ | — | — | — |
-| AtariFalcon | `.ftc` | ✅ | ✅ | — | — | — |
-| AtariFalconXga | `.xga` | ✅ | ✅ | — | — | — |
-| AtariFont | `.fnt8` | ✅ | ✅ | — | — | — |
-| AtariFontMaker | `.fn2` | ✅ | ✅ | — | — | — |
-| AtariGfb | `.gfb` | ✅ | ✅ | — | — | — |
-| AtariGr7 | `.gr7` | ✅ | ✅ | — | — | — |
-| AtariGr8 | `.gr8` | ✅ | ✅ | — | — | — |
-| AtariGrafik | `.pcp` | ✅ | ✅ | — | — | — |
-| AtariGraphics10 | `.gr10`, `.g10` | ✅ | ✅ | — | — | — |
-| AtariGraphics11 | `.gr11`, `.g11` | ✅ | ✅ | — | — | — |
-| AtariGraphics3 | `.gr3`, `.sg3` | ✅ | ✅ | — | — | — |
-| AtariGraphics9 | `.gr9`, `.g9`, `.g9s`, `.sfd` | ✅ | ✅ | — | — | — |
-| AtariGraphicsStudio | `.ags` | ✅ | ✅ | — | — | — |
-| AtariGrayscale9 | `.bg9`, `.g09` | ✅ | ✅ | — | — | — |
-| AtariHardInterlace | `.hip`, `.hps` | ✅ | ✅ | — | — | — |
-| AtariHighResPage | `.pg3` | ✅ | ✅ | — | — | — |
-| AtariHr | `.hr` | ✅ | ✅ | — | — | — |
-| AtariHr2 | `.hr2`, `.hci` | ✅ | ✅ | — | — | — |
-| AtariIce | `.ice`, `.icn` | ✅ | ✅ | — | — | — |
-| AtariImageManager | `.im`, `.col` | ✅ | ✅ | — | — | — |
-| AtariMaxi | `.max8`, `.amx` | ✅ | ✅ | — | — | — |
-| AtariPaintworks | `.cl0`, `.cl1`, `.cl2`, `.pg0`, `.pg1`, `.pg2`, `.pg3`, `.sc0`, `.sc1`, `.sc2` | ✅ | ✅ | — | — | — |
-| AtariPi5 | `.pi5` | ✅ | ✅ | — | — | — |
-| AtariPi8 | `.pi8` | ✅ | ✅ | — | — | — |
-| AtariPi9 | `.pi9` | ✅ | ✅ | — | — | — |
-| AtariPicture | `.apc`, `.apa`, `.plm`, `.aps`, `.mga`, `.pls` | ✅ | ✅ | — | — | — |
-| AtariPicworks | `.cp3` | ✅ | ✅ | — | — | — |
-| AtariPlayer | `.pmg`, `.plm` | ✅ | ✅ | — | — | — |
-| AtariPlayerEditor | `.apl` | ✅ | ✅ | — | — | — |
-| AtariSif | `.sif` | ✅ | ✅ | — | — | — |
-| AtariTools800 | `.4pl`, `.4mi`, `.4pm` | ✅ | ✅ | — | — | — |
-| AtariTools800Font | `.acs` | ✅ | ✅ | — | — | — |
-| AtariTt | `.pi5`, `.pi4`, `.pi6` | ✅ | ✅ | — | — | — |
-| AtariTxs | `.txs` | ✅ | ✅ | — | — | — |
-| AttGroup4 | `.att` | ✅ | ✅ | — | — | — |
-| AutodeskCel | `.cel` | ✅ | ✅ | — | — | — |
-| AutoFx | `.afx` | ✅ | ✅ | — | — | — |
-| Autologic | `.gm`, `.gm2`, `.gm4` | ✅ | ✅ | — | — | — |
-| AvhrrImage | `.sst` | ✅ | ✅ | — | — | — |
-| Avif | `.avif` | ✅ | ✅ | — | — | — |
-| Avs | `.avs`, `.x`, `.mbfavs`, `.mbfs` | ✅ | ✅ | — | — | — |
-| AwardBmp | `.epa`, `.awbm` | ✅ | ✅ | — | — | — |
-| Awd | `.awd` | ✅ | ✅ | — | — | — |
-| AxialisScreensaver | `.ssp` | ✅ | ✅ | — | ✅ | — |
-| Bam | `.bam` | ✅ | ✅ | ✅ | — | — |
-| BbcMicro | `.bbc` | ✅ | ✅ | — | — | — |
-| BbcMicroScreen | `.bb4`, `.bb0`, `.bb1`, `.bb2`, `.bb5` | ✅ | ✅ | — | — | — |
-| BennetYeeFace | `.ybm` | ✅ | ✅ | — | — | — |
-| BestPaint | `.bp` | ✅ | ✅ | — | — | — |
-| Bfli | `.bfl`, `.bfli`, `.flp` | ✅ | ✅ | — | — | — |
-| BfxBitware | `.bfx` | ✅ | ✅ | — | — | — |
-| BigTiff | `.btf`, `.tf8` | ✅ | ✅ | — | ✅ | — |
-| BioRadPic | `.pic` | ✅ | ✅ | — | — | — |
-| BkScreen | `.bks` | ✅ | ✅ | — | — | — |
-| Blazing | `.blz`, `.pi` | ✅ | ✅ | — | — | — |
-| BlazingPaddlesWindow | `.wnd` | ✅ | ✅ | — | — | — |
-| Blazon | `.bpl` | ✅ | ✅ | — | — | — |
-| Blp | `.blp` | ✅ | ✅ | — | — | — |
-| Bmp | `.bmp`, `.dib`, `.bga`, `.rl4`, `.rl8`, `.vga`, `.sys`, `.bum`, `.thb`, `.2d`, `.bmc`, `.stm`, `.upi`, `.msk`, `.flt` | ✅ | ✅ | ✅ | — | ✅ |
-| Bob | `.bob` | ✅ | ✅ | — | — | — |
-| BodyPaint3D | `.b3d`, `.b2d` | ✅ | ✅ | — | — | — |
-| BoogieDownPaint | `.bdp` | ✅ | ✅ | — | — | — |
-| Botticelli | `.p4i` | ✅ | ✅ | — | — | — |
-| Bpg | `.bpg` | ✅ | — | — | — | — |
-| BrooktroutFax | `.brk`, `.301`, `.brt` | ✅ | ✅ | — | — | — |
-| BrotherFax | `.uni` | ✅ | ✅ | — | — | — |
-| Brus | `.brus` | ✅ | ✅ | — | — | — |
-| Bsave | `.bsv` | ✅ | ✅ | — | — | — |
-| Bsb | `.kap`, `.bsb` | ✅ | ✅ | — | — | — |
-| BugbiterApac | `.bgp` | ✅ | ✅ | — | — | — |
-| BugBitmap | `.bbm`, `.bug` | ✅ | ✅ | — | — | — |
-| ByLight | `.bif` | ✅ | ✅ | — | — | — |
-| ByuSir | `.sir` | ✅ | ✅ | — | — | — |
-| C128 | `.c128`, `.vdc` | ✅ | ✅ | — | — | — |
-| C128Hires | `.c1h` | ✅ | ✅ | — | — | — |
-| C128Multi | `.c1m` | ✅ | ✅ | — | — | — |
-| C128VDC | `.vdc`, `.vdc3` | ✅ | ✅ | — | — | — |
-| C16Plus4 | `.c16`, `.plus4` | ✅ | ✅ | — | — | — |
-| C64Multi | `.ocp`, `.hires`, `.ami` | ✅ | ✅ | — | — | — |
-| Calamus | `.cpi`, `.crg` | ✅ | ✅ | — | — | — |
-| Cals | `.cal`, `.cals`, `.gp4`, `.mil` | ✅ | ✅ | — | — | — |
-| CameraRaw | `.cr2`, `.nef`, `.arw`, `.orf`, `.rw2`, `.pef`, `.raf`, `.raw`, `.srw`, `.dcs`, `.dcr`, `.kdc`, `.srf`, `.sr2`, `.mos`, `.3fr`, `.mef`, `.nrw`, `.rwl`, `.erf`, `.iiq` | ✅ | ✅ | — | — | — |
-| CanonNavFax | `.can` | ✅ | ✅ | — | — | — |
-| Canvas | `.cvs` | ✅ | ✅ | — | — | — |
-| CanvasRaster | `.ful` | ✅ | ✅ | — | — | — |
-| CartesMichelin | `.big` | ✅ | — | — | — | — |
-| CasioQv | `.cam` | ✅ | ✅ | — | — | — |
-| Ccitt | `.g3`, `.g4`, `.ccitt`, `.fax` | ✅ | ✅ | — | — | — |
-| Cdr | `.cdr` | ✅ | — | — | — | — |
-| CDUPaint | `.cdu` | ✅ | ✅ | — | — | — |
-| Cdxl | `.cdxl` | ✅ | ✅ | — | — | — |
-| Cel | `.cel` | ✅ | ✅ | — | — | — |
-| CelGrey | `.cel` | ✅ | ✅ | — | — | — |
-| Centauri | `.cnt`, `.cen` | ✅ | ✅ | — | — | — |
-| CentauriLogoEditor | `.cle` | ✅ | ✅ | — | — | — |
-| CfliDesigner | `.cfli` | ✅ | ✅ | — | — | — |
-| Cgm | `.cgm` | ✅ | ✅ | — | — | — |
-| ChampionsInterlace | `.cin` | ✅ | ✅ | — | — | — |
-| CharPad | `.ctm` | ✅ | ✅ | — | — | — |
-| CharSet64 | `.chr64` | ✅ | ✅ | — | — | — |
-| Cheese | `.che`, `.chs` | ✅ | ✅ | — | — | — |
-| ChinonEs1000 | `.cmt` | ✅ | ✅ | — | — | — |
-| ChrDollar | `.ch$` | ✅ | ✅ | — | — | — |
-| CImage | `.dsi` | ✅ | ✅ | — | — | — |
-| CinemasterAtari | `.cin8` | ✅ | ✅ | — | — | — |
-| Cineon | `.cin` | ✅ | ✅ | — | — | — |
-| CiscoIp | `.cip` | ✅ | ✅ | — | — | — |
-| ClipArtCatalog | `.cat` | ✅ | ✅ | — | ✅ | — |
-| Cloe | `.clo`, `.cloe` | ✅ | ✅ | — | — | — |
-| Clp | `.clp` | ✅ | ✅ | — | — | — |
-| Cmu | `.cmu` | ✅ | ✅ | — | — | — |
-| CmuWindowManager | `.cmu`, `.cmuwm` | ✅ | ✅ | — | — | — |
-| Cmx | `.cmx` | ✅ | — | — | — | — |
-| CoCo | `.coc` | ✅ | ✅ | — | — | — |
-| CoCo3 | `.cc3` | ✅ | ✅ | — | — | — |
-| CoCoMax | `.max`, `.p41` | ✅ | ✅ | — | — | — |
-| CocoP11 | `.p11` | ✅ | ✅ | — | — | — |
-| CokeAtari | `.tg1` | ✅ | ✅ | — | — | — |
-| ColoRix | `.rix`, `.sc0`, `.sc1`, `.sc2`, `.sc3`, `.sc4`, `.sc5`, `.sc6`, `.sc7`, `.sc8`, `.sc9`, `.sca`, `.scb`, `.scc`, `.scd`, `.sce`, `.scf`, `.scg`, `.sch`, `.sci`, `.scj`, `.sck`, `.scl`, `.scm`, `.scn`, `.sco`, `.scp`, `.scq`, `.scr`, `.scs`, `.sct`, `.scu`, `.scv`, `.scw`, `.scx`, `.scy`, `.scz` | ✅ | ✅ | — | — | — |
-| ColorStar | `.bil` | ✅ | ✅ | — | — | — |
-| ColorStarObject | `.obj` | ✅ | ✅ | — | — | — |
-| ColrObjectEditor | `.mur` | ✅ | ✅ | — | — | — |
-| Commodore64Font | `.64c`, `.g` | ✅ | ✅ | — | — | — |
-| CommodoreGrafix | `.cgx` | ✅ | ✅ | — | — | — |
-| CommodorePet | `.pet` | ✅ | ✅ | — | — | — |
-| CompuServeRle | `.rle` | ✅ | ✅ | — | — | — |
-| ComputerEyes | `.ce`, `.ce1`, `.ce2` | ✅ | ✅ | — | — | — |
-| ComputerEyesSt | `.ce3` | ✅ | ✅ | — | — | — |
-| CompW | `.wlm` | ✅ | ✅ | — | — | — |
-| CoreIdc | `.idc` | ✅ | ✅ | — | — | — |
-| CorelGallery | `.bmf` | ✅ | ✅ | — | — | — |
-| Cp8Gray | `.cp8` | ✅ | ✅ | — | — | — |
-| CpcAdvanced | `.cpa` | ✅ | ✅ | — | — | — |
-| CpcFont | `.cpf` | ✅ | ✅ | — | — | — |
-| CpcOverscan | `.cpo` | ✅ | ✅ | — | — | — |
-| CpcPlus | `.cpp` | ✅ | ✅ | — | — | — |
-| CpcSprite | `.cps` | ✅ | ✅ | — | — | — |
-| Cr3 | `.cr3` | ✅ | ✅ | — | — | — |
-| Crack | `.ca2` | ✅ | ✅ | — | — | — |
-| CrackArt | `.ca1`, `.ca2`, `.ca3` | ✅ | ✅ | — | — | — |
-| CranachPaint | `.esm` | ✅ | ✅ | — | — | — |
-| Crd | `.crd` | ✅ | ✅ | — | — | — |
-| CreateWithGarfield | `.cwg` | ✅ | ✅ | — | — | — |
-| Crw | `.crw` | ✅ | ✅ | — | — | — |
-| CsvImage | `.csv` | ✅ | ✅ | — | — | — |
-| Cur | `.cur` | ✅ | ✅ | — | ✅ | ✅ |
-| CutCreator | `.cut` | ✅ | ✅ | — | — | — |
-| DaisyDotFont | `.nlq` | ✅ | ✅ | — | — | — |
-| DaliCompressed | `.lpk`, `.mpk`, `.hpk` | ✅ | ✅ | — | — | — |
-| DaliST | `.sd0`, `.sd1`, `.sd2` | ✅ | ✅ | — | — | — |
-| DbwRender | `.dbw` | ✅ | ✅ | — | — | — |
-| Dcx | `.dcx` | ✅ | ✅ | — | ✅ | — |
-| Dds | `.dds` | ✅ | ✅ | — | — | — |
-| Degas | `.pi1`, `.pi2`, `.pi3`, `.pc1`, `.pc2`, `.pc3`, `.suh` | ✅ | ✅ | — | — | — |
-| DegasBrush | `.bru` | ✅ | ✅ | — | — | — |
-| DegasIcon | `.icn` | ✅ | ✅ | — | — | — |
-| DelmPaint | `.del`, `.dph` | ✅ | ✅ | — | — | — |
-| Deluxe | `.dps`, `.dlx` | ✅ | ✅ | — | — | — |
-| DGraphCompressed | `.p3c` | ✅ | ✅ | — | — | — |
-| Dicom | `.dcm`, `.dicom`, `.acr`, `.dic`, `.dc3` | ✅ | ✅ | — | — | — |
-| DigiSpec | `.dgs` | ✅ | ✅ | — | — | — |
-| DigitalFx | `.tdim` | ✅ | ✅ | — | — | — |
-| DigiView | `.dgv` | ✅ | ✅ | — | — | — |
-| Din | `.din` | ✅ | ✅ | — | — | — |
-| DirLogoMaker | `.dlm` | ✅ | ✅ | — | — | — |
-| DispThumbnail | `.tnl` | ✅ | ✅ | — | — | — |
-| DivGameMap | `.fpg` | ✅ | ✅ | — | — | — |
-| DjVu | `.djvu`, `.djv`, `.iw4` | ✅ | ✅ | — | — | — |
-| Dng | `.dng` | ✅ | ✅ | — | — | — |
-| DolphinEd | `.dol`, `.bed` | ✅ | ✅ | — | — | — |
-| Doodle | `.dd`, `.ddp` | ✅ | ✅ | — | — | — |
-| DoodleAtari | `.doo` | ✅ | ✅ | — | — | — |
-| DoodleComp | `.jj` | ✅ | ✅ | — | — | — |
-| DoodlePacked | `.dpk` | ✅ | ✅ | — | — | — |
-| DoomFlat | `.flat` | ✅ | ✅ | — | — | — |
-| Dpx | `.dpx` | ✅ | ✅ | — | — | — |
-| Dragon | `.dgn` | ✅ | ✅ | — | — | — |
-| DrawIt | `.dit` | ✅ | ✅ | — | — | — |
-| Drazlace | `.dlp`, `.drl` | ✅ | ✅ | — | — | — |
-| DrazPaint | `.drz`, `.drp` | ✅ | ✅ | — | — | — |
-| DrHalo | `.cut` | ✅ | ✅ | — | — | — |
-| DuneGraph | `.dg1`, `.dc1` | ✅ | ✅ | — | — | — |
-| Duo | `.duo`, `.du1` | ✅ | ✅ | — | — | — |
-| DuoMedium | `.du2` | ✅ | ✅ | — | — | — |
-| Dwg | `.dwg` | ✅ | ✅ | — | — | — |
-| Dxf | `.dxf` | ✅ | ✅ | — | — | — |
-| EccHeader | `.ecc` | ✅ | ✅ | — | — | — |
-| EciGraphicEditor | `.eci`, `.ecp` | ✅ | ✅ | — | — | — |
-| EclipseTile | `.tile` | ✅ | ✅ | — | — | — |
-| Ecw | `.ecw` | ✅ | ✅ | — | — | — |
-| EdmicsC4 | `.c4` | ✅ | ✅ | — | — | — |
-| EggPaint | `.trp` | ✅ | ✅ | — | — | — |
-| ElectricImage | `.ei`, `.eidi` | ✅ | ✅ | — | ✅ | — |
-| Electronika | `.bk`, `.ekr` | ✅ | ✅ | — | — | — |
-| EmbeddedDib | `.zmf`, `.skf`, `.cad`, `.btn` | ✅ | — | — | — | — |
-| EmcEditor | `.emc` | ✅ | ✅ | — | — | — |
-| Emf | `.emf` | ✅ | ✅ | — | — | — |
-| Enterprise128 | `.ep`, `.elan` | ✅ | ✅ | — | — | — |
-| Envi | `.hdr` | ✅ | ✅ | — | — | — |
-| EpaBios | `.epa` | ✅ | ✅ | — | — | — |
-| Eps | `.eps`, `.epsf`, `.epsi`, `.epi`, `.ept` | ✅ | ✅ | — | — | — |
-| Eroiica | `.eif` | ✅ | ✅ | — | ✅ | — |
-| EscapePaint | `.esp` | ✅ | ✅ | — | — | — |
-| EsmSoftwarePix | `.pix` | ✅ | ✅ | — | — | — |
-| EverexFax | `.efx`, `.ef3` | ✅ | ✅ | — | — | — |
-| Excel | `.xlsx`, `.xlsm`, `.xltx`, `.xltm` | ✅ | ✅ | — | ✅ | — |
-| Exr | `.exr` | ✅ | ✅ | — | — | — |
-| ExtendedGemImg | `.ximg` | ✅ | ✅ | — | — | — |
-| ExtendSuperHires | `.esh` | ✅ | ✅ | — | — | — |
-| EzArt | `.eza` | ✅ | ✅ | — | — | — |
-| FacePainter | `.fpt`, `.fcp` | ✅ | ✅ | — | — | — |
-| FaceSaver | `.face`, `.fac` | ✅ | ✅ | — | — | — |
-| FaceServer | `.fac`, `.face` | ✅ | ✅ | — | — | — |
-| FalconFuckpaint | `.pi4`, `.pi7`, `.pi9` | ✅ | ✅ | — | — | — |
-| FalconPaint | `.fpn` | ✅ | ✅ | — | — | — |
-| FalconRes | `.frs` | ✅ | ✅ | — | — | — |
-| Farbfeld | `.ff`, `.farbfeld` | ✅ | ✅ | — | — | — |
-| FastgraphPixelRun | `.prf` | ✅ | ✅ | — | — | — |
-| FaxG3 | `.g3` | ✅ | ✅ | — | — | — |
-| FaxMan | `.fmf` | ✅ | ✅ | — | — | — |
-| Fbm | `.fbm` | ✅ | ✅ | — | — | — |
-| Fff | `.fff` | ✅ | ✅ | — | — | — |
-| Ffli | `.ffli`, `.ffl` | ✅ | ✅ | — | — | — |
-| FirstPublisher | `.art` | ✅ | ✅ | — | — | — |
-| Fits | `.fits`, `.fit`, `.fts` | ✅ | ✅ | — | — | — |
-| FitsDocument | `.fits`, `.fit`, `.fts` | ✅ | ✅ | — | ✅ | — |
-| Fl32 | `.fl32` | ✅ | ✅ | — | — | — |
-| FlashImage | `.fi` | ✅ | ✅ | — | — | — |
-| Fli | `.fli`, `.flc` | ✅ | ✅ | — | ✅ | — |
-| Fli64 | `.fli64` | ✅ | ✅ | — | — | — |
-| FliDesigner | `.fd2` | ✅ | ✅ | — | — | — |
-| FliDesigner2 | `.fd2` | ✅ | ✅ | — | — | — |
-| FliEditor | `.fed` | ✅ | ✅ | — | — | — |
-| Flif | `.flif` | ✅ | ✅ | — | — | — |
-| FliGraph | `.flg`, `.bml`, `.fli` | ✅ | ✅ | — | — | — |
-| Flimatic | `.flm` | ✅ | ✅ | — | — | — |
-| Flip64 | `.fbi` | ✅ | ✅ | — | — | — |
-| FliProfi | `.fpr` | ✅ | ✅ | — | — | — |
-| FloorDesigner | `.fge` | ✅ | ✅ | — | — | — |
-| FmTowns | `.fmt` | ✅ | ✅ | — | — | — |
-| FontasyGrafik | `.bsg` | ✅ | ✅ | — | — | — |
-| Fpx | `.fpx`, `.mix` | ✅ | — | — | — | — |
-| FreeHand | `.fhs` | ✅ | ✅ | — | — | — |
-| FremontFax | `.f96` | ✅ | ✅ | — | — | — |
-| Fsh | `.fsh` | ✅ | ✅ | — | — | — |
-| Fuckpaint | `.fp` | ✅ | ✅ | — | — | — |
-| FullscreenKit | `.kid` | ✅ | ✅ | — | — | — |
-| FunGraphicsMachine | `.fgs` | ✅ | ✅ | — | — | — |
-| FunPainter | `.fp2`, `.fun` | ✅ | ✅ | — | — | — |
-| FunPhotor | `.fpr` | ✅ | ✅ | — | — | — |
-| FuntasticPaint | `.fun8`, `.ftp` | ✅ | ✅ | — | — | — |
-| FunWithArt | `.fwa` | ✅ | ✅ | — | — | — |
-| G9b | `.g9b` | ✅ | ✅ | — | — | — |
-| Gaf | `.gaf` | ✅ | ✅ | — | — | — |
-| GameBoyTile | `.2bpp`, `.cgb` | ✅ | ✅ | — | — | — |
-| GammaFax | `.gmf` | ✅ | ✅ | — | — | — |
-| GbaTile | `.4bpp`, `.gba` | ✅ | ✅ | — | — | — |
-| Gbr | `.gbr` | ✅ | ✅ | — | — | — |
-| Gd2 | `.gd2` | ✅ | ✅ | — | — | — |
-| GedPicture | `.ged` | ✅ | ✅ | — | — | — |
-| GeGenesis | `.fre`, `.pd`, `.t1`, `.t2` | ✅ | ✅ | — | — | — |
-| Gem | `.gem` | ✅ | ✅ | — | — | — |
-| GemImg | `.img` | ✅ | ✅ | — | — | — |
-| GeoPaint | `.geo` | ✅ | ✅ | — | — | — |
-| GephardHires | `.ghg` | ✅ | ✅ | — | — | — |
-| GfaPaint | `.gfp` | ✅ | ✅ | — | — | — |
-| GfaRaytrace | `.sul` | ✅ | ✅ | — | — | — |
-| Gif | `.gif`, `.giff`, `.bpr` | ✅ | ✅ | — | ✅ | ✅ |
-| Gigacad | `.gcd` | ✅ | ✅ | — | — | — |
-| GigaPaint | `.gih`, `.gig`, `.rpo` | ✅ | ✅ | — | — | — |
-| GoDot4Bit | `.4bt`, `.4bit`, `.clp` | ✅ | ✅ | — | — | — |
-| GodPaint | `.gpn`, `.gdp`, `.god` | ✅ | ✅ | — | — | — |
-| Grafix | `.grx` | ✅ | ✅ | — | — | — |
-| Graph2Font | `.g2f` | ✅ | ✅ | — | — | — |
-| Graph2FontMch | `.mch` | ✅ | ✅ | — | — | — |
-| Graph2FontScroll | `.vsc` | ✅ | ✅ | — | — | — |
-| Graphics10Plus | `.gr10p` | ✅ | ✅ | — | — | — |
-| Graphics9Plus | `.gr9p` | ✅ | ✅ | — | — | — |
-| GraphicsMaster | `.gms`, `.gm8` | ✅ | ✅ | — | — | — |
-| GraphLogo | `.all` | ✅ | ✅ | — | — | — |
-| GraphSaurus | `.sr5`, `.grs`, `.sr8`, `.srs` | ✅ | ✅ | — | — | — |
-| GraphSaurus6 | `.sr6` | ✅ | ✅ | — | — | — |
-| GraphSaurus7 | `.sr7` | ✅ | ✅ | — | — | — |
-| GraphSaurusInterlaced | `.sri` | ✅ | ✅ | — | — | — |
-| GraspGl | `.gl` | ✅ | ✅ | — | — | — |
-| GrassSlideshow | `.hpm` | ✅ | ✅ | — | — | — |
-| GreatPaint | `.gpt` | ✅ | ✅ | — | — | — |
-| GrfBitmap | `.grf` | ✅ | ✅ | — | — | — |
-| Grs16 | `.g16` | ✅ | ✅ | — | — | — |
-| GunPaint | `.gun`, `.ifl` | ✅ | ✅ | — | — | — |
-| HalfLifeMdl | `.mdltex` | ✅ | ✅ | — | — | — |
-| HalfLifeModel | `.mdl` | ✅ | ✅ | — | — | — |
-| HandyScanner | `.hs2` | ✅ | ✅ | — | — | — |
-| HardColorMap | `.hcm` | ✅ | ✅ | — | — | — |
-| HardInterlace | `.hip` | ✅ | ✅ | — | — | — |
-| HayesJtfax | `.jtf` | ✅ | ✅ | — | — | — |
-| HcbEditor | `.hcb` | ✅ | ✅ | — | — | — |
-| Hdr | `.hdr`, `.hdri`, `.rgbe`, `.xyze`, `.rad` | ✅ | ✅ | — | — | — |
-| Heif | `.heic`, `.heif`, `.avci`, `.avcs` | ✅ | ✅ | ✅ | ✅ | — |
-| HereticM8 | `.m8` | ✅ | ✅ | — | — | — |
-| HfImage | `.hf` | ✅ | ✅ | — | — | — |
-| HiEddi | `.hed` | ✅ | ✅ | — | — | — |
-| HighResAtari | `.hra` | ✅ | ✅ | — | — | — |
-| HighresMedium | `.hrm` | ✅ | ✅ | — | — | — |
-| HighResST | `.hst`, `.hrs` | ✅ | ✅ | — | — | — |
-| HinterGrundBild | `.hgb` | ✅ | ✅ | — | — | — |
-| HiPicCreator | `.hpc`, `.aas` | ✅ | ✅ | — | — | — |
-| HiresC64 | `.hir`, `.hbm`, `.hpi` | ✅ | ✅ | — | — | — |
-| HiResEditor | `.het`, `.rph` | ✅ | ✅ | — | — | — |
-| HiresFliCrest | `.hfc`, `.hfd` | ✅ | ✅ | — | — | — |
-| HiresInterlaceFeniks | `.hlf`, `.hie` | ✅ | ✅ | — | — | — |
-| Hireslace | `.hle` | ✅ | ✅ | — | — | — |
-| HiresManager | `.him` | ✅ | ✅ | — | — | — |
-| HomeworldLif | `.lif` | ✅ | ✅ | — | — | — |
-| Hp48Grob | `.grb`, `.gro` | ✅ | ✅ | — | — | — |
-| Hpgl | `.hpgl`, `.hgl`, `.hpg`, `.prn`, `.prt`, `.spl` | ✅ | ✅ | — | — | — |
-| HpGrob | `.grob`, `.hp`, `.gro2`, `.gro4` | ✅ | ✅ | — | — | — |
-| Hpi | `.hpi` | ✅ | ✅ | — | — | — |
-| Hru | `.hru` | ✅ | ✅ | — | — | — |
-| Hrz | `.hrz` | ✅ | ✅ | ✅ | — | — |
-| Hta | `.hta` | ✅ | ✅ | — | ✅ | — |
-| IbmKips | `.kps` | ✅ | ✅ | — | — | — |
-| IcDraw | `.ibi`, `.ib3` | ✅ | ✅ | — | — | — |
-| Ice | `.irg`, `.ir2`, `.icn`, `.imn`, `.ipc` | ✅ | ✅ | — | — | — |
-| IcePcinPlus | `.ip2` | ✅ | ✅ | — | — | — |
-| Icns | `.icns` | ✅ | ✅ | — | ✅ | — |
-| Ico | `.ico` | ✅ | ✅ | — | ✅ | ✅ |
-| IconLibrary | `.icl` | ✅ | — | — | — | — |
-| Ics | `.ics` | ✅ | ✅ | — | — | — |
-| IffAcbm | `.acbm`, `.iff`, `.blk` | ✅ | ✅ | — | — | — |
-| IffAnim | `.anim` | ✅ | ✅ | — | — | — |
-| IffAnim8 | `.an8`, `.anim8` | ✅ | ✅ | — | — | — |
-| IffDctv | `.dctv` | ✅ | ✅ | — | — | — |
-| IffDeep | `.deep`, `.iff`, `.blk` | ✅ | ✅ | — | — | — |
-| IffDpan | `.dpan` | ✅ | ✅ | — | — | — |
-| IffHame | `.hame` | ✅ | ✅ | — | — | — |
-| IffMultiPalette | `.mpl`, `.mpal` | ✅ | ✅ | — | — | — |
-| IffPbm | `.lbm`, `.pbm`, `.blk` | ✅ | ✅ | — | — | — |
-| IffRgb8 | `.rgb8`, `.iff`, `.blk` | ✅ | ✅ | — | — | — |
-| IffRgbn | `.rgbn`, `.iff`, `.blk` | ✅ | ✅ | — | — | — |
-| IffSham | `.sham` | ✅ | ✅ | — | — | — |
-| Ilbm | `.lbm`, `.ilbm`, `.iff`, `.blk`, `.ham`, `.ham6`, `.ham8`, `.256`, `.ap2`, `.beam`, `.dct`, `.dr`, `.mp`, `.bl1`, `.bl2`, `.bl3` | ✅ | ✅ | — | — | — |
-| Im5Visilog | `.im5` | ✅ | ✅ | — | — | — |
-| ImageLabBw | `.b&w`, `.b_w`, `.dit` | ✅ | ✅ | — | — | — |
-| ImageSysC64 | `.isc` | ✅ | ✅ | — | — | — |
-| ImageSystem | `.ish`, `.ism` | ✅ | ✅ | — | — | — |
-| Imagic | `.ic1`, `.ic2`, `.ic3` | ✅ | ✅ | — | — | — |
-| ImagicPaint | `.imp`, `.igp` | ✅ | ✅ | — | — | — |
-| ImagingFax | `.g3n` | ✅ | ✅ | — | — | — |
-| ImnetImage | `.imt` | ✅ | ✅ | — | — | — |
-| IndyPaint | `.ipn`, `.idy`, `.tru` | ✅ | ✅ | — | — | — |
-| Ingr | `.cit`, `.itg` | ✅ | ✅ | — | — | — |
-| InShape | `.iim` | ✅ | ✅ | — | — | — |
-| Int95a | `.int` | ✅ | ✅ | — | — | — |
-| Interfile | `.hv` | ✅ | ✅ | — | — | — |
-| Interlace8 | `.int8` | ✅ | ✅ | — | — | — |
-| InterlacedLogoEditor | `.ile` | ✅ | ✅ | — | — | — |
-| InterlaceGraphicsEditor | `.ige` | ✅ | ✅ | — | — | — |
-| InterlaceHiresEditor | `.ihe` | ✅ | ✅ | — | — | — |
-| InterlaceLogoDesigner | `.ild` | ✅ | ✅ | — | — | — |
-| InterlaceStudio | `.ist` | ✅ | ✅ | — | — | — |
-| InterleafImage | `.iimg` | ✅ | ✅ | — | — | — |
-| InterPainter | `.inp`, `.ing`, `.ins` | ✅ | ✅ | — | — | — |
-| InterPaintHi | `.iph`, `.hre` | ✅ | ✅ | — | — | — |
-| InterPaintMc | `.ipt`, `.lre` | ✅ | ✅ | — | — | — |
-| Ioca | `.ica`, `.ioca`, `.ioc`, `.mod` | ✅ | ✅ | — | — | — |
-| IPaint | `.ip` | ✅ | ✅ | — | — | — |
-| Ipg | `.ipg` | ✅ | — | — | ✅ | — |
-| Ipl | `.ipl` | ✅ | ✅ | — | — | — |
-| Ipsm | `.pan` | ✅ | ✅ | — | — | — |
-| Iss | `.iss` | ✅ | ✅ | — | — | — |
-| It01 | `.fit` | ✅ | ✅ | — | — | — |
-| Jbig | `.jbg`, `.bie`, `.jbig` | ✅ | ✅ | — | — | — |
-| Jbig2 | `.jb2`, `.jbig2` | ✅ | ✅ | — | — | — |
-| JetGraphicsPlanner | `.jgp` | ✅ | ✅ | — | — | — |
-| JigsawPicture | `.jig` | ✅ | ✅ | — | — | — |
-| JigsawPuzzle | `.jig` | ✅ | ✅ | — | — | — |
-| Jng | `.jng` | ✅ | ✅ | — | — | — |
-| Jnx | `.jnx` | ✅ | ✅ | — | ✅ | — |
-| JovianVi | `.vi` | ✅ | ✅ | — | — | — |
-| Jpeg | `.jpg`, `.jpeg`, `.jpe`, `.jfif`, `.jps`, `.thm`, `.j`, `.jif`, `.fsy`, `.mph`, `.ncy`, `.frm` | ✅ | ✅ | — | — | ✅ |
-| Jpeg2000 | `.jp2`, `.j2k`, `.j2c`, `.jpx`, `.jpc`, `.jpf`, `.jpt`, `.jpm` | ✅ | ✅ | — | — | — |
-| JpegLs | `.jls` | ✅ | ✅ | — | — | — |
-| JpegXl | `.jxl` | ✅ | ✅ | — | ✅ | — |
-| JpegXr | `.jxr`, `.wdp`, `.hdp` | ✅ | ✅ | — | — | — |
-| JupiterAce | `.jac`, `.ace` | ✅ | ✅ | — | — | — |
-| Kitty | `.kty`, `.kt4` | ✅ | ✅ | — | — | — |
-| Koala | `.koa`, `.koala`, `.kla` | ✅ | ✅ | — | — | — |
-| KoalaCompressed | `.gg` | ✅ | ✅ | — | — | — |
-| KodakDc25 | `.k25` | ✅ | ✅ | — | — | — |
-| KofaxKfx | `.kfx` | ✅ | ✅ | — | — | — |
-| Kqp | `.kqp` | ✅ | ✅ | — | — | — |
-| Krita | `.kra` | ✅ | ✅ | — | — | — |
-| KssPaint | `.kss` | ✅ | ✅ | — | — | — |
-| Ktx | `.ktx`, `.ktx2` | ✅ | ✅ | — | — | — |
-| LarkaObjectEditor | `.leo` | ✅ | ✅ | — | — | — |
-| LaserData | `.lda` | ✅ | ✅ | — | — | — |
-| LastWordFont | `.f80` | ✅ | ✅ | — | — | — |
-| LdPic | `.bbg` | ✅ | ✅ | — | — | — |
-| LightWorkImage | `.lwi` | ✅ | ✅ | — | — | — |
-| LogoPainter | `.lp3` | ✅ | ✅ | — | — | — |
-| LogoSys | `.sys`, `.logo` | ✅ | ✅ | — | — | — |
-| Lss16 | `.lss`, `.16` | ✅ | ✅ | — | — | — |
-| LucasFilm | `.lff` | ✅ | ✅ | — | — | — |
-| LudekMaker | `.ldm` | ✅ | ✅ | — | — | — |
-| LViewPro | `.lvp` | ✅ | ✅ | — | — | — |
-| MacPaint | `.mac`, `.macp`, `.pntg`, `.pnt`, `.paint`, `.mpnt` | ✅ | ✅ | — | — | — |
-| MadDesigner | `.mbg` | ✅ | ✅ | — | — | — |
-| MadStudio | `.an4`, `.an2`, `.an5`, `.gr1`, `.gr2` | ✅ | ✅ | — | — | — |
-| MadStudioMissile | `.msl` | ✅ | ✅ | — | — | — |
-| MadStudioTile | `.tl4` | ✅ | ✅ | — | — | — |
-| Mag | `.mag`, `.mki` | ✅ | ✅ | — | — | — |
-| MagicPainter | `.mgp` | ✅ | ✅ | — | — | — |
-| Mamut | `.rys` | ✅ | ✅ | — | — | — |
-| MapletownMl1 | `.ml1` | ✅ | ✅ | — | — | — |
-| MapletownMx1 | `.mx1` | ✅ | ✅ | — | — | — |
-| MapletownNl3 | `.nl3` | ✅ | ✅ | — | — | — |
-| MasterSystemTile | `.sms`, `.gg` | ✅ | ✅ | — | — | — |
-| MatLab | `.mat` | ✅ | ✅ | — | — | — |
-| MawWareTexture | `.mtx` | ✅ | ✅ | — | — | — |
-| MayaIff | `.iff`, `.maya`, `.tdi` | ✅ | ✅ | — | — | — |
-| McPainter | `.mcp` | ✅ | ✅ | — | — | — |
-| Mcs | `.mcs` | ✅ | ✅ | — | — | — |
-| Mda | `.mda` | ✅ | ✅ | — | — | — |
-| Mdp | `.mdp` | ✅ | ✅ | — | — | — |
-| MegaluxFrame | `.frm` | ✅ | ✅ | — | — | — |
-| MegaPaint | `.bld` | ✅ | ✅ | — | — | — |
-| MetaImage | `.mha`, `.mhd` | ✅ | ✅ | — | — | — |
-| MgrBitmap | `.mgr` | ✅ | ✅ | — | — | — |
-| MicroDesignCut | `.cut` | ✅ | ✅ | — | — | — |
-| MicroDesignGrf | `.grf` | ✅ | ✅ | — | — | — |
-| MicroDynamicsMars | `.pbt` | ✅ | ✅ | — | — | — |
-| MicroIllustrator | `.mil` | ✅ | ✅ | — | — | — |
-| MicroIllustratorA8 | `.mia` | ✅ | ✅ | — | — | — |
-| MicroPainter8 | `.mpt8`, `.mp8` | ✅ | ✅ | — | — | — |
-| Miff | `.miff`, `.mif` | ✅ | ✅ | — | — | — |
-| MiniPaint | `.mg` | ✅ | ✅ | — | — | — |
-| Mlt | `.mlt` | ✅ | ✅ | — | — | — |
-| Mng | `.mng` | ✅ | ✅ | — | ✅ | — |
-| MobileFax | `.rfa` | ✅ | ✅ | — | — | — |
-| MobyDick | `.mby`, `.mbd` | ✅ | ✅ | — | — | — |
-| MonoMagic | `.mon` | ✅ | ✅ | — | — | — |
-| MonoStar | `.obj` | ✅ | ✅ | — | — | — |
-| MovieMakerBackground | `.bkg` | ✅ | ✅ | — | — | — |
-| Mpo | `.mpo` | ✅ | ✅ | — | ✅ | — |
-| Mrc | `.mrc`, `.map` | ✅ | ✅ | — | — | — |
-| Mrf | `.mrf` | ✅ | ✅ | — | — | — |
-| Mrw | `.mrw` | ✅ | ✅ | — | — | — |
-| Msp | `.msp` | ✅ | ✅ | — | — | — |
-| Msx | `.sc2`, `.sc5`, `.sc7`, `.sc8`, `.ge7`, `.ge8` | ✅ | ✅ | — | — | — |
-| MsxFont | `.fnt`, `.mft` | ✅ | ✅ | — | — | — |
-| MsxGl16 | `.gl5`, `.sh5`, `.gl7`, `.sh7` | ✅ | ✅ | — | — | — |
-| MsxGl6 | `.gl6`, `.sh6`, `.stp` | ✅ | ✅ | — | — | — |
-| MsxGl8 | `.gl8`, `.sh8` | ✅ | ✅ | — | — | — |
-| MsxGlYjk | `.glc`, `.gls`, `.shc`, `.gla`, `.glb`, `.sha`, `.shb` | ✅ | ✅ | — | — | — |
-| MsxMig | `.mig` | ✅ | ✅ | — | — | — |
-| MsxScc | `.scc`, `.yjk` | ✅ | ✅ | — | — | — |
-| MsxScreen10 | `.sca`, `.scb` | ✅ | ✅ | — | — | — |
-| MsxScreen2 | `.sc2`, `.grp` | ✅ | ✅ | — | — | — |
-| MsxScreen3 | `.sc3` | ✅ | ✅ | — | — | — |
-| MsxScreen4 | `.sc4` | ✅ | ✅ | — | — | — |
-| MsxScreen5 | `.sc5`, `.ge5` | ✅ | ✅ | — | — | — |
-| MsxScreen6 | `.sc6` | ✅ | ✅ | — | — | — |
-| MsxScreen8 | `.sc8` | ✅ | ✅ | — | — | — |
-| MsxSprite | `.spt` | ✅ | ✅ | — | — | — |
-| MsxVideo | `.mvi` | ✅ | ✅ | — | — | — |
-| MsxView | `.mvw`, `.msv` | ✅ | ✅ | — | — | — |
-| Mtv | `.mtv`, `.pic` | ✅ | ✅ | — | — | — |
-| MuifliEditor | `.muf`, `.mui`, `.mup` | ✅ | ✅ | — | — | — |
-| MultiLaceEditor | `.mle` | ✅ | ✅ | — | — | — |
-| MultiPainter | `.mpt`, `.mlt64` | ✅ | ✅ | — | — | — |
-| MultiPalettePicture | `.mpp` | ✅ | ✅ | — | — | — |
-| NcrImage | `.ncr` | ✅ | ✅ | — | — | — |
-| NdsTexture | `.nbfs`, `.nds` | ✅ | ✅ | — | — | — |
-| NeoBookCartoon | `.car` | ✅ | ✅ | — | — | — |
-| Neochrome | `.neo` | ✅ | ✅ | — | — | — |
-| NeoGeoPocket | `.ngp`, `.ngpc` | ✅ | ✅ | — | — | — |
-| NeoGeoSprite | `.spr` | ✅ | ✅ | — | — | — |
-| NeroCoverDesigner | `.cde`, `.nct`, `.ncd` | ✅ | ✅ | — | — | — |
-| NesChr | `.chr` | ✅ | ✅ | — | — | — |
-| Netpbm | `.pbm`, `.pgm`, `.ppm`, `.pnm`, `.pam`, `.ppma`, `.rpbm`, `.rpgm`, `.rppm`, `.rpnm` | ✅ | ✅ | — | — | — |
-| NewsRoom | `.nsr`, `.ph`, `.bn` | ✅ | ✅ | — | — | — |
-| Nfo | `.nfo`, `.diz` | ✅ | ✅ | — | — | — |
-| Nhdr | `.nhdr` | ✅ | ✅ | — | — | — |
-| Nie | `.nie` | ✅ | ✅ | — | — | — |
-| Nifti | `.nii` | ✅ | ✅ | — | — | — |
-| Nifti2 | `.nii` | ✅ | ✅ | — | — | — |
-| Nifti2Gzip | `.nii.gz` | ✅ | ✅ | — | — | — |
-| NiftiGzip | `.nii.gz` | ✅ | ✅ | — | — | — |
-| NiftiPair | `.hdr`, `.img` | ✅ | ✅ | — | — | — |
-| NistIHead | `.nst` | ✅ | ✅ | — | — | — |
-| Nitf | `.ntf`, `.nitf` | ✅ | ✅ | — | — | — |
-| NokiaGroupGraphics | `.ngg` | ✅ | ✅ | — | — | — |
-| NokiaLogo | `.nol`, `.ngg` | ✅ | ✅ | — | — | — |
-| NokiaNlm | `.nlm` | ✅ | ✅ | — | — | — |
-| NokiaOperatorLogo | `.nol` | ✅ | ✅ | — | — | — |
-| NokiaPictureMessage | `.npm` | ✅ | ✅ | — | — | — |
-| Nrrd | `.nrrd`, `.nhdr` | ✅ | ✅ | — | — | — |
-| NufliEditor | `.nuf`, `.nup` | ✅ | ✅ | — | — | — |
-| OazFax | `.oaz`, `.xfx` | ✅ | ✅ | — | — | — |
-| OcpArtStudioWindow | `.win` | ✅ | ✅ | — | — | — |
-| OcsPics | `.ocs` | ✅ | ✅ | — | — | — |
-| OdFontEditor | `.odf` | ✅ | ✅ | — | — | — |
-| Oil | `.oil` | ✅ | ✅ | — | — | — |
-| OlicomFax | `.ofx` | ✅ | ✅ | — | — | — |
-| Olpc565 | `.565` | ✅ | ✅ | — | — | — |
-| OpenRaster | `.ora` | ✅ | ✅ | — | — | — |
-| Optocat | `.abs` | ✅ | ✅ | — | — | — |
-| Oric | `.oric`, `.tap` | ✅ | ✅ | — | — | — |
-| Otb | `.otb` | ✅ | ✅ | — | — | — |
-| PabloPaint | `.pa3` | ✅ | ✅ | — | — | — |
-| Pagefox | `.pfx` | ✅ | ✅ | — | — | — |
-| PaintMagic | `.pmg` | ✅ | ✅ | — | — | — |
-| PaintPro | `.ppro` | ✅ | ✅ | — | — | — |
-| PaintShop | `.da4` | ✅ | ✅ | — | — | — |
-| PaintShopBrowser | `.jbf` | ✅ | ✅ | — | ✅ | — |
-| PaintShopCompressed | `.psc` | ✅ | ✅ | — | — | — |
-| Palm | `.palm`, `.pdb` | ✅ | ✅ | — | — | — |
-| PalmImageViewer | `.pdb` | ✅ | ✅ | — | — | — |
-| PalmPdb | `.pdb` | ✅ | ✅ | — | — | — |
-| Paradox | `.mcpp` | ✅ | ✅ | — | — | — |
-| Pat | `.pat` | ✅ | ✅ | — | — | — |
-| Pc88 | `.pc8` | ✅ | ✅ | — | — | — |
-| Pc98Ebd | `.ebd` | ✅ | ✅ | — | — | — |
-| Pcd | `.pcd` | ✅ | ✅ | — | — | — |
-| Pcds | `.pcds` | ✅ | ✅ | — | — | — |
-| PcEngineTile | `.pce` | ✅ | ✅ | — | — | — |
-| Pcl | `.pcl`, `.prn` | ✅ | ✅ | — | — | — |
-| Pco16Bit | `.b16` | ✅ | ✅ | — | — | — |
-| PcPaint | `.pic`, `.clp`, `.sim` | ✅ | ✅ | — | — | — |
-| PcpBitmap | `.pcp` | ✅ | ✅ | — | — | — |
-| Pcx | `.pcx`, `.pcc`, `.fcx`, `.bmg`, `.ibg` | ✅ | ✅ | — | — | ✅ |
-| Pdf | `.pdf` | ✅ | ✅ | — | ✅ | — |
-| Pdn | `.pdn` | ✅ | ✅ | — | — | — |
-| Pds | `.pds`, `.lbl` | ✅ | ✅ | — | — | — |
-| PeResource | `.exe`, `.dll`, `.ocx`, `.scr`, `.cpl` | ✅ | — | — | ✅ | — |
-| PerfectPix | `.pph` | ✅ | ✅ | — | — | — |
-| Pes | `.pes` | ✅ | ✅ | — | — | — |
-| PetDraw | `.pdr` | ✅ | ✅ | — | — | — |
-| PetsciiBot | `.pbot` | ✅ | ✅ | — | — | — |
-| Pfm | `.pfm` | ✅ | ✅ | — | — | — |
-| Pgx | `.pgx` | ✅ | ✅ | — | — | — |
-| Phm | `.phm` | ✅ | ✅ | — | — | — |
-| PhotoChrome | `.pcf`, `.phc` | ✅ | ✅ | — | — | — |
-| PhotoChromePcs | `.pcs` | ✅ | ✅ | — | — | — |
-| PhotoLine | `.pld` | ✅ | ✅ | — | — | — |
-| PhotoPaint | `.cpt` | ✅ | ✅ | — | — | — |
-| PhotoParade | `.php` | ✅ | ✅ | — | ✅ | — |
-| PhotoStudio | `.psf` | ✅ | ✅ | — | — | — |
-| PhotoSuiteProject | `.pzp` | ✅ | ✅ | — | — | — |
-| Pi | `.pi` | ✅ | ✅ | — | — | — |
-| Pic2 | `.p2` | ✅ | ✅ | — | — | — |
-| Picasso | `.pic0` | ✅ | ✅ | — | — | — |
-| Picasso64 | `.p64`, `.fly` | ✅ | ✅ | — | — | — |
-| Pict | `.pict`, `.pct`, `.pict2`, `.bum`, `.x` | ✅ | ✅ | — | — | — |
-| PictureEditor | `.ped` | ✅ | ✅ | — | — | — |
-| PicturePublisher | `.pp5` | ✅ | ✅ | — | — | — |
-| PicturePublisher4 | `.pp4` | ✅ | ✅ | — | — | — |
-| PicWorks | `.pwk`, `.pws` | ✅ | ✅ | — | — | — |
-| PixarRib | `.pxr`, `.pixar`, `.picio` | ✅ | ✅ | — | — | — |
-| Pixel64 | `.px64`, `.px` | ✅ | ✅ | — | — | — |
-| PixelPerfect | `.pp`, `.ppp` | ✅ | ✅ | — | — | — |
-| PixelPowerCollage | `.i17`, `.i18`, `.ib7`, `.if9` | ✅ | ✅ | — | — | — |
-| Pixia | `.pxa`, `.pxs` | ✅ | ✅ | — | — | — |
-| Pixibox | `.pxb` | ✅ | ✅ | — | — | — |
-| Pkm | `.pkm` | ✅ | ✅ | — | — | — |
-| Pl4Picture | `.pl4` | ✅ | ✅ | — | — | — |
-| PlaybackBitmapSequence | `.bms` | ✅ | ✅ | — | — | — |
-| PlotMaker | `.plt`, `.plm2` | ✅ | ✅ | — | — | — |
-| PmBitmap | `.pm1`, `.pm2`, `.pm3`, `.pm4` | ✅ | ✅ | — | — | — |
-| PmgDesigner | `.pmd` | ✅ | ✅ | — | — | — |
-| PmView | `.pm` | ✅ | ✅ | — | — | — |
-| Png | `.png`, `.frm` | ✅ | ✅ | — | — | ✅ |
-| PntrFalcon | `.pnf`, `.pfl` | ✅ | ✅ | — | — | — |
-| PocketPc2bp | `.2bp` | ✅ | ✅ | — | — | — |
-| PocketPcTheme | `.tsk` | ✅ | ✅ | — | — | — |
-| PortfolioGraphics | `.pgf`, `.pgc` | ✅ | ✅ | — | — | — |
-| Portrait | `.cvp` | ✅ | ✅ | — | — | — |
-| PostScript | `.ps`, `.ps1`, `.ps2`, `.ps3`, `.eps`, `.epsf`, `.epsi`, `.epi`, `.prn`, `.pdx` | ✅ | ✅ | — | — | — |
-| PowerGraphics | `.pgr` | ✅ | ✅ | — | — | — |
-| PowerPoint | `.ppt`, `.pps`, `.pot`, `.pptx`, `.ppsx`, `.potx`, `.pptm`, `.ppsm`, `.potm` | ✅ | ✅ | — | ✅ | — |
-| PrinterPageSegment | `.pse`, `.psg` | ✅ | ✅ | — | — | — |
-| Printfox | `.gb` | ✅ | ✅ | — | — | — |
-| PrintfoxPagefox | `.bs`, `.pg` | ✅ | ✅ | — | — | — |
-| PrintMaster | `.pm` | ✅ | ✅ | — | — | — |
-| PrintShop | `.psa`, `.psb` | ✅ | ✅ | — | — | — |
-| PrintShopIcon | `.psf` | ✅ | ✅ | — | — | — |
-| PrintTechnik | `.hir` | ✅ | ✅ | — | — | — |
-| PrismPaint | `.pnt`, `.tpi` | ✅ | ✅ | — | — | — |
-| Prisms | `.pri`, `.lff` | ✅ | ✅ | — | — | — |
-| ProfiGrf | `.grf` | ✅ | ✅ | — | — | — |
-| Ps2Txc | `.txc` | ✅ | ✅ | — | — | — |
-| Psb | `.psb` | ✅ | ✅ | — | — | — |
-| Psd | `.psd`, `.pdd` | ✅ | ✅ | — | — | — |
-| PsionPic | `.pic`, `.icn`, `.ch3` | ✅ | ✅ | — | — | — |
-| Psp | `.psp`, `.pspimage`, `.tub`, `.psptube`, `.pspbrush`, `.pspframe`, `.pfr`, `.pspmask`, `.msk`, `.pspt`, `.tex` | ✅ | ✅ | — | — | — |
-| Ptif | `.ptif`, `.ptiff` | ✅ | ✅ | — | — | — |
-| PublicPainter | `.cmp` | ✅ | ✅ | — | — | — |
-| Pvr | `.pvr` | ✅ | ✅ | — | — | — |
-| Q0 | `.q0` | ✅ | ✅ | — | — | — |
-| QdvImage | `.qdv` | ✅ | ✅ | — | — | — |
-| Qoi | `.qoi` | ✅ | ✅ | — | — | — |
-| Qrt | `.qrt` | ✅ | ✅ | — | — | — |
-| Qtif | `.qtif`, `.qti` | ✅ | ✅ | — | — | — |
-| QuakeLmp | `.lmp` | ✅ | ✅ | — | — | — |
-| QuakeSpr | `.spr` | ✅ | ✅ | — | — | — |
-| QuantelVpb | `.vpb` | ✅ | ✅ | — | — | — |
-| QuantumPaint | `.pbx` | ✅ | ✅ | — | — | — |
-| RagD | `.rag`, `.ragc` | ✅ | ✅ | — | — | — |
-| RagePaint | `.rge` | ✅ | ✅ | — | — | — |
-| RainbowPainter | `.rp` | ✅ | ✅ | — | — | — |
-| RamBrandt | `.rm0`, `.rm1`, `.rm2`, `.rm3`, `.rm4` | ✅ | ✅ | — | — | — |
-| RawGreyscale | `.gry`, `.grey`, `.raw` | ✅ | ✅ | — | — | — |
-| RawWorkshop | `.rwl`, `.rwh` | ✅ | ✅ | — | — | — |
-| RedStormRsb | `.rsb` | ✅ | ✅ | — | — | — |
-| Rembrandt | `.tcp` | ✅ | ✅ | — | — | — |
-| Rgf | `.rgf` | ✅ | ✅ | — | — | — |
-| RicohFax | `.ric`, `.001` | ✅ | ✅ | — | — | — |
-| RicohIs30 | `.pig` | ✅ | ✅ | — | — | — |
-| RicohJ6i | `.j6i` | ✅ | ✅ | — | — | — |
-| RiscOsSprite | `.spr`, `.ros` | ✅ | ✅ | — | — | — |
-| Rla | `.rla`, `.rlb`, `.rpf` | ✅ | ✅ | — | — | — |
-| Rlc2 | `.rlc` | ✅ | ✅ | — | — | — |
-| RockyInterlace | `.rip` | ✅ | ✅ | — | — | — |
-| RunPaint | `.rpm` | ✅ | ✅ | — | — | — |
-| SamarHiresMap | `.shc` | ✅ | ✅ | — | — | — |
-| SamCoupe | `.sam` | ✅ | ✅ | — | — | — |
-| SamCoupeLce | `.lce` | ✅ | ✅ | — | — | — |
-| SamCoupeMode4 | `.ss4`, `.scs4` | ✅ | ✅ | — | — | — |
-| SamCoupeScreen | `.ss1`, `.ss2`, `.ss3` | ✅ | ✅ | — | — | — |
-| SamCoupeSsx | `.ssx` | ✅ | ✅ | — | — | — |
-| SaracenPaint | `.sar` | ✅ | ✅ | — | — | — |
-| SbigCcd | `.st4`, `.stx`, `.st5`, `.st6`, `.st7`, `.st8` | ✅ | ✅ | — | — | — |
-| SciFax | `.scf` | ✅ | ✅ | — | — | — |
-| ScitexCt | `.sct`, `.ct`, `.ch` | ✅ | ✅ | — | — | — |
-| ScreenBlaster | `.sbl` | ✅ | ✅ | — | — | — |
-| ScreenMaker | `.smk` | ✅ | ✅ | — | — | — |
-| Sdg | `.sdg` | ✅ | — | — | ✅ | — |
-| Sdt | `.sdt` | ✅ | ✅ | — | — | — |
-| SeattleFilmWorks | `.sfw`, `.pwp` | ✅ | ✅ | — | — | — |
-| SecondNatureSlideShow | `.cat` | ✅ | ✅ | — | ✅ | — |
-| SecretPhotos | `.xp0` | ✅ | ✅ | — | — | — |
-| SegaGenTile | `.gen`, `.sgd` | ✅ | ✅ | — | — | — |
-| SegaSj1 | `.sj1` | ✅ | ✅ | — | — | — |
-| SemiGraphicLogo | `.sge` | ✅ | ✅ | — | — | — |
-| SeqImage | `.seq` | ✅ | ✅ | — | — | — |
-| SeuckSprites | `.a` | ✅ | ✅ | — | — | — |
-| SevenuP | `.sev` | ✅ | ✅ | — | — | — |
-| Sf3 | `.sf3` | ✅ | ✅ | — | — | — |
-| Sff | `.sff` | ✅ | ✅ | — | — | — |
-| Sgi | `.sgi`, `.rgb`, `.bw`, `.iris`, `.rgba`, `.inta` | ✅ | ✅ | — | — | ✅ |
-| ShapeTableFileType | `.shp` | ✅ | ✅ | — | — | — |
-| SharpX68k | `.x68`, `.x68k` | ✅ | ✅ | — | — | — |
-| ShfXlEdit | `.shx` | ✅ | ✅ | — | — | — |
-| SiemensBmx | `.bmx` | ✅ | ✅ | — | — | — |
-| SifImage | `.sif` | ✅ | ✅ | — | — | — |
-| SinbadSlideshow | `.ssb` | ✅ | ✅ | — | — | — |
-| SinclairBasic | `.p` | ✅ | ✅ | — | — | — |
-| Sixel | `.six`, `.sixel` | ✅ | ✅ | — | — | — |
-| Skantek | `.skn` | ✅ | ✅ | — | — | — |
-| SketchPaddles | `.skp` | ✅ | ✅ | — | — | — |
-| SmartFax | `.smf`, `.001` | ✅ | ✅ | — | — | — |
-| SmartST | `.sst`, `.sst2` | ✅ | ✅ | — | — | — |
-| SnesTile | `.sfc`, `.snes` | ✅ | ✅ | — | — | — |
-| SoftImage | `.pic`, `.si` | ✅ | ✅ | — | — | — |
-| SoftwareAutomation | `.sag`, `.swa` | ✅ | ✅ | — | — | — |
-| SonyMavica | `.411` | ✅ | ✅ | — | — | — |
-| SonyPmp | `.pmp` | ✅ | ✅ | — | — | — |
-| SpcPainter | `.spp`, `.spc2` | ✅ | ✅ | — | — | — |
-| SpeccyExtended | `.sxg` | ✅ | ✅ | — | — | — |
-| SpecScii | `.zxs` | ✅ | ✅ | — | — | — |
-| Spectrum512 | `.spu` | ✅ | ✅ | — | — | — |
-| Spectrum512Comp | `.spc` | ✅ | ✅ | — | — | — |
-| Spectrum512Ext | `.spx` | ✅ | ✅ | — | — | — |
-| Spectrum512Smoosh | `.sps` | ✅ | ✅ | — | — | — |
-| SpeederFalcon | `.spf` | ✅ | ✅ | — | — | — |
-| Spiff | `.spf`, `.spiff` | ✅ | ✅ | — | — | — |
-| SpookySpritesFalcon | `.tre` | ✅ | ✅ | — | — | — |
-| SpotImage | `.dat` | ✅ | ✅ | — | — | — |
-| Sprite64 | `.s64`, `.spr64` | ✅ | ✅ | — | — | — |
-| SpritePad | `.spd` | ✅ | ✅ | — | — | — |
-| SriSun | `.ssi` | ✅ | ✅ | — | — | — |
-| Stad | `.pac` | ✅ | ✅ | — | — | — |
-| StarPainter | `.gr`, `.cs` | ✅ | ✅ | — | — | — |
-| StarPainterFont | `.zs` | ✅ | ✅ | — | — | — |
-| StelaRaw | `.hsi` | ✅ | ✅ | — | — | — |
-| Stellar | `.stl` | ✅ | ✅ | — | — | — |
-| StTrueColor | `.stc` | ✅ | ✅ | — | — | — |
-| SunIcon | `.icon`, `.pr` | ✅ | ✅ | — | — | — |
-| SunRaster | `.ras`, `.sun`, `.rast`, `.rs`, `.sr` | ✅ | ✅ | — | — | — |
-| SuperHires | `.shi` | ✅ | ✅ | — | — | — |
-| SuperHiresEditor | `.she` | ✅ | ✅ | — | — | — |
-| SuperHiresEditor1 | `.sh1` | ✅ | ✅ | — | — | — |
-| SuperHiresEditor2 | `.sh2` | ✅ | ✅ | — | — | — |
-| SuperHiresFli | `.shf` | ✅ | ✅ | — | — | — |
-| SuperHiresStudio | `.shs` | ✅ | ✅ | — | — | — |
-| Svg | `.svg` | ✅ | ✅ | — | — | — |
-| Svgz | `.svgz` | ✅ | ✅ | — | — | — |
-| SyberiaTexture | `.syj` | ✅ | ✅ | — | — | — |
-| SymbianMbm | `.mbm` | ✅ | ✅ | — | — | — |
-| SymbOsGraphic | `.sgx` | ✅ | ✅ | — | — | — |
-| SyntheticArts | `.srt` | ✅ | ✅ | — | — | — |
-| Synu | `.synu`, `.syn` | ✅ | ✅ | — | — | — |
-| Taac | `.vff`, `.taac`, `.suniff` | ✅ | ✅ | — | — | — |
-| TaquartInterlace | `.tip` | ✅ | ✅ | — | — | — |
-| TechnicolorDream | `.lum` | ✅ | ✅ | — | — | — |
-| TeliFax | `.mh` | ✅ | ✅ | — | — | — |
-| TextureEditorMikey | `.txe` | ✅ | ✅ | — | — | — |
-| TextureMaker0 | `.tx0` | ✅ | ✅ | — | — | — |
-| Tg4 | `.tg4` | ✅ | ✅ | — | — | — |
-| Tga | `.tga`, `.vda`, `.icb`, `.vst`, `.bpx`, `.targa`, `.ivb` | ✅ | ✅ | — | — | ✅ |
-| Thomson | `.map` | ✅ | ✅ | — | — | — |
-| TiBitmap | `.8xi`, `.89i` | ✅ | ✅ | — | — | — |
-| Tiff | `.tif`, `.tiff`, `.ftf`, `.stw`, `.fx3`, `.xif`, `.ctf` | ✅ | ✅ | — | ✅ | ✅ |
-| TilePic | `.tjp` | ✅ | ✅ | — | — | — |
-| TilezTexture | `.til` | ✅ | ✅ | — | — | — |
-| Tim | `.tim` | ✅ | ✅ | — | — | — |
-| Tim2 | `.tm2` | ✅ | ✅ | — | — | — |
-| TimexGigascreen | `.hrg`, `.scr` | ✅ | ✅ | — | — | — |
-| Tiny | `.tny`, `.tn1`, `.tn2`, `.tn3`, `.tn4`, `.tn5`, `.tn6` | ✅ | ✅ | — | — | — |
-| TiPicture | `.73i`, `.82i`, `.83i`, `.85i`, `.86i` | ✅ | ✅ | — | — | — |
-| TmSat | `.imi` | ✅ | ✅ | — | — | — |
-| TobiasRichterSlideshow | `.pci` | ✅ | ✅ | — | — | — |
-| TriPaint | `.tpf` | ✅ | ✅ | — | — | — |
-| Trs80 | `.hr` | ✅ | ✅ | — | — | — |
-| TrsPix | `.pix` | ✅ | ✅ | — | — | — |
-| TrueColorImg | `.timg` | ✅ | ✅ | — | — | — |
-| TruePaint | `.mci` | ✅ | ✅ | — | — | — |
-| TrueType | `.ttf` | ✅ | ✅ | — | — | — |
-| TrzmielCompressed | `.cpr` | ✅ | ✅ | — | — | — |
-| TurboRascal | `.flf` | ✅ | ✅ | — | — | — |
-| TurboView | `.tvw`, `.tbv` | ✅ | ✅ | — | — | — |
-| UfliEditor | `.ufl` | ✅ | ✅ | — | — | — |
-| Uhdr | `.uhdr` | ✅ | ✅ | — | — | — |
-| UifliEditor | `.uif` | ✅ | ✅ | — | — | — |
-| Uimg | `.bp1`, `.bp2`, `.bp4`, `.bp6`, `.bp8`, `.c01`, `.c02`, `.c04`, `.c06`, `.c08`, `.c16`, `.c24`, `.c32` | ✅ | ✅ | — | — | — |
-| UleadAlbumTemplate | `.pe4` | ✅ | ✅ | — | ✅ | — |
-| UleadImageLibrary | `.pst` | ✅ | ✅ | — | ✅ | — |
-| UtahRle | `.rle`, `.urt` | ✅ | ✅ | — | — | — |
-| UyvyRaw | `.uyvy`, `.qtl` | ✅ | ✅ | — | — | — |
-| VbxeSlideShow | `.dap` | ✅ | ✅ | — | — | — |
-| VdcBitmap | `.vbm`, `.bm` | ✅ | ✅ | — | — | — |
-| Vector06c | `.v06`, `.scr` | ✅ | ✅ | — | — | — |
-| VentaFax | `.vfx` | ✅ | ✅ | — | — | — |
-| VerticalHiresInterlace | `.vhi` | ✅ | ✅ | — | — | — |
-| VertiZontalInterlacing | `.vzi` | ✅ | ✅ | — | — | — |
-| Vic20 | `.vic20`, `.prg` | ✅ | ✅ | — | — | — |
-| Vicar | `.vic`, `.vicar`, `.img` | ✅ | ✅ | — | — | — |
-| Vidcom64 | `.vid` | ✅ | ✅ | — | — | — |
-| VidiChrome | `.vdc`, `.vdc2` | ✅ | ✅ | — | — | — |
-| VidigPaint | `.rap` | ✅ | ✅ | — | — | — |
-| Viff | `.viff`, `.xv`, `.vif` | ✅ | ✅ | — | — | — |
-| Vips | `.v`, `.vips` | ✅ | ✅ | — | — | — |
-| VirtualBoyTile | `.vbt`, `.vb`, `.vboy` | ✅ | ✅ | — | — | — |
-| Vitec | `.vit` | ✅ | ✅ | — | — | — |
-| Vivid | `.vivid`, `.dis` | ✅ | ✅ | — | — | — |
-| Vrml | `.wrl`, `.vrml` | ✅ | ✅ | — | — | — |
-| Vtf | `.vtf` | ✅ | ✅ | — | — | — |
-| Vue | `.vob` | ✅ | ✅ | — | — | — |
-| Wad2 | `.wad` | ✅ | ✅ | — | — | — |
-| Wad3 | `.wad` | ✅ | ✅ | — | — | — |
-| Wal | `.wal` | ✅ | ✅ | — | — | — |
-| Wbmp | `.wbmp`, `.wbm`, `.wap` | ✅ | ✅ | — | — | — |
-| WebP | `.webp`, `.wep` | ✅ | ✅ | — | ✅ | ✅ |
-| WebShots | `.wb1`, `.wbc`, `.wbp`, `.wbz` | ✅ | ✅ | — | — | — |
-| WigmoreArtist | `.wig` | ✅ | ✅ | — | — | — |
-| WinFax | `.fxs`, `.fxo`, `.fxr`, `.fxd`, `.fxm` | ✅ | ✅ | — | — | — |
-| WizSolitaireDeck | `.dec` | ✅ | ✅ | — | — | — |
-| Wmf | `.wmf` | ✅ | ✅ | — | — | — |
-| WonderSwanTile | `.wst`, `.ws` | ✅ | ✅ | — | — | — |
-| Word | `.docx`, `.docm`, `.dotx`, `.dotm` | ✅ | ✅ | — | ✅ | — |
-| WorldportFax | `.wpf`, `.wfx` | ✅ | ✅ | — | — | — |
-| Wpg | `.wpg` | ✅ | ✅ | — | — | — |
-| Wsq | `.wsq` | ✅ | ✅ | — | — | — |
-| Wzl | `.wzl` | ✅ | ✅ | — | — | — |
-| X11Puzzle | `.pzl` | ✅ | ✅ | — | — | — |
-| X3f | `.x3f` | ✅ | ✅ | — | — | — |
-| Xar | `.xar` | ✅ | ✅ | — | — | — |
-| XBin | `.xb`, `.xbin` | ✅ | ✅ | — | — | — |
-| Xbm | `.xbm`, `.icon`, `.ico`, `.cbm`, `.x` | ✅ | ✅ | — | — | — |
-| XbmColor | `.xbm` | ✅ | ✅ | — | — | — |
-| Xcf | `.xcf` | ✅ | ✅ | — | — | — |
-| Xcursor | `.xcur`, `.cursor` | ✅ | ✅ | — | — | — |
-| XFliEditor | `.xfl` | ✅ | ✅ | — | — | — |
-| Ximage | `.xim` | ✅ | ✅ | — | — | — |
-| XionicsSmp | `.smp` | ✅ | ✅ | — | — | — |
-| Xld4 | `.q4` | ✅ | ✅ | — | — | — |
-| XlPaint | `.xlp` | ✅ | ✅ | — | — | — |
-| Xpm | `.xpm`, `.picon` | ✅ | ✅ | — | — | — |
-| XvThumbnail | `.xv`, `.p7` | ✅ | ✅ | — | — | — |
-| Xwd | `.xwd`, `.x11` | ✅ | ✅ | — | — | — |
-| Xyz | `.xyz` | ✅ | ✅ | — | — | — |
-| Ybm | `.ybm` | ✅ | ✅ | — | — | — |
-| YuvRaw | `.yuv` | ✅ | ✅ | — | — | — |
-| ZeissBivas | `.dta` | ✅ | ✅ | — | — | — |
-| ZeissLsm | `.lsm` | ✅ | ✅ | — | — | — |
-| Zinc | `.zinc` | ✅ | ✅ | — | — | — |
-| ZonerBrush | `.zbr` | ✅ | ✅ | — | — | — |
-| Zoom4 | `.zm4` | ✅ | ✅ | — | — | — |
-| Zoomatic | `.zom` | ✅ | ✅ | — | — | — |
-| ZsStaffKid98 | `.zim` | ✅ | ✅ | — | — | — |
-| Zx81 | `.zx81`, `.p81` | ✅ | ✅ | — | — | — |
-| ZxArtStudio | `.zas` | ✅ | ✅ | — | — | — |
-| ZxAttributes | `.atr` | ✅ | ✅ | — | — | — |
-| ZxAttributesGigascreen | `.hlr` | ✅ | ✅ | — | — | — |
-| ZxBigFont | `.chx` | ✅ | ✅ | — | — | — |
-| ZxBorderMulticolor | `.bmc4` | ✅ | ✅ | — | — | — |
-| ZxBorderScreen | `.bsc` | ✅ | ✅ | — | — | — |
-| ZxChrd | `.chr`, `.chrd` | ✅ | ✅ | — | — | — |
-| ZxFlash | `.zfl` | ✅ | ✅ | — | — | — |
-| ZxFont | `.ch8`, `.ch4`, `.ch6` | ✅ | ✅ | — | — | — |
-| ZxGigascreen | `.gsc`, `.img` | ✅ | ✅ | — | — | — |
-| ZxMlg | `.mlg` | ✅ | ✅ | — | — | — |
-| ZxMultiArtist | `.mg1`, `.mg2`, `.mg4`, `.mg8` | ✅ | ✅ | — | — | — |
-| ZxMulticolor | `.mlt`, `.mc` | ✅ | ✅ | — | — | — |
-| ZxNext | `.nxt` | ✅ | ✅ | — | — | — |
-| ZxNextImage | `.nxi` | ✅ | ✅ | — | — | — |
-| ZxPaintbrush | `.zxp` | ✅ | ✅ | — | — | — |
-| ZxPaintyOne | `.zp1` | ✅ | ✅ | — | — | — |
-| ZxRgb3 | `.3` | ✅ | ✅ | — | — | — |
-| ZxSnapshot | `.sna` | ✅ | ✅ | — | — | — |
-| ZxSpectrum | `.scr`, `.$s`, `.$c`, `.!s` | ✅ | ✅ | — | — | — |
-| ZxTimex | `.tmx`, `.scr` | ✅ | ✅ | — | — | — |
-| ZxTrefiBorderScreen | `.bsp` | ✅ | ✅ | — | — | — |
-| ZxTricolor | `.3cl` | ✅ | ✅ | — | — | — |
-| ZxUlaPlus | `.ulp`, `.scr` | ✅ | ✅ | — | — | — |
-| ZzRough | `.rgh` | ✅ | ✅ | — | — | — |
+| Format | Extensions | Read | Write | Info | Multi | Optimizer | Oracle |
+| --- | --- | :---: | :---: | :---: | :---: | :---: | --- |
+| Aai | `.aai` | ✅ | ✅ | — | — | — | ImageMagick |
+| AccessFax | `.g4`, `.acc` | ✅ | ✅ | — | — | — | none |
+| Acorn | `.spr`, `.acorn` | ✅ | ✅ | — | — | — | none |
+| AdexImage | `.adx` | ✅ | ✅ | — | — | — | none |
+| AdTechFax | `.adt` | ✅ | ✅ | — | — | — | none |
+| AdvancedArtStudio | `.ocp`, `.mpi`, `.mpic` | ✅ | ✅ | — | — | — | recoil2png |
+| Afli | `.afl` | ✅ | ✅ | — | — | — | none |
+| Ai | `.ai` | ✅ | ✅ | — | — | — | none |
+| AimGreyScale | `.ima` | ✅ | ✅ | — | — | — | none |
+| AirNav | `.anv` | ✅ | ✅ | — | — | — | none |
+| AladdinPaint | `.alp` | ✅ | ✅ | — | — | — | none |
+| AliasPix | `.pix`, `.als`, `.alias`, `.img`, `.lux` | ✅ | ✅ | — | — | — | ImageMagick, ffmpeg |
+| AmicaPaint | `.ami` | ✅ | ✅ | — | — | — | recoil2png |
+| AmigaIcon | `.info` | ✅ | ✅ | — | — | — | none |
+| AmosBank | `.abk` | ✅ | ✅ | — | — | — | recoil2png |
+| AmstradCpc | `.cpc` | ✅ | ✅ | — | — | — | none |
+| AmstradMode5 | `.cm5` | ✅ | ✅ | — | — | — | recoil2png |
+| Analyze | `.hdr`, `.img` | ✅ | ✅ | — | — | — | none |
+| AndrewToolkit | `.atk` | ✅ | ✅ | — | — | — | none |
+| Ani | `.ani` | ✅ | ✅ | — | ✅ | ✅ | none |
+| AnimatorCompressor | `.kpr` | ✅ | ✅ | — | — | — | recoil2png |
+| Anime4Ever | `.a4r` | ✅ | ✅ | — | — | — | recoil2png |
+| AnimPainter | `.anp` | ✅ | ✅ | — | — | — | none |
+| AnsiArt | `.ans`, `.ansi` | ✅ | ✅ | — | — | — | none |
+| Apac3 | `.ap3`, `.apv`, `.dgi`, `.dgp`, `.esc`, `.ilc`, `.pzm`, `.app`, `.ils` | ✅ | ✅ | — | — | — | recoil2png |
+| Apng | `.apng` | ✅ | ✅ | — | ✅ | — | ImageMagick, ffmpeg |
+| ApolloHdru | `.hdru`, `.gn` | ✅ | ✅ | — | — | — | none |
+| Apple3201 | `.3201` | ✅ | ✅ | — | — | — | recoil2png |
+| AppleII | `.hgr`, `.dhgr` | ✅ | ✅ | — | — | — | recoil2png |
+| AppleIIDhr | `.dhr`, `.a2d` | ✅ | ✅ | — | — | — | none |
+| AppleIIgs | `.shr`, `.c1`, `.pic` | ✅ | ✅ | — | — | — | none |
+| AppleIIHgr | `.hgr` | ✅ | ✅ | — | — | — | recoil2png |
+| ApplePreferred | `.32k`, `.gs`, `.iigs`, `.shr` | ✅ | ✅ | — | — | — | recoil2png |
+| AppleSh3 | `.sh3`, `.3200` | ✅ | ✅ | — | — | — | recoil2png |
+| AppleShr | `.shr` | ✅ | ✅ | — | — | — | recoil2png |
+| Apx | `.apx` | ✅ | ✅ | — | — | — | none |
+| Arf | `.arf` | ✅ | ✅ | — | — | — | none |
+| Arn | `.arn` | ✅ | ✅ | — | — | — | none |
+| Art | `.art` | ✅ | ✅ | — | — | — | none |
+| ArtDirector | `.art` | ✅ | ✅ | — | — | — | recoil2png |
+| Artist64 | `.a64` | ✅ | ✅ | — | — | — | recoil2png |
+| ArtMaster88 | `.arv`, `.img` | ✅ | ✅ | — | — | — | recoil2png |
+| ArtStudio8 | `.as8` | ✅ | ✅ | — | — | — | none |
+| ArtStudioWindow | `.mwi`, `.mwin` | ✅ | ✅ | — | — | — | recoil2png |
+| AsciiMaker | `.asc`, `.gr0` | ✅ | ✅ | — | — | — | recoil2png |
+| Aseprite | `.aseprite`, `.ase` | ✅ | ✅ | — | — | — | ImageMagick |
+| Astc | `.astc` | ✅ | ✅ | — | — | — | none |
+| Atari16x16Font | `.sxs` | ✅ | ✅ | — | — | — | recoil2png |
+| Atari2600 | `.a26`, `.tia` | ✅ | ✅ | — | — | — | none |
+| Atari7800 | `.a78`, `.a7800` | ✅ | ✅ | — | — | — | none |
+| Atari8Bit | `.gr7`, `.gr8`, `.gr9`, `.gr15`, `.hip`, `.mic`, `.int` | ✅ | ✅ | — | — | — | recoil2png |
+| Atari8Missile | `.mis` | ✅ | ✅ | — | — | — | none |
+| Atari8Player | `.pla` | ✅ | ✅ | — | — | — | none |
+| AtariAgp | `.agp` | ✅ | ✅ | — | — | — | recoil2png |
+| AtariAnimation | `.aan` | ✅ | ✅ | — | — | — | none |
+| AtariAnticMode | `.ame`, `.anm` | ✅ | ✅ | — | — | — | none |
+| AtariArtist | `.aat` | ✅ | ✅ | — | — | — | none |
+| AtariCAD | `.drg`, `.acd` | ✅ | ✅ | — | — | — | recoil2png |
+| AtariCel | `.cel` | ✅ | ✅ | — | — | — | recoil2png |
+| AtariChampionsInterlace | `.cin`, `.cci` | ✅ | ✅ | — | — | — | recoil2png |
+| AtariCompressed | `.acr`, `.acp` | ✅ | ✅ | — | — | — | none |
+| AtariDoodle | `.doo` | ✅ | ✅ | — | — | — | recoil2png |
+| AtariDump | `.asd`, `.adm` | ✅ | ✅ | — | — | — | none |
+| AtariFalcon | `.ftc` | ✅ | ✅ | — | — | — | recoil2png |
+| AtariFalconXga | `.xga` | ✅ | ✅ | — | — | — | recoil2png |
+| AtariFont | `.fnt8` | ✅ | ✅ | — | — | — | none |
+| AtariFontMaker | `.fn2` | ✅ | ✅ | — | — | — | recoil2png |
+| AtariGfb | `.gfb` | ✅ | ✅ | — | — | — | recoil2png |
+| AtariGr7 | `.gr7` | ✅ | ✅ | — | — | — | none |
+| AtariGr8 | `.gr8` | ✅ | ✅ | — | — | — | recoil2png |
+| AtariGrafik | `.pcp` | ✅ | ✅ | — | — | — | none |
+| AtariGraphics10 | `.gr10`, `.g10` | ✅ | ✅ | — | — | — | none |
+| AtariGraphics11 | `.gr11`, `.g11` | ✅ | ✅ | — | — | — | none |
+| AtariGraphics3 | `.gr3`, `.sg3` | ✅ | ✅ | — | — | — | recoil2png |
+| AtariGraphics9 | `.gr9`, `.g9`, `.g9s`, `.sfd` | ✅ | ✅ | — | — | — | none |
+| AtariGraphicsStudio | `.ags` | ✅ | ✅ | — | — | — | recoil2png |
+| AtariGrayscale9 | `.bg9`, `.g09` | ✅ | ✅ | — | — | — | recoil2png |
+| AtariHardInterlace | `.hip`, `.hps` | ✅ | ✅ | — | — | — | recoil2png |
+| AtariHighResPage | `.pg3` | ✅ | ✅ | — | — | — | recoil2png |
+| AtariHr | `.hr` | ✅ | ✅ | — | — | — | recoil2png |
+| AtariHr2 | `.hr2`, `.hci` | ✅ | ✅ | — | — | — | recoil2png |
+| AtariIce | `.ice`, `.icn` | ✅ | ✅ | — | — | — | recoil2png |
+| AtariImageManager | `.im`, `.col` | ✅ | ✅ | — | — | — | recoil2png |
+| AtariMaxi | `.max8`, `.amx` | ✅ | ✅ | — | — | — | none |
+| AtariPaintworks | `.cl0`, `.cl1`, `.cl2`, `.pg0`, `.pg1`, `.pg2`, `.pg3`, `.sc0`, `.sc1`, `.sc2` | ✅ | ✅ | — | — | — | recoil2png |
+| AtariPi5 | `.pi5` | ✅ | ✅ | — | — | — | recoil2png |
+| AtariPi8 | `.pi8` | ✅ | ✅ | — | — | — | none |
+| AtariPi9 | `.pi9` | ✅ | ✅ | — | — | — | recoil2png |
+| AtariPicture | `.apc`, `.apa`, `.plm`, `.aps`, `.mga`, `.pls` | ✅ | ✅ | — | — | — | recoil2png |
+| AtariPicworks | `.cp3` | ✅ | ✅ | — | — | — | recoil2png |
+| AtariPlayer | `.pmg`, `.plm` | ✅ | ✅ | — | — | — | none |
+| AtariPlayerEditor | `.apl` | ✅ | ✅ | — | — | — | recoil2png |
+| AtariSif | `.sif` | ✅ | ✅ | — | — | — | none |
+| AtariTools800 | `.4pl`, `.4mi`, `.4pm` | ✅ | ✅ | — | — | — | recoil2png |
+| AtariTools800Font | `.acs` | ✅ | ✅ | — | — | — | recoil2png |
+| AtariTt | `.pi5`, `.pi4`, `.pi6` | ✅ | ✅ | — | — | — | recoil2png |
+| AtariTxs | `.txs` | ✅ | ✅ | — | — | — | recoil2png |
+| AttGroup4 | `.att` | ✅ | ✅ | — | — | — | none |
+| AutodeskCel | `.cel` | ✅ | ✅ | — | — | — | none |
+| AutoFx | `.afx` | ✅ | ✅ | — | — | — | ffmpeg |
+| Autologic | `.gm`, `.gm2`, `.gm4` | ✅ | ✅ | — | — | — | none |
+| AvhrrImage | `.sst` | ✅ | ✅ | — | — | — | none |
+| Avif | `.avif` | ✅ | ✅ | — | — | — | ImageMagick, avifdec, ffmpeg |
+| Avs | `.avs`, `.x`, `.mbfavs`, `.mbfs` | ✅ | ✅ | — | — | — | ImageMagick |
+| AwardBmp | `.epa`, `.awbm` | ✅ | ✅ | — | — | — | recoil2png |
+| Awd | `.awd` | ✅ | ✅ | — | — | — | none |
+| AxialisScreensaver | `.ssp` | ✅ | ✅ | — | ✅ | — | none |
+| Bam | `.bam` | ✅ | ✅ | ✅ | — | — | none |
+| BbcMicro | `.bbc` | ✅ | ✅ | — | — | — | none |
+| BbcMicroScreen | `.bb4`, `.bb0`, `.bb1`, `.bb2`, `.bb5` | ✅ | ✅ | — | — | — | recoil2png |
+| BennetYeeFace | `.ybm` | ✅ | ✅ | — | — | — | none |
+| BestPaint | `.bp` | ✅ | ✅ | — | — | — | recoil2png |
+| Bfli | `.bfl`, `.bfli`, `.flp` | ✅ | ✅ | — | — | — | none |
+| BfxBitware | `.bfx` | ✅ | ✅ | — | — | — | none |
+| BigTiff | `.btf`, `.tf8` | ✅ | ✅ | — | ✅ | — | ImageMagick |
+| BioRadPic | `.pic` | ✅ | ✅ | — | — | — | none |
+| BkScreen | `.bks` | ✅ | ✅ | — | — | — | recoil2png |
+| Blazing | `.blz`, `.pi` | ✅ | ✅ | — | — | — | recoil2png |
+| BlazingPaddlesWindow | `.wnd` | ✅ | ✅ | — | — | — | recoil2png |
+| Blazon | `.bpl` | ✅ | ✅ | — | — | — | recoil2png |
+| Blp | `.blp` | ✅ | ✅ | — | — | — | none |
+| Bmp | `.bmp`, `.dib`, `.bga`, `.rl4`, `.rl8`, `.vga`, `.sys`, `.bum`, `.thb`, `.2d`, `.bmc`, `.stm`, `.upi`, `.msk`, `.flt` | ✅ | ✅ | ✅ | — | ✅ | ImageMagick, ffmpeg |
+| Bob | `.bob` | ✅ | ✅ | — | — | — | none |
+| BodyPaint3D | `.b3d`, `.b2d` | ✅ | ✅ | — | — | — | none |
+| BoogieDownPaint | `.bdp` | ✅ | ✅ | — | — | — | recoil2png |
+| Botticelli | `.p4i` | ✅ | ✅ | — | — | — | recoil2png |
+| Bpg | `.bpg` | ✅ | ✅ | — | — | — | none |
+| BrooktroutFax | `.brk`, `.301`, `.brt` | ✅ | ✅ | — | — | — | none |
+| BrotherFax | `.uni` | ✅ | ✅ | — | — | — | none |
+| Brus | `.brus` | ✅ | ✅ | — | — | — | recoil2png |
+| Bsave | `.bsv` | ✅ | ✅ | — | — | — | none |
+| Bsb | `.kap`, `.bsb` | ✅ | ✅ | — | — | — | none |
+| BugbiterApac | `.bgp` | ✅ | ✅ | — | — | — | recoil2png |
+| BugBitmap | `.bbm`, `.bug` | ✅ | ✅ | — | — | — | none |
+| ByLight | `.bif` | ✅ | ✅ | — | — | — | ffmpeg |
+| ByuSir | `.sir` | ✅ | ✅ | — | — | — | none |
+| C128 | `.c128`, `.vdc` | ✅ | ✅ | — | — | — | none |
+| C128Hires | `.c1h` | ✅ | ✅ | — | — | — | none |
+| C128Multi | `.c1m` | ✅ | ✅ | — | — | — | none |
+| C128VDC | `.vdc`, `.vdc3` | ✅ | ✅ | — | — | — | none |
+| C16Plus4 | `.c16`, `.plus4` | ✅ | ✅ | — | — | — | none |
+| C64Multi | `.ocp`, `.hires`, `.ami` | ✅ | ✅ | — | — | — | recoil2png |
+| Calamus | `.cpi`, `.crg` | ✅ | ✅ | — | — | — | none |
+| Cals | `.cal`, `.cals`, `.gp4`, `.mil` | ✅ | ✅ | — | — | — | ImageMagick |
+| CameraRaw | `.cr2`, `.nef`, `.arw`, `.orf`, `.rw2`, `.pef`, `.raf`, `.raw`, `.srw`, `.dcs`, `.dcr`, `.kdc`, `.srf`, `.sr2`, `.mos`, `.3fr`, `.mef`, `.nrw`, `.rwl`, `.erf`, `.iiq` | ✅ | ✅ | — | — | — | ImageMagick, ffmpeg |
+| CanonNavFax | `.can` | ✅ | ✅ | — | — | — | none |
+| Canvas | `.cvs` | ✅ | ✅ | — | — | — | none |
+| CanvasRaster | `.ful` | ✅ | ✅ | — | — | — | recoil2png |
+| CartesMichelin | `.big` | ✅ | — | — | — | — | — |
+| CasioQv | `.cam` | ✅ | ✅ | — | — | — | ffmpeg |
+| Ccitt | `.g3`, `.g4`, `.ccitt`, `.fax` | ✅ | ✅ | — | — | — | none |
+| Cdr | `.cdr` | ✅ | — | — | — | — | — |
+| CDUPaint | `.cdu` | ✅ | ✅ | — | — | — | recoil2png |
+| Cdxl | `.cdxl` | ✅ | ✅ | — | — | — | none |
+| Cel | `.cel` | ✅ | ✅ | — | — | — | none |
+| CelGrey | `.cel` | ✅ | ✅ | — | — | — | none |
+| Centauri | `.cnt`, `.cen` | ✅ | ✅ | — | — | — | none |
+| CentauriLogoEditor | `.cle` | ✅ | ✅ | — | — | — | recoil2png |
+| CfliDesigner | `.cfli` | ✅ | ✅ | — | — | — | recoil2png |
+| Cgm | `.cgm` | ✅ | ✅ | — | — | — | none |
+| ChampionsInterlace | `.cin` | ✅ | ✅ | — | — | — | none |
+| CharPad | `.ctm` | ✅ | ✅ | — | — | — | recoil2png |
+| CharSet64 | `.chr64` | ✅ | ✅ | — | — | — | none |
+| Cheese | `.che`, `.chs` | ✅ | ✅ | — | — | — | recoil2png |
+| ChinonEs1000 | `.cmt` | ✅ | ✅ | — | — | — | none |
+| ChrDollar | `.ch$` | ✅ | ✅ | — | — | — | recoil2png |
+| CImage | `.dsi` | ✅ | ✅ | — | — | — | none |
+| CinemasterAtari | `.cin8` | ✅ | ✅ | — | — | — | none |
+| Cineon | `.cin` | ✅ | ✅ | — | — | — | ImageMagick |
+| CiscoIp | `.cip` | ✅ | ✅ | — | — | — | none |
+| ClipArtCatalog | `.cat` | ✅ | ✅ | — | ✅ | — | none |
+| Cloe | `.clo`, `.cloe` | ✅ | ✅ | — | — | — | none |
+| Clp | `.clp` | ✅ | ✅ | — | — | — | none |
+| Cmu | `.cmu` | ✅ | ✅ | — | — | — | none |
+| CmuWindowManager | `.cmu`, `.cmuwm` | ✅ | ✅ | — | — | — | none |
+| Cmx | `.cmx` | ✅ | — | — | — | — | — |
+| CoCo | `.coc` | ✅ | ✅ | — | — | — | none |
+| CoCo3 | `.cc3` | ✅ | ✅ | — | — | — | none |
+| CoCoMax | `.max`, `.p41` | ✅ | ✅ | — | — | — | recoil2png |
+| CocoP11 | `.p11` | ✅ | ✅ | — | — | — | recoil2png |
+| CokeAtari | `.tg1` | ✅ | ✅ | — | — | — | recoil2png |
+| ColoRix | `.rix`, `.sc0`, `.sc1`, `.sc2`, `.sc3`, `.sc4`, `.sc5`, `.sc6`, `.sc7`, `.sc8`, `.sc9`, `.sca`, `.scb`, `.scc`, `.scd`, `.sce`, `.scf`, `.scg`, `.sch`, `.sci`, `.scj`, `.sck`, `.scl`, `.scm`, `.scn`, `.sco`, `.scp`, `.scq`, `.scr`, `.scs`, `.sct`, `.scu`, `.scv`, `.scw`, `.scx`, `.scy`, `.scz` | ✅ | ✅ | — | — | — | none |
+| ColorStar | `.bil` | ✅ | ✅ | — | — | — | recoil2png |
+| ColorStarObject | `.obj` | ✅ | ✅ | — | — | — | recoil2png |
+| ColrObjectEditor | `.mur` | ✅ | ✅ | — | — | — | recoil2png |
+| Commodore64Font | `.64c`, `.g` | ✅ | ✅ | — | — | — | recoil2png |
+| CommodoreGrafix | `.cgx` | ✅ | ✅ | — | — | — | recoil2png |
+| CommodorePet | `.pet` | ✅ | ✅ | — | — | — | recoil2png |
+| CompuServeRle | `.rle` | ✅ | ✅ | — | — | — | recoil2png |
+| ComputerEyes | `.ce`, `.ce1`, `.ce2` | ✅ | ✅ | — | — | — | none |
+| ComputerEyesSt | `.ce3` | ✅ | ✅ | — | — | — | recoil2png |
+| CompW | `.wlm` | ✅ | ✅ | — | — | — | none |
+| CoreIdc | `.idc` | ✅ | ✅ | — | — | — | none |
+| CorelGallery | `.bmf` | ✅ | ✅ | — | — | — | none |
+| Cp8Gray | `.cp8` | ✅ | ✅ | — | — | — | none |
+| CpcAdvanced | `.cpa` | ✅ | ✅ | — | — | — | none |
+| CpcFont | `.cpf` | ✅ | ✅ | — | — | — | none |
+| CpcOverscan | `.cpo` | ✅ | ✅ | — | — | — | none |
+| CpcPlus | `.cpp` | ✅ | ✅ | — | — | — | none |
+| CpcSprite | `.cps` | ✅ | ✅ | — | — | — | none |
+| Cr3 | `.cr3` | ✅ | ✅ | — | — | — | none |
+| Crack | `.ca2` | ✅ | ✅ | — | — | — | none |
+| CrackArt | `.ca1`, `.ca2`, `.ca3` | ✅ | ✅ | — | — | — | recoil2png |
+| CranachPaint | `.esm` | ✅ | ✅ | — | — | — | recoil2png |
+| Crd | `.crd` | ✅ | ✅ | — | — | — | ffmpeg |
+| CreateWithGarfield | `.cwg` | ✅ | ✅ | — | — | — | recoil2png |
+| Crw | `.crw` | ✅ | ✅ | — | — | — | none |
+| CsvImage | `.csv` | ✅ | ✅ | — | — | — | none |
+| Cur | `.cur` | ✅ | ✅ | — | ✅ | ✅ | ImageMagick |
+| CutCreator | `.cut` | ✅ | ✅ | — | — | — | recoil2png |
+| DaisyDotFont | `.nlq` | ✅ | ✅ | — | — | — | recoil2png |
+| DaliCompressed | `.lpk`, `.mpk`, `.hpk` | ✅ | ✅ | — | — | — | recoil2png |
+| DaliST | `.sd0`, `.sd1`, `.sd2` | ✅ | ✅ | — | — | — | recoil2png |
+| DbwRender | `.dbw` | ✅ | ✅ | — | — | — | none |
+| Dcx | `.dcx` | ✅ | ✅ | — | ✅ | — | ImageMagick |
+| Dds | `.dds` | ✅ | ✅ | — | — | — | ImageMagick, ffmpeg |
+| Degas | `.pi1`, `.pi2`, `.pi3`, `.pc1`, `.pc2`, `.pc3`, `.suh` | ✅ | ✅ | — | — | — | recoil2png |
+| DegasBrush | `.bru` | ✅ | ✅ | — | — | — | recoil2png |
+| DegasIcon | `.icn` | ✅ | ✅ | — | — | — | recoil2png |
+| DelmPaint | `.del`, `.dph` | ✅ | ✅ | — | — | — | recoil2png |
+| Deluxe | `.dps`, `.dlx` | ✅ | ✅ | — | — | — | none |
+| DGraphCompressed | `.p3c` | ✅ | ✅ | — | — | — | recoil2png |
+| Dicom | `.dcm`, `.dicom`, `.acr`, `.dic`, `.dc3` | ✅ | ✅ | — | — | — | ImageMagick |
+| DigiSpec | `.dgs` | ✅ | ✅ | — | — | — | none |
+| DigitalFx | `.tdim` | ✅ | ✅ | — | — | — | none |
+| DigiView | `.dgv` | ✅ | ✅ | — | — | — | none |
+| Din | `.din` | ✅ | ✅ | — | — | — | none |
+| DirLogoMaker | `.dlm` | ✅ | ✅ | — | — | — | recoil2png |
+| DispThumbnail | `.tnl` | ✅ | ✅ | — | — | — | ffmpeg |
+| DivGameMap | `.fpg` | ✅ | ✅ | — | — | — | none |
+| DjVu | `.djvu`, `.djv`, `.iw4` | ✅ | ✅ | — | — | — | none |
+| Dng | `.dng` | ✅ | ✅ | — | — | — | ffmpeg |
+| DolphinEd | `.dol`, `.bed` | ✅ | ✅ | — | — | — | recoil2png |
+| Doodle | `.dd`, `.ddp` | ✅ | ✅ | — | — | — | recoil2png |
+| DoodleAtari | `.doo` | ✅ | ✅ | — | — | — | none |
+| DoodleComp | `.jj` | ✅ | ✅ | — | — | — | recoil2png |
+| DoodlePacked | `.dpk` | ✅ | ✅ | — | — | — | none |
+| DoomFlat | `.flat` | ✅ | ✅ | — | — | — | none |
+| Dpx | `.dpx` | ✅ | ✅ | — | — | — | ImageMagick, ffmpeg |
+| Dragon | `.dgn` | ✅ | ✅ | — | — | — | none |
+| DrawIt | `.dit` | ✅ | ✅ | — | — | — | recoil2png |
+| Drazlace | `.dlp`, `.drl` | ✅ | ✅ | — | — | — | none |
+| DrazPaint | `.drz`, `.drp` | ✅ | ✅ | — | — | — | none |
+| DrHalo | `.cut` | ✅ | ✅ | — | — | — | ImageMagick |
+| DuneGraph | `.dg1`, `.dc1` | ✅ | ✅ | — | — | — | recoil2png |
+| Duo | `.duo`, `.du1` | ✅ | ✅ | — | — | — | recoil2png |
+| DuoMedium | `.du2` | ✅ | ✅ | — | — | — | recoil2png |
+| Dwg | `.dwg` | ✅ | ✅ | — | — | — | none |
+| Dxf | `.dxf` | ✅ | ✅ | — | — | — | none |
+| EccHeader | `.ecc` | ✅ | ✅ | — | — | — | none |
+| EciGraphicEditor | `.eci`, `.ecp` | ✅ | ✅ | — | — | — | recoil2png |
+| EclipseTile | `.tile` | ✅ | ✅ | — | — | — | none |
+| Ecw | `.ecw` | ✅ | ✅ | — | — | — | none |
+| EdmicsC4 | `.c4` | ✅ | ✅ | — | — | — | none |
+| EggPaint | `.trp` | ✅ | ✅ | — | — | — | recoil2png |
+| ElectricImage | `.ei`, `.eidi` | ✅ | ✅ | — | ✅ | — | none |
+| Electronika | `.bk`, `.ekr` | ✅ | ✅ | — | — | — | none |
+| EmbeddedDib | `.zmf`, `.skf`, `.cad`, `.btn` | ✅ | — | — | — | — | — |
+| EmcEditor | `.emc` | ✅ | ✅ | — | — | — | none |
+| Emf | `.emf` | ✅ | ✅ | — | — | — | none |
+| Enterprise128 | `.ep`, `.elan` | ✅ | ✅ | — | — | — | none |
+| Envi | `.hdr` | ✅ | ✅ | — | — | — | none |
+| EpaBios | `.epa` | ✅ | ✅ | — | — | — | recoil2png |
+| Eps | `.eps`, `.epsf`, `.epsi`, `.epi`, `.ept` | ✅ | ✅ | — | — | — | ImageMagick |
+| Eroiica | `.eif` | ✅ | ✅ | — | ✅ | — | none |
+| EscapePaint | `.esp` | ✅ | ✅ | — | — | — | none |
+| EsmSoftwarePix | `.pix` | ✅ | ✅ | — | — | — | none |
+| EverexFax | `.efx`, `.ef3` | ✅ | ✅ | — | — | — | none |
+| Excel | `.xlsx`, `.xlsm`, `.xltx`, `.xltm` | ✅ | ✅ | — | ✅ | — | none |
+| Exr | `.exr` | ✅ | ✅ | — | — | — | ImageMagick, ffmpeg |
+| ExtendedGemImg | `.ximg` | ✅ | ✅ | — | — | — | recoil2png, ffmpeg |
+| ExtendSuperHires | `.esh` | ✅ | ✅ | — | — | — | recoil2png |
+| EzArt | `.eza` | ✅ | ✅ | — | — | — | recoil2png |
+| FacePainter | `.fpt`, `.fcp` | ✅ | ✅ | — | — | — | recoil2png |
+| FaceSaver | `.face`, `.fac` | ✅ | ✅ | — | — | — | none |
+| FaceServer | `.fac`, `.face` | ✅ | ✅ | — | — | — | none |
+| FalconFuckpaint | `.pi4`, `.pi7`, `.pi9` | ✅ | ✅ | — | — | — | recoil2png |
+| FalconPaint | `.fpn` | ✅ | ✅ | — | — | — | none |
+| FalconRes | `.frs` | ✅ | ✅ | — | — | — | none |
+| Farbfeld | `.ff`, `.farbfeld` | ✅ | ✅ | — | — | — | ImageMagick |
+| FastgraphPixelRun | `.prf` | ✅ | ✅ | — | — | — | none |
+| FaxG3 | `.g3` | ✅ | ✅ | — | — | — | none |
+| FaxMan | `.fmf` | ✅ | ✅ | — | — | — | none |
+| Fbm | `.fbm` | ✅ | ✅ | — | — | — | none |
+| Fff | `.fff` | ✅ | ✅ | — | — | — | ffmpeg |
+| Ffli | `.ffli`, `.ffl` | ✅ | ✅ | — | — | — | none |
+| FirstPublisher | `.art` | ✅ | ✅ | — | — | — | none |
+| Fits | `.fits`, `.fit`, `.fts` | ✅ | ✅ | — | — | — | ImageMagick |
+| FitsDocument | `.fits`, `.fit`, `.fts` | ✅ | ✅ | — | ✅ | — | ImageMagick |
+| Fl32 | `.fl32` | ✅ | ✅ | — | — | — | ImageMagick |
+| FlashImage | `.fi` | ✅ | ✅ | — | — | — | none |
+| Fli | `.fli`, `.flc` | ✅ | ✅ | — | ✅ | — | ffmpeg |
+| Fli64 | `.fli64` | ✅ | ✅ | — | — | — | none |
+| FliDesigner | `.fd2` | ✅ | ✅ | — | — | — | none |
+| FliDesigner2 | `.fd2` | ✅ | ✅ | — | — | — | none |
+| FliEditor | `.fed` | ✅ | ✅ | — | — | — | none |
+| Flif | `.flif` | ✅ | ✅ | — | — | — | none |
+| FliGraph | `.flg`, `.bml`, `.fli` | ✅ | ✅ | — | — | — | recoil2png |
+| Flimatic | `.flm` | ✅ | ✅ | — | — | — | none |
+| Flip64 | `.fbi` | ✅ | ✅ | — | — | — | none |
+| FliProfi | `.fpr` | ✅ | ✅ | — | — | — | none |
+| FloorDesigner | `.fge` | ✅ | ✅ | — | — | — | recoil2png |
+| FmTowns | `.fmt` | ✅ | ✅ | — | — | — | none |
+| FontasyGrafik | `.bsg` | ✅ | ✅ | — | — | — | none |
+| Fpx | `.fpx`, `.mix` | ✅ | — | — | — | — | — |
+| FreeHand | `.fhs` | ✅ | ✅ | — | — | — | none |
+| FremontFax | `.f96` | ✅ | ✅ | — | — | — | none |
+| Fsh | `.fsh` | ✅ | ✅ | — | — | — | none |
+| Fuckpaint | `.fp` | ✅ | ✅ | — | — | — | recoil2png |
+| FullscreenKit | `.kid` | ✅ | ✅ | — | — | — | recoil2png |
+| FunGraphicsMachine | `.fgs` | ✅ | ✅ | — | — | — | recoil2png |
+| FunPainter | `.fp2`, `.fun` | ✅ | ✅ | — | — | — | recoil2png |
+| FunPhotor | `.fpr` | ✅ | ✅ | — | — | — | none |
+| FuntasticPaint | `.fun8`, `.ftp` | ✅ | ✅ | — | — | — | none |
+| FunWithArt | `.fwa` | ✅ | ✅ | — | — | — | recoil2png |
+| G9b | `.g9b` | ✅ | ✅ | — | — | — | recoil2png |
+| Gaf | `.gaf` | ✅ | ✅ | — | — | — | none |
+| GameBoyTile | `.2bpp`, `.cgb` | ✅ | ✅ | — | — | — | none |
+| GammaFax | `.gmf` | ✅ | ✅ | — | — | — | none |
+| GbaTile | `.4bpp`, `.gba` | ✅ | ✅ | — | — | — | none |
+| Gbr | `.gbr` | ✅ | ✅ | — | — | — | none |
+| Gd2 | `.gd2` | ✅ | ✅ | — | — | — | none |
+| GedPicture | `.ged` | ✅ | ✅ | — | — | — | recoil2png |
+| GeGenesis | `.fre`, `.pd`, `.t1`, `.t2` | ✅ | ✅ | — | — | — | none |
+| Gem | `.gem` | ✅ | ✅ | — | — | — | none |
+| GemImg | `.img` | ✅ | ✅ | — | — | — | recoil2png, ffmpeg |
+| GeoPaint | `.geo` | ✅ | ✅ | — | — | — | none |
+| GephardHires | `.ghg` | ✅ | ✅ | — | — | — | recoil2png |
+| GfaPaint | `.gfp` | ✅ | ✅ | — | — | — | none |
+| GfaRaytrace | `.sul` | ✅ | ✅ | — | — | — | none |
+| Gif | `.gif`, `.giff`, `.bpr` | ✅ | ✅ | — | ✅ | ✅ | ImageMagick, ffmpeg |
+| Gigacad | `.gcd` | ✅ | ✅ | — | — | — | recoil2png |
+| GigaPaint | `.gih`, `.gig`, `.rpo` | ✅ | ✅ | — | — | — | recoil2png |
+| GoDot4Bit | `.4bt`, `.4bit`, `.clp` | ✅ | ✅ | — | — | — | none |
+| GodPaint | `.gpn`, `.gdp`, `.god` | ✅ | ✅ | — | — | — | recoil2png |
+| Grafix | `.grx` | ✅ | ✅ | — | — | — | recoil2png |
+| Graph2Font | `.g2f` | ✅ | ✅ | — | — | — | recoil2png |
+| Graph2FontMch | `.mch` | ✅ | ✅ | — | — | — | recoil2png |
+| Graph2FontScroll | `.vsc` | ✅ | ✅ | — | — | — | recoil2png |
+| Graphics10Plus | `.gr10p` | ✅ | ✅ | — | — | — | none |
+| Graphics9Plus | `.gr9p` | ✅ | ✅ | — | — | — | recoil2png |
+| GraphicsMaster | `.gms`, `.gm8` | ✅ | ✅ | — | — | — | none |
+| GraphLogo | `.all` | ✅ | ✅ | — | — | — | recoil2png |
+| GraphSaurus | `.sr5`, `.grs`, `.sr8`, `.srs` | ✅ | ✅ | — | — | — | recoil2png |
+| GraphSaurus6 | `.sr6` | ✅ | ✅ | — | — | — | none |
+| GraphSaurus7 | `.sr7` | ✅ | ✅ | — | — | — | recoil2png |
+| GraphSaurusInterlaced | `.sri` | ✅ | ✅ | — | — | — | recoil2png |
+| GraspGl | `.gl` | ✅ | ✅ | — | — | — | none |
+| GrassSlideshow | `.hpm` | ✅ | ✅ | — | — | — | recoil2png |
+| GreatPaint | `.gpt` | ✅ | ✅ | — | — | — | none |
+| GrfBitmap | `.grf` | ✅ | ✅ | — | — | — | none |
+| Grs16 | `.g16` | ✅ | ✅ | — | — | — | none |
+| GunPaint | `.gun`, `.ifl` | ✅ | ✅ | — | — | — | recoil2png |
+| HalfLifeMdl | `.mdltex` | ✅ | ✅ | — | — | — | none |
+| HalfLifeModel | `.mdl` | ✅ | ✅ | — | — | — | none |
+| HandyScanner | `.hs2` | ✅ | ✅ | — | — | — | recoil2png |
+| HardColorMap | `.hcm` | ✅ | ✅ | — | — | — | recoil2png |
+| HardInterlace | `.hip` | ✅ | ✅ | — | — | — | none |
+| HayesJtfax | `.jtf` | ✅ | ✅ | — | — | — | none |
+| HcbEditor | `.hcb` | ✅ | ✅ | — | — | — | recoil2png |
+| Hdr | `.hdr`, `.hdri`, `.rgbe`, `.xyze`, `.rad` | ✅ | ✅ | — | — | — | ImageMagick, ffmpeg |
+| Heif | `.heic`, `.heif`, `.avci`, `.avcs` | ✅ | ✅ | ✅ | ✅ | — | ImageMagick, heif-dec, ffmpeg |
+| HereticM8 | `.m8` | ✅ | ✅ | — | — | — | none |
+| HfImage | `.hf` | ✅ | ✅ | — | — | — | none |
+| HiEddi | `.hed` | ✅ | ✅ | — | — | — | recoil2png |
+| HighResAtari | `.hra` | ✅ | ✅ | — | — | — | none |
+| HighresMedium | `.hrm` | ✅ | ✅ | — | — | — | none |
+| HighResST | `.hst`, `.hrs` | ✅ | ✅ | — | — | — | none |
+| HinterGrundBild | `.hgb` | ✅ | ✅ | — | — | — | none |
+| HiPicCreator | `.hpc`, `.aas` | ✅ | ✅ | — | — | — | recoil2png |
+| HiresC64 | `.hir`, `.hbm`, `.hpi` | ✅ | ✅ | — | — | — | recoil2png |
+| HiResEditor | `.het`, `.rph` | ✅ | ✅ | — | — | — | recoil2png |
+| HiresFliCrest | `.hfc`, `.hfd` | ✅ | ✅ | — | — | — | none |
+| HiresInterlaceFeniks | `.hlf`, `.hie` | ✅ | ✅ | — | — | — | none |
+| Hireslace | `.hle` | ✅ | ✅ | — | — | — | recoil2png |
+| HiresManager | `.him` | ✅ | ✅ | — | — | — | none |
+| HomeworldLif | `.lif` | ✅ | ✅ | — | — | — | none |
+| Hp48Grob | `.grb`, `.gro` | ✅ | ✅ | — | — | — | recoil2png |
+| Hpgl | `.hpgl`, `.hgl`, `.hpg`, `.prn`, `.prt`, `.spl` | ✅ | ✅ | — | — | — | none |
+| HpGrob | `.grob`, `.hp`, `.gro2`, `.gro4` | ✅ | ✅ | — | — | — | none |
+| Hpi | `.hpi` | ✅ | ✅ | — | — | — | ffmpeg |
+| Hru | `.hru` | ✅ | ✅ | — | — | — | none |
+| Hrz | `.hrz` | ✅ | ✅ | ✅ | — | — | ImageMagick |
+| Hta | `.hta` | ✅ | ✅ | — | ✅ | — | none |
+| IbmKips | `.kps` | ✅ | ✅ | — | — | — | none |
+| IcDraw | `.ibi`, `.ib3` | ✅ | ✅ | — | — | — | recoil2png |
+| Ice | `.irg`, `.ir2`, `.icn`, `.imn`, `.ipc` | ✅ | ✅ | — | — | — | recoil2png |
+| IcePcinPlus | `.ip2` | ✅ | ✅ | — | — | — | recoil2png |
+| Icns | `.icns` | ✅ | ✅ | — | ✅ | — | none |
+| Ico | `.ico` | ✅ | ✅ | — | ✅ | ✅ | ImageMagick, ffmpeg |
+| IconLibrary | `.icl` | ✅ | — | — | — | — | — |
+| Ics | `.ics` | ✅ | ✅ | — | — | — | none |
+| IffAcbm | `.acbm`, `.iff`, `.blk` | ✅ | ✅ | — | — | — | recoil2png, ffmpeg |
+| IffAnim | `.anim` | ✅ | ✅ | — | — | — | ffmpeg |
+| IffAnim8 | `.an8`, `.anim8` | ✅ | ✅ | — | — | — | ffmpeg |
+| IffDctv | `.dctv` | ✅ | ✅ | — | — | — | recoil2png |
+| IffDeep | `.deep`, `.iff`, `.blk` | ✅ | ✅ | — | — | — | recoil2png, ffmpeg |
+| IffDpan | `.dpan` | ✅ | ✅ | — | — | — | ffmpeg |
+| IffHame | `.hame` | ✅ | ✅ | — | — | — | none |
+| IffMultiPalette | `.mpl`, `.mpal` | ✅ | ✅ | — | — | — | ffmpeg |
+| IffPbm | `.lbm`, `.pbm`, `.blk` | ✅ | ✅ | — | — | — | recoil2png, ffmpeg |
+| IffRgb8 | `.rgb8`, `.iff`, `.blk` | ✅ | ✅ | — | — | — | recoil2png, ffmpeg |
+| IffRgbn | `.rgbn`, `.iff`, `.blk` | ✅ | ✅ | — | — | — | recoil2png, ffmpeg |
+| IffSham | `.sham` | ✅ | ✅ | — | — | — | recoil2png, ffmpeg |
+| Ilbm | `.lbm`, `.ilbm`, `.iff`, `.blk`, `.ham`, `.ham6`, `.ham8`, `.256`, `.ap2`, `.beam`, `.dct`, `.dr`, `.mp`, `.bl1`, `.bl2`, `.bl3` | ✅ | ✅ | — | — | — | recoil2png, ffmpeg |
+| Im5Visilog | `.im5` | ✅ | ✅ | — | — | — | none |
+| ImageLabBw | `.b&w`, `.b_w`, `.dit` | ✅ | ✅ | — | — | — | recoil2png |
+| ImageSysC64 | `.isc` | ✅ | ✅ | — | — | — | none |
+| ImageSystem | `.ish`, `.ism` | ✅ | ✅ | — | — | — | recoil2png |
+| Imagic | `.ic1`, `.ic2`, `.ic3` | ✅ | ✅ | — | — | — | recoil2png |
+| ImagicPaint | `.imp`, `.igp` | ✅ | ✅ | — | — | — | none |
+| ImagingFax | `.g3n` | ✅ | ✅ | — | — | — | none |
+| ImnetImage | `.imt` | ✅ | ✅ | — | — | — | none |
+| IndyPaint | `.ipn`, `.idy`, `.tru` | ✅ | ✅ | — | — | — | recoil2png |
+| Ingr | `.cit`, `.itg` | ✅ | ✅ | — | — | — | none |
+| InShape | `.iim` | ✅ | ✅ | — | — | — | recoil2png |
+| Int95a | `.int` | ✅ | ✅ | — | — | — | recoil2png |
+| Interfile | `.hv` | ✅ | ✅ | — | — | — | none |
+| Interlace8 | `.int8` | ✅ | ✅ | — | — | — | none |
+| InterlacedLogoEditor | `.ile` | ✅ | ✅ | — | — | — | recoil2png |
+| InterlaceGraphicsEditor | `.ige` | ✅ | ✅ | — | — | — | recoil2png |
+| InterlaceHiresEditor | `.ihe` | ✅ | ✅ | — | — | — | none |
+| InterlaceLogoDesigner | `.ild` | ✅ | ✅ | — | — | — | recoil2png |
+| InterlaceStudio | `.ist` | ✅ | ✅ | — | — | — | none |
+| InterleafImage | `.iimg` | ✅ | ✅ | — | — | — | none |
+| InterPainter | `.inp`, `.ing`, `.ins` | ✅ | ✅ | — | — | — | recoil2png |
+| InterPaintHi | `.iph`, `.hre` | ✅ | ✅ | — | — | — | recoil2png |
+| InterPaintMc | `.ipt`, `.lre` | ✅ | ✅ | — | — | — | recoil2png |
+| Ioca | `.ica`, `.ioca`, `.ioc`, `.mod` | ✅ | ✅ | — | — | — | none |
+| IPaint | `.ip` | ✅ | ✅ | — | — | — | recoil2png |
+| Ipg | `.ipg` | ✅ | — | — | ✅ | — | — |
+| Ipl | `.ipl` | ✅ | ✅ | — | — | — | ImageMagick |
+| Ipsm | `.pan` | ✅ | ✅ | — | — | — | ffmpeg |
+| Iss | `.iss` | ✅ | ✅ | — | — | — | none |
+| It01 | `.fit` | ✅ | ✅ | — | — | — | none |
+| Jbig | `.jbg`, `.bie`, `.jbig` | ✅ | ✅ | — | — | — | ImageMagick |
+| Jbig2 | `.jb2`, `.jbig2` | ✅ | ✅ | — | — | — | none |
+| JetGraphicsPlanner | `.jgp` | ✅ | ✅ | — | — | — | recoil2png |
+| JigsawPicture | `.jig` | ✅ | ✅ | — | — | — | none |
+| JigsawPuzzle | `.jig` | ✅ | ✅ | — | — | — | none |
+| Jng | `.jng` | ✅ | ✅ | — | — | — | ImageMagick, ffmpeg |
+| Jnx | `.jnx` | ✅ | ✅ | — | ✅ | — | ImageMagick |
+| JovianVi | `.vi` | ✅ | ✅ | — | — | — | none |
+| Jpeg | `.jpg`, `.jpeg`, `.jpe`, `.jfif`, `.jps`, `.thm`, `.j`, `.jif`, `.fsy`, `.mph`, `.ncy`, `.frm` | ✅ | ✅ | — | — | ✅ | ImageMagick, ffmpeg |
+| Jpeg2000 | `.jp2`, `.j2k`, `.j2c`, `.jpx`, `.jpc`, `.jpf`, `.jpt`, `.jpm` | ✅ | ✅ | — | — | — | ImageMagick, opj_decompress, ffmpeg |
+| JpegLs | `.jls` | ✅ | ✅ | — | — | — | ffmpeg |
+| JpegXl | `.jxl` | ✅ | ✅ | — | ✅ | — | ImageMagick, djxl, ffmpeg |
+| JpegXr | `.jxr`, `.wdp`, `.hdp` | ✅ | ✅ | — | — | — | none |
+| JupiterAce | `.jac`, `.ace` | ✅ | ✅ | — | — | — | none |
+| Kitty | `.kty`, `.kt4` | ✅ | ✅ | — | — | — | recoil2png |
+| Koala | `.koa`, `.koala`, `.kla` | ✅ | ✅ | — | — | — | recoil2png |
+| KoalaCompressed | `.gg` | ✅ | ✅ | — | — | — | recoil2png |
+| KodakDc25 | `.k25` | ✅ | ✅ | — | — | — | none |
+| KofaxKfx | `.kfx` | ✅ | ✅ | — | — | — | none |
+| Kqp | `.kqp` | ✅ | ✅ | — | — | — | none |
+| Krita | `.kra` | ✅ | ✅ | — | — | — | none |
+| KssPaint | `.kss` | ✅ | ✅ | — | — | — | recoil2png |
+| Ktx | `.ktx`, `.ktx2` | ✅ | ✅ | — | — | — | none |
+| LarkaObjectEditor | `.leo` | ✅ | ✅ | — | — | — | recoil2png |
+| LaserData | `.lda` | ✅ | ✅ | — | — | — | none |
+| LastWordFont | `.f80` | ✅ | ✅ | — | — | — | recoil2png |
+| LdPic | `.bbg` | ✅ | ✅ | — | — | — | recoil2png |
+| LightWorkImage | `.lwi` | ✅ | ✅ | — | — | — | none |
+| LogoPainter | `.lp3` | ✅ | ✅ | — | — | — | recoil2png |
+| LogoSys | `.sys`, `.logo` | ✅ | ✅ | — | — | — | none |
+| Lss16 | `.lss`, `.16` | ✅ | ✅ | — | — | — | none |
+| LucasFilm | `.lff` | ✅ | ✅ | — | — | — | none |
+| LudekMaker | `.ldm` | ✅ | ✅ | — | — | — | none |
+| LViewPro | `.lvp` | ✅ | ✅ | — | — | — | ffmpeg |
+| MacPaint | `.mac`, `.macp`, `.pntg`, `.pnt`, `.paint`, `.mpnt` | ✅ | ✅ | — | — | — | recoil2png, ImageMagick |
+| MadDesigner | `.mbg` | ✅ | ✅ | — | — | — | recoil2png |
+| MadStudio | `.an4`, `.an2`, `.an5`, `.gr1`, `.gr2` | ✅ | ✅ | — | — | — | recoil2png |
+| MadStudioMissile | `.msl` | ✅ | ✅ | — | — | — | none |
+| MadStudioTile | `.tl4` | ✅ | ✅ | — | — | — | recoil2png |
+| Mag | `.mag`, `.mki` | ✅ | ✅ | — | — | — | recoil2png |
+| MagicPainter | `.mgp` | ✅ | ✅ | — | — | — | recoil2png |
+| Mamut | `.rys` | ✅ | ✅ | — | — | — | recoil2png |
+| MapletownMl1 | `.ml1` | ✅ | ✅ | — | — | — | recoil2png |
+| MapletownMx1 | `.mx1` | ✅ | ✅ | — | — | — | recoil2png |
+| MapletownNl3 | `.nl3` | ✅ | ✅ | — | — | — | recoil2png |
+| MasterSystemTile | `.sms`, `.gg` | ✅ | ✅ | — | — | — | none |
+| MatLab | `.mat` | ✅ | ✅ | — | — | — | ImageMagick |
+| MawWareTexture | `.mtx` | ✅ | ✅ | — | — | — | none |
+| MayaIff | `.iff`, `.maya`, `.tdi` | ✅ | ✅ | — | — | — | none |
+| McPainter | `.mcp` | ✅ | ✅ | — | — | — | recoil2png |
+| Mcs | `.mcs` | ✅ | ✅ | — | — | — | none |
+| Mda | `.mda` | ✅ | ✅ | — | — | — | none |
+| Mdp | `.mdp` | ✅ | ✅ | — | — | — | none |
+| MegaluxFrame | `.frm` | ✅ | ✅ | — | — | — | ffmpeg |
+| MegaPaint | `.bld` | ✅ | ✅ | — | — | — | recoil2png |
+| MetaImage | `.mha`, `.mhd` | ✅ | ✅ | — | — | — | none |
+| MgrBitmap | `.mgr` | ✅ | ✅ | — | — | — | none |
+| MicroDesignCut | `.cut` | ✅ | ✅ | — | — | — | none |
+| MicroDesignGrf | `.grf` | ✅ | ✅ | — | — | — | none |
+| MicroDynamicsMars | `.pbt` | ✅ | ✅ | — | — | — | none |
+| MicroIllustrator | `.mil` | ✅ | ✅ | — | — | — | recoil2png |
+| MicroIllustratorA8 | `.mia` | ✅ | ✅ | — | — | — | none |
+| MicroPainter8 | `.mpt8`, `.mp8` | ✅ | ✅ | — | — | — | none |
+| Miff | `.miff`, `.mif` | ✅ | ✅ | — | — | — | ImageMagick |
+| MiniPaint | `.mg` | ✅ | ✅ | — | — | — | recoil2png |
+| Mlt | `.mlt` | ✅ | ✅ | — | — | — | none |
+| Mng | `.mng` | ✅ | ✅ | — | ✅ | — | ImageMagick, ffmpeg |
+| MobileFax | `.rfa` | ✅ | ✅ | — | — | — | none |
+| MobyDick | `.mby`, `.mbd` | ✅ | ✅ | — | — | — | none |
+| MonoMagic | `.mon` | ✅ | ✅ | — | — | — | recoil2png |
+| MonoStar | `.obj` | ✅ | ✅ | — | — | — | recoil2png |
+| MovieMakerBackground | `.bkg` | ✅ | ✅ | — | — | — | recoil2png |
+| Mpo | `.mpo` | ✅ | ✅ | — | ✅ | — | ImageMagick, ffmpeg |
+| Mrc | `.mrc`, `.map` | ✅ | ✅ | — | — | — | none |
+| Mrf | `.mrf` | ✅ | ✅ | — | — | — | none |
+| Mrw | `.mrw` | ✅ | ✅ | — | — | — | none |
+| Msp | `.msp` | ✅ | ✅ | — | — | — | recoil2png, ffmpeg |
+| Msx | `.sc2`, `.sc5`, `.sc7`, `.sc8`, `.ge7`, `.ge8` | ✅ | ✅ | — | — | — | none |
+| MsxFont | `.fnt`, `.mft` | ✅ | ✅ | — | — | — | none |
+| MsxGl16 | `.gl5`, `.sh5`, `.gl7`, `.sh7` | ✅ | ✅ | — | — | — | recoil2png |
+| MsxGl6 | `.gl6`, `.sh6`, `.stp` | ✅ | ✅ | — | — | — | recoil2png |
+| MsxGl8 | `.gl8`, `.sh8` | ✅ | ✅ | — | — | — | recoil2png |
+| MsxGlYjk | `.glc`, `.gls`, `.shc`, `.gla`, `.glb`, `.sha`, `.shb` | ✅ | ✅ | — | — | — | recoil2png |
+| MsxMig | `.mig` | ✅ | ✅ | — | — | — | none |
+| MsxScc | `.scc`, `.yjk` | ✅ | ✅ | — | — | — | recoil2png |
+| MsxScreen10 | `.sca`, `.scb` | ✅ | ✅ | — | — | — | recoil2png |
+| MsxScreen2 | `.sc2`, `.grp` | ✅ | ✅ | — | — | — | none |
+| MsxScreen3 | `.sc3` | ✅ | ✅ | — | — | — | recoil2png |
+| MsxScreen4 | `.sc4` | ✅ | ✅ | — | — | — | recoil2png |
+| MsxScreen5 | `.sc5`, `.ge5` | ✅ | ✅ | — | — | — | none |
+| MsxScreen6 | `.sc6` | ✅ | ✅ | — | — | — | recoil2png |
+| MsxScreen8 | `.sc8` | ✅ | ✅ | — | — | — | recoil2png |
+| MsxSprite | `.spt` | ✅ | ✅ | — | — | — | none |
+| MsxVideo | `.mvi` | ✅ | ✅ | — | — | — | none |
+| MsxView | `.mvw`, `.msv` | ✅ | ✅ | — | — | — | none |
+| Mtv | `.mtv`, `.pic` | ✅ | ✅ | — | — | — | ImageMagick |
+| MuifliEditor | `.muf`, `.mui`, `.mup` | ✅ | ✅ | — | — | — | none |
+| MultiLaceEditor | `.mle` | ✅ | ✅ | — | — | — | none |
+| MultiPainter | `.mpt`, `.mlt64` | ✅ | ✅ | — | — | — | none |
+| MultiPalettePicture | `.mpp` | ✅ | ✅ | — | — | — | none |
+| NcrImage | `.ncr` | ✅ | ✅ | — | — | — | none |
+| NdsTexture | `.nbfs`, `.nds` | ✅ | ✅ | — | — | — | none |
+| NeoBookCartoon | `.car` | ✅ | ✅ | — | — | — | none |
+| Neochrome | `.neo` | ✅ | ✅ | — | — | — | recoil2png |
+| NeoGeoPocket | `.ngp`, `.ngpc` | ✅ | ✅ | — | — | — | none |
+| NeoGeoSprite | `.spr` | ✅ | ✅ | — | — | — | none |
+| NeroCoverDesigner | `.cde`, `.nct`, `.ncd` | ✅ | ✅ | — | — | — | none |
+| NesChr | `.chr` | ✅ | ✅ | — | — | — | none |
+| Netpbm | `.pbm`, `.pgm`, `.ppm`, `.pnm`, `.pam`, `.ppma`, `.rpbm`, `.rpgm`, `.rppm`, `.rpnm` | ✅ | ✅ | — | — | — | ImageMagick, ffmpeg |
+| NewsRoom | `.nsr`, `.ph`, `.bn` | ✅ | ✅ | — | — | — | none |
+| Nfo | `.nfo`, `.diz` | ✅ | ✅ | — | — | — | none |
+| Nhdr | `.nhdr` | ✅ | ✅ | — | — | — | none |
+| Nie | `.nie` | ✅ | ✅ | — | — | — | none |
+| Nifti | `.nii` | ✅ | ✅ | — | — | — | none |
+| Nifti2 | `.nii` | ✅ | ✅ | — | — | — | none |
+| Nifti2Gzip | `.nii.gz` | ✅ | ✅ | — | — | — | none |
+| NiftiGzip | `.nii.gz` | ✅ | ✅ | — | — | — | none |
+| NiftiPair | `.hdr`, `.img` | ✅ | ✅ | — | — | — | none |
+| NistIHead | `.nst` | ✅ | ✅ | — | — | — | none |
+| Nitf | `.ntf`, `.nitf` | ✅ | ✅ | — | — | — | none |
+| NokiaGroupGraphics | `.ngg` | ✅ | ✅ | — | — | — | none |
+| NokiaLogo | `.nol`, `.ngg` | ✅ | ✅ | — | — | — | none |
+| NokiaNlm | `.nlm` | ✅ | ✅ | — | — | — | none |
+| NokiaOperatorLogo | `.nol` | ✅ | ✅ | — | — | — | none |
+| NokiaPictureMessage | `.npm` | ✅ | ✅ | — | — | — | none |
+| Nrrd | `.nrrd`, `.nhdr` | ✅ | ✅ | — | — | — | none |
+| NufliEditor | `.nuf`, `.nup` | ✅ | ✅ | — | — | — | none |
+| OazFax | `.oaz`, `.xfx` | ✅ | ✅ | — | — | — | none |
+| OcpArtStudioWindow | `.win` | ✅ | ✅ | — | — | — | recoil2png |
+| OcsPics | `.ocs` | ✅ | ✅ | — | — | — | none |
+| OdFontEditor | `.odf` | ✅ | ✅ | — | — | — | recoil2png |
+| Oil | `.oil` | ✅ | ✅ | — | — | — | none |
+| OlicomFax | `.ofx` | ✅ | ✅ | — | — | — | none |
+| Olpc565 | `.565` | ✅ | ✅ | — | — | — | none |
+| OpenRaster | `.ora` | ✅ | ✅ | — | — | — | ImageMagick |
+| Optocat | `.abs` | ✅ | ✅ | — | — | — | none |
+| Oric | `.oric`, `.tap` | ✅ | ✅ | — | — | — | none |
+| Otb | `.otb` | ✅ | ✅ | — | — | — | ImageMagick |
+| PabloPaint | `.pa3` | ✅ | ✅ | — | — | — | recoil2png |
+| Pagefox | `.pfx` | ✅ | ✅ | — | — | — | none |
+| PaintMagic | `.pmg` | ✅ | ✅ | — | — | — | recoil2png |
+| PaintPro | `.ppro` | ✅ | ✅ | — | — | — | none |
+| PaintShop | `.da4` | ✅ | ✅ | — | — | — | recoil2png |
+| PaintShopBrowser | `.jbf` | ✅ | ✅ | — | ✅ | — | none |
+| PaintShopCompressed | `.psc` | ✅ | ✅ | — | — | — | recoil2png |
+| Palm | `.palm`, `.pdb` | ✅ | ✅ | — | — | — | none |
+| PalmImageViewer | `.pdb` | ✅ | ✅ | — | — | — | ImageMagick |
+| PalmPdb | `.pdb` | ✅ | ✅ | — | — | — | none |
+| Paradox | `.mcpp` | ✅ | ✅ | — | — | — | recoil2png |
+| Pat | `.pat` | ✅ | ✅ | — | — | — | none |
+| Pc88 | `.pc8` | ✅ | ✅ | — | — | — | none |
+| Pc98Ebd | `.ebd` | ✅ | ✅ | — | — | — | none |
+| Pcd | `.pcd` | ✅ | ✅ | — | — | — | none |
+| Pcds | `.pcds` | ✅ | ✅ | — | — | — | none |
+| PcEngineTile | `.pce` | ✅ | ✅ | — | — | — | none |
+| Pcl | `.pcl`, `.prn` | ✅ | ✅ | — | — | — | none |
+| Pco16Bit | `.b16` | ✅ | ✅ | — | — | — | none |
+| PcPaint | `.pic`, `.clp`, `.sim` | ✅ | ✅ | — | — | — | ffmpeg |
+| PcpBitmap | `.pcp` | ✅ | ✅ | — | — | — | none |
+| Pcx | `.pcx`, `.pcc`, `.fcx`, `.bmg`, `.ibg` | ✅ | ✅ | — | — | ✅ | ImageMagick, ffmpeg |
+| Pdf | `.pdf` | ✅ | ✅ | — | ✅ | — | ImageMagick |
+| Pdn | `.pdn` | ✅ | ✅ | — | — | — | none |
+| Pds | `.pds`, `.lbl` | ✅ | ✅ | — | — | — | none |
+| PeResource | `.exe`, `.dll`, `.ocx`, `.scr`, `.cpl` | ✅ | — | — | ✅ | — | — |
+| PerfectPix | `.pph` | ✅ | ✅ | — | — | — | recoil2png |
+| Pes | `.pes` | ✅ | ✅ | — | — | — | none |
+| PetDraw | `.pdr` | ✅ | ✅ | — | — | — | recoil2png |
+| PetsciiBot | `.pbot` | ✅ | ✅ | — | — | — | recoil2png |
+| Pfm | `.pfm` | ✅ | ✅ | — | — | — | ImageMagick, ffmpeg |
+| Pgx | `.pgx` | ✅ | ✅ | — | — | — | ImageMagick, ffmpeg |
+| Phm | `.phm` | ✅ | ✅ | — | — | — | ImageMagick, ffmpeg |
+| PhotoChrome | `.pcf`, `.phc` | ✅ | ✅ | — | — | — | none |
+| PhotoChromePcs | `.pcs` | ✅ | ✅ | — | — | — | recoil2png |
+| PhotoLine | `.pld` | ✅ | ✅ | — | — | — | none |
+| PhotoPaint | `.cpt` | ✅ | ✅ | — | — | — | none |
+| PhotoParade | `.php` | ✅ | ✅ | — | ✅ | — | ffmpeg |
+| PhotoStudio | `.psf` | ✅ | ✅ | — | — | — | none |
+| PhotoSuiteProject | `.pzp` | ✅ | ✅ | — | — | — | none |
+| Pi | `.pi` | ✅ | ✅ | — | — | — | none |
+| Pic2 | `.p2` | ✅ | ✅ | — | — | — | none |
+| Picasso | `.pic0` | ✅ | ✅ | — | — | — | recoil2png |
+| Picasso64 | `.p64`, `.fly` | ✅ | ✅ | — | — | — | recoil2png |
+| Pict | `.pict`, `.pct`, `.pict2`, `.bum`, `.x` | ✅ | ✅ | — | — | — | ImageMagick, ffmpeg |
+| PictureEditor | `.ped` | ✅ | ✅ | — | — | — | none |
+| PicturePublisher | `.pp5` | ✅ | ✅ | — | — | — | none |
+| PicturePublisher4 | `.pp4` | ✅ | ✅ | — | — | — | none |
+| PicWorks | `.pwk`, `.pws` | ✅ | ✅ | — | — | — | none |
+| PixarRib | `.pxr`, `.pixar`, `.picio` | ✅ | ✅ | — | — | — | none |
+| Pixel64 | `.px64`, `.px` | ✅ | ✅ | — | — | — | none |
+| PixelPerfect | `.pp`, `.ppp` | ✅ | ✅ | — | — | — | none |
+| PixelPowerCollage | `.i17`, `.i18`, `.ib7`, `.if9` | ✅ | ✅ | — | — | — | none |
+| Pixia | `.pxa`, `.pxs` | ✅ | ✅ | — | — | — | none |
+| Pixibox | `.pxb` | ✅ | ✅ | — | — | — | none |
+| Pkm | `.pkm` | ✅ | ✅ | — | — | — | none |
+| Pl4Picture | `.pl4` | ✅ | ✅ | — | — | — | recoil2png |
+| PlaybackBitmapSequence | `.bms` | ✅ | ✅ | — | — | — | none |
+| PlotMaker | `.plt`, `.plm2` | ✅ | ✅ | — | — | — | none |
+| PmBitmap | `.pm1`, `.pm2`, `.pm3`, `.pm4` | ✅ | ✅ | — | — | — | none |
+| PmgDesigner | `.pmd` | ✅ | ✅ | — | — | — | none |
+| PmView | `.pm` | ✅ | ✅ | — | — | — | none |
+| Png | `.png`, `.frm` | ✅ | ✅ | — | — | ✅ | ImageMagick, ffmpeg |
+| PntrFalcon | `.pnf`, `.pfl` | ✅ | ✅ | — | — | — | none |
+| PocketPc2bp | `.2bp` | ✅ | ✅ | — | — | — | none |
+| PocketPcTheme | `.tsk` | ✅ | ✅ | — | — | — | none |
+| PortfolioGraphics | `.pgf`, `.pgc` | ✅ | ✅ | — | — | — | recoil2png |
+| Portrait | `.cvp` | ✅ | ✅ | — | — | — | none |
+| PostScript | `.ps`, `.ps1`, `.ps2`, `.ps3`, `.eps`, `.epsf`, `.epsi`, `.epi`, `.prn`, `.pdx` | ✅ | ✅ | — | — | — | none |
+| PowerGraphics | `.pgr` | ✅ | ✅ | — | — | — | recoil2png |
+| PowerPoint | `.ppt`, `.pps`, `.pot`, `.pptx`, `.ppsx`, `.potx`, `.pptm`, `.ppsm`, `.potm` | ✅ | ✅ | — | ✅ | — | none |
+| PrinterPageSegment | `.pse`, `.psg` | ✅ | ✅ | — | — | — | none |
+| Printfox | `.gb` | ✅ | ✅ | — | — | — | recoil2png |
+| PrintfoxPagefox | `.bs`, `.pg` | ✅ | ✅ | — | — | — | recoil2png |
+| PrintMaster | `.pm` | ✅ | ✅ | — | — | — | none |
+| PrintShop | `.psa`, `.psb` | ✅ | ✅ | — | — | — | none |
+| PrintShopIcon | `.psf` | ✅ | ✅ | — | — | — | recoil2png |
+| PrintTechnik | `.hir` | ✅ | ✅ | — | — | — | none |
+| PrismPaint | `.pnt`, `.tpi` | ✅ | ✅ | — | — | — | none |
+| Prisms | `.pri`, `.lff` | ✅ | ✅ | — | — | — | none |
+| ProfiGrf | `.grf` | ✅ | ✅ | — | — | — | recoil2png |
+| Ps2Txc | `.txc` | ✅ | ✅ | — | — | — | none |
+| Psb | `.psb` | ✅ | ✅ | — | — | — | ImageMagick |
+| Psd | `.psd`, `.pdd` | ✅ | ✅ | — | — | — | ImageMagick, ffmpeg |
+| PsionPic | `.pic`, `.icn`, `.ch3` | ✅ | ✅ | — | — | — | recoil2png |
+| Psp | `.psp`, `.pspimage`, `.tub`, `.psptube`, `.pspbrush`, `.pspframe`, `.pfr`, `.pspmask`, `.msk`, `.pspt`, `.tex` | ✅ | ✅ | — | — | — | none |
+| Ptif | `.ptif`, `.ptiff` | ✅ | ✅ | — | — | — | ImageMagick, ffmpeg |
+| PublicPainter | `.cmp` | ✅ | ✅ | — | — | — | recoil2png |
+| Pvr | `.pvr` | ✅ | ✅ | — | — | — | none |
+| Q0 | `.q0` | ✅ | ✅ | — | — | — | none |
+| QdvImage | `.qdv` | ✅ | ✅ | — | — | — | none |
+| Qoi | `.qoi` | ✅ | ✅ | — | — | — | ImageMagick, ffmpeg |
+| Qrt | `.qrt` | ✅ | ✅ | — | — | — | none |
+| Qtif | `.qtif`, `.qti` | ✅ | ✅ | — | — | — | none |
+| QuakeLmp | `.lmp` | ✅ | ✅ | — | — | — | none |
+| QuakeSpr | `.spr` | ✅ | ✅ | — | — | — | none |
+| QuantelVpb | `.vpb` | ✅ | ✅ | — | — | — | none |
+| QuantumPaint | `.pbx` | ✅ | ✅ | — | — | — | recoil2png |
+| RagD | `.rag`, `.ragc` | ✅ | ✅ | — | — | — | recoil2png |
+| RagePaint | `.rge` | ✅ | ✅ | — | — | — | none |
+| RainbowPainter | `.rp` | ✅ | ✅ | — | — | — | recoil2png |
+| RamBrandt | `.rm0`, `.rm1`, `.rm2`, `.rm3`, `.rm4` | ✅ | ✅ | — | — | — | recoil2png |
+| RawGreyscale | `.gry`, `.grey`, `.raw` | ✅ | ✅ | — | — | — | ImageMagick |
+| RawWorkshop | `.rwl`, `.rwh` | ✅ | ✅ | — | — | — | recoil2png |
+| RedStormRsb | `.rsb` | ✅ | ✅ | — | — | — | none |
+| Rembrandt | `.tcp` | ✅ | ✅ | — | — | — | recoil2png |
+| Rgf | `.rgf` | ✅ | ✅ | — | — | — | none |
+| RicohFax | `.ric`, `.001` | ✅ | ✅ | — | — | — | none |
+| RicohIs30 | `.pig` | ✅ | ✅ | — | — | — | none |
+| RicohJ6i | `.j6i` | ✅ | ✅ | — | — | — | ffmpeg |
+| RiscOsSprite | `.spr`, `.ros` | ✅ | ✅ | — | — | — | none |
+| Rla | `.rla`, `.rlb`, `.rpf` | ✅ | ✅ | — | — | — | none |
+| Rlc2 | `.rlc` | ✅ | ✅ | — | — | — | none |
+| RockyInterlace | `.rip` | ✅ | ✅ | — | — | — | none |
+| RunPaint | `.rpm` | ✅ | ✅ | — | — | — | recoil2png |
+| SamarHiresMap | `.shc` | ✅ | ✅ | — | — | — | recoil2png |
+| SamCoupe | `.sam` | ✅ | ✅ | — | — | — | none |
+| SamCoupeLce | `.lce` | ✅ | ✅ | — | — | — | recoil2png |
+| SamCoupeMode4 | `.ss4`, `.scs4` | ✅ | ✅ | — | — | — | recoil2png |
+| SamCoupeScreen | `.ss1`, `.ss2`, `.ss3` | ✅ | ✅ | — | — | — | recoil2png |
+| SamCoupeSsx | `.ssx` | ✅ | ✅ | — | — | — | recoil2png |
+| SaracenPaint | `.sar` | ✅ | ✅ | — | — | — | recoil2png |
+| SbigCcd | `.st4`, `.stx`, `.st5`, `.st6`, `.st7`, `.st8` | ✅ | ✅ | — | — | — | none |
+| SciFax | `.scf` | ✅ | ✅ | — | — | — | none |
+| ScitexCt | `.sct`, `.ct`, `.ch` | ✅ | ✅ | — | — | — | ImageMagick |
+| ScreenBlaster | `.sbl` | ✅ | ✅ | — | — | — | none |
+| ScreenMaker | `.smk` | ✅ | ✅ | — | — | — | none |
+| Sdg | `.sdg` | ✅ | — | — | ✅ | — | — |
+| Sdt | `.sdt` | ✅ | ✅ | — | — | — | none |
+| SeattleFilmWorks | `.sfw`, `.pwp` | ✅ | ✅ | — | — | — | none |
+| SecondNatureSlideShow | `.cat` | ✅ | ✅ | — | ✅ | — | ffmpeg |
+| SecretPhotos | `.xp0` | ✅ | ✅ | — | — | — | ffmpeg |
+| SegaGenTile | `.gen`, `.sgd` | ✅ | ✅ | — | — | — | none |
+| SegaSj1 | `.sj1` | ✅ | ✅ | — | — | — | none |
+| SemiGraphicLogo | `.sge` | ✅ | ✅ | — | — | — | recoil2png |
+| SeqImage | `.seq` | ✅ | ✅ | — | — | — | none |
+| SeuckSprites | `.a` | ✅ | ✅ | — | — | — | recoil2png |
+| SevenuP | `.sev` | ✅ | ✅ | — | — | — | recoil2png |
+| Sf3 | `.sf3` | ✅ | ✅ | — | — | — | ImageMagick |
+| Sff | `.sff` | ✅ | ✅ | — | — | — | none |
+| Sgi | `.sgi`, `.rgb`, `.bw`, `.iris`, `.rgba`, `.inta` | ✅ | ✅ | — | — | ✅ | ImageMagick, ffmpeg |
+| ShapeTableFileType | `.shp` | ✅ | ✅ | — | — | — | recoil2png |
+| SharpX68k | `.x68`, `.x68k` | ✅ | ✅ | — | — | — | none |
+| ShfXlEdit | `.shx` | ✅ | ✅ | — | — | — | recoil2png |
+| SiemensBmx | `.bmx` | ✅ | ✅ | — | — | — | none |
+| SifImage | `.sif` | ✅ | ✅ | — | — | — | none |
+| SinbadSlideshow | `.ssb` | ✅ | ✅ | — | — | — | recoil2png |
+| SinclairBasic | `.p` | ✅ | ✅ | — | — | — | recoil2png |
+| Sixel | `.six`, `.sixel` | ✅ | ✅ | — | — | — | none |
+| Skantek | `.skn` | ✅ | ✅ | — | — | — | none |
+| SketchPaddles | `.skp` | ✅ | ✅ | — | — | — | recoil2png |
+| SmartFax | `.smf`, `.001` | ✅ | ✅ | — | — | — | none |
+| SmartST | `.sst`, `.sst2` | ✅ | ✅ | — | — | — | none |
+| SnesTile | `.sfc`, `.snes` | ✅ | ✅ | — | — | — | none |
+| SoftImage | `.pic`, `.si` | ✅ | ✅ | — | — | — | none |
+| SoftwareAutomation | `.sag`, `.swa` | ✅ | ✅ | — | — | — | none |
+| SonyMavica | `.411` | ✅ | ✅ | — | — | — | none |
+| SonyPmp | `.pmp` | ✅ | ✅ | — | — | — | ffmpeg |
+| SpcPainter | `.spp`, `.spc2` | ✅ | ✅ | — | — | — | none |
+| SpeccyExtended | `.sxg` | ✅ | ✅ | — | — | — | none |
+| SpecScii | `.zxs` | ✅ | ✅ | — | — | — | recoil2png |
+| Spectrum512 | `.spu` | ✅ | ✅ | — | — | — | recoil2png |
+| Spectrum512Comp | `.spc` | ✅ | ✅ | — | — | — | none |
+| Spectrum512Ext | `.spx` | ✅ | ✅ | — | — | — | recoil2png |
+| Spectrum512Smoosh | `.sps` | ✅ | ✅ | — | — | — | recoil2png |
+| SpeederFalcon | `.spf` | ✅ | ✅ | — | — | — | none |
+| Spiff | `.spf`, `.spiff` | ✅ | ✅ | — | — | — | none |
+| SpookySpritesFalcon | `.tre` | ✅ | ✅ | — | — | — | recoil2png |
+| SpotImage | `.dat` | ✅ | ✅ | — | — | — | none |
+| Sprite64 | `.s64`, `.spr64` | ✅ | ✅ | — | — | — | none |
+| SpritePad | `.spd` | ✅ | ✅ | — | — | — | none |
+| SriSun | `.ssi` | ✅ | ✅ | — | — | — | none |
+| Stad | `.pac` | ✅ | ✅ | — | — | — | recoil2png |
+| StarPainter | `.gr`, `.cs` | ✅ | ✅ | — | — | — | recoil2png |
+| StarPainterFont | `.zs` | ✅ | ✅ | — | — | — | recoil2png |
+| StelaRaw | `.hsi` | ✅ | ✅ | — | — | — | none |
+| Stellar | `.stl` | ✅ | ✅ | — | — | — | recoil2png |
+| StTrueColor | `.stc` | ✅ | ✅ | — | — | — | none |
+| SunIcon | `.icon`, `.pr` | ✅ | ✅ | — | — | — | none |
+| SunRaster | `.ras`, `.sun`, `.rast`, `.rs`, `.sr` | ✅ | ✅ | — | — | — | ImageMagick, ffmpeg |
+| SuperHires | `.shi` | ✅ | ✅ | — | — | — | none |
+| SuperHiresEditor | `.she` | ✅ | ✅ | — | — | — | none |
+| SuperHiresEditor1 | `.sh1` | ✅ | ✅ | — | — | — | recoil2png |
+| SuperHiresEditor2 | `.sh2` | ✅ | ✅ | — | — | — | recoil2png |
+| SuperHiresFli | `.shf` | ✅ | ✅ | — | — | — | recoil2png |
+| SuperHiresStudio | `.shs` | ✅ | ✅ | — | — | — | recoil2png |
+| Svg | `.svg` | ✅ | ✅ | — | — | — | ImageMagick, ffmpeg |
+| Svgz | `.svgz` | ✅ | ✅ | — | — | — | ImageMagick, ffmpeg |
+| SyberiaTexture | `.syj` | ✅ | ✅ | — | — | — | none |
+| SymbianMbm | `.mbm` | ✅ | ✅ | — | — | — | none |
+| SymbOsGraphic | `.sgx` | ✅ | ✅ | — | — | — | recoil2png |
+| SyntheticArts | `.srt` | ✅ | ✅ | — | — | — | none |
+| Synu | `.synu`, `.syn` | ✅ | ✅ | — | — | — | none |
+| Taac | `.vff`, `.taac`, `.suniff` | ✅ | ✅ | — | — | — | none |
+| TaquartInterlace | `.tip` | ✅ | ✅ | — | — | — | recoil2png |
+| TechnicolorDream | `.lum` | ✅ | ✅ | — | — | — | recoil2png |
+| TeliFax | `.mh` | ✅ | ✅ | — | — | — | none |
+| TextureEditorMikey | `.txe` | ✅ | ✅ | — | — | — | recoil2png |
+| TextureMaker0 | `.tx0` | ✅ | ✅ | — | — | — | recoil2png |
+| Tg4 | `.tg4` | ✅ | ✅ | — | — | — | none |
+| Tga | `.tga`, `.vda`, `.icb`, `.vst`, `.bpx`, `.targa`, `.ivb` | ✅ | ✅ | — | — | ✅ | ImageMagick, ffmpeg |
+| Thomson | `.map` | ✅ | ✅ | — | — | — | none |
+| TiBitmap | `.8xi`, `.89i` | ✅ | ✅ | — | — | — | none |
+| Tiff | `.tif`, `.tiff`, `.ftf`, `.stw`, `.fx3`, `.xif`, `.ctf` | ✅ | ✅ | — | ✅ | ✅ | ImageMagick, ffmpeg |
+| TilePic | `.tjp` | ✅ | ✅ | — | — | — | ffmpeg |
+| TilezTexture | `.til` | ✅ | ✅ | — | — | — | ffmpeg |
+| Tim | `.tim` | ✅ | ✅ | — | — | — | recoil2png, ImageMagick |
+| Tim2 | `.tm2` | ✅ | ✅ | — | — | — | ImageMagick |
+| TimexGigascreen | `.hrg`, `.scr` | ✅ | ✅ | — | — | — | recoil2png |
+| Tiny | `.tny`, `.tn1`, `.tn2`, `.tn3`, `.tn4`, `.tn5`, `.tn6` | ✅ | ✅ | — | — | — | recoil2png |
+| TiPicture | `.73i`, `.82i`, `.83i`, `.85i`, `.86i` | ✅ | ✅ | — | — | — | none |
+| TmSat | `.imi` | ✅ | ✅ | — | — | — | none |
+| TobiasRichterSlideshow | `.pci` | ✅ | ✅ | — | — | — | recoil2png |
+| TriPaint | `.tpf` | ✅ | ✅ | — | — | — | none |
+| Trs80 | `.hr` | ✅ | ✅ | — | — | — | recoil2png |
+| TrsPix | `.pix` | ✅ | ✅ | — | — | — | none |
+| TrueColorImg | `.timg` | ✅ | ✅ | — | — | — | recoil2png, ffmpeg |
+| TruePaint | `.mci` | ✅ | ✅ | — | — | — | recoil2png |
+| TrueType | `.ttf` | ✅ | ✅ | — | — | — | none |
+| TrzmielCompressed | `.cpr` | ✅ | ✅ | — | — | — | recoil2png |
+| TurboRascal | `.flf` | ✅ | ✅ | — | — | — | recoil2png |
+| TurboView | `.tvw`, `.tbv` | ✅ | ✅ | — | — | — | none |
+| UfliEditor | `.ufl` | ✅ | ✅ | — | — | — | none |
+| Uhdr | `.uhdr` | ✅ | ✅ | — | — | — | none |
+| UifliEditor | `.uif` | ✅ | ✅ | — | — | — | recoil2png |
+| Uimg | `.bp1`, `.bp2`, `.bp4`, `.bp6`, `.bp8`, `.c01`, `.c02`, `.c04`, `.c06`, `.c08`, `.c16`, `.c24`, `.c32` | ✅ | ✅ | — | — | — | recoil2png |
+| UleadAlbumTemplate | `.pe4` | ✅ | ✅ | — | ✅ | — | ffmpeg |
+| UleadImageLibrary | `.pst` | ✅ | ✅ | — | ✅ | — | ffmpeg |
+| UtahRle | `.rle`, `.urt` | ✅ | ✅ | — | — | — | ImageMagick |
+| UyvyRaw | `.uyvy`, `.qtl` | ✅ | ✅ | — | — | — | none |
+| VbxeSlideShow | `.dap` | ✅ | ✅ | — | — | — | recoil2png |
+| VdcBitmap | `.vbm`, `.bm` | ✅ | ✅ | — | — | — | recoil2png |
+| Vector06c | `.v06`, `.scr` | ✅ | ✅ | — | — | — | none |
+| VentaFax | `.vfx` | ✅ | ✅ | — | — | — | none |
+| VerticalHiresInterlace | `.vhi` | ✅ | ✅ | — | — | — | recoil2png |
+| VertiZontalInterlacing | `.vzi` | ✅ | ✅ | — | — | — | recoil2png |
+| Vic20 | `.vic20`, `.prg` | ✅ | ✅ | — | — | — | none |
+| Vicar | `.vic`, `.vicar`, `.img` | ✅ | ✅ | — | — | — | ImageMagick |
+| Vidcom64 | `.vid` | ✅ | ✅ | — | — | — | recoil2png |
+| VidiChrome | `.vdc`, `.vdc2` | ✅ | ✅ | — | — | — | none |
+| VidigPaint | `.rap` | ✅ | ✅ | — | — | — | recoil2png |
+| Viff | `.viff`, `.xv`, `.vif` | ✅ | ✅ | — | — | — | ImageMagick |
+| Vips | `.v`, `.vips` | ✅ | ✅ | — | — | — | ImageMagick |
+| VirtualBoyTile | `.vbt`, `.vb`, `.vboy` | ✅ | ✅ | — | — | — | none |
+| Vitec | `.vit` | ✅ | ✅ | — | — | — | none |
+| Vivid | `.vivid`, `.dis` | ✅ | ✅ | — | — | — | none |
+| Vrml | `.wrl`, `.vrml` | ✅ | ✅ | — | — | — | none |
+| Vtf | `.vtf` | ✅ | ✅ | — | — | — | none |
+| Vue | `.vob` | ✅ | ✅ | — | — | — | none |
+| Wad2 | `.wad` | ✅ | ✅ | — | — | — | none |
+| Wad3 | `.wad` | ✅ | ✅ | — | — | — | none |
+| Wal | `.wal` | ✅ | ✅ | — | — | — | none |
+| Wbmp | `.wbmp`, `.wbm`, `.wap` | ✅ | ✅ | — | — | — | ImageMagick, ffmpeg |
+| WebP | `.webp`, `.wep` | ✅ | ✅ | — | ✅ | ✅ | ImageMagick, dwebp, ffmpeg |
+| WebShots | `.wb1`, `.wbc`, `.wbp`, `.wbz` | ✅ | ✅ | — | — | — | none |
+| WigmoreArtist | `.wig` | ✅ | ✅ | — | — | — | recoil2png |
+| WinFax | `.fxs`, `.fxo`, `.fxr`, `.fxd`, `.fxm` | ✅ | ✅ | — | — | — | none |
+| WizSolitaireDeck | `.dec` | ✅ | ✅ | — | — | — | none |
+| Wmf | `.wmf` | ✅ | ✅ | — | — | — | none |
+| WonderSwanTile | `.wst`, `.ws` | ✅ | ✅ | — | — | — | none |
+| Word | `.docx`, `.docm`, `.dotx`, `.dotm` | ✅ | ✅ | — | ✅ | — | none |
+| WorldportFax | `.wpf`, `.wfx` | ✅ | ✅ | — | — | — | none |
+| Wpg | `.wpg` | ✅ | ✅ | — | — | — | ImageMagick |
+| Wsq | `.wsq` | ✅ | ✅ | — | — | — | none |
+| Wzl | `.wzl` | ✅ | ✅ | — | — | — | none |
+| X11Puzzle | `.pzl` | ✅ | ✅ | — | — | — | none |
+| X3f | `.x3f` | ✅ | ✅ | — | — | — | none |
+| Xar | `.xar` | ✅ | ✅ | — | — | — | none |
+| XBin | `.xb`, `.xbin` | ✅ | ✅ | — | — | — | ffmpeg |
+| Xbm | `.xbm`, `.icon`, `.ico`, `.cbm`, `.x` | ✅ | ✅ | — | — | — | ImageMagick, ffmpeg |
+| XbmColor | `.xbm` | ✅ | ✅ | — | — | — | ffmpeg |
+| Xcf | `.xcf` | ✅ | ✅ | — | — | — | ImageMagick |
+| Xcursor | `.xcur`, `.cursor` | ✅ | ✅ | — | — | — | none |
+| XFliEditor | `.xfl` | ✅ | ✅ | — | — | — | none |
+| Ximage | `.xim` | ✅ | ✅ | — | — | — | none |
+| XionicsSmp | `.smp` | ✅ | ✅ | — | — | — | none |
+| Xld4 | `.q4` | ✅ | ✅ | — | — | — | recoil2png |
+| XlPaint | `.xlp` | ✅ | ✅ | — | — | — | recoil2png |
+| Xpm | `.xpm`, `.picon` | ✅ | ✅ | — | — | — | ImageMagick, ffmpeg |
+| XvThumbnail | `.xv`, `.p7` | ✅ | ✅ | — | — | — | none |
+| Xwd | `.xwd`, `.x11` | ✅ | ✅ | — | — | — | ImageMagick, ffmpeg |
+| Xyz | `.xyz` | ✅ | ✅ | — | — | — | none |
+| Ybm | `.ybm` | ✅ | ✅ | — | — | — | none |
+| YuvRaw | `.yuv` | ✅ | ✅ | — | — | — | none |
+| ZeissBivas | `.dta` | ✅ | ✅ | — | — | — | none |
+| ZeissLsm | `.lsm` | ✅ | ✅ | — | — | — | none |
+| Zinc | `.zinc` | ✅ | ✅ | — | — | — | none |
+| ZonerBrush | `.zbr` | ✅ | ✅ | — | — | — | none |
+| Zoom4 | `.zm4` | ✅ | ✅ | — | — | — | recoil2png |
+| Zoomatic | `.zom` | ✅ | ✅ | — | — | — | recoil2png |
+| ZsStaffKid98 | `.zim` | ✅ | ✅ | — | — | — | recoil2png |
+| Zx81 | `.zx81`, `.p81` | ✅ | ✅ | — | — | — | none |
+| ZxArtStudio | `.zas` | ✅ | ✅ | — | — | — | none |
+| ZxAttributes | `.atr` | ✅ | ✅ | — | — | — | recoil2png |
+| ZxAttributesGigascreen | `.hlr` | ✅ | ✅ | — | — | — | recoil2png |
+| ZxBigFont | `.chx` | ✅ | ✅ | — | — | — | none |
+| ZxBorderMulticolor | `.bmc4` | ✅ | ✅ | — | — | — | none |
+| ZxBorderScreen | `.bsc` | ✅ | ✅ | — | — | — | none |
+| ZxChrd | `.chr`, `.chrd` | ✅ | ✅ | — | — | — | none |
+| ZxFlash | `.zfl` | ✅ | ✅ | — | — | — | none |
+| ZxFont | `.ch8`, `.ch4`, `.ch6` | ✅ | ✅ | — | — | — | recoil2png |
+| ZxGigascreen | `.gsc`, `.img` | ✅ | ✅ | — | — | — | recoil2png |
+| ZxMlg | `.mlg` | ✅ | ✅ | — | — | — | none |
+| ZxMultiArtist | `.mg1`, `.mg2`, `.mg4`, `.mg8` | ✅ | ✅ | — | — | — | none |
+| ZxMulticolor | `.mlt`, `.mc` | ✅ | ✅ | — | — | — | recoil2png |
+| ZxNext | `.nxt` | ✅ | ✅ | — | — | — | none |
+| ZxNextImage | `.nxi` | ✅ | ✅ | — | — | — | recoil2png |
+| ZxPaintbrush | `.zxp` | ✅ | ✅ | — | — | — | none |
+| ZxPaintyOne | `.zp1` | ✅ | ✅ | — | — | — | recoil2png |
+| ZxRgb3 | `.3` | ✅ | ✅ | — | — | — | recoil2png |
+| ZxSnapshot | `.sna` | ✅ | ✅ | — | — | — | none |
+| ZxSpectrum | `.scr`, `.$s`, `.$c`, `.!s` | ✅ | ✅ | — | — | — | none |
+| ZxTimex | `.tmx`, `.scr` | ✅ | ✅ | — | — | — | recoil2png, ImageMagick |
+| ZxTrefiBorderScreen | `.bsp` | ✅ | ✅ | — | — | — | none |
+| ZxTricolor | `.3cl` | ✅ | ✅ | — | — | — | none |
+| ZxUlaPlus | `.ulp`, `.scr` | ✅ | ✅ | — | — | — | recoil2png, ImageMagick |
+| ZzRough | `.rgh` | ✅ | ✅ | — | — | — | recoil2png |
+
+**Oracle** — the tool outside this repository that has read what the writer produces. `none` means nothing but this package's own reader ever has, and a reader agreeing with the writer beside it proves only that the two share one reading of the format; `—` means there is no writer, so there is nothing for anything to have read. What a name in this column states exactly: handed a file this writer produced, under one of the format's own extensions and at one of the sizes the format declares, that tool decoded it back to a picture of the same size which is not a blank canvas. That is weaker than the pixel-for-pixel comparisons in `Tests/Conformance.Recoil.Tests` and in the codec evidence below, and it is the one thing that could be asked of every writer here rather than of a chosen few. It does not prove the pixels agree, and where two unrelated formats share an extension and a geometry it can be a tool reading the other one. The tools: [avifdec](https://github.com/AOMediaCodec/libavif) · [djxl](https://github.com/libjxl/libjxl) · [dwebp](https://developers.google.com/speed/webp/docs/dwebp) · [ffmpeg](https://ffmpeg.org/) · [heif-dec](https://github.com/strukturag/libheif) · [ImageMagick](https://imagemagick.org/) · [opj_decompress](https://www.openjpeg.org/) · [recoil2png](https://recoil.sourceforge.net/).
 <!-- IMAGE-FORMATS:END -->
 
 ### Optimizers
@@ -966,9 +970,11 @@ For these formats `✅` means more than "the project can read what it wrote". A 
 | MNG | ✅ | ✅ | Writer is MNG-VLC: `MHDR`/`TERM` wire values, VLC layer/frame/play-time accounting and a truthful simplicity profile are asserted byte for byte. Full MNG-LC/MNG object buffers, loops, JNG and delta-PNG are not written and not claimed. |
 | JPEG XR | ✅ | ✅ | T.832 core is a managed port of JXRLib (see `Formats/JpegXr/Reference/UPSTREAM.md`), oracle-tested upstream against `JxrEncApp`/`JxrDecApp`/WIC; the public path writes real `WMPHOTO` codestreams with standard WIC pixel-format GUIDs and decodes the independent JXRLib `red.jxr` fixture (frequency-order YUV444 plus a planar alpha plane). Gray8, RGB24 and RGBA32 are exposed; other WIC layouts may be refused at the container adapter even though the core handles them. |
 | JPEG 2000 | ✅ | ✅ | Both directions are settled against independent implementations. The reader decodes `opj_compress` codestreams sample for sample — measured over 90 lossless files covering 1–5 decomposition levels, 16/32/64 code-blocks, explicit precincts, tiles, all five progression orders, tile-part splitting, SOP/EPH, up to six quality layers, MCT on and off, vertically-causal contexts, segmentation symbols, a non-zero image origin, 8- and 16-bit samples. Irreversible 9/7 files cannot be bit-exact and land within 2 of 255 of OpenJPEG's own decode. The writer's output is accepted exactly by `opj_decompress`, ImageMagick and ffmpeg alike: 48 codestreams, 144 comparisons, zero differing samples. It writes one tile, one layer, reversible 5/3, LRCP; ROI, POC, packed packet headers and arithmetic bypass are refused rather than mis-decoded. |
-| HEIF / HEIC | ⚠️ | ✅ | Directly coded HEVC items decode through the shared managed H.265 decoder at 8, 10 and 12 bits, Main-profile intra — so what `libheif`/x265 and ImageMagick write by default now reads, measured against ffmpeg's HEVC decoder over 49 streams with zero differing samples. The writer builds the picture out of intra PCM coding units and is now verified by decoders other than our own: `dec265` returns all 15 test pictures byte-identical, `heif-dec` and ImageMagick decode all 15 at the right size. The colour description is read rather than assumed: the item's `colr` nclx property states the range and the matrix, the sequence's video usability information states them where the item carries no such property, and the container wins where the two disagree. Over 15 libheif- and ImageMagick-written files spanning quality, depth, matrix and range that took the mean error against libheif's own decode from 2.6–3.4% down to 0.3–1.7%, and flat colour comes back exact or within one level on every matrix and range; what is left is libheif replicating the half-size chroma samples where this reader interpolates them onto the siting H.265 states — replicate them here too and the same 15 files land within one level everywhere. Monochrome items decode too — libheif picks `chroma_format_idc` of zero for a greyscale or all-black picture, so it is not an exotic case — and land within one level of libheif over six greyscale files at 10 and 12 bits, lossy and lossless. The one disagreement there is libheif's: it writes monochrome luminance full-range whatever `--full_range_flag` said, so a file it tags studio swing is read here as it is tagged and comes out with more contrast than libheif gives it. It stays amber for what is still refused: 4:4:4, 4:2:2 and depths above 12. |
+| HEIF / HEIC | ⚠️ | ✅ | Directly coded HEVC items decode through the shared managed H.265 decoder at 8, 10 and 12 bits and in every chroma format the standard defines — monochrome, 4:2:0, 4:2:2 and 4:4:4 — so what `libheif`/x265 and ImageMagick write now reads whatever they were asked for, `heif-enc -p chroma=444` and `heif-enc -L` included; the last of those is 4:4:4 whatever chroma was requested, because lossless coding cannot afford a colour transform. The three subsampled formats are three decoding processes rather than three plane sizes: 4:2:2 cuts each chrominance transform block into two stacked squares with a coded-block flag, a residual and an intra prediction each, the lower one predicting from the reconstructed upper one, and bends every intra direction through Table 8-4 because a half-width grid points an angle somewhere else; 4:4:4 gives chrominance the luminance block sizes, a prediction mode per prediction block rather than per coding unit, the mode-dependent coefficient scan at 8x8 and the reference smoothing that is otherwise luminance's alone; both take the quantiser bound of clause 8.6.1 in place of Table 8-10, and each has its own deblocking and sample-adaptive-offset grid and its own chrominance motion vectors. **Measured on the coded planes rather than on RGB**, because an RGB comparison compares two chroma upsamplers and two colour matrices as much as two decoders: 158 intra-coded streams — 137 written by x265 4.3 and 21 lifted out of libheif 1.23.3 HEICs — decoded sample for sample by ffmpeg 9.0.1 and by `dec265` from libde265 1.1.2, spanning every chroma format at 8, 10 and 12 bits, coding tree blocks of 16, 32 and 64, transform hierarchies four deep, transform skip, sign-data hiding off, default and custom scaling lists, wavefront entropy coding on and off, per-block quantiser deltas, cropped extents, both in-loop filters on and off, and lossless. **156 of the 158 agree with both oracles on every sample of every plane.** The two that do not are the two oracles disagreeing with each other rather than with this decoder: on one 4:2:2 file five chrominance samples out of 153,600 differ from ffmpeg, where libde265 and x265's own reconstruction of that same stream both agree with this decode byte for byte; on one 4:4:4 file with custom scaling lists libde265 differs where ffmpeg agrees, and clause 7.4.5 settles it — a 32x32 chrominance matrix is derived from the 16x16 matrix of the same component, not from the luminance matrix beside it. Inter prediction is exercised in the same way but belongs to the video package rather than to a still: nine predicted-frame streams, three per chroma format, agree with both oracles exactly. The writer builds the picture out of intra PCM coding units and is verified by decoders other than our own: `dec265` returns all 15 test pictures byte-identical, `heif-dec` and ImageMagick decode all 15 at the right size. The colour description is read rather than assumed: the item's `colr` nclx property states the range and the matrix, the sequence's video usability information states them where the item carries no such property, and the container wins where the two disagree. Over 15 libheif- and ImageMagick-written files spanning quality, depth, matrix and range that took the mean error against libheif's own decode from 2.6–3.4% down to 0.3–1.7%, and flat colour comes back exact or within one level on every matrix and range; what is left is libheif replicating the half-size chroma samples where this reader interpolates them onto the siting H.265 states — replicate them here too and the same 15 files land within one level everywhere. That gap is a property of the upsampler and not of the decode, and the chroma format says so: over 21 further libheif files read end to end and compared with libheif's own decode of them, the seven 4:4:4 ones agree to within a single level everywhere — neither side has anything to upsample — the seven 4:2:2 ones to within one level on smooth colour and 30 on a fractal, where only the horizontal axis is interpolated, and the seven 4:2:0 ones to within one level on smooth colour and 92 on the same fractal, where both axes are. Monochrome items decode too — libheif picks `chroma_format_idc` of zero for a greyscale or all-black picture, so it is not an exotic case — and land within one level of libheif over six greyscale files at 10 and 12 bits, lossy and lossless. The one disagreement there is libheif's: it writes monochrome luminance full-range whatever `--full_range_flag` said, so a file it tags studio swing is read here as it is tagged and comes out with more contrast than libheif gives it. It stays amber for one refusal, and it is a refusal for want of an oracle rather than of syntax: **samples deeper than twelve bits**. Those belong to the range-extension profiles — Main 4:4:4 16 Intra and its high-throughput sibling — and nothing to hand will write one: x265 builds eight, ten and twelve bits and nothing beyond, and libheif encodes HEVC through x265. Writing a decoding process with nothing to check it against is the one thing this table does not accept as evidence, so the depth is refused by name instead. Everything else the range and screen-content extensions add — the nine coding-tool flags, cross-component prediction, per-unit chroma quantiser offset lists, scaled sample-adaptive offsets, palette mode, intra block copy — and separately coded colour planes stay refused by name as well; no encoder that writes HEIF emits any of them. |
 | AVIF | ✅ | ✅ | The reader is a managed AV1 key-frame decoder whose default CDF, scan, quantiser, quantiser-matrix and context tables are transcribed value for value from libaom `v3.15.0`, named file by file in [`THIRD_PARTY_NOTICES.md`](https://github.com/Hawkynt/PNGCrushCS/blob/main/Hawkynt.FileFormats.Images/THIRD_PARTY_NOTICES.md) — a re-derived probability table is simply a wrong one. Scope: 8, 10 and 12 bits, monochrome and 4:2:0, 4:2:2 and 4:4:4, every in-loop filter (deblocking, CDEF, Wiener and self-guided restoration), per-superblock delta-Q and multiple tiles. Measured against dav1d 1.5.4 sample for sample over 95 files written by `avifenc`/libaom 3.15.0, ImageMagick/libheif, ffmpeg/libaom and SVT-AV1: **zero differing samples on every plane of every file**, nothing excluded. Weighted towards 8-bit, though — 10-bit is five files and 12-bit is one, so those two paths are exercised rather than swept, and alpha sits outside that sweep (checked separately against `avifdec`, the alpha channel byte for byte). Note the decoder works at the file's own depth but hands out 8-bit RGB, so a 10- or 12-bit file is narrowed on the way out. The writer emits a lossless 4:4:4 key frame with the identity matrix, and `avifdec`, ffmpeg and ImageMagick each decode it byte-identically to the input across 20 pictures from 1x1 to 4200x200, the last of which is wide enough to force two tiles. Scope is still pictures: inter prediction, film grain, super-resolution, scalability, palette blocks, intra block copy and segmentation are refused by name rather than approximated, and the writer makes no rate decisions — it is lossless or nothing, and does not write alpha. Of those, palette is the one to expect in practice rather than an exotic corner: libaom picks it for flat graphics, and a two-colour checkerboard is refused at every depth and chroma layout. |
-| JPEG XL | ⚠️ | ✅ | The reader is complete for still pictures: modular and VarDCT, splines, patches, noise, multi-frame composition, 16-bit samples and embedded ICC profiles, all measured against libjxl — 104 corpus files and 27 fixtures, the 8-bit ones within one level of `djxl`'s dithered output and the 16-bit ones byte-identical. An animation comes back as every moment it is shown at rather than only the first, each moment byte for byte what libjxl decodes it to. The writer emits a real ISO/IEC 18181-1 codestream: modular, lossless, 8- and 16-bit, grey/grey+alpha/RGB/RGBA, in one group where the picture fits one and in as many as it takes otherwise, so there is no size it refuses. `djxl` decodes it sample for sample — 22 curated files and 500 randomised ones, plus 41 sizes from 1x1 to 8192x8192 chosen to straddle group boundaries in both directions at every channel count and depth, zero differing samples. It is amber on the read side for one gap: an animation whose frames are lossy is refused outright, because blending VarDCT frames happens in XYB before the colour transform and nothing here has been measured against libjxl doing that — which is what `cjxl` writes unless it is asked for lossless. |
+| BPG | ⚠️ | ✅ | A BPG picture is an HEVC intra frame in a small wrapper, and the wrapper is the easy half: the file carries no video or sequence parameter set at all, so a decoder rebuilds those from four bytes of BPG's own header plus the fixed choices the specification makes for it. The writer therefore had to code the picture to those choices rather than to any it would otherwise prefer — minimum coding block the same 32 by 32 as the tree block, because a decoder derives the coded picture size from the minimum and nothing else, which also swaps the `split_cu_flag` in front of `pcm_flag` for a `part_mode`. What it writes is 8-bit 4:4:4 in BPG's RGB colour space, which is the absence of a colour matrix: G, B and R in the three planes, coded entirely from intra PCM coding units and so lossless. The check is Fabrice Bellard's own `bpgdec` 0.9.8, reading a file nothing of ours touched afterwards: **39 pictures, zero differing samples on all 39** — 1x1 to 320x240, on and off the tree-block grid (1x64, 64x1, 31x31, 33x17, 129x3, 200x137), plasma and pure noise, all-black and all-white, from Rgb24, Rgba32, Bgra32 and Gray8 sources. It is amber on the read side because the general, transform-coded path still expects the parameter sets a real BPG file does not carry, so it reads what this package writes and not what `bpgenc` writes. The writer authors one profile and refuses the rest by name: deeper bit depths, 4:2:0 and 4:2:2, the YCbCr and YCgCo colour spaces, limited range, alpha, CMYK, animation, and the Exif/ICC/XMP/thumbnail extension tags. A single grey plane is refused for a reason that is not ours — `libbpg`'s own `hls_pcm_sample` writes a coding unit's chroma blocks unconditionally and faults on a frame that has none, so a monochrome PCM picture is one the reference decoder cannot read, and a picture with no colour in it is written as three equal planes instead. |
+
+| JPEG XL | ⚠️ | ✅ | The reader covers still pictures and animations alike: modular and VarDCT, splines, patches, noise, multi-frame composition, 16-bit samples and embedded ICC profiles, all measured against libjxl — 104 corpus files and 31 fixtures, the 8-bit ones within one level of `djxl`'s dithered output and the 16-bit ones byte-identical. An animation comes back as every moment it is shown at rather than only the first, and a lossy animation now among them: composing VarDCT frames does not happen in XYB, as this project long assumed, but after the colour transform — libjxl's own blending stage refuses a background still in XYB by name — so a lossy frame is carried to the colour the picture is stated in and composed there, where a modular frame's samples already are. Measured over 194 animations `cjxl` 0.12.0 wrote at its own defaults, colour and grey, with and without alpha, one group and several, frames covering the whole picture and frames covering only what moved: 168 read whole, and every one of their 612 moments is within 0.06 of an eight-bit level of libjxl's own float decode. The writer emits a real ISO/IEC 18181-1 codestream: modular, lossless, 8- and 16-bit, grey/grey+alpha/RGB/RGBA, in one group where the picture fits one and in as many as it takes otherwise, so there is no size it refuses. `djxl` decodes it sample for sample — 22 curated files and 500 randomised ones, plus 41 sizes from 1x1 to 8192x8192 chosen to straddle group boundaries in both directions at every channel count and depth, zero differing samples. It stays amber on the read side for the 26 that did not read, which are one thing and the same thing: a lossy frame's extra channels are read only out of its global stream, so a picture larger than one group that carries an alpha plane is refused rather than composed without it. |
 
 ### Measured against other decoders
 
@@ -991,6 +997,12 @@ What the arrangement turned up were two defects that had nothing to do with grou
 With both corrected, 41 sizes from 1x1 to 8,192x8,192 — one pixel either side of a group boundary in each direction, many groups one way and part of a group the other, at one, two, three and four channels and at eight and sixteen bits — decode through `djxl` with **zero differing samples**, and every one of them reads back through this package's own reader as well.
 
 On the read side, a file may state several frames and mean two different things by them: in a still picture they are layers, and only their composition is a picture; in an animation they are moments, and each frame with a duration is the whole picture as it stands then. The reader knew the difference well enough to stop at the first moment, which is the right still picture and was also the only thing a caller could reach. It now reads an animation to its end and hands back every moment beside the still picture, which is unchanged — measured against libjxl over five animations and twenty moments, colour and grey, with and without alpha. An animation whose later frames cannot be read comes back as its still picture with no moments at all rather than with a count that is short, because a caller stepping through a truncated animation has no way to tell that is what it is.
+
+What stayed refused after that was an animation whose frames are lossy, which is what `cjxl` writes unless it is asked for lossless — refused on the stated grounds that such frames are composed in XYB, before the colour transform, and that nothing here had been measured against libjxl doing it. That premise was wrong, and libjxl says so twice. Its pipeline is built as the XYB transform, then the step out of linear, then blending, in that order (`lib/jxl/dec_cache.cc`); and its blending stage refuses outright to take a kept-aside frame that is still in XYB as a background, in as many words (`lib/jxl/render_pipeline/stage_blending.cc`). Composition happens in the colour the picture is stated in — which is exactly the space a modular frame's samples were already being composed in. So a lossy frame is taken the whole way, through the inverse opsin transform and the transfer curve, and handed to the same compositor. The transfer curve is applied without clamping there, which makes no difference to a frame that is rounded straight afterwards and all the difference to one that is blended first: libjxl keeps the sign and carries values outside the representable range, and a value clamped before a blend is a value the blend cannot get back.
+
+That alone was not enough, and what stood in the way was one number in a table. The map from a block's shape to its entropy context runs through libjxl's `kStrategyOrder`, and this project had transcribed it twice — correctly where a shape's scan order is chosen, and with its second entry a zero instead of a one where a block's context is chosen. That entry is the shape libjxl calls `IDENTITY`. A block of it took the histogram of a plain 8x8, and from there the arithmetic decoder and the encoder disagreed to the end of the group: most such files were refused as the count of non-zero coefficients failed to come out even, and the ones where it happened to come out even anyway were returned as pictures that were simply wrong — one of them 8.9 levels out on average across four fifths of its samples, with nothing to say so. Neither shows in a file that has no block of that shape, which is why a corpus of gradients and plasmas never caught it. The two copies are now one, taken from `lib/jxl/coeff_order.h`, and a test pins the table against the value libjxl states rather than against the other copy.
+
+Together those move both halves. On the still side, 80 single-frame lossy pictures `cjxl` wrote from photographs, plasmas and gradients went from 61 refused and one silently wrong to none refused and every one within a hundredth of an eight-bit level of `djxl`'s float decode. On the animation side, 194 files, 612 moments: 168 read whole, none wrong, the worst sample anywhere 0.055 of a level, and 26 refused — all 26 the same thing, a lossy frame carrying an alpha plane on a picture larger than one group, whose extra channels are carried group by group rather than in the frame's global stream and are not followed there. Refusing is the honest answer to that one rather than composing without the alpha, because a frame blended by a plane of zeros is a frame that vanishes. Four of the animations are kept as fixtures with `djxl`'s decode of every moment beside them — one grey with frames that cover only what moved, one carrying an alpha plane, one wider than a group, and one in colour — chosen so that the colour transform, the crop, the seam and the extra channel are each somebody's business rather than nobody's.
 
 Asking the wider question the audit was for — whether any format is missing outright — comes down to comparing every extension ImageMagick can read against every extension this registry claims. Eighty names are on ImageMagick's side and not on this one, and the great majority are not formats: ImageMagick's own generated pictures (`gradient`, `label`, `plasma`, `xc`), names for formats already read here under another one (`.png24`, `.png32`, `.bmp2`, `.bmp3`, `.gif87`, `.pjpeg`, and `.dxt1`/`.dxt5`, which are DDS files and decode as such to within a pixel of ImageMagick), headerless dumps of raw samples, and documents and fonts. What is left after those are set aside is a short list, and it is now empty: Aseprite, which the next paragraph is about, Garmin's JNX, Brother's PES, AVCI and Canon's CR3.
 
@@ -1032,7 +1044,7 @@ The colour budget is where the format's limit bites, and it is smaller than the 
 
 Graph2FontScroll needs that judgement more than most, because nearly everything it writes goes into files it only names. A .vsc is a list; the picture is in the Graph2Font projects the list points at, so a tool accepting the .vsc alone would say nothing about them. RECOIL resolves the names itself, from the path, which is what makes it able to tell. Scrolls of one, two and four screens written here decode through `recoil2png` to the same pixels this package reads back from the same files. The comparison is controlled by spoiling a project two ways: one flipped colour byte, which RECOIL accepts and draws differently, and an impossible column count, which it refuses outright.
 
-A caution about the Read column: it is `SupportsRead` from the registry, which says a reader is registered for the format, not that the reader returns a picture. One entry currently takes the tick without earning it — `IconLibrary` refuses in `ToRawImage` for every file, honestly and by name, because the icons inside a library are not pulled out here, but the matrix cannot see that and shows it as read. `IffSham` was the other until its sliced-HAM decoder went in, and it now reads and writes for real. Two more did until recently: `Spectrum512Smoosh` threw on every file and `IffDctv` rendered its compressed body as grey noise, both while showing a tick, and both were found only because someone came to write them. Treat a tick here as "the format is recognised"; the paragraphs above say which readers have been measured against another implementation, and that is the claim worth trusting.
+A caution about the Read column: it is `SupportsRead` from the registry, which says a reader is registered for the format, not that the reader returns a picture. Two entries currently take the tick without earning it. `IconLibrary` refuses in `ToRawImage` for every file, honestly and by name, because the icons inside a library are not pulled out here. `Bpg` is the subtler case and the more instructive one: it reads, but only what this package itself writes — both of Fabrice Bellard's own sample files are refused, `lena512color.bpg` for carrying no sequence parameter set and `clock.bpg` for being animated — because the transform-coded path still expects parameter sets a real BPG file does not carry. A format can hold a Read tick and a Write tick and still round-trip only with itself. `IffSham` was the other until its sliced-HAM decoder went in, and it now reads and writes for real. Two more did until recently: `Spectrum512Smoosh` threw on every file and `IffDctv` rendered its compressed body as grey noise, both while showing a tick, and both were found only because someone came to write them. Treat a tick here as "the format is recognised"; the paragraphs above say which readers have been measured against another implementation, and that is the claim worth trusting.
 
 ### HP-GL authoring
 
@@ -1042,7 +1054,7 @@ This list used to be far longer, and the entries that left it did so by argument
 
 ### Registered but read-only
 
-These 10 entries read but have no writer; each is a decision, not an oversight. **Not bounded** (an encoder or a model this package does not have): PeResource, Fpx (executable, OLE and compound-document containers), Bpg. A BPG picture is an HEVC intra frame in a small wrapper, so writing one needs an HEVC encoder, and this package has an HEVC decoder only. There used to be a `Bpg` writer and it did not do that: it stored the caller's RGB bytes under a `YCbCr444` label with no transform of any kind, and its round-trip test passed because the decode path caught its own failure and handed the stored bytes straight back. Two of ours agreeing with each other proves nothing, so it is gone and the format reads only. **Holders of other files rather than pictures of their own**: IconLibrary, Ipg, Sdg, Cdr, Cmx — an icon library, a tileset and a gallery carry whole files of other formats, and CorelDRAW's streams are vector scenes whose raster part is only an embedded preview, so writing any of them means deciding what belongs in a collection or composing a drawing, neither of which is serialising a picture. **Deliberately not written** because a file built from arbitrary pixels would not be what the name promises: EmbeddedDib, CartesMichelin.
+These 9 entries read but have no writer; each is a decision, not an oversight. **Not bounded** (an encoder or a model this package does not have): PeResource, Fpx (executable, OLE and compound-document containers). **Holders of other files rather than pictures of their own**: IconLibrary, Ipg, Sdg, Cdr, Cmx — an icon library, a tileset and a gallery carry whole files of other formats, and CorelDRAW's streams are vector scenes whose raster part is only an embedded preview, so writing any of them means deciding what belongs in a collection or composing a drawing, neither of which is serialising a picture. **Deliberately not written** because a file built from arbitrary pixels would not be what the name promises: EmbeddedDib, CartesMichelin.
 
 ## 🚀 Quick start
 
@@ -1432,7 +1444,7 @@ The long tail also includes TGA/Targa, PCX, SGI/Iris, Sun Raster, X PixMap (XPM)
 
 <!-- API:BEGIN generated by Hawkynt/RepositoryTemplate/package-readme — edit the XML docs in source, not here -->
 
-Every public and protected member of all 3362 types, generated from the built assembly and its XML documentation, is in [REFERENCE.md](https://github.com/Hawkynt/PNGCrushCS/blob/main/Hawkynt.FileFormats.Images/REFERENCE.md).
+Every public and protected member of all 3365 types, generated from the built assembly and its XML documentation, is in [REFERENCE.md](https://github.com/Hawkynt/PNGCrushCS/blob/main/Hawkynt.FileFormats.Images/REFERENCE.md).
 
 <!-- API:END -->
 
@@ -1451,7 +1463,7 @@ Every public and protected member of all 3362 types, generated from the built as
 ## ⚠️ Limitations
 
 - **Lossy advanced features** — VP8 lossy is keyframe-only; multi-pass rate control and token-partition threading are not implemented yet. Alpha IS preserved (the encoder writes an ALPH chunk on RGBA input; uncompressed method 0 — VP8L-encoded alpha is a future optimization).
-- **Codec subsets** — HEIF/HEIC now resolves and decodes directly coded HEVC image items through the shared managed H.265 decoder; that path currently targets Main-profile intra-picture 8-bit 4:2:0 content and rejects unsupported HEVC profiles/features instead of fabricating pixels. AVIF container parsing exists, but real AV1 pixel decoding remains disabled until the AV1 entropy syntax is conforming. BPG remains an I-frame-oriented managed subset. **JPEG 2000** writing uses a deliberately narrow 8-bit Gray/RGB conforming baseline profile; unsupported optional coding modes are outside that authoring profile rather than encoded with private syntax. **JPEG XL**: container + SizeHeader + ImageMetadata + FrameHeader (ISO/IEC 18181-1 §3.6.2 / §3.6.3 / §3.6.5) are spec-conformant — the all_default fast path that most libjxl-encoded files use is fully supported, and the non-default conditional plumbing (orientation, bit_depth, num_extra_channels, extra_channel_info, color_encoding, tone_mapping, frame_type, encoding flag) is in place. The modular sub-codec decodes 8-bit `cjxl` output exactly, at every effort setting, in colour and grayscale, in one group or several; VarDCT decodes to within a hundredth of an eight-bit level of libjxl and is returned to callers. Three of the four things that stood in its way are done. The block strategies are read from the metadata the file states rather than assumed to be 8x8 everywhere, with the scan that steps over the blocks a large transform covers; the quantisation field is carried into the entropy context; and each of a VarDCT frame's sub-images is read under its own stream number, which is property one and which every one of them was reading as zero, so a tree that told the DC apart from the metadata sent both down the same branch and got neither. A single-group VarDCT frame now follows its bitstream from end to end instead of parting company at the first non-zero coefficient.
+- **Codec subsets** — HEIF/HEIC resolves and decodes directly coded HEVC image items through the shared managed H.265 decoder; that path covers intra pictures at 8, 10 and 12 bits in monochrome, 4:2:0, 4:2:2 and 4:4:4, and rejects deeper samples and the range- and screen-content-extension coding tools by name instead of fabricating pixels. AVIF decodes through a managed AV1 key-frame decoder measured against dav1d. BPG writes 8-bit 4:4:4 intra PCM pictures in its RGB colour space and refuses every other combination by name; reading it is still an I-frame-oriented managed subset, and the transform-coded path does not yet rebuild the parameter sets a BPG file omits. **JPEG 2000** writing uses a deliberately narrow 8-bit Gray/RGB conforming baseline profile; unsupported optional coding modes are outside that authoring profile rather than encoded with private syntax. **JPEG XL**: container + SizeHeader + ImageMetadata + FrameHeader (ISO/IEC 18181-1 §3.6.2 / §3.6.3 / §3.6.5) are spec-conformant — the all_default fast path that most libjxl-encoded files use is fully supported, and the non-default conditional plumbing (orientation, bit_depth, num_extra_channels, extra_channel_info, color_encoding, tone_mapping, frame_type, encoding flag) is in place. The modular sub-codec decodes 8-bit `cjxl` output exactly, at every effort setting, in colour and grayscale, in one group or several; VarDCT decodes to within a hundredth of an eight-bit level of libjxl and is returned to callers. Three of the four things that stood in its way are done. The block strategies are read from the metadata the file states rather than assumed to be 8x8 everywhere, with the scan that steps over the blocks a large transform covers; the quantisation field is carried into the entropy context; and each of a VarDCT frame's sub-images is read under its own stream number, which is property one and which every one of them was reading as zero, so a tree that told the DC apart from the metadata sent both down the same branch and got neither. A single-group VarDCT frame now follows its bitstream from end to end instead of parting company at the first non-zero coefficient.
 
 Following it is not decoding it. What comes out is close — a few parts in a thousand on small pictures, a few percent on a gradient — and close is not what this package hands back, so a VarDCT frame is still refused. What remains is the arrangement rather than the reading of the coefficients, and it is now a short list. The two scan conventions are settled: the order is computed from the transform's shape and stored transposed, which reproduces the table this decoder has always used for a plain 8x8 entry for entry — sixty-four of sixty-four — so one rule now covers every shape. The next pair went in together, because neither works alone: a transform drawn once from the block it starts at has to take the lowest of its coefficients from the DC values of every block it covers, and drawing it once without that is worse than drawing it repeatedly and letting the last write stand — measured, a gradient went from three percent wrong to forty-five. Rather than restate the specification's forward transform and its scaling tables, the map from those DC values to those coefficients is measured from the inverse transform already here: feed it each lowest coefficient alone, see what average each covered block ends up with, and invert the matrix that falls out. The two cannot disagree, because one is derived from the other. A sixteen-by-sixteen picture came five times closer for it.
 

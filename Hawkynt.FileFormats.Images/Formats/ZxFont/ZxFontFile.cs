@@ -11,6 +11,7 @@ namespace FileFormat.ZxFont;
 /// wide the glyphs are meant to be drawn (4, 6 or 8 pixels) but the storage is identical, so they
 /// share one implementation.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct ZxFontFile
   : IImageFormatReader<ZxFontFile>, IImageToRawImage<ZxFontFile>,
     IImageFromRawImage<ZxFontFile>, IImageFormatWriter<ZxFontFile> {

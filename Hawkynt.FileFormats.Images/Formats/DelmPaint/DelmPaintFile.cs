@@ -13,6 +13,7 @@ namespace FileFormat.DelmPaint;
 /// The larger form assembles 640x480 out of four 320x240 quadrants that share one palette, which is
 /// the same reason — the Falcon could hold a quadrant in the memory an ST screen occupied.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct DelmPaintFile
   : IImageFormatReader<DelmPaintFile>, IImageToRawImage<DelmPaintFile>,
     IImageFromRawImage<DelmPaintFile>, IImageFormatWriter<DelmPaintFile> {

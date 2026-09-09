@@ -5,6 +5,7 @@ using FileFormat.Core;
 namespace FileFormat.AppleShr;
 
 /// <summary>In-memory representation of an Apple IIgs Super Hi-Res image.</summary>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct AppleShrFile : IImageFormatReader<AppleShrFile>, IImageToRawImage<AppleShrFile>, IImageFromRawImage<AppleShrFile>, IImageFormatWriter<AppleShrFile> {
 
   static string IImageFormatMetadata<AppleShrFile>.PrimaryExtension => ".shr";

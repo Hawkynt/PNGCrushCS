@@ -9,6 +9,7 @@ namespace FileFormat.IffDctv;
 /// what the file actually stores — the ILBM around it is a carrier and its colour map is a set of
 /// DAC levels rather than picture colours. See <see cref="IffDctvCodec"/> for the encoding.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct IffDctvFile : IImageFormatReader<IffDctvFile>, IImageToRawImage<IffDctvFile>, IImageFromRawImage<IffDctvFile>, IImageFormatWriter<IffDctvFile> {
 
   /// <summary>Minimum valid file size (FORM header plus a BMHD chunk).</summary>

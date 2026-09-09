@@ -8,6 +8,7 @@ using Hawkynt.FileFormats.Video;
 namespace FileFormat.Matroska;
 
 /// <summary>Writes a finite Matroska document with explicit-size EBML elements and one block per packet.</summary>
+[VerifiedBy(ConformanceOracle.FFmpeg)]
 public sealed class MatroskaWriter : IVideoContainerWriter<MatroskaWriter> {
 
   private const long _TIMESTAMP_SCALE = 1_000_000; // ns, one millisecond

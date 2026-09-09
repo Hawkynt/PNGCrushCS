@@ -10,6 +10,7 @@ namespace FileFormat.VidigPaint;
 /// stored nibble covers four screen pixels and each stored row four screen rows, so the picture is
 /// displayed at 320x192.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct VidigPaintFile
   : IImageFormatReader<VidigPaintFile>, IImageToRawImage<VidigPaintFile>,
     IImageFromRawImage<VidigPaintFile>, IImageFormatWriter<VidigPaintFile> {

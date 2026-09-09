@@ -4,6 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.CrackArt;
 
 /// <summary>In-memory representation of a CrackArt packed image.</summary>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct CrackArtFile : IImageFormatReader<CrackArtFile>, IImageToRawImage<CrackArtFile>, IImageFromRawImage<CrackArtFile>, IImageFormatWriter<CrackArtFile> {
 
   static string IImageFormatMetadata<CrackArtFile>.PrimaryExtension => ".ca1";

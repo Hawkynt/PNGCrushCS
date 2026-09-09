@@ -10,6 +10,7 @@ namespace FileFormat.MapletownMl1;
 /// separate kind of stroke — a chain — that walks down the picture ahead of the scan to lay an
 /// outline the runs then stop at. Nothing about it is a bitmap.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct MapletownMl1File
   : IImageFormatReader<MapletownMl1File>, IImageToRawImage<MapletownMl1File>,
     IImageFromRawImage<MapletownMl1File>, IImageFormatWriter<MapletownMl1File> {

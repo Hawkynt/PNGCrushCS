@@ -14,6 +14,7 @@ namespace FileFormat.SinclairBasic;
 /// LET, FOR, POKE and NEXT. Anything outside that shape is rejected rather than guessed at, which
 /// is the right trade — a program that does something else is a program, not a picture.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct SinclairBasicFile
   : IImageFormatReader<SinclairBasicFile>, IImageToRawImage<SinclairBasicFile>,
     IImageFromRawImage<SinclairBasicFile>, IImageFormatWriter<SinclairBasicFile> {

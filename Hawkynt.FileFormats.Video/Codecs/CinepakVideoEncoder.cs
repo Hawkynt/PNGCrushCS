@@ -52,6 +52,7 @@ namespace FileFormat.Codecs;
 /// before is what a skipped block shows; and a picture so large that one strip of it would not fit the
 /// two bytes a strip's length is read from.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.FFmpeg)]
 public sealed class CinepakVideoEncoder : IVideoCodecEncoder<CinepakVideoEncoder> {
 
   /// <summary>The four-character code this writes, which is the spelling ffmpeg's muxers use.</summary>

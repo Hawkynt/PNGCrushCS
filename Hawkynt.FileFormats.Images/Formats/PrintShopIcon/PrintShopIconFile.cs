@@ -12,6 +12,7 @@ namespace FileFormat.PrintShopIcon;
 /// A set bit is ink. The two colours are the Atari's, not pure black and white: the paper is GTIA
 /// colour 14, which is a light grey, because that is what the program drew its preview on.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct PrintShopIconFile
   : IImageFormatReader<PrintShopIconFile>, IImageToRawImage<PrintShopIconFile>,
     IImageFromRawImage<PrintShopIconFile>, IImageFormatWriter<PrintShopIconFile> {

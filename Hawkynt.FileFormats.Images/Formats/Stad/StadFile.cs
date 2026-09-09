@@ -5,6 +5,7 @@ namespace FileFormat.Stad;
 
 /// <summary>In-memory representation of a STAD compressed Atari ST high-resolution screen image.</summary>
 [FormatMagicBytes([0x70, 0x4D, 0x38])]
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct StadFile : IImageFormatReader<StadFile>, IImageToRawImage<StadFile>, IImageFromRawImage<StadFile>, IImageFormatWriter<StadFile> {
 
   /// <summary>Decompressed screen data size in bytes (640x400 monochrome = 32000 bytes).</summary>

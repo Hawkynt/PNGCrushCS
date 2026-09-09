@@ -89,6 +89,27 @@ internal static class JxlXybColorTransform {
       : 1.055f * MathF.Pow(v, 1.0f / 2.4f) - 0.055f;
   }
 
+  /// <summary>
+  /// The same transfer curve, but carried through values outside the
+  /// representable range instead of clamping them.
+  /// </summary>
+  /// <remarks>
+  /// libjxl's own <c>FromLinear</c> stage takes the magnitude, runs it through
+  /// the curve and puts the sign back
+  /// (<c>lib/jxl/cms/transfer_functions-inl.h</c>, <c>TF_SRGB</c>); nothing is
+  /// clamped until the samples are written out. That makes no difference to a
+  /// picture that is rounded straight afterwards, and all the difference to one
+  /// that is blended first — a value clamped before the blend is a value the
+  /// blend cannot get back.
+  /// </remarks>
+  public static float LinearSrgbToGammaUnclamped(float v) {
+    var magnitude = MathF.Abs(v);
+    var encoded = magnitude <= 0.0031308f
+      ? 12.92f * magnitude
+      : 1.055f * MathF.Pow(magnitude, 1.0f / 2.4f) - 0.055f;
+    return v < 0.0f ? -encoded : encoded;
+  }
+
   /// <summary>Convert linear sRGB float to gamma-sRGB byte (0..255).</summary>
   public static byte LinearSrgbToGammaByte(float v) {
     if (v <= 0.0f)

@@ -15,6 +15,7 @@ namespace FileFormat.ArtMaster88;
 /// costs two bytes to repeat twice and three to repeat any number of times, and a stream with no
 /// repeats in it is the same size as the data.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct ArtMaster88File
   : IImageFormatReader<ArtMaster88File>, IImageToRawImage<ArtMaster88File>,
     IImageFromRawImage<ArtMaster88File>, IImageFormatWriter<ArtMaster88File> {

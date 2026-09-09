@@ -4,6 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.AtariCAD;
 
 /// <summary>In-memory representation of an Atari CAD Screen (.acd) file.</summary>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct AtariCADFile : IImageFormatReader<AtariCADFile>, IImageToRawImage<AtariCADFile>, IImageFromRawImage<AtariCADFile>, IImageFormatWriter<AtariCADFile> {
 
   /// <summary>Exact file size: 40 bytes/row x 192 rows.</summary>

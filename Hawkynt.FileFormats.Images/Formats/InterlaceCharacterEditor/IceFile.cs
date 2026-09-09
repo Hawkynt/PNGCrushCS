@@ -21,6 +21,7 @@ namespace FileFormat.InterlaceCharacterEditor;
 /// being fitted to a shared character set.
 /// </para>
 /// </remarks>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct IceFile
   : IImageFormatReader<IceFile>, IImageToRawImage<IceFile>,
     IImageFromRawImage<IceFile>, IImageFormatWriter<IceFile> {

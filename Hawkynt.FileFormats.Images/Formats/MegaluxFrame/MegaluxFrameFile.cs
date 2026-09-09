@@ -23,6 +23,7 @@ namespace FileFormat.MegaluxFrame;
 /// check a reading of them against, and the widths their layouts imply differ, so a guess would draw
 /// a picture of the wrong shape rather than fail.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.FFmpeg)]
 public readonly record struct MegaluxFrameFile
   : IImageFormatReader<MegaluxFrameFile>, IImageToRawImage<MegaluxFrameFile>, IImageFromRawImage<MegaluxFrameFile>, IImageFormatWriter<MegaluxFrameFile> {
 

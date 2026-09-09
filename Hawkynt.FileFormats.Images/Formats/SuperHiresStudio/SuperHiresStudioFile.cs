@@ -13,6 +13,7 @@ namespace FileFormat.SuperHiresStudio;
 /// Each sprite band gets one colour per layer, so the window shows two extra colours across each of
 /// its four sprite-widths rather than per cell.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct SuperHiresStudioFile
   : IImageFormatReader<SuperHiresStudioFile>, IImageToRawImage<SuperHiresStudioFile>,
     IImageFromRawImage<SuperHiresStudioFile>, IImageFormatWriter<SuperHiresStudioFile> {

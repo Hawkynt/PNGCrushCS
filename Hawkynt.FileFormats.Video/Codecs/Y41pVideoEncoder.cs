@@ -34,6 +34,7 @@ namespace FileFormat.Codecs;
 /// refuses the same width, and so does ffmpeg's encoder, so there is no stream to say what a partial
 /// group would mean — and a frame whose geometry differs from the stream's.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.FFmpeg)]
 public sealed class Y41pVideoEncoder : IVideoCodecEncoder<Y41pVideoEncoder> {
 
   private static readonly CodecTag _Tag = CodecTag.FromCharacters("Y41P");

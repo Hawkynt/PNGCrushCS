@@ -10,6 +10,7 @@ namespace FileFormat.MagicPainter;
 /// bitmap section is one byte shorter than a full screen; readers treat the missing trailing byte
 /// as zero. The 160x96 logical pixels are displayed at 320x192.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct MagicPainterFile : IImageFormatReader<MagicPainterFile>, IImageToRawImage<MagicPainterFile>, IImageFromRawImage<MagicPainterFile>, IImageFormatWriter<MagicPainterFile> {
 
   /// <summary>Logical bitmap width.</summary>

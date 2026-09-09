@@ -15,6 +15,7 @@ namespace FileFormat.PhotoChromePcs;
 /// difference from the first — separately for the bitmap and for the palettes, either of which may
 /// instead be stored outright.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct PhotoChromePcsFile
   : IImageFormatReader<PhotoChromePcsFile>, IImageToRawImage<PhotoChromePcsFile>,
     IImageFromRawImage<PhotoChromePcsFile>, IImageFormatWriter<PhotoChromePcsFile> {

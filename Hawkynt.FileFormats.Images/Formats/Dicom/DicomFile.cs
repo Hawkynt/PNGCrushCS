@@ -5,6 +5,7 @@ namespace FileFormat.Dicom;
 
 /// <summary>In-memory representation of a DICOM image (basic subset).</summary>
 [FormatMagicBytes([0x44, 0x49, 0x43, 0x4D], offset: 128)]
+[VerifiedBy(ConformanceOracle.ImageMagick)]
 public readonly record struct DicomFile : IImageFormatReader<DicomFile>, IImageToRawImage<DicomFile>, IImageFromRawImage<DicomFile>, IImageFormatWriter<DicomFile> {
 
   static string IImageFormatMetadata<DicomFile>.PrimaryExtension => ".dcm";

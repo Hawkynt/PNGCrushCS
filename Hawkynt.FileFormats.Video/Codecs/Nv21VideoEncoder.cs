@@ -35,6 +35,7 @@ namespace FileFormat.Codecs;
 /// decoder refuses the same size and for the same reason — and a frame whose geometry differs from
 /// the stream's.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.FFmpeg)]
 public sealed class Nv21VideoEncoder : IVideoCodecEncoder<Nv21VideoEncoder> {
 
   private static readonly CodecTag _Tag = CodecTag.FromCharacters("NV21");

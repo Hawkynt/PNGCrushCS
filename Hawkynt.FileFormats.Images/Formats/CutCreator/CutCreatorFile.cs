@@ -13,6 +13,7 @@ namespace FileFormat.CutCreator;
 /// refused these for having no usable dimensions. An extension names several formats often enough
 /// here that the registry tries every one that claims it, so both can have it.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct CutCreatorFile
   : IImageFormatReader<CutCreatorFile>, IImageToRawImage<CutCreatorFile>,
     IImageFromRawImage<CutCreatorFile>, IImageFormatWriter<CutCreatorFile> {

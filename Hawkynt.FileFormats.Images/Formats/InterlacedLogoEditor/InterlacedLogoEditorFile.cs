@@ -12,6 +12,7 @@ namespace FileFormat.InterlacedLogoEditor;
 /// The four colours sit in the last bytes of the file. The last of them is masked to three bits
 /// rather than four — it is the border register, which on the VIC-II has only eight values.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct InterlacedLogoEditorFile
   : IImageFormatReader<InterlacedLogoEditorFile>, IImageToRawImage<InterlacedLogoEditorFile>,
     IImageFromRawImage<InterlacedLogoEditorFile>, IImageFormatWriter<InterlacedLogoEditorFile> {

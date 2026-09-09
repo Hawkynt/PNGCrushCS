@@ -13,6 +13,7 @@ namespace FileFormat.AtariPi9;
 /// The Graphics 9 form has trailing bytes the picture does not use, which is why three different
 /// lengths mean the same 7680-byte screen.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct AtariPi9File
   : IImageFormatReader<AtariPi9File>, IImageToRawImage<AtariPi9File>,
     IImageFromRawImage<AtariPi9File>, IImageFormatWriter<AtariPi9File> {

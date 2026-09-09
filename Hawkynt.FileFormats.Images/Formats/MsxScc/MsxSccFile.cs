@@ -15,6 +15,7 @@ namespace FileFormat.MsxScc;
 /// sprite tables after the screen, and those are drawn on top. A shorter file may instead be
 /// packed, which a different leading byte announces.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct MsxSccFile
   : IImageFormatReader<MsxSccFile>, IImageToRawImage<MsxSccFile>,
     IImageFromRawImage<MsxSccFile>, IImageFormatWriter<MsxSccFile> {

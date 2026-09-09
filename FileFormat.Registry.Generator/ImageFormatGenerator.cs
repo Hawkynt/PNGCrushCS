@@ -24,6 +24,7 @@ public sealed class ImageFormatGenerator : IIncrementalGenerator {
   private const string _FORMAT_MAGIC_BYTES = "FileFormat.Core.FormatMagicBytesAttribute";
   private const string _FORMAT_DETECTION_PRIORITY = "FileFormat.Core.FormatDetectionPriorityAttribute";
   private const string _FORMAT_MIME_TYPE = "FileFormat.Core.FormatMimeTypeAttribute";
+  private const string _VERIFIED_BY = "FileFormat.Core.VerifiedByAttribute";
 
   // MSBuild property `<FileFormatRegistryNamespace>` overrides the default emit namespace.
   // Defaults to "Optimizer.Image" for back-compat with the original consumer.
@@ -80,6 +81,7 @@ public sealed class ImageFormatGenerator : IIncrementalGenerator {
     var magicBytesAttr = compilation.GetTypeByMetadataName(_FORMAT_MAGIC_BYTES);
     var detectionPriorityAttr = compilation.GetTypeByMetadataName(_FORMAT_DETECTION_PRIORITY);
     var mimeTypeAttr = compilation.GetTypeByMetadataName(_FORMAT_MIME_TYPE);
+    var verifiedByAttr = compilation.GetTypeByMetadataName(_VERIFIED_BY);
 
     if (imageFormatReader == null)
       return ImmutableArray<FormatInfo>.Empty;
@@ -232,7 +234,8 @@ public sealed class ImageFormatGenerator : IIncrementalGenerator {
         hasChunkLayout,
         hasChunkRewriter,
         hasChunkPlanRewriter,
-        typedWritePixelFormats.Distinct(StringComparer.Ordinal).ToArray()
+        typedWritePixelFormats.Distinct(StringComparer.Ordinal).ToArray(),
+        OracleAttributeReader.Read(type, verifiedByAttr)
       ));
     }
 
@@ -375,6 +378,8 @@ public sealed class ImageFormatGenerator : IIncrementalGenerator {
       if (hasWriter) {
         sb.Append(", ");
         _EmitTypedWriteCapabilities(sb, format);
+        sb.Append(", ");
+        OracleAttributeReader.Emit(sb, format.VerifyingOracles);
       }
       sb.AppendLine(");");
     }
@@ -471,6 +476,9 @@ public sealed class ImageFormatGenerator : IIncrementalGenerator {
     public bool HasChunkPlanRewriter { get; }
     public string[] TypedWritePixelFormats { get; }
 
+    /// <summary>The <c>ConformanceOracle</c> members this format's <c>[VerifiedBy]</c> names.</summary>
+    public string[] VerifyingOracles { get; }
+
     public FormatInfo(
       string formatId, string? fullTypeName,
       bool hasFormatReader, bool hasToRawImage,
@@ -482,7 +490,8 @@ public sealed class ImageFormatGenerator : IIncrementalGenerator {
       bool hasChunkLayout = false,
       bool hasChunkRewriter = false,
       bool hasChunkPlanRewriter = false,
-      string[]? typedWritePixelFormats = null
+      string[]? typedWritePixelFormats = null,
+      string[]? verifyingOracles = null
     ) {
       FormatId = formatId;
       FullTypeName = fullTypeName;
@@ -499,6 +508,7 @@ public sealed class ImageFormatGenerator : IIncrementalGenerator {
       HasChunkRewriter = hasChunkRewriter;
       HasChunkPlanRewriter = hasChunkPlanRewriter;
       TypedWritePixelFormats = typedWritePixelFormats ?? Array.Empty<string>();
+      VerifyingOracles = verifyingOracles ?? Array.Empty<string>();
     }
   }
 }

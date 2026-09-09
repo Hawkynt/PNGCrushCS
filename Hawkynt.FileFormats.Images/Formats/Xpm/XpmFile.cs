@@ -11,6 +11,7 @@ namespace FileFormat.Xpm;
 /// </remarks>
 [FormatMagicBytes([0x2F, 0x2A, 0x20, 0x58, 0x50, 0x4D, 0x20, 0x2A, 0x2F])]
 [FormatMimeType("image/x-xpixmap", "image/x-xpm")]
+[VerifiedBy(ConformanceOracle.ImageMagick, ConformanceOracle.FFmpeg)]
 public readonly record struct XpmFile : IImageFormatReader<XpmFile>, IImageToRawImage<XpmFile>, IImageFromRawImage<XpmFile>, IImageFormatWriter<XpmFile> {
 
   static string IImageFormatMetadata<XpmFile>.PrimaryExtension => ".xpm";

@@ -21,9 +21,14 @@ internal sealed class H265FrameDecoder {
   private readonly int _blocksAcross;
   private readonly int _blocksDown;
 
+  private readonly int _chromaArrayType;
+  private readonly int _chromaShiftX;
+  private readonly int _chromaShiftY;
+
   private readonly short[] _sliceIndex;
   private readonly byte[] _predictionMode;
   private readonly byte[] _intraPredModeY;
+  private readonly byte[] _intraPredModeC;
   private readonly byte[] _codingTreeDepth;
   private readonly bool[] _transquantBypass;
   private readonly bool[] _pulseCodeModulated;
@@ -81,8 +86,12 @@ internal sealed class H265FrameDecoder {
   internal H265FrameDecoder(H265SequenceParameterSet sps, H265PictureParameterSet pps) {
     this._sps = sps;
     this._pps = pps;
-    this._picture = new(sps.Width, sps.Height, _LOG2_MIN_BLOCK, sps.ChromaArrayType == 0);
+    this._picture = new(sps.Width, sps.Height, _LOG2_MIN_BLOCK, sps.ChromaArrayType);
     this._tiles = new(sps, pps);
+
+    this._chromaArrayType = sps.ChromaArrayType;
+    this._chromaShiftX = sps.ChromaShiftX;
+    this._chromaShiftY = sps.ChromaShiftY;
 
     this._log2CtbSize = sps.CtbLog2SizeY;
     this._ctbSize = sps.CtbSizeY;
@@ -97,6 +106,7 @@ internal sealed class H265FrameDecoder {
 
     this._predictionMode = new byte[blocks];
     this._intraPredModeY = new byte[blocks];
+    this._intraPredModeC = new byte[blocks];
     this._codingTreeDepth = new byte[blocks];
     this._transquantBypass = new bool[blocks];
     this._pulseCodeModulated = new bool[blocks];
@@ -505,7 +515,7 @@ internal sealed class H265FrameDecoder {
       rootHasResidual = this._cabac.DecodeBin(H265CabacContexts.RQT_ROOT_CBF) != 0;
 
     if (rootHasResidual)
-      this._DecodeTransformTree(x0, y0, x0, y0, log2CbSize, 0, 0, true, true);
+      this._DecodeTransformTree(x0, y0, x0, y0, log2CbSize, 0, 0, ChromaCodedBlockFlags.Root);
     else
       this._MarkTransformEdges(x0, y0, size, size);
   }
@@ -597,15 +607,22 @@ internal sealed class H265FrameDecoder {
       this._FillBlocks(this._intraPredModeY, x, y, step, step, (byte)modes[i]);
     }
 
-    // intra_chroma_pred_mode is conditioned on ChromaArrayType by clause 7.3.8.5: a monochrome coding
-    // unit has no chrominance to give a prediction mode to, and sends no bin for one.
-    if (this._sps.ChromaArrayType != 0)
-      this._chromaPredMode = this._DecodeChromaMode(modes[0]);
+    // intra_chroma_pred_mode is conditioned on ChromaArrayType by clause 7.3.8.5. A monochrome coding
+    // unit has no chrominance to give a prediction mode to and sends no bin for one; a 4:4:4 unit
+    // split into quarters sends four, one per prediction block, because its chrominance blocks are
+    // the same size and shape as its luminance ones and can each choose. Every other format sends
+    // one for the whole coding unit, whose single chrominance block spans all four quarters.
+    if (this._chromaArrayType == 3) {
+      for (var i = 0; i < parts * parts; ++i) {
+        var x = x0 + (i % parts) * step;
+        var y = y0 + (i / parts) * step;
+        this._FillBlocks(this._intraPredModeC, x, y, step, step, (byte)this._DecodeChromaMode(modes[i]));
+      }
+    } else if (this._chromaArrayType != 0)
+      this._FillBlocks(this._intraPredModeC, x0, y0, size, size, (byte)this._DecodeChromaMode(modes[0]));
 
     return false;
   }
-
-  private int _chromaPredMode;
 
   private int[] _MostProbableModes(int x, int y) {
     var left = this._NeighbourIntraMode(x, y, x - 1, y, false);
@@ -640,15 +657,17 @@ internal sealed class H265FrameDecoder {
   }
 
   private int _DecodeChromaMode(int lumaMode) {
-    if (this._cabac.DecodeBin(H265CabacContexts.INTRA_CHROMA_PRED_MODE) == 0)
-      return lumaMode;
+    var mode = lumaMode;
+    if (this._cabac.DecodeBin(H265CabacContexts.INTRA_CHROMA_PRED_MODE) != 0) {
+      var index = this._cabac.DecodeBypassBits(2);
+      int[] candidates = [
+        H265IntraPrediction.PLANAR, H265IntraPrediction.VERTICAL, H265IntraPrediction.HORIZONTAL,
+        H265IntraPrediction.DC,
+      ];
+      mode = candidates[index] == lumaMode ? 34 : candidates[index];
+    }
 
-    var index = this._cabac.DecodeBypassBits(2);
-    int[] candidates = [
-      H265IntraPrediction.PLANAR, H265IntraPrediction.VERTICAL, H265IntraPrediction.HORIZONTAL,
-      H265IntraPrediction.DC,
-    ];
-    return candidates[index] == lumaMode ? 34 : candidates[index];
+    return this._chromaArrayType == 2 ? H265IntraPrediction.MapChromaModeFor422(mode) : mode;
   }
 
   private void _DecodePulseCodeModulatedBlock(int x0, int y0, int log2CbSize) {
@@ -844,9 +863,29 @@ internal sealed class H265FrameDecoder {
       }
   }
 
+  /// <summary>
+  /// The chrominance coded-block flags of one node of the transform tree.
+  /// </summary>
+  /// <remarks>
+  /// Two per component rather than one, because 4:2:2 is the format whose chrominance transform
+  /// blocks are not in one-to-one correspondence with its luminance ones: a luminance block of
+  /// <c>2^n</c> samples covers a chrominance area half as wide and just as tall, which is two square
+  /// blocks stacked, and each of them carries a coded-block flag of its own. Every other format
+  /// leaves the second of each pair unread and unused.
+  /// </remarks>
+  private readonly record struct ChromaCodedBlockFlags(bool Cb0, bool Cb1, bool Cr0, bool Cr1) {
+
+    /// <summary>What the top of a transform tree inherits: nothing was read, so nothing constrains it.</summary>
+    internal static ChromaCodedBlockFlags Root => new(true, true, true, true);
+
+    internal bool Cb(int index) => index == 0 ? this.Cb0 : this.Cb1;
+
+    internal bool Cr(int index) => index == 0 ? this.Cr0 : this.Cr1;
+  }
+
   private void _DecodeTransformTree(
     int x0, int y0, int xBase, int yBase, int log2TrafoSize, int trafoDepth, int blockIdx,
-    bool parentCbfCb, bool parentCbfCr) {
+    ChromaCodedBlockFlags parent) {
     var split = log2TrafoSize > this._sps.MaxTbLog2SizeY
                 || (this._cuIntraSplit && trafoDepth == 0)
                 || (this._sps.MaxTransformHierarchyDepthInter == 0
@@ -861,52 +900,88 @@ internal sealed class H265FrameDecoder {
       split = this._cabac.DecodeBin(
         H265CabacContexts.SPLIT_TRANSFORM_FLAG + 5 - log2TrafoSize) != 0;
 
-    var cbfCb = false;
-    var cbfCr = false;
+    // Clause 7.3.8.8. A monochrome sequence sends no chrominance coded-block flags at all, so reading
+    // them would take bins out of the luminance that follows. A 4:2:0 or 4:2:2 node at the smallest
+    // transform size sends none either — its chrominance was coded at its parent, whose flags it
+    // inherits — where a 4:4:4 node sends its own at every size, because its chrominance blocks never
+    // stop halving before its luminance ones do.
+    var flags = this._chromaArrayType == 0 ? default : parent;
+    if ((log2TrafoSize > 2 && this._chromaArrayType != 0) || this._chromaArrayType == 3) {
+      // The lower half of a 4:2:2 pair is only sent where this node is where the chrominance stops:
+      // either it is a leaf, or its children are 4x4 luminance blocks that carry no chrominance.
+      var stacked = this._chromaArrayType == 2 && (!split || log2TrafoSize == 3);
 
-    // A monochrome sequence sends no chrominance coded-block flags at all — clause 7.3.8.8 conditions
-    // both on ChromaArrayType — so reading them would take two bins out of the luminance that follows.
-    if (this._sps.ChromaArrayType != 0) {
-      if (log2TrafoSize > 2) {
-        if (trafoDepth == 0 || parentCbfCb)
-          cbfCb = this._cabac.DecodeBin(H265CabacContexts.CBF_CHROMA + trafoDepth) != 0;
-        if (trafoDepth == 0 || parentCbfCr)
-          cbfCr = this._cabac.DecodeBin(H265CabacContexts.CBF_CHROMA + trafoDepth) != 0;
-      } else {
-        cbfCb = parentCbfCb;
-        cbfCr = parentCbfCr;
+      var cb0 = false;
+      var cb1 = false;
+      var cr0 = false;
+      var cr1 = false;
+
+      if (trafoDepth == 0 || parent.Cb0) {
+        cb0 = this._cabac.DecodeBin(H265CabacContexts.CBF_CHROMA + trafoDepth) != 0;
+        if (stacked)
+          cb1 = this._cabac.DecodeBin(H265CabacContexts.CBF_CHROMA + trafoDepth) != 0;
       }
+
+      if (trafoDepth == 0 || parent.Cr0) {
+        cr0 = this._cabac.DecodeBin(H265CabacContexts.CBF_CHROMA + trafoDepth) != 0;
+        if (stacked)
+          cr1 = this._cabac.DecodeBin(H265CabacContexts.CBF_CHROMA + trafoDepth) != 0;
+      }
+
+      flags = new(cb0, cb1, cr0, cr1);
     }
 
     if (split) {
       var half = 1 << (log2TrafoSize - 1);
-      this._DecodeTransformTree(x0, y0, x0, y0, log2TrafoSize - 1, trafoDepth + 1, 0, cbfCb, cbfCr);
-      this._DecodeTransformTree(x0 + half, y0, x0, y0, log2TrafoSize - 1, trafoDepth + 1, 1, cbfCb, cbfCr);
-      this._DecodeTransformTree(x0, y0 + half, x0, y0, log2TrafoSize - 1, trafoDepth + 1, 2, cbfCb, cbfCr);
-      this._DecodeTransformTree(x0 + half, y0 + half, x0, y0, log2TrafoSize - 1, trafoDepth + 1, 3, cbfCb, cbfCr);
+      this._DecodeTransformTree(x0, y0, x0, y0, log2TrafoSize - 1, trafoDepth + 1, 0, flags);
+      this._DecodeTransformTree(x0 + half, y0, x0, y0, log2TrafoSize - 1, trafoDepth + 1, 1, flags);
+      this._DecodeTransformTree(x0, y0 + half, x0, y0, log2TrafoSize - 1, trafoDepth + 1, 2, flags);
+      this._DecodeTransformTree(x0 + half, y0 + half, x0, y0, log2TrafoSize - 1, trafoDepth + 1, 3, flags);
       return;
     }
 
+    var anyChroma = flags.Cb0 || flags.Cr0 || (this._chromaArrayType == 2 && (flags.Cb1 || flags.Cr1));
+
     var cbfLuma = true;
-    if (this._cuPredictionMode == H265PredictionMode.Intra || trafoDepth != 0 || cbfCb || cbfCr)
+    if (this._cuPredictionMode == H265PredictionMode.Intra || trafoDepth != 0 || anyChroma)
       cbfLuma = this._cabac.DecodeBin(
         H265CabacContexts.CBF_LUMA + (trafoDepth == 0 ? 1 : 0)) != 0;
 
-    this._DecodeTransformUnit(x0, y0, xBase, yBase, log2TrafoSize, trafoDepth, blockIdx, cbfLuma, cbfCb, cbfCr);
+    this._DecodeTransformUnit(x0, y0, xBase, yBase, log2TrafoSize, trafoDepth, blockIdx, cbfLuma, flags);
   }
 
+  /// <summary>
+  /// Reconstructs one transform unit — clause 7.3.8.10.
+  /// </summary>
+  /// <remarks>
+  /// The chrominance half of this is where the three subsampled formats part company. At 4:4:4 a
+  /// chrominance transform block is the luminance one's twin — same size, same position, coded at
+  /// every leaf of the tree. At 4:2:0 it is half as wide and half as tall, so the smallest luminance
+  /// blocks have no chrominance of their own and four of them share one, coded at the fourth. At
+  /// 4:2:2 it is half as wide and just as tall, which no square block can be: the chrominance of one
+  /// luminance block is <em>two</em> square blocks stacked, each with a coded-block flag, a residual
+  /// and — for an intra unit — a prediction of its own, the lower one predicting from the
+  /// reconstructed upper one.
+  /// </remarks>
   private void _DecodeTransformUnit(
     int x0, int y0, int xBase, int yBase, int log2TrafoSize, int trafoDepth, int blockIdx,
-    bool cbfLuma, bool cbfCb, bool cbfCr) {
+    bool cbfLuma, ChromaCodedBlockFlags flags) {
     var size = 1 << log2TrafoSize;
     this._MarkTransformEdges(x0, y0, size, size);
     this._FillBlocks(this._hasCodedResidual, x0, y0, size, size, cbfLuma);
 
-    var monochrome = this._sps.ChromaArrayType == 0;
-    var chromaAtParent = log2TrafoSize == 2;
-    var anyChroma = chromaAtParent ? blockIdx == 3 && (cbfCb || cbfCr) : cbfCb || cbfCr;
+    var monochrome = this._chromaArrayType == 0;
+    var stackedChroma = this._chromaArrayType == 2;
+    var chromaAtParent = this._chromaArrayType != 3 && log2TrafoSize == 2;
+    var log2TrafoSizeC = Math.Max(2, log2TrafoSize - (this._chromaArrayType == 3 ? 0 : 1));
 
-    if ((cbfLuma || cbfCb || cbfCr)
+    // The quantiser delta is sent for the first transform unit of a group that codes anything at
+    // all, and a unit whose chrominance was coded at its parent still counts as coding it — the
+    // flags it inherited are what clause 7.3.8.10 reads, whichever of the four blocks this is.
+    var anyChroma = !monochrome
+                    && (flags.Cb0 || flags.Cr0 || (stackedChroma && (flags.Cb1 || flags.Cr1)));
+
+    if ((cbfLuma || anyChroma)
         && this._pps.CuQpDeltaEnabled && !this._quantiserDeltaCoded) {
       this._quantiserDeltaCoded = true;
       this._SetQuantiser(this._DecodeQuantiserDelta());
@@ -921,20 +996,25 @@ internal sealed class H265FrameDecoder {
     if (monochrome)
       return;
 
-    if (chromaAtParent) {
-      if (blockIdx != 3)
-        return;
-      if (this._cuPredictionMode == H265PredictionMode.Intra)
-        this._ReconstructIntraChroma(xBase, yBase, 2, cbfCb, cbfCr, qp);
-      else if (anyChroma)
-        this._AddChromaResidual(xBase, yBase, 2, cbfCb, cbfCr, qp);
+    // Where the chrominance was coded at the parent, only the last of the four luminance blocks
+    // carries it, and it covers the parent's whole area rather than that block's.
+    if (chromaAtParent && blockIdx != 3)
       return;
-    }
 
-    if (this._cuPredictionMode == H265PredictionMode.Intra)
-      this._ReconstructIntraChroma(x0, y0, log2TrafoSize - 1, cbfCb, cbfCr, qp);
-    else if (anyChroma)
-      this._AddChromaResidual(x0, y0, log2TrafoSize - 1, cbfCb, cbfCr, qp);
+    var chromaX = (chromaAtParent ? xBase : x0) >> this._chromaShiftX;
+    var chromaY = (chromaAtParent ? yBase : y0) >> this._chromaShiftY;
+    var blocks = stackedChroma ? 2 : 1;
+
+    for (var component = 1; component <= 2; ++component)
+      for (var i = 0; i < blocks; ++i) {
+        var hasResidual = component == 1 ? flags.Cb(i) : flags.Cr(i);
+        var y = chromaY + (i << log2TrafoSizeC);
+
+        if (this._cuPredictionMode == H265PredictionMode.Intra)
+          this._ReconstructIntraChroma(chromaX, y, log2TrafoSizeC, component, hasResidual, qp);
+        else if (hasResidual)
+          this._AddChromaResidual(chromaX, y, log2TrafoSizeC, component, qp);
+      }
   }
 
   private int _DecodeQuantiserDelta() {
@@ -962,7 +1042,8 @@ internal sealed class H265FrameDecoder {
     var transformSkip = false;
     if (hasResidual)
       transformSkip = H265Residual.Decode(
-        ref this._cabac, this._coefficients, log2Size, 0, mode, this._pps, this._cuTransquantBypass);
+        ref this._cabac, this._coefficients, log2Size, 0, mode, this._chromaArrayType, this._pps,
+        this._cuTransquantBypass);
 
     this._Reconstruct(
       this._picture.Luma, this._picture.Width, x0, y0, log2Size, hasResidual, transformSkip,
@@ -977,57 +1058,66 @@ internal sealed class H265FrameDecoder {
   /// </summary>
   private int _LumaQuantiser(int qpY) => qpY + this._sps.QpBdOffsetLuma;
 
-  private void _ReconstructIntraChroma(int x0, int y0, int log2Size, bool cbfCb, bool cbfCr, int qp) {
-    var chromaX = x0 >> 1;
-    var chromaY = y0 >> 1;
+  private void _ReconstructIntraChroma(
+    int chromaX, int chromaY, int log2Size, int component, bool hasResidual, int qp) {
     var size = 1 << log2Size;
-    var mode = this._chromaPredMode;
+    var mode = this._ChromaModeAt(chromaX, chromaY);
+    var plane = this._picture.Chroma(component - 1);
 
-    for (var component = 1; component <= 2; ++component) {
-      var hasResidual = component == 1 ? cbfCb : cbfCr;
-      var plane = this._picture.Chroma(component - 1);
-      this._GatherReferenceChroma(chromaX, chromaY, size, component);
-      H265IntraPrediction.Predict(this._prediction, this._reference, size, mode, false, this._sps.BitDepthChroma);
+    this._GatherReferenceChroma(chromaX, chromaY, size, component, mode);
+    H265IntraPrediction.Predict(this._prediction, this._reference, size, mode, false, this._sps.BitDepthChroma);
 
-      var transformSkip = false;
-      if (hasResidual)
-        transformSkip = H265Residual.Decode(
-          ref this._cabac, this._coefficients, log2Size, component, mode, this._pps, this._cuTransquantBypass);
+    var transformSkip = false;
+    if (hasResidual)
+      transformSkip = H265Residual.Decode(
+        ref this._cabac, this._coefficients, log2Size, component, mode, this._chromaArrayType, this._pps,
+        this._cuTransquantBypass);
 
-      this._Reconstruct(
-        plane, this._picture.ChromaWidth, chromaX, chromaY, log2Size, hasResidual, transformSkip,
-        this._ChromaQuantiser(qp, component), component, this._sps.BitDepthChroma, -1);
-    }
+    this._Reconstruct(
+      plane, this._picture.ChromaWidth, chromaX, chromaY, log2Size, hasResidual, transformSkip,
+      this._ChromaQuantiser(qp, component), component, this._sps.BitDepthChroma, -1);
   }
+
+  /// <summary>The chrominance intra prediction mode covering one chrominance sample position.</summary>
+  private int _ChromaModeAt(int chromaX, int chromaY)
+    => this._intraPredModeC[this._BlockIndex(chromaX << this._chromaShiftX, chromaY << this._chromaShiftY)];
 
   private void _AddLumaResidual(int x0, int y0, int log2Size, int qp) {
     var transformSkip = H265Residual.Decode(
-      ref this._cabac, this._coefficients, log2Size, 0, -1, this._pps, this._cuTransquantBypass);
+      ref this._cabac, this._coefficients, log2Size, 0, -1, this._chromaArrayType, this._pps,
+      this._cuTransquantBypass);
     this._AddResidual(
       this._picture.Luma, this._picture.Width, x0, y0, log2Size, transformSkip,
       this._LumaQuantiser(qp), 0, this._sps.BitDepthLuma, false);
   }
 
-  private void _AddChromaResidual(int x0, int y0, int log2Size, bool cbfCb, bool cbfCr, int qp) {
-    var chromaX = x0 >> 1;
-    var chromaY = y0 >> 1;
-    for (var component = 1; component <= 2; ++component) {
-      if (component == 1 ? !cbfCb : !cbfCr)
-        continue;
-      var transformSkip = H265Residual.Decode(
-        ref this._cabac, this._coefficients, log2Size, component, -1, this._pps, this._cuTransquantBypass);
-      this._AddResidual(
-        this._picture.Chroma(component - 1), this._picture.ChromaWidth, chromaX, chromaY, log2Size,
-        transformSkip, this._ChromaQuantiser(qp, component), component, this._sps.BitDepthChroma, false);
-    }
+  private void _AddChromaResidual(int chromaX, int chromaY, int log2Size, int component, int qp) {
+    var transformSkip = H265Residual.Decode(
+      ref this._cabac, this._coefficients, log2Size, component, -1, this._chromaArrayType, this._pps,
+      this._cuTransquantBypass);
+    this._AddResidual(
+      this._picture.Chroma(component - 1), this._picture.ChromaWidth, chromaX, chromaY, log2Size,
+      transformSkip, this._ChromaQuantiser(qp, component), component, this._sps.BitDepthChroma, false);
   }
 
+  /// <summary>
+  /// <c>Qp′Cb</c> or <c>Qp′Cr</c>: the quantiser one chrominance component is dequantised with —
+  /// clause 8.6.1.
+  /// </summary>
+  /// <remarks>
+  /// The mapping from the luminance quantiser is not the same in every chroma format. 4:2:0 sends
+  /// its index through Table 8-10, which holds the chrominance quantiser back above index 30 because
+  /// half-resolution chrominance shows quantisation more readily than luminance does. The formats
+  /// that do not subsample vertically have no such headroom to spend and take the index unchanged,
+  /// bounded at 51.
+  /// </remarks>
   private int _ChromaQuantiser(int lumaQp, int component) {
     var offset = component == 1
       ? this._pps.CbQpOffset + this._header.SliceCbQpOffset
       : this._pps.CrQpOffset + this._header.SliceCrQpOffset;
     var index = Math.Clamp(lumaQp + offset, -this._sps.QpBdOffsetChroma, 57);
-    return H265Dequantiser.ChromaQp(index) + this._sps.QpBdOffsetChroma;
+    var mapped = this._chromaArrayType == 1 ? H265Dequantiser.ChromaQp(index) : Math.Min(index, 51);
+    return mapped + this._sps.QpBdOffsetChroma;
   }
 
   private void _Reconstruct(
@@ -1113,7 +1203,16 @@ internal sealed class H265FrameDecoder {
         this._reference, size, this._sps.StrongIntraSmoothingEnabled, this._sps.BitDepthLuma);
   }
 
-  private void _GatherReferenceChroma(int x0, int y0, int size, int component) {
+  /// <summary>
+  /// Collects the reference samples one chrominance block predicts from — clauses 8.4.4.2.2 and 8.4.4.2.3.
+  /// </summary>
+  /// <remarks>
+  /// The smoothing is the part that turns on the chroma format. Clause 8.4.4.2.3 applies it when the
+  /// component is luminance <em>or</em> the sequence is 4:4:4, because at 4:4:4 a chrominance block
+  /// is the same size as a luminance one and its reference edge carries the same spatial frequencies.
+  /// The strong 32x32 interpolation stays luminance-only whatever the format.
+  /// </remarks>
+  private void _GatherReferenceChroma(int x0, int y0, int size, int component, int mode) {
     var count = H265IntraPrediction.ReferenceCount(size);
     Array.Clear(this._referenceAvailable, 0, count);
     var plane = this._picture.Chroma(component - 1);
@@ -1135,6 +1234,9 @@ internal sealed class H265FrameDecoder {
     }
 
     H265IntraPrediction.Substitute(this._reference, this._referenceAvailable, size, this._sps.BitDepthChroma);
+
+    if (this._chromaArrayType == 3 && H265IntraPrediction.FilterReference(mode, size))
+      H265IntraPrediction.Filter(this._reference, size, false, this._sps.BitDepthChroma);
   }
 
   private bool _TakeReference(
@@ -1151,7 +1253,9 @@ internal sealed class H265FrameDecoder {
     ushort[] plane, int stride, int width, int height, int x0, int y0, int x, int y, int slot) {
     if (x < 0 || y < 0 || x >= width || y >= height)
       return false;
-    if (!this._IsPredictable(x0 << 1, y0 << 1, x << 1, y << 1))
+    if (!this._IsPredictable(
+          x0 << this._chromaShiftX, y0 << this._chromaShiftY,
+          x << this._chromaShiftX, y << this._chromaShiftY))
       return false;
     this._reference[slot] = plane[y * stride + x];
     return true;

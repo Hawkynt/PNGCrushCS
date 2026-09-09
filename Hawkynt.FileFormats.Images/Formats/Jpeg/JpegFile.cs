@@ -6,6 +6,7 @@ namespace FileFormat.Jpeg;
 
 /// <summary>In-memory representation of a JPEG image.</summary>
 [FormatMimeType("image/jpeg", "image/jpg", "image/pjpeg")]
+[VerifiedBy(ConformanceOracle.ImageMagick, ConformanceOracle.FFmpeg)]
 public readonly record struct JpegFile :
   IImageFormatReader<JpegFile>, IImageToRawImage<JpegFile>, IImageFromRawImage<JpegFile>, IImageFormatWriter<JpegFile>,
   IFormatChunkLayout<JpegFile>, IFormatChunkRewriter<JpegFile>, IFormatChunkPlanRewriter<JpegFile> {

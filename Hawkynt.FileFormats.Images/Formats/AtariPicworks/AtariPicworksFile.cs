@@ -14,6 +14,7 @@ namespace FileFormat.AtariPicworks;
 /// The counts are gathered at the front of the file in pairs and the bytes they refer to follow, so
 /// the two streams are read at different speeds rather than interleaved.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct AtariPicworksFile
   : IImageFormatReader<AtariPicworksFile>, IImageToRawImage<AtariPicworksFile>,
     IImageFromRawImage<AtariPicworksFile>, IImageFormatWriter<AtariPicworksFile> {
