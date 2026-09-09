@@ -15,18 +15,21 @@ namespace FileFormat.Eroiica.Tests;
 [TestFixture]
 public sealed class EroiicaTests {
 
-  private static byte[] _Tiff(int width, int height) {
+  private static RawImage _Picture(int width, int height) {
     var pixels = new byte[width * height * 3];
     for (var i = 0; i < pixels.Length; ++i)
       pixels[i] = (byte)(i * 7 % 251);
 
-    return TiffWriter.ToBytes(TiffFile.FromRawImage(new() {
+    return new() {
       Width = width,
       Height = height,
       Format = PixelFormat.Rgb24,
       PixelData = pixels,
-    }));
+    };
   }
+
+  private static byte[] _Tiff(int width, int height)
+    => TiffWriter.ToBytes(TiffFile.FromRawImage(_Picture(width, height)));
 
   private static byte[] _Build(params byte[][] pages)
     => EroiicaFile.Magic.ToArray().Concat(pages.SelectMany(x => x)).ToArray();
@@ -91,4 +94,49 @@ public sealed class EroiicaTests {
 
     Assert.Throws<InvalidDataException>(() => EroiicaReader.FromBytes(_Build(noise)));
   }
+
+  [Test]
+  [Category("Unit")]
+  public void Writer_FromRawImage_RoundTripsThePicture() {
+    var source = _Picture(7, 5);
+
+    var bytes = EroiicaWriter.ToBytes(EroiicaFile.FromRawImage(source));
+    var decoded = EroiicaFile.ToRawImage(EroiicaReader.FromBytes(bytes));
+
+    Assert.Multiple(() => {
+      Assert.That(bytes.AsSpan(0, EroiicaFile.Magic.Length).SequenceEqual(EroiicaFile.Magic), Is.True);
+      Assert.That(decoded.Width, Is.EqualTo(source.Width));
+      Assert.That(decoded.Height, Is.EqualTo(source.Height));
+      Assert.That(decoded.Format, Is.EqualTo(source.Format));
+      Assert.That(decoded.PixelData, Is.EqualTo(source.PixelData));
+    });
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void Writer_PreservesEveryTiffPageAndItsOrder() {
+    var first = _Tiff(5, 3);
+    var second = _Tiff(7, 2);
+
+    var bytes = EroiicaWriter.ToBytes(new() { Pages = [first, second] });
+    var decoded = EroiicaReader.FromBytes(bytes);
+
+    Assert.Multiple(() => {
+      Assert.That(decoded.Pages, Has.Count.EqualTo(2));
+      Assert.That(decoded.Pages[0], Is.EqualTo(first));
+      Assert.That(decoded.Pages[1], Is.EqualTo(second));
+      Assert.That(EroiicaFile.ToRawImage(decoded, 0).Width, Is.EqualTo(5));
+      Assert.That(EroiicaFile.ToRawImage(decoded, 1).Width, Is.EqualTo(7));
+    });
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void Writer_WithoutPages_IsRefused()
+    => Assert.Throws<ArgumentException>(() => EroiicaWriter.ToBytes(new()));
+
+  [Test]
+  [Category("Unit")]
+  public void Writer_WithNonTiffPage_IsRefused()
+    => Assert.Throws<InvalidDataException>(() => EroiicaWriter.ToBytes(new() { Pages = [new byte[32]] }));
 }
