@@ -122,15 +122,33 @@ public sealed class PowerPointTests {
     => Assert.Throws<InvalidDataException>(() => PowerPointReader.FromBytes(_Document(_Png())));
 
   /// <summary>
-  /// The instance decides as much as the record type does: a BLIP carrying two checksums puts its
-  /// picture elsewhere, and XnView reads none of those.
+  /// The instance decides as much as the record type does: 0x6E2 belongs to a JPEG BLIP, so a record
+  /// stating it under the PNG type describes no picture MS-ODRAW defines.
   /// </summary>
   [Test]
   [Category("Unit")]
   public void FromBytes_APictureRecordOfAnInstanceNotReadIsRefused(
-    [Values((ushort)0x6E10, (ushort)0x6E20)] ushort versionAndInstance)
+    [Values((ushort)0x6E20)] ushort versionAndInstance)
     => Assert.Throws<InvalidDataException>(
       () => PowerPointReader.FromBytes(_Document(_Record(versionAndInstance, PowerPointFile.PngBlipType, _Png(), 32))));
+
+  /// <summary>
+  /// Instance 0x6E1 is the PNG BLIP that carries two UIDs rather than one, so its picture starts
+  /// thirty-three bytes into the body instead of seventeen. Both are pictures the format defines.
+  /// </summary>
+  [Test]
+  [Category("Unit")]
+  public void FromBytes_APngBlipCarryingTwoUidsIsRead() {
+    var expected = PixelConverter.Convert(PngFile.ToRawImage(PngReader.FromBytes(_Png())), PixelFormat.Rgb24);
+
+    var read = PowerPointReader.FromBytes(
+      _Document(_Record(0x6E10, PowerPointFile.PngBlipType, _Png(), 32)));
+
+    Assert.Multiple(() => {
+      Assert.That((read.Width, read.Height), Is.EqualTo((expected.Width, expected.Height)));
+      Assert.That(read.PixelData, Is.EqualTo(expected.PixelData));
+    });
+  }
 
   /// <summary>A record holding others is stepped over whole, so a picture inside one is not found.</summary>
   [Test]
