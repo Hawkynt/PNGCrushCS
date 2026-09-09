@@ -32,9 +32,14 @@ namespace FileFormat.TrueType;
 /// which is a different language, and a <c>ttcf</c> collection is several fonts in one file; both
 /// are refused by name rather than half-read.
 /// <para/>
-/// It does not write.
+/// Writing produces an unhinted OpenType font with the required metadata and metrics tables. The
+/// reader's outline model does not retain names, character mappings, instructions, or composite
+/// structure, so those are rebuilt deterministically rather than pretending discarded source data
+/// can be recovered.
 /// </remarks>
-public readonly record struct TrueTypeFile : IImageFormatReader<TrueTypeFile>, IImageToRawImage<TrueTypeFile> {
+public readonly record struct TrueTypeFile :
+  IImageFormatReader<TrueTypeFile>, IImageToRawImage<TrueTypeFile>,
+  IImageFromRawImage<TrueTypeFile>, IImageFormatWriter<TrueTypeFile> {
 
   /// <summary>The version a font with TrueType outlines states.</summary>
   public const uint TrueTypeVersion = 0x00010000;
@@ -63,6 +68,7 @@ public readonly record struct TrueTypeFile : IImageFormatReader<TrueTypeFile>, I
   static string IImageFormatMetadata<TrueTypeFile>.PrimaryExtension => ".ttf";
   static string[] IImageFormatMetadata<TrueTypeFile>.FileExtensions => [".ttf"];
   static TrueTypeFile IImageFormatReader<TrueTypeFile>.FromSpan(ReadOnlySpan<byte> data) => TrueTypeReader.FromSpan(data);
+  static byte[] IImageFormatWriter<TrueTypeFile>.ToBytes(TrueTypeFile file) => TrueTypeWriter.ToBytes(file);
   static VideoMode[] IImageFormatMetadata<TrueTypeFile>.VideoModes => [
     new("Glyph sheet", [(IntegerRange.Any, IntegerRange.Any)], [2])
   ];
@@ -86,6 +92,8 @@ public readonly record struct TrueTypeFile : IImageFormatReader<TrueTypeFile>, I
   public IReadOnlyList<TrueTypeGlyph> Glyphs { get; init; }
 
   public static RawImage ToRawImage(TrueTypeFile file) => TrueTypeRenderer.Render(file);
+
+  public static TrueTypeFile FromRawImage(RawImage image) => TrueTypeWriter.FromRawImage(image);
 }
 
 /// <summary>One point of an outline, and whether the curve passes through it.</summary>
