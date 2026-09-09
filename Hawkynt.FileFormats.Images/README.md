@@ -1539,6 +1539,46 @@ What is left is a shorter list than it was. The edge-preserving filter is parsed
 - Coverage breadth is larger than conformance depth. Some historical formats have scarce or no public samples; registry presence is not a promise that every obscure producer variant has been verified.
 - The JPEG XL pixel path is measured against libjxl on 104 files plus the fixtures, not against every `.jxl` that exists. Do not treat its internal round-trip as proof of arbitrary `.jxl` compatibility.
 
+## 📚 References
+
+The format-specific links in [Extended format-family reference](#-extended-format-family-reference) are the detailed bibliography. This table records external material that materially shaped implementation, reverse engineering, cross-checking, or conformance work: normative specifications and manuals, foreign source code used as implementation references or provenance, third-party encoders/decoders used as behavioural oracles, and catalogues/corpora used to find coverage gaps. An **oracle** is evidence against an external implementation, not a claim that every tool listed is independent — broad tools can share the same underlying codec libraries. Where this repository carries explicit third-party licence notices, [`THIRD_PARTY_NOTICES.md`](https://github.com/Hawkynt/PNGCrushCS/blob/main/Hawkynt.FileFormats.Images/THIRD_PARTY_NOTICES.md) is authoritative for those licence terms; this table is technical provenance, not a licensing inventory.
+
+| Reference | Kind | Used for |
+| --- | --- | --- |
+| [RFC 6386 — VP8 Data Format and Decoding Guide](https://www.rfc-editor.org/rfc/rfc6386) | Specification | VP8 bitstream syntax and boolean arithmetic coding. |
+| [Go `x/image/vp8`](https://pkg.go.dev/golang.org/x/image/vp8) | Foreign source code | Source lineage for the managed VP8 lossy decoder. |
+| [libwebp](https://github.com/webmproject/libwebp) | Foreign source code + oracle | WebP animation-compositor behaviour and `dwebp` pixel parity, including fancy chroma upsampling. |
+| [AV1 Bitstream & Decoding Process Specification](https://aomediacodec.github.io/av1-spec/) | Specification | AV1 syntax, transforms, prediction, entropy contexts and in-loop filters. |
+| [libaom](https://aomedia.googlesource.com/aom/) | Foreign source code + oracle | AV1 normative tables/algorithms and `libaom`-produced AVIF conformance corpus. |
+| [rav1e](https://github.com/xiph/rav1e) | Foreign source code | AV1 range-encoder storage/carry logic used by the managed writer; see third-party notices. |
+| [dav1d](https://code.videolan.org/videolan/dav1d) | Oracle | Sample-for-sample AV1 decode parity. |
+| [libavif (`avifenc` / `avifdec`)](https://github.com/AOMediaCodec/libavif) | Oracle | Independent AVIF generation/acceptance and alpha-plane checks. |
+| [SVT-AV1](https://gitlab.com/AOMediaCodec/SVT-AV1) | Oracle / corpus producer | Additional independently encoded AV1 bitstreams in the AVIF corpus. |
+| [ITU-T T.800 / JPEG 2000 Part 1](https://www.itu.int/rec/T-REC-T.800) | Specification | JPEG 2000 codestream syntax and baseline coding rules. |
+| [OpenJPEG](https://github.com/uclouvain/openjpeg) | Oracle | `opj_compress` / `opj_decompress` interoperability and pixel comparisons for JPEG 2000. |
+| [JPEG XL / ISO/IEC 18181](https://jpeg.org/jpegxl/) | Specification / documentation | JPEG XL codestream, metadata, modular and VarDCT semantics. |
+| [libjxl (`cjxl` / `djxl`)](https://github.com/libjxl/libjxl) | Foreign source code + oracle | Fast-lossless encoder provenance, decoder behaviour and extensive JPEG XL pixel parity. |
+| [zune-jpegxl](https://github.com/etemesi254/zune-image/tree/dev/crates/zune-jpegxl) | Foreign source-code cross-check | Independent cross-check of the JPEG XL fast-lossless adaptation. |
+| [ITU-T T.832 — JPEG XR](https://www.itu.int/rec/T-REC-T.832) | Specification | JPEG XR / HD Photo core coding rules. |
+| [SharpAstro/Codecs](https://github.com/SharpAstro/Codecs) | Foreign source code | Vendored managed JPEG XR T.832 core; exact provenance is recorded in third-party notices. |
+| [JXRLib](https://github.com/4creators/jxrlib) | Reference implementation + oracle | JPEG XR source lineage, fixtures, `JxrEncApp` / `JxrDecApp` interoperability. |
+| [Microsoft Windows Imaging Component (WIC)](https://learn.microsoft.com/windows/win32/wic/-wic-about-windows-imaging-codec) | Documentation + oracle | JPEG XR container/pixel-format GUID behaviour and Windows interoperability. |
+| [libheif](https://github.com/strukturag/libheif) | Oracle | HEIF/HEIC and AVCI decoding, colour handling, container interpretation and writer acceptance. |
+| [libde265 (`dec265`)](https://github.com/strukturag/libde265) | Oracle | Independent HEVC decode acceptance for HEIF writer output. |
+| [x264](https://code.videolan.org/videolan/x264) / [x265](https://bitbucket.org/multicoreware/x265_git/) | Corpus producers | Intra H.264/HEVC streams used to exercise AVCI and HEIF container paths. |
+| [FFmpeg](https://ffmpeg.org/) | Oracle | HEVC, JPEG 2000, AVIF and broad cross-format decode comparisons. |
+| [DjVuLibre](https://djvu.sourceforge.net/) | Foreign source-code provenance / reference implementation | ZP coder/decoder behaviour and probability-table provenance for DjVu. |
+| [RECOIL](https://recoil.sourceforge.net/) | Reference implementation + oracle | Pixel-exact validation and writer acceptance for many retro-computing formats where it is the only complete external decoder. |
+| [ImageMagick](https://imagemagick.org/formats/) | Oracle + format catalogue | Broad writer-generated corpus, pixel comparisons, acceptance checks and format-gap discovery. |
+| [XnView / NConvert](https://www.xnview.com/en/image-formats/) | Oracle + format catalogue | Broad format coverage comparison and external writer/read acceptance. |
+| [IrfanView](https://www.irfanview.info/main_formats.htm) | Oracle + format catalogue | Broad format coverage comparison and writer/read acceptance. |
+| [ExifTool](https://exiftool.org/) | Documentation + oracle | CR3/Canon box layout cross-checks and byte-exact preview/thumbnail extraction. |
+| [Tom's Editor supported formats](https://tomseditor.com/blog/supported-formats) | Format catalogue / oracle | Coverage-gap checks and spot conversions for obscure formats. |
+| [Telparia file-format samples](https://telparia.com/fileFormatSamples/image) | External corpus | Additional real-world samples used by parity tooling. |
+| [Microsoft OpenType specification](https://learn.microsoft.com/typography/opentype/spec/) | Specification | TrueType/sfnt table and glyph parsing. |
+| [Apple TrueType Reference Manual](https://developer.apple.com/fonts/TrueType-Reference-Manual/index.html) | Reference manual | Independent cross-check for TrueType outlines and table semantics. |
+| [Autodesk DXF Reference](https://help.autodesk.com/cloudhelp/2025/ENU/AutoCAD-DXF/files/GUID-20172853-157D-4024-8E64-32F3BD64F883.htm) | Reference manual | ASCII DXF file structure, group codes, sections and entity semantics. |
+
 ## ❤️ Support
 
 If this project saves you time or money, consider supporting its development:
