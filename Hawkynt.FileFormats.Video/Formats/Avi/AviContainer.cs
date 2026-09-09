@@ -120,6 +120,29 @@ public sealed class AviContainer : IVideoContainerReader<AviContainer> {
       }
   }
 
+  /// <summary>The OpenDML index, which points at chunks rather than being one.</summary>
+  private const string _INDEX_SUFFIX = "ix";
+
+  /// <summary>A palette change, which alters how later frames are shown without being a frame.</summary>
+  private const string _PALETTE_CHANGE_SUFFIX = "pc";
+
+  /// <summary>
+  /// Decides whether a chunk inside the movie list is a stream's payload, and whose.
+  /// </summary>
+  /// <remarks>
+  /// The two digits name the stream and the two characters after them name what the chunk holds.
+  /// This used to accept only <c>db</c>, <c>dc</c>, <c>wb</c> and <c>tx</c>, which are what the
+  /// specification lists — and it meant a file whose encoder spelled the suffix its own way yielded
+  /// no packets at all rather than an error. Intel's own Indeo 4 files do exactly that: the two on
+  /// <c>samples.ffmpeg.org</c> write their video as <c>00iv</c>, ffmpeg plays them, and this returned
+  /// an empty stream and called it a successful read.
+  /// <para/>
+  /// So the test is inverted. A chunk is payload unless its suffix names something that is not — the
+  /// OpenDML index, which points at chunks, and a palette change, which alters how later frames are
+  /// shown without being one. Anything else goes to the stream its digits name, and the stream's own
+  /// declared kind decides what to do with it. Being wrong this way produces a packet a decoder then
+  /// refuses by name; being wrong the other way produced silence.
+  /// </remarks>
   private static bool _TryPacket(
     AviContainer container,
     RiffElement element,
@@ -131,7 +154,7 @@ public sealed class AviContainer : IVideoContainerReader<AviContainer> {
     var id = element.Id.ToString();
     if (id.Length != 4 || !char.IsAsciiDigit(id[0]) || !char.IsAsciiDigit(id[1]))
       return false;
-    if (id.Substring(2) is not ("db" or "dc" or "wb" or "tx"))
+    if (id.Substring(2) is _INDEX_SUFFIX or _PALETTE_CHANGE_SUFFIX)
       return false;
 
     var streamIndex = (id[0] - '0') * 10 + (id[1] - '0');
