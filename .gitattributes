@@ -9,3 +9,4 @@ Hawkynt.FileFormats.Images/README.md text eol=crlf
 *.pgm binary
 *.pbm binary
 *.pnm binary
+*.pam binary
