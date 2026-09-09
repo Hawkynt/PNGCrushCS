@@ -146,4 +146,89 @@ public sealed class X3fTests {
         Assert.That(file.PixelData[y * width * 3], Is.EqualTo((byte)(y + 1)), $"row {y} starts where the stride says");
     });
   }
+
+  [Test]
+  [Category("Unit")]
+  public void ToBytes_RoundTripsUncompressedRgb24Exactly() {
+    var picture = _Picture(5, 3);
+
+    var written = X3fWriter.ToBytes(X3fFile.FromRawImage(picture));
+    var decoded = X3fFile.ToRawImage(X3fReader.FromBytes(written));
+
+    Assert.Multiple(() => {
+      Assert.That(decoded.Width, Is.EqualTo(picture.Width));
+      Assert.That(decoded.Height, Is.EqualTo(picture.Height));
+      Assert.That(decoded.Format, Is.EqualTo(PixelFormat.Rgb24));
+      Assert.That(decoded.PixelData, Is.EqualTo(picture.PixelData));
+    });
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void ToBytes_WritesVersion22ProcessedImageAndTerminalDirectory() {
+    const int width = 5;
+    const int height = 3;
+    const int stride = 16;
+    const int sectionLength = X3fFile.ImageSectionHeaderSize + stride * height;
+    const int directoryOffset = X3fFile.HeaderSize + sectionLength;
+
+    var written = X3fWriter.ToBytes(X3fFile.FromRawImage(_Picture(width, height)));
+    // Copied out rather than sliced in place: a ref struct local cannot be captured by the lambda
+    // Assert.Multiple takes.
+    var section = written.AsSpan(X3fFile.HeaderSize, sectionLength).ToArray();
+    var directory = written.AsSpan(directoryOffset).ToArray();
+
+    Assert.Multiple(() => {
+      Assert.That(written.AsSpan(0, 4).ToArray(), Is.EqualTo(X3fFile.Magic.ToArray()));
+      Assert.That(BinaryPrimitives.ReadUInt32LittleEndian(written.AsSpan(4)), Is.EqualTo(0x00020002u));
+      Assert.That(BinaryPrimitives.ReadUInt32LittleEndian(written.AsSpan(X3fFile.ColumnsField)), Is.EqualTo((uint)width));
+      Assert.That(BinaryPrimitives.ReadUInt32LittleEndian(written.AsSpan(X3fFile.RowsField)), Is.EqualTo((uint)height));
+
+      Assert.That(section[..4], Is.EqualTo(new byte[] { (byte)'S', (byte)'E', (byte)'C', (byte)'i' }));
+      Assert.That(BinaryPrimitives.ReadUInt32LittleEndian(section.AsSpan(4)), Is.EqualTo(0x00020000u));
+      Assert.That(BinaryPrimitives.ReadUInt32LittleEndian(section.AsSpan(8)), Is.EqualTo(2u));
+      Assert.That(BinaryPrimitives.ReadUInt32LittleEndian(section.AsSpan(12)), Is.EqualTo((uint)X3fFile.FormatRgb24));
+      Assert.That(BinaryPrimitives.ReadUInt32LittleEndian(section.AsSpan(16)), Is.EqualTo((uint)width));
+      Assert.That(BinaryPrimitives.ReadUInt32LittleEndian(section.AsSpan(20)), Is.EqualTo((uint)height));
+      Assert.That(BinaryPrimitives.ReadUInt32LittleEndian(section.AsSpan(24)), Is.EqualTo((uint)stride));
+
+      Assert.That(directory[..4], Is.EqualTo(X3fFile.DirectoryMagic.ToArray()));
+      Assert.That(BinaryPrimitives.ReadUInt32LittleEndian(directory.AsSpan(4)), Is.EqualTo(0x00020000u));
+      Assert.That(BinaryPrimitives.ReadUInt32LittleEndian(directory.AsSpan(8)), Is.EqualTo(1u));
+      Assert.That(BinaryPrimitives.ReadUInt32LittleEndian(directory.AsSpan(12)), Is.EqualTo((uint)X3fFile.HeaderSize));
+      Assert.That(BinaryPrimitives.ReadUInt32LittleEndian(directory.AsSpan(16)), Is.EqualTo((uint)sectionLength));
+      Assert.That(directory.AsSpan(20, 4).ToArray(), Is.EqualTo(new byte[] { (byte)'I', (byte)'M', (byte)'A', (byte)'G' }));
+      Assert.That(BinaryPrimitives.ReadUInt32LittleEndian(written.AsSpan(written.Length - 4)), Is.EqualTo((uint)directoryOffset));
+    });
+
+    for (var y = 0; y < height; ++y)
+      Assert.That(section[X3fFile.ImageSectionHeaderSize + y * stride + width * 3], Is.Zero, $"row {y} padding is zero");
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void ToBytes_PixelDataLengthDoesNotMatchDimensions_ThrowsArgumentException() {
+    var file = new X3fFile { Width = 2, Height = 2, PixelData = new byte[11] };
+
+    Assert.Throws<ArgumentException>(() => X3fWriter.ToBytes(file));
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void FromRawImage_ConvertsToRgb24() {
+    var rgba = new RawImage {
+      Width = 2,
+      Height = 1,
+      Format = PixelFormat.Rgba32,
+      PixelData = [1, 2, 3, 4, 5, 6, 7, 8],
+    };
+
+    var file = X3fFile.FromRawImage(rgba);
+
+    Assert.Multiple(() => {
+      Assert.That(file.Width, Is.EqualTo(2));
+      Assert.That(file.Height, Is.EqualTo(1));
+      Assert.That(file.PixelData, Is.EqualTo(new byte[] { 1, 2, 3, 5, 6, 7 }));
+    });
+  }
 }

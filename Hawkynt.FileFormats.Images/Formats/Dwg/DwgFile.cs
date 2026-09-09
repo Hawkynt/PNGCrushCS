@@ -4,12 +4,12 @@ using FileFormat.Core;
 
 namespace FileFormat.Dwg;
 
-/// <summary>An AutoCAD drawing (.dwg), read by the thumbnail it states the address of.</summary>
+/// <summary>An AutoCAD drawing (.dwg), exposed as the thumbnail it states the address of.</summary>
 /// <remarks>
 /// The drawing itself is a compressed, sectioned, bit-packed database of entities whose layout
-/// changes with every release; reading it is a project rather than a reader, and half of what it
-/// holds is not a picture at all. What every version of it does carry, and states the address of in
-/// its first twenty bytes, is the thumbnail a file chooser shows.
+/// changes with every release; reading it is a project rather than a raster reader, and half of what
+/// it holds is not a picture at all. What every R13-and-newer version carries, and states the address
+/// of in its first twenty bytes, is the thumbnail a file chooser shows.
 /// <para/>
 /// Byte 13 of the file header holds that address. At it sits a sixteen-byte sentinel, then the
 /// length of the block, then a count of the pictures in it, then that many descriptors of nine
@@ -18,12 +18,13 @@ namespace FileFormat.Dwg;
 /// header on, and type 6 a PNG entire. The block ends with the sentinel again, every byte
 /// complemented, which is what says the whole thing has been read as it was meant.
 /// <para/>
-/// Both samples here are AC1027 and carry a PNG at the stated offset, the sentinel and its
-/// complement both agreeing. Nothing about the drawing's own contents is read or guessed at.
-/// <para/>
-/// It does not write, because a thumbnail with no drawing behind it is not a drawing.
+/// Writing follows the same image-level contract without pretending pixels are CAD entities: it
+/// emits a self-contained R2000 (<c>AC1015</c>) envelope with no drawing entities and stores the
+/// supplied <see cref="RawImage"/> losslessly as its PNG preview. The raster remains a preview,
+/// because that is the only image DWG itself defines and the only DWG content this package models.
 /// </remarks>
-public readonly record struct DwgFile : IImageFormatReader<DwgFile>, IImageToRawImage<DwgFile> {
+public readonly record struct DwgFile :
+  IImageFormatReader<DwgFile>, IImageToRawImage<DwgFile>, IImageFromRawImage<DwgFile>, IImageFormatWriter<DwgFile> {
 
   /// <summary>The sixteen bytes the thumbnail block opens with.</summary>
   public static ReadOnlySpan<byte> ImageSentinel => [
@@ -46,6 +47,7 @@ public readonly record struct DwgFile : IImageFormatReader<DwgFile>, IImageToRaw
   static string IImageFormatMetadata<DwgFile>.PrimaryExtension => ".dwg";
   static string[] IImageFormatMetadata<DwgFile>.FileExtensions => [".dwg"];
   static DwgFile IImageFormatReader<DwgFile>.FromSpan(ReadOnlySpan<byte> data) => DwgReader.FromSpan(data);
+  static byte[] IImageFormatWriter<DwgFile>.ToBytes(DwgFile file) => DwgWriter.ToBytes(file);
   static VideoMode[] IImageFormatMetadata<DwgFile>.VideoModes => [
     new("Thumbnail", [(IntegerRange.Any, IntegerRange.Any)], [16777216])
   ];
@@ -76,4 +78,20 @@ public readonly record struct DwgFile : IImageFormatReader<DwgFile>, IImageToRaw
 
   public static RawImage ToRawImage(DwgFile file)
     => file.Thumbnail ?? throw new InvalidDataException("An AutoCAD drawing carries no thumbnail this could read.");
+
+  public static DwgFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+    image = image.EnsureFormat(PixelFormat.Rgba32);
+
+    return new() {
+      Thumbnail = new RawImage {
+        Width = image.Width,
+        Height = image.Height,
+        Format = PixelFormat.Rgba32,
+        PixelData = image.PixelData[..],
+      },
+      ThumbnailType = TypePng,
+      Version = "AC1015",
+    };
+  }
 }

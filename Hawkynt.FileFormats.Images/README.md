@@ -194,6 +194,7 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | CartesMichelin | `.big` | ✅ | — | — | — | — |
 | CasioQv | `.cam` | ✅ | ✅ | — | — | — |
 | Ccitt | `.g3`, `.g4`, `.ccitt`, `.fax` | ✅ | ✅ | — | — | — |
+| Cdr | `.cdr` | ✅ | — | — | — | — |
 | CDUPaint | `.cdu` | ✅ | ✅ | — | — | — |
 | Cdxl | `.cdxl` | ✅ | ✅ | — | — | — |
 | Cel | `.cel` | ✅ | ✅ | — | — | — |
@@ -217,6 +218,7 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | Clp | `.clp` | ✅ | ✅ | — | — | — |
 | Cmu | `.cmu` | ✅ | ✅ | — | — | — |
 | CmuWindowManager | `.cmu`, `.cmuwm` | ✅ | ✅ | — | — | — |
+| Cmx | `.cmx` | ✅ | — | — | — | — |
 | CoCo | `.coc` | ✅ | ✅ | — | — | — |
 | CoCo3 | `.cc3` | ✅ | ✅ | — | — | — |
 | CoCoMax | `.max`, `.p41` | ✅ | ✅ | — | — | — |
@@ -241,13 +243,13 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | CpcOverscan | `.cpo` | ✅ | ✅ | — | — | — |
 | CpcPlus | `.cpp` | ✅ | ✅ | — | — | — |
 | CpcSprite | `.cps` | ✅ | ✅ | — | — | — |
-| Cr3 | `.cr3` | ✅ | — | — | — | — |
+| Cr3 | `.cr3` | ✅ | ✅ | — | — | — |
 | Crack | `.ca2` | ✅ | ✅ | — | — | — |
 | CrackArt | `.ca1`, `.ca2`, `.ca3` | ✅ | ✅ | — | — | — |
 | CranachPaint | `.esm` | ✅ | ✅ | — | — | — |
-| Crd | `.crd` | ✅ | — | — | — | — |
+| Crd | `.crd` | ✅ | ✅ | — | — | — |
 | CreateWithGarfield | `.cwg` | ✅ | ✅ | — | — | — |
-| Crw | `.crw` | ✅ | — | — | — | — |
+| Crw | `.crw` | ✅ | ✅ | — | — | — |
 | CsvImage | `.csv` | ✅ | ✅ | — | — | — |
 | Cur | `.cur` | ✅ | ✅ | — | ✅ | ✅ |
 | CutCreator | `.cut` | ✅ | ✅ | — | — | — |
@@ -288,24 +290,24 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | DuneGraph | `.dg1`, `.dc1` | ✅ | ✅ | — | — | — |
 | Duo | `.duo`, `.du1` | ✅ | ✅ | — | — | — |
 | DuoMedium | `.du2` | ✅ | ✅ | — | — | — |
-| Dwg | `.dwg` | ✅ | — | — | — | — |
-| Dxf | `.dxf` | ✅ | — | — | — | — |
+| Dwg | `.dwg` | ✅ | ✅ | — | — | — |
+| Dxf | `.dxf` | ✅ | ✅ | — | — | — |
 | EccHeader | `.ecc` | ✅ | ✅ | — | — | — |
 | EciGraphicEditor | `.eci`, `.ecp` | ✅ | ✅ | — | — | — |
 | EclipseTile | `.tile` | ✅ | ✅ | — | — | — |
 | Ecw | `.ecw` | ✅ | ✅ | — | — | — |
 | EdmicsC4 | `.c4` | ✅ | ✅ | — | — | — |
 | EggPaint | `.trp` | ✅ | ✅ | — | — | — |
-| ElectricImage | `.ei`, `.eidi` | ✅ | — | — | ✅ | — |
+| ElectricImage | `.ei`, `.eidi` | ✅ | ✅ | — | ✅ | — |
 | Electronika | `.bk`, `.ekr` | ✅ | ✅ | — | — | — |
-| EmbeddedDib | `.cdr`, `.cmx`, `.zmf`, `.skf`, `.cad`, `.sdg`, `.ipg`, `.btn` | ✅ | — | — | — | — |
+| EmbeddedDib | `.zmf`, `.skf`, `.cad`, `.btn` | ✅ | — | — | — | — |
 | EmcEditor | `.emc` | ✅ | ✅ | — | — | — |
 | Emf | `.emf` | ✅ | ✅ | — | — | — |
 | Enterprise128 | `.ep`, `.elan` | ✅ | ✅ | — | — | — |
 | Envi | `.hdr` | ✅ | ✅ | — | — | — |
 | EpaBios | `.epa` | ✅ | ✅ | — | — | — |
 | Eps | `.eps`, `.epsf`, `.epsi`, `.epi`, `.ept` | ✅ | ✅ | — | — | — |
-| Eroiica | `.eif` | ✅ | — | — | ✅ | — |
+| Eroiica | `.eif` | ✅ | ✅ | — | ✅ | — |
 | EscapePaint | `.esp` | ✅ | ✅ | — | — | — |
 | EsmSoftwarePix | `.pix` | ✅ | ✅ | — | — | — |
 | EverexFax | `.efx`, `.ef3` | ✅ | ✅ | — | — | — |
@@ -364,7 +366,7 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | Gd2 | `.gd2` | ✅ | ✅ | — | — | — |
 | GedPicture | `.ged` | ✅ | ✅ | — | — | — |
 | GeGenesis | `.fre`, `.pd`, `.t1`, `.t2` | ✅ | ✅ | — | — | — |
-| Gem | `.gem` | ✅ | — | — | — | — |
+| Gem | `.gem` | ✅ | ✅ | — | — | — |
 | GemImg | `.img` | ✅ | ✅ | — | — | — |
 | GeoPaint | `.geo` | ✅ | ✅ | — | — | — |
 | GephardHires | `.ghg` | ✅ | ✅ | — | — | — |
@@ -394,7 +396,7 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | Grs16 | `.g16` | ✅ | ✅ | — | — | — |
 | GunPaint | `.gun`, `.ifl` | ✅ | ✅ | — | — | — |
 | HalfLifeMdl | `.mdltex` | ✅ | ✅ | — | — | — |
-| HalfLifeModel | `.mdl` | ✅ | — | — | — | — |
+| HalfLifeModel | `.mdl` | ✅ | ✅ | — | — | — |
 | HandyScanner | `.hs2` | ✅ | ✅ | — | — | — |
 | HardColorMap | `.hcm` | ✅ | ✅ | — | — | — |
 | HardInterlace | `.hip` | ✅ | ✅ | — | — | — |
@@ -418,7 +420,7 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | HiresManager | `.him` | ✅ | ✅ | — | — | — |
 | HomeworldLif | `.lif` | ✅ | ✅ | — | — | — |
 | Hp48Grob | `.grb`, `.gro` | ✅ | ✅ | — | — | — |
-| Hpgl | `.hpgl`, `.hgl`, `.hpg`, `.prn`, `.prt`, `.spl` | ✅ | — | — | — | — |
+| Hpgl | `.hpgl`, `.hgl`, `.hpg`, `.prn`, `.prt`, `.spl` | ✅ | ✅ | — | — | — |
 | HpGrob | `.grob`, `.hp`, `.gro2`, `.gro4` | ✅ | ✅ | — | — | — |
 | Hpi | `.hpi` | ✅ | ✅ | — | — | — |
 | Hru | `.hru` | ✅ | ✅ | — | — | — |
@@ -434,16 +436,16 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | Ics | `.ics` | ✅ | ✅ | — | — | — |
 | IffAcbm | `.acbm`, `.iff`, `.blk` | ✅ | ✅ | — | — | — |
 | IffAnim | `.anim` | ✅ | ✅ | — | — | — |
-| IffAnim8 | `.an8`, `.anim8` | ✅ | — | — | — | — |
+| IffAnim8 | `.an8`, `.anim8` | ✅ | ✅ | — | — | — |
 | IffDctv | `.dctv` | ✅ | ✅ | — | — | — |
 | IffDeep | `.deep`, `.iff`, `.blk` | ✅ | ✅ | — | — | — |
-| IffDpan | `.dpan` | ✅ | — | — | — | — |
-| IffHame | `.hame` | ✅ | — | — | — | — |
-| IffMultiPalette | `.mpl`, `.mpal` | ✅ | — | — | — | — |
+| IffDpan | `.dpan` | ✅ | ✅ | — | — | — |
+| IffHame | `.hame` | ✅ | ✅ | — | — | — |
+| IffMultiPalette | `.mpl`, `.mpal` | ✅ | ✅ | — | — | — |
 | IffPbm | `.lbm`, `.pbm`, `.blk` | ✅ | ✅ | — | — | — |
 | IffRgb8 | `.rgb8`, `.iff`, `.blk` | ✅ | ✅ | — | — | — |
 | IffRgbn | `.rgbn`, `.iff`, `.blk` | ✅ | ✅ | — | — | — |
-| IffSham | `.sham` | ✅ | — | — | — | — |
+| IffSham | `.sham` | ✅ | ✅ | — | — | — |
 | Ilbm | `.lbm`, `.ilbm`, `.iff`, `.blk`, `.ham`, `.ham6`, `.ham8`, `.256`, `.ap2`, `.beam`, `.dct`, `.dr`, `.mp`, `.bl1`, `.bl2`, `.bl3` | ✅ | ✅ | — | — | — |
 | Im5Visilog | `.im5` | ✅ | ✅ | — | — | — |
 | ImageLabBw | `.b&w`, `.b_w`, `.dit` | ✅ | ✅ | — | — | — |
@@ -470,6 +472,7 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | InterPaintMc | `.ipt`, `.lre` | ✅ | ✅ | — | — | — |
 | Ioca | `.ica`, `.ioca`, `.ioc`, `.mod` | ✅ | ✅ | — | — | — |
 | IPaint | `.ip` | ✅ | ✅ | — | — | — |
+| Ipg | `.ipg` | ✅ | — | — | ✅ | — |
 | Ipl | `.ipl` | ✅ | ✅ | — | — | — |
 | Ipsm | `.pan` | ✅ | ✅ | — | — | — |
 | Iss | `.iss` | ✅ | ✅ | — | — | — |
@@ -549,7 +552,7 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | Mpo | `.mpo` | ✅ | ✅ | — | ✅ | — |
 | Mrc | `.mrc`, `.map` | ✅ | ✅ | — | — | — |
 | Mrf | `.mrf` | ✅ | ✅ | — | — | — |
-| Mrw | `.mrw` | ✅ | — | — | — | — |
+| Mrw | `.mrw` | ✅ | ✅ | — | — | — |
 | Msp | `.msp` | ✅ | ✅ | — | — | — |
 | Msx | `.sc2`, `.sc5`, `.sc7`, `.sc8`, `.ge7`, `.ge8` | ✅ | ✅ | — | — | — |
 | MsxFont | `.fnt`, `.mft` | ✅ | ✅ | — | — | — |
@@ -576,7 +579,7 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | MultiPalettePicture | `.mpp` | ✅ | ✅ | — | — | — |
 | NcrImage | `.ncr` | ✅ | ✅ | — | — | — |
 | NdsTexture | `.nbfs`, `.nds` | ✅ | ✅ | — | — | — |
-| NeoBookCartoon | `.car` | ✅ | — | — | — | — |
+| NeoBookCartoon | `.car` | ✅ | ✅ | — | — | — |
 | Neochrome | `.neo` | ✅ | ✅ | — | — | — |
 | NeoGeoPocket | `.ngp`, `.ngpc` | ✅ | ✅ | — | — | — |
 | NeoGeoSprite | `.spr` | ✅ | ✅ | — | — | — |
@@ -651,7 +654,7 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | PhotoPaint | `.cpt` | ✅ | ✅ | — | — | — |
 | PhotoParade | `.php` | ✅ | ✅ | — | ✅ | — |
 | PhotoStudio | `.psf` | ✅ | ✅ | — | — | — |
-| PhotoSuiteProject | `.pzp` | ✅ | — | — | — | — |
+| PhotoSuiteProject | `.pzp` | ✅ | ✅ | — | — | — |
 | Pi | `.pi` | ✅ | ✅ | — | — | — |
 | Pic2 | `.p2` | ✅ | ✅ | — | — | — |
 | Picasso | `.pic0` | ✅ | ✅ | — | — | — |
@@ -677,7 +680,7 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | Png | `.png`, `.frm` | ✅ | ✅ | — | — | ✅ |
 | PntrFalcon | `.pnf`, `.pfl` | ✅ | ✅ | — | — | — |
 | PocketPc2bp | `.2bp` | ✅ | ✅ | — | — | — |
-| PocketPcTheme | `.tsk` | ✅ | — | — | — | — |
+| PocketPcTheme | `.tsk` | ✅ | ✅ | — | — | — |
 | PortfolioGraphics | `.pgf`, `.pgc` | ✅ | ✅ | — | — | — |
 | Portrait | `.cvp` | ✅ | ✅ | — | — | — |
 | PostScript | `.ps`, `.ps1`, `.ps2`, `.ps3`, `.eps`, `.epsf`, `.epsi`, `.epi`, `.prn`, `.pdx` | ✅ | ✅ | — | — | — |
@@ -739,6 +742,7 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | ScitexCt | `.sct`, `.ct`, `.ch` | ✅ | ✅ | — | — | — |
 | ScreenBlaster | `.sbl` | ✅ | ✅ | — | — | — |
 | ScreenMaker | `.smk` | ✅ | ✅ | — | — | — |
+| Sdg | `.sdg` | ✅ | — | — | ✅ | — |
 | Sdt | `.sdt` | ✅ | ✅ | — | — | — |
 | SeattleFilmWorks | `.sfw`, `.pwp` | ✅ | ✅ | — | — | — |
 | SecondNatureSlideShow | `.cat` | ✅ | ✅ | — | ✅ | — |
@@ -829,7 +833,7 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | TrsPix | `.pix` | ✅ | ✅ | — | — | — |
 | TrueColorImg | `.timg` | ✅ | ✅ | — | — | — |
 | TruePaint | `.mci` | ✅ | ✅ | — | — | — |
-| TrueType | `.ttf` | ✅ | — | — | — | — |
+| TrueType | `.ttf` | ✅ | ✅ | — | — | — |
 | TrzmielCompressed | `.cpr` | ✅ | ✅ | — | — | — |
 | TurboRascal | `.flf` | ✅ | ✅ | — | — | — |
 | TurboView | `.tvw`, `.tbv` | ✅ | ✅ | — | — | — |
@@ -876,7 +880,7 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | Wsq | `.wsq` | ✅ | ✅ | — | — | — |
 | Wzl | `.wzl` | ✅ | ✅ | — | — | — |
 | X11Puzzle | `.pzl` | ✅ | ✅ | — | — | — |
-| X3f | `.x3f` | ✅ | — | — | — | — |
+| X3f | `.x3f` | ✅ | ✅ | — | — | — |
 | Xar | `.xar` | ✅ | ✅ | — | — | — |
 | XBin | `.xb`, `.xbin` | ✅ | ✅ | — | — | — |
 | Xbm | `.xbm`, `.icon`, `.ico`, `.cbm`, `.x` | ✅ | ✅ | — | — | — |
@@ -886,7 +890,7 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | XFliEditor | `.xfl` | ✅ | ✅ | — | — | — |
 | Ximage | `.xim` | ✅ | ✅ | — | — | — |
 | XionicsSmp | `.smp` | ✅ | ✅ | — | — | — |
-| Xld4 | `.q4` | ✅ | — | — | — | — |
+| Xld4 | `.q4` | ✅ | ✅ | — | — | — |
 | XlPaint | `.xlp` | ✅ | ✅ | — | — | — |
 | Xpm | `.xpm`, `.picon` | ✅ | ✅ | — | — | — |
 | XvThumbnail | `.xv`, `.p7` | ✅ | ✅ | — | — | — |
@@ -994,7 +998,7 @@ PES came the same way and reaches a different answer, because the file is a diff
 
 AVCI turned out not to be a format at all. An `.avci` is a HEIF: the same boxes, the same item structure, the same `iloc` and `ipco`, with an H.264 access unit where an HEVC one would be and an `avcC` property where an `hvcC` would be. So it is read by the container code that was already here, with the H.264 decoder from the video package linked in beside the H.265 one that HEIF already borrowed, and `.avci` and `.avcs` join `.heic` and `.heif` as names of that one format rather than becoming a format of their own. ImageMagick is no help here — asked for AVCI it writes HEVC and calls it that — so the reference is libheif, which reads AVCI properly: a file built from an x264 intra frame is one libheif reports the brand, item and size of and decodes, and its decode is what this is measured against. The two agree to within two levels a sample, which is the rounding of the conversion out of YCbCr and the same allowance every other lossy comparison here makes.
 
-CR3 was the last of them and the one that looked closed. It is an ISO base media file — the same boxes again — with Canon's own boxes inside two `uuid`s, and its sensor data coded with CRX, Canon's wavelet codec, which is not implemented here and is refused by name. What is read is what the camera stored beside it: the full-size preview and the thumbnail, both ordinary JPEGs, which is the same answer this package already gives for every other raw format whose sensor compression it does not know — the preview inside is a picture either way. No CR3 was to hand and none could be produced, so the file the reader is measured on was built to the layout ExifTool reads, and ExifTool is what judges it: handed a file written here it reports the type as CR3, states the codec version out of the Canon box, and extracts the preview and the thumbnail byte for byte as they went in. The one detail that had to be taken from ExifTool's own tables rather than reasoned about is that the preview's JPEG begins at a fixed offset of forty-eight bytes into its `uuid` box, behind a header whose earlier fields disagree with the comments describing them.
+CR3 was the last of them and the one that looked closed. It is an ISO base media file — the same boxes again — with Canon's own boxes inside two `uuid`s, and its sensor data coded with CRX, Canon's wavelet codec, which is not implemented here and is refused by name. What is read is what the camera stored beside it: the full-size preview and the thumbnail, both ordinary JPEGs, which is the same answer this package already gives for every other raw format whose sensor compression it does not know — the preview inside is a picture either way. The registry writer deliberately stops at that same boundary: an arbitrary `RawImage` is JPEG-encoded as the CR3 preview and wrapped in the same `ftyp`/Canon-`uuid`/`PRVW` structure; no CRX track, camera model, lens or exposure is fabricated. The Write tick therefore means a CR3 container carrying the requested picture, not a camera-authored raw capture. No CR3 was to hand and none could be produced, so the file the reader is measured on was built to the layout ExifTool reads, and ExifTool is what judges it: handed a file written here it reports the type as CR3, states the codec version out of the Canon box, and extracts the preview and the thumbnail byte for byte as they went in. The one detail that had to be taken from ExifTool's own tables rather than reasoned about is that the preview's JPEG begins at a fixed offset of forty-eight bytes into its `uuid` box, behind a header whose earlier fields disagree with the comments describing them.
 
 The audit's third finding was a format that was simply absent. Aseprite is what ImageMagick writes for `.ase` and `.aseprite`, and nothing here read it — the entry above used to say the format was "not yet registered", which read as a decision and was not one; no reader existed. There is one now, and a writer with it. A sprite is a stack of layers rather than a raster, so the reader composes the first frame's visible cels in layer order, each at the offset its own chunk states, and refuses a blend mode other than normal rather than approximating one. Reading ImageMagick's own 64x48 sprite gives back the picture ImageMagick was given to make it, every pixel identical.
 
@@ -1020,9 +1024,15 @@ Graph2FontScroll needs that judgement more than most, because nearly everything 
 
 A caution about the Read column: it is `SupportsRead` from the registry, which says a reader is registered for the format, not that the reader returns a picture. Two entries currently take the tick without earning it — `IffSham` and `IconLibrary` refuse in `ToRawImage` for every file, honestly and by name, but the matrix cannot see that and shows them as read. Two more did until recently: `Spectrum512Smoosh` threw on every file and `IffDctv` rendered its compressed body as grey noise, both while showing a tick, and both were found only because someone came to write them. Treat a tick here as "the format is recognised"; the paragraphs above say which readers have been measured against another implementation, and that is the claim worth trusting.
 
+### HP-GL authoring
+
+`Hpgl` writes arbitrary raster input as standard HP-GL pen geometry: alpha is composited onto white, colours are reduced to the modelled eight-pen carousel, adjacent pixels using the same pen are joined into filled rectangles, and sources above 512 pixels on either side are sampled down with their aspect ratio intact to keep plot size bounded. The output deliberately uses ordinary `IN`/`SP`/`PU`/`RA` commands rather than a private raster payload.
+
+This list used to be far longer, and the entries that left it did so by argument rather than by anyone's afternoon. It once declined the camera-raw formats on the ground that a CR3 built from arbitrary pixels would state a sensor, a lens and an exposure that never happened; it declined TrueType because a font is not a picture, ElectricImage because this package cannot produce a true example of one, and a Half-Life model because it carries skins rather than an image. Those writers now exist and are registered, and each states in its own row and remarks what it does and does not claim to be — a CR3 whose metadata describes the preview it wraps rather than a capture that never happened, a font whose glyphs are the traced runs of the raster it was given. The objection they answer was never that the bytes could not be produced; it was that producing them would assert something untrue. Where a row cannot make that claim honestly it says so.
+
 ### Registered but read-only
 
-These 29 entries read but have no writer; each is a decision, not an oversight. **Not bounded** (an encoder or a model this package does not have): Crw, Mrw, X3f (camera-raw sensor models), Dwg, Dxf, Hpgl (CAD/vector), TrueType (font), PeResource, PowerPoint, Fpx, PocketPcTheme (executable, OLE and CAB containers), IffAnim8, IffDpan, IffHame (multi-frame or hardware-mode Amiga animation), IffSham, IffMultiPalette (per-line palette encoders whose identity is unverified), Xld4, Gem, IconLibrary, PhotoSuiteProject (compressed or container layouts read from one sample each). **Deliberately not written** because a file built from arbitrary pixels would not be what the name promises: EmbeddedDib, Eroiica, Crd, NeoBookCartoon, CartesMichelin, Cr3, Pes. A CR3 is a camera's file, and one made from arbitrary pixels would state a sensor, a lens and an exposure that never happened, which is why every camera format here is read-only; `Cr3Writer` builds the container around a preview so the reader can be checked against ExifTool, and stays off the registry's writer contract for the same reason. The last of those is a needle path rather than a raster — a Brother embroidery file states where the needle goes and in which thread, and the picture is what those moves draw — so writing one from a picture means deciding where to put every stitch, which is needlework and not serialisation. Writing one from stitches a caller already has is a different thing and `PesWriter` does it; it stays off the registry's writer contract because that contract asks for a picture. **Declined for what the file would be, not for difficulty**: ElectricImage, HalfLifeModel. This entry used to call both of them, and ML1 with them, "simple raster layouts with specified headers" that nothing blocked but the work. Each format's own source says otherwise and has for some time; ML1 has since been answered, and the paragraph above says how. ElectricImage is a renderer's output file, and `ElectricImageFile`'s remarks decline to write one on the ground that this package cannot produce a true example of one. A Half-Life model is not a picture; it carries skins, and writing an image into one means synthesising a whole `studiohdr_t` model around a single texture. Neither is a missing encoder waiting for someone's afternoon.
+These 11 entries read but have no writer; each is a decision, not an oversight. **Not bounded** (an encoder or a model this package does not have): PeResource, PowerPoint, Fpx (executable, OLE and compound-document containers). **Holders of other files rather than pictures of their own**: IconLibrary, Ipg, Sdg, Cdr, Cmx — an icon library, a tileset and a gallery carry whole files of other formats, and CorelDRAW's streams are vector scenes whose raster part is only an embedded preview, so writing any of them means deciding what belongs in a collection or composing a drawing, neither of which is serialising a picture. **Deliberately not written** because a file built from arbitrary pixels would not be what the name promises: EmbeddedDib, CartesMichelin, Pes. The last is a needle path rather than a raster — a Brother embroidery file states where the needle goes and in which thread, and the picture is what those moves draw — so writing one from a picture means deciding where to put every stitch, which is needlework and not serialisation. Writing one from stitches a caller already has is a different thing and `PesWriter` does it; it stays off the registry's writer contract because that contract asks for a picture.
 
 ## 🚀 Quick start
 
@@ -1412,7 +1422,7 @@ The long tail also includes TGA/Targa, PCX, SGI/Iris, Sun Raster, X PixMap (XPM)
 
 <!-- API:BEGIN generated by Hawkynt/RepositoryTemplate/package-readme — edit the XML docs in source, not here -->
 
-Every public and protected member of all 3261 types, generated from the built assembly and its XML documentation, is in [REFERENCE.md](https://github.com/Hawkynt/PNGCrushCS/blob/main/Hawkynt.FileFormats.Images/REFERENCE.md).
+Every public and protected member of all 3287 types, generated from the built assembly and its XML documentation, is in [REFERENCE.md](https://github.com/Hawkynt/PNGCrushCS/blob/main/Hawkynt.FileFormats.Images/REFERENCE.md).
 
 <!-- API:END -->
 
@@ -1538,6 +1548,46 @@ What is left is a shorter list than it was. The edge-preserving filter is parsed
 - **TFM** — targets `net8.0`. Older runtimes are not supported.
 - Coverage breadth is larger than conformance depth. Some historical formats have scarce or no public samples; registry presence is not a promise that every obscure producer variant has been verified.
 - The JPEG XL pixel path is measured against libjxl on 104 files plus the fixtures, not against every `.jxl` that exists. Do not treat its internal round-trip as proof of arbitrary `.jxl` compatibility.
+
+## 📚 References
+
+The format-specific links in [Extended format-family reference](#-extended-format-family-reference) are the detailed bibliography. This table records external material that materially shaped implementation, reverse engineering, cross-checking, or conformance work: normative specifications and manuals, foreign source code used as implementation references or provenance, third-party encoders/decoders used as behavioural oracles, and catalogues/corpora used to find coverage gaps. An **oracle** is evidence against an external implementation, not a claim that every tool listed is independent — broad tools can share the same underlying codec libraries. Where this repository carries explicit third-party licence notices, [`THIRD_PARTY_NOTICES.md`](https://github.com/Hawkynt/PNGCrushCS/blob/main/Hawkynt.FileFormats.Images/THIRD_PARTY_NOTICES.md) is authoritative for those licence terms; this table is technical provenance, not a licensing inventory.
+
+| Reference | Kind | Used for |
+| --- | --- | --- |
+| [RFC 6386 — VP8 Data Format and Decoding Guide](https://www.rfc-editor.org/rfc/rfc6386) | Specification | VP8 bitstream syntax and boolean arithmetic coding. |
+| [Go `x/image/vp8`](https://pkg.go.dev/golang.org/x/image/vp8) | Foreign source code | Source lineage for the managed VP8 lossy decoder. |
+| [libwebp](https://github.com/webmproject/libwebp) | Foreign source code + oracle | WebP animation-compositor behaviour and `dwebp` pixel parity, including fancy chroma upsampling. |
+| [AV1 Bitstream & Decoding Process Specification](https://aomediacodec.github.io/av1-spec/) | Specification | AV1 syntax, transforms, prediction, entropy contexts and in-loop filters. |
+| [libaom](https://aomedia.googlesource.com/aom/) | Foreign source code + oracle | AV1 normative tables/algorithms and `libaom`-produced AVIF conformance corpus. |
+| [rav1e](https://github.com/xiph/rav1e) | Foreign source code | AV1 range-encoder storage/carry logic used by the managed writer; see third-party notices. |
+| [dav1d](https://code.videolan.org/videolan/dav1d) | Oracle | Sample-for-sample AV1 decode parity. |
+| [libavif (`avifenc` / `avifdec`)](https://github.com/AOMediaCodec/libavif) | Oracle | Independent AVIF generation/acceptance and alpha-plane checks. |
+| [SVT-AV1](https://gitlab.com/AOMediaCodec/SVT-AV1) | Oracle / corpus producer | Additional independently encoded AV1 bitstreams in the AVIF corpus. |
+| [ITU-T T.800 / JPEG 2000 Part 1](https://www.itu.int/rec/T-REC-T.800) | Specification | JPEG 2000 codestream syntax and baseline coding rules. |
+| [OpenJPEG](https://github.com/uclouvain/openjpeg) | Oracle | `opj_compress` / `opj_decompress` interoperability and pixel comparisons for JPEG 2000. |
+| [JPEG XL / ISO/IEC 18181](https://jpeg.org/jpegxl/) | Specification / documentation | JPEG XL codestream, metadata, modular and VarDCT semantics. |
+| [libjxl (`cjxl` / `djxl`)](https://github.com/libjxl/libjxl) | Foreign source code + oracle | Fast-lossless encoder provenance, decoder behaviour and extensive JPEG XL pixel parity. |
+| [zune-jpegxl](https://github.com/etemesi254/zune-image/tree/dev/crates/zune-jpegxl) | Foreign source-code cross-check | Independent cross-check of the JPEG XL fast-lossless adaptation. |
+| [ITU-T T.832 — JPEG XR](https://www.itu.int/rec/T-REC-T.832) | Specification | JPEG XR / HD Photo core coding rules. |
+| [SharpAstro/Codecs](https://github.com/SharpAstro/Codecs) | Foreign source code | Vendored managed JPEG XR T.832 core; exact provenance is recorded in third-party notices. |
+| [JXRLib](https://github.com/4creators/jxrlib) | Reference implementation + oracle | JPEG XR source lineage, fixtures, `JxrEncApp` / `JxrDecApp` interoperability. |
+| [Microsoft Windows Imaging Component (WIC)](https://learn.microsoft.com/windows/win32/wic/-wic-about-windows-imaging-codec) | Documentation + oracle | JPEG XR container/pixel-format GUID behaviour and Windows interoperability. |
+| [libheif](https://github.com/strukturag/libheif) | Oracle | HEIF/HEIC and AVCI decoding, colour handling, container interpretation and writer acceptance. |
+| [libde265 (`dec265`)](https://github.com/strukturag/libde265) | Oracle | Independent HEVC decode acceptance for HEIF writer output. |
+| [x264](https://code.videolan.org/videolan/x264) / [x265](https://bitbucket.org/multicoreware/x265_git/) | Corpus producers | Intra H.264/HEVC streams used to exercise AVCI and HEIF container paths. |
+| [FFmpeg](https://ffmpeg.org/) | Oracle | HEVC, JPEG 2000, AVIF and broad cross-format decode comparisons. |
+| [DjVuLibre](https://djvu.sourceforge.net/) | Foreign source-code provenance / reference implementation | ZP coder/decoder behaviour and probability-table provenance for DjVu. |
+| [RECOIL](https://recoil.sourceforge.net/) | Reference implementation + oracle | Pixel-exact validation and writer acceptance for many retro-computing formats where it is the only complete external decoder. |
+| [ImageMagick](https://imagemagick.org/formats/) | Oracle + format catalogue | Broad writer-generated corpus, pixel comparisons, acceptance checks and format-gap discovery. |
+| [XnView / NConvert](https://www.xnview.com/en/image-formats/) | Oracle + format catalogue | Broad format coverage comparison and external writer/read acceptance. |
+| [IrfanView](https://www.irfanview.info/main_formats.htm) | Oracle + format catalogue | Broad format coverage comparison and writer/read acceptance. |
+| [ExifTool](https://exiftool.org/) | Documentation + oracle | CR3/Canon box layout cross-checks and byte-exact preview/thumbnail extraction. |
+| [Tom's Editor supported formats](https://tomseditor.com/blog/supported-formats) | Format catalogue / oracle | Coverage-gap checks and spot conversions for obscure formats. |
+| [Telparia file-format samples](https://telparia.com/fileFormatSamples/image) | External corpus | Additional real-world samples used by parity tooling. |
+| [Microsoft OpenType specification](https://learn.microsoft.com/typography/opentype/spec/) | Specification | TrueType/sfnt table and glyph parsing. |
+| [Apple TrueType Reference Manual](https://developer.apple.com/fonts/TrueType-Reference-Manual/index.html) | Reference manual | Independent cross-check for TrueType outlines and table semantics. |
+| [Autodesk DXF Reference](https://help.autodesk.com/cloudhelp/2025/ENU/AutoCAD-DXF/files/GUID-20172853-157D-4024-8E64-32F3BD64F883.htm) | Reference manual | ASCII DXF file structure, group codes, sections and entity semantics. |
 
 ## ❤️ Support
 

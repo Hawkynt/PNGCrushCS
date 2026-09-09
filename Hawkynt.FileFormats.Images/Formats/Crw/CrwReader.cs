@@ -129,6 +129,9 @@ public static class CrwReader {
       Sensor = sensor,
       SensorWidth = sensorWidth,
       SensorHeight = sensorHeight,
+      ImageLeft = left,
+      ImageTop = top,
+      BitsPerSample = lowBits ? 12 : 10,
     };
   }
 

@@ -4,166 +4,157 @@ using System.Runtime.CompilerServices;
 
 namespace FileFormat.DjVu.Codec;
 
-/// <summary>
-/// ZP (Z-coder) adaptive binary arithmetic encoder for DjVu.
-/// Faithful port of djvulibre's ZPCodec encoder (ZPCODER variant).
-///
-/// Key: z = a + P[ctx], NOT just P[ctx].
-/// Uses the z-restriction: d = 0x6000 + ((z+a)>>2); if (z > d) z = d
-/// Output uses a 24-bit buffer with bit-stuffing carry propagation (zemit/outbit).
-/// Initial 25-bit delay before output begins.
-/// </summary>
+/// <summary>DjVu ZP adaptive binary arithmetic encoder.</summary>
+/// <remarks>
+/// The interval split, probability-state adaptation and bit emission follow the published ZP coding
+/// process. Implementation provenance and compatible reference material are recorded in
+/// <c>UPSTREAM.md</c> beside this file.
+/// </remarks>
 internal sealed class ZpEncoder {
 
-  private readonly MemoryStream _output;
-  private uint _a;        // interval width above half
-  private uint _subend;   // sub-interval endpoint
-  private uint _buffer;   // 24-bit carry buffer
-  private int _nrun;      // run of 0x00 bytes pending
-  private int _delay;     // countdown before output starts (25 initially)
-  private byte _byte;     // accumulating output byte
-  private int _scount;    // bits accumulated in _byte
+  private readonly MemoryStream _output = new(4096);
+  private uint _interval;
+  private uint _subintervalEnd;
+  private uint _carryWindow = 0xffffff;
+  private int _pendingRun;
+  private int _startupDelay = 25;
+  private byte _outputByte;
+  private int _outputBits;
 
-  public ZpEncoder() {
-    _output = new(4096);
-    _a = 0;
-    _scount = 0;
-    _byte = 0;
-    _delay = 25;
-    _subend = 0;
-    _buffer = 0xFFFFFF;
-    _nrun = 0;
-  }
-
-  /// <summary>Encodes a single bit given a context.</summary>
+  /// <summary>Encodes one context-adaptive bit.</summary>
   [MethodImpl(MethodImplOptions.AggressiveInlining)]
-  public void EncodeBit(int bit, ref ZpContext ctx) {
-    // z = a + P[ctx] -- the combined interval boundary
-    var z = _a + ZpTables.P[ctx.Value];
+  public void EncodeBit(int bit, ref ZpContext context) {
+    var state = context.Value;
+    var probableBit = state & 1;
+    var split = _interval + ZpTables.P[state];
 
-    if (bit != (ctx.Value & 1)) {
-      // LPS path
-      // Apply z-restriction (ZPCODER variant)
-      var d = 0x6000u + ((z + _a) >> 2);
-      if (z > d) z = d;
-      // Context demotion
-      ctx = new(ZpTables.Dn[ctx.Value]);
-      // Update interval: LPS region
-      z = 0x10000u - z;
-      _subend += z;
-      _a += z;
-    } else if (z >= 0x8000) {
-      // MPS path, needs renorm
-      // Apply z-restriction (ZPCODER variant)
-      var d = 0x6000u + ((z + _a) >> 2);
-      if (z > d) z = d;
-      // Context promotion
-      if (_a >= ZpTables.M[ctx.Value])
-        ctx = new(ZpTables.Up[ctx.Value]);
-      // Update interval: MPS region
-      _a = z;
-    } else {
-      // MPS fast path: no renorm needed
-      _a = z;
+    if (bit != probableBit) {
+      split = _RestrictSplit(split);
+      context = new(ZpTables.Dn[state]);
+      _SelectLessProbable(split);
       return;
     }
 
-    // Export bits (renormalize)
-    while (_a >= 0x8000) {
-      _Zemit(1 - (int)(_subend >> 15));
-      _subend = (ushort)(_subend << 1);
-      _a = (ushort)(_a << 1);
+    if (split < 0x8000) {
+      _interval = split;
+      return;
     }
+
+    split = _RestrictSplit(split);
+    if (_interval >= ZpTables.M[state])
+      context = new(ZpTables.Up[state]);
+
+    _interval = split;
+    _Renormalize();
   }
 
-  /// <summary>Encodes a bit without context (equiprobable).</summary>
+  /// <summary>Encodes one equiprobable bit.</summary>
   public void EncodePassthrough(int bit) {
-    // IW44-style passthrough: z = 0x8000 + (a >> 1)
-    var z = 0x8000u + (_a >> 1);
+    var split = 0x8000u + (_interval >> 1);
+    if (bit == 0)
+      _interval = split;
+    else
+      _SelectLessProbableWithoutRenormalization(split);
 
-    if (bit != 0) {
-      // LPS: code 1
-      z = 0x10000u - z;
-      _subend += z;
-      _a += z;
-    } else {
-      // MPS: code 0
-      _a = z;
-    }
-
-    // Export bits
-    while (_a >= 0x8000) {
-      _Zemit(1 - (int)(_subend >> 15));
-      _subend = (ushort)(_subend << 1);
-      _a = (ushort)(_a << 1);
-    }
+    _Renormalize();
   }
 
-  /// <summary>Encodes an unsigned integer in binary with the given number of bits.</summary>
-  public void EncodeBinary(int value, ref ZpContext ctx, int bits) {
-    for (var i = bits - 1; i >= 0; --i)
-      EncodeBit((value >> i) & 1, ref ctx);
+  /// <summary>Encodes an unsigned integer, most-significant bit first, with one adaptive context.</summary>
+  public void EncodeBinary(int value, ref ZpContext context, int bits) {
+    for (var bit = bits - 1; bit >= 0; --bit)
+      EncodeBit((value >> bit) & 1, ref context);
   }
 
-  /// <summary>Finalizes and returns compressed bytes.</summary>
+  /// <summary>Finalizes the arithmetic stream and returns the emitted bytes.</summary>
   public byte[] Finish() {
-    _Eflush();
+    if (_subintervalEnd > 0x8000)
+      _subintervalEnd = 0x10000;
+    else if (_subintervalEnd > 0)
+      _subintervalEnd = 0x8000;
+
+    while (_carryWindow != 0xffffff || _subintervalEnd != 0) {
+      _EmitArithmeticBit(1 - (int)(_subintervalEnd >> 15));
+      _subintervalEnd = (ushort)(_subintervalEnd << 1);
+    }
+
+    _WriteBit(1);
+    _FlushPendingRun(0);
+
+    while (_outputBits > 0)
+      _WriteBit(1);
+
+    _startupDelay = 0xff;
     return _output.ToArray();
   }
 
-  private void _Zemit(int b) {
-    _buffer = (_buffer << 1) + (uint)b;
-    b = (int)(_buffer >> 24);
-    _buffer &= 0xFFFFFF;
-    switch (b) {
+  [MethodImpl(MethodImplOptions.AggressiveInlining)]
+  private uint _RestrictSplit(uint split) {
+    var limit = 0x6000u + ((_interval + split) >> 2);
+    return Math.Min(split, limit);
+  }
+
+  [MethodImpl(MethodImplOptions.AggressiveInlining)]
+  private void _SelectLessProbable(uint split) {
+    _SelectLessProbableWithoutRenormalization(split);
+    _Renormalize();
+  }
+
+  [MethodImpl(MethodImplOptions.AggressiveInlining)]
+  private void _SelectLessProbableWithoutRenormalization(uint split) {
+    var tail = 0x10000u - split;
+    _subintervalEnd += tail;
+    _interval += tail;
+  }
+
+  private void _Renormalize() {
+    while (_interval >= 0x8000) {
+      _EmitArithmeticBit(1 - (int)(_subintervalEnd >> 15));
+      _subintervalEnd = (ushort)(_subintervalEnd << 1);
+      _interval = (ushort)(_interval << 1);
+    }
+  }
+
+  private void _EmitArithmeticBit(int bit) {
+    _carryWindow = (_carryWindow << 1) + (uint)bit;
+    var carry = _carryWindow >> 24;
+    _carryWindow &= 0xffffff;
+
+    switch (carry) {
       case 1:
-        _Outbit(1);
-        while (_nrun-- > 0)
-          _Outbit(0);
-        _nrun = 0;
+        _WriteBit(1);
+        _FlushPendingRun(0);
         break;
-      case 0xFF:
-        _Outbit(0);
-        while (_nrun-- > 0)
-          _Outbit(1);
-        _nrun = 0;
+      case 0xff:
+        _WriteBit(0);
+        _FlushPendingRun(1);
         break;
       case 0:
-        ++_nrun;
+        ++_pendingRun;
         break;
+    }
+  }
+
+  private void _FlushPendingRun(int bit) {
+    while (_pendingRun > 0) {
+      --_pendingRun;
+      _WriteBit(bit);
     }
   }
 
   [MethodImpl(MethodImplOptions.AggressiveInlining)]
-  private void _Outbit(int bit) {
-    if (_delay > 0) {
-      if (_delay < 0xFF)
-        --_delay;
-    } else {
-      _byte = (byte)((_byte << 1) | bit);
-      if (++_scount == 8) {
-        _output.WriteByte(_byte);
-        _scount = 0;
-        _byte = 0;
-      }
+  private void _WriteBit(int bit) {
+    if (_startupDelay > 0) {
+      if (_startupDelay < 0xff)
+        --_startupDelay;
+      return;
     }
-  }
 
-  private void _Eflush() {
-    if (_subend > 0x8000)
-      _subend = 0x10000;
-    else if (_subend > 0)
-      _subend = 0x8000;
-    while (_buffer != 0xFFFFFF || _subend != 0) {
-      _Zemit(1 - (int)(_subend >> 15));
-      _subend = (ushort)(_subend << 1);
-    }
-    _Outbit(1);
-    while (_nrun-- > 0)
-      _Outbit(0);
-    _nrun = 0;
-    while (_scount > 0)
-      _Outbit(1);
-    _delay = 0xFF;
+    _outputByte = (byte)((_outputByte << 1) | bit);
+    if (++_outputBits != 8)
+      return;
+
+    _output.WriteByte(_outputByte);
+    _outputByte = 0;
+    _outputBits = 0;
   }
 }

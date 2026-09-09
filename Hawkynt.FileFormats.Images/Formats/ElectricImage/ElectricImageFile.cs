@@ -37,11 +37,14 @@ namespace FileFormat.ElectricImage;
 /// <para/>
 /// Depths of 1 and 16, and the depth frames that carry floating-point distances rather than colour,
 /// are refused: none of the eighteen is one and there is nothing to check a reading of them against.
-/// Nothing is written, for the same reason — a renderer's output file is not something this can
-/// produce a true example of.
+/// The writer likewise emits only the three forms the measured colour corpus establishes: 8-bit
+/// indexed, 24-bit RGB, and the alpha-first four-byte form signalled by depth 24 and extra value
+/// 0x0108. Adobe's ElectricImage Photoshop plug-in was explicitly able to write this picture format,
+/// so authoring a raster here does not require inventing a renderer scene or camera record.
 /// </remarks>
 public sealed class ElectricImageFile
   : IImageFormatReader<ElectricImageFile>, IImageToRawImage<ElectricImageFile>,
+    IImageFromRawImage<ElectricImageFile>, IImageFormatWriter<ElectricImageFile>,
     IMultiImageFileFormat<ElectricImageFile> {
 
   /// <summary>The only version any of the files carries.</summary>
@@ -56,6 +59,7 @@ public sealed class ElectricImageFile
   static string IImageFormatMetadata<ElectricImageFile>.PrimaryExtension => ".ei";
   static string[] IImageFormatMetadata<ElectricImageFile>.FileExtensions => [".ei", ".eidi"];
   static ElectricImageFile IImageFormatReader<ElectricImageFile>.FromSpan(ReadOnlySpan<byte> data) => ElectricImageReader.FromSpan(data);
+  static byte[] IImageFormatWriter<ElectricImageFile>.ToBytes(ElectricImageFile file) => ElectricImageWriter.ToBytes(file);
   static FormatCapability IImageFormatMetadata<ElectricImageFile>.Capabilities => FormatCapability.MultiImage;
   static VideoMode[] IImageFormatMetadata<ElectricImageFile>.VideoModes => [
     new("Palette", [(IntegerRange.Any, IntegerRange.Any)], [256]),
@@ -125,5 +129,63 @@ public sealed class ElectricImageFile
       throw new InvalidDataException("An ElectricImage file with no frame in it.");
 
     return ToRawImage(file, 0);
+  }
+
+  /// <summary>Creates a one-frame ElectricImage picture from an arbitrary raw image.</summary>
+  public static ElectricImageFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    if (image.Width is < 1 or > ushort.MaxValue)
+      throw new ArgumentOutOfRangeException(nameof(image), image.Width, "ElectricImage width must be between 1 and 65535 pixels.");
+    if (image.Height is < 1 or > ushort.MaxValue)
+      throw new ArgumentOutOfRangeException(nameof(image), image.Height, "ElectricImage height must be between 1 and 65535 pixels.");
+    if (!image.HasEnoughPixelData)
+      throw new ArgumentException("The raw image does not carry enough pixel data for its stated dimensions and format.", nameof(image));
+
+    if (image.Format == PixelFormat.Indexed8 && !image.HasAlpha)
+      return _FromIndexed8(image);
+
+    image = image.EnsureFormat(image.HasAlpha ? PixelFormat.Argb32 : PixelFormat.Rgb24);
+    var bytesPerPixel = image.Format == PixelFormat.Argb32 ? 4 : 3;
+    var length = checked(image.Width * image.Height * bytesPerPixel);
+
+    return new() {
+      Frames = [new() {
+        Width = image.Width,
+        Height = image.Height,
+        BytesPerPixel = bytesPerPixel,
+        PixelData = image.PixelData.AsSpan(0, length).ToArray(),
+      }]
+    };
+  }
+
+  private static ElectricImageFile _FromIndexed8(RawImage image) {
+    var palette = image.Palette;
+    if (palette is null || palette.Length < 3 || palette.Length % 3 != 0)
+      throw new ArgumentException("An indexed raw image needs an RGB palette made of complete triples.", nameof(image));
+
+    var paletteCount = image.PaletteCount > 0 ? image.PaletteCount : palette.Length / 3;
+    if (paletteCount is < 1 or > 256 || palette.Length < paletteCount * 3)
+      throw new ArgumentException("An indexed ElectricImage picture needs between 1 and 256 palette entries.", nameof(image));
+
+    var pixelCount = checked(image.Width * image.Height);
+    var indices = image.PixelData.AsSpan(0, pixelCount).ToArray();
+    var highest = 0;
+    foreach (var index in indices)
+      if (index > highest)
+        highest = index;
+
+    if (highest >= paletteCount)
+      throw new ArgumentException($"The image uses palette index {highest}, but declares only {paletteCount} palette entries.", nameof(image));
+
+    return new() {
+      Frames = [new() {
+        Width = image.Width,
+        Height = image.Height,
+        BytesPerPixel = 1,
+        PixelData = indices,
+        Palette = palette.AsSpan(0, paletteCount * 3).ToArray(),
+      }]
+    };
   }
 }

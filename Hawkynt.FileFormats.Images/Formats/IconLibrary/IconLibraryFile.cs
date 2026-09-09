@@ -9,6 +9,12 @@ public readonly record struct IconLibraryFile : IImageFormatReader<IconLibraryFi
   /// <summary>Default icon dimensions when not detectable.</summary>
   internal const int DefaultSize = 32;
 
+  /// <summary>
+  /// Present because <see cref="RawData"/> carries a field initializer, which a record struct may
+  /// only have alongside an explicitly declared constructor.
+  /// </summary>
+  public IconLibraryFile() { }
+
   static string IImageFormatMetadata<IconLibraryFile>.PrimaryExtension => ".icl";
   static string[] IImageFormatMetadata<IconLibraryFile>.FileExtensions => [".icl"];
   static IconLibraryFile IImageFormatReader<IconLibraryFile>.FromSpan(ReadOnlySpan<byte> data) => IconLibraryReader.FromSpan(data);

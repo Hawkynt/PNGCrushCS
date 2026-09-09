@@ -124,4 +124,88 @@ public sealed class MrwTests {
 
     Assert.That(file.PixelData, Has.Some.Not.EqualTo(file.PixelData[0]), "the unpacked samples are not all one value");
   }
+
+  [Test]
+  [Category("Unit")]
+  public void ToBytes_WritesCanonicalPackedRggbBlocksAndAlignsTheSensor() {
+    var data = MrwWriter.ToBytes(new() {
+      Width = 8,
+      Height = 4,
+      PixelData = new byte[8 * 4 * 3],
+    });
+
+    Assert.Multiple(() => {
+      Assert.That(data[..4], Is.EqualTo(MrwFile.Magic.ToArray()));
+      Assert.That(BinaryPrimitives.ReadUInt32BigEndian(data.AsSpan(4)), Is.EqualTo(504));
+      Assert.That(data[8..12], Is.EqualTo(MrwFile.PictureBlock.ToArray()));
+      Assert.That(BinaryPrimitives.ReadUInt32BigEndian(data.AsSpan(12)), Is.EqualTo(24));
+      Assert.That(BinaryPrimitives.ReadUInt16BigEndian(data.AsSpan(24)), Is.EqualTo(4));
+      Assert.That(BinaryPrimitives.ReadUInt16BigEndian(data.AsSpan(26)), Is.EqualTo(8));
+      Assert.That(BinaryPrimitives.ReadUInt16BigEndian(data.AsSpan(28)), Is.EqualTo(4));
+      Assert.That(BinaryPrimitives.ReadUInt16BigEndian(data.AsSpan(30)), Is.EqualTo(8));
+      Assert.That(data[32], Is.EqualTo(12));
+      Assert.That(data[33], Is.EqualTo(12));
+      Assert.That(data[34], Is.EqualTo(0x59));
+      Assert.That(BinaryPrimitives.ReadUInt16BigEndian(data.AsSpan(38)), Is.EqualTo(1));
+      Assert.That(data[40..44], Is.EqualTo(MrwFile.WhiteBalanceBlock.ToArray()));
+      Assert.That(data[48..52], Is.EqualTo(new byte[] { 2, 2, 2, 2 }));
+      Assert.That(BinaryPrimitives.ReadUInt16BigEndian(data.AsSpan(52)), Is.EqualTo(256));
+      Assert.That(data[60..64], Is.EqualTo(new byte[] { 0, (byte)'P', (byte)'A', (byte)'D' }));
+      Assert.That(BinaryPrimitives.ReadUInt32BigEndian(data.AsSpan(64)), Is.EqualTo(444));
+      Assert.That(data.Length, Is.EqualTo(512 + 8 * 4 / 2 * 3));
+    });
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void ToBytes_PacksRgbIntoRggbTwelveBitSamples() {
+    var data = MrwWriter.ToBytes(new() {
+      Width = 2,
+      Height = 2,
+      PixelData = [
+        0xAB, 0x01, 0x02,  0x03, 0xCD, 0x04,
+        0x05, 0x12, 0x06,  0x07, 0x08, 0x34,
+      ],
+    });
+
+    Assert.That(data[512..], Is.EqualTo(new byte[] { 0xAB, 0xAC, 0xDC, 0x12, 0x13, 0x43 }));
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void ToBytes_ResultIsReadableByMrwReader() {
+    var source = new RawImage {
+      Width = 8,
+      Height = 4,
+      Format = PixelFormat.Rgb24,
+      PixelData = new byte[8 * 4 * 3],
+    };
+
+    var encoded = MrwWriter.ToBytes(MrwFile.FromRawImage(source));
+    var decoded = MrwReader.FromBytes(encoded);
+
+    Assert.Multiple(() => {
+      Assert.That(decoded.Width, Is.EqualTo(source.Width));
+      Assert.That(decoded.Height, Is.EqualTo(source.Height));
+      Assert.That(decoded.PixelData, Has.Length.EqualTo(source.PixelData.Length));
+    });
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void ToBytes_OddWidth_ThrowsArgumentException()
+    => Assert.Throws<ArgumentException>(() => MrwWriter.ToBytes(new() {
+      Width = 3,
+      Height = 2,
+      PixelData = new byte[3 * 2 * 3],
+    }));
+
+  [Test]
+  [Category("Unit")]
+  public void ToBytes_WrongRgbByteCount_ThrowsArgumentException()
+    => Assert.Throws<ArgumentException>(() => MrwWriter.ToBytes(new() {
+      Width = 4,
+      Height = 2,
+      PixelData = new byte[4 * 2 * 3 - 1],
+    }));
 }

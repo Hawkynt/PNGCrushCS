@@ -1,5 +1,7 @@
 using System;
+using System.Buffers.Binary;
 using System.IO;
+using FileFormat.Core;
 using FileFormat.IffDpan;
 
 namespace FileFormat.IffDpan.Tests;
@@ -41,114 +43,104 @@ public sealed class IffDpanReaderTests {
 
   [Test]
   [Category("Unit")]
-  public void FromBytes_MinimalValid_ReturnsDefaultDimensions() {
-    var data = _CreateMinimalValidData();
+  public void FromBytes_FormDpanPseudoContainer_IsRejected() {
+    var data = new byte[12];
+    "FORM"u8.CopyTo(data);
+    BinaryPrimitives.WriteUInt32BigEndian(data.AsSpan(4, 4), 4);
+    "DPAN"u8.CopyTo(data.AsSpan(8, 4));
+
+    Assert.Throws<InvalidDataException>(() => IffDpanReader.FromBytes(data));
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void FromBytes_AnimWithoutIlbm_IsRejected() {
+    var data = new byte[12];
+    "FORM"u8.CopyTo(data);
+    BinaryPrimitives.WriteUInt32BigEndian(data.AsSpan(4, 4), 4);
+    "ANIM"u8.CopyTo(data.AsSpan(8, 4));
+
+    Assert.Throws<InvalidDataException>(() => IffDpanReader.FromBytes(data));
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void FromBytes_WriterOutput_ParsesDpanMetadataAndFrame() {
+    var data = _CreateValidData(7, 5);
 
     var result = IffDpanReader.FromBytes(data);
 
     Assert.Multiple(() => {
-      Assert.That(result.Width, Is.EqualTo(IffDpanFile.DefaultWidth));
-      Assert.That(result.Height, Is.EqualTo(IffDpanFile.DefaultHeight));
+      Assert.That(result.Width, Is.EqualTo(7));
+      Assert.That(result.Height, Is.EqualTo(5));
+      Assert.That(result.Version, Is.EqualTo(IffDpanFile.CurrentVersion));
+      Assert.That(result.FrameCount, Is.EqualTo(1));
+      Assert.That(result.Flags, Is.Zero);
+      Assert.That(result.PixelData, Has.Length.EqualTo(7 * 5 * 3));
+      Assert.That(result.RawData, Is.EqualTo(data));
+      Assert.That(result.RawData, Is.Not.SameAs(data));
     });
   }
 
   [Test]
   [Category("Unit")]
-  public void FromBytes_ValidData_CopiesRawData() {
-    var data = _CreateMinimalValidData();
+  public void FromStream_WriterOutput_ParsesCorrectly() {
+    var data = _CreateValidData(16, 9);
 
-    var result = IffDpanReader.FromBytes(data);
-
-    Assert.That(result.RawData, Is.EqualTo(data));
-    Assert.That(result.RawData, Is.Not.SameAs(data));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void FromBytes_WithBmhd_ParsesDimensions() {
-    var data = _CreateDataWithBmhd(64, 48);
-
-    var result = IffDpanReader.FromBytes(data);
-
-    Assert.Multiple(() => {
-      Assert.That(result.Width, Is.EqualTo(64));
-      Assert.That(result.Height, Is.EqualTo(48));
-    });
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void FromStream_ValidData_ParsesCorrectly() {
-    var data = _CreateDataWithBmhd(16, 32);
-
-    using var ms = new MemoryStream(data);
-    var result = IffDpanReader.FromStream(ms);
+    using var stream = new MemoryStream(data);
+    var result = IffDpanReader.FromStream(stream);
 
     Assert.Multiple(() => {
       Assert.That(result.Width, Is.EqualTo(16));
-      Assert.That(result.Height, Is.EqualTo(32));
+      Assert.That(result.Height, Is.EqualTo(9));
+      Assert.That(result.FrameCount, Is.EqualTo(1));
       Assert.That(result.RawData, Is.EqualTo(data));
     });
   }
 
   [Test]
   [Category("Unit")]
-  public void FromBytes_RoundTrip_PreservesData() {
-    var original = new IffDpanFile {
-      Width = 100,
-      Height = 80,
-      RawData = _CreateDataWithBmhd(100, 80),
+  public void FromBytes_TruncatedOuterForm_IsRejected() {
+    var data = _CreateValidData(3, 2);
+    BinaryPrimitives.WriteUInt32BigEndian(data.AsSpan(4, 4), checked((uint)data.Length));
+
+    Assert.Throws<InvalidDataException>(() => IffDpanReader.FromBytes(data));
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void FromBytes_WrongDpanPayloadSize_IsRejected() {
+    var data = _CreateValidData(3, 2);
+    var dpanOffset = _FindSequence(data, "DPAN"u8);
+    Assert.That(dpanOffset, Is.GreaterThan(0));
+    BinaryPrimitives.WriteUInt32BigEndian(data.AsSpan(dpanOffset + 4, 4), 7);
+
+    Assert.Throws<InvalidDataException>(() => IffDpanReader.FromBytes(data));
+  }
+
+  private static byte[] _CreateValidData(int width, int height) {
+    var pixels = new byte[checked(width * height * 3)];
+    for (var i = 0; i < pixels.Length; i += 3) {
+      pixels[i] = (byte)(i * 17);
+      pixels[i + 1] = (byte)(i * 29);
+      pixels[i + 2] = (byte)(i * 43);
+    }
+
+    var image = new RawImage {
+      Width = width,
+      Height = height,
+      Format = PixelFormat.Rgb24,
+      PixelData = pixels,
     };
 
-    var bytes = IffDpanWriter.ToBytes(original);
-    var restored = IffDpanReader.FromBytes(bytes);
-
-    Assert.Multiple(() => {
-      Assert.That(restored.Width, Is.EqualTo(100));
-      Assert.That(restored.Height, Is.EqualTo(80));
-      Assert.That(restored.RawData, Is.EqualTo(original.RawData));
-    });
+    return FormatIO.Encode<IffDpanFile>(image);
   }
 
-  private static byte[] _CreateMinimalValidData() {
-    var data = new byte[IffDpanFile.MinFileSize];
-    for (var i = 0; i < data.Length; ++i)
-      data[i] = (byte)(i & 0xFF);
-    return data;
-  }
+  private static int _FindSequence(ReadOnlySpan<byte> data, ReadOnlySpan<byte> sequence) {
+    for (var i = 0; i <= data.Length - sequence.Length; ++i)
+      if (data.Slice(i, sequence.Length).SequenceEqual(sequence))
+        return i;
 
-  private static byte[] _CreateDataWithBmhd(int width, int height) {
-    var bmhdData = new byte[20];
-    bmhdData[0] = (byte)(width >> 8);
-    bmhdData[1] = (byte)(width & 0xFF);
-    bmhdData[2] = (byte)(height >> 8);
-    bmhdData[3] = (byte)(height & 0xFF);
-
-    var data = new byte[12 + 4 + 4 + 20 + 10];
-    var offset = 0;
-
-    data[offset++] = (byte)'F';
-    data[offset++] = (byte)'O';
-    data[offset++] = (byte)'R';
-    data[offset++] = (byte)'M';
-    offset += 4;
-    data[offset++] = (byte)'D';
-    data[offset++] = (byte)'P';
-    data[offset++] = (byte)'A';
-    data[offset++] = (byte)'N';
-
-    data[offset++] = 0x42; // 'B'
-    data[offset++] = 0x4D; // 'M'
-    data[offset++] = 0x48; // 'H'
-    data[offset++] = 0x44; // 'D'
-
-    data[offset++] = 0;
-    data[offset++] = 0;
-    data[offset++] = 0;
-    data[offset++] = 20;
-
-    Array.Copy(bmhdData, 0, data, offset, bmhdData.Length);
-
-    return data;
+    return -1;
   }
 }

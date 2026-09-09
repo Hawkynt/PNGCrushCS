@@ -1,0 +1,61 @@
+name: PocketPcTheme README sync
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    if: github.head_ref == 'feature/pocketpctheme-writer' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+          path: PNGCrushCS
+          fetch-depth: 0
+
+      - name: Check out CompressionWorkbench sibling
+        uses: actions/checkout@v4
+        with:
+          repository: Hawkynt/CompressionWorkbench
+          path: CompressionWorkbench
+          fetch-depth: 1
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.x
+            10.0.x
+
+      - name: Restore package
+        working-directory: PNGCrushCS
+        run: dotnet restore Hawkynt.FileFormats.Images/Hawkynt.FileFormats.Images.csproj -p:EnableWindowsTargeting=true
+
+      - name: Build package
+        working-directory: PNGCrushCS
+        run: dotnet build Hawkynt.FileFormats.Images/Hawkynt.FileFormats.Images.csproj --configuration Release --no-restore -p:EnableWindowsTargeting=true
+
+      - name: Regenerate package README and API reference
+        uses: Hawkynt/RepositoryTemplate/package-readme@v1
+        with:
+          mode: write
+          root: PNGCrushCS
+          configuration: Release
+          project: Hawkynt.FileFormats.Images/Hawkynt.FileFormats.Images.csproj
+
+      - name: Commit generated package documentation
+        shell: bash
+        working-directory: PNGCrushCS
+        run: |
+          if git diff --quiet -- Hawkynt.FileFormats.Images/README.md Hawkynt.FileFormats.Images/REFERENCE.md; then
+            exit 0
+          fi
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add Hawkynt.FileFormats.Images/README.md Hawkynt.FileFormats.Images/REFERENCE.md
+          git commit -m "* regenerate Pocket PC package documentation"
+          git push origin HEAD:${GITHUB_HEAD_REF}

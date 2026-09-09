@@ -39,7 +39,7 @@ internal static class WrappedDib {
     var planes = BinaryPrimitives.ReadUInt16LittleEndian(data[(at + 12)..]);
     var bits = BinaryPrimitives.ReadUInt16LittleEndian(data[(at + 14)..]);
     var compression = BinaryPrimitives.ReadInt32LittleEndian(data[(at + 16)..]);
-    if (planes != 1 || bits is not (1 or 4 or 8 or 16 or 24 or 32) || compression is not (0 or 1 or 2))
+    if (planes != 1 || bits is not (1 or 4 or 8 or 16 or 24 or 32) || compression is not (0 or 1 or 2 or 3))
       return -1;
 
     // Height is signed: negative means the rows run top-down.
@@ -56,18 +56,23 @@ internal static class WrappedDib {
     return at + total > data.Length ? -1 : (int)total;
   }
 
-  /// <summary>Bytes from the header to the picture: the header itself and the palette after it.</summary>
+  /// <summary>Bytes from the header to the picture: the header itself, optional bit masks, and palette.</summary>
   internal static int PixelOffset(ReadOnlySpan<byte> data, int at) {
     var size = BinaryPrimitives.ReadInt32LittleEndian(data[at..]);
     var bits = BinaryPrimitives.ReadUInt16LittleEndian(data[(at + 14)..]);
+    var compression = BinaryPrimitives.ReadInt32LittleEndian(data[(at + 16)..]);
+
+    // A 40-byte BITMAPINFOHEADER keeps BI_BITFIELDS' RGB masks immediately after the header.
+    // V4/V5 headers carry the masks inside the header itself and therefore need no extra bytes here.
+    var offset = size + (size == 40 && compression == 3 ? 12 : 0);
     if (bits > 8)
-      return size;
+      return offset;
 
     var used = BinaryPrimitives.ReadInt32LittleEndian(data[(at + 32)..]);
     if (used is <= 0 or > 256)
       used = 1 << bits;
 
-    return size + used * 4;
+    return offset + used * 4;
   }
 
   /// <summary>A picture as the bitmap one of these containers stores: the info header, the palette

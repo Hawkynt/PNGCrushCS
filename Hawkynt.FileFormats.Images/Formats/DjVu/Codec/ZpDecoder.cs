@@ -1,184 +1,144 @@
 using System;
+using System.Numerics;
 using System.Runtime.CompilerServices;
 
 namespace FileFormat.DjVu.Codec;
 
-/// <summary>
-/// ZP (Z-coder) adaptive binary arithmetic decoder for DjVu.
-/// Faithful port of djvulibre's ZPCodec decoder (ZPCODER variant).
-///
-/// Key: z = a + P[ctx], NOT just P[ctx].
-/// Uses the z-restriction: d = 0x6000 + ((z+a)>>2); if (z > d) z = d
-/// Reads from a byte stream using a 32-bit shift buffer.
-/// Initial 16-bit code load, with fence optimization for fast MPS path.
-/// </summary>
+/// <summary>DjVu ZP adaptive binary arithmetic decoder.</summary>
+/// <remarks>
+/// The interval split, probability-state adaptation and renormalization follow the published ZP
+/// coding process. Implementation provenance and compatible reference material are recorded in
+/// <c>UPSTREAM.md</c> beside this file.
+/// </remarks>
 internal sealed class ZpDecoder {
 
-  // Lookup table for find-first-zero (leading 1-bits count per byte)
-  private static readonly byte[] _Ffzt;
+  private readonly byte[] _source;
+  private int _position;
+  private uint _interval;
+  private uint _code;
+  private uint _fence;
+  private uint _reservoir;
+  private int _reservoirBits;
+  private int _paddingReadsRemaining = 25;
 
-  static ZpDecoder() {
-    _Ffzt = new byte[256];
-    for (var i = 0; i < 256; ++i) {
-      _Ffzt[i] = 0;
-      for (var j = i; (j & 0x80) != 0; j <<= 1)
-        ++_Ffzt[i];
-    }
-  }
-
-  private readonly byte[] _data;
-  private int _bytePos;
-  private uint _a;        // interval width above half
-  private uint _code;     // code register (16-bit)
-  private uint _fence;    // optimization: min(code, 0x7FFF)
-  private uint _buffer;   // shift register
-  private int _scount;    // bits available in buffer
-  private int _delay;     // EOF delay counter
-
-  /// <summary>Whether the decoder has exhausted the input.</summary>
-  public bool IsEof => _bytePos >= _data.Length && _delay <= 0;
+  /// <summary>Whether the real input and the arithmetic decoder's permitted synthetic tail are exhausted.</summary>
+  public bool IsEof => _position >= _source.Length && _paddingReadsRemaining <= 0;
 
   public ZpDecoder(byte[] data, int startOffset = 0) {
     ArgumentNullException.ThrowIfNull(data);
-    _data = data;
-    _bytePos = startOffset;
 
-    // Initialize (matching djvulibre decode init)
-    _a = 0;
-    _buffer = 0;
-    _scount = 0;
-    _delay = 25;
-
-    // Read first two bytes into code
-    var b0 = _ReadNextByte();
-    _code = (uint)(b0 << 8);
-    var b1 = _ReadNextByte();
-    _code |= b1;
-
-    // Preload buffer
-    _Preload();
-
-    // Set fence
-    _fence = _code;
-    if (_code >= 0x8000)
-      _fence = 0x7FFF;
+    _source = data;
+    _position = startOffset;
+    _code = (uint)(_ReadByte() << 8) | _ReadByte();
+    _FillReservoir();
+    _UpdateFence();
   }
 
-  /// <summary>Decodes a single bit given a context.</summary>
+  /// <summary>Decodes one context-adaptive bit.</summary>
   [MethodImpl(MethodImplOptions.AggressiveInlining)]
-  public int DecodeBit(ref ZpContext ctx) {
-    // z = a + P[ctx] -- the combined interval boundary
-    var z = _a + ZpTables.P[ctx.Value];
-    if (z <= _fence) {
-      // Fast MPS path: z <= fence guarantees z <= code and z < 0x8000
-      // No shift needed -- lazy renormalization defers to slow path
-      _a = z;
-      return ctx.Value & 1;
+  public int DecodeBit(ref ZpContext context) {
+    var state = context.Value;
+    var probableBit = state & 1;
+    var split = _interval + ZpTables.P[state];
+
+    if (split <= _fence) {
+      _interval = split;
+      return probableBit;
     }
-    return _DecodeSub(ref ctx, z);
+
+    return _DecodeAdaptiveSlow(ref context, state, probableBit, split);
   }
 
-  /// <summary>Decodes a bit without context (equiprobable).</summary>
-  public int DecodePassthrough() {
-    // IW44-style passthrough: z = 0x8000 + (a >> 1)
-    var z = 0x8000u + (_a >> 1);
+  /// <summary>Decodes one equiprobable bit.</summary>
+  public int DecodePassthrough()
+    => _DecodePassthrough(0x8000u + (_interval >> 1));
 
-    if (z > _code) {
-      // LPS: bit 1
-      z = 0x10000u - z;
-      _a += z;
-      _code += z;
-      var shift = _Ffz(_a);
-      _scount -= shift;
-      _a = (ushort)(_a << shift);
-      _code = (ushort)((_code << shift) | ((_buffer >> _scount) & ((1u << shift) - 1)));
-      if (_scount < 16) _Preload();
-      _fence = _code;
-      if (_code >= 0x8000) _fence = 0x7FFF;
+  /// <summary>Decodes an unsigned integer, most-significant bit first, with one adaptive context.</summary>
+  public int DecodeBinary(ref ZpContext context, int bits) {
+    var result = 0;
+    for (var bit = bits - 1; bit >= 0; --bit)
+      result |= DecodeBit(ref context) << bit;
+    return result;
+  }
+
+  private int _DecodeAdaptiveSlow(ref ZpContext context, byte state, int probableBit, uint split) {
+    split = _RestrictSplit(split);
+
+    if (split > _code) {
+      var tail = 0x10000u - split;
+      _interval = (_interval + tail) & 0xffff;
+      _code = (_code + tail) & 0xffff;
+      context = new(ZpTables.Dn[state]);
+      _RenormalizeAfterLessProbable();
+      _UpdateFence();
+      return probableBit ^ 1;
+    }
+
+    if (_interval >= ZpTables.M[state])
+      context = new(ZpTables.Up[state]);
+
+    _ShiftOne(split);
+    _UpdateFence();
+    return probableBit;
+  }
+
+  private int _DecodePassthrough(uint split) {
+    if (split > _code) {
+      var tail = 0x10000u - split;
+      _interval = (_interval + tail) & 0xffff;
+      _code = (_code + tail) & 0xffff;
+      _RenormalizeAfterLessProbable();
+      _UpdateFence();
       return 1;
     }
 
-    // MPS: bit 0
-    --_scount;
-    _a = (ushort)(z << 1);
-    _code = (ushort)((_code << 1) | ((_buffer >> _scount) & 1));
-    if (_scount < 16) _Preload();
-    _fence = _code;
-    if (_code >= 0x8000) _fence = 0x7FFF;
+    _ShiftOne(split);
+    _UpdateFence();
     return 0;
   }
 
-  /// <summary>Decodes an unsigned integer in binary with the given number of bits.</summary>
-  public int DecodeBinary(ref ZpContext ctx, int bits) {
-    var value = 0;
-    for (var i = bits - 1; i >= 0; --i) {
-      var bit = DecodeBit(ref ctx);
-      value |= bit << i;
-    }
-    return value;
-  }
-
-  /// <summary>Full decode path with z-restriction and LPS check.</summary>
-  private int _DecodeSub(ref ZpContext ctx, uint z) {
-    var bit = ctx.Value & 1;
-
-    // Apply z-restriction (ZPCODER variant)
-    var d = 0x6000u + ((z + _a) >> 2);
-    if (z > d) z = d;
-
-    if (z > _code) {
-      // LPS path
-      bit ^= 1;
-      z = 0x10000u - z;
-      _a += z;
-      _code += z;
-      ctx = new(ZpTables.Dn[ctx.Value]);
-      var shift = _Ffz(_a);
-      _scount -= shift;
-      _a = (ushort)(_a << shift);
-      _code = (ushort)((_code << shift) | ((_buffer >> _scount) & ((1u << shift) - 1)));
-    } else {
-      // MPS path (but needed renorm since z was > fence)
-      if (_a >= ZpTables.M[ctx.Value])
-        ctx = new(ZpTables.Up[ctx.Value]);
-      --_scount;
-      _a = (ushort)(z << 1);
-      _code = (ushort)((_code << 1) | ((_buffer >> _scount) & 1));
-    }
-
-    if (_scount < 16) _Preload();
-    _fence = _code;
-    if (_code >= 0x8000) _fence = 0x7FFF;
-    return bit;
-  }
-
-  /// <summary>Preload bytes into the shift buffer until scount > 24.</summary>
-  private void _Preload() {
-    while (_scount <= 24) {
-      var b = _ReadNextByte();
-      _buffer = (_buffer << 8) | b;
-      _scount += 8;
-    }
-  }
-
-  /// <summary>Read the next byte from the data, returning 0xFF on EOF.</summary>
   [MethodImpl(MethodImplOptions.AggressiveInlining)]
-  private byte _ReadNextByte() {
-    if (_bytePos < _data.Length)
-      return _data[_bytePos++];
-    if (--_delay < 1)
-      return 0xFF;
-    return 0xFF;
+  private uint _RestrictSplit(uint split) {
+    var limit = 0x6000u + ((_interval + split) >> 2);
+    return Math.Min(split, limit);
   }
 
-  /// <summary>
-  /// Find first zero bit from MSB in a 16-bit value.
-  /// Returns the number of leading consecutive 1-bits.
-  /// Uses the precomputed lookup table matching djvulibre's ffz().
-  /// </summary>
   [MethodImpl(MethodImplOptions.AggressiveInlining)]
-  private static int _Ffz(uint x)
-    => x >= 0xFF00
-      ? _Ffzt[x & 0xFF] + 8
-      : _Ffzt[(x >> 8) & 0xFF];
+  private void _ShiftOne(uint split) {
+    --_reservoirBits;
+    _interval = (split << 1) & 0xffff;
+    _code = ((_code << 1) | ((_reservoir >> _reservoirBits) & 1)) & 0xffff;
+    if (_reservoirBits < 16)
+      _FillReservoir();
+  }
+
+  private void _RenormalizeAfterLessProbable() {
+    var shift = Math.Min(16, BitOperations.LeadingZeroCount((~_interval & 0xffffu) << 16));
+    _reservoirBits -= shift;
+    _interval = (_interval << shift) & 0xffff;
+    var mask = (1u << shift) - 1;
+    _code = ((_code << shift) | ((_reservoir >> _reservoirBits) & mask)) & 0xffff;
+    if (_reservoirBits < 16)
+      _FillReservoir();
+  }
+
+  private void _FillReservoir() {
+    while (_reservoirBits <= 24) {
+      _reservoir = (_reservoir << 8) | _ReadByte();
+      _reservoirBits += 8;
+    }
+  }
+
+  [MethodImpl(MethodImplOptions.AggressiveInlining)]
+  private byte _ReadByte() {
+    if (_position < _source.Length)
+      return _source[_position++];
+
+    --_paddingReadsRemaining;
+    return 0xff;
+  }
+
+  [MethodImpl(MethodImplOptions.AggressiveInlining)]
+  private void _UpdateFence()
+    => _fence = Math.Min(_code, 0x7fffu);
 }

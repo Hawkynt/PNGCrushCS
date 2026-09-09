@@ -946,7 +946,7 @@ Windows only, so nothing here has ever been able to compare against them either.
 | gm | .gm .gm2 .gm4 | read; FF04 0007, a level byte at 17, and the ICL manual's byte pair |
 | hdri | .hdri |  |
 | hdru | .gn .hdru | read uncompressed; the Group 3 and Group 4 cases are refused |
-| hpgl | .hgl .hpg .hpgl .prn .prt | read |
+| hpgl | .hgl .hpg .hpgl .prn .prt | read/write; writer reduces raster input to the eight plotter pens and filled horizontal runs |
 | hru | .hru |  |
 | hta | .hta | read; a directory of PNGs, written so that deark and XnView both take it |
 | icd | .idc | read; the header is a 32-byte trailer and it ends in IDC21 |

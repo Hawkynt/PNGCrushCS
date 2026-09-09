@@ -24,7 +24,9 @@ namespace FileFormat.Mrw;
 /// The preview itself is only a quarter of the picture's width, so it is not what is drawn. It is
 /// evidence about the sensor data, not a substitute for it.
 /// </remarks>
-public readonly record struct MrwFile : IImageFormatReader<MrwFile>, IImageToRawImage<MrwFile> {
+public readonly record struct MrwFile
+  : IImageFormatReader<MrwFile>, IImageToRawImage<MrwFile>,
+    IImageFromRawImage<MrwFile>, IImageFormatWriter<MrwFile> {
 
   /// <summary>The four bytes every one of these opens with.</summary>
   public static ReadOnlySpan<byte> Magic => [0x00, (byte)'M', (byte)'R', (byte)'M'];
@@ -50,6 +52,7 @@ public readonly record struct MrwFile : IImageFormatReader<MrwFile>, IImageToRaw
   static string IImageFormatMetadata<MrwFile>.PrimaryExtension => ".mrw";
   static string[] IImageFormatMetadata<MrwFile>.FileExtensions => [".mrw"];
   static MrwFile IImageFormatReader<MrwFile>.FromSpan(ReadOnlySpan<byte> data) => MrwReader.FromSpan(data);
+  static byte[] IImageFormatWriter<MrwFile>.ToBytes(MrwFile file) => MrwWriter.ToBytes(file);
   static VideoMode[] IImageFormatMetadata<MrwFile>.VideoModes => [
     new("Default", [(IntegerRange.Any, IntegerRange.Any)], [16777216])
   ];
@@ -69,6 +72,17 @@ public readonly record struct MrwFile : IImageFormatReader<MrwFile>, IImageToRaw
       Height = file.Height,
       Format = PixelFormat.Rgb24,
       PixelData = file.PixelData[..],
+    };
+  }
+
+  public static MrwFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+    image = image.EnsureFormat(PixelFormat.Rgb24);
+
+    return new() {
+      Width = image.Width,
+      Height = image.Height,
+      PixelData = image.PixelData[..],
     };
   }
 }

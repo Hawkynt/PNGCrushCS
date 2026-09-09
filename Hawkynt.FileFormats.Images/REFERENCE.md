@@ -6388,6 +6388,38 @@ Implements `IImageFormatMetadata<CcittFile>`, `IImageFormatReader<CcittFile>`, `
 | --- | --- | --- |
 | `ToBytes` | `static byte[] ToBytes(CcittFile file)` |  |
 
+### Namespace `FileFormat.Cdr`
+
+[`CdrFile`](#cdrfile) · [`CdrReader`](#cdrreader) · [`CdrWriter`](#cdrwriter)
+
+#### `CdrFile`
+
+Implements `IImageFormatMetadata<CdrFile>`, `IImageFormatReader<CdrFile>`, `IImageFormatWriter<CdrFile>`, `IImageToRawImage<CdrFile>`.
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `CdrFile` | `CdrFile()` |  |
+| `MaxDimension` | `const int MaxDimension` |  |
+| `Chunks` | `List<RiffChunk> Chunks { get; init; }` |  |
+| `FormType` | `FourCC FormType { get; init; }` |  |
+| `Preview` | `RawImage Preview { get; init; }` |  |
+| `TrailingData` | `byte[] TrailingData { get; init; }` |  |
+| `Version` | `int Version { get; init; }` |  |
+| `ToRawImage` | `static RawImage ToRawImage(CdrFile file)` |  |
+
+#### `CdrReader`
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `FromSpan` | `static CdrFile FromSpan(ReadOnlySpan<byte> data)` |  |
+
+#### `CdrWriter`
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `ToBytes` | `static byte[] ToBytes(CdrFile file)` |  |
+| `ToBytes` | `static byte[] ToBytes(CdrFile file, RawImage preview)` |  |
+
 ### Namespace `FileFormat.Cdxl`
 
 [`CdxlFile`](#cdxlfile) · [`CdxlReader`](#cdxlreader) · [`CdxlWriter`](#cdxlwriter)
@@ -7326,6 +7358,30 @@ Implements `IEquatable<CmuWindowManagerFile>`, `IImageFormatMetadata<CmuWindowMa
 | `ToBytes` | `static byte[] ToBytes(CmuWindowManagerFile file)` |  |
 | `ToFile` | `static void ToFile(CmuWindowManagerFile file, FileInfo destination)` |  |
 | `ToStream` | `static void ToStream(CmuWindowManagerFile file, Stream stream)` |  |
+
+### Namespace `FileFormat.Cmx`
+
+[`CmxFile`](#cmxfile) · [`CmxReader`](#cmxreader)
+
+#### `CmxFile`
+
+Implements `IImageFormatMetadata<CmxFile>`, `IImageFormatReader<CmxFile>`, `IImageToRawImage<CmxFile>`.
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `CmxFile` | `CmxFile()` |  |
+| `CoordinatePrecisionBits` | `int CoordinatePrecisionBits { get; init; }` |  |
+| `IsBigEndian` | `bool IsBigEndian { get; init; }` |  |
+| `PreviewOffset` | `int PreviewOffset { get; init; }` |  |
+| `Preview` | `RawImage Preview { get; init; }` |  |
+| `ToRawImage` | `static RawImage ToRawImage(CmxFile file)` |  |
+
+#### `CmxReader`
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `FromSpan` | `static CmxFile FromSpan(ReadOnlySpan<byte> data)` |  |
+| `MatchesSignature` | `static bool? MatchesSignature(ReadOnlySpan<byte> header)` |  |
 
 ### Namespace `FileFormat.CoCo`
 
@@ -10648,7 +10704,7 @@ Implements `IEquatable<CpcSpriteFile>`, `IImageFormatMetadata<CpcSpriteFile>`, `
 
 #### `Cr3File`
 
-Implements `IImageFormatMetadata<Cr3File>`, `IImageFormatReader<Cr3File>`, `IImageToRawImage<Cr3File>`.
+Implements `IImageFormatMetadata<Cr3File>`, `IImageFormatReader<Cr3File>`, `IImageFormatWriter<Cr3File>`, `IImageFromRawImage<Cr3File>`, `IImageToRawImage<Cr3File>`.
 
 | Member | Signature | Summary |
 | --- | --- | --- |
@@ -10660,6 +10716,7 @@ Implements `IImageFormatMetadata<Cr3File>`, `IImageFormatReader<Cr3File>`, `IIma
 | `ThumbnailHeight` | `int ThumbnailHeight { get; init; }` |  |
 | `ThumbnailJpeg` | `byte[] ThumbnailJpeg { get; init; }` |  |
 | `ThumbnailWidth` | `int ThumbnailWidth { get; init; }` |  |
+| `FromRawImage` | `static Cr3File FromRawImage(RawImage image)` |  |
 | `ToRawImage` | `static RawImage ToRawImage(Cr3File file)` |  |
 
 #### `Cr3Reader`
@@ -10802,11 +10859,11 @@ Implements `IEquatable<CranachPaintFile>`, `IImageFormatMetadata<CranachPaintFil
 
 ### Namespace `FileFormat.Crd`
 
-[`CrdFile`](#crdfile) · [`CrdReader`](#crdreader)
+[`CrdFile`](#crdfile) · [`CrdReader`](#crdreader) · [`CrdWriter`](#crdwriter)
 
 #### `CrdFile`
 
-Implements `IImageFormatMetadata<CrdFile>`, `IImageFormatReader<CrdFile>`, `IImageToRawImage<CrdFile>`.
+Implements `IImageFormatMetadata<CrdFile>`, `IImageFormatReader<CrdFile>`, `IImageFormatWriter<CrdFile>`, `IImageFromRawImage<CrdFile>`, `IImageToRawImage<CrdFile>`.
 
 | Member | Signature | Summary |
 | --- | --- | --- |
@@ -10816,6 +10873,7 @@ Implements `IImageFormatMetadata<CrdFile>`, `IImageFormatReader<CrdFile>`, `IIma
 | `Magic` | `static ReadOnlySpan<byte> Magic { get; }` |  |
 | `PictureData` | `byte[] PictureData { get; init; }` |  |
 | `PictureOffset` | `int PictureOffset { get; init; }` |  |
+| `FromRawImage` | `static CrdFile FromRawImage(RawImage image)` |  |
 | `ToRawImage` | `static RawImage ToRawImage(CrdFile file)` |  |
 
 #### `CrdReader`
@@ -10826,6 +10884,12 @@ Implements `IImageFormatMetadata<CrdFile>`, `IImageFormatReader<CrdFile>`, `IIma
 | `FromFile` | `static CrdFile FromFile(FileInfo file)` |  |
 | `FromSpan` | `static CrdFile FromSpan(ReadOnlySpan<byte> data)` |  |
 | `FromStream` | `static CrdFile FromStream(Stream stream)` |  |
+
+#### `CrdWriter`
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `ToBytes` | `static byte[] ToBytes(CrdFile file)` |  |
 
 ### Namespace `FileFormat.CreateWithGarfield`
 
@@ -10871,20 +10935,24 @@ Implements `IEquatable<CreateWithGarfieldFile>`, `IImageFormatMetadata<CreateWit
 
 ### Namespace `FileFormat.Crw`
 
-[`CrwFile`](#crwfile) · [`CrwReader`](#crwreader)
+[`CrwFile`](#crwfile) · [`CrwReader`](#crwreader) · [`CrwWriter`](#crwwriter)
 
 #### `CrwFile`
 
-Implements `IEquatable<CrwFile>`, `IImageFormatMetadata<CrwFile>`, `IImageFormatReader<CrwFile>`, `IImageToRawImage<CrwFile>`.
+Implements `IEquatable<CrwFile>`, `IImageFormatMetadata<CrwFile>`, `IImageFormatReader<CrwFile>`, `IImageFormatWriter<CrwFile>`, `IImageFromRawImage<CrwFile>`, `IImageToRawImage<CrwFile>`.
 
 | Member | Signature | Summary |
 | --- | --- | --- |
+| `BitsPerSample` | `int BitsPerSample { get; init; }` |  |
 | `Height` | `int Height { get; init; }` |  |
+| `ImageLeft` | `int ImageLeft { get; init; }` |  |
+| `ImageTop` | `int ImageTop { get; init; }` |  |
 | `PixelData` | `byte[] PixelData { get; init; }` |  |
 | `SensorHeight` | `int SensorHeight { get; init; }` |  |
 | `SensorWidth` | `int SensorWidth { get; init; }` |  |
 | `Sensor` | `ushort[] Sensor { get; init; }` |  |
 | `Width` | `int Width { get; init; }` |  |
+| `FromRawImage` | `static CrwFile FromRawImage(RawImage image)` |  |
 | `ToRawImage` | `static RawImage ToRawImage(CrwFile file)` |  |
 
 #### `CrwReader`
@@ -10895,6 +10963,13 @@ Implements `IEquatable<CrwFile>`, `IImageFormatMetadata<CrwFile>`, `IImageFormat
 | `FromFile` | `static CrwFile FromFile(FileInfo file)` |  |
 | `FromSpan` | `static CrwFile FromSpan(ReadOnlySpan<byte> data)` |  |
 | `FromStream` | `static CrwFile FromStream(Stream stream)` |  |
+
+#### `CrwWriter`
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `FromRawImage` | `static CrwFile FromRawImage(RawImage image)` |  |
+| `ToBytes` | `static byte[] ToBytes(CrwFile file)` |  |
 
 ### Namespace `FileFormat.CsvImage`
 
@@ -12583,11 +12658,11 @@ Implements `IEquatable<DuoMediumFile>`, `IImageFormatMetadata<DuoMediumFile>`, `
 
 ### Namespace `FileFormat.Dwg`
 
-[`DwgFile`](#dwgfile) · [`DwgReader`](#dwgreader)
+[`DwgFile`](#dwgfile) · [`DwgReader`](#dwgreader) · [`DwgWriter`](#dwgwriter)
 
 #### `DwgFile`
 
-Implements `IEquatable<DwgFile>`, `IImageFormatMetadata<DwgFile>`, `IImageFormatReader<DwgFile>`, `IImageToRawImage<DwgFile>`.
+Implements `IEquatable<DwgFile>`, `IImageFormatMetadata<DwgFile>`, `IImageFormatReader<DwgFile>`, `IImageFormatWriter<DwgFile>`, `IImageFromRawImage<DwgFile>`, `IImageToRawImage<DwgFile>`.
 
 | Member | Signature | Summary |
 | --- | --- | --- |
@@ -12602,6 +12677,7 @@ Implements `IEquatable<DwgFile>`, `IImageFormatMetadata<DwgFile>`, `IImageFormat
 | `ThumbnailType` | `int ThumbnailType { get; init; }` |  |
 | `Thumbnail` | `RawImage Thumbnail { get; init; }` |  |
 | `Version` | `string Version { get; init; }` |  |
+| `FromRawImage` | `static DwgFile FromRawImage(RawImage image)` |  |
 | `ToRawImage` | `static RawImage ToRawImage(DwgFile file)` |  |
 
 #### `DwgReader`
@@ -12613,9 +12689,15 @@ Implements `IEquatable<DwgFile>`, `IImageFormatMetadata<DwgFile>`, `IImageFormat
 | `FromSpan` | `static DwgFile FromSpan(ReadOnlySpan<byte> data)` |  |
 | `FromStream` | `static DwgFile FromStream(Stream stream)` |  |
 
+#### `DwgWriter`
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `ToBytes` | `static byte[] ToBytes(DwgFile file)` |  |
+
 ### Namespace `FileFormat.Dxf`
 
-[`DxfBlock`](#dxfblock) · [`DxfDrawing`](#dxfdrawing) · [`DxfEntity`](#dxfentity) · [`DxfFile`](#dxffile) · [`DxfPair`](#dxfpair) · [`DxfReader`](#dxfreader) · [`DxfRenderer`](#dxfrenderer)
+[`DxfBlock`](#dxfblock) · [`DxfDrawing`](#dxfdrawing) · [`DxfEntity`](#dxfentity) · [`DxfFile`](#dxffile) · [`DxfPair`](#dxfpair) · [`DxfReader`](#dxfreader) · [`DxfRenderer`](#dxfrenderer) · [`DxfWriter`](#dxfwriter)
 
 #### `DxfBlock`
 
@@ -12653,12 +12735,13 @@ Implements `IEquatable<DwgFile>`, `IImageFormatMetadata<DwgFile>`, `IImageFormat
 
 #### `DxfFile`
 
-Implements `IEquatable<DxfFile>`, `IImageFormatMetadata<DxfFile>`, `IImageFormatReader<DxfFile>`, `IImageToRawImage<DxfFile>`.
+Implements `IEquatable<DxfFile>`, `IImageFormatMetadata<DxfFile>`, `IImageFormatReader<DxfFile>`, `IImageFormatWriter<DxfFile>`, `IImageFromRawImage<DxfFile>`, `IImageToRawImage<DxfFile>`.
 
 | Member | Signature | Summary |
 | --- | --- | --- |
 | `BinarySentinel` | `const string BinarySentinel` |  |
 | `Pairs` | `IReadOnlyList<DxfPair> Pairs { get; init; }` |  |
+| `FromRawImage` | `static DxfFile FromRawImage(RawImage image)` |  |
 | `ToRawImage` | `static RawImage ToRawImage(DxfFile file)` |  |
 
 #### `DxfPair`
@@ -12685,6 +12768,13 @@ Implements `IEquatable<DxfPair>`.
 | Member | Signature | Summary |
 | --- | --- | --- |
 | `Render` | `static RawImage Render(DxfFile file)` |  |
+
+#### `DxfWriter`
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `FromRawImage` | `static DxfFile FromRawImage(RawImage image)` |  |
+| `ToBytes` | `static byte[] ToBytes(DxfFile file)` |  |
 
 ### Namespace `FileFormat.EccHeader`
 
@@ -12896,11 +12986,11 @@ Implements `IEquatable<EggPaintFile>`, `IImageFormatMetadata<EggPaintFile>`, `II
 
 ### Namespace `FileFormat.ElectricImage`
 
-[`ElectricImageFile`](#electricimagefile) · [`ElectricImageFile.Frame`](#electricimagefileframe) · [`ElectricImageReader`](#electricimagereader)
+[`ElectricImageFile`](#electricimagefile) · [`ElectricImageFile.Frame`](#electricimagefileframe) · [`ElectricImageReader`](#electricimagereader) · [`ElectricImageWriter`](#electricimagewriter)
 
 #### `ElectricImageFile`
 
-Implements `IImageFormatMetadata<ElectricImageFile>`, `IImageFormatReader<ElectricImageFile>`, `IImageToRawImage<ElectricImageFile>`, `IMultiImageFileFormat<ElectricImageFile>`.
+Implements `IImageFormatMetadata<ElectricImageFile>`, `IImageFormatReader<ElectricImageFile>`, `IImageFormatWriter<ElectricImageFile>`, `IImageFromRawImage<ElectricImageFile>`, `IImageToRawImage<ElectricImageFile>`, `IMultiImageFileFormat<ElectricImageFile>`.
 
 | Member | Signature | Summary |
 | --- | --- | --- |
@@ -12909,6 +12999,7 @@ Implements `IImageFormatMetadata<ElectricImageFile>`, `IImageFormatReader<Electr
 | `FrameHeaderSize` | `const int FrameHeaderSize` |  |
 | `Version` | `const int Version` |  |
 | `Frames` | `IReadOnlyList<Frame> Frames { get; init; }` |  |
+| `FromRawImage` | `static ElectricImageFile FromRawImage(RawImage image)` |  |
 | `ImageCount` | `static int ImageCount(ElectricImageFile file)` |  |
 | `ToRawImage` | `static RawImage ToRawImage(ElectricImageFile file)` |  |
 | `ToRawImage` | `static RawImage ToRawImage(ElectricImageFile file, int index)` |  |
@@ -12934,6 +13025,12 @@ Implements `IEquatable<Frame>`.
 | `FromFile` | `static ElectricImageFile FromFile(FileInfo file)` |  |
 | `FromSpan` | `static ElectricImageFile FromSpan(ReadOnlySpan<byte> data)` |  |
 | `FromStream` | `static ElectricImageFile FromStream(Stream stream)` |  |
+
+#### `ElectricImageWriter`
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `ToBytes` | `static byte[] ToBytes(ElectricImageFile file)` |  |
 
 ### Namespace `FileFormat.Electronika`
 
@@ -12968,7 +13065,7 @@ Implements `IEquatable<ElectronikaFile>`, `IImageFormatMetadata<ElectronikaFile>
 
 ### Namespace `FileFormat.EmbeddedDib`
 
-[`EmbeddedDibFile`](#embeddeddibfile) · [`EmbeddedDibReader`](#embeddeddibreader)
+[`EmbeddedDibFile`](#embeddeddibfile) · [`EmbeddedDibReader`](#embeddeddibreader) · [`EmbeddedDibWriter`](#embeddeddibwriter)
 
 #### `EmbeddedDibFile`
 
@@ -12992,6 +13089,13 @@ Implements `IEquatable<EmbeddedDibFile>`, `IImageFormatMetadata<EmbeddedDibFile>
 | `FromFile` | `static EmbeddedDibFile FromFile(FileInfo file)` |  |
 | `FromSpan` | `static EmbeddedDibFile FromSpan(ReadOnlySpan<byte> data)` |  |
 | `FromStream` | `static EmbeddedDibFile FromStream(Stream stream)` |  |
+
+#### `EmbeddedDibWriter`
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `ToBytes` | `static byte[] ToBytes(EmbeddedDibFile file)` |  |
+| `ToBytes` | `static byte[] ToBytes(RawImage image)` |  |
 
 ### Namespace `FileFormat.EmcEditor`
 
@@ -13271,17 +13375,18 @@ Implements `IEquatable<EpsFile>`, `IImageFormatMetadata<EpsFile>`, `IImageFormat
 
 ### Namespace `FileFormat.Eroiica`
 
-[`EroiicaFile`](#eroiicafile) · [`EroiicaReader`](#eroiicareader)
+[`EroiicaFile`](#eroiicafile) · [`EroiicaReader`](#eroiicareader) · [`EroiicaWriter`](#eroiicawriter)
 
 #### `EroiicaFile`
 
-Implements `IImageFormatMetadata<EroiicaFile>`, `IImageFormatReader<EroiicaFile>`, `IImageToRawImage<EroiicaFile>`, `IMultiImageFileFormat<EroiicaFile>`.
+Implements `IImageFormatMetadata<EroiicaFile>`, `IImageFormatReader<EroiicaFile>`, `IImageFormatWriter<EroiicaFile>`, `IImageFromRawImage<EroiicaFile>`, `IImageToRawImage<EroiicaFile>`, `IMultiImageFileFormat<EroiicaFile>`.
 
 | Member | Signature | Summary |
 | --- | --- | --- |
 | `EroiicaFile` | `EroiicaFile()` |  |
 | `Magic` | `static ReadOnlySpan<byte> Magic { get; }` |  |
 | `Pages` | `IReadOnlyList<byte[]> Pages { get; init; }` |  |
+| `FromRawImage` | `static EroiicaFile FromRawImage(RawImage image)` |  |
 | `ImageCount` | `static int ImageCount(EroiicaFile file)` |  |
 | `ToRawImage` | `static RawImage ToRawImage(EroiicaFile file)` |  |
 | `ToRawImage` | `static RawImage ToRawImage(EroiicaFile file, int index)` |  |
@@ -13294,6 +13399,12 @@ Implements `IImageFormatMetadata<EroiicaFile>`, `IImageFormatReader<EroiicaFile>
 | `FromFile` | `static EroiicaFile FromFile(FileInfo file)` |  |
 | `FromSpan` | `static EroiicaFile FromSpan(ReadOnlySpan<byte> data)` |  |
 | `FromStream` | `static EroiicaFile FromStream(Stream stream)` |  |
+
+#### `EroiicaWriter`
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `ToBytes` | `static byte[] ToBytes(EroiicaFile file)` |  |
 
 ### Namespace `FileFormat.EscapePaint`
 
@@ -15649,7 +15760,7 @@ Implements `IEquatable<GedPictureFile>`, `IImageFormatMetadata<GedPictureFile>`,
 
 ### Namespace `FileFormat.Gem`
 
-[`GemAttributes`](#gemattributes) · [`GemFile`](#gemfile) · [`GemOpcode`](#gemopcode) · [`GemPrimitive`](#gemprimitive) · [`GemReader`](#gemreader) · [`GemRecord`](#gemrecord) · [`GemRenderer`](#gemrenderer)
+[`GemAttributes`](#gemattributes) · [`GemFile`](#gemfile) · [`GemOpcode`](#gemopcode) · [`GemPrimitive`](#gemprimitive) · [`GemReader`](#gemreader) · [`GemRecord`](#gemrecord) · [`GemRenderer`](#gemrenderer) · [`GemWriter`](#gemwriter)
 
 #### `GemAttributes`
 
@@ -15667,7 +15778,7 @@ Implements `IEquatable<GedPictureFile>`, `IImageFormatMetadata<GedPictureFile>`,
 
 #### `GemFile`
 
-Implements `IEquatable<GemFile>`, `IImageFormatMetadata<GemFile>`, `IImageFormatReader<GemFile>`, `IImageToRawImage<GemFile>`.
+Implements `IEquatable<GemFile>`, `IImageFormatMetadata<GemFile>`, `IImageFormatReader<GemFile>`, `IImageFormatWriter<GemFile>`, `IImageFromRawImage<GemFile>`, `IImageToRawImage<GemFile>`.
 
 | Member | Signature | Summary |
 | --- | --- | --- |
@@ -15678,10 +15789,12 @@ Implements `IEquatable<GemFile>`, `IImageFormatMetadata<GemFile>`, `IImageFormat
 | `StandardHeaderWords` | `const int StandardHeaderWords` |  |
 | `CoordinateFlag` | `int CoordinateFlag { get; init; }` |  |
 | `Extent` | `ValueTuple<int, int, int, int> Extent { get; init; }` |  |
+| `HasBitImage` | `bool HasBitImage { get; init; }` |  |
 | `PageSize` | `ValueTuple<int, int> PageSize { get; init; }` |  |
 | `Records` | `IReadOnlyList<GemRecord> Records { get; init; }` |  |
 | `Version` | `int Version { get; init; }` |  |
 | `Window` | `ValueTuple<int, int, int, int> Window { get; init; }` |  |
+| `FromRawImage` | `static GemFile FromRawImage(RawImage image)` |  |
 | `ToRawImage` | `static RawImage ToRawImage(GemFile file)` |  |
 
 #### `GemOpcode`
@@ -15761,6 +15874,13 @@ Implements `IEquatable<GemRecord>`.
 | --- | --- | --- |
 | `Render` | `static RawImage Render(GemFile file)` |  |
 | `Viewport` | `static VectorViewport Viewport(GemFile file)` |  |
+
+#### `GemWriter`
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `FromRawImage` | `static GemFile FromRawImage(RawImage image)` |  |
+| `ToBytes` | `static byte[] ToBytes(GemFile file)` |  |
 
 ### Namespace `FileFormat.GemImg`
 
@@ -17033,16 +17153,24 @@ Implements `IEquatable<HalfLifeMdlFile>`, `IImageFormatMetadata<HalfLifeMdlFile>
 
 ### Namespace `FileFormat.HalfLifeModel`
 
-[`HalfLifeModelFile`](#halflifemodelfile) · [`HalfLifeModelReader`](#halflifemodelreader)
+[`HalfLifeModelFile`](#halflifemodelfile) · [`HalfLifeModelReader`](#halflifemodelreader) · [`HalfLifeModelWriter`](#halflifemodelwriter)
 
 #### `HalfLifeModelFile`
 
-Implements `IEquatable<HalfLifeModelFile>`, `IImageFormatMetadata<HalfLifeModelFile>`, `IImageFormatReader<HalfLifeModelFile>`, `IImageToRawImage<HalfLifeModelFile>`.
+Implements `IEquatable<HalfLifeModelFile>`, `IImageFormatMetadata<HalfLifeModelFile>`, `IImageFormatReader<HalfLifeModelFile>`, `IImageFormatWriter<HalfLifeModelFile>`, `IImageFromRawImage<HalfLifeModelFile>`, `IImageToRawImage<HalfLifeModelFile>`.
 
 | Member | Signature | Summary |
 | --- | --- | --- |
+| `HeaderSize` | `const int HeaderSize` |  |
+| `LengthOffset` | `const int LengthOffset` |  |
+| `MaxReadDimension` | `const int MaxReadDimension` |  |
+| `MaxWriteDimension` | `const int MaxWriteDimension` |  |
 | `MinFileSize` | `const int MinFileSize` |  |
+| `MinWriteDimension` | `const int MinWriteDimension` |  |
 | `PaletteEntries` | `const int PaletteEntries` |  |
+| `SkinFamilyCountOffset` | `const int SkinFamilyCountOffset` |  |
+| `SkinIndexOffset` | `const int SkinIndexOffset` |  |
+| `SkinReferenceCountOffset` | `const int SkinReferenceCountOffset` |  |
 | `TextureCountOffset` | `const int TextureCountOffset` |  |
 | `TextureDataOffset` | `const int TextureDataOffset` |  |
 | `TextureEntrySize` | `const int TextureEntrySize` |  |
@@ -17056,6 +17184,7 @@ Implements `IEquatable<HalfLifeModelFile>`, `IImageFormatMetadata<HalfLifeModelF
 | `Signature` | `static ReadOnlySpan<byte> Signature { get; }` |  |
 | `SkinCount` | `int SkinCount { get; init; }` |  |
 | `Width` | `int Width { get; init; }` |  |
+| `FromRawImage` | `static HalfLifeModelFile FromRawImage(RawImage image)` |  |
 | `ToRawImage` | `static RawImage ToRawImage(HalfLifeModelFile file)` |  |
 
 #### `HalfLifeModelReader`
@@ -17067,6 +17196,12 @@ Implements `IEquatable<HalfLifeModelFile>`, `IImageFormatMetadata<HalfLifeModelF
 | `FromSpan` | `static HalfLifeModelFile FromSpan(ReadOnlySpan<byte> data)` |  |
 | `FromSpan` | `static HalfLifeModelFile FromSpan(ReadOnlySpan<byte> data, int skin)` |  |
 | `FromStream` | `static HalfLifeModelFile FromStream(Stream stream)` |  |
+
+#### `HalfLifeModelWriter`
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `ToBytes` | `static byte[] ToBytes(HalfLifeModelFile file)` |  |
 
 ### Namespace `FileFormat.HandyScanner`
 
@@ -17933,11 +18068,11 @@ Implements `IEquatable<HpGrobFile>`, `IImageFormatMetadata<HpGrobFile>`, `IImage
 
 ### Namespace `FileFormat.Hpgl`
 
-[`HpglFile`](#hpglfile) · [`HpglInstruction`](#hpglinstruction) · [`HpglReader`](#hpglreader) · [`HpglRenderer`](#hpglrenderer)
+[`HpglFile`](#hpglfile) · [`HpglInstruction`](#hpglinstruction) · [`HpglReader`](#hpglreader) · [`HpglRenderer`](#hpglrenderer) · [`HpglWriter`](#hpglwriter)
 
 #### `HpglFile`
 
-Implements `IEquatable<HpglFile>`, `IImageFormatMetadata<HpglFile>`, `IImageFormatReader<HpglFile>`, `IImageToRawImage<HpglFile>`.
+Implements `IEquatable<HpglFile>`, `IImageFormatMetadata<HpglFile>`, `IImageFormatReader<HpglFile>`, `IImageFormatWriter<HpglFile>`, `IImageFromRawImage<HpglFile>`, `IImageToRawImage<HpglFile>`.
 
 | Member | Signature | Summary |
 | --- | --- | --- |
@@ -17948,6 +18083,7 @@ Implements `IEquatable<HpglFile>`, `IImageFormatMetadata<HpglFile>`, `IImageForm
 | `MillimetresPerUnit` | `const double MillimetresPerUnit` |  |
 | `Pens` | `static readonly Rgba32[] Pens` |  |
 | `Instructions` | `IReadOnlyList<HpglInstruction> Instructions { get; init; }` |  |
+| `FromRawImage` | `static HpglFile FromRawImage(RawImage image)` |  |
 | `ToRawImage` | `static RawImage ToRawImage(HpglFile file)` |  |
 
 #### `HpglInstruction`
@@ -17975,6 +18111,13 @@ Implements `IEquatable<HpglInstruction>`.
 | Member | Signature | Summary |
 | --- | --- | --- |
 | `Render` | `static RawImage Render(HpglFile file)` |  |
+
+#### `HpglWriter`
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `FromRawImage` | `static HpglFile FromRawImage(RawImage image)` |  |
+| `ToBytes` | `static byte[] ToBytes(HpglFile file)` |  |
 
 ### Namespace `FileFormat.Hpi`
 
@@ -18385,6 +18528,7 @@ Implements `IEquatable<IconLibraryFile>`, `IImageFormatMetadata<IconLibraryFile>
 
 | Member | Signature | Summary |
 | --- | --- | --- |
+| `IconLibraryFile` | `IconLibraryFile()` |  |
 | `Height` | `int Height { get; init; }` |  |
 | `RawData` | `byte[] RawData { get; init; }` |  |
 | `Width` | `int Width { get; init; }` |  |
@@ -18574,13 +18718,15 @@ Implements `IEquatable<IffAnimFile>`, `IImageFormatMetadata<IffAnimFile>`, `IIma
 
 #### `IffAnim8File`
 
-Implements `IEquatable<IffAnim8File>`, `IImageFormatMetadata<IffAnim8File>`, `IImageFormatReader<IffAnim8File>`, `IImageFormatWriter<IffAnim8File>`, `IImageToRawImage<IffAnim8File>`.
+Implements `IEquatable<IffAnim8File>`, `IImageFormatMetadata<IffAnim8File>`, `IImageFormatReader<IffAnim8File>`, `IImageFormatWriter<IffAnim8File>`, `IImageFromRawImage<IffAnim8File>`, `IImageToRawImage<IffAnim8File>`.
 
 | Member | Signature | Summary |
 | --- | --- | --- |
 | `Height` | `int Height { get; init; }` |  |
+| `PixelData` | `byte[] PixelData { get; init; }` |  |
 | `RawData` | `byte[] RawData { get; init; }` |  |
 | `Width` | `int Width { get; init; }` |  |
+| `FromRawImage` | `static IffAnim8File FromRawImage(RawImage image)` |  |
 | `ToRawImage` | `static RawImage ToRawImage(IffAnim8File file)` |  |
 
 #### `IffAnim8Reader`
@@ -18680,13 +18826,18 @@ Implements `IEquatable<IffDeepFile>`, `IImageFormatMetadata<IffDeepFile>`, `IIma
 
 #### `IffDpanFile`
 
-Implements `IEquatable<IffDpanFile>`, `IImageFormatMetadata<IffDpanFile>`, `IImageFormatReader<IffDpanFile>`, `IImageFormatWriter<IffDpanFile>`, `IImageToRawImage<IffDpanFile>`.
+Implements `IEquatable<IffDpanFile>`, `IImageFormatMetadata<IffDpanFile>`, `IImageFormatReader<IffDpanFile>`, `IImageFormatWriter<IffDpanFile>`, `IImageFromRawImage<IffDpanFile>`, `IImageToRawImage<IffDpanFile>`.
 
 | Member | Signature | Summary |
 | --- | --- | --- |
+| `Flags` | `uint Flags { get; init; }` |  |
+| `FrameCount` | `ushort FrameCount { get; init; }` |  |
 | `Height` | `int Height { get; init; }` |  |
+| `PixelData` | `byte[] PixelData { get; init; }` |  |
 | `RawData` | `byte[] RawData { get; init; }` |  |
+| `Version` | `ushort Version { get; init; }` |  |
 | `Width` | `int Width { get; init; }` |  |
+| `FromRawImage` | `static IffDpanFile FromRawImage(RawImage image)` |  |
 | `ToRawImage` | `static RawImage ToRawImage(IffDpanFile file)` |  |
 
 #### `IffDpanReader`
@@ -18710,13 +18861,18 @@ Implements `IEquatable<IffDpanFile>`, `IImageFormatMetadata<IffDpanFile>`, `IIma
 
 #### `IffHameFile`
 
-Implements `IEquatable<IffHameFile>`, `IImageFormatMetadata<IffHameFile>`, `IImageFormatReader<IffHameFile>`, `IImageFormatWriter<IffHameFile>`, `IImageToRawImage<IffHameFile>`.
+Implements `IEquatable<IffHameFile>`, `IImageFormatMetadata<IffHameFile>`, `IImageFormatReader<IffHameFile>`, `IImageFormatWriter<IffHameFile>`, `IImageFromRawImage<IffHameFile>`, `IImageToRawImage<IffHameFile>`.
 
 | Member | Signature | Summary |
 | --- | --- | --- |
 | `Height` | `int Height { get; init; }` |  |
+| `Interlaced` | `bool Interlaced { get; init; }` |  |
+| `PaletteCount` | `int PaletteCount { get; init; }` |  |
+| `Palette` | `byte[] Palette { get; init; }` |  |
+| `PixelData` | `byte[] PixelData { get; init; }` |  |
 | `RawData` | `byte[] RawData { get; init; }` |  |
 | `Width` | `int Width { get; init; }` |  |
+| `FromRawImage` | `static IffHameFile FromRawImage(RawImage image)` |  |
 | `ToRawImage` | `static RawImage ToRawImage(IffHameFile file)` |  |
 
 #### `IffHameReader`
@@ -18733,6 +18889,8 @@ Implements `IEquatable<IffHameFile>`, `IImageFormatMetadata<IffHameFile>`, `IIma
 | Member | Signature | Summary |
 | --- | --- | --- |
 | `ToBytes` | `static byte[] ToBytes(IffHameFile file)` |  |
+| `ToFile` | `static void ToFile(IffHameFile file, FileInfo target)` |  |
+| `ToStream` | `static void ToStream(IffHameFile file, Stream stream)` |  |
 
 ### Namespace `FileFormat.IffMultiPalette`
 
@@ -18740,13 +18898,19 @@ Implements `IEquatable<IffHameFile>`, `IImageFormatMetadata<IffHameFile>`, `IIma
 
 #### `IffMultiPaletteFile`
 
-Implements `IEquatable<IffMultiPaletteFile>`, `IImageFormatMetadata<IffMultiPaletteFile>`, `IImageFormatReader<IffMultiPaletteFile>`, `IImageFormatWriter<IffMultiPaletteFile>`, `IImageToRawImage<IffMultiPaletteFile>`.
+Implements `IEquatable<IffMultiPaletteFile>`, `IImageFormatMetadata<IffMultiPaletteFile>`, `IImageFormatReader<IffMultiPaletteFile>`, `IImageFormatWriter<IffMultiPaletteFile>`, `IImageFromRawImage<IffMultiPaletteFile>`, `IImageToRawImage<IffMultiPaletteFile>`.
 
 | Member | Signature | Summary |
 | --- | --- | --- |
 | `Height` | `int Height { get; init; }` |  |
+| `NumPlanes` | `int NumPlanes { get; init; }` |  |
+| `Palette` | `byte[] Palette { get; init; }` |  |
+| `PixelData` | `byte[] PixelData { get; init; }` |  |
 | `RawData` | `byte[] RawData { get; init; }` |  |
+| `ScanlinePalettes` | `byte[] ScanlinePalettes { get; init; }` |  |
+| `ViewportMode` | `uint ViewportMode { get; init; }` |  |
 | `Width` | `int Width { get; init; }` |  |
+| `FromRawImage` | `static IffMultiPaletteFile FromRawImage(RawImage image)` |  |
 | `ToRawImage` | `static RawImage ToRawImage(IffMultiPaletteFile file)` |  |
 
 #### `IffMultiPaletteReader`
@@ -18910,13 +19074,16 @@ Implements `IEquatable<IffRgbnFile>`, `IImageFormatMetadata<IffRgbnFile>`, `IIma
 
 #### `IffShamFile`
 
-Implements `IEquatable<IffShamFile>`, `IImageFormatMetadata<IffShamFile>`, `IImageFormatReader<IffShamFile>`, `IImageFormatWriter<IffShamFile>`, `IImageToRawImage<IffShamFile>`.
+Implements `IEquatable<IffShamFile>`, `IImageFormatMetadata<IffShamFile>`, `IImageFormatReader<IffShamFile>`, `IImageFormatWriter<IffShamFile>`, `IImageFromRawImage<IffShamFile>`, `IImageToRawImage<IffShamFile>`.
 
 | Member | Signature | Summary |
 | --- | --- | --- |
 | `Height` | `int Height { get; init; }` |  |
+| `PixelData` | `byte[] PixelData { get; init; }` |  |
 | `RawData` | `byte[] RawData { get; init; }` |  |
+| `ScanlinePalettes` | `byte[] ScanlinePalettes { get; init; }` |  |
 | `Width` | `int Width { get; init; }` |  |
+| `FromRawImage` | `static IffShamFile FromRawImage(RawImage image)` |  |
 | `ToRawImage` | `static RawImage ToRawImage(IffShamFile file)` |  |
 
 #### `IffShamReader`
@@ -20042,6 +20209,31 @@ Implements `IEquatable<IocaFile>`, `IImageFormatMetadata<IocaFile>`, `IImageForm
 | Member | Signature | Summary |
 | --- | --- | --- |
 | `ToBytes` | `static byte[] ToBytes(IocaFile file)` |  |
+
+### Namespace `FileFormat.Ipg`
+
+[`IpgFile`](#ipgfile) · [`IpgReader`](#ipgreader)
+
+#### `IpgFile`
+
+Implements `IImageFormatMetadata<IpgFile>`, `IImageFormatReader<IpgFile>`, `IImageToRawImage<IpgFile>`, `IMultiImageFileFormat<IpgFile>`.
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `IpgFile` | `IpgFile()` |  |
+| `Images` | `List<RawImage> Images { get; init; }` |  |
+| `Version` | `int Version { get; init; }` |  |
+| `ImageCount` | `static int ImageCount(IpgFile file)` |  |
+| `ToRawImage` | `static RawImage ToRawImage(IpgFile file)` |  |
+| `ToRawImage` | `static RawImage ToRawImage(IpgFile file, int index)` |  |
+| `ToRawImages` | `static IReadOnlyList<RawImage> ToRawImages(IpgFile file)` |  |
+
+#### `IpgReader`
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `FromSpan` | `static IpgFile FromSpan(ReadOnlySpan<byte> data)` |  |
+| `MatchesSignature` | `static bool? MatchesSignature(ReadOnlySpan<byte> header)` |  |
 
 ### Namespace `FileFormat.Ipl`
 
@@ -23317,11 +23509,11 @@ Implements `IEquatable<MrfFile>`, `IImageFormatMetadata<MrfFile>`, `IImageFormat
 
 ### Namespace `FileFormat.Mrw`
 
-[`MrwFile`](#mrwfile) · [`MrwReader`](#mrwreader)
+[`MrwFile`](#mrwfile) · [`MrwReader`](#mrwreader) · [`MrwWriter`](#mrwwriter)
 
 #### `MrwFile`
 
-Implements `IEquatable<MrwFile>`, `IImageFormatMetadata<MrwFile>`, `IImageFormatReader<MrwFile>`, `IImageToRawImage<MrwFile>`.
+Implements `IEquatable<MrwFile>`, `IImageFormatMetadata<MrwFile>`, `IImageFormatReader<MrwFile>`, `IImageFormatWriter<MrwFile>`, `IImageFromRawImage<MrwFile>`, `IImageToRawImage<MrwFile>`.
 
 | Member | Signature | Summary |
 | --- | --- | --- |
@@ -23335,6 +23527,7 @@ Implements `IEquatable<MrwFile>`, `IImageFormatMetadata<MrwFile>`, `IImageFormat
 | `PixelData` | `byte[] PixelData { get; init; }` |  |
 | `WhiteBalanceBlock` | `static ReadOnlySpan<byte> WhiteBalanceBlock { get; }` |  |
 | `Width` | `int Width { get; init; }` |  |
+| `FromRawImage` | `static MrwFile FromRawImage(RawImage image)` |  |
 | `ToRawImage` | `static RawImage ToRawImage(MrwFile file)` |  |
 
 #### `MrwReader`
@@ -23345,6 +23538,12 @@ Implements `IEquatable<MrwFile>`, `IImageFormatMetadata<MrwFile>`, `IImageFormat
 | `FromFile` | `static MrwFile FromFile(FileInfo file)` |  |
 | `FromSpan` | `static MrwFile FromSpan(ReadOnlySpan<byte> data)` |  |
 | `FromStream` | `static MrwFile FromStream(Stream stream)` |  |
+
+#### `MrwWriter`
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `ToBytes` | `static byte[] ToBytes(MrwFile file)` |  |
 
 ### Namespace `FileFormat.Msp`
 
@@ -24395,18 +24594,20 @@ Implements `IEquatable<NdsTextureFile>`, `IImageFormatMetadata<NdsTextureFile>`,
 
 ### Namespace `FileFormat.NeoBookCartoon`
 
-[`NeoBookCartoonFile`](#neobookcartoonfile) · [`NeoBookCartoonReader`](#neobookcartoonreader)
+[`NeoBookCartoonFile`](#neobookcartoonfile) · [`NeoBookCartoonReader`](#neobookcartoonreader) · [`NeoBookCartoonWriter`](#neobookcartoonwriter)
 
 #### `NeoBookCartoonFile`
 
-Implements `IEquatable<NeoBookCartoonFile>`, `IImageFormatMetadata<NeoBookCartoonFile>`, `IImageFormatReader<NeoBookCartoonFile>`, `IImageToRawImage<NeoBookCartoonFile>`.
+Implements `IEquatable<NeoBookCartoonFile>`, `IImageFormatMetadata<NeoBookCartoonFile>`, `IImageFormatReader<NeoBookCartoonFile>`, `IImageFormatWriter<NeoBookCartoonFile>`, `IImageFromRawImage<NeoBookCartoonFile>`, `IImageToRawImage<NeoBookCartoonFile>`.
 
 | Member | Signature | Summary |
 | --- | --- | --- |
+| `DefaultPictureOffset` | `const int DefaultPictureOffset` |  |
 | `HeaderSize` | `const int HeaderSize` |  |
 | `Magic` | `static ReadOnlySpan<byte> Magic { get; }` |  |
 | `PictureOffset` | `int PictureOffset { get; init; }` |  |
 | `Picture` | `byte[] Picture { get; init; }` |  |
+| `FromRawImage` | `static NeoBookCartoonFile FromRawImage(RawImage image)` |  |
 | `ToRawImage` | `static RawImage ToRawImage(NeoBookCartoonFile file)` |  |
 
 #### `NeoBookCartoonReader`
@@ -24417,6 +24618,12 @@ Implements `IEquatable<NeoBookCartoonFile>`, `IImageFormatMetadata<NeoBookCartoo
 | `FromFile` | `static NeoBookCartoonFile FromFile(FileInfo file)` |  |
 | `FromSpan` | `static NeoBookCartoonFile FromSpan(ReadOnlySpan<byte> data)` |  |
 | `FromStream` | `static NeoBookCartoonFile FromStream(Stream stream)` |  |
+
+#### `NeoBookCartoonWriter`
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `ToBytes` | `static byte[] ToBytes(NeoBookCartoonFile file)` |  |
 
 ### Namespace `FileFormat.NeoGeoPocket`
 
@@ -27310,11 +27517,11 @@ Implements `IEquatable<PhotoStudioFile>`, `IImageFormatMetadata<PhotoStudioFile>
 
 ### Namespace `FileFormat.PhotoSuiteProject`
 
-[`PhotoSuiteProjectFile`](#photosuiteprojectfile) · [`PhotoSuiteProjectReader`](#photosuiteprojectreader)
+[`PhotoSuiteProjectFile`](#photosuiteprojectfile) · [`PhotoSuiteProjectReader`](#photosuiteprojectreader) · [`PhotoSuiteProjectWriter`](#photosuiteprojectwriter)
 
 #### `PhotoSuiteProjectFile`
 
-Implements `IEquatable<PhotoSuiteProjectFile>`, `IImageFormatMetadata<PhotoSuiteProjectFile>`, `IImageFormatReader<PhotoSuiteProjectFile>`, `IImageToRawImage<PhotoSuiteProjectFile>`.
+Implements `IEquatable<PhotoSuiteProjectFile>`, `IImageFormatMetadata<PhotoSuiteProjectFile>`, `IImageFormatReader<PhotoSuiteProjectFile>`, `IImageFormatWriter<PhotoSuiteProjectFile>`, `IImageFromRawImage<PhotoSuiteProjectFile>`, `IImageToRawImage<PhotoSuiteProjectFile>`.
 
 | Member | Signature | Summary |
 | --- | --- | --- |
@@ -27325,6 +27532,7 @@ Implements `IEquatable<PhotoSuiteProjectFile>`, `IImageFormatMetadata<PhotoSuite
 | `PngSignature` | `static ReadOnlySpan<byte> PngSignature { get; }` |  |
 | `Signature` | `static ReadOnlySpan<byte> Signature { get; }` |  |
 | `Width` | `int Width { get; init; }` |  |
+| `FromRawImage` | `static PhotoSuiteProjectFile FromRawImage(RawImage image)` |  |
 | `ToRawImage` | `static RawImage ToRawImage(PhotoSuiteProjectFile file)` |  |
 
 #### `PhotoSuiteProjectReader`
@@ -27335,6 +27543,12 @@ Implements `IEquatable<PhotoSuiteProjectFile>`, `IImageFormatMetadata<PhotoSuite
 | `FromFile` | `static PhotoSuiteProjectFile FromFile(FileInfo file)` |  |
 | `FromSpan` | `static PhotoSuiteProjectFile FromSpan(ReadOnlySpan<byte> data)` |  |
 | `FromStream` | `static PhotoSuiteProjectFile FromStream(Stream stream)` |  |
+
+#### `PhotoSuiteProjectWriter`
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `ToBytes` | `static byte[] ToBytes(PhotoSuiteProjectFile file)` |  |
 
 ### Namespace `FileFormat.Pi`
 
@@ -28377,11 +28591,11 @@ Implements `IEquatable<PocketPc2bpFile>`, `IImageFormatMetadata<PocketPc2bpFile>
 
 ### Namespace `FileFormat.PocketPcTheme`
 
-[`PocketPcThemeFile`](#pocketpcthemefile) · [`PocketPcThemeReader`](#pocketpcthemereader)
+[`PocketPcThemeFile`](#pocketpcthemefile) · [`PocketPcThemeReader`](#pocketpcthemereader) · [`PocketPcThemeWriter`](#pocketpcthemewriter)
 
 #### `PocketPcThemeFile`
 
-Implements `IEquatable<PocketPcThemeFile>`, `IImageFormatMetadata<PocketPcThemeFile>`, `IImageFormatReader<PocketPcThemeFile>`, `IImageToRawImage<PocketPcThemeFile>`.
+Implements `IEquatable<PocketPcThemeFile>`, `IImageFormatMetadata<PocketPcThemeFile>`, `IImageFormatReader<PocketPcThemeFile>`, `IImageFormatWriter<PocketPcThemeFile>`, `IImageFromRawImage<PocketPcThemeFile>`, `IImageToRawImage<PocketPcThemeFile>`.
 
 | Member | Signature | Summary |
 | --- | --- | --- |
@@ -28393,6 +28607,7 @@ Implements `IEquatable<PocketPcThemeFile>`, `IImageFormatMetadata<PocketPcThemeF
 | `PngSignature` | `static ReadOnlySpan<byte> PngSignature { get; }` |  |
 | `Signature` | `static ReadOnlySpan<byte> Signature { get; }` |  |
 | `Width` | `int Width { get; init; }` |  |
+| `FromRawImage` | `static PocketPcThemeFile FromRawImage(RawImage image)` |  |
 | `ToRawImage` | `static RawImage ToRawImage(PocketPcThemeFile file)` |  |
 
 #### `PocketPcThemeReader`
@@ -28403,6 +28618,12 @@ Implements `IEquatable<PocketPcThemeFile>`, `IImageFormatMetadata<PocketPcThemeF
 | `FromFile` | `static PocketPcThemeFile FromFile(FileInfo file)` |  |
 | `FromSpan` | `static PocketPcThemeFile FromSpan(ReadOnlySpan<byte> data)` |  |
 | `FromStream` | `static PocketPcThemeFile FromStream(Stream stream)` |  |
+
+#### `PocketPcThemeWriter`
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `ToBytes` | `static byte[] ToBytes(PocketPcThemeFile file)` |  |
 
 ### Namespace `FileFormat.PortfolioGraphics`
 
@@ -31379,6 +31600,29 @@ Implements `IEquatable<ScreenMakerFile>`, `IImageFormatMetadata<ScreenMakerFile>
 | Member | Signature | Summary |
 | --- | --- | --- |
 | `ToBytes` | `static byte[] ToBytes(ScreenMakerFile file)` |  |
+
+### Namespace `FileFormat.Sdg`
+
+[`SdgFile`](#sdgfile) · [`SdgReader`](#sdgreader)
+
+#### `SdgFile`
+
+Implements `IImageFormatMetadata<SdgFile>`, `IImageFormatReader<SdgFile>`, `IImageToRawImage<SdgFile>`, `IMultiImageFileFormat<SdgFile>`.
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `SdgFile` | `SdgFile()` |  |
+| `Images` | `List<RawImage> Images { get; init; }` |  |
+| `ImageCount` | `static int ImageCount(SdgFile file)` |  |
+| `ToRawImage` | `static RawImage ToRawImage(SdgFile file)` |  |
+| `ToRawImage` | `static RawImage ToRawImage(SdgFile file, int index)` |  |
+| `ToRawImages` | `static IReadOnlyList<RawImage> ToRawImages(SdgFile file)` |  |
+
+#### `SdgReader`
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `FromSpan` | `static SdgFile FromSpan(ReadOnlySpan<byte> data)` |  |
 
 ### Namespace `FileFormat.Sdt`
 
@@ -35265,11 +35509,11 @@ Implements `IEquatable<TruePaintFile>`, `IImageFormatMetadata<TruePaintFile>`, `
 
 ### Namespace `FileFormat.TrueType`
 
-[`TrueTypeFile`](#truetypefile) · [`TrueTypeGlyph`](#truetypeglyph) · [`TrueTypePoint`](#truetypepoint) · [`TrueTypeReader`](#truetypereader) · [`TrueTypeRenderer`](#truetyperenderer)
+[`TrueTypeFile`](#truetypefile) · [`TrueTypeGlyph`](#truetypeglyph) · [`TrueTypePoint`](#truetypepoint) · [`TrueTypeReader`](#truetypereader) · [`TrueTypeRenderer`](#truetyperenderer) · [`TrueTypeWriter`](#truetypewriter)
 
 #### `TrueTypeFile`
 
-Implements `IEquatable<TrueTypeFile>`, `IImageFormatMetadata<TrueTypeFile>`, `IImageFormatReader<TrueTypeFile>`, `IImageToRawImage<TrueTypeFile>`.
+Implements `IEquatable<TrueTypeFile>`, `IImageFormatMetadata<TrueTypeFile>`, `IImageFormatReader<TrueTypeFile>`, `IImageFormatWriter<TrueTypeFile>`, `IImageFromRawImage<TrueTypeFile>`, `IImageToRawImage<TrueTypeFile>`.
 
 | Member | Signature | Summary |
 | --- | --- | --- |
@@ -35284,6 +35528,7 @@ Implements `IEquatable<TrueTypeFile>`, `IImageFormatMetadata<TrueTypeFile>`, `II
 | `GlyphCount` | `int GlyphCount { get; init; }` |  |
 | `Glyphs` | `IReadOnlyList<TrueTypeGlyph> Glyphs { get; init; }` |  |
 | `UnitsPerEm` | `int UnitsPerEm { get; init; }` |  |
+| `FromRawImage` | `static TrueTypeFile FromRawImage(RawImage image)` |  |
 | `ToRawImage` | `static RawImage ToRawImage(TrueTypeFile file)` |  |
 
 #### `TrueTypeGlyph`
@@ -35320,6 +35565,13 @@ Implements `IEquatable<TrueTypePoint>`.
 | Member | Signature | Summary |
 | --- | --- | --- |
 | `Render` | `static RawImage Render(TrueTypeFile file)` |  |
+
+#### `TrueTypeWriter`
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `FromRawImage` | `static TrueTypeFile FromRawImage(RawImage image)` |  |
+| `ToBytes` | `static byte[] ToBytes(TrueTypeFile file)` |  |
 
 ### Namespace `FileFormat.TrzmielCompressed`
 
@@ -37684,11 +37936,11 @@ Implements `IEquatable<X11PuzzleFile>`, `IImageFormatMetadata<X11PuzzleFile>`, `
 
 ### Namespace `FileFormat.X3f`
 
-[`X3fFile`](#x3ffile) · [`X3fReader`](#x3freader)
+[`X3fFile`](#x3ffile) · [`X3fReader`](#x3freader) · [`X3fWriter`](#x3fwriter)
 
 #### `X3fFile`
 
-Implements `IEquatable<X3fFile>`, `IImageFormatMetadata<X3fFile>`, `IImageFormatReader<X3fFile>`, `IImageToRawImage<X3fFile>`.
+Implements `IEquatable<X3fFile>`, `IImageFormatMetadata<X3fFile>`, `IImageFormatReader<X3fFile>`, `IImageFormatWriter<X3fFile>`, `IImageFromRawImage<X3fFile>`, `IImageToRawImage<X3fFile>`.
 
 | Member | Signature | Summary |
 | --- | --- | --- |
@@ -37704,6 +37956,7 @@ Implements `IEquatable<X3fFile>`, `IImageFormatMetadata<X3fFile>`, `IImageFormat
 | `Magic` | `static ReadOnlySpan<byte> Magic { get; }` |  |
 | `PixelData` | `byte[] PixelData { get; init; }` |  |
 | `Width` | `int Width { get; init; }` |  |
+| `FromRawImage` | `static X3fFile FromRawImage(RawImage image)` |  |
 | `ToRawImage` | `static RawImage ToRawImage(X3fFile file)` |  |
 
 #### `X3fReader`
@@ -37714,6 +37967,12 @@ Implements `IEquatable<X3fFile>`, `IImageFormatMetadata<X3fFile>`, `IImageFormat
 | `FromFile` | `static X3fFile FromFile(FileInfo file)` |  |
 | `FromSpan` | `static X3fFile FromSpan(ReadOnlySpan<byte> data)` |  |
 | `FromStream` | `static X3fFile FromStream(Stream stream)` |  |
+
+#### `X3fWriter`
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `ToBytes` | `static byte[] ToBytes(X3fFile file)` |  |
 
 ### Namespace `FileFormat.XBin`
 
@@ -38176,11 +38435,11 @@ Implements `IEquatable<XlPaintFile>`, `IImageFormatMetadata<XlPaintFile>`, `IIma
 
 ### Namespace `FileFormat.Xld4`
 
-[`Xld4File`](#xld4file) · [`Xld4Reader`](#xld4reader)
+[`Xld4File`](#xld4file) · [`Xld4Reader`](#xld4reader) · [`Xld4Writer`](#xld4writer)
 
 #### `Xld4File`
 
-Implements `IEquatable<Xld4File>`, `IImageFormatMetadata<Xld4File>`, `IImageFormatReader<Xld4File>`, `IImageToRawImage<Xld4File>`.
+Implements `IEquatable<Xld4File>`, `IImageFormatMetadata<Xld4File>`, `IImageFormatReader<Xld4File>`, `IImageFormatWriter<Xld4File>`, `IImageFromRawImage<Xld4File>`, `IImageToRawImage<Xld4File>`.
 
 | Member | Signature | Summary |
 | --- | --- | --- |
@@ -38189,6 +38448,7 @@ Implements `IEquatable<Xld4File>`, `IImageFormatMetadata<Xld4File>`, `IImageForm
 | `Width` | `const int Width` |  |
 | `Palette` | `byte[] Palette { get; init; }` |  |
 | `Pixels` | `byte[] Pixels { get; init; }` |  |
+| `FromRawImage` | `static Xld4File FromRawImage(RawImage image)` |  |
 | `ToRawImage` | `static RawImage ToRawImage(Xld4File file)` |  |
 
 #### `Xld4Reader`
@@ -38199,6 +38459,12 @@ Implements `IEquatable<Xld4File>`, `IImageFormatMetadata<Xld4File>`, `IImageForm
 | `FromFile` | `static Xld4File FromFile(FileInfo file)` |  |
 | `FromSpan` | `static Xld4File FromSpan(ReadOnlySpan<byte> data)` |  |
 | `FromStream` | `static Xld4File FromStream(Stream stream)` |  |
+
+#### `Xld4Writer`
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `ToBytes` | `static byte[] ToBytes(Xld4File file)` |  |
 
 ### Namespace `FileFormat.Xpm`
 
@@ -39871,737 +40137,741 @@ Implements `IEquatable<FormatEntry>`.
 | `CartesMichelin` | `151` |  |
 | `CasioQv` | `152` |  |
 | `Ccitt` | `153` |  |
-| `Cdxl` | `154` |  |
-| `Cel` | `155` |  |
-| `CelGrey` | `156` |  |
-| `Centauri` | `157` |  |
-| `CentauriLogoEditor` | `158` |  |
-| `CfliDesigner` | `159` |  |
-| `Cgm` | `160` |  |
-| `ChampionsInterlace` | `161` |  |
-| `CharPad` | `162` |  |
-| `CharSet64` | `163` |  |
-| `Cheese` | `164` |  |
-| `ChinonEs1000` | `165` |  |
-| `ChrDollar` | `166` |  |
-| `CinemasterAtari` | `167` |  |
-| `Cineon` | `168` |  |
-| `CiscoIp` | `169` |  |
-| `ClipArtCatalog` | `170` |  |
-| `Cloe` | `171` |  |
-| `Clp` | `172` |  |
-| `Cmu` | `173` |  |
-| `CmuWindowManager` | `174` |  |
-| `CoCo` | `175` |  |
-| `CoCo3` | `176` |  |
-| `CoCoMax` | `177` |  |
-| `CocoP11` | `178` |  |
-| `CokeAtari` | `179` |  |
-| `ColoRix` | `180` |  |
-| `ColorStar` | `181` |  |
-| `ColorStarObject` | `182` |  |
-| `ColrObjectEditor` | `183` |  |
-| `Commodore64Font` | `184` |  |
-| `CommodoreGrafix` | `185` |  |
-| `CommodorePet` | `186` |  |
-| `CompW` | `187` |  |
-| `CompuServeRle` | `188` |  |
-| `ComputerEyes` | `189` |  |
-| `ComputerEyesSt` | `190` |  |
-| `CoreIdc` | `191` |  |
-| `CorelGallery` | `192` |  |
-| `Cp8Gray` | `193` |  |
-| `CpcAdvanced` | `194` |  |
-| `CpcFont` | `195` |  |
-| `CpcOverscan` | `196` |  |
-| `CpcPlus` | `197` |  |
-| `CpcSprite` | `198` |  |
-| `Cr3` | `199` |  |
-| `Crack` | `200` |  |
-| `CrackArt` | `201` |  |
-| `CranachPaint` | `202` |  |
-| `Crd` | `203` |  |
-| `CreateWithGarfield` | `204` |  |
-| `Crw` | `205` |  |
-| `CsvImage` | `206` |  |
-| `Cur` | `207` |  |
-| `CutCreator` | `208` |  |
-| `DGraphCompressed` | `209` |  |
-| `DaisyDotFont` | `210` |  |
-| `DaliCompressed` | `211` |  |
-| `DaliST` | `212` |  |
-| `DbwRender` | `213` |  |
-| `Dcx` | `214` |  |
-| `Dds` | `215` |  |
-| `Degas` | `216` |  |
-| `DegasBrush` | `217` |  |
-| `DegasIcon` | `218` |  |
-| `DelmPaint` | `219` |  |
-| `Deluxe` | `220` |  |
-| `Dicom` | `221` |  |
-| `DigiSpec` | `222` |  |
-| `DigiView` | `223` |  |
-| `DigitalFx` | `224` |  |
-| `Din` | `225` |  |
-| `DirLogoMaker` | `226` |  |
-| `DispThumbnail` | `227` |  |
-| `DivGameMap` | `228` |  |
-| `DjVu` | `229` |  |
-| `Dng` | `230` |  |
-| `DolphinEd` | `231` |  |
-| `Doodle` | `232` |  |
-| `DoodleAtari` | `233` |  |
-| `DoodleComp` | `234` |  |
-| `DoodlePacked` | `235` |  |
-| `DoomFlat` | `236` |  |
-| `Dpx` | `237` |  |
-| `DrHalo` | `238` |  |
-| `Dragon` | `239` |  |
-| `DrawIt` | `240` |  |
-| `DrazPaint` | `241` |  |
-| `Drazlace` | `242` |  |
-| `DuneGraph` | `243` |  |
-| `Duo` | `244` |  |
-| `DuoMedium` | `245` |  |
-| `Dwg` | `246` |  |
-| `Dxf` | `247` |  |
-| `EccHeader` | `248` |  |
-| `EciGraphicEditor` | `249` |  |
-| `EclipseTile` | `250` |  |
-| `Ecw` | `251` |  |
-| `EdmicsC4` | `252` |  |
-| `EggPaint` | `253` |  |
-| `ElectricImage` | `254` |  |
-| `Electronika` | `255` |  |
-| `EmbeddedDib` | `256` |  |
-| `EmcEditor` | `257` |  |
-| `Emf` | `258` |  |
-| `Enterprise128` | `259` |  |
-| `Envi` | `260` |  |
-| `EpaBios` | `261` |  |
-| `Eps` | `262` |  |
-| `Eroiica` | `263` |  |
-| `EscapePaint` | `264` |  |
-| `EsmSoftwarePix` | `265` |  |
-| `EverexFax` | `266` |  |
-| `Exr` | `267` |  |
-| `ExtendSuperHires` | `268` |  |
-| `ExtendedGemImg` | `269` |  |
-| `EzArt` | `270` |  |
-| `FacePainter` | `271` |  |
-| `FaceSaver` | `272` |  |
-| `FaceServer` | `273` |  |
-| `FalconFuckpaint` | `274` |  |
-| `FalconPaint` | `275` |  |
-| `FalconRes` | `276` |  |
-| `Farbfeld` | `277` |  |
-| `FastgraphPixelRun` | `278` |  |
-| `FaxG3` | `279` |  |
-| `FaxMan` | `280` |  |
-| `Fbm` | `281` |  |
-| `Fff` | `282` |  |
-| `Ffli` | `283` |  |
-| `FirstPublisher` | `284` |  |
-| `Fits` | `285` |  |
-| `FitsDocument` | `286` |  |
-| `Fl32` | `287` |  |
-| `FlashImage` | `288` |  |
-| `Fli` | `289` |  |
-| `Fli64` | `290` |  |
-| `FliDesigner` | `291` |  |
-| `FliDesigner2` | `292` |  |
-| `FliEditor` | `293` |  |
-| `FliGraph` | `294` |  |
-| `FliProfi` | `295` |  |
-| `Flif` | `296` |  |
-| `Flimatic` | `297` |  |
-| `Flip64` | `298` |  |
-| `FloorDesigner` | `299` |  |
-| `FmTowns` | `300` |  |
-| `FontasyGrafik` | `301` |  |
-| `Fpx` | `302` |  |
-| `FreeHand` | `303` |  |
-| `FremontFax` | `304` |  |
-| `Fsh` | `305` |  |
-| `Fuckpaint` | `306` |  |
-| `FullscreenKit` | `307` |  |
-| `FunGraphicsMachine` | `308` |  |
-| `FunPainter` | `309` |  |
-| `FunPhotor` | `310` |  |
-| `FunWithArt` | `311` |  |
-| `FuntasticPaint` | `312` |  |
-| `G9b` | `313` |  |
-| `Gaf` | `314` |  |
-| `GameBoyTile` | `315` |  |
-| `GammaFax` | `316` |  |
-| `GbaTile` | `317` |  |
-| `Gbr` | `318` |  |
-| `Gd2` | `319` |  |
-| `GeGenesis` | `320` |  |
-| `GedPicture` | `321` |  |
-| `Gem` | `322` |  |
-| `GemImg` | `323` |  |
-| `GeoPaint` | `324` |  |
-| `GephardHires` | `325` |  |
-| `GfaPaint` | `326` |  |
-| `GfaRaytrace` | `327` |  |
-| `Gif` | `328` |  |
-| `GigaPaint` | `329` |  |
-| `Gigacad` | `330` |  |
-| `GoDot4Bit` | `331` |  |
-| `GodPaint` | `332` |  |
-| `Grafix` | `333` |  |
-| `Graph2Font` | `334` |  |
-| `Graph2FontMch` | `335` |  |
-| `Graph2FontScroll` | `336` |  |
-| `GraphLogo` | `337` |  |
-| `GraphSaurus` | `338` |  |
-| `GraphSaurus6` | `339` |  |
-| `GraphSaurus7` | `340` |  |
-| `GraphSaurusInterlaced` | `341` |  |
-| `Graphics10Plus` | `342` |  |
-| `Graphics9Plus` | `343` |  |
-| `GraphicsMaster` | `344` |  |
-| `GraspGl` | `345` |  |
-| `GrassSlideshow` | `346` |  |
-| `GreatPaint` | `347` |  |
-| `GrfBitmap` | `348` |  |
-| `Grs16` | `349` |  |
-| `GunPaint` | `350` |  |
-| `HalfLifeMdl` | `351` |  |
-| `HalfLifeModel` | `352` |  |
-| `HandyScanner` | `353` |  |
-| `HardColorMap` | `354` |  |
-| `HardInterlace` | `355` |  |
-| `HayesJtfax` | `356` |  |
-| `HcbEditor` | `357` |  |
-| `Hdr` | `358` |  |
-| `Heif` | `359` |  |
-| `HereticM8` | `360` |  |
-| `HfImage` | `361` |  |
-| `HiEddi` | `362` |  |
-| `HiPicCreator` | `363` |  |
-| `HiResEditor` | `364` |  |
-| `HighResAtari` | `365` |  |
-| `HighResST` | `366` |  |
-| `HighresMedium` | `367` |  |
-| `HinterGrundBild` | `368` |  |
-| `HiresC64` | `369` |  |
-| `HiresFliCrest` | `370` |  |
-| `HiresInterlaceFeniks` | `371` |  |
-| `HiresManager` | `372` |  |
-| `Hireslace` | `373` |  |
-| `HomeworldLif` | `374` |  |
-| `Hp48Grob` | `375` |  |
-| `HpGrob` | `376` |  |
-| `Hpgl` | `377` |  |
-| `Hpi` | `378` |  |
-| `Hru` | `379` |  |
-| `Hrz` | `380` |  |
-| `Hta` | `381` |  |
-| `IPaint` | `382` |  |
-| `IbmKips` | `383` |  |
-| `IcDraw` | `384` |  |
-| `Ice` | `385` |  |
-| `IcePcinPlus` | `386` |  |
-| `Icns` | `387` |  |
-| `Ico` | `388` |  |
-| `IconLibrary` | `389` |  |
-| `Ics` | `390` |  |
-| `IffAcbm` | `391` |  |
-| `IffAnim` | `392` |  |
-| `IffAnim8` | `393` |  |
-| `IffDctv` | `394` |  |
-| `IffDeep` | `395` |  |
-| `IffDpan` | `396` |  |
-| `IffHame` | `397` |  |
-| `IffMultiPalette` | `398` |  |
-| `IffPbm` | `399` |  |
-| `IffRgb8` | `400` |  |
-| `IffRgbn` | `401` |  |
-| `IffSham` | `402` |  |
-| `Ilbm` | `403` |  |
-| `Im5Visilog` | `404` |  |
-| `ImageLabBw` | `405` |  |
-| `ImageSysC64` | `406` |  |
-| `ImageSystem` | `407` |  |
-| `Imagic` | `408` |  |
-| `ImagicPaint` | `409` |  |
-| `ImagingFax` | `410` |  |
-| `ImnetImage` | `411` |  |
-| `InShape` | `412` |  |
-| `IndyPaint` | `413` |  |
-| `Ingr` | `414` |  |
-| `Int95a` | `415` |  |
-| `InterPaintHi` | `416` |  |
-| `InterPaintMc` | `417` |  |
-| `InterPainter` | `418` |  |
-| `Interfile` | `419` |  |
-| `Interlace8` | `420` |  |
-| `InterlaceGraphicsEditor` | `421` |  |
-| `InterlaceHiresEditor` | `422` |  |
-| `InterlaceLogoDesigner` | `423` |  |
-| `InterlaceStudio` | `424` |  |
-| `InterlacedLogoEditor` | `425` |  |
-| `InterleafImage` | `426` |  |
-| `Ioca` | `427` |  |
-| `Ipl` | `428` |  |
-| `Ipsm` | `429` |  |
-| `Iss` | `430` |  |
-| `It01` | `431` |  |
-| `Jbig` | `432` |  |
-| `Jbig2` | `433` |  |
-| `JetGraphicsPlanner` | `434` |  |
-| `JigsawPicture` | `435` |  |
-| `JigsawPuzzle` | `436` |  |
-| `Jng` | `437` |  |
-| `Jnx` | `438` |  |
-| `JovianVi` | `439` |  |
-| `Jpeg` | `440` |  |
-| `Jpeg2000` | `441` |  |
-| `JpegLs` | `442` |  |
-| `JpegXl` | `443` |  |
-| `JpegXr` | `444` |  |
-| `JupiterAce` | `445` |  |
-| `Kitty` | `446` |  |
-| `Koala` | `447` |  |
-| `KoalaCompressed` | `448` |  |
-| `KodakDc25` | `449` |  |
-| `KofaxKfx` | `450` |  |
-| `Kqp` | `451` |  |
-| `Krita` | `452` |  |
-| `KssPaint` | `453` |  |
-| `Ktx` | `454` |  |
-| `LViewPro` | `455` |  |
-| `LarkaObjectEditor` | `456` |  |
-| `LaserData` | `457` |  |
-| `LastWordFont` | `458` |  |
-| `LdPic` | `459` |  |
-| `LightWorkImage` | `460` |  |
-| `LogoPainter` | `461` |  |
-| `LogoSys` | `462` |  |
-| `Lss16` | `463` |  |
-| `LucasFilm` | `464` |  |
-| `LudekMaker` | `465` |  |
-| `MacPaint` | `466` |  |
-| `MadDesigner` | `467` |  |
-| `MadStudio` | `468` |  |
-| `MadStudioMissile` | `469` |  |
-| `MadStudioTile` | `470` |  |
-| `Mag` | `471` |  |
-| `MagicPainter` | `472` |  |
-| `Mamut` | `473` |  |
-| `MapletownMl1` | `474` |  |
-| `MapletownMx1` | `475` |  |
-| `MapletownNl3` | `476` |  |
-| `MasterSystemTile` | `477` |  |
-| `MatLab` | `478` |  |
-| `MawWareTexture` | `479` |  |
-| `MayaIff` | `480` |  |
-| `McPainter` | `481` |  |
-| `Mcs` | `482` |  |
-| `Mda` | `483` |  |
-| `Mdp` | `484` |  |
-| `MegaPaint` | `485` |  |
-| `MegaluxFrame` | `486` |  |
-| `MetaImage` | `487` |  |
-| `MgrBitmap` | `488` |  |
-| `MicroDesignCut` | `489` |  |
-| `MicroDesignGrf` | `490` |  |
-| `MicroDynamicsMars` | `491` |  |
-| `MicroIllustrator` | `492` |  |
-| `MicroIllustratorA8` | `493` |  |
-| `MicroPainter8` | `494` |  |
-| `Miff` | `495` |  |
-| `MiniPaint` | `496` |  |
-| `Mlt` | `497` |  |
-| `Mng` | `498` |  |
-| `MobileFax` | `499` |  |
-| `MobyDick` | `500` |  |
-| `MonoMagic` | `501` |  |
-| `MonoStar` | `502` |  |
-| `MovieMakerBackground` | `503` |  |
-| `Mpo` | `504` |  |
-| `Mrc` | `505` |  |
-| `Mrf` | `506` |  |
-| `Mrw` | `507` |  |
-| `Msp` | `508` |  |
-| `Msx` | `509` |  |
-| `MsxFont` | `510` |  |
-| `MsxGl16` | `511` |  |
-| `MsxGl6` | `512` |  |
-| `MsxGl8` | `513` |  |
-| `MsxGlYjk` | `514` |  |
-| `MsxMig` | `515` |  |
-| `MsxScc` | `516` |  |
-| `MsxScreen10` | `517` |  |
-| `MsxScreen2` | `518` |  |
-| `MsxScreen3` | `519` |  |
-| `MsxScreen4` | `520` |  |
-| `MsxScreen5` | `521` |  |
-| `MsxScreen6` | `522` |  |
-| `MsxScreen8` | `523` |  |
-| `MsxSprite` | `524` |  |
-| `MsxVideo` | `525` |  |
-| `MsxView` | `526` |  |
-| `Mtv` | `527` |  |
-| `MuifliEditor` | `528` |  |
-| `MultiLaceEditor` | `529` |  |
-| `MultiPainter` | `530` |  |
-| `MultiPalettePicture` | `531` |  |
-| `NcrImage` | `532` |  |
-| `NdsTexture` | `533` |  |
-| `NeoBookCartoon` | `534` |  |
-| `NeoGeoPocket` | `535` |  |
-| `NeoGeoSprite` | `536` |  |
-| `Neochrome` | `537` |  |
-| `NeroCoverDesigner` | `538` |  |
-| `NesChr` | `539` |  |
-| `Netpbm` | `540` |  |
-| `NewsRoom` | `541` |  |
-| `Nfo` | `542` |  |
-| `Nhdr` | `543` |  |
-| `Nie` | `544` |  |
-| `Nifti` | `545` |  |
-| `Nifti2` | `546` |  |
-| `Nifti2Gzip` | `547` |  |
-| `NiftiGzip` | `548` |  |
-| `NiftiPair` | `549` |  |
-| `NistIHead` | `550` |  |
-| `Nitf` | `551` |  |
-| `NokiaGroupGraphics` | `552` |  |
-| `NokiaLogo` | `553` |  |
-| `NokiaNlm` | `554` |  |
-| `NokiaOperatorLogo` | `555` |  |
-| `NokiaPictureMessage` | `556` |  |
-| `Nrrd` | `557` |  |
-| `NufliEditor` | `558` |  |
-| `OazFax` | `559` |  |
-| `OcpArtStudioWindow` | `560` |  |
-| `OcsPics` | `561` |  |
-| `OdFontEditor` | `562` |  |
-| `Oil` | `563` |  |
-| `OlicomFax` | `564` |  |
-| `Olpc565` | `565` |  |
-| `OpenRaster` | `566` |  |
-| `Optocat` | `567` |  |
-| `Oric` | `568` |  |
-| `Otb` | `569` |  |
-| `PabloPaint` | `570` |  |
-| `Pagefox` | `571` |  |
-| `PaintMagic` | `572` |  |
-| `PaintPro` | `573` |  |
-| `PaintShop` | `574` |  |
-| `PaintShopBrowser` | `575` |  |
-| `PaintShopCompressed` | `576` |  |
-| `Palm` | `577` |  |
-| `PalmImageViewer` | `578` |  |
-| `PalmPdb` | `579` |  |
-| `Paradox` | `580` |  |
-| `Pat` | `581` |  |
-| `Pc88` | `582` |  |
-| `Pc98Ebd` | `583` |  |
-| `PcEngineTile` | `584` |  |
-| `PcPaint` | `585` |  |
-| `Pcd` | `586` |  |
-| `Pcds` | `587` |  |
-| `Pcl` | `588` |  |
-| `Pco16Bit` | `589` |  |
-| `PcpBitmap` | `590` |  |
-| `Pcx` | `591` |  |
-| `Pdf` | `592` |  |
-| `Pdn` | `593` |  |
-| `Pds` | `594` |  |
-| `PeResource` | `595` |  |
-| `PerfectPix` | `596` |  |
-| `Pes` | `597` |  |
-| `PetDraw` | `598` |  |
-| `PetsciiBot` | `599` |  |
-| `Pfm` | `600` |  |
-| `Pgx` | `601` |  |
-| `Phm` | `602` |  |
-| `PhotoChrome` | `603` |  |
-| `PhotoChromePcs` | `604` |  |
-| `PhotoLine` | `605` |  |
-| `PhotoPaint` | `606` |  |
-| `PhotoParade` | `607` |  |
-| `PhotoStudio` | `608` |  |
-| `PhotoSuiteProject` | `609` |  |
-| `Pi` | `610` |  |
-| `Pic2` | `611` |  |
-| `PicWorks` | `612` |  |
-| `Picasso` | `613` |  |
-| `Picasso64` | `614` |  |
-| `Pict` | `615` |  |
-| `PictureEditor` | `616` |  |
-| `PicturePublisher` | `617` |  |
-| `PicturePublisher4` | `618` |  |
-| `PixarRib` | `619` |  |
-| `Pixel64` | `620` |  |
-| `PixelPerfect` | `621` |  |
-| `PixelPowerCollage` | `622` |  |
-| `Pixia` | `623` |  |
-| `Pixibox` | `624` |  |
-| `Pkm` | `625` |  |
-| `Pl4Picture` | `626` |  |
-| `PlaybackBitmapSequence` | `627` |  |
-| `PlotMaker` | `628` |  |
-| `PmBitmap` | `629` |  |
-| `PmView` | `630` |  |
-| `PmgDesigner` | `631` |  |
-| `Png` | `632` |  |
-| `PntrFalcon` | `633` |  |
-| `PocketPc2bp` | `634` |  |
-| `PocketPcTheme` | `635` |  |
-| `PortfolioGraphics` | `636` |  |
-| `Portrait` | `637` |  |
-| `PostScript` | `638` |  |
-| `PowerGraphics` | `639` |  |
-| `PowerPoint` | `640` |  |
-| `PrintMaster` | `641` |  |
-| `PrintShop` | `642` |  |
-| `PrintShopIcon` | `643` |  |
-| `PrintTechnik` | `644` |  |
-| `PrinterPageSegment` | `645` |  |
-| `Printfox` | `646` |  |
-| `PrintfoxPagefox` | `647` |  |
-| `PrismPaint` | `648` |  |
-| `Prisms` | `649` |  |
-| `ProfiGrf` | `650` |  |
-| `Ps2Txc` | `651` |  |
-| `Psb` | `652` |  |
-| `Psd` | `653` |  |
-| `PsionPic` | `654` |  |
-| `Psp` | `655` |  |
-| `Ptif` | `656` |  |
-| `PublicPainter` | `657` |  |
-| `Pvr` | `658` |  |
-| `Q0` | `659` |  |
-| `QdvImage` | `660` |  |
-| `Qoi` | `661` |  |
-| `Qrt` | `662` |  |
-| `Qtif` | `663` |  |
-| `QuakeLmp` | `664` |  |
-| `QuakeSpr` | `665` |  |
-| `QuantelVpb` | `666` |  |
-| `QuantumPaint` | `667` |  |
-| `RagD` | `668` |  |
-| `RagePaint` | `669` |  |
-| `RainbowPainter` | `670` |  |
-| `RamBrandt` | `671` |  |
-| `RawGreyscale` | `672` |  |
-| `RawWorkshop` | `673` |  |
-| `RedStormRsb` | `674` |  |
-| `Rembrandt` | `675` |  |
-| `Rgf` | `676` |  |
-| `RicohFax` | `677` |  |
-| `RicohIs30` | `678` |  |
-| `RicohJ6i` | `679` |  |
-| `RiscOsSprite` | `680` |  |
-| `Rla` | `681` |  |
-| `Rlc2` | `682` |  |
-| `RockyInterlace` | `683` |  |
-| `RunPaint` | `684` |  |
-| `SamCoupe` | `685` |  |
-| `SamCoupeLce` | `686` |  |
-| `SamCoupeMode4` | `687` |  |
-| `SamCoupeScreen` | `688` |  |
-| `SamCoupeSsx` | `689` |  |
-| `SamarHiresMap` | `690` |  |
-| `SaracenPaint` | `691` |  |
-| `SbigCcd` | `692` |  |
-| `SciFax` | `693` |  |
-| `ScitexCt` | `694` |  |
-| `ScreenBlaster` | `695` |  |
-| `ScreenMaker` | `696` |  |
-| `Sdt` | `697` |  |
-| `SeattleFilmWorks` | `698` |  |
-| `SecondNatureSlideShow` | `699` |  |
-| `SecretPhotos` | `700` |  |
-| `SegaGenTile` | `701` |  |
-| `SegaSj1` | `702` |  |
-| `SemiGraphicLogo` | `703` |  |
-| `SeqImage` | `704` |  |
-| `SeuckSprites` | `705` |  |
-| `SevenuP` | `706` |  |
-| `Sf3` | `707` |  |
-| `Sff` | `708` |  |
-| `Sgi` | `709` |  |
-| `ShapeTableFileType` | `710` |  |
-| `SharpX68k` | `711` |  |
-| `ShfXlEdit` | `712` |  |
-| `SiemensBmx` | `713` |  |
-| `SifImage` | `714` |  |
-| `SinbadSlideshow` | `715` |  |
-| `SinclairBasic` | `716` |  |
-| `Sixel` | `717` |  |
-| `Skantek` | `718` |  |
-| `SketchPaddles` | `719` |  |
-| `SmartFax` | `720` |  |
-| `SmartST` | `721` |  |
-| `SnesTile` | `722` |  |
-| `SoftImage` | `723` |  |
-| `SoftwareAutomation` | `724` |  |
-| `SonyMavica` | `725` |  |
-| `SonyPmp` | `726` |  |
-| `SpcPainter` | `727` |  |
-| `SpecScii` | `728` |  |
-| `SpeccyExtended` | `729` |  |
-| `Spectrum512` | `730` |  |
-| `Spectrum512Comp` | `731` |  |
-| `Spectrum512Ext` | `732` |  |
-| `Spectrum512Smoosh` | `733` |  |
-| `SpeederFalcon` | `734` |  |
-| `Spiff` | `735` |  |
-| `SpookySpritesFalcon` | `736` |  |
-| `SpotImage` | `737` |  |
-| `Sprite64` | `738` |  |
-| `SpritePad` | `739` |  |
-| `SriSun` | `740` |  |
-| `StTrueColor` | `741` |  |
-| `Stad` | `742` |  |
-| `StarPainter` | `743` |  |
-| `StarPainterFont` | `744` |  |
-| `StelaRaw` | `745` |  |
-| `Stellar` | `746` |  |
-| `SunIcon` | `747` |  |
-| `SunRaster` | `748` |  |
-| `SuperHires` | `749` |  |
-| `SuperHiresEditor` | `750` |  |
-| `SuperHiresEditor1` | `751` |  |
-| `SuperHiresEditor2` | `752` |  |
-| `SuperHiresFli` | `753` |  |
-| `SuperHiresStudio` | `754` |  |
-| `Svg` | `755` |  |
-| `Svgz` | `756` |  |
-| `SyberiaTexture` | `757` |  |
-| `SymbOsGraphic` | `758` |  |
-| `SymbianMbm` | `759` |  |
-| `SyntheticArts` | `760` |  |
-| `Synu` | `761` |  |
-| `Taac` | `762` |  |
-| `TaquartInterlace` | `763` |  |
-| `TechnicolorDream` | `764` |  |
-| `TeliFax` | `765` |  |
-| `TextureEditorMikey` | `766` |  |
-| `TextureMaker0` | `767` |  |
-| `Tg4` | `768` |  |
-| `Tga` | `769` |  |
-| `Thomson` | `770` |  |
-| `TiBitmap` | `771` |  |
-| `TiPicture` | `772` |  |
-| `Tiff` | `773` |  |
-| `TilePic` | `774` |  |
-| `TilezTexture` | `775` |  |
-| `Tim` | `776` |  |
-| `Tim2` | `777` |  |
-| `TimexGigascreen` | `778` |  |
-| `Tiny` | `779` |  |
-| `TmSat` | `780` |  |
-| `TobiasRichterSlideshow` | `781` |  |
-| `TriPaint` | `782` |  |
-| `Trs80` | `783` |  |
-| `TrsPix` | `784` |  |
-| `TrueColorImg` | `785` |  |
-| `TruePaint` | `786` |  |
-| `TrueType` | `787` |  |
-| `TrzmielCompressed` | `788` |  |
-| `TurboRascal` | `789` |  |
-| `TurboView` | `790` |  |
-| `UfliEditor` | `791` |  |
-| `Uhdr` | `792` |  |
-| `UifliEditor` | `793` |  |
-| `Uimg` | `794` |  |
-| `UleadAlbumTemplate` | `795` |  |
-| `UleadImageLibrary` | `796` |  |
-| `UtahRle` | `797` |  |
-| `UyvyRaw` | `798` |  |
-| `VbxeSlideShow` | `799` |  |
-| `VdcBitmap` | `800` |  |
-| `Vector06c` | `801` |  |
-| `VentaFax` | `802` |  |
-| `VertiZontalInterlacing` | `803` |  |
-| `VerticalHiresInterlace` | `804` |  |
-| `Vic20` | `805` |  |
-| `Vicar` | `806` |  |
-| `Vidcom64` | `807` |  |
-| `VidiChrome` | `808` |  |
-| `VidigPaint` | `809` |  |
-| `Viff` | `810` |  |
-| `Vips` | `811` |  |
-| `VirtualBoyTile` | `812` |  |
-| `Vitec` | `813` |  |
-| `Vivid` | `814` |  |
-| `Vrml` | `815` |  |
-| `Vtf` | `816` |  |
-| `Vue` | `817` |  |
-| `Wad2` | `818` |  |
-| `Wad3` | `819` |  |
-| `Wal` | `820` |  |
-| `Wbmp` | `821` |  |
-| `WebP` | `822` |  |
-| `WebShots` | `823` |  |
-| `WigmoreArtist` | `824` |  |
-| `WinFax` | `825` |  |
-| `WizSolitaireDeck` | `826` |  |
-| `Wmf` | `827` |  |
-| `WonderSwanTile` | `828` |  |
-| `WorldportFax` | `829` |  |
-| `Wpg` | `830` |  |
-| `Wsq` | `831` |  |
-| `Wzl` | `832` |  |
-| `X11Puzzle` | `833` |  |
-| `X3f` | `834` |  |
-| `XBin` | `835` |  |
-| `XFliEditor` | `836` |  |
-| `Xar` | `837` |  |
-| `Xbm` | `838` |  |
-| `XbmColor` | `839` |  |
-| `Xcf` | `840` |  |
-| `Xcursor` | `841` |  |
-| `Ximage` | `842` |  |
-| `XionicsSmp` | `843` |  |
-| `XlPaint` | `844` |  |
-| `Xld4` | `845` |  |
-| `Xpm` | `846` |  |
-| `XvThumbnail` | `847` |  |
-| `Xwd` | `848` |  |
-| `Xyz` | `849` |  |
-| `Ybm` | `850` |  |
-| `YuvRaw` | `851` |  |
-| `ZeissBivas` | `852` |  |
-| `ZeissLsm` | `853` |  |
-| `Zinc` | `854` |  |
-| `ZonerBrush` | `855` |  |
-| `Zoom4` | `856` |  |
-| `Zoomatic` | `857` |  |
-| `ZsStaffKid98` | `858` |  |
-| `Zx81` | `859` |  |
-| `ZxArtStudio` | `860` |  |
-| `ZxAttributes` | `861` |  |
-| `ZxAttributesGigascreen` | `862` |  |
-| `ZxBigFont` | `863` |  |
-| `ZxBorderMulticolor` | `864` |  |
-| `ZxBorderScreen` | `865` |  |
-| `ZxChrd` | `866` |  |
-| `ZxFlash` | `867` |  |
-| `ZxFont` | `868` |  |
-| `ZxGigascreen` | `869` |  |
-| `ZxMlg` | `870` |  |
-| `ZxMultiArtist` | `871` |  |
-| `ZxMulticolor` | `872` |  |
-| `ZxNext` | `873` |  |
-| `ZxNextImage` | `874` |  |
-| `ZxPaintbrush` | `875` |  |
-| `ZxPaintyOne` | `876` |  |
-| `ZxRgb3` | `877` |  |
-| `ZxSnapshot` | `878` |  |
-| `ZxSpectrum` | `879` |  |
-| `ZxTimex` | `880` |  |
-| `ZxTrefiBorderScreen` | `881` |  |
-| `ZxTricolor` | `882` |  |
-| `ZxUlaPlus` | `883` |  |
-| `ZzRough` | `884` |  |
+| `Cdr` | `154` |  |
+| `Cdxl` | `155` |  |
+| `Cel` | `156` |  |
+| `CelGrey` | `157` |  |
+| `Centauri` | `158` |  |
+| `CentauriLogoEditor` | `159` |  |
+| `CfliDesigner` | `160` |  |
+| `Cgm` | `161` |  |
+| `ChampionsInterlace` | `162` |  |
+| `CharPad` | `163` |  |
+| `CharSet64` | `164` |  |
+| `Cheese` | `165` |  |
+| `ChinonEs1000` | `166` |  |
+| `ChrDollar` | `167` |  |
+| `CinemasterAtari` | `168` |  |
+| `Cineon` | `169` |  |
+| `CiscoIp` | `170` |  |
+| `ClipArtCatalog` | `171` |  |
+| `Cloe` | `172` |  |
+| `Clp` | `173` |  |
+| `Cmu` | `174` |  |
+| `CmuWindowManager` | `175` |  |
+| `Cmx` | `176` |  |
+| `CoCo` | `177` |  |
+| `CoCo3` | `178` |  |
+| `CoCoMax` | `179` |  |
+| `CocoP11` | `180` |  |
+| `CokeAtari` | `181` |  |
+| `ColoRix` | `182` |  |
+| `ColorStar` | `183` |  |
+| `ColorStarObject` | `184` |  |
+| `ColrObjectEditor` | `185` |  |
+| `Commodore64Font` | `186` |  |
+| `CommodoreGrafix` | `187` |  |
+| `CommodorePet` | `188` |  |
+| `CompW` | `189` |  |
+| `CompuServeRle` | `190` |  |
+| `ComputerEyes` | `191` |  |
+| `ComputerEyesSt` | `192` |  |
+| `CoreIdc` | `193` |  |
+| `CorelGallery` | `194` |  |
+| `Cp8Gray` | `195` |  |
+| `CpcAdvanced` | `196` |  |
+| `CpcFont` | `197` |  |
+| `CpcOverscan` | `198` |  |
+| `CpcPlus` | `199` |  |
+| `CpcSprite` | `200` |  |
+| `Cr3` | `201` |  |
+| `Crack` | `202` |  |
+| `CrackArt` | `203` |  |
+| `CranachPaint` | `204` |  |
+| `Crd` | `205` |  |
+| `CreateWithGarfield` | `206` |  |
+| `Crw` | `207` |  |
+| `CsvImage` | `208` |  |
+| `Cur` | `209` |  |
+| `CutCreator` | `210` |  |
+| `DGraphCompressed` | `211` |  |
+| `DaisyDotFont` | `212` |  |
+| `DaliCompressed` | `213` |  |
+| `DaliST` | `214` |  |
+| `DbwRender` | `215` |  |
+| `Dcx` | `216` |  |
+| `Dds` | `217` |  |
+| `Degas` | `218` |  |
+| `DegasBrush` | `219` |  |
+| `DegasIcon` | `220` |  |
+| `DelmPaint` | `221` |  |
+| `Deluxe` | `222` |  |
+| `Dicom` | `223` |  |
+| `DigiSpec` | `224` |  |
+| `DigiView` | `225` |  |
+| `DigitalFx` | `226` |  |
+| `Din` | `227` |  |
+| `DirLogoMaker` | `228` |  |
+| `DispThumbnail` | `229` |  |
+| `DivGameMap` | `230` |  |
+| `DjVu` | `231` |  |
+| `Dng` | `232` |  |
+| `DolphinEd` | `233` |  |
+| `Doodle` | `234` |  |
+| `DoodleAtari` | `235` |  |
+| `DoodleComp` | `236` |  |
+| `DoodlePacked` | `237` |  |
+| `DoomFlat` | `238` |  |
+| `Dpx` | `239` |  |
+| `DrHalo` | `240` |  |
+| `Dragon` | `241` |  |
+| `DrawIt` | `242` |  |
+| `DrazPaint` | `243` |  |
+| `Drazlace` | `244` |  |
+| `DuneGraph` | `245` |  |
+| `Duo` | `246` |  |
+| `DuoMedium` | `247` |  |
+| `Dwg` | `248` |  |
+| `Dxf` | `249` |  |
+| `EccHeader` | `250` |  |
+| `EciGraphicEditor` | `251` |  |
+| `EclipseTile` | `252` |  |
+| `Ecw` | `253` |  |
+| `EdmicsC4` | `254` |  |
+| `EggPaint` | `255` |  |
+| `ElectricImage` | `256` |  |
+| `Electronika` | `257` |  |
+| `EmbeddedDib` | `258` |  |
+| `EmcEditor` | `259` |  |
+| `Emf` | `260` |  |
+| `Enterprise128` | `261` |  |
+| `Envi` | `262` |  |
+| `EpaBios` | `263` |  |
+| `Eps` | `264` |  |
+| `Eroiica` | `265` |  |
+| `EscapePaint` | `266` |  |
+| `EsmSoftwarePix` | `267` |  |
+| `EverexFax` | `268` |  |
+| `Exr` | `269` |  |
+| `ExtendSuperHires` | `270` |  |
+| `ExtendedGemImg` | `271` |  |
+| `EzArt` | `272` |  |
+| `FacePainter` | `273` |  |
+| `FaceSaver` | `274` |  |
+| `FaceServer` | `275` |  |
+| `FalconFuckpaint` | `276` |  |
+| `FalconPaint` | `277` |  |
+| `FalconRes` | `278` |  |
+| `Farbfeld` | `279` |  |
+| `FastgraphPixelRun` | `280` |  |
+| `FaxG3` | `281` |  |
+| `FaxMan` | `282` |  |
+| `Fbm` | `283` |  |
+| `Fff` | `284` |  |
+| `Ffli` | `285` |  |
+| `FirstPublisher` | `286` |  |
+| `Fits` | `287` |  |
+| `FitsDocument` | `288` |  |
+| `Fl32` | `289` |  |
+| `FlashImage` | `290` |  |
+| `Fli` | `291` |  |
+| `Fli64` | `292` |  |
+| `FliDesigner` | `293` |  |
+| `FliDesigner2` | `294` |  |
+| `FliEditor` | `295` |  |
+| `FliGraph` | `296` |  |
+| `FliProfi` | `297` |  |
+| `Flif` | `298` |  |
+| `Flimatic` | `299` |  |
+| `Flip64` | `300` |  |
+| `FloorDesigner` | `301` |  |
+| `FmTowns` | `302` |  |
+| `FontasyGrafik` | `303` |  |
+| `Fpx` | `304` |  |
+| `FreeHand` | `305` |  |
+| `FremontFax` | `306` |  |
+| `Fsh` | `307` |  |
+| `Fuckpaint` | `308` |  |
+| `FullscreenKit` | `309` |  |
+| `FunGraphicsMachine` | `310` |  |
+| `FunPainter` | `311` |  |
+| `FunPhotor` | `312` |  |
+| `FunWithArt` | `313` |  |
+| `FuntasticPaint` | `314` |  |
+| `G9b` | `315` |  |
+| `Gaf` | `316` |  |
+| `GameBoyTile` | `317` |  |
+| `GammaFax` | `318` |  |
+| `GbaTile` | `319` |  |
+| `Gbr` | `320` |  |
+| `Gd2` | `321` |  |
+| `GeGenesis` | `322` |  |
+| `GedPicture` | `323` |  |
+| `Gem` | `324` |  |
+| `GemImg` | `325` |  |
+| `GeoPaint` | `326` |  |
+| `GephardHires` | `327` |  |
+| `GfaPaint` | `328` |  |
+| `GfaRaytrace` | `329` |  |
+| `Gif` | `330` |  |
+| `GigaPaint` | `331` |  |
+| `Gigacad` | `332` |  |
+| `GoDot4Bit` | `333` |  |
+| `GodPaint` | `334` |  |
+| `Grafix` | `335` |  |
+| `Graph2Font` | `336` |  |
+| `Graph2FontMch` | `337` |  |
+| `Graph2FontScroll` | `338` |  |
+| `GraphLogo` | `339` |  |
+| `GraphSaurus` | `340` |  |
+| `GraphSaurus6` | `341` |  |
+| `GraphSaurus7` | `342` |  |
+| `GraphSaurusInterlaced` | `343` |  |
+| `Graphics10Plus` | `344` |  |
+| `Graphics9Plus` | `345` |  |
+| `GraphicsMaster` | `346` |  |
+| `GraspGl` | `347` |  |
+| `GrassSlideshow` | `348` |  |
+| `GreatPaint` | `349` |  |
+| `GrfBitmap` | `350` |  |
+| `Grs16` | `351` |  |
+| `GunPaint` | `352` |  |
+| `HalfLifeMdl` | `353` |  |
+| `HalfLifeModel` | `354` |  |
+| `HandyScanner` | `355` |  |
+| `HardColorMap` | `356` |  |
+| `HardInterlace` | `357` |  |
+| `HayesJtfax` | `358` |  |
+| `HcbEditor` | `359` |  |
+| `Hdr` | `360` |  |
+| `Heif` | `361` |  |
+| `HereticM8` | `362` |  |
+| `HfImage` | `363` |  |
+| `HiEddi` | `364` |  |
+| `HiPicCreator` | `365` |  |
+| `HiResEditor` | `366` |  |
+| `HighResAtari` | `367` |  |
+| `HighResST` | `368` |  |
+| `HighresMedium` | `369` |  |
+| `HinterGrundBild` | `370` |  |
+| `HiresC64` | `371` |  |
+| `HiresFliCrest` | `372` |  |
+| `HiresInterlaceFeniks` | `373` |  |
+| `HiresManager` | `374` |  |
+| `Hireslace` | `375` |  |
+| `HomeworldLif` | `376` |  |
+| `Hp48Grob` | `377` |  |
+| `HpGrob` | `378` |  |
+| `Hpgl` | `379` |  |
+| `Hpi` | `380` |  |
+| `Hru` | `381` |  |
+| `Hrz` | `382` |  |
+| `Hta` | `383` |  |
+| `IPaint` | `384` |  |
+| `IbmKips` | `385` |  |
+| `IcDraw` | `386` |  |
+| `Ice` | `387` |  |
+| `IcePcinPlus` | `388` |  |
+| `Icns` | `389` |  |
+| `Ico` | `390` |  |
+| `IconLibrary` | `391` |  |
+| `Ics` | `392` |  |
+| `IffAcbm` | `393` |  |
+| `IffAnim` | `394` |  |
+| `IffAnim8` | `395` |  |
+| `IffDctv` | `396` |  |
+| `IffDeep` | `397` |  |
+| `IffDpan` | `398` |  |
+| `IffHame` | `399` |  |
+| `IffMultiPalette` | `400` |  |
+| `IffPbm` | `401` |  |
+| `IffRgb8` | `402` |  |
+| `IffRgbn` | `403` |  |
+| `IffSham` | `404` |  |
+| `Ilbm` | `405` |  |
+| `Im5Visilog` | `406` |  |
+| `ImageLabBw` | `407` |  |
+| `ImageSysC64` | `408` |  |
+| `ImageSystem` | `409` |  |
+| `Imagic` | `410` |  |
+| `ImagicPaint` | `411` |  |
+| `ImagingFax` | `412` |  |
+| `ImnetImage` | `413` |  |
+| `InShape` | `414` |  |
+| `IndyPaint` | `415` |  |
+| `Ingr` | `416` |  |
+| `Int95a` | `417` |  |
+| `InterPaintHi` | `418` |  |
+| `InterPaintMc` | `419` |  |
+| `InterPainter` | `420` |  |
+| `Interfile` | `421` |  |
+| `Interlace8` | `422` |  |
+| `InterlaceGraphicsEditor` | `423` |  |
+| `InterlaceHiresEditor` | `424` |  |
+| `InterlaceLogoDesigner` | `425` |  |
+| `InterlaceStudio` | `426` |  |
+| `InterlacedLogoEditor` | `427` |  |
+| `InterleafImage` | `428` |  |
+| `Ioca` | `429` |  |
+| `Ipg` | `430` |  |
+| `Ipl` | `431` |  |
+| `Ipsm` | `432` |  |
+| `Iss` | `433` |  |
+| `It01` | `434` |  |
+| `Jbig` | `435` |  |
+| `Jbig2` | `436` |  |
+| `JetGraphicsPlanner` | `437` |  |
+| `JigsawPicture` | `438` |  |
+| `JigsawPuzzle` | `439` |  |
+| `Jng` | `440` |  |
+| `Jnx` | `441` |  |
+| `JovianVi` | `442` |  |
+| `Jpeg` | `443` |  |
+| `Jpeg2000` | `444` |  |
+| `JpegLs` | `445` |  |
+| `JpegXl` | `446` |  |
+| `JpegXr` | `447` |  |
+| `JupiterAce` | `448` |  |
+| `Kitty` | `449` |  |
+| `Koala` | `450` |  |
+| `KoalaCompressed` | `451` |  |
+| `KodakDc25` | `452` |  |
+| `KofaxKfx` | `453` |  |
+| `Kqp` | `454` |  |
+| `Krita` | `455` |  |
+| `KssPaint` | `456` |  |
+| `Ktx` | `457` |  |
+| `LViewPro` | `458` |  |
+| `LarkaObjectEditor` | `459` |  |
+| `LaserData` | `460` |  |
+| `LastWordFont` | `461` |  |
+| `LdPic` | `462` |  |
+| `LightWorkImage` | `463` |  |
+| `LogoPainter` | `464` |  |
+| `LogoSys` | `465` |  |
+| `Lss16` | `466` |  |
+| `LucasFilm` | `467` |  |
+| `LudekMaker` | `468` |  |
+| `MacPaint` | `469` |  |
+| `MadDesigner` | `470` |  |
+| `MadStudio` | `471` |  |
+| `MadStudioMissile` | `472` |  |
+| `MadStudioTile` | `473` |  |
+| `Mag` | `474` |  |
+| `MagicPainter` | `475` |  |
+| `Mamut` | `476` |  |
+| `MapletownMl1` | `477` |  |
+| `MapletownMx1` | `478` |  |
+| `MapletownNl3` | `479` |  |
+| `MasterSystemTile` | `480` |  |
+| `MatLab` | `481` |  |
+| `MawWareTexture` | `482` |  |
+| `MayaIff` | `483` |  |
+| `McPainter` | `484` |  |
+| `Mcs` | `485` |  |
+| `Mda` | `486` |  |
+| `Mdp` | `487` |  |
+| `MegaPaint` | `488` |  |
+| `MegaluxFrame` | `489` |  |
+| `MetaImage` | `490` |  |
+| `MgrBitmap` | `491` |  |
+| `MicroDesignCut` | `492` |  |
+| `MicroDesignGrf` | `493` |  |
+| `MicroDynamicsMars` | `494` |  |
+| `MicroIllustrator` | `495` |  |
+| `MicroIllustratorA8` | `496` |  |
+| `MicroPainter8` | `497` |  |
+| `Miff` | `498` |  |
+| `MiniPaint` | `499` |  |
+| `Mlt` | `500` |  |
+| `Mng` | `501` |  |
+| `MobileFax` | `502` |  |
+| `MobyDick` | `503` |  |
+| `MonoMagic` | `504` |  |
+| `MonoStar` | `505` |  |
+| `MovieMakerBackground` | `506` |  |
+| `Mpo` | `507` |  |
+| `Mrc` | `508` |  |
+| `Mrf` | `509` |  |
+| `Mrw` | `510` |  |
+| `Msp` | `511` |  |
+| `Msx` | `512` |  |
+| `MsxFont` | `513` |  |
+| `MsxGl16` | `514` |  |
+| `MsxGl6` | `515` |  |
+| `MsxGl8` | `516` |  |
+| `MsxGlYjk` | `517` |  |
+| `MsxMig` | `518` |  |
+| `MsxScc` | `519` |  |
+| `MsxScreen10` | `520` |  |
+| `MsxScreen2` | `521` |  |
+| `MsxScreen3` | `522` |  |
+| `MsxScreen4` | `523` |  |
+| `MsxScreen5` | `524` |  |
+| `MsxScreen6` | `525` |  |
+| `MsxScreen8` | `526` |  |
+| `MsxSprite` | `527` |  |
+| `MsxVideo` | `528` |  |
+| `MsxView` | `529` |  |
+| `Mtv` | `530` |  |
+| `MuifliEditor` | `531` |  |
+| `MultiLaceEditor` | `532` |  |
+| `MultiPainter` | `533` |  |
+| `MultiPalettePicture` | `534` |  |
+| `NcrImage` | `535` |  |
+| `NdsTexture` | `536` |  |
+| `NeoBookCartoon` | `537` |  |
+| `NeoGeoPocket` | `538` |  |
+| `NeoGeoSprite` | `539` |  |
+| `Neochrome` | `540` |  |
+| `NeroCoverDesigner` | `541` |  |
+| `NesChr` | `542` |  |
+| `Netpbm` | `543` |  |
+| `NewsRoom` | `544` |  |
+| `Nfo` | `545` |  |
+| `Nhdr` | `546` |  |
+| `Nie` | `547` |  |
+| `Nifti` | `548` |  |
+| `Nifti2` | `549` |  |
+| `Nifti2Gzip` | `550` |  |
+| `NiftiGzip` | `551` |  |
+| `NiftiPair` | `552` |  |
+| `NistIHead` | `553` |  |
+| `Nitf` | `554` |  |
+| `NokiaGroupGraphics` | `555` |  |
+| `NokiaLogo` | `556` |  |
+| `NokiaNlm` | `557` |  |
+| `NokiaOperatorLogo` | `558` |  |
+| `NokiaPictureMessage` | `559` |  |
+| `Nrrd` | `560` |  |
+| `NufliEditor` | `561` |  |
+| `OazFax` | `562` |  |
+| `OcpArtStudioWindow` | `563` |  |
+| `OcsPics` | `564` |  |
+| `OdFontEditor` | `565` |  |
+| `Oil` | `566` |  |
+| `OlicomFax` | `567` |  |
+| `Olpc565` | `568` |  |
+| `OpenRaster` | `569` |  |
+| `Optocat` | `570` |  |
+| `Oric` | `571` |  |
+| `Otb` | `572` |  |
+| `PabloPaint` | `573` |  |
+| `Pagefox` | `574` |  |
+| `PaintMagic` | `575` |  |
+| `PaintPro` | `576` |  |
+| `PaintShop` | `577` |  |
+| `PaintShopBrowser` | `578` |  |
+| `PaintShopCompressed` | `579` |  |
+| `Palm` | `580` |  |
+| `PalmImageViewer` | `581` |  |
+| `PalmPdb` | `582` |  |
+| `Paradox` | `583` |  |
+| `Pat` | `584` |  |
+| `Pc88` | `585` |  |
+| `Pc98Ebd` | `586` |  |
+| `PcEngineTile` | `587` |  |
+| `PcPaint` | `588` |  |
+| `Pcd` | `589` |  |
+| `Pcds` | `590` |  |
+| `Pcl` | `591` |  |
+| `Pco16Bit` | `592` |  |
+| `PcpBitmap` | `593` |  |
+| `Pcx` | `594` |  |
+| `Pdf` | `595` |  |
+| `Pdn` | `596` |  |
+| `Pds` | `597` |  |
+| `PeResource` | `598` |  |
+| `PerfectPix` | `599` |  |
+| `Pes` | `600` |  |
+| `PetDraw` | `601` |  |
+| `PetsciiBot` | `602` |  |
+| `Pfm` | `603` |  |
+| `Pgx` | `604` |  |
+| `Phm` | `605` |  |
+| `PhotoChrome` | `606` |  |
+| `PhotoChromePcs` | `607` |  |
+| `PhotoLine` | `608` |  |
+| `PhotoPaint` | `609` |  |
+| `PhotoParade` | `610` |  |
+| `PhotoStudio` | `611` |  |
+| `PhotoSuiteProject` | `612` |  |
+| `Pi` | `613` |  |
+| `Pic2` | `614` |  |
+| `PicWorks` | `615` |  |
+| `Picasso` | `616` |  |
+| `Picasso64` | `617` |  |
+| `Pict` | `618` |  |
+| `PictureEditor` | `619` |  |
+| `PicturePublisher` | `620` |  |
+| `PicturePublisher4` | `621` |  |
+| `PixarRib` | `622` |  |
+| `Pixel64` | `623` |  |
+| `PixelPerfect` | `624` |  |
+| `PixelPowerCollage` | `625` |  |
+| `Pixia` | `626` |  |
+| `Pixibox` | `627` |  |
+| `Pkm` | `628` |  |
+| `Pl4Picture` | `629` |  |
+| `PlaybackBitmapSequence` | `630` |  |
+| `PlotMaker` | `631` |  |
+| `PmBitmap` | `632` |  |
+| `PmView` | `633` |  |
+| `PmgDesigner` | `634` |  |
+| `Png` | `635` |  |
+| `PntrFalcon` | `636` |  |
+| `PocketPc2bp` | `637` |  |
+| `PocketPcTheme` | `638` |  |
+| `PortfolioGraphics` | `639` |  |
+| `Portrait` | `640` |  |
+| `PostScript` | `641` |  |
+| `PowerGraphics` | `642` |  |
+| `PowerPoint` | `643` |  |
+| `PrintMaster` | `644` |  |
+| `PrintShop` | `645` |  |
+| `PrintShopIcon` | `646` |  |
+| `PrintTechnik` | `647` |  |
+| `PrinterPageSegment` | `648` |  |
+| `Printfox` | `649` |  |
+| `PrintfoxPagefox` | `650` |  |
+| `PrismPaint` | `651` |  |
+| `Prisms` | `652` |  |
+| `ProfiGrf` | `653` |  |
+| `Ps2Txc` | `654` |  |
+| `Psb` | `655` |  |
+| `Psd` | `656` |  |
+| `PsionPic` | `657` |  |
+| `Psp` | `658` |  |
+| `Ptif` | `659` |  |
+| `PublicPainter` | `660` |  |
+| `Pvr` | `661` |  |
+| `Q0` | `662` |  |
+| `QdvImage` | `663` |  |
+| `Qoi` | `664` |  |
+| `Qrt` | `665` |  |
+| `Qtif` | `666` |  |
+| `QuakeLmp` | `667` |  |
+| `QuakeSpr` | `668` |  |
+| `QuantelVpb` | `669` |  |
+| `QuantumPaint` | `670` |  |
+| `RagD` | `671` |  |
+| `RagePaint` | `672` |  |
+| `RainbowPainter` | `673` |  |
+| `RamBrandt` | `674` |  |
+| `RawGreyscale` | `675` |  |
+| `RawWorkshop` | `676` |  |
+| `RedStormRsb` | `677` |  |
+| `Rembrandt` | `678` |  |
+| `Rgf` | `679` |  |
+| `RicohFax` | `680` |  |
+| `RicohIs30` | `681` |  |
+| `RicohJ6i` | `682` |  |
+| `RiscOsSprite` | `683` |  |
+| `Rla` | `684` |  |
+| `Rlc2` | `685` |  |
+| `RockyInterlace` | `686` |  |
+| `RunPaint` | `687` |  |
+| `SamCoupe` | `688` |  |
+| `SamCoupeLce` | `689` |  |
+| `SamCoupeMode4` | `690` |  |
+| `SamCoupeScreen` | `691` |  |
+| `SamCoupeSsx` | `692` |  |
+| `SamarHiresMap` | `693` |  |
+| `SaracenPaint` | `694` |  |
+| `SbigCcd` | `695` |  |
+| `SciFax` | `696` |  |
+| `ScitexCt` | `697` |  |
+| `ScreenBlaster` | `698` |  |
+| `ScreenMaker` | `699` |  |
+| `Sdg` | `700` |  |
+| `Sdt` | `701` |  |
+| `SeattleFilmWorks` | `702` |  |
+| `SecondNatureSlideShow` | `703` |  |
+| `SecretPhotos` | `704` |  |
+| `SegaGenTile` | `705` |  |
+| `SegaSj1` | `706` |  |
+| `SemiGraphicLogo` | `707` |  |
+| `SeqImage` | `708` |  |
+| `SeuckSprites` | `709` |  |
+| `SevenuP` | `710` |  |
+| `Sf3` | `711` |  |
+| `Sff` | `712` |  |
+| `Sgi` | `713` |  |
+| `ShapeTableFileType` | `714` |  |
+| `SharpX68k` | `715` |  |
+| `ShfXlEdit` | `716` |  |
+| `SiemensBmx` | `717` |  |
+| `SifImage` | `718` |  |
+| `SinbadSlideshow` | `719` |  |
+| `SinclairBasic` | `720` |  |
+| `Sixel` | `721` |  |
+| `Skantek` | `722` |  |
+| `SketchPaddles` | `723` |  |
+| `SmartFax` | `724` |  |
+| `SmartST` | `725` |  |
+| `SnesTile` | `726` |  |
+| `SoftImage` | `727` |  |
+| `SoftwareAutomation` | `728` |  |
+| `SonyMavica` | `729` |  |
+| `SonyPmp` | `730` |  |
+| `SpcPainter` | `731` |  |
+| `SpecScii` | `732` |  |
+| `SpeccyExtended` | `733` |  |
+| `Spectrum512` | `734` |  |
+| `Spectrum512Comp` | `735` |  |
+| `Spectrum512Ext` | `736` |  |
+| `Spectrum512Smoosh` | `737` |  |
+| `SpeederFalcon` | `738` |  |
+| `Spiff` | `739` |  |
+| `SpookySpritesFalcon` | `740` |  |
+| `SpotImage` | `741` |  |
+| `Sprite64` | `742` |  |
+| `SpritePad` | `743` |  |
+| `SriSun` | `744` |  |
+| `StTrueColor` | `745` |  |
+| `Stad` | `746` |  |
+| `StarPainter` | `747` |  |
+| `StarPainterFont` | `748` |  |
+| `StelaRaw` | `749` |  |
+| `Stellar` | `750` |  |
+| `SunIcon` | `751` |  |
+| `SunRaster` | `752` |  |
+| `SuperHires` | `753` |  |
+| `SuperHiresEditor` | `754` |  |
+| `SuperHiresEditor1` | `755` |  |
+| `SuperHiresEditor2` | `756` |  |
+| `SuperHiresFli` | `757` |  |
+| `SuperHiresStudio` | `758` |  |
+| `Svg` | `759` |  |
+| `Svgz` | `760` |  |
+| `SyberiaTexture` | `761` |  |
+| `SymbOsGraphic` | `762` |  |
+| `SymbianMbm` | `763` |  |
+| `SyntheticArts` | `764` |  |
+| `Synu` | `765` |  |
+| `Taac` | `766` |  |
+| `TaquartInterlace` | `767` |  |
+| `TechnicolorDream` | `768` |  |
+| `TeliFax` | `769` |  |
+| `TextureEditorMikey` | `770` |  |
+| `TextureMaker0` | `771` |  |
+| `Tg4` | `772` |  |
+| `Tga` | `773` |  |
+| `Thomson` | `774` |  |
+| `TiBitmap` | `775` |  |
+| `TiPicture` | `776` |  |
+| `Tiff` | `777` |  |
+| `TilePic` | `778` |  |
+| `TilezTexture` | `779` |  |
+| `Tim` | `780` |  |
+| `Tim2` | `781` |  |
+| `TimexGigascreen` | `782` |  |
+| `Tiny` | `783` |  |
+| `TmSat` | `784` |  |
+| `TobiasRichterSlideshow` | `785` |  |
+| `TriPaint` | `786` |  |
+| `Trs80` | `787` |  |
+| `TrsPix` | `788` |  |
+| `TrueColorImg` | `789` |  |
+| `TruePaint` | `790` |  |
+| `TrueType` | `791` |  |
+| `TrzmielCompressed` | `792` |  |
+| `TurboRascal` | `793` |  |
+| `TurboView` | `794` |  |
+| `UfliEditor` | `795` |  |
+| `Uhdr` | `796` |  |
+| `UifliEditor` | `797` |  |
+| `Uimg` | `798` |  |
+| `UleadAlbumTemplate` | `799` |  |
+| `UleadImageLibrary` | `800` |  |
+| `UtahRle` | `801` |  |
+| `UyvyRaw` | `802` |  |
+| `VbxeSlideShow` | `803` |  |
+| `VdcBitmap` | `804` |  |
+| `Vector06c` | `805` |  |
+| `VentaFax` | `806` |  |
+| `VertiZontalInterlacing` | `807` |  |
+| `VerticalHiresInterlace` | `808` |  |
+| `Vic20` | `809` |  |
+| `Vicar` | `810` |  |
+| `Vidcom64` | `811` |  |
+| `VidiChrome` | `812` |  |
+| `VidigPaint` | `813` |  |
+| `Viff` | `814` |  |
+| `Vips` | `815` |  |
+| `VirtualBoyTile` | `816` |  |
+| `Vitec` | `817` |  |
+| `Vivid` | `818` |  |
+| `Vrml` | `819` |  |
+| `Vtf` | `820` |  |
+| `Vue` | `821` |  |
+| `Wad2` | `822` |  |
+| `Wad3` | `823` |  |
+| `Wal` | `824` |  |
+| `Wbmp` | `825` |  |
+| `WebP` | `826` |  |
+| `WebShots` | `827` |  |
+| `WigmoreArtist` | `828` |  |
+| `WinFax` | `829` |  |
+| `WizSolitaireDeck` | `830` |  |
+| `Wmf` | `831` |  |
+| `WonderSwanTile` | `832` |  |
+| `WorldportFax` | `833` |  |
+| `Wpg` | `834` |  |
+| `Wsq` | `835` |  |
+| `Wzl` | `836` |  |
+| `X11Puzzle` | `837` |  |
+| `X3f` | `838` |  |
+| `XBin` | `839` |  |
+| `XFliEditor` | `840` |  |
+| `Xar` | `841` |  |
+| `Xbm` | `842` |  |
+| `XbmColor` | `843` |  |
+| `Xcf` | `844` |  |
+| `Xcursor` | `845` |  |
+| `Ximage` | `846` |  |
+| `XionicsSmp` | `847` |  |
+| `XlPaint` | `848` |  |
+| `Xld4` | `849` |  |
+| `Xpm` | `850` |  |
+| `XvThumbnail` | `851` |  |
+| `Xwd` | `852` |  |
+| `Xyz` | `853` |  |
+| `Ybm` | `854` |  |
+| `YuvRaw` | `855` |  |
+| `ZeissBivas` | `856` |  |
+| `ZeissLsm` | `857` |  |
+| `Zinc` | `858` |  |
+| `ZonerBrush` | `859` |  |
+| `Zoom4` | `860` |  |
+| `Zoomatic` | `861` |  |
+| `ZsStaffKid98` | `862` |  |
+| `Zx81` | `863` |  |
+| `ZxArtStudio` | `864` |  |
+| `ZxAttributes` | `865` |  |
+| `ZxAttributesGigascreen` | `866` |  |
+| `ZxBigFont` | `867` |  |
+| `ZxBorderMulticolor` | `868` |  |
+| `ZxBorderScreen` | `869` |  |
+| `ZxChrd` | `870` |  |
+| `ZxFlash` | `871` |  |
+| `ZxFont` | `872` |  |
+| `ZxGigascreen` | `873` |  |
+| `ZxMlg` | `874` |  |
+| `ZxMultiArtist` | `875` |  |
+| `ZxMulticolor` | `876` |  |
+| `ZxNext` | `877` |  |
+| `ZxNextImage` | `878` |  |
+| `ZxPaintbrush` | `879` |  |
+| `ZxPaintyOne` | `880` |  |
+| `ZxRgb3` | `881` |  |
+| `ZxSnapshot` | `882` |  |
+| `ZxSpectrum` | `883` |  |
+| `ZxTimex` | `884` |  |
+| `ZxTrefiBorderScreen` | `885` |  |
+| `ZxTricolor` | `886` |  |
+| `ZxUlaPlus` | `887` |  |
+| `ZzRough` | `888` |  |
 
 #### `MagicSignature`
 

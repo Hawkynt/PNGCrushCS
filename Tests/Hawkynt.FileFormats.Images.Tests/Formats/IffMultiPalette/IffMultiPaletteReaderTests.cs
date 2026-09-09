@@ -1,6 +1,9 @@
 using System;
+using System.Buffers.Binary;
 using System.IO;
+using FileFormat.Core;
 using FileFormat.IffMultiPalette;
+using FileFormat.Ilbm;
 
 namespace FileFormat.IffMultiPalette.Tests;
 
@@ -41,117 +44,119 @@ public sealed class IffMultiPaletteReaderTests {
 
   [Test]
   [Category("Unit")]
-  /// <summary>
-  /// A dozen bytes that are not an IFF file are not a picture.
-  /// </summary>
-  /// <remarks>
-  /// This used to expect a default size back. The reader took anything twelve bytes or longer and
-  /// invented dimensions when it found no bitmap header, so unrelated files opened as blank pages
-  /// and counted as decodes — and the format that could have read them never got to see them.
-  /// </remarks>
-  public void FromBytes_TwelveArbitraryBytesAreRefused() {
-    var data = _CreateMinimalValidData();
+  public void FromBytes_FormMpal_IsRefusedBecauseMultipaletteIsAnIlbmProperty() {
+    var data = new byte[12];
+    "FORM"u8.CopyTo(data);
+    BinaryPrimitives.WriteUInt32BigEndian(data.AsSpan(4), 4);
+    "MPAL"u8.CopyTo(data.AsSpan(8));
 
-    Assert.Throws<InvalidDataException>(() => IffMultiPaletteReader.FromBytes(data));
+    var error = Assert.Throws<InvalidDataException>(() => IffMultiPaletteReader.FromBytes(data));
+    Assert.That(error!.Message, Does.Contain("FORM ILBM"));
   }
 
   [Test]
   [Category("Unit")]
-  public void FromBytes_ValidData_CopiesRawData() {
-    var data = _CreateDataWithBmhd(64, 48);
-
-    var result = IffMultiPaletteReader.FromBytes(data);
-
-    Assert.That(result.RawData, Is.EqualTo(data));
-    Assert.That(result.RawData, Is.Not.SameAs(data));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void FromBytes_WithBmhd_ParsesDimensions() {
-    var data = _CreateDataWithBmhd(64, 48);
-
-    var result = IffMultiPaletteReader.FromBytes(data);
-
-    Assert.Multiple(() => {
-      Assert.That(result.Width, Is.EqualTo(64));
-      Assert.That(result.Height, Is.EqualTo(48));
+  public void FromBytes_OrdinaryIlbmWithoutPchg_IsRefused() {
+    var data = IlbmWriter.ToBytes(new IlbmFile {
+      Width = 8,
+      Height = 2,
+      NumPlanes = 1,
+      Compression = IlbmCompression.None,
+      Masking = IlbmMasking.None,
+      TransparentColor = 0,
+      XAspect = 1,
+      YAspect = 1,
+      PageWidth = 8,
+      PageHeight = 2,
+      PixelData = new byte[16],
+      Palette = [0, 0, 0, 255, 255, 255],
     });
+
+    var error = Assert.Throws<InvalidDataException>(() => IffMultiPaletteReader.FromBytes(data));
+    Assert.That(error!.Message, Does.Contain("no PCHG"));
   }
 
   [Test]
   [Category("Unit")]
-  public void FromStream_ValidData_ParsesCorrectly() {
-    var data = _CreateDataWithBmhd(16, 32);
+  public void FromBytes_CompressedPchg_IsRefusedByName() {
+    var data = _ValidFile();
+    var pchg = _FindChunk(data, "PCHG");
+    BinaryPrimitives.WriteUInt16BigEndian(data.AsSpan(pchg + 8), 1);
 
-    using var ms = new MemoryStream(data);
-    var result = IffMultiPaletteReader.FromStream(ms);
+    var error = Assert.Throws<NotSupportedException>(() => IffMultiPaletteReader.FromBytes(data));
+    Assert.That(error!.Message, Does.Contain("Compressed PCHG"));
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void FromBytes_ThirtyTwoBitPchg_IsRefusedByName() {
+    var data = _ValidFile();
+    var pchg = _FindChunk(data, "PCHG");
+    BinaryPrimitives.WriteUInt16BigEndian(data.AsSpan(pchg + 10), 2);
+
+    var error = Assert.Throws<NotSupportedException>(() => IffMultiPaletteReader.FromBytes(data));
+    Assert.That(error!.Message, Does.Contain("32-bit PCHG"));
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void FromBytes_ValidWriterOutput_ParsesSemanticImage() {
+    var data = _ValidFile(13, 5);
+
+    var result = IffMultiPaletteReader.FromBytes(data);
 
     Assert.Multiple(() => {
-      Assert.That(result.Width, Is.EqualTo(16));
-      Assert.That(result.Height, Is.EqualTo(32));
+      Assert.That((result.Width, result.Height), Is.EqualTo((13, 5)));
+      Assert.That(result.NumPlanes, Is.EqualTo(4));
+      Assert.That(result.PixelData, Has.Length.EqualTo(13 * 5));
+      Assert.That(result.Palette, Has.Length.EqualTo(IffMultiPaletteFile.PaletteBytes));
+      Assert.That(result.ScanlinePalettes, Has.Length.EqualTo(5 * IffMultiPaletteFile.PaletteBytes));
       Assert.That(result.RawData, Is.EqualTo(data));
+      Assert.That(result.RawData, Is.Not.SameAs(data));
     });
   }
 
   [Test]
   [Category("Unit")]
-  public void FromBytes_RoundTrip_PreservesData() {
-    var original = new IffMultiPaletteFile {
-      Width = 100,
-      Height = 80,
-      RawData = _CreateDataWithBmhd(100, 80),
-    };
+  public void FromStream_ValidWriterOutput_ParsesCorrectly() {
+    var data = _ValidFile(16, 3);
+    using var stream = new MemoryStream(data);
 
-    var bytes = IffMultiPaletteWriter.ToBytes(original);
-    var restored = IffMultiPaletteReader.FromBytes(bytes);
+    var result = IffMultiPaletteReader.FromStream(stream);
 
-    Assert.Multiple(() => {
-      Assert.That(restored.Width, Is.EqualTo(100));
-      Assert.That(restored.Height, Is.EqualTo(80));
-      Assert.That(restored.RawData, Is.EqualTo(original.RawData));
+    Assert.That((result.Width, result.Height), Is.EqualTo((16, 3)));
+  }
+
+  private static byte[] _ValidFile(int width = 8, int height = 4) {
+    var pixels = new byte[width * height * 3];
+    for (var y = 0; y < height; ++y)
+    for (var x = 0; x < width; ++x) {
+      var at = (y * width + x) * 3;
+      pixels[at] = (byte)(((x + y) & 1) == 0 ? 0xFF : 0x00);
+      pixels[at + 1] = (byte)((x % 3) * 0x55);
+      pixels[at + 2] = (byte)((y % 3) * 0x55);
+    }
+
+    var file = IffMultiPaletteFile.FromRawImage(new() {
+      Width = width,
+      Height = height,
+      Format = PixelFormat.Rgb24,
+      PixelData = pixels,
     });
+    return IffMultiPaletteWriter.ToBytes(file);
   }
 
-  private static byte[] _CreateMinimalValidData() {
-    var data = new byte[IffMultiPaletteFile.MinFileSize];
-    for (var i = 0; i < data.Length; ++i)
-      data[i] = (byte)(i & 0xFF);
-    return data;
-  }
+  private static int _FindChunk(byte[] data, string id) {
+    var expected = System.Text.Encoding.ASCII.GetBytes(id);
+    var offset = 12;
+    while (offset + 8 <= data.Length) {
+      var length = checked((int)BinaryPrimitives.ReadUInt32BigEndian(data.AsSpan(offset + 4)));
+      if (data.AsSpan(offset, 4).SequenceEqual(expected))
+        return offset;
+      offset = checked(offset + 8 + length + (length & 1));
+    }
 
-  private static byte[] _CreateDataWithBmhd(int width, int height) {
-    var bmhdData = new byte[20];
-    bmhdData[0] = (byte)(width >> 8);
-    bmhdData[1] = (byte)(width & 0xFF);
-    bmhdData[2] = (byte)(height >> 8);
-    bmhdData[3] = (byte)(height & 0xFF);
-
-    var data = new byte[12 + 4 + 4 + 20 + 10];
-    var offset = 0;
-
-    data[offset++] = (byte)'F';
-    data[offset++] = (byte)'O';
-    data[offset++] = (byte)'R';
-    data[offset++] = (byte)'M';
-    offset += 4;
-    data[offset++] = (byte)'M';
-    data[offset++] = (byte)'P';
-    data[offset++] = (byte)'A';
-    data[offset++] = (byte)'L';
-
-    data[offset++] = 0x42; // 'B'
-    data[offset++] = 0x4D; // 'M'
-    data[offset++] = 0x48; // 'H'
-    data[offset++] = 0x44; // 'D'
-
-    data[offset++] = 0;
-    data[offset++] = 0;
-    data[offset++] = 0;
-    data[offset++] = 20;
-
-    Array.Copy(bmhdData, 0, data, offset, bmhdData.Length);
-
-    return data;
+    Assert.Fail($"Missing {id} chunk.");
+    return -1;
   }
 }
