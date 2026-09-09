@@ -231,4 +231,131 @@ public sealed class H265TableTests {
       Assert.That(step, Is.InRange(0, 1), $"quantiser {qp}");
     }
   }
+
+  // ==============================================================================================
+  // The 4:2:2 chroma intra mode map — Table 8-4
+  // ==============================================================================================
+
+  /// <summary>
+  /// The two modes with no direction and the two that lie along an axis survive halving the
+  /// horizontal scale.
+  /// </summary>
+  /// <remarks>
+  /// Planar and direct current have no angle to distort. Horizontal and vertical are the two
+  /// directions a change of horizontal scale leaves alone — a horizontal line is horizontal at any
+  /// width and a vertical one is vertical — so a table that moved either of them would be a table
+  /// with a transposed digit in it.
+  /// </remarks>
+  [TestCase(H265IntraPrediction.PLANAR)]
+  [TestCase(H265IntraPrediction.DC)]
+  [TestCase(H265IntraPrediction.HORIZONTAL)]
+  [TestCase(H265IntraPrediction.VERTICAL)]
+  [Category("Unit")]
+  public void TheFourTwoTwoModeMapFixesTheModesAChangeOfWidthCannotMove(int mode)
+    => Assert.That(H265IntraPrediction.MapChromaModeFor422(mode), Is.EqualTo(mode));
+
+  /// <summary>
+  /// The map is a monotone, in-range map that never carries a direction past horizontal or vertical.
+  /// </summary>
+  /// <remarks>
+  /// Halving the horizontal scale makes every direction steeper, and steeper is monotone in the mode
+  /// number within each of the three arcs the two axis modes cut the fan into. Crossing either axis
+  /// would mean a direction that leaned left coming back leaning right, which no change of scale
+  /// does.
+  /// </remarks>
+  [Test]
+  [Category("Unit")]
+  public void TheFourTwoTwoModeMapIsMonotoneAndStaysWithinItsArc() {
+    var map = H265IntraPrediction.Chroma422ModeMap;
+    Assert.That(map.Length, Is.EqualTo(35), "one entry per intra prediction mode");
+
+    for (var mode = 0; mode < map.Length; ++mode)
+      Assert.That((int)map[mode], Is.InRange(0, 34), $"mode {mode}");
+
+    for (var mode = 1; mode < map.Length; ++mode)
+      Assert.That((int)map[mode], Is.GreaterThanOrEqualTo(map[mode - 1]), $"mode {mode}");
+
+    // Modes 2 to 9 lean below the horizontal, 11 to 25 reach across the corner, and 27 to 34 lean
+    // right of the vertical. Each arc maps into itself, the middle one bounded by the two axes.
+    for (var mode = 2; mode <= 9; ++mode)
+      Assert.That((int)map[mode], Is.InRange(2, 9), $"mode {mode}");
+
+    for (var mode = 11; mode <= 25; ++mode)
+      Assert.That((int)map[mode], Is.InRange(11, 25), $"mode {mode}");
+
+    for (var mode = 27; mode <= 34; ++mode)
+      Assert.That((int)map[mode], Is.InRange(27, 34), $"mode {mode}");
+  }
+
+  /// <summary>
+  /// Every mapped mode is the one whose direction is nearest to the original's after the horizontal
+  /// scale is halved.
+  /// </summary>
+  /// <remarks>
+  /// This is what the table is for, and it is checkable rather than merely restatable. A chrominance
+  /// column at 4:2:2 covers two luminance columns and a chrominance row covers one, so a direction
+  /// <c>(dx, dy)</c> in the luminance grid is <c>(dx / 2, dy)</c> in the chrominance one. Turning
+  /// every mode into such a vector through Table 8-5 makes the relation geometry rather than a list,
+  /// and the standard's entry is then the mode whose own direction is closest in angle.
+  /// <para/>
+  /// Two entries are exact ties — the two directions a degree either side of vertical, each equally
+  /// close to vertical itself once halved — and the standard keeps the leaning one. The check allows
+  /// a tie to be broken either way and insists on the nearest everywhere else.
+  /// </remarks>
+  [Test]
+  [Category("Unit")]
+  public void TheFourTwoTwoModeMapHalvesEachDirectionsHorizontalStep() {
+    for (var mode = 2; mode <= 34; ++mode) {
+      var (dx, dy) = _Direction(mode);
+      var wanted = Math.Atan2(dy, dx / 2);
+
+      var nearest = 2;
+      var closest = double.MaxValue;
+      for (var candidate = 2; candidate <= 34; ++candidate) {
+        var distance = _Separation(candidate, wanted);
+        if (distance >= closest)
+          continue;
+
+        closest = distance;
+        nearest = candidate;
+      }
+
+      var mapped = H265IntraPrediction.MapChromaModeFor422(mode);
+      Assert.That(_Separation(mapped, wanted), Is.LessThanOrEqualTo(closest + 1e-9),
+        $"mode {mode} points at {_Degrees(mode):F1} degrees, so 4:2:2 wants {wanted * 180 / Math.PI:F1}; "
+        + $"the table says mode {mapped} at {_Degrees(mapped):F1} where mode {nearest} at "
+        + $"{_Degrees(nearest):F1} is nearer");
+    }
+  }
+
+  private static double _Separation(int mode, double wanted) {
+    var (dx, dy) = _Direction(mode);
+    return Math.Abs(Math.Atan2(dy, dx) - wanted);
+  }
+
+  private static double _Degrees(int mode) {
+    var (dx, dy) = _Direction(mode);
+    return Math.Atan2(dy, dx) * 180 / Math.PI;
+  }
+
+  /// <summary>
+  /// The direction one angular mode predicts along, as a vector from a sample towards its reference.
+  /// </summary>
+  /// <remarks>
+  /// Table 8-5 states one number per mode and the two halves of the fan mean it differently: below
+  /// mode 18 the predictor reads the left column and the angle says how far down it moves per
+  /// column, at 18 and above it reads the row above and the angle says how far right it moves per
+  /// row. So the two halves are reciprocals of each other, and they point at opposite ends of their
+  /// line — the 45-degree direction is mode 2 read from the left and mode 34 read from above. One
+  /// vector each keeps both facts.
+  /// </remarks>
+  private static (double X, double Y) _Direction(int mode) {
+    int[] angle = [
+      32, 26, 21, 17, 13, 9, 5, 2, 0, -2, -5, -9, -13, -17, -21, -26, -32,
+      -26, -21, -17, -13, -9, -5, -2, 0, 2, 5, 9, 13, 17, 21, 26, 32,
+    ];
+
+    var value = angle[mode - 2] / 32.0;
+    return mode < 18 ? (-1.0, value) : (value, -1.0);
+  }
 }

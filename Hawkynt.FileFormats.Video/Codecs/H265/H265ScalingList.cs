@@ -167,21 +167,27 @@ internal sealed class H265ScalingList {
   }
 
   /// <summary>
-  /// Gives the four 32x32 matrices the standard never codes the same values as the two it does.
+  /// Fills in the four 32x32 chrominance matrices the syntax never codes.
   /// </summary>
   /// <remarks>
   /// Only luma intra and luma inter are transmitted at 32x32, because in every chroma format but
-  /// 4:4:4 no chroma transform block is that big. They are filled in all the same so that the
-  /// lookup is a plain index rather than a special case at the one place it would be asked.
+  /// 4:4:4 no chroma transform block is that big. 4:4:4 has such blocks and still sends nothing for
+  /// them, so clause 7.4.5 says where their weights come from: the 16x16 matrix of the same
+  /// component and prediction mode, each of whose sixty-four coded values then covers a four-by-four
+  /// square instead of a two-by-two, with that matrix's own direct-current entry.
+  /// <para/>
+  /// Deriving them from the 16x16 rather than from the 32x32 luma matrix matters only where a stream
+  /// codes lists of its own: the defaults of Table 7-6 are the same list for luma and chroma, so a
+  /// stream that enables the lists without stating them cannot tell the two derivations apart. A
+  /// stream that states them can, and would be dequantised with the wrong weights.
   /// </remarks>
   private void _FillSkipped() {
     for (var matrixId = 0; matrixId < _MATRIX_COUNT; ++matrixId) {
       if (this._coded[3][matrixId] != null)
         continue;
 
-      var source = matrixId < 3 ? 0 : 3;
-      this._coded[3][matrixId] = (int[])this._coded[3][source].Clone();
-      this._dc[1][matrixId] = this._dc[1][source];
+      this._coded[3][matrixId] = (int[])this._coded[2][matrixId].Clone();
+      this._dc[1][matrixId] = this._dc[0][matrixId];
     }
   }
 

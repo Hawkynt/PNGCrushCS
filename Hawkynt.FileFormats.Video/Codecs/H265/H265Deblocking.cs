@@ -44,19 +44,30 @@ internal static class H265Deblocking {
       }
   }
 
+  /// <summary>
+  /// Filters every chrominance edge of the picture in one direction — clause 8.7.2.
+  /// </summary>
+  /// <remarks>
+  /// The grid is eight chrominance samples apart whatever the chroma format, which is what makes it
+  /// sixteen luminance samples apart at 4:2:0 and eight at 4:4:4. Walking it in chrominance
+  /// coordinates and converting back is therefore the same loop for all three formats; walking it in
+  /// luminance ones would need the spacing to change with the format as well as the conversion.
+  /// </remarks>
   private static void _FilterChroma(H265FrameDecoder frame, bool vertical) {
     var picture = frame.Picture;
     var width = picture.ChromaWidth;
     var height = picture.ChromaHeight;
     var acrossLimit = vertical ? width : height;
     var alongLimit = vertical ? height : width;
+    var shiftX = picture.ChromaShiftX;
+    var shiftY = picture.ChromaShiftY;
 
     for (var across = 8; across < acrossLimit; across += 8)
       for (var along = 0; along < alongLimit; along += 4) {
         var chromaX = vertical ? across : along;
         var chromaY = vertical ? along : across;
-        var x = chromaX << 1;
-        var y = chromaY << 1;
+        var x = chromaX << shiftX;
+        var y = chromaY << shiftY;
 
         if (_BoundaryStrength(frame, x, y, vertical) != 2)
           continue;
@@ -311,7 +322,10 @@ internal static class H265Deblocking {
     var qQp = frame.QuantiserAt(x, y);
     var offset = component == 0 ? frame.Pps.CbQpOffset : frame.Pps.CrQpOffset;
     var index = Math.Clamp(((pQp + qQp + 1) >> 1) + offset, -sps.QpBdOffsetChroma, 57);
-    var chromaQp = H265Dequantiser.ChromaQp(index);
+
+    // The same split as clause 8.6.1 makes: Table 8-10 only where the chrominance is subsampled in
+    // both directions, and the index itself, bounded at 51, everywhere else.
+    var chromaQp = sps.ChromaArrayType == 1 ? H265Dequantiser.ChromaQp(index) : Math.Clamp(index, 0, 51);
 
     var clip = _Clipping[Math.Clamp(chromaQp + 2 + (tcOffset << 1), 0, 53)] * (1 << (sps.BitDepthChroma - 8));
     var maximum = (1 << sps.BitDepthChroma) - 1;

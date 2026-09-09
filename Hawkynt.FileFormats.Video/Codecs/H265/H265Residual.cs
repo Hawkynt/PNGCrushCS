@@ -45,6 +45,11 @@ internal static class H265Residual {
   /// The prediction mode of the block, which chooses the scan for the two smallest sizes. Pass a
   /// negative value for an inter block, which always scans diagonally.
   /// </param>
+  /// <param name="chromaArrayType">
+  /// The sequence's chroma format, which decides whether an 8x8 chrominance block chooses its scan
+  /// from the prediction mode: only at 4:4:4, where such a block is the same size as the luminance
+  /// one beside it rather than the chrominance of a 16x16.
+  /// </param>
   /// <returns>Whether the residual was sent untransformed.</returns>
   internal static bool Decode(
     ref H265CabacEngine cabac,
@@ -52,6 +57,7 @@ internal static class H265Residual {
     int log2Size,
     int cIdx,
     int intraPredMode,
+    int chromaArrayType,
     H265PictureParameterSet pps,
     bool transquantBypass) {
     var size = 1 << log2Size;
@@ -62,7 +68,7 @@ internal static class H265Residual {
       transformSkip = cabac.DecodeBin(
         cIdx == 0 ? H265CabacContexts.TRANSFORM_SKIP_FLAG_LUMA : H265CabacContexts.TRANSFORM_SKIP_FLAG_CHROMA) != 0;
 
-    var scanIdx = _ScanIndex(log2Size, cIdx, intraPredMode);
+    var scanIdx = _ScanIndex(log2Size, cIdx, intraPredMode, chromaArrayType);
 
     _ReadLastPosition(ref cabac, log2Size, cIdx, out var lastX, out var lastY);
     if (scanIdx == H265ScanOrder.VERTICAL)
@@ -279,12 +285,16 @@ internal static class H265Residual {
   /// Only the two smallest luma blocks and the smallest chroma ones choose; everything larger reads
   /// diagonally. A mode near horizontal predicts along rows, so what the residual is left with runs
   /// down the columns and is read vertically — and the other way about for a mode near vertical.
+  /// <para/>
+  /// The rule is stated in transform block sizes rather than in luma ones, so at 4:4:4 an 8x8
+  /// chrominance block chooses its scan exactly as an 8x8 luminance block does. In every subsampled
+  /// format such a block is the chrominance of a 16x16 and reads diagonally.
   /// </remarks>
-  private static int _ScanIndex(int log2Size, int cIdx, int intraPredMode) {
+  private static int _ScanIndex(int log2Size, int cIdx, int intraPredMode, int chromaArrayType) {
     if (intraPredMode < 0)
       return H265ScanOrder.DIAGONAL;
 
-    if (log2Size != 2 && !(log2Size == 3 && cIdx == 0))
+    if (log2Size != 2 && !(log2Size == 3 && (cIdx == 0 || chromaArrayType == 3)))
       return H265ScanOrder.DIAGONAL;
 
     return intraPredMode switch {

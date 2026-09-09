@@ -62,6 +62,30 @@ internal static class H265IntraPrediction {
     -4096, -1638, -910, -630, -482, -390, -315, -256, -315, -390, -482, -630, -910, -1638, -4096,
   ];
 
+  /// <summary>
+  /// Table 8-4: the 4:2:2 remapping of a chrominance intra prediction mode.
+  /// </summary>
+  /// <remarks>
+  /// A 4:2:2 chrominance block is half as wide as the luminance block it borrows its mode from and
+  /// just as tall, so a direction stated in the luminance grid points somewhere else in the
+  /// chrominance one — every angle gets steeper by the factor the two grids differ by. The table is
+  /// that correction, rounded to the nearest direction the thirty-three angular modes offer, and it
+  /// clamps at each end where the steeper direction has no mode of its own. Planar, direct current
+  /// and the two axis modes have no horizontal scale to distort and map to themselves.
+  /// <para/>
+  /// The values are copied rather than derived: they are a rounded table in the standard, and a
+  /// re-derivation would disagree with it at the ties.
+  /// </remarks>
+  private static readonly byte[] _Chroma422ModeMap = [
+    0, 1, 2, 2, 2, 2, 3, 5, 7, 8, 10, 12, 13, 15, 17, 18, 19, 20,
+    21, 22, 23, 23, 24, 24, 25, 25, 26, 27, 27, 28, 28, 29, 29, 30, 31,
+  ];
+
+  internal static ReadOnlySpan<byte> Chroma422ModeMap => _Chroma422ModeMap;
+
+  /// <summary>The direction a chrominance block really predicts along at 4:2:2 — clause 8.4.3.</summary>
+  internal static int MapChromaModeFor422(int mode) => _Chroma422ModeMap[mode];
+
   /// <summary>Where the corner sample sits in a reference array for a block of this size.</summary>
   internal static int CornerIndex(int size) => size << 1;
 

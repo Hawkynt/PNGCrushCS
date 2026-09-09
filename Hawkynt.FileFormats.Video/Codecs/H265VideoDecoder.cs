@@ -10,15 +10,16 @@ namespace FileFormat.Codecs;
 /// Decodes H.265 / HEVC video, ITU-T H.265 | ISO/IEC 23008-2.
 /// </summary>
 /// <remarks>
-/// The decoder reconstructs native Main-profile 4:2:0 eight-bit pictures, including intra and inter
-/// slices, reference-picture management, weighted prediction, CABAC, scaling lists, deblocking and
+/// The decoder reconstructs native pictures at eight, ten and twelve bits in every chroma format the
+/// standard defines — monochrome, 4:2:0, 4:2:2 and 4:4:4 — including intra and inter slices,
+/// reference-picture management, weighted prediction, CABAC, scaling lists, deblocking and
 /// sample-adaptive offset. Tile and dependent-slice transport structure is handled in the same
 /// picture decoder rather than flattened or silently ignored.
 /// <para/>
-/// Completed pictures are returned as native <see cref="PixelFormat.Yuv420P8"/> samples after both
-/// in-loop filters. RGB conversion remains a consumer-side operation through <see cref="RawImageConverter"/>.
-/// Unsupported profile extensions still fail explicitly rather than returning plausible partial
-/// pictures.
+/// Completed pictures are returned as native planar samples after both in-loop filters, in the
+/// layout the sequence's own chroma format and depth name. RGB conversion remains a consumer-side
+/// operation through <see cref="RawImageConverter"/>. Unsupported profile extensions still fail
+/// explicitly rather than returning plausible partial pictures.
 /// </remarks>
 public sealed class H265VideoDecoder : IVideoCodecDecoder<H265VideoDecoder> {
 
@@ -56,7 +57,7 @@ public sealed class H265VideoDecoder : IVideoCodecDecoder<H265VideoDecoder> {
   }
 
   public static string CodecName
-    => "H.265/HEVC (ITU-T H.265 | ISO/IEC 23008-2), Main profile";
+    => "H.265/HEVC (ITU-T H.265 | ISO/IEC 23008-2)";
 
   public static bool Accepts(MediaStreamInfo stream) {
     ArgumentNullException.ThrowIfNull(stream);
@@ -256,42 +257,61 @@ public sealed class H265VideoDecoder : IVideoCodecDecoder<H265VideoDecoder> {
     var sps = this._pictureSequence!;
     var width = sps.DisplayWidth;
     var height = sps.DisplayHeight;
-    var chromaWidth = (width + 1) >> 1;
-    var chromaHeight = (height + 1) >> 1;
+    var shiftX = picture.ChromaShiftX;
+    var shiftY = picture.ChromaShiftY;
+    var chromaWidth = (width + (1 << shiftX) - 1) >> shiftX;
+    var chromaHeight = (height + (1 << shiftY) - 1) >> shiftY;
 
-    if (sps.BitDepthLuma == 8 && sps.BitDepthChroma == 8)
-      return RawImageFactory.FromYuv420P8(
-        width,
-        height,
-        _Narrow(picture.Luma),
-        picture.Width,
-        _Narrow(picture.Cb),
-        _Narrow(picture.Cr),
-        picture.ChromaWidth,
-        sps.CropOffsetX,
-        sps.CropOffsetY,
-        RawImageColorInfo.Bt601Limited);
+    if (sps.BitDepthLuma == 8 && sps.BitDepthChroma == 8) {
+      var luma = _Narrow(picture.Luma);
+      var cb = _Narrow(picture.Cb);
+      var cr = _Narrow(picture.Cr);
+      var stride = picture.ChromaWidth;
+      var left = sps.CropOffsetX;
+      var top = sps.CropOffsetY;
 
-    // A Main 10 sequence keeps its ten bits: the samples go out in RawImage's P10 layout rather than
-    // being shifted down to a byte, because that shift is a quality decision the caller has not made.
+      return sps.ChromaArrayType switch {
+        2 => RawImageFactory.FromYuv422P8(
+          width, height, luma, picture.Width, cb, cr, stride, left, top, RawImageColorInfo.Bt601Limited),
+        3 => RawImageFactory.FromYuv444P8(
+          width, height, luma, picture.Width, cb, cr, stride, left, top, RawImageColorInfo.Bt601Limited),
+        _ => RawImageFactory.FromYuv420P8(
+          width, height, luma, picture.Width, cb, cr, stride, left, top, RawImageColorInfo.Bt601Limited),
+      };
+    }
+
+    // A sequence deeper than eight bits keeps its own depth: the samples go out in RawImage's planar
+    // sixteen-bit layout rather than being shifted down to a byte, because that shift is a quality
+    // decision the caller has not made. The format says which depth they are, so a twelve-bit stream
+    // is not handed over labelled as ten.
     var data = new byte[checked((width * height + 2 * chromaWidth * chromaHeight) * 2)];
-    var at = _CopyTenBitPlane(
+    var at = _CopyWidePlane(
       picture.Luma, picture.Width, sps.CropOffsetX, sps.CropOffsetY, width, height, data, 0);
-    at = _CopyTenBitPlane(
-      picture.Cb, picture.ChromaWidth, sps.CropOffsetX >> 1, sps.CropOffsetY >> 1,
+    at = _CopyWidePlane(
+      picture.Cb, picture.ChromaWidth, sps.CropOffsetX >> shiftX, sps.CropOffsetY >> shiftY,
       chromaWidth, chromaHeight, data, at);
-    _CopyTenBitPlane(
-      picture.Cr, picture.ChromaWidth, sps.CropOffsetX >> 1, sps.CropOffsetY >> 1,
+    _CopyWidePlane(
+      picture.Cr, picture.ChromaWidth, sps.CropOffsetX >> shiftX, sps.CropOffsetY >> shiftY,
       chromaWidth, chromaHeight, data, at);
 
     return new() {
       Width = width,
       Height = height,
-      Format = PixelFormat.Yuv420P10,
+      Format = _PlanarFormat(sps.ChromaArrayType, Math.Max(sps.BitDepthLuma, sps.BitDepthChroma)),
       PixelData = data,
       ColorInfo = RawImageColorInfo.Bt601Limited,
     };
   }
+
+  /// <summary>Which planar layout a sequence's chroma format and sample depth name.</summary>
+  private static PixelFormat _PlanarFormat(int chromaArrayType, int bitDepth) => (chromaArrayType, bitDepth) switch {
+    (2, 10) => PixelFormat.Yuv422P10,
+    (2, 12) => PixelFormat.Yuv422P12,
+    (3, 10) => PixelFormat.Yuv444P10,
+    (3, 12) => PixelFormat.Yuv444P12,
+    (_, 12) => PixelFormat.Yuv420P12,
+    _ => PixelFormat.Yuv420P10,
+  };
 
   /// <summary>Copies an eight-bit sequence's samples out of the wider plane they are decoded into.</summary>
   private static byte[] _Narrow(ushort[] plane) {
@@ -302,9 +322,9 @@ public sealed class H265VideoDecoder : IVideoCodecDecoder<H265VideoDecoder> {
   }
 
   /// <summary>
-  /// Crops one plane into RawImage's P10 layout: a right-justified sample in a little-endian ushort.
+  /// Crops one plane into RawImage's wide planar layout: a right-justified sample in a little-endian ushort.
   /// </summary>
-  private static int _CopyTenBitPlane(
+  private static int _CopyWidePlane(
     ushort[] source, int sourceStride, int left, int top, int width, int height, byte[] target, int at) {
     for (var y = 0; y < height; ++y) {
       var row = (top + y) * sourceStride + left;

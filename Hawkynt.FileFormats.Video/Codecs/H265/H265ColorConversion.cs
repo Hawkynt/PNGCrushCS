@@ -4,7 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.Codecs.H265;
 
 /// <summary>
-/// Turns a decoded 4:2:0 picture into the packed RGB every reader in this library hands back.
+/// Turns a decoded picture into the packed RGB every reader in this library hands back.
 /// </summary>
 /// <remarks>
 /// Both steps here are display conventions rather than parts of the coding standard. H.265 codes
@@ -25,12 +25,18 @@ namespace FileFormat.Codecs.H265;
 /// pointed the other way, and it is the more common one now: libheif and x265 write full range
 /// unless told otherwise, so it is what almost every HEIC in existence needs.
 /// <para/>
-/// The chrominance planes are half size, and where their samples sit relative to the luminance ones
-/// is inherited from MPEG-2: level with the even luminance column and halfway between the two
-/// luminance rows. So bringing chrominance back up is an exact copy on even columns and a halfway
-/// average on odd ones, while vertically it is the three-to-one interpolation a quarter-step offset
-/// calls for. Using centre siting instead shifts every colour edge half a luminance sample to the
-/// left, which is small, everywhere, and looks like a decode that worked.
+/// Where the chrominance samples sit relative to the luminance ones is inherited from MPEG-2: level
+/// with the even luminance column and halfway between the two luminance rows. So bringing 4:2:0
+/// chrominance back up is an exact copy on even columns and a halfway average on odd ones, while
+/// vertically it is the three-to-one interpolation a quarter-step offset calls for. Using centre
+/// siting instead shifts every colour edge half a luminance sample to the left, which is small,
+/// everywhere, and looks like a decode that worked.
+/// <para/>
+/// Each axis is only interpolated where that axis was subsampled, which is what makes the other two
+/// chroma formats cheaper and more faithful rather than special cases: 4:2:2 takes the horizontal
+/// step and no vertical one, and 4:4:4 takes neither, because every luminance sample already has a
+/// chrominance sample under it. Interpolating an axis the format did not subsample would invent a
+/// quarter-row offset that is not there.
 /// </remarks>
 internal static class H265ColorConversion {
 
@@ -101,10 +107,12 @@ internal static class H265ColorConversion {
     // real reconstructed samples that a later picture may predict from — but they are not part of
     // this picture, so the interpolation replicates the last displayed sample rather than reaching
     // into them.
-    var chromaLeft = left >> 1;
-    var chromaTop = top >> 1;
-    var chromaRight = chromaLeft + ((width + 1) >> 1) - 1;
-    var chromaBottom = chromaTop + ((height + 1) >> 1) - 1;
+    var shiftX = picture.ChromaShiftX;
+    var shiftY = picture.ChromaShiftY;
+    var chromaLeft = left >> shiftX;
+    var chromaTop = top >> shiftY;
+    var chromaRight = chromaLeft + ((width + (1 << shiftX) - 1) >> shiftX) - 1;
+    var chromaBottom = chromaTop + ((height + (1 << shiftY) - 1) >> shiftY) - 1;
 
     for (var y = 0; y < height; ++y) {
       var lumaRow = (top + y) * picture.Width + left;
@@ -112,9 +120,9 @@ internal static class H265ColorConversion {
 
       for (var x = 0; x < width; ++x) {
         var luma = picture.Luma[lumaRow + x];
-        var cb = _Chroma(picture.Cb, picture.ChromaWidth, left + x, top + y,
+        var cb = _Chroma(picture.Cb, picture.ChromaWidth, left + x, top + y, shiftX, shiftY,
           chromaLeft, chromaRight, chromaTop, chromaBottom);
-        var cr = _Chroma(picture.Cr, picture.ChromaWidth, left + x, top + y,
+        var cr = _Chroma(picture.Cr, picture.ChromaWidth, left + x, top + y, shiftX, shiftY,
           chromaLeft, chromaRight, chromaTop, chromaBottom);
 
         conversion.ToRgb(luma, cb, cr, rounding, out var r, out var g, out var b);
@@ -128,30 +136,38 @@ internal static class H265ColorConversion {
     return rgb;
   }
 
-  /// <summary>One chrominance sample at a luminance position, interpolated from the four around it.</summary>
+  /// <summary>
+  /// One chrominance sample at a luminance position, interpolated from the samples around it.
+  /// </summary>
+  /// <remarks>
+  /// Each axis is interpolated only where that axis was subsampled. At 4:4:4 there is nothing to
+  /// interpolate in either direction and every luminance sample has a chrominance sample of its own;
+  /// at 4:2:2 only the horizontal step is real, and the vertical one would be inventing a quarter-row
+  /// offset that the format does not have.
+  /// </remarks>
   private static int _Chroma(
-    ushort[] plane, int planeWidth, int x, int y, int minX, int maxX, int minY, int maxY) {
-    var nearX = x >> 1;
-    var nearY = y >> 1;
+    ushort[] plane, int planeWidth, int x, int y, int shiftX, int shiftY,
+    int minX, int maxX, int minY, int maxY) {
+    var nearX = x >> shiftX;
+    var nearY = y >> shiftY;
 
     // Horizontally the sample is co-sited with the even column, so an even column reads it whole and
     // an odd one splits evenly between it and the next.
-    var farX = (x & 1) == 0 ? nearX : _Clip(nearX + 1, minX, maxX);
-    var nearWeightX = (x & 1) == 0 ? 2 : 1;
+    var odd = shiftX == 1 && (x & 1) != 0;
+    var farX = odd ? _Clip(nearX + 1, minX, maxX) : nearX;
+    var nearWeightX = odd ? 1 : 2;
     var farWeightX = 2 - nearWeightX;
+
+    var top = nearWeightX * plane[nearY * planeWidth + nearX] + farWeightX * plane[nearY * planeWidth + farX];
+    if (shiftY == 0)
+      return (top + 1) >> 1;
 
     // Vertically it sits halfway between the two rows it covers, so each row is a quarter step away
     // from it in one direction or the other: three parts of the near sample to one of the far.
     var farY = _Clip((y & 1) == 0 ? nearY - 1 : nearY + 1, minY, maxY);
+    var bottom = nearWeightX * plane[farY * planeWidth + nearX] + farWeightX * plane[farY * planeWidth + farX];
 
-    var topLeft = plane[nearY * planeWidth + nearX];
-    var topRight = plane[nearY * planeWidth + farX];
-    var bottomLeft = plane[farY * planeWidth + nearX];
-    var bottomRight = plane[farY * planeWidth + farX];
-
-    return (3 * (nearWeightX * topLeft + farWeightX * topRight)
-            + (nearWeightX * bottomLeft + farWeightX * bottomRight)
-            + 4) >> 3;
+    return (3 * top + bottom + 4) >> 3;
   }
 
   private static int _Clip(int value, int lowest, int highest)

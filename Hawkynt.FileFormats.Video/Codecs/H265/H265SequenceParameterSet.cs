@@ -51,6 +51,18 @@ internal sealed class H265SequenceParameterSet {
 
   internal int SubHeightC => this.ChromaArrayType == 1 ? 2 : 1;
 
+  /// <summary>
+  /// <c>SubWidthC</c> as a shift: how far right a luma column moves to become a chroma column.
+  /// </summary>
+  /// <remarks>
+  /// The subsampling factors are only ever one or two, so every place that maps between the two
+  /// coordinate systems does it with a shift rather than a division — and a shift keeps the mapping
+  /// exact for the negative coordinates a prediction neighbour is asked about.
+  /// </remarks>
+  internal int ChromaShiftX => this.ChromaArrayType is 1 or 2 ? 1 : 0;
+
+  internal int ChromaShiftY => this.ChromaArrayType == 1 ? 1 : 0;
+
   /// <summary>The coded picture width in luma samples, which is a whole number of minimum coding blocks.</summary>
   internal int Width { get; private init; }
 
@@ -349,26 +361,17 @@ internal sealed class H265SequenceParameterSet {
         + "three monochrome pictures with a colour_plane_id each, rather than as one picture. Reading that form is "
         + "not implemented.");
 
-    // Monochrome joins 4:2:0 rather than being refused with the rest. It is not a subsampling at all
-    // — the sequence simply codes no chrominance, so every place that would read or reconstruct a
-    // chrominance sample has nothing to do — where 4:2:2 and 4:4:4 change the transform tree, the
-    // chrominance intra modes, the quantiser mapping and the deblocking grid. An all-black or
-    // greyscale picture comes out monochrome from libheif, so it is not an exotic case.
-    if (this.ChromaFormatIdc is not (0 or 1))
-      throw new NotSupportedException(
-        $"This H.265 stream is {this.ChromaFormatIdc switch {
-          2 => "4:2:2",
-          3 => "4:4:4",
-          _ => $"chroma_format_idc {this.ChromaFormatIdc}",
-        }} (clause 7.4.3.2.1). Only 4:2:0 and monochrome, which is what the Main, Main 10 and "
-        + "Monochrome profiles permit, are implemented.");
+    if (this.ChromaFormatIdc is < 0 or > 3)
+      throw new InvalidDataException(
+        $"An H.265 sequence parameter set states chroma_format_idc {this.ChromaFormatIdc}, which clause 7.4.3.2.1 "
+        + "bounds at 3. These bytes are not a parameter set.");
 
     if (this.BitDepthLuma is < 8 or > 12 || this.BitDepthChroma is < 8 or > 12)
       throw new NotSupportedException(
         $"This H.265 stream codes {this.BitDepthLuma}-bit luma and {this.BitDepthChroma}-bit chroma samples "
-        + "(clause 7.4.3.2.1). Eight to twelve bits are implemented, which covers Main, Main 10 and the twelve-bit "
-        + "still profile; deeper samples need the extended precision the range extensions add, and the parameter "
-        + "sets refuse every tool of theirs that changes a sample.");
+        + "(clause 7.4.3.2.1). Eight to twelve bits are implemented, which covers Main, Main 10, the 4:2:2 and "
+        + "4:4:4 twelve-bit profiles and the twelve-bit still profile; deeper samples need the extended precision "
+        + "the range extensions add, and the parameter sets refuse every tool of theirs that changes a sample.");
   }
 
   /// <summary>Reads the extension flags and refuses the ones that change the decoding process.</summary>
