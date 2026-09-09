@@ -188,10 +188,10 @@ public sealed class WebPFile :
   }
 
   /// <summary>Encode as VP8 lossy at the given quality (0-100). Alpha is preserved losslessly
-  /// in an accompanying ALPH chunk (uncompressed method 0); the RGB plane goes through the
-  /// usual lossy VP8 path. Pixel-perfect decoding requires <see cref="FromRawImage(RawImage)"/>
-  /// (VP8L lossless), but RGBA-with-alpha now round-trips alpha bit-exactly even via the
-  /// lossy path.</summary>
+  /// in an accompanying ALPH chunk, using VP8L compression when it saves space and raw method 0
+  /// otherwise; the RGB plane goes through the usual lossy VP8 path. Pixel-perfect decoding requires
+  /// <see cref="FromRawImage(RawImage)"/> (VP8L lossless), but RGBA-with-alpha round-trips alpha
+  /// bit-exactly even via the lossy path.</summary>
   public static WebPFile FromRawImageLossy(RawImage image, int quality = 75) {
     ArgumentNullException.ThrowIfNull(image);
     var vp8Data = Vp8Encoder.Encode(image, quality);
