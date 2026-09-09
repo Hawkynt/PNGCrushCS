@@ -6,6 +6,7 @@ namespace FileFormat.CmuWindowManager;
 /// <summary>In-memory representation of a Carnegie Mellon University window-manager bitmap.</summary>
 [FormatDetectionPriority(95)]
 [FormatMagicBytes([0xF1, 0x00, 0x40, 0xBB])]
+[VerifiedBy(ConformanceOracle.XnView)]
 public readonly record struct CmuWindowManagerFile : IImageFormatReader<CmuWindowManagerFile>, IImageToRawImage<CmuWindowManagerFile>, IImageFromRawImage<CmuWindowManagerFile>, IImageFormatWriter<CmuWindowManagerFile> {
 
   /// <summary>Largest decoded image accepted by this managed implementation.</summary>

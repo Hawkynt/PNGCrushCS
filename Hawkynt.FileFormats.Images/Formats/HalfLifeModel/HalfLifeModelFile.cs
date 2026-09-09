@@ -24,6 +24,7 @@ namespace FileFormat.HalfLifeModel;
 /// authored textures to 8..512 pixels and resized them toward powers of two. This writer keeps the
 /// caller's dimensions instead of inventing a resize policy, but stays inside that vanilla range.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.XnView)]
 public readonly record struct HalfLifeModelFile
   : IImageFormatReader<HalfLifeModelFile>, IImageToRawImage<HalfLifeModelFile>,
     IImageFromRawImage<HalfLifeModelFile>, IImageFormatWriter<HalfLifeModelFile> {

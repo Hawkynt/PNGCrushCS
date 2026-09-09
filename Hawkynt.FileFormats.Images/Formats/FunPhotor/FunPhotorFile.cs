@@ -10,6 +10,7 @@ namespace FileFormat.FunPhotor;
 /// Four bytes of length and then an ordinary PNG. Nothing here decodes anything itself; the whole
 /// format is the wrapper, and all three samples come out of the PNG reader matching XnView exactly.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.XnView)]
 public readonly record struct FunPhotorFile
   : IImageFormatReader<FunPhotorFile>, IImageToRawImage<FunPhotorFile>,
     IImageFromRawImage<FunPhotorFile>, IImageFormatWriter<FunPhotorFile> {

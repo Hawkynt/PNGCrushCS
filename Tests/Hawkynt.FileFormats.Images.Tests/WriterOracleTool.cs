@@ -47,6 +47,7 @@ internal static class WriterOracleTool {
   public static readonly ConformanceOracle[] Runnable = [
     ConformanceOracle.Recoil2Png,
     ConformanceOracle.ImageMagick,
+    ConformanceOracle.XnView,
     ConformanceOracle.DWebp,
     ConformanceOracle.Djxl,
     ConformanceOracle.OpjDecompress,
@@ -93,9 +94,9 @@ internal static class WriterOracleTool {
       if (exitCode == null)
         return (Verdict.Rejected, diagnostics.Length == 0 ? "it would not run" : _FirstLine(diagnostics));
 
-      // Three ways of saying "I have never heard of this format", which is the tool declining to
-      // judge rather than judging. Blaming the writer for them would measure the tool's build.
-      if (_IsNoOpinion(diagnostics))
+      // The several ways of saying "I have never heard of this format", which is the tool declining
+      // to judge rather than judging. Blaming the writer for them would measure the tool's build.
+      if (_IsNoOpinion(diagnostics) || _NeverHeardOfTheName(oracle, diagnostics))
         return (Verdict.NoOpinion, _FirstLine(diagnostics));
 
       if (_RebuiltThePicture(output, width, height))
@@ -163,9 +164,41 @@ internal static class WriterOracleTool {
       || diagnostics.Contains("NoDecodeDelegateForThisImageFormat", StringComparison.OrdinalIgnoreCase)
       || diagnostics.Contains("UnableToOpenBlob", StringComparison.OrdinalIgnoreCase);
 
+  /// <summary>Whether a tool that chooses its reader by content has declined to look at all.</summary>
+  /// <remarks>
+  /// <c>nconvert</c> picks a loader by sniffing the bytes and not by the name — a PNG called
+  /// <c>.xyzzy</c> converts — and what it says on failure records how far it got. A loader that
+  /// claimed the file and then could not follow it answers <c>Can't read file</c>, or complains in
+  /// its own words about the field it did not like; that is a reader disagreeing, and it is a
+  /// rejection. <c>Don't know how to read this picture</c> is the other answer and means no loader
+  /// claimed the bytes at all.
+  /// <para/>
+  /// That second answer covers two cases which cannot be told apart from here: a format XnView has
+  /// never implemented, and a header so wrong that the loader which would have read it did not
+  /// recognise the file as its own. The column's claim is specifically that the tool read the file
+  /// and disagreed, so the ambiguous answer is recorded as no opinion rather than guessed at.
+  /// <para/>
+  /// The catalogue beside the binary was the obvious tie-breaker — <c>Formats.txt</c>, which
+  /// <c>Conformance.Recoil.Tests.XnViewOracle</c> reads for its own gating — and measuring it over
+  /// this registry is what ruled it out. An extension in that table is not a reader for the format
+  /// that goes by it here: taking a listed extension as proof XnView implements the format turned
+  /// 120 formats it has plainly never heard of into writers it rejects, purely on our spelling of a
+  /// name colliding with somebody else's.
+  /// <para/>
+  /// What survives the rule is the case worth having: a writer whose container is right and whose
+  /// payload is not gets its loader claimed and then refused, which is the shape the defects this
+  /// column exists to find actually take.
+  /// </remarks>
+  private static bool _NeverHeardOfTheName(ConformanceOracle oracle, string diagnostics)
+    => oracle == ConformanceOracle.XnView
+      && diagnostics.Contains("know how to read", StringComparison.OrdinalIgnoreCase);
+
   private static string[] _Arguments(ConformanceOracle oracle, string input, string output) => oracle switch {
     ConformanceOracle.Recoil2Png => ["-o", output, input],
     ConformanceOracle.ImageMagick => [input + "[0]", "png:" + output],
+    // -noholder keeps it from reading a '#' or a '%' in a temporary name as a placeholder to expand,
+    // and -overwrite stops it stalling on a name that already exists.
+    ConformanceOracle.XnView => ["-quiet", "-noholder", "-overwrite", "-out", "png", "-o", output, input],
     ConformanceOracle.DWebp => [input, "-o", output],
     ConformanceOracle.Djxl => [input, output],
     ConformanceOracle.OpjDecompress => ["-i", input, "-o", output],
@@ -184,6 +217,7 @@ internal static class WriterOracleTool {
     var (variable, name) = oracle switch {
       ConformanceOracle.Recoil2Png => ("RECOIL2PNG", "recoil2png"),
       ConformanceOracle.ImageMagick => ("IMAGEMAGICK", "magick"),
+      ConformanceOracle.XnView => ("NCONVERT", "nconvert"),
       ConformanceOracle.DWebp => ("DWEBP", "dwebp"),
       ConformanceOracle.Djxl => ("DJXL", "djxl"),
       ConformanceOracle.OpjDecompress => ("OPJ_DECOMPRESS", "opj_decompress"),

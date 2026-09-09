@@ -5,6 +5,7 @@ namespace FileFormat.Clp;
 
 /// <summary>In-memory representation of a CLP (Windows Clipboard) image file.</summary>
 [FormatMagicBytes([0xC3, 0x50])]
+[VerifiedBy(ConformanceOracle.XnView)]
 public readonly record struct ClpFile : IImageFormatReader<ClpFile>, IImageToRawImage<ClpFile>, IImageFromRawImage<ClpFile>, IImageFormatWriter<ClpFile> {
 
   static string IImageFormatMetadata<ClpFile>.PrimaryExtension => ".clp";

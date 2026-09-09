@@ -4,6 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.Skantek;
 
 /// <summary>In-memory representation of a Skantek page (.skn).</summary>
+[VerifiedBy(ConformanceOracle.XnView)]
 public readonly record struct SkantekFile : IImageFormatReader<SkantekFile>, IImageToRawImage<SkantekFile>, IImageFromRawImage<SkantekFile>, IImageFormatWriter<SkantekFile> {
 
   public static ReadOnlySpan<byte> Signature => [

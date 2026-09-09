@@ -14,6 +14,7 @@ namespace FileFormat.NokiaLogo;
 /// What was here before was the bare bitmap at one bit a pixel, fixed at 72 by 14, with no header at
 /// all — neither the layout nor the size restriction is real.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.XnView)]
 public readonly record struct NokiaLogoFile
   : IImageFormatReader<NokiaLogoFile>, IImageToRawImage<NokiaLogoFile>,
     IImageFromRawImage<NokiaLogoFile>, IImageFormatWriter<NokiaLogoFile> {

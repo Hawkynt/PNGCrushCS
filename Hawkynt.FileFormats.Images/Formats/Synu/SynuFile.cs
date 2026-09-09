@@ -18,6 +18,7 @@ namespace FileFormat.Synu;
 /// The picture starts on the byte after that last newline, one byte a channel, rows from the bottom
 /// up. Everything needed is stated, so nothing here is guessed at.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.XnView)]
 public readonly record struct SynuFile
   : IImageFormatReader<SynuFile>, IImageToRawImage<SynuFile>,
     IImageFromRawImage<SynuFile>, IImageFormatWriter<SynuFile> {

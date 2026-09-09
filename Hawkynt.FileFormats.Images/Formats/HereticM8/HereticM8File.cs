@@ -16,6 +16,7 @@ namespace FileFormat.HereticM8;
 /// <para/>
 /// The levels are the same picture at halving sizes, so the first is the one to read.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.XnView)]
 public readonly record struct HereticM8File
   : IImageFormatReader<HereticM8File>, IImageToRawImage<HereticM8File>,
     IImageFromRawImage<HereticM8File>, IImageFormatWriter<HereticM8File> {

@@ -36,6 +36,7 @@ namespace FileFormat.Apx;
   (byte)'M', (byte)'X', (byte)'P', (byte)'a', (byte)'i', (byte)'n', (byte)'t', (byte)'P', (byte)'r', (byte)'o', (byte)'-',
   (byte)'N', (byte)'i', (byte)'c', (byte)'k', (byte)'A', (byte)'v', (byte)'r', (byte)'i', (byte)'o', (byte)'n'
 ])]
+[VerifiedBy(ConformanceOracle.XnView)]
 public sealed class ApxFile : IImageFormatReader<ApxFile>, IImageToRawImage<ApxFile>, IImageFromRawImage<ApxFile>, IImageFormatWriter<ApxFile> {
 
   public const int SignatureSize = 21;

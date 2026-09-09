@@ -13,6 +13,7 @@ namespace FileFormat.Cr3;
 /// </remarks>
 [FormatDetectionPriority(210)]
 [FormatMimeType("image/x-canon-cr3")]
+[VerifiedBy(ConformanceOracle.XnView)]
 public sealed class Cr3File :
   IImageFormatReader<Cr3File>, IImageToRawImage<Cr3File>, IImageFromRawImage<Cr3File>, IImageFormatWriter<Cr3File> {
 

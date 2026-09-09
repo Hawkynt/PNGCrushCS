@@ -16,6 +16,7 @@ namespace FileFormat.DigitalFx;
 /// settled by handing it a picture whose four channels were all different and reading back which
 /// three came out.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.XnView)]
 public readonly record struct DigitalFxFile
   : IImageFormatReader<DigitalFxFile>, IImageToRawImage<DigitalFxFile>, IImageFromRawImage<DigitalFxFile>, IImageFormatWriter<DigitalFxFile> {
 

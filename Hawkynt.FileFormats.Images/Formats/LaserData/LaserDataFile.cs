@@ -10,6 +10,7 @@ public enum LaserDataCompression : byte {
 }
 
 /// <summary>In-memory representation of a LaserData document image (.lda).</summary>
+[VerifiedBy(ConformanceOracle.XnView)]
 public readonly record struct LaserDataFile : IImageFormatReader<LaserDataFile>, IImageToRawImage<LaserDataFile>, IImageFromRawImage<LaserDataFile>, IImageFormatWriter<LaserDataFile> {
 
   static string IImageFormatMetadata<LaserDataFile>.PrimaryExtension => ".lda";

@@ -14,6 +14,7 @@ namespace FileFormat.Bob;
 /// would try to allocate. Decoded as above it matches XnView's rendering of the same file to the
 /// byte.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.XnView)]
 public readonly record struct BobFile :
   IImageFormatReader<BobFile>,
   IImageToRawImage<BobFile>,

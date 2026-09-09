@@ -16,6 +16,7 @@ namespace FileFormat.Vivid;
 /// and the same sum gives 30204 for the other. Read a row at a time in that order both agree with
 /// XnView on every pixel.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.XnView)]
 public readonly record struct VividFile
   : IImageFormatReader<VividFile>, IImageToRawImage<VividFile>,
     IImageFromRawImage<VividFile>, IImageFormatWriter<VividFile> {

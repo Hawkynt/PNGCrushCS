@@ -13,6 +13,7 @@ namespace FileFormat.QdvImage;
 /// refused by it. The sample states 640 by 480, and 5 plus 768 plus 640 times 480 is its length to
 /// the byte.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.XnView)]
 public readonly record struct QdvImageFile
   : IImageFormatReader<QdvImageFile>, IImageToRawImage<QdvImageFile>,
     IImageFromRawImage<QdvImageFile>, IImageFormatWriter<QdvImageFile> {

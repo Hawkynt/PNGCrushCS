@@ -4,6 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.MayaIff;
 
 /// <summary>In-memory representation of a Maya IFF (FOR4/CIMG) image.</summary>
+[VerifiedBy(ConformanceOracle.XnView)]
 public readonly record struct MayaIffFile : IImageFormatReader<MayaIffFile>, IImageToRawImage<MayaIffFile>, IImageFromRawImage<MayaIffFile>, IImageFormatWriter<MayaIffFile> {
 
   static string IImageFormatMetadata<MayaIffFile>.PrimaryExtension => ".iff";

@@ -5,6 +5,7 @@ namespace FileFormat.Xyz;
 
 /// <summary>In-memory representation of an RPG Maker 2000/2003 XYZ image.</summary>
 [FormatMagicBytes([0x58, 0x59, 0x5A, 0x31])]
+[VerifiedBy(ConformanceOracle.XnView)]
 public readonly record struct XyzFile : IImageFormatReader<XyzFile>, IImageToRawImage<XyzFile>, IImageFromRawImage<XyzFile>, IImageFormatWriter<XyzFile> {
 
   static string IImageFormatMetadata<XyzFile>.PrimaryExtension => ".xyz";

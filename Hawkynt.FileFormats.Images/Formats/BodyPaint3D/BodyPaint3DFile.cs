@@ -34,6 +34,7 @@ namespace FileFormat.BodyPaint3D;
 /// once flattened and once as the single layer; writing a second copy would be filling in a
 /// structure the document does not have.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.XnView)]
 public readonly record struct BodyPaint3DFile
   : IImageFormatReader<BodyPaint3DFile>, IImageToRawImage<BodyPaint3DFile>,
     IImageFromRawImage<BodyPaint3DFile>, IImageFormatWriter<BodyPaint3DFile> {
