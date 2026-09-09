@@ -1,4 +1,5 @@
 using System;
+using System.Buffers.Binary;
 using System.IO;
 using FileFormat.IffSham;
 
@@ -40,48 +41,76 @@ public sealed class IffShamReaderTests {
 
   [Test]
   [Category("Unit")]
-  public void FromBytes_MinSize_Succeeds() {
-    var data = new byte[12];
-    data[0] = 0xAB;
-
-    var result = IffShamReader.FromBytes(data);
-
-    Assert.That(result.RawData.Length, Is.EqualTo(12));
-    Assert.That(result.RawData[0], Is.EqualTo(0xAB));
+  public void FromBytes_ArbitraryTwelveBytes_ThrowsInvalidDataException() {
+    Assert.Throws<InvalidDataException>(() => IffShamReader.FromBytes(new byte[12]));
   }
 
   [Test]
   [Category("Unit")]
-  public void FromBytes_DefaultDimensions_WhenNoBmhd() {
-    var data = new byte[20];
+  public void FromBytes_WriterOutput_ParsesStructuredState() {
+    var bytes = _CreateValidBytes();
 
-    var result = IffShamReader.FromBytes(data);
+    var result = IffShamReader.FromBytes(bytes);
 
-    Assert.That(result.Width, Is.EqualTo(320));
-    Assert.That(result.Height, Is.EqualTo(200));
+    Assert.Multiple(() => {
+      Assert.That(result.Width, Is.EqualTo(320));
+      Assert.That(result.Height, Is.EqualTo(200));
+      Assert.That(result.PixelData, Has.Length.EqualTo(320 * 200));
+      Assert.That(result.ScanlinePalettes, Has.Length.EqualTo(200 * 16 * 3));
+    });
   }
 
   [Test]
   [Category("Unit")]
-  public void FromStream_Valid() {
-    var data = new byte[16];
-    data[0] = 0x42;
+  public void FromBytes_UnsupportedShamVersion_ThrowsNotSupportedException() {
+    var bytes = _CreateValidBytes();
+    var sham = _FindChunk(bytes, "SHAM"u8);
+    BinaryPrimitives.WriteUInt16BigEndian(bytes.AsSpan(sham), 1);
 
-    using var ms = new MemoryStream(data);
-    var result = IffShamReader.FromStream(ms);
-
-    Assert.That(result.RawData[0], Is.EqualTo(0x42));
+    Assert.Throws<NotSupportedException>(() => IffShamReader.FromBytes(bytes));
   }
 
   [Test]
   [Category("Unit")]
-  public void FromBytes_CopiesData_NotReference() {
-    var data = new byte[12];
-    data[0] = 0xFF;
+  public void FromBytes_MissingShamChunk_ThrowsInvalidDataException() {
+    var bytes = _CreateValidBytes();
+    var sham = _FindChunk(bytes, "SHAM"u8);
+    "CTBL"u8.CopyTo(bytes.AsSpan(sham - 8, 4));
 
-    var result = IffShamReader.FromBytes(data);
-    data[0] = 0x00;
+    Assert.Throws<InvalidDataException>(() => IffShamReader.FromBytes(bytes));
+  }
 
-    Assert.That(result.RawData[0], Is.EqualTo(0xFF));
+  [Test]
+  [Category("Unit")]
+  public void FromBytes_CopiesRawData_NotReference() {
+    var bytes = _CreateValidBytes();
+    var result = IffShamReader.FromBytes(bytes);
+
+    bytes[0] = 0;
+
+    Assert.That(result.RawData[0], Is.EqualTo((byte)'F'));
+  }
+
+  private static byte[] _CreateValidBytes() {
+    return IffShamWriter.ToBytes(new() {
+      Width = 320,
+      Height = 200,
+      RawData = [],
+      PixelData = new byte[320 * 200],
+      ScanlinePalettes = new byte[200 * 16 * 3],
+    });
+  }
+
+  private static int _FindChunk(byte[] data, ReadOnlySpan<byte> id) {
+    var end = 8 + BinaryPrimitives.ReadInt32BigEndian(data.AsSpan(4, 4));
+    for (var offset = 12; offset + 8 <= end;) {
+      var size = BinaryPrimitives.ReadInt32BigEndian(data.AsSpan(offset + 4, 4));
+      if (data.AsSpan(offset, 4).SequenceEqual(id))
+        return offset + 8;
+      offset += 8 + size + (size & 1);
+    }
+
+    Assert.Fail($"Chunk {System.Text.Encoding.ASCII.GetString(id)} was not found.");
+    return -1;
   }
 }
