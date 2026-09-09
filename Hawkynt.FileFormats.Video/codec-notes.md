@@ -4108,6 +4108,102 @@ not decode leaves that part of the canvas alone rather than failing the frame, a
 leaves the cursor where it was, and a packet whose leading tag is neither `TDSF` nor `DTSM` hands back
 the canvas unchanged — each of which is what the reference decoder does.
 
+### Smacker Video
+
+RAD Game Tools' own FMV codec, behind more games of the 1990s than anything else in this package's
+game-and-FMV family, and carried in the Smacker container this package already read and wrote. A
+picture is 4x4 blocks, each described by a run-length descriptor read through one of four Huffman
+tables — `MMap`, `MClr`, `Full` and `Type` — that the file states once, in a section of its own ahead
+of the first frame, and every frame then shares.
+
+This codec had an entry in `codec-investigations.md` for a long time, and that entry is kept because
+its account of the published description is still accurate. What it stopped on was not the tree
+algorithm, which it settled correctly on its own, but the step that composes the four sixteen-bit
+tables out of two byte sub-decoders and three markers. RAD's "Optimized Compression" section describes
+that step in prose that reads the same in every revision of the document, is complete enough to
+implement, and does not describe what the files contain: twelve structural readings of it were built
+and measured, and every one left between 79% and 98.7% of a real file's declared tree section
+unconsumed.
+
+**Four things the prose leaves out, all of them in FFmpeg's `libavcodec/smacker.c` and, as far as could
+be established, nowhere else.** Each of the two byte sub-decoders inside a sixteen-bit table carries
+its own presence bit ahead of it and one padding bit after it, so a reading that expects two bare trees
+back to back is out of step before it reaches the first marker. The three markers are sixteen raw bits
+each rather than values read through those sub-decoders. One further padding bit follows the
+sixteen-bit tree itself, before the next of the four tables begins. And the tree occupies one slot per
+**four** bytes of the size its file header states for it, not the one per eight those byte counts
+invite — which is what the investigation's own arithmetic, dividing all twelve size fields by eight and
+finding entry counts from 25 to 8,939 that no reading came within three orders of magnitude of, was
+measuring against the wrong denominator. With those four in place the tree sections of every file
+tested unpack completely.
+
+**The move-to-front cache is three positions in the table, not three values beside it.** This is the
+part the published prose gestures at — an unpacked value different from the one before it "will be
+moved together with another two recent codes to shortest tree' branches" — without saying what is
+actually moved. A leaf whose unpacked value equals one of the three markers does not become a leaf
+holding that marker. It becomes a leaf holding zero, and its **position** is remembered as one of the
+table's three cache slots; decoding a symbol then rewrites those three positions in place, the value
+just decoded into the first and each previous occupant one slot along. Three details of that only an
+implementation states: only the *last* leaf matching a given marker is remembered, so an earlier one
+keeps its zero and never moves again; every table's three slots are reset to zero at the start of every
+frame; and a marker that never appeared in the tree at all is given a slot of its own past the tree's
+last real node, which is why the slot array is allocated three longer than the header's own count.
+
+**The block coding, once the tables parse, is straightforward and matches the published description.**
+Four block types in the low two bits of a `Type` descriptor — a two-colour mono block whose sixteen
+pixels are picked by an `MMap` bit map, a sixteen-colour full block, a skipped block that leaves the
+picture before it alone, and a solid block whose colour is the descriptor's own high byte — and a
+six-bit run index selecting from a table that counts up one block at a time to 59 and then jumps to
+128, 256, 512, 1024 and 2048. A full block's two `Full` symbols a row are not painted left to right:
+the first carries the row's third and fourth pixels and the second its first and second. `SMK4` adds
+one or two bits read once for a whole run, immediately after its descriptor and before any of the run's
+blocks are painted, choosing between that row shape, four solid 2x2 quadrants at two colours a symbol,
+and the row shape with every row painted twice.
+
+**The palette is resolved here rather than in the demuxer**, which is the one place this decoder's
+input differs from FFmpeg's. FFmpeg's demuxer keeps the running palette itself and prepends a
+resolved 768-byte copy to every packet; `SmackerContainer` deliberately does not, on the grounds that
+resolving a chain of partial restatements is decoding. So this decoder takes the frame's own flag byte
+and, where the flag says so, the palette chunk in the form the file states it: runs kept as they were,
+runs copied from elsewhere in the *previous* palette, and new colours at six bits a component widened
+through a sixty-four-entry ladder that rises in steps of four except at every sixteenth entry, where
+it rises by five.
+
+**Measured.** Every `.smk` file on `samples.ffmpeg.org` and in FFmpeg's own FATE suite — nine of
+them, found under `game-formats/smacker/` and under two of `ffmpeg-bugs/trac/`, from five games and
+two of FFmpeg's own bug reports — was decoded here and by FFmpeg 9.0.1. One of the nine,
+`mech2/mintro.smk`, is truncated to 106,496 bytes where its own header states a 180,961-byte tree
+section alone, so that section runs past the end of the file and neither decoder will open it: FFmpeg
+refuses it as invalid input and `SmackerReader` refuses it by name for the same reason, which is
+agreement rather than a gap.
+
+The other eight — 120x76 to 640x480, 1 to 787 pictures apiece, 1,473 pictures in all — were compared
+on the paletted output both decoders produce, with no colour conversion anywhere between them:
+FFmpeg's `-pix_fmt pal8` rawvideo output carries the 256-entry palette after each picture's index
+plane, so both the index of every pixel and every byte of every palette are directly comparable. All
+127,616,480 palette indices and all 1,131,264 palette bytes are identical, with no difference on any
+frame of any file.
+
+**The `SMK4` half of that is one file, and it does the work.** Eight of the nine are `SMK2`; the only
+`SMK4` file anywhere public is `ffmpeg-bugs/trac/ticket2728/test.smk`, 320x240 and 303 pictures. It is
+enough: across those pictures it emits 83,075 full-block runs, and they are spread over all three of
+the shapes `SMK4` adds rather than favouring one — 21,040 of the plain row form, 38,441 of the
+quadrant form and 23,594 of the doubled-row form. Every one of them, and the one or two bits that pick
+between them, is covered by the bit-exact comparison above. The same three shapes are also exercised
+on bitstreams built for the purpose in `SmackerVideoDecoderTests`, which is what pins each one's
+painting down pixel by pixel rather than only in aggregate.
+
+Where the two decoders do differ is on invalid data, deliberately. FFmpeg checks the return of its
+symbol decoder for the `Type` table and not for the other three, so a stream that runs out of bits
+inside an `MClr`, `MMap` or `Full` code carries on there with a garbage value; this decoder refuses.
+On all 1,170 pictures of valid input that difference never arises.
+
+What refuses, by name: a picture whose width or height is not a whole number of 4x4 blocks, since
+Smacker codes nothing for the pixels such a picture would leave over and no sample states one; a
+stream whose header states none of its four tables, which would decode every block of every picture to
+the same descriptor; a tree section shorter than the tables it declares; and a palette chunk whose copy
+block reaches past the palette's own 256 entries.
+
 
 ## 📜 License
 

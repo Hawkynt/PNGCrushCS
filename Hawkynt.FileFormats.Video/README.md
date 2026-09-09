@@ -81,7 +81,7 @@ quietly come to mean "some of it". How each codec was measured is in
 
 Every codec the package registers has a row, and the name in the first column is the codec's own
 `CodecName` — the same string a refusal message names it by. `Decode` is what
-[`VideoFormatRegistry.CreateDecoder`](https://github.com/Hawkynt/PNGCrushCS/blob/main/Hawkynt.FileFormats.Video/VideoFormatRegistry.cs) builds, 99 of them; `Encode` is
+[`VideoFormatRegistry.CreateDecoder`](https://github.com/Hawkynt/PNGCrushCS/blob/main/Hawkynt.FileFormats.Video/VideoFormatRegistry.cs) builds, 100 of them; `Encode` is
 what [`VideoFormatRegistry.CreateEncoder`](https://github.com/Hawkynt/PNGCrushCS/blob/main/Hawkynt.FileFormats.Video/VideoFormatRegistry.cs) builds, 46 of them. The two
 are separate tables in the registry because they are looked up by different things: a decoder by a
 whole stream description, an encoder by the four-character code a caller wants written.
@@ -197,6 +197,7 @@ measurement notes are in
 | [IFF ANIM Video](https://en.wikipedia.org/wiki/ANIM) | ⚠️ | — | `ANIM`; compression method 5 (Byte Vertical Delta) only, palettised or Hold-And-Modify. The other four methods the specification names are not decoded | [Amiga ANIM IFF](https://wiki.amigaos.net/wiki/ANIM_IFF_CEL_Animations) |
 | [Brute Force & Ignorance Video](https://wiki.multimedia.cx/index.php/BFI) | ✅ | — | `BFIV`; palettised 8-bit with literal runs, back-references, carried runs and fills | [MultimediaWiki BFI](https://wiki.multimedia.cx/index.php/BFI) |
 | [Sierra VMD Video](https://wiki.multimedia.cx/index.php/VMD) | ⚠️ | — | `VMDV` codec version 2, 8-bit palettised, painted one rectangle at a time. New-palette frames, empty rectangles, LZ rectangles without the preload marker and unknown rendering methods refused | [MultimediaWiki VMD](https://wiki.multimedia.cx/index.php/VMD) |
+| [Smacker Video](https://wiki.multimedia.cx/index.php/Smacker) | ✅ | — | `SMK2` and `SMK4`; 8-bit palettised 4x4 blocks read through four Huffman tables the file states once and every frame shares, with the running palette resolved here rather than in the demuxer. A picture that is not a whole number of 4x4 blocks refuses, as does a stream stating none of its four tables. The composition of those four tables — the piece RAD's own description leaves out, and what this codec sat undecoded on — is adapted from FFmpeg's LGPL-2.1-or-later decoder | [FFmpeg `smacker.c`](https://github.com/FFmpeg/FFmpeg/blob/master/libavcodec/smacker.c) |
 | [Escape 124](https://wiki.multimedia.cx/index.php/Escape_124) | ⚠️ | — | ARMovie/RPL codec id 124; 8x8 superblocks, so dimensions not divisible by eight are refused rather than left fringed. Adapted from FFmpeg's LGPL-2.1-or-later decoder | [FFmpeg `escape124.c`](https://github.com/FFmpeg/FFmpeg/blob/master/libavcodec/escape124.c) |
 | [Eidos Escape 130](https://wiki.multimedia.cx/index.php/Escape_130) | ✅ | — | ARMovie/RPL codec id 130; 2x2 blocks, so a picture must be a whole number of them | [MultimediaWiki Escape 130](https://wiki.multimedia.cx/index.php/Escape_130) |
 
@@ -242,7 +243,6 @@ nothing could be verified even with a description in hand.
 | ScreenPressor (`SCPR`) | The only descriptions found are two third-party reimplementations, which is more implementations, and one sample file |
 | TechSmith Screen Codec 2 (`TSCC2`) | The only technical write-up is by the decoder's own author, about writing the decoder |
 | FM Screen Capture (`FMVC`) | Every technical fact on its page was added five years after the decoder, and even then names its two compression types as LZ77 variants without stating either one's coding |
-| Smacker video (`SMK2`, `SMK4`) — the codec; the container is demuxed and muxed | The Huffman tree construction is confirmed correct; the documented step that composes the four real tables from sub-decoders and markers does not match what the files contain under any of twelve readings tried |
 | Electronic Arts TGQ, TQI, MAD | The shared inverse transform and zigzag are undocumented; the wiki page's edit history shows its own IDCT description being replaced by a link to the author's FFmpeg source |
 | Electronic Arts TGV | Four of five intra statement forms decode correctly against real files; the three-byte form's bit layout does not match the published formula and no single-field adjustment reaches the right copy offset without breaking the rest |
 | Deluxe Paint Animation (`ANM`) | The container is fully documented by EA's own manual; the RunSkipDump opcodes exist only in EA's unpublished program source, which is the format owner's code and still not licensed for transcription |
@@ -251,10 +251,10 @@ nothing could be verified even with a description in hand.
 
 ### Adapted from somebody else's code, and named
 
-Sixteen decoders are adaptations of FFmpeg's own LGPL-2.1-or-later decoders rather than
-implementations from a published description: Escape 124, LCL MSZH's back-reference parser, LOCO,
-Canopus Lossless, Matrox M101, VBLE, MidiVid Archive, MS Screen 1, RemotelyAnywhere, MSCC, MWSC,
-RSCC, Screenpresso, WinCAM, VMware Screen Codec and TDSC. Sixteen of the encoders are as well:
+Seventeen decoders are adaptations of FFmpeg's own LGPL-2.1-or-later decoders rather than
+implementations from a published description: Escape 124, Indeo 4 and 5's tables, LCL MSZH's
+back-reference parser, LOCO, Canopus Lossless, Matrox M101, VBLE, MidiVid Archive, MS Screen 1,
+RemotelyAnywhere, MSCC, MWSC, RSCC, Screenpresso, WinCAM, VMware Screen Codec, TDSC and Smacker. Sixteen of the encoders are as well:
 Apple Graphics, Apple Video, Cinepak's bitstream, CLJR, DV, FFV1, Flash Screen Video, Hap's block
 compression, HuffYUV, LCL ZLIB, MagicYUV, Microsoft RLE, Microsoft Video 1's mode decision,
 QuickTime Animation, Ut Video and ZMBV. Hap's is the one of those not under the LGPL: FFmpeg's
@@ -409,7 +409,7 @@ Every public and protected member of all 467 types, generated from the built ass
 - Large RealVideo pictures require preserved slice offsets when they must be split across 16-bit RealMedia packet lengths, and RoQ sound requires its original predictor argument.
 - Several advanced codecs intentionally implement well-defined subsets (for example H.264 progressive 8-bit 4:2:0, HEVC Main profile, and VC-1 Simple/Main intra pictures). Every row marked ⚠️ in the codec table names its own subset. Unsupported profiles/features are refused by name rather than silently misdecoded.
 - Codec support is more precise than a single green check can express; consult [`codec-notes.md`](https://github.com/Hawkynt/PNGCrushCS/blob/main/Hawkynt.FileFormats.Video/codec-notes.md) before relying on a profile/level/feature not named in this README.
-- Encoding is a smaller domain than decoding on purpose: 46 codecs of the 99 read can also be written. Most are lossless; twelve are not, and each says so in its own row. Motion JPEG writes baseline JPEG, whose loss is a matter of degree, and DV's fixed-length frames, Microsoft Video 1's two-colours-to-a-block coding, Cinepak's vector quantisation, Microsoft's MPEG-4 transform, the ASUS codecs' quantised DCT, Apple Video's 15-bit blocks, H.261's and Apple ProRes's quantised transforms, Hap's texture blocks and id RoQ's vector quantisation have no lossless form at all — a picture that codec can hold exactly comes back exactly, and one it cannot does not. What is still not written back is the modern lossy codecs: a stream read as H.264 cannot be written back as H.264.
+- Encoding is a smaller domain than decoding on purpose: 46 codecs of the 100 read can also be written. Most are lossless; twelve are not, and each says so in its own row. Motion JPEG writes baseline JPEG, whose loss is a matter of degree, and DV's fixed-length frames, Microsoft Video 1's two-colours-to-a-block coding, Cinepak's vector quantisation, Microsoft's MPEG-4 transform, the ASUS codecs' quantised DCT, Apple Video's 15-bit blocks, H.261's and Apple ProRes's quantised transforms, Hap's texture blocks and id RoQ's vector quantisation have no lossless form at all — a picture that codec can hold exactly comes back exactly, and one it cannot does not. What is still not written back is the modern lossy codecs: a stream read as H.264 cannot be written back as H.264.
 - Video correctness depends on real-world packetization as much as codec math. The project therefore validates packet counts, sizes, timestamps, and key-frame flags against external tools where samples are available.
 
 ## ❤️ Support

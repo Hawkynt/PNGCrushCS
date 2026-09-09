@@ -1,0 +1,47 @@
+The Smacker video decoder in this directory, and Codecs/SmackerVideoDecoder.cs
+which uses it, are converted from FFmpeg (https://ffmpeg.org/):
+
+  libavcodec/smacker.c   Smacker video decoder: the packed Huffman trees, the
+                         composition of the four sixteen-bit tables, the
+                         move-to-front history and the block coding
+  libavformat/smacker.c  the palette chunk's three block shapes and the
+                         six-bit-to-eight-bit component ladder they upscale
+                         through, which live in RAD's demuxing layer rather
+                         than beside the picture coding
+
+  Copyright (c) 2006 Konstantin Shishkov
+
+Both files are licensed under the GNU Lesser General Public License, version 2.1
+or (at your option) any later version. This work is distributed under the GNU
+Lesser General Public License version 3 or later, which the "or later" of their
+own licence permits; the text of that licence is in LICENSE at the root of this
+repository.
+
+The algorithm was carried across rather than the source pasted: the code here is
+written to this repository's own conventions, and its structure follows what the
+format does rather than the layout of the C. What was copied exactly, because it
+has to be, are the two constants: the sixty-four block-run lengths a descriptor's
+six-bit run index selects, and the sixty-four-entry ladder a palette entry's
+six-bit components are widened through. Neither is transmitted by any file, and
+neither is a formula — the run lengths count up one at a time for sixty entries
+and then jump, and the ladder rises in steps of four except at every sixteenth
+entry, where it rises by five — so a decoder holding values worked out for itself
+decodes a different picture.
+
+What made this conversion worth doing is narrower than the whole decoder, and it
+is worth naming. RAD's own published description of the format covers the packed
+Huffman trees and the four tables built out of them in prose that is complete
+enough to implement and does not describe what the files contain. Four things it
+omits are in libavcodec/smacker.c and, as far as could be established, nowhere
+else: that each of the two byte sub-decoders inside a sixteen-bit table carries
+its own presence bit ahead of it and a padding bit after it; that the three
+marker values are sixteen raw bits rather than values read through those
+sub-decoders; that one more padding bit follows the sixteen-bit tree itself; and
+that the tree occupies one slot per four bytes of the size the file header
+states, rather than one per eight. Without those four, a reading of the published
+description alone leaves the great majority of a real file's declared tree
+section unconsumed, which is where this codec stood in this repository before.
+
+FFmpeg's own copyright and licence notices, and the full text of the LGPL, are
+available from the FFmpeg project at https://ffmpeg.org/legal.html and in the
+source files named above.

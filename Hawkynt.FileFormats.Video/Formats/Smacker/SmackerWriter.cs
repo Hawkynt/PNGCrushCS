@@ -56,7 +56,7 @@ public sealed class SmackerWriter : IVideoContainerWriter<SmackerWriter> {
     if (this._finished) throw new InvalidOperationException("Smacker writer has already been finished.");
     this._finished = true;
 
-    var frames = new List<(byte Type, byte[] Blob)>();
+    var frames = new List<(byte Type, bool IsKeyFrame, byte[] Blob)>();
     var pendingAudio = new Dictionary<int, ReadOnlyMemory<byte>>();
 
     foreach (var packet in this._packets) {
@@ -102,8 +102,15 @@ public sealed class SmackerWriter : IVideoContainerWriter<SmackerWriter> {
           frame.Write(audio.Span);
         }
         frame.Write(videoPayload.Span);
+
+        // A frame is a whole number of four bytes, because the low two bits of the size a file states
+        // for it are flags rather than length — see SmackerReader for the file that settles that. A
+        // frame written any other length would have up to three of its own bytes read as flags, and
+        // every frame after it would then be looked for in the wrong place.
+        for (var padding = (4 - (int)frame.Length % 4) % 4; padding > 0; --padding)
+          frame.WriteByte(0);
       });
-      frames.Add((type, blob));
+      frames.Add((type, packet.IsKeyFrame, blob));
       pendingAudio.Clear();
     }
 
@@ -134,7 +141,9 @@ public sealed class SmackerWriter : IVideoContainerWriter<SmackerWriter> {
     output.Write(header);
 
     foreach (var frame in frames)
-      ContainerWriterTools.WriteUInt32LittleEndian(output, checked((uint)frame.Blob.Length));
+      // Bit zero of the stated size is the key-frame flag rather than part of the length, which is
+      // why every frame is padded to a whole number of four bytes above and nothing is lost by it.
+      ContainerWriterTools.WriteUInt32LittleEndian(output, checked((uint)frame.Blob.Length) | (frame.IsKeyFrame ? 1u : 0u));
     foreach (var frame in frames)
       output.WriteByte(frame.Type);
     output.Write(privateData[16..]);

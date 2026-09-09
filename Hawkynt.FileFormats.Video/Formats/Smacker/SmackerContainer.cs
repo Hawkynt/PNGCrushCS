@@ -49,8 +49,14 @@ public sealed class SmackerContainer : IVideoContainerReader<SmackerContainer> {
   /// field — see <see cref="SmackerReader"/> for the two ways that field is read.</summary>
   public required Rational VideoTimeBase { get; init; }
 
-  /// <summary>Every frame's stated length in bytes, used exactly as the header states it.</summary>
+  /// <summary>Every frame's length in bytes: the header's own stated value with its low two flag bits
+  /// cleared, which is what makes every frame a whole number of four bytes. See <see cref="SmackerReader"/>
+  /// for the file that settled those bits as flags rather than length.</summary>
   public required int[] FrameSizes { get; init; }
+
+  /// <summary>Whether each frame is a key frame: the first one always, plus every frame whose stated
+  /// size has bit zero set, which is the flag RAD's own description names and one real file exercises.</summary>
+  public required bool[] FrameKeyFrames { get; init; }
 
   /// <summary>Every frame's flag byte: bit zero for a palette chunk, bits one through seven for which
   /// of the seven possible audio tracks contribute a chunk to that frame.</summary>
