@@ -24,8 +24,10 @@ namespace FileFormat.NeoBookCartoon;
 /// offset and the picture hold is not known; they are not read here and XnView does not read them
 /// either.
 /// <para/>
-/// Nothing is written: the six bytes this reader understands are not a cartoon, and writing a file
-/// that only this could read back is what the rest of this library was built to avoid.
+/// Writing uses offset 12 for newly encoded images because that is the value in all three observed
+/// real files. Re-serialising a parsed or explicitly constructed file preserves its valid stated
+/// offset and fills the otherwise unknown gap with zeroes; those zero-filled files were among the
+/// variants accepted by XnView during the format probe.
 /// <para/>
 /// The two letters are not registered as a signature. Reading by bytes alone takes the first format
 /// whose signature matches and does not try a second, and two letters as ordinary as these would
@@ -33,7 +35,8 @@ namespace FileFormat.NeoBookCartoon;
 /// them; only content sniffing is left out of it.
 /// </remarks>
 public readonly record struct NeoBookCartoonFile
-  : IImageFormatReader<NeoBookCartoonFile>, IImageToRawImage<NeoBookCartoonFile> {
+  : IImageFormatReader<NeoBookCartoonFile>, IImageToRawImage<NeoBookCartoonFile>,
+    IImageFromRawImage<NeoBookCartoonFile>, IImageFormatWriter<NeoBookCartoonFile> {
 
   /// <summary>The two letters a cartoon opens with.</summary>
   public static ReadOnlySpan<byte> Magic => "SN"u8;
@@ -41,9 +44,13 @@ public readonly record struct NeoBookCartoonFile
   /// <summary>Two letters and the offset word.</summary>
   public const int HeaderSize = 6;
 
+  /// <summary>Where every observed real NeoBook cartoon starts its PNG.</summary>
+  public const int DefaultPictureOffset = 12;
+
   static string IImageFormatMetadata<NeoBookCartoonFile>.PrimaryExtension => ".car";
   static string[] IImageFormatMetadata<NeoBookCartoonFile>.FileExtensions => [".car"];
   static NeoBookCartoonFile IImageFormatReader<NeoBookCartoonFile>.FromSpan(ReadOnlySpan<byte> data) => NeoBookCartoonReader.FromSpan(data);
+  static byte[] IImageFormatWriter<NeoBookCartoonFile>.ToBytes(NeoBookCartoonFile file) => NeoBookCartoonWriter.ToBytes(file);
   static VideoMode[] IImageFormatMetadata<NeoBookCartoonFile>.VideoModes => [
     new("Default", [(IntegerRange.Any, IntegerRange.Any)], [16777216])
   ];
@@ -59,5 +66,14 @@ public readonly record struct NeoBookCartoonFile
       throw new InvalidOperationException("No picture was read.");
 
     return PngFile.ToRawImage(PngReader.FromSpan(file.Picture));
+  }
+
+  public static NeoBookCartoonFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+
+    return new() {
+      PictureOffset = DefaultPictureOffset,
+      Picture = PngWriter.ToBytes(PngFile.FromRawImage(image)),
+    };
   }
 }

@@ -1,6 +1,6 @@
 using System;
+using System.Buffers.Binary;
 using System.IO;
-using System.Linq;
 using FileFormat.Core;
 using FileFormat.NeoBookCartoon;
 using FileFormat.Png;
@@ -14,18 +14,21 @@ namespace FileFormat.NeoBookCartoon.Tests;
 [TestFixture]
 public sealed class NeoBookCartoonTests {
 
-  private static byte[] _Png(int width, int height) {
+  private static RawImage _Picture(int width, int height) {
     var pixels = new byte[width * height * 3];
     for (var i = 0; i < pixels.Length; ++i)
       pixels[i] = (byte)(i * 11 % 251);
 
-    return PngWriter.ToBytes(PngFile.FromRawImage(new() {
+    return new() {
       Width = width,
       Height = height,
       Format = PixelFormat.Rgb24,
       PixelData = pixels,
-    }));
+    };
   }
+
+  private static byte[] _Png(int width, int height)
+    => PngWriter.ToBytes(PngFile.FromRawImage(_Picture(width, height)));
 
   private static byte[] _Build(byte[] payload, int offset = 12, int stated = -1) {
     var at = stated < 0 ? offset : stated;
@@ -80,4 +83,58 @@ public sealed class NeoBookCartoonTests {
   [Category("Unit")]
   public void FromBytes_APngThatDoesNotReachItsEndIsRefused()
     => Assert.Throws<InvalidDataException>(() => NeoBookCartoonReader.FromBytes(_Build(_Png(4, 4)[..^20])));
+
+  [Test]
+  [Category("Unit")]
+  public void ToBytes_DefaultModelUsesTheObservedTwelveByteLayout() {
+    var picture = _Png(5, 3);
+
+    var data = NeoBookCartoonWriter.ToBytes(new() { Picture = picture });
+
+    Assert.Multiple(() => {
+      Assert.That(data.AsSpan(0, 2).ToArray(), Is.EqualTo(NeoBookCartoonFile.Magic.ToArray()));
+      Assert.That(BinaryPrimitives.ReadUInt32LittleEndian(data.AsSpan(2, 4)), Is.EqualTo(12u));
+      Assert.That(data.AsSpan(6, 6).ToArray(), Is.EqualTo(new byte[6]));
+      Assert.That(data.AsSpan(12).ToArray(), Is.EqualTo(picture));
+    });
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void ToBytes_ExplicitValidOffsetIsPreserved() {
+    var picture = _Png(4, 4);
+
+    var data = NeoBookCartoonWriter.ToBytes(new() { PictureOffset = 20, Picture = picture });
+
+    Assert.Multiple(() => {
+      Assert.That(BinaryPrimitives.ReadUInt32LittleEndian(data.AsSpan(2, 4)), Is.EqualTo(20u));
+      Assert.That(data.AsSpan(20).ToArray(), Is.EqualTo(picture));
+    });
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void ToBytes_OffsetInsideTheHeaderIsRefused()
+    => Assert.Throws<InvalidDataException>(() => NeoBookCartoonWriter.ToBytes(new() { PictureOffset = 5, Picture = _Png(1, 1) }));
+
+  [Test]
+  [Category("Unit")]
+  public void ToBytes_MissingPictureIsRefused()
+    => Assert.Throws<InvalidDataException>(() => NeoBookCartoonWriter.ToBytes(default));
+
+  [Test]
+  [Category("Integration")]
+  public void RoundTrip_FromRawImagePreservesEveryPixel() {
+    var source = _Picture(13, 9);
+
+    var restored = NeoBookCartoonReader.FromBytes(NeoBookCartoonWriter.ToBytes(NeoBookCartoonFile.FromRawImage(source)));
+    var decoded = NeoBookCartoonFile.ToRawImage(restored);
+
+    Assert.Multiple(() => {
+      Assert.That(restored.PictureOffset, Is.EqualTo(NeoBookCartoonFile.DefaultPictureOffset));
+      Assert.That(decoded.Width, Is.EqualTo(source.Width));
+      Assert.That(decoded.Height, Is.EqualTo(source.Height));
+      Assert.That(PixelConverter.Convert(decoded, PixelFormat.Rgb24).PixelData, Is.EqualTo(source.PixelData));
+    });
+  }
 }
