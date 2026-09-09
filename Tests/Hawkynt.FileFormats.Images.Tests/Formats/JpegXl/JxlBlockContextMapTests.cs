@@ -196,4 +196,31 @@ public sealed class JxlBlockContextMapTests {
         "3 channels × 13 orders × 1 dc × 1 qf bucket = 39.");
     });
   }
+
+  /// <summary>
+  /// The block context map and the coefficient order decoder read the same
+  /// table, and read it the way libjxl states it.
+  /// </summary>
+  /// <remarks>
+  /// They used to keep a copy each and the copies disagreed in one entry — the
+  /// shape libjxl calls <c>IDENTITY</c> and this decoder calls Hornuss, which
+  /// the block context map had at 0 where <c>lib/jxl/coeff_order.h</c> says 1.
+  /// Every entropy read for a block of that shape then came from the histogram
+  /// of a plain 8x8, and the arithmetic decoder parted company with the encoder
+  /// from that block to the end of its group.
+  /// </remarks>
+  [Test]
+  public void TheStrategyOrderTableIsTheOneLibjxlStates() {
+    byte[] libjxl = [
+      0, 1, 1, 1, 2, 3, 4, 4, 5, 5, 6, 6, 1, 1,
+      1, 1, 1, 1, 7, 8, 8, 9, 10, 10, 11, 12, 12,
+    ];
+
+    Assert.Multiple(() => {
+      Assert.That(JxlCoeffOrderDecoder.StrategyOrder, Is.EqualTo(libjxl));
+      Assert.That(JxlBlockContextMap.StrategyOrder, Is.SameAs(JxlCoeffOrderDecoder.StrategyOrder),
+        "one table, not two that can drift apart");
+      Assert.That(JxlBlockContextMap.StrategyOrder[(int)JxlAcStrategyType.Hornuss], Is.EqualTo(1));
+    });
+  }
 }
