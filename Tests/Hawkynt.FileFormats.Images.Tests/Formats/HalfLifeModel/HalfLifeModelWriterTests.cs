@@ -27,13 +27,15 @@ public sealed class HalfLifeModelWriterTests {
       Assert.That(BinaryPrimitives.ReadInt32LittleEndian(bytes.AsSpan(0xC8)), Is.EqualTo(0x144));
     });
 
-    var entry = bytes.AsSpan(0xF4, 80);
+    // Copied out of the span rather than read through it: a ref struct local cannot be captured by
+    // the lambda Assert.Multiple takes.
+    var entry = bytes.AsSpan(0xF4, 80).ToArray();
     Assert.Multiple(() => {
-      Assert.That(entry[..5].ToArray(), Is.EqualTo(new byte[] { (byte)'s', (byte)'k', (byte)'i', (byte)'n', 0 }));
-      Assert.That(BinaryPrimitives.ReadInt32LittleEndian(entry[64..]), Is.Zero);
-      Assert.That(BinaryPrimitives.ReadInt32LittleEndian(entry[68..]), Is.EqualTo(16));
-      Assert.That(BinaryPrimitives.ReadInt32LittleEndian(entry[72..]), Is.EqualTo(12));
-      Assert.That(BinaryPrimitives.ReadInt32LittleEndian(entry[76..]), Is.EqualTo(0x148));
+      Assert.That(entry[..5], Is.EqualTo(new byte[] { (byte)'s', (byte)'k', (byte)'i', (byte)'n', 0 }));
+      Assert.That(BinaryPrimitives.ReadInt32LittleEndian(entry.AsSpan(64)), Is.Zero);
+      Assert.That(BinaryPrimitives.ReadInt32LittleEndian(entry.AsSpan(68)), Is.EqualTo(16));
+      Assert.That(BinaryPrimitives.ReadInt32LittleEndian(entry.AsSpan(72)), Is.EqualTo(12));
+      Assert.That(BinaryPrimitives.ReadInt32LittleEndian(entry.AsSpan(76)), Is.EqualTo(0x148));
       Assert.That(BinaryPrimitives.ReadInt16LittleEndian(bytes.AsSpan(0x144)), Is.Zero);
     });
   }

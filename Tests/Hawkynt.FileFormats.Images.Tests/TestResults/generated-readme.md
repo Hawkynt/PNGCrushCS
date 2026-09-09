@@ -1,0 +1,1520 @@
+# Hawkynt.FileFormats.Images
+
+[![NuGet](https://img.shields.io/nuget/v/Hawkynt.FileFormats.Images.svg)](https://www.nuget.org/packages/Hawkynt.FileFormats.Images/)
+[![NuGet downloads](https://img.shields.io/nuget/dt/Hawkynt.FileFormats.Images.svg)](https://www.nuget.org/packages/Hawkynt.FileFormats.Images/)
+[![CI](https://github.com/Hawkynt/PNGCrushCS/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Hawkynt/PNGCrushCS/actions/workflows/ci.yml)
+[![License](https://img.shields.io/github/license/Hawkynt/PNGCrushCS)](https://github.com/Hawkynt/PNGCrushCS/blob/main/LICENSE)
+![Target](https://img.shields.io/badge/target-net8.0-blue)
+![Formats](https://img.shields.io/badge/formats-850%2B-brightgreen)
+![Reflection](https://img.shields.io/badge/runtime%20reflection-zero-success)
+
+> One drop-in pure-C# package for detecting, reading, writing and converting image formats, through
+> one source-generated registry and one platform-independent `RawImage` model. The package claims the
+> WHOLE domain — every image format, not a selection of it. Where a format is missing or only partly
+> supported that is a tracked gap, recorded row by row in [Format support](#-format-support) below.
+
+## 📦 Installation
+
+```bash
+dotnet add package Hawkynt.FileFormats.Images
+```
+
+The package targets `net8.0`. Format implementations and the support libraries they need are bundled behind the public package API; consumers do not need one NuGet package per image format.
+
+## ✨ Features
+
+- 850+ registered formats spanning web, desktop, scientific, professional, fax, console, retro-computing, texture, icon/cursor, and document-preview formats.
+- Source-generated `ImageFormat` enum and `FormatRegistry`; no runtime reflection is needed for registration or dispatch.
+- Magic-byte, extension, MIME-type, file, byte-span, and stream detection.
+- Common `RawImage` representation for cross-format conversion.
+- Runtime read/write capability discovery instead of caller-maintained format lists.
+- Multi-image access where a format exposes pages, frames, entries, or embedded images.
+- Optional metadata-only `ImageInfo` paths when dimensions/properties can be read without decoding all pixels.
+- Per-format `VideoMode` metadata for fixed dimensions, palette restrictions, pixel aspect ratios, and display filters used by historical formats.
+
+## 🧩 Format support
+
+This table is generated from `FormatRegistry.AllFormats`, which is the authoritative package inventory. Every registered image format has one row; extensions and read/write capability come directly from its `FormatEntry`.
+
+`✅` means the corresponding registry operation is available. A registered operation can still have format-specific subset limitations described later in this README; the matrix records capability presence, not a claim that every producer-specific variant is implemented.
+
+The columns are the four things a caller can ask the registry for: **Read** decodes to a `RawImage`; **Write** encodes an arbitrary `RawImage` (a format that can only re-serialise a file it parsed counts as read-only); **Info** answers `ReadImageInfo` — dimensions, depth, colour mode, compression and frame count from the header alone, without decoding pixels; **Multi** exposes pages, frames or entries through the multi-image contract; **Optimizer** means the `Crush.Image` optimizer below rewrites the format losslessly in place instead of converting it.
+
+<!-- IMAGE-FORMATS:BEGIN generated from FormatRegistry -- do not edit this table by hand -->
+| Format | Extensions | Read | Write | Info | Multi | Optimizer |
+| --- | --- | :---: | :---: | :---: | :---: | :---: |
+| Aai | `.aai` | ✅ | ✅ | — | — | — |
+| AccessFax | `.g4`, `.acc` | ✅ | ✅ | — | — | — |
+| Acorn | `.spr`, `.acorn` | ✅ | ✅ | — | — | — |
+| AdexImage | `.adx` | ✅ | ✅ | — | — | — |
+| AdTechFax | `.adt` | ✅ | ✅ | — | — | — |
+| AdvancedArtStudio | `.ocp`, `.mpi`, `.mpic` | ✅ | ✅ | — | — | — |
+| Afli | `.afl` | ✅ | ✅ | — | — | — |
+| Ai | `.ai` | ✅ | ✅ | — | — | — |
+| AimGreyScale | `.ima` | ✅ | ✅ | — | — | — |
+| AirNav | `.anv` | ✅ | ✅ | — | — | — |
+| AladdinPaint | `.alp` | ✅ | ✅ | — | — | — |
+| AliasPix | `.pix`, `.als`, `.alias`, `.img`, `.lux` | ✅ | ✅ | — | — | — |
+| AmicaPaint | `.ami` | ✅ | ✅ | — | — | — |
+| AmigaIcon | `.info` | ✅ | ✅ | — | — | — |
+| AmosBank | `.abk` | ✅ | ✅ | — | — | — |
+| AmstradCpc | `.cpc` | ✅ | ✅ | — | — | — |
+| AmstradMode5 | `.cm5` | ✅ | ✅ | — | — | — |
+| Analyze | `.hdr`, `.img` | ✅ | ✅ | — | — | — |
+| AndrewToolkit | `.atk` | ✅ | ✅ | — | — | — |
+| Ani | `.ani` | ✅ | ✅ | — | ✅ | ✅ |
+| AnimatorCompressor | `.kpr` | ✅ | ✅ | — | — | — |
+| Anime4Ever | `.a4r` | ✅ | ✅ | — | — | — |
+| AnimPainter | `.anp` | ✅ | ✅ | — | — | — |
+| AnsiArt | `.ans`, `.ansi` | ✅ | ✅ | — | — | — |
+| Apac3 | `.ap3`, `.apv`, `.dgi`, `.dgp`, `.esc`, `.ilc`, `.pzm`, `.app`, `.ils` | ✅ | ✅ | — | — | — |
+| Apng | `.apng` | ✅ | ✅ | — | ✅ | — |
+| ApolloHdru | `.hdru`, `.gn` | ✅ | ✅ | — | — | — |
+| Apple3201 | `.3201` | ✅ | ✅ | — | — | — |
+| AppleII | `.hgr`, `.dhgr` | ✅ | ✅ | — | — | — |
+| AppleIIDhr | `.dhr`, `.a2d` | ✅ | ✅ | — | — | — |
+| AppleIIgs | `.shr`, `.c1`, `.pic` | ✅ | ✅ | — | — | — |
+| AppleIIHgr | `.hgr` | ✅ | ✅ | — | — | — |
+| ApplePreferred | `.32k`, `.gs`, `.iigs`, `.shr` | ✅ | ✅ | — | — | — |
+| AppleSh3 | `.sh3`, `.3200` | ✅ | ✅ | — | — | — |
+| AppleShr | `.shr` | ✅ | ✅ | — | — | — |
+| Apx | `.apx` | ✅ | ✅ | — | — | — |
+| Arf | `.arf` | ✅ | ✅ | — | — | — |
+| Arn | `.arn` | ✅ | ✅ | — | — | — |
+| Art | `.art` | ✅ | ✅ | — | — | — |
+| ArtDirector | `.art` | ✅ | ✅ | — | — | — |
+| Artist64 | `.a64` | ✅ | ✅ | — | — | — |
+| ArtMaster88 | `.arv`, `.img` | ✅ | ✅ | — | — | — |
+| ArtStudio8 | `.as8` | ✅ | ✅ | — | — | — |
+| ArtStudioWindow | `.mwi`, `.mwin` | ✅ | ✅ | — | — | — |
+| AsciiMaker | `.asc`, `.gr0` | ✅ | ✅ | — | — | — |
+| Aseprite | `.aseprite`, `.ase` | ✅ | ✅ | — | — | — |
+| Astc | `.astc` | ✅ | ✅ | — | — | — |
+| Atari16x16Font | `.sxs` | ✅ | ✅ | — | — | — |
+| Atari2600 | `.a26`, `.tia` | ✅ | ✅ | — | — | — |
+| Atari7800 | `.a78`, `.a7800` | ✅ | ✅ | — | — | — |
+| Atari8Bit | `.gr7`, `.gr8`, `.gr9`, `.gr15`, `.hip`, `.mic`, `.int` | ✅ | ✅ | — | — | — |
+| Atari8Missile | `.mis` | ✅ | ✅ | — | — | — |
+| Atari8Player | `.pla` | ✅ | ✅ | — | — | — |
+| AtariAgp | `.agp` | ✅ | ✅ | — | — | — |
+| AtariAnimation | `.aan` | ✅ | ✅ | — | — | — |
+| AtariAnticMode | `.ame`, `.anm` | ✅ | ✅ | — | — | — |
+| AtariArtist | `.aat` | ✅ | ✅ | — | — | — |
+| AtariCAD | `.drg`, `.acd` | ✅ | ✅ | — | — | — |
+| AtariCel | `.cel` | ✅ | ✅ | — | — | — |
+| AtariChampionsInterlace | `.cin`, `.cci` | ✅ | ✅ | — | — | — |
+| AtariCompressed | `.acr`, `.acp` | ✅ | ✅ | — | — | — |
+| AtariDoodle | `.doo` | ✅ | ✅ | — | — | — |
+| AtariDump | `.asd`, `.adm` | ✅ | ✅ | — | — | — |
+| AtariFalcon | `.ftc` | ✅ | ✅ | — | — | — |
+| AtariFalconXga | `.xga` | ✅ | ✅ | — | — | — |
+| AtariFont | `.fnt8` | ✅ | ✅ | — | — | — |
+| AtariFontMaker | `.fn2` | ✅ | ✅ | — | — | — |
+| AtariGfb | `.gfb` | ✅ | ✅ | — | — | — |
+| AtariGr7 | `.gr7` | ✅ | ✅ | — | — | — |
+| AtariGr8 | `.gr8` | ✅ | ✅ | — | — | — |
+| AtariGrafik | `.pcp` | ✅ | ✅ | — | — | — |
+| AtariGraphics10 | `.gr10`, `.g10` | ✅ | ✅ | — | — | — |
+| AtariGraphics11 | `.gr11`, `.g11` | ✅ | ✅ | — | — | — |
+| AtariGraphics3 | `.gr3`, `.sg3` | ✅ | ✅ | — | — | — |
+| AtariGraphics9 | `.gr9`, `.g9`, `.g9s`, `.sfd` | ✅ | ✅ | — | — | — |
+| AtariGraphicsStudio | `.ags` | ✅ | ✅ | — | — | — |
+| AtariGrayscale9 | `.bg9`, `.g09` | ✅ | ✅ | — | — | — |
+| AtariHardInterlace | `.hip`, `.hps` | ✅ | ✅ | — | — | — |
+| AtariHighResPage | `.pg3` | ✅ | ✅ | — | — | — |
+| AtariHr | `.hr` | ✅ | ✅ | — | — | — |
+| AtariHr2 | `.hr2`, `.hci` | ✅ | ✅ | — | — | — |
+| AtariIce | `.ice`, `.icn` | ✅ | ✅ | — | — | — |
+| AtariImageManager | `.im`, `.col` | ✅ | ✅ | — | — | — |
+| AtariMaxi | `.max8`, `.amx` | ✅ | ✅ | — | — | — |
+| AtariPaintworks | `.cl0`, `.cl1`, `.cl2`, `.pg0`, `.pg1`, `.pg2`, `.pg3`, `.sc0`, `.sc1`, `.sc2` | ✅ | ✅ | — | — | — |
+| AtariPi5 | `.pi5` | ✅ | ✅ | — | — | — |
+| AtariPi8 | `.pi8` | ✅ | ✅ | — | — | — |
+| AtariPi9 | `.pi9` | ✅ | ✅ | — | — | — |
+| AtariPicture | `.apc`, `.apa`, `.plm`, `.aps`, `.mga`, `.pls` | ✅ | ✅ | — | — | — |
+| AtariPicworks | `.cp3` | ✅ | ✅ | — | — | — |
+| AtariPlayer | `.pmg`, `.plm` | ✅ | ✅ | — | — | — |
+| AtariPlayerEditor | `.apl` | ✅ | ✅ | — | — | — |
+| AtariSif | `.sif` | ✅ | ✅ | — | — | — |
+| AtariTools800 | `.4pl`, `.4mi`, `.4pm` | ✅ | ✅ | — | — | — |
+| AtariTools800Font | `.acs` | ✅ | ✅ | — | — | — |
+| AtariTt | `.pi5`, `.pi4`, `.pi6` | ✅ | ✅ | — | — | — |
+| AtariTxs | `.txs` | ✅ | ✅ | — | — | — |
+| AttGroup4 | `.att` | ✅ | ✅ | — | — | — |
+| AutodeskCel | `.cel` | ✅ | ✅ | — | — | — |
+| AutoFx | `.afx` | ✅ | ✅ | — | — | — |
+| Autologic | `.gm`, `.gm2`, `.gm4` | ✅ | ✅ | — | — | — |
+| AvhrrImage | `.sst` | ✅ | ✅ | — | — | — |
+| Avif | `.avif` | ✅ | ✅ | — | — | — |
+| Avs | `.avs`, `.x`, `.mbfavs`, `.mbfs` | ✅ | ✅ | — | — | — |
+| AwardBmp | `.epa`, `.awbm` | ✅ | ✅ | — | — | — |
+| Awd | `.awd` | ✅ | ✅ | — | — | — |
+| AxialisScreensaver | `.ssp` | ✅ | ✅ | — | ✅ | — |
+| Bam | `.bam` | ✅ | ✅ | ✅ | — | — |
+| BbcMicro | `.bbc` | ✅ | ✅ | — | — | — |
+| BbcMicroScreen | `.bb4`, `.bb0`, `.bb1`, `.bb2`, `.bb5` | ✅ | ✅ | — | — | — |
+| BennetYeeFace | `.ybm` | ✅ | ✅ | — | — | — |
+| BestPaint | `.bp` | ✅ | ✅ | — | — | — |
+| Bfli | `.bfl`, `.bfli`, `.flp` | ✅ | ✅ | — | — | — |
+| BfxBitware | `.bfx` | ✅ | ✅ | — | — | — |
+| BigTiff | `.btf`, `.tf8` | ✅ | ✅ | — | ✅ | — |
+| BioRadPic | `.pic` | ✅ | ✅ | — | — | — |
+| BkScreen | `.bks` | ✅ | ✅ | — | — | — |
+| Blazing | `.blz`, `.pi` | ✅ | ✅ | — | — | — |
+| BlazingPaddlesWindow | `.wnd` | ✅ | ✅ | — | — | — |
+| Blazon | `.bpl` | ✅ | ✅ | — | — | — |
+| Blp | `.blp` | ✅ | ✅ | — | — | — |
+| Bmp | `.bmp`, `.dib`, `.bga`, `.rl4`, `.rl8`, `.vga`, `.sys`, `.bum`, `.thb`, `.2d`, `.bmc`, `.stm`, `.upi`, `.msk`, `.flt` | ✅ | ✅ | ✅ | — | ✅ |
+| Bob | `.bob` | ✅ | ✅ | — | — | — |
+| BodyPaint3D | `.b3d`, `.b2d` | ✅ | ✅ | — | — | — |
+| BoogieDownPaint | `.bdp` | ✅ | ✅ | — | — | — |
+| Botticelli | `.p4i` | ✅ | ✅ | — | — | — |
+| Bpg | `.bpg` | ✅ | — | — | — | — |
+| BrooktroutFax | `.brk`, `.301`, `.brt` | ✅ | ✅ | — | — | — |
+| BrotherFax | `.uni` | ✅ | ✅ | — | — | — |
+| Brus | `.brus` | ✅ | ✅ | — | — | — |
+| Bsave | `.bsv` | ✅ | ✅ | — | — | — |
+| Bsb | `.kap`, `.bsb` | ✅ | ✅ | — | — | — |
+| BugbiterApac | `.bgp` | ✅ | ✅ | — | — | — |
+| BugBitmap | `.bbm`, `.bug` | ✅ | ✅ | — | — | — |
+| ByLight | `.bif` | ✅ | ✅ | — | — | — |
+| ByuSir | `.sir` | ✅ | ✅ | — | — | — |
+| C128 | `.c128`, `.vdc` | ✅ | ✅ | — | — | — |
+| C128Hires | `.c1h` | ✅ | ✅ | — | — | — |
+| C128Multi | `.c1m` | ✅ | ✅ | — | — | — |
+| C128VDC | `.vdc`, `.vdc3` | ✅ | ✅ | — | — | — |
+| C16Plus4 | `.c16`, `.plus4` | ✅ | ✅ | — | — | — |
+| C64Multi | `.ocp`, `.hires`, `.ami` | ✅ | ✅ | — | — | — |
+| Calamus | `.cpi`, `.crg` | ✅ | ✅ | — | — | — |
+| Cals | `.cal`, `.cals`, `.gp4`, `.mil` | ✅ | ✅ | — | — | — |
+| CameraRaw | `.cr2`, `.nef`, `.arw`, `.orf`, `.rw2`, `.pef`, `.raf`, `.raw`, `.srw`, `.dcs`, `.dcr`, `.kdc`, `.srf`, `.sr2`, `.mos`, `.3fr`, `.mef`, `.nrw`, `.rwl`, `.erf`, `.iiq` | ✅ | ✅ | — | — | — |
+| CanonNavFax | `.can` | ✅ | ✅ | — | — | — |
+| Canvas | `.cvs` | ✅ | ✅ | — | — | — |
+| CanvasRaster | `.ful` | ✅ | ✅ | — | — | — |
+| CartesMichelin | `.big` | ✅ | — | — | — | — |
+| CasioQv | `.cam` | ✅ | ✅ | — | — | — |
+| Ccitt | `.g3`, `.g4`, `.ccitt`, `.fax` | ✅ | ✅ | — | — | — |
+| Cdr | `.cdr` | ✅ | — | — | — | — |
+| CDUPaint | `.cdu` | ✅ | ✅ | — | — | — |
+| Cdxl | `.cdxl` | ✅ | ✅ | — | — | — |
+| Cel | `.cel` | ✅ | ✅ | — | — | — |
+| CelGrey | `.cel` | ✅ | ✅ | — | — | — |
+| Centauri | `.cnt`, `.cen` | ✅ | ✅ | — | — | — |
+| CentauriLogoEditor | `.cle` | ✅ | ✅ | — | — | — |
+| CfliDesigner | `.cfli` | ✅ | ✅ | — | — | — |
+| Cgm | `.cgm` | ✅ | ✅ | — | — | — |
+| ChampionsInterlace | `.cin` | ✅ | ✅ | — | — | — |
+| CharPad | `.ctm` | ✅ | ✅ | — | — | — |
+| CharSet64 | `.chr64` | ✅ | ✅ | — | — | — |
+| Cheese | `.che`, `.chs` | ✅ | ✅ | — | — | — |
+| ChinonEs1000 | `.cmt` | ✅ | ✅ | — | — | — |
+| ChrDollar | `.ch$` | ✅ | ✅ | — | — | — |
+| CImage | `.dsi` | ✅ | ✅ | — | — | — |
+| CinemasterAtari | `.cin8` | ✅ | ✅ | — | — | — |
+| Cineon | `.cin` | ✅ | ✅ | — | — | — |
+| CiscoIp | `.cip` | ✅ | ✅ | — | — | — |
+| ClipArtCatalog | `.cat` | ✅ | ✅ | — | ✅ | — |
+| Cloe | `.clo`, `.cloe` | ✅ | ✅ | — | — | — |
+| Clp | `.clp` | ✅ | ✅ | — | — | — |
+| Cmu | `.cmu` | ✅ | ✅ | — | — | — |
+| CmuWindowManager | `.cmu`, `.cmuwm` | ✅ | ✅ | — | — | — |
+| Cmx | `.cmx` | ✅ | — | — | — | — |
+| CoCo | `.coc` | ✅ | ✅ | — | — | — |
+| CoCo3 | `.cc3` | ✅ | ✅ | — | — | — |
+| CoCoMax | `.max`, `.p41` | ✅ | ✅ | — | — | — |
+| CocoP11 | `.p11` | ✅ | ✅ | — | — | — |
+| CokeAtari | `.tg1` | ✅ | ✅ | — | — | — |
+| ColoRix | `.rix`, `.sc0`, `.sc1`, `.sc2`, `.sc3`, `.sc4`, `.sc5`, `.sc6`, `.sc7`, `.sc8`, `.sc9`, `.sca`, `.scb`, `.scc`, `.scd`, `.sce`, `.scf`, `.scg`, `.sch`, `.sci`, `.scj`, `.sck`, `.scl`, `.scm`, `.scn`, `.sco`, `.scp`, `.scq`, `.scr`, `.scs`, `.sct`, `.scu`, `.scv`, `.scw`, `.scx`, `.scy`, `.scz` | ✅ | ✅ | — | — | — |
+| ColorStar | `.bil` | ✅ | ✅ | — | — | — |
+| ColorStarObject | `.obj` | ✅ | ✅ | — | — | — |
+| ColrObjectEditor | `.mur` | ✅ | ✅ | — | — | — |
+| Commodore64Font | `.64c`, `.g` | ✅ | ✅ | — | — | — |
+| CommodoreGrafix | `.cgx` | ✅ | ✅ | — | — | — |
+| CommodorePet | `.pet` | ✅ | ✅ | — | — | — |
+| CompuServeRle | `.rle` | ✅ | ✅ | — | — | — |
+| ComputerEyes | `.ce`, `.ce1`, `.ce2` | ✅ | ✅ | — | — | — |
+| ComputerEyesSt | `.ce3` | ✅ | ✅ | — | — | — |
+| CompW | `.wlm` | ✅ | ✅ | — | — | — |
+| CoreIdc | `.idc` | ✅ | ✅ | — | — | — |
+| CorelGallery | `.bmf` | ✅ | ✅ | — | — | — |
+| Cp8Gray | `.cp8` | ✅ | ✅ | — | — | — |
+| CpcAdvanced | `.cpa` | ✅ | ✅ | — | — | — |
+| CpcFont | `.cpf` | ✅ | ✅ | — | — | — |
+| CpcOverscan | `.cpo` | ✅ | ✅ | — | — | — |
+| CpcPlus | `.cpp` | ✅ | ✅ | — | — | — |
+| CpcSprite | `.cps` | ✅ | ✅ | — | — | — |
+| Cr3 | `.cr3` | ✅ | ✅ | — | — | — |
+| Crack | `.ca2` | ✅ | ✅ | — | — | — |
+| CrackArt | `.ca1`, `.ca2`, `.ca3` | ✅ | ✅ | — | — | — |
+| CranachPaint | `.esm` | ✅ | ✅ | — | — | — |
+| Crd | `.crd` | ✅ | ✅ | — | — | — |
+| CreateWithGarfield | `.cwg` | ✅ | ✅ | — | — | — |
+| Crw | `.crw` | ✅ | ✅ | — | — | — |
+| CsvImage | `.csv` | ✅ | ✅ | — | — | — |
+| Cur | `.cur` | ✅ | ✅ | — | ✅ | ✅ |
+| CutCreator | `.cut` | ✅ | ✅ | — | — | — |
+| DaisyDotFont | `.nlq` | ✅ | ✅ | — | — | — |
+| DaliCompressed | `.lpk`, `.mpk`, `.hpk` | ✅ | ✅ | — | — | — |
+| DaliST | `.sd0`, `.sd1`, `.sd2` | ✅ | ✅ | — | — | — |
+| DbwRender | `.dbw` | ✅ | ✅ | — | — | — |
+| Dcx | `.dcx` | ✅ | ✅ | — | ✅ | — |
+| Dds | `.dds` | ✅ | ✅ | — | — | — |
+| Degas | `.pi1`, `.pi2`, `.pi3`, `.pc1`, `.pc2`, `.pc3`, `.suh` | ✅ | ✅ | — | — | — |
+| DegasBrush | `.bru` | ✅ | ✅ | — | — | — |
+| DegasIcon | `.icn` | ✅ | ✅ | — | — | — |
+| DelmPaint | `.del`, `.dph` | ✅ | ✅ | — | — | — |
+| Deluxe | `.dps`, `.dlx` | ✅ | ✅ | — | — | — |
+| DGraphCompressed | `.p3c` | ✅ | ✅ | — | — | — |
+| Dicom | `.dcm`, `.dicom`, `.acr`, `.dic`, `.dc3` | ✅ | ✅ | — | — | — |
+| DigiSpec | `.dgs` | ✅ | ✅ | — | — | — |
+| DigitalFx | `.tdim` | ✅ | ✅ | — | — | — |
+| DigiView | `.dgv` | ✅ | ✅ | — | — | — |
+| Din | `.din` | ✅ | ✅ | — | — | — |
+| DirLogoMaker | `.dlm` | ✅ | ✅ | — | — | — |
+| DispThumbnail | `.tnl` | ✅ | ✅ | — | — | — |
+| DivGameMap | `.fpg` | ✅ | ✅ | — | — | — |
+| DjVu | `.djvu`, `.djv`, `.iw4` | ✅ | ✅ | — | — | — |
+| Dng | `.dng` | ✅ | ✅ | — | — | — |
+| DolphinEd | `.dol`, `.bed` | ✅ | ✅ | — | — | — |
+| Doodle | `.dd`, `.ddp` | ✅ | ✅ | — | — | — |
+| DoodleAtari | `.doo` | ✅ | ✅ | — | — | — |
+| DoodleComp | `.jj` | ✅ | ✅ | — | — | — |
+| DoodlePacked | `.dpk` | ✅ | ✅ | — | — | — |
+| DoomFlat | `.flat` | ✅ | ✅ | — | — | — |
+| Dpx | `.dpx` | ✅ | ✅ | — | — | — |
+| Dragon | `.dgn` | ✅ | ✅ | — | — | — |
+| DrawIt | `.dit` | ✅ | ✅ | — | — | — |
+| Drazlace | `.dlp`, `.drl` | ✅ | ✅ | — | — | — |
+| DrazPaint | `.drz`, `.drp` | ✅ | ✅ | — | — | — |
+| DrHalo | `.cut` | ✅ | ✅ | — | — | — |
+| DuneGraph | `.dg1`, `.dc1` | ✅ | ✅ | — | — | — |
+| Duo | `.duo`, `.du1` | ✅ | ✅ | — | — | — |
+| DuoMedium | `.du2` | ✅ | ✅ | — | — | — |
+| Dwg | `.dwg` | ✅ | ✅ | — | — | — |
+| Dxf | `.dxf` | ✅ | ✅ | — | — | — |
+| EccHeader | `.ecc` | ✅ | ✅ | — | — | — |
+| EciGraphicEditor | `.eci`, `.ecp` | ✅ | ✅ | — | — | — |
+| EclipseTile | `.tile` | ✅ | ✅ | — | — | — |
+| Ecw | `.ecw` | ✅ | ✅ | — | — | — |
+| EdmicsC4 | `.c4` | ✅ | ✅ | — | — | — |
+| EggPaint | `.trp` | ✅ | ✅ | — | — | — |
+| ElectricImage | `.ei`, `.eidi` | ✅ | ✅ | — | ✅ | — |
+| Electronika | `.bk`, `.ekr` | ✅ | ✅ | — | — | — |
+| EmbeddedDib | `.zmf`, `.skf`, `.cad`, `.btn` | ✅ | — | — | — | — |
+| EmcEditor | `.emc` | ✅ | ✅ | — | — | — |
+| Emf | `.emf` | ✅ | ✅ | — | — | — |
+| Enterprise128 | `.ep`, `.elan` | ✅ | ✅ | — | — | — |
+| Envi | `.hdr` | ✅ | ✅ | — | — | — |
+| EpaBios | `.epa` | ✅ | ✅ | — | — | — |
+| Eps | `.eps`, `.epsf`, `.epsi`, `.epi`, `.ept` | ✅ | ✅ | — | — | — |
+| Eroiica | `.eif` | ✅ | ✅ | — | ✅ | — |
+| EscapePaint | `.esp` | ✅ | ✅ | — | — | — |
+| EsmSoftwarePix | `.pix` | ✅ | ✅ | — | — | — |
+| EverexFax | `.efx`, `.ef3` | ✅ | ✅ | — | — | — |
+| Exr | `.exr` | ✅ | ✅ | — | — | — |
+| ExtendedGemImg | `.ximg` | ✅ | ✅ | — | — | — |
+| ExtendSuperHires | `.esh` | ✅ | ✅ | — | — | — |
+| EzArt | `.eza` | ✅ | ✅ | — | — | — |
+| FacePainter | `.fpt`, `.fcp` | ✅ | ✅ | — | — | — |
+| FaceSaver | `.face`, `.fac` | ✅ | ✅ | — | — | — |
+| FaceServer | `.fac`, `.face` | ✅ | ✅ | — | — | — |
+| FalconFuckpaint | `.pi4`, `.pi7`, `.pi9` | ✅ | ✅ | — | — | — |
+| FalconPaint | `.fpn` | ✅ | ✅ | — | — | — |
+| FalconRes | `.frs` | ✅ | ✅ | — | — | — |
+| Farbfeld | `.ff`, `.farbfeld` | ✅ | ✅ | — | — | — |
+| FastgraphPixelRun | `.prf` | ✅ | ✅ | — | — | — |
+| FaxG3 | `.g3` | ✅ | ✅ | — | — | — |
+| FaxMan | `.fmf` | ✅ | ✅ | — | — | — |
+| Fbm | `.fbm` | ✅ | ✅ | — | — | — |
+| Fff | `.fff` | ✅ | ✅ | — | — | — |
+| Ffli | `.ffli`, `.ffl` | ✅ | ✅ | — | — | — |
+| FirstPublisher | `.art` | ✅ | ✅ | — | — | — |
+| Fits | `.fits`, `.fit`, `.fts` | ✅ | ✅ | — | — | — |
+| FitsDocument | `.fits`, `.fit`, `.fts` | ✅ | ✅ | — | ✅ | — |
+| Fl32 | `.fl32` | ✅ | ✅ | — | — | — |
+| FlashImage | `.fi` | ✅ | ✅ | — | — | — |
+| Fli | `.fli`, `.flc` | ✅ | ✅ | — | ✅ | — |
+| Fli64 | `.fli64` | ✅ | ✅ | — | — | — |
+| FliDesigner | `.fd2` | ✅ | ✅ | — | — | — |
+| FliDesigner2 | `.fd2` | ✅ | ✅ | — | — | — |
+| FliEditor | `.fed` | ✅ | ✅ | — | — | — |
+| Flif | `.flif` | ✅ | ✅ | — | — | — |
+| FliGraph | `.flg`, `.bml`, `.fli` | ✅ | ✅ | — | — | — |
+| Flimatic | `.flm` | ✅ | ✅ | — | — | — |
+| Flip64 | `.fbi` | ✅ | ✅ | — | — | — |
+| FliProfi | `.fpr` | ✅ | ✅ | — | — | — |
+| FloorDesigner | `.fge` | ✅ | ✅ | — | — | — |
+| FmTowns | `.fmt` | ✅ | ✅ | — | — | — |
+| FontasyGrafik | `.bsg` | ✅ | ✅ | — | — | — |
+| Fpx | `.fpx`, `.mix` | ✅ | — | — | — | — |
+| FreeHand | `.fhs` | ✅ | ✅ | — | — | — |
+| FremontFax | `.f96` | ✅ | ✅ | — | — | — |
+| Fsh | `.fsh` | ✅ | ✅ | — | — | — |
+| Fuckpaint | `.fp` | ✅ | ✅ | — | — | — |
+| FullscreenKit | `.kid` | ✅ | ✅ | — | — | — |
+| FunGraphicsMachine | `.fgs` | ✅ | ✅ | — | — | — |
+| FunPainter | `.fp2`, `.fun` | ✅ | ✅ | — | — | — |
+| FunPhotor | `.fpr` | ✅ | ✅ | — | — | — |
+| FuntasticPaint | `.fun8`, `.ftp` | ✅ | ✅ | — | — | — |
+| FunWithArt | `.fwa` | ✅ | ✅ | — | — | — |
+| G9b | `.g9b` | ✅ | ✅ | — | — | — |
+| Gaf | `.gaf` | ✅ | ✅ | — | — | — |
+| GameBoyTile | `.2bpp`, `.cgb` | ✅ | ✅ | — | — | — |
+| GammaFax | `.gmf` | ✅ | ✅ | — | — | — |
+| GbaTile | `.4bpp`, `.gba` | ✅ | ✅ | — | — | — |
+| Gbr | `.gbr` | ✅ | ✅ | — | — | — |
+| Gd2 | `.gd2` | ✅ | ✅ | — | — | — |
+| GedPicture | `.ged` | ✅ | ✅ | — | — | — |
+| GeGenesis | `.fre`, `.pd`, `.t1`, `.t2` | ✅ | ✅ | — | — | — |
+| Gem | `.gem` | ✅ | ✅ | — | — | — |
+| GemImg | `.img` | ✅ | ✅ | — | — | — |
+| GeoPaint | `.geo` | ✅ | ✅ | — | — | — |
+| GephardHires | `.ghg` | ✅ | ✅ | — | — | — |
+| GfaPaint | `.gfp` | ✅ | ✅ | — | — | — |
+| GfaRaytrace | `.sul` | ✅ | ✅ | — | — | — |
+| Gif | `.gif`, `.giff`, `.bpr` | ✅ | ✅ | — | ✅ | ✅ |
+| Gigacad | `.gcd` | ✅ | ✅ | — | — | — |
+| GigaPaint | `.gih`, `.gig`, `.rpo` | ✅ | ✅ | — | — | — |
+| GoDot4Bit | `.4bt`, `.4bit`, `.clp` | ✅ | ✅ | — | — | — |
+| GodPaint | `.gpn`, `.gdp`, `.god` | ✅ | ✅ | — | — | — |
+| Grafix | `.grx` | ✅ | ✅ | — | — | — |
+| Graph2Font | `.g2f` | ✅ | ✅ | — | — | — |
+| Graph2FontMch | `.mch` | ✅ | ✅ | — | — | — |
+| Graph2FontScroll | `.vsc` | ✅ | ✅ | — | — | — |
+| Graphics10Plus | `.gr10p` | ✅ | ✅ | — | — | — |
+| Graphics9Plus | `.gr9p` | ✅ | ✅ | — | — | — |
+| GraphicsMaster | `.gms`, `.gm8` | ✅ | ✅ | — | — | — |
+| GraphLogo | `.all` | ✅ | ✅ | — | — | — |
+| GraphSaurus | `.sr5`, `.grs`, `.sr8`, `.srs` | ✅ | ✅ | — | — | — |
+| GraphSaurus6 | `.sr6` | ✅ | ✅ | — | — | — |
+| GraphSaurus7 | `.sr7` | ✅ | ✅ | — | — | — |
+| GraphSaurusInterlaced | `.sri` | ✅ | ✅ | — | — | — |
+| GraspGl | `.gl` | ✅ | ✅ | — | — | — |
+| GrassSlideshow | `.hpm` | ✅ | ✅ | — | — | — |
+| GreatPaint | `.gpt` | ✅ | ✅ | — | — | — |
+| GrfBitmap | `.grf` | ✅ | ✅ | — | — | — |
+| Grs16 | `.g16` | ✅ | ✅ | — | — | — |
+| GunPaint | `.gun`, `.ifl` | ✅ | ✅ | — | — | — |
+| HalfLifeMdl | `.mdltex` | ✅ | ✅ | — | — | — |
+| HalfLifeModel | `.mdl` | ✅ | ✅ | — | — | — |
+| HandyScanner | `.hs2` | ✅ | ✅ | — | — | — |
+| HardColorMap | `.hcm` | ✅ | ✅ | — | — | — |
+| HardInterlace | `.hip` | ✅ | ✅ | — | — | — |
+| HayesJtfax | `.jtf` | ✅ | ✅ | — | — | — |
+| HcbEditor | `.hcb` | ✅ | ✅ | — | — | — |
+| Hdr | `.hdr`, `.hdri`, `.rgbe`, `.xyze`, `.rad` | ✅ | ✅ | — | — | — |
+| Heif | `.heic`, `.heif`, `.avci`, `.avcs` | ✅ | ✅ | ✅ | ✅ | — |
+| HereticM8 | `.m8` | ✅ | ✅ | — | — | — |
+| HfImage | `.hf` | ✅ | ✅ | — | — | — |
+| HiEddi | `.hed` | ✅ | ✅ | — | — | — |
+| HighResAtari | `.hra` | ✅ | ✅ | — | — | — |
+| HighresMedium | `.hrm` | ✅ | ✅ | — | — | — |
+| HighResST | `.hst`, `.hrs` | ✅ | ✅ | — | — | — |
+| HinterGrundBild | `.hgb` | ✅ | ✅ | — | — | — |
+| HiPicCreator | `.hpc`, `.aas` | ✅ | ✅ | — | — | — |
+| HiresC64 | `.hir`, `.hbm`, `.hpi` | ✅ | ✅ | — | — | — |
+| HiResEditor | `.het`, `.rph` | ✅ | ✅ | — | — | — |
+| HiresFliCrest | `.hfc`, `.hfd` | ✅ | ✅ | — | — | — |
+| HiresInterlaceFeniks | `.hlf`, `.hie` | ✅ | ✅ | — | — | — |
+| Hireslace | `.hle` | ✅ | ✅ | — | — | — |
+| HiresManager | `.him` | ✅ | ✅ | — | — | — |
+| HomeworldLif | `.lif` | ✅ | ✅ | — | — | — |
+| Hp48Grob | `.grb`, `.gro` | ✅ | ✅ | — | — | — |
+| Hpgl | `.hpgl`, `.hgl`, `.hpg`, `.prn`, `.prt`, `.spl` | ✅ | ✅ | — | — | — |
+| HpGrob | `.grob`, `.hp`, `.gro2`, `.gro4` | ✅ | ✅ | — | — | — |
+| Hpi | `.hpi` | ✅ | ✅ | — | — | — |
+| Hru | `.hru` | ✅ | ✅ | — | — | — |
+| Hrz | `.hrz` | ✅ | ✅ | ✅ | — | — |
+| Hta | `.hta` | ✅ | ✅ | — | ✅ | — |
+| IbmKips | `.kps` | ✅ | ✅ | — | — | — |
+| IcDraw | `.ibi`, `.ib3` | ✅ | ✅ | — | — | — |
+| Ice | `.irg`, `.ir2`, `.icn`, `.imn`, `.ipc` | ✅ | ✅ | — | — | — |
+| IcePcinPlus | `.ip2` | ✅ | ✅ | — | — | — |
+| Icns | `.icns` | ✅ | ✅ | — | ✅ | — |
+| Ico | `.ico` | ✅ | ✅ | — | ✅ | ✅ |
+| IconLibrary | `.icl` | ✅ | ✅ | — | — | — |
+| Ics | `.ics` | ✅ | ✅ | — | — | — |
+| IffAcbm | `.acbm`, `.iff`, `.blk` | ✅ | ✅ | — | — | — |
+| IffAnim | `.anim` | ✅ | ✅ | — | — | — |
+| IffAnim8 | `.an8`, `.anim8` | ✅ | ✅ | — | — | — |
+| IffDctv | `.dctv` | ✅ | ✅ | — | — | — |
+| IffDeep | `.deep`, `.iff`, `.blk` | ✅ | ✅ | — | — | — |
+| IffDpan | `.dpan` | ✅ | ✅ | — | — | — |
+| IffHame | `.hame` | ✅ | ✅ | — | — | — |
+| IffMultiPalette | `.mpl`, `.mpal` | ✅ | ✅ | — | — | — |
+| IffPbm | `.lbm`, `.pbm`, `.blk` | ✅ | ✅ | — | — | — |
+| IffRgb8 | `.rgb8`, `.iff`, `.blk` | ✅ | ✅ | — | — | — |
+| IffRgbn | `.rgbn`, `.iff`, `.blk` | ✅ | ✅ | — | — | — |
+| IffSham | `.sham` | ✅ | ✅ | — | — | — |
+| Ilbm | `.lbm`, `.ilbm`, `.iff`, `.blk`, `.ham`, `.ham6`, `.ham8`, `.256`, `.ap2`, `.beam`, `.dct`, `.dr`, `.mp`, `.bl1`, `.bl2`, `.bl3` | ✅ | ✅ | — | — | — |
+| Im5Visilog | `.im5` | ✅ | ✅ | — | — | — |
+| ImageLabBw | `.b&w`, `.b_w`, `.dit` | ✅ | ✅ | — | — | — |
+| ImageSysC64 | `.isc` | ✅ | ✅ | — | — | — |
+| ImageSystem | `.ish`, `.ism` | ✅ | ✅ | — | — | — |
+| Imagic | `.ic1`, `.ic2`, `.ic3` | ✅ | ✅ | — | — | — |
+| ImagicPaint | `.imp`, `.igp` | ✅ | ✅ | — | — | — |
+| ImagingFax | `.g3n` | ✅ | ✅ | — | — | — |
+| ImnetImage | `.imt` | ✅ | ✅ | — | — | — |
+| IndyPaint | `.ipn`, `.idy`, `.tru` | ✅ | ✅ | — | — | — |
+| Ingr | `.cit`, `.itg` | ✅ | ✅ | — | — | — |
+| InShape | `.iim` | ✅ | ✅ | — | — | — |
+| Int95a | `.int` | ✅ | ✅ | — | — | — |
+| Interfile | `.hv` | ✅ | ✅ | — | — | — |
+| Interlace8 | `.int8` | ✅ | ✅ | — | — | — |
+| InterlacedLogoEditor | `.ile` | ✅ | ✅ | — | — | — |
+| InterlaceGraphicsEditor | `.ige` | ✅ | ✅ | — | — | — |
+| InterlaceHiresEditor | `.ihe` | ✅ | ✅ | — | — | — |
+| InterlaceLogoDesigner | `.ild` | ✅ | ✅ | — | — | — |
+| InterlaceStudio | `.ist` | ✅ | ✅ | — | — | — |
+| InterleafImage | `.iimg` | ✅ | ✅ | — | — | — |
+| InterPainter | `.inp`, `.ing`, `.ins` | ✅ | ✅ | — | — | — |
+| InterPaintHi | `.iph`, `.hre` | ✅ | ✅ | — | — | — |
+| InterPaintMc | `.ipt`, `.lre` | ✅ | ✅ | — | — | — |
+| Ioca | `.ica`, `.ioca`, `.ioc`, `.mod` | ✅ | ✅ | — | — | — |
+| IPaint | `.ip` | ✅ | ✅ | — | — | — |
+| Ipg | `.ipg` | ✅ | — | — | ✅ | — |
+| Ipl | `.ipl` | ✅ | ✅ | — | — | — |
+| Ipsm | `.pan` | ✅ | ✅ | — | — | — |
+| Iss | `.iss` | ✅ | ✅ | — | — | — |
+| It01 | `.fit` | ✅ | ✅ | — | — | — |
+| Jbig | `.jbg`, `.bie`, `.jbig` | ✅ | ✅ | — | — | — |
+| Jbig2 | `.jb2`, `.jbig2` | ✅ | ✅ | — | — | — |
+| JetGraphicsPlanner | `.jgp` | ✅ | ✅ | — | — | — |
+| JigsawPicture | `.jig` | ✅ | ✅ | — | — | — |
+| JigsawPuzzle | `.jig` | ✅ | ✅ | — | — | — |
+| Jng | `.jng` | ✅ | ✅ | — | — | — |
+| Jnx | `.jnx` | ✅ | ✅ | — | ✅ | — |
+| JovianVi | `.vi` | ✅ | ✅ | — | — | — |
+| Jpeg | `.jpg`, `.jpeg`, `.jpe`, `.jfif`, `.jps`, `.thm`, `.j`, `.jif`, `.fsy`, `.mph`, `.ncy`, `.frm` | ✅ | ✅ | — | — | ✅ |
+| Jpeg2000 | `.jp2`, `.j2k`, `.j2c`, `.jpx`, `.jpc`, `.jpf`, `.jpt`, `.jpm` | ✅ | ✅ | — | — | — |
+| JpegLs | `.jls` | ✅ | ✅ | — | — | — |
+| JpegXl | `.jxl` | ✅ | ✅ | — | ✅ | — |
+| JpegXr | `.jxr`, `.wdp`, `.hdp` | ✅ | ✅ | — | — | — |
+| JupiterAce | `.jac`, `.ace` | ✅ | ✅ | — | — | — |
+| Kitty | `.kty`, `.kt4` | ✅ | ✅ | — | — | — |
+| Koala | `.koa`, `.koala`, `.kla` | ✅ | ✅ | — | — | — |
+| KoalaCompressed | `.gg` | ✅ | ✅ | — | — | — |
+| KodakDc25 | `.k25` | ✅ | ✅ | — | — | — |
+| KofaxKfx | `.kfx` | ✅ | ✅ | — | — | — |
+| Kqp | `.kqp` | ✅ | ✅ | — | — | — |
+| Krita | `.kra` | ✅ | ✅ | — | — | — |
+| KssPaint | `.kss` | ✅ | ✅ | — | — | — |
+| Ktx | `.ktx`, `.ktx2` | ✅ | ✅ | — | — | — |
+| LarkaObjectEditor | `.leo` | ✅ | ✅ | — | — | — |
+| LaserData | `.lda` | ✅ | ✅ | — | — | — |
+| LastWordFont | `.f80` | ✅ | ✅ | — | — | — |
+| LdPic | `.bbg` | ✅ | ✅ | — | — | — |
+| LightWorkImage | `.lwi` | ✅ | ✅ | — | — | — |
+| LogoPainter | `.lp3` | ✅ | ✅ | — | — | — |
+| LogoSys | `.sys`, `.logo` | ✅ | ✅ | — | — | — |
+| Lss16 | `.lss`, `.16` | ✅ | ✅ | — | — | — |
+| LucasFilm | `.lff` | ✅ | ✅ | — | — | — |
+| LudekMaker | `.ldm` | ✅ | ✅ | — | — | — |
+| LViewPro | `.lvp` | ✅ | ✅ | — | — | — |
+| MacPaint | `.mac`, `.macp`, `.pntg`, `.pnt`, `.paint`, `.mpnt` | ✅ | ✅ | — | — | — |
+| MadDesigner | `.mbg` | ✅ | ✅ | — | — | — |
+| MadStudio | `.an4`, `.an2`, `.an5`, `.gr1`, `.gr2` | ✅ | ✅ | — | — | — |
+| MadStudioMissile | `.msl` | ✅ | ✅ | — | — | — |
+| MadStudioTile | `.tl4` | ✅ | ✅ | — | — | — |
+| Mag | `.mag`, `.mki` | ✅ | ✅ | — | — | — |
+| MagicPainter | `.mgp` | ✅ | ✅ | — | — | — |
+| Mamut | `.rys` | ✅ | ✅ | — | — | — |
+| MapletownMl1 | `.ml1` | ✅ | ✅ | — | — | — |
+| MapletownMx1 | `.mx1` | ✅ | ✅ | — | — | — |
+| MapletownNl3 | `.nl3` | ✅ | ✅ | — | — | — |
+| MasterSystemTile | `.sms`, `.gg` | ✅ | ✅ | — | — | — |
+| MatLab | `.mat` | ✅ | ✅ | — | — | — |
+| MawWareTexture | `.mtx` | ✅ | ✅ | — | — | — |
+| MayaIff | `.iff`, `.maya`, `.tdi` | ✅ | ✅ | — | — | — |
+| McPainter | `.mcp` | ✅ | ✅ | — | — | — |
+| Mcs | `.mcs` | ✅ | ✅ | — | — | — |
+| Mda | `.mda` | ✅ | ✅ | — | — | — |
+| Mdp | `.mdp` | ✅ | ✅ | — | — | — |
+| MegaluxFrame | `.frm` | ✅ | ✅ | — | — | — |
+| MegaPaint | `.bld` | ✅ | ✅ | — | — | — |
+| MetaImage | `.mha`, `.mhd` | ✅ | ✅ | — | — | — |
+| MgrBitmap | `.mgr` | ✅ | ✅ | — | — | — |
+| MicroDesignCut | `.cut` | ✅ | ✅ | — | — | — |
+| MicroDesignGrf | `.grf` | ✅ | ✅ | — | — | — |
+| MicroDynamicsMars | `.pbt` | ✅ | ✅ | — | — | — |
+| MicroIllustrator | `.mil` | ✅ | ✅ | — | — | — |
+| MicroIllustratorA8 | `.mia` | ✅ | ✅ | — | — | — |
+| MicroPainter8 | `.mpt8`, `.mp8` | ✅ | ✅ | — | — | — |
+| Miff | `.miff`, `.mif` | ✅ | ✅ | — | — | — |
+| MiniPaint | `.mg` | ✅ | ✅ | — | — | — |
+| Mlt | `.mlt` | ✅ | ✅ | — | — | — |
+| Mng | `.mng` | ✅ | ✅ | — | ✅ | — |
+| MobileFax | `.rfa` | ✅ | ✅ | — | — | — |
+| MobyDick | `.mby`, `.mbd` | ✅ | ✅ | — | — | — |
+| MonoMagic | `.mon` | ✅ | ✅ | — | — | — |
+| MonoStar | `.obj` | ✅ | ✅ | — | — | — |
+| MovieMakerBackground | `.bkg` | ✅ | ✅ | — | — | — |
+| Mpo | `.mpo` | ✅ | ✅ | — | ✅ | — |
+| Mrc | `.mrc`, `.map` | ✅ | ✅ | — | — | — |
+| Mrf | `.mrf` | ✅ | ✅ | — | — | — |
+| Mrw | `.mrw` | ✅ | ✅ | — | — | — |
+| Msp | `.msp` | ✅ | ✅ | — | — | — |
+| Msx | `.sc2`, `.sc5`, `.sc7`, `.sc8`, `.ge7`, `.ge8` | ✅ | ✅ | — | — | — |
+| MsxFont | `.fnt`, `.mft` | ✅ | ✅ | — | — | — |
+| MsxGl16 | `.gl5`, `.sh5`, `.gl7`, `.sh7` | ✅ | ✅ | — | — | — |
+| MsxGl6 | `.gl6`, `.sh6`, `.stp` | ✅ | ✅ | — | — | — |
+| MsxGl8 | `.gl8`, `.sh8` | ✅ | ✅ | — | — | — |
+| MsxGlYjk | `.glc`, `.gls`, `.shc`, `.gla`, `.glb`, `.sha`, `.shb` | ✅ | ✅ | — | — | — |
+| MsxMig | `.mig` | ✅ | ✅ | — | — | — |
+| MsxScc | `.scc`, `.yjk` | ✅ | ✅ | — | — | — |
+| MsxScreen10 | `.sca`, `.scb` | ✅ | ✅ | — | — | — |
+| MsxScreen2 | `.sc2`, `.grp` | ✅ | ✅ | — | — | — |
+| MsxScreen3 | `.sc3` | ✅ | ✅ | — | — | — |
+| MsxScreen4 | `.sc4` | ✅ | ✅ | — | — | — |
+| MsxScreen5 | `.sc5`, `.ge5` | ✅ | ✅ | — | — | — |
+| MsxScreen6 | `.sc6` | ✅ | ✅ | — | — | — |
+| MsxScreen8 | `.sc8` | ✅ | ✅ | — | — | — |
+| MsxSprite | `.spt` | ✅ | ✅ | — | — | — |
+| MsxVideo | `.mvi` | ✅ | ✅ | — | — | — |
+| MsxView | `.mvw`, `.msv` | ✅ | ✅ | — | — | — |
+| Mtv | `.mtv`, `.pic` | ✅ | ✅ | — | — | — |
+| MuifliEditor | `.muf`, `.mui`, `.mup` | ✅ | ✅ | — | — | — |
+| MultiLaceEditor | `.mle` | ✅ | ✅ | — | — | — |
+| MultiPainter | `.mpt`, `.mlt64` | ✅ | ✅ | — | — | — |
+| MultiPalettePicture | `.mpp` | ✅ | ✅ | — | — | — |
+| NcrImage | `.ncr` | ✅ | ✅ | — | — | — |
+| NdsTexture | `.nbfs`, `.nds` | ✅ | ✅ | — | — | — |
+| NeoBookCartoon | `.car` | ✅ | ✅ | — | — | — |
+| Neochrome | `.neo` | ✅ | ✅ | — | — | — |
+| NeoGeoPocket | `.ngp`, `.ngpc` | ✅ | ✅ | — | — | — |
+| NeoGeoSprite | `.spr` | ✅ | ✅ | — | — | — |
+| NeroCoverDesigner | `.cde`, `.nct`, `.ncd` | ✅ | ✅ | — | — | — |
+| NesChr | `.chr` | ✅ | ✅ | — | — | — |
+| Netpbm | `.pbm`, `.pgm`, `.ppm`, `.pnm`, `.pam`, `.ppma`, `.rpbm`, `.rpgm`, `.rppm`, `.rpnm` | ✅ | ✅ | — | — | — |
+| NewsRoom | `.nsr`, `.ph`, `.bn` | ✅ | ✅ | — | — | — |
+| Nfo | `.nfo`, `.diz` | ✅ | ✅ | — | — | — |
+| Nhdr | `.nhdr` | ✅ | ✅ | — | — | — |
+| Nie | `.nie` | ✅ | ✅ | — | — | — |
+| Nifti | `.nii` | ✅ | ✅ | — | — | — |
+| Nifti2 | `.nii` | ✅ | ✅ | — | — | — |
+| Nifti2Gzip | `.nii.gz` | ✅ | ✅ | — | — | — |
+| NiftiGzip | `.nii.gz` | ✅ | ✅ | — | — | — |
+| NiftiPair | `.hdr`, `.img` | ✅ | ✅ | — | — | — |
+| NistIHead | `.nst` | ✅ | ✅ | — | — | — |
+| Nitf | `.ntf`, `.nitf` | ✅ | ✅ | — | — | — |
+| NokiaGroupGraphics | `.ngg` | ✅ | ✅ | — | — | — |
+| NokiaLogo | `.nol`, `.ngg` | ✅ | ✅ | — | — | — |
+| NokiaNlm | `.nlm` | ✅ | ✅ | — | — | — |
+| NokiaOperatorLogo | `.nol` | ✅ | ✅ | — | — | — |
+| NokiaPictureMessage | `.npm` | ✅ | ✅ | — | — | — |
+| Nrrd | `.nrrd`, `.nhdr` | ✅ | ✅ | — | — | — |
+| NufliEditor | `.nuf`, `.nup` | ✅ | ✅ | — | — | — |
+| OazFax | `.oaz`, `.xfx` | ✅ | ✅ | — | — | — |
+| OcpArtStudioWindow | `.win` | ✅ | ✅ | — | — | — |
+| OcsPics | `.ocs` | ✅ | ✅ | — | — | — |
+| OdFontEditor | `.odf` | ✅ | ✅ | — | — | — |
+| Oil | `.oil` | ✅ | ✅ | — | — | — |
+| OlicomFax | `.ofx` | ✅ | ✅ | — | — | — |
+| Olpc565 | `.565` | ✅ | ✅ | — | — | — |
+| OpenRaster | `.ora` | ✅ | ✅ | — | — | — |
+| Optocat | `.abs` | ✅ | ✅ | — | — | — |
+| Oric | `.oric`, `.tap` | ✅ | ✅ | — | — | — |
+| Otb | `.otb` | ✅ | ✅ | — | — | — |
+| PabloPaint | `.pa3` | ✅ | ✅ | — | — | — |
+| Pagefox | `.pfx` | ✅ | ✅ | — | — | — |
+| PaintMagic | `.pmg` | ✅ | ✅ | — | — | — |
+| PaintPro | `.ppro` | ✅ | ✅ | — | — | — |
+| PaintShop | `.da4` | ✅ | ✅ | — | — | — |
+| PaintShopBrowser | `.jbf` | ✅ | ✅ | — | ✅ | — |
+| PaintShopCompressed | `.psc` | ✅ | ✅ | — | — | — |
+| Palm | `.palm`, `.pdb` | ✅ | ✅ | — | — | — |
+| PalmImageViewer | `.pdb` | ✅ | ✅ | — | — | — |
+| PalmPdb | `.pdb` | ✅ | ✅ | — | — | — |
+| Paradox | `.mcpp` | ✅ | ✅ | — | — | — |
+| Pat | `.pat` | ✅ | ✅ | — | — | — |
+| Pc88 | `.pc8` | ✅ | ✅ | — | — | — |
+| Pc98Ebd | `.ebd` | ✅ | ✅ | — | — | — |
+| Pcd | `.pcd` | ✅ | ✅ | — | — | — |
+| Pcds | `.pcds` | ✅ | ✅ | — | — | — |
+| PcEngineTile | `.pce` | ✅ | ✅ | — | — | — |
+| Pcl | `.pcl`, `.prn` | ✅ | ✅ | — | — | — |
+| Pco16Bit | `.b16` | ✅ | ✅ | — | — | — |
+| PcPaint | `.pic`, `.clp`, `.sim` | ✅ | ✅ | — | — | — |
+| PcpBitmap | `.pcp` | ✅ | ✅ | — | — | — |
+| Pcx | `.pcx`, `.pcc`, `.fcx`, `.bmg`, `.ibg` | ✅ | ✅ | — | — | ✅ |
+| Pdf | `.pdf` | ✅ | ✅ | — | ✅ | — |
+| Pdn | `.pdn` | ✅ | ✅ | — | — | — |
+| Pds | `.pds`, `.lbl` | ✅ | ✅ | — | — | — |
+| PeResource | `.exe`, `.dll`, `.ocx`, `.scr`, `.cpl` | ✅ | — | — | ✅ | — |
+| PerfectPix | `.pph` | ✅ | ✅ | — | — | — |
+| Pes | `.pes` | ✅ | — | — | — | — |
+| PetDraw | `.pdr` | ✅ | ✅ | — | — | — |
+| PetsciiBot | `.pbot` | ✅ | ✅ | — | — | — |
+| Pfm | `.pfm` | ✅ | ✅ | — | — | — |
+| Pgx | `.pgx` | ✅ | ✅ | — | — | — |
+| Phm | `.phm` | ✅ | ✅ | — | — | — |
+| PhotoChrome | `.pcf`, `.phc` | ✅ | ✅ | — | — | — |
+| PhotoChromePcs | `.pcs` | ✅ | ✅ | — | — | — |
+| PhotoLine | `.pld` | ✅ | ✅ | — | — | — |
+| PhotoPaint | `.cpt` | ✅ | ✅ | — | — | — |
+| PhotoParade | `.php` | ✅ | ✅ | — | ✅ | — |
+| PhotoStudio | `.psf` | ✅ | ✅ | — | — | — |
+| PhotoSuiteProject | `.pzp` | ✅ | ✅ | — | — | — |
+| Pi | `.pi` | ✅ | ✅ | — | — | — |
+| Pic2 | `.p2` | ✅ | ✅ | — | — | — |
+| Picasso | `.pic0` | ✅ | ✅ | — | — | — |
+| Picasso64 | `.p64`, `.fly` | ✅ | ✅ | — | — | — |
+| Pict | `.pict`, `.pct`, `.pict2`, `.bum`, `.x` | ✅ | ✅ | — | — | — |
+| PictureEditor | `.ped` | ✅ | ✅ | — | — | — |
+| PicturePublisher | `.pp5` | ✅ | ✅ | — | — | — |
+| PicturePublisher4 | `.pp4` | ✅ | ✅ | — | — | — |
+| PicWorks | `.pwk`, `.pws` | ✅ | ✅ | — | — | — |
+| PixarRib | `.pxr`, `.pixar`, `.picio` | ✅ | ✅ | — | — | — |
+| Pixel64 | `.px64`, `.px` | ✅ | ✅ | — | — | — |
+| PixelPerfect | `.pp`, `.ppp` | ✅ | ✅ | — | — | — |
+| PixelPowerCollage | `.i17`, `.i18`, `.ib7`, `.if9` | ✅ | ✅ | — | — | — |
+| Pixia | `.pxa`, `.pxs` | ✅ | ✅ | — | — | — |
+| Pixibox | `.pxb` | ✅ | ✅ | — | — | — |
+| Pkm | `.pkm` | ✅ | ✅ | — | — | — |
+| Pl4Picture | `.pl4` | ✅ | ✅ | — | — | — |
+| PlaybackBitmapSequence | `.bms` | ✅ | ✅ | — | — | — |
+| PlotMaker | `.plt`, `.plm2` | ✅ | ✅ | — | — | — |
+| PmBitmap | `.pm1`, `.pm2`, `.pm3`, `.pm4` | ✅ | ✅ | — | — | — |
+| PmgDesigner | `.pmd` | ✅ | ✅ | — | — | — |
+| PmView | `.pm` | ✅ | ✅ | — | — | — |
+| Png | `.png`, `.frm` | ✅ | ✅ | — | — | ✅ |
+| PntrFalcon | `.pnf`, `.pfl` | ✅ | ✅ | — | — | — |
+| PocketPc2bp | `.2bp` | ✅ | ✅ | — | — | — |
+| PocketPcTheme | `.tsk` | ✅ | ✅ | — | — | — |
+| PortfolioGraphics | `.pgf`, `.pgc` | ✅ | ✅ | — | — | — |
+| Portrait | `.cvp` | ✅ | ✅ | — | — | — |
+| PostScript | `.ps`, `.ps1`, `.ps2`, `.ps3`, `.eps`, `.epsf`, `.epsi`, `.epi`, `.prn`, `.pdx` | ✅ | ✅ | — | — | — |
+| PowerGraphics | `.pgr` | ✅ | ✅ | — | — | — |
+| PowerPoint | `.ppt`, `.pps` | ✅ | — | — | — | — |
+| PrinterPageSegment | `.pse`, `.psg` | ✅ | ✅ | — | — | — |
+| Printfox | `.gb` | ✅ | ✅ | — | — | — |
+| PrintfoxPagefox | `.bs`, `.pg` | ✅ | ✅ | — | — | — |
+| PrintMaster | `.pm` | ✅ | ✅ | — | — | — |
+| PrintShop | `.psa`, `.psb` | ✅ | ✅ | — | — | — |
+| PrintShopIcon | `.psf` | ✅ | ✅ | — | — | — |
+| PrintTechnik | `.hir` | ✅ | ✅ | — | — | — |
+| PrismPaint | `.pnt`, `.tpi` | ✅ | ✅ | — | — | — |
+| Prisms | `.pri`, `.lff` | ✅ | ✅ | — | — | — |
+| ProfiGrf | `.grf` | ✅ | ✅ | — | — | — |
+| Ps2Txc | `.txc` | ✅ | ✅ | — | — | — |
+| Psb | `.psb` | ✅ | ✅ | — | — | — |
+| Psd | `.psd`, `.pdd` | ✅ | ✅ | — | — | — |
+| PsionPic | `.pic`, `.icn`, `.ch3` | ✅ | ✅ | — | — | — |
+| Psp | `.psp`, `.pspimage`, `.tub`, `.psptube`, `.pspbrush`, `.pspframe`, `.pfr`, `.pspmask`, `.msk`, `.pspt`, `.tex` | ✅ | ✅ | — | — | — |
+| Ptif | `.ptif`, `.ptiff` | ✅ | ✅ | — | — | — |
+| PublicPainter | `.cmp` | ✅ | ✅ | — | — | — |
+| Pvr | `.pvr` | ✅ | ✅ | — | — | — |
+| Q0 | `.q0` | ✅ | ✅ | — | — | — |
+| QdvImage | `.qdv` | ✅ | ✅ | — | — | — |
+| Qoi | `.qoi` | ✅ | ✅ | — | — | — |
+| Qrt | `.qrt` | ✅ | ✅ | — | — | — |
+| Qtif | `.qtif`, `.qti` | ✅ | ✅ | — | — | — |
+| QuakeLmp | `.lmp` | ✅ | ✅ | — | — | — |
+| QuakeSpr | `.spr` | ✅ | ✅ | — | — | — |
+| QuantelVpb | `.vpb` | ✅ | ✅ | — | — | — |
+| QuantumPaint | `.pbx` | ✅ | ✅ | — | — | — |
+| RagD | `.rag`, `.ragc` | ✅ | ✅ | — | — | — |
+| RagePaint | `.rge` | ✅ | ✅ | — | — | — |
+| RainbowPainter | `.rp` | ✅ | ✅ | — | — | — |
+| RamBrandt | `.rm0`, `.rm1`, `.rm2`, `.rm3`, `.rm4` | ✅ | ✅ | — | — | — |
+| RawGreyscale | `.gry`, `.grey`, `.raw` | ✅ | ✅ | — | — | — |
+| RawWorkshop | `.rwl`, `.rwh` | ✅ | ✅ | — | — | — |
+| RedStormRsb | `.rsb` | ✅ | ✅ | — | — | — |
+| Rembrandt | `.tcp` | ✅ | ✅ | — | — | — |
+| Rgf | `.rgf` | ✅ | ✅ | — | — | — |
+| RicohFax | `.ric`, `.001` | ✅ | ✅ | — | — | — |
+| RicohIs30 | `.pig` | ✅ | ✅ | — | — | — |
+| RicohJ6i | `.j6i` | ✅ | ✅ | — | — | — |
+| RiscOsSprite | `.spr`, `.ros` | ✅ | ✅ | — | — | — |
+| Rla | `.rla`, `.rlb`, `.rpf` | ✅ | ✅ | — | — | — |
+| Rlc2 | `.rlc` | ✅ | ✅ | — | — | — |
+| RockyInterlace | `.rip` | ✅ | ✅ | — | — | — |
+| RunPaint | `.rpm` | ✅ | ✅ | — | — | — |
+| SamarHiresMap | `.shc` | ✅ | ✅ | — | — | — |
+| SamCoupe | `.sam` | ✅ | ✅ | — | — | — |
+| SamCoupeLce | `.lce` | ✅ | ✅ | — | — | — |
+| SamCoupeMode4 | `.ss4`, `.scs4` | ✅ | ✅ | — | — | — |
+| SamCoupeScreen | `.ss1`, `.ss2`, `.ss3` | ✅ | ✅ | — | — | — |
+| SamCoupeSsx | `.ssx` | ✅ | ✅ | — | — | — |
+| SaracenPaint | `.sar` | ✅ | ✅ | — | — | — |
+| SbigCcd | `.st4`, `.stx`, `.st5`, `.st6`, `.st7`, `.st8` | ✅ | ✅ | — | — | — |
+| SciFax | `.scf` | ✅ | ✅ | — | — | — |
+| ScitexCt | `.sct`, `.ct`, `.ch` | ✅ | ✅ | — | — | — |
+| ScreenBlaster | `.sbl` | ✅ | ✅ | — | — | — |
+| ScreenMaker | `.smk` | ✅ | ✅ | — | — | — |
+| Sdg | `.sdg` | ✅ | — | — | ✅ | — |
+| Sdt | `.sdt` | ✅ | ✅ | — | — | — |
+| SeattleFilmWorks | `.sfw`, `.pwp` | ✅ | ✅ | — | — | — |
+| SecondNatureSlideShow | `.cat` | ✅ | ✅ | — | ✅ | — |
+| SecretPhotos | `.xp0` | ✅ | ✅ | — | — | — |
+| SegaGenTile | `.gen`, `.sgd` | ✅ | ✅ | — | — | — |
+| SegaSj1 | `.sj1` | ✅ | ✅ | — | — | — |
+| SemiGraphicLogo | `.sge` | ✅ | ✅ | — | — | — |
+| SeqImage | `.seq` | ✅ | ✅ | — | — | — |
+| SeuckSprites | `.a` | ✅ | ✅ | — | — | — |
+| SevenuP | `.sev` | ✅ | ✅ | — | — | — |
+| Sf3 | `.sf3` | ✅ | ✅ | — | — | — |
+| Sff | `.sff` | ✅ | ✅ | — | — | — |
+| Sgi | `.sgi`, `.rgb`, `.bw`, `.iris`, `.rgba`, `.inta` | ✅ | ✅ | — | — | ✅ |
+| ShapeTableFileType | `.shp` | ✅ | ✅ | — | — | — |
+| SharpX68k | `.x68`, `.x68k` | ✅ | ✅ | — | — | — |
+| ShfXlEdit | `.shx` | ✅ | ✅ | — | — | — |
+| SiemensBmx | `.bmx` | ✅ | ✅ | — | — | — |
+| SifImage | `.sif` | ✅ | ✅ | — | — | — |
+| SinbadSlideshow | `.ssb` | ✅ | ✅ | — | — | — |
+| SinclairBasic | `.p` | ✅ | ✅ | — | — | — |
+| Sixel | `.six`, `.sixel` | ✅ | ✅ | — | — | — |
+| Skantek | `.skn` | ✅ | ✅ | — | — | — |
+| SketchPaddles | `.skp` | ✅ | ✅ | — | — | — |
+| SmartFax | `.smf`, `.001` | ✅ | ✅ | — | — | — |
+| SmartST | `.sst`, `.sst2` | ✅ | ✅ | — | — | — |
+| SnesTile | `.sfc`, `.snes` | ✅ | ✅ | — | — | — |
+| SoftImage | `.pic`, `.si` | ✅ | ✅ | — | — | — |
+| SoftwareAutomation | `.sag`, `.swa` | ✅ | ✅ | — | — | — |
+| SonyMavica | `.411` | ✅ | ✅ | — | — | — |
+| SonyPmp | `.pmp` | ✅ | ✅ | — | — | — |
+| SpcPainter | `.spp`, `.spc2` | ✅ | ✅ | — | — | — |
+| SpeccyExtended | `.sxg` | ✅ | ✅ | — | — | — |
+| SpecScii | `.zxs` | ✅ | ✅ | — | — | — |
+| Spectrum512 | `.spu` | ✅ | ✅ | — | — | — |
+| Spectrum512Comp | `.spc` | ✅ | ✅ | — | — | — |
+| Spectrum512Ext | `.spx` | ✅ | ✅ | — | — | — |
+| Spectrum512Smoosh | `.sps` | ✅ | ✅ | — | — | — |
+| SpeederFalcon | `.spf` | ✅ | ✅ | — | — | — |
+| Spiff | `.spf`, `.spiff` | ✅ | ✅ | — | — | — |
+| SpookySpritesFalcon | `.tre` | ✅ | ✅ | — | — | — |
+| SpotImage | `.dat` | ✅ | ✅ | — | — | — |
+| Sprite64 | `.s64`, `.spr64` | ✅ | ✅ | — | — | — |
+| SpritePad | `.spd` | ✅ | ✅ | — | — | — |
+| SriSun | `.ssi` | ✅ | ✅ | — | — | — |
+| Stad | `.pac` | ✅ | ✅ | — | — | — |
+| StarPainter | `.gr`, `.cs` | ✅ | ✅ | — | — | — |
+| StarPainterFont | `.zs` | ✅ | ✅ | — | — | — |
+| StelaRaw | `.hsi` | ✅ | ✅ | — | — | — |
+| Stellar | `.stl` | ✅ | ✅ | — | — | — |
+| StTrueColor | `.stc` | ✅ | ✅ | — | — | — |
+| SunIcon | `.icon`, `.pr` | ✅ | ✅ | — | — | — |
+| SunRaster | `.ras`, `.sun`, `.rast`, `.rs`, `.sr` | ✅ | ✅ | — | — | — |
+| SuperHires | `.shi` | ✅ | ✅ | — | — | — |
+| SuperHiresEditor | `.she` | ✅ | ✅ | — | — | — |
+| SuperHiresEditor1 | `.sh1` | ✅ | ✅ | — | — | — |
+| SuperHiresEditor2 | `.sh2` | ✅ | ✅ | — | — | — |
+| SuperHiresFli | `.shf` | ✅ | ✅ | — | — | — |
+| SuperHiresStudio | `.shs` | ✅ | ✅ | — | — | — |
+| Svg | `.svg` | ✅ | ✅ | — | — | — |
+| Svgz | `.svgz` | ✅ | ✅ | — | — | — |
+| SyberiaTexture | `.syj` | ✅ | ✅ | — | — | — |
+| SymbianMbm | `.mbm` | ✅ | ✅ | — | — | — |
+| SymbOsGraphic | `.sgx` | ✅ | ✅ | — | — | — |
+| SyntheticArts | `.srt` | ✅ | ✅ | — | — | — |
+| Synu | `.synu`, `.syn` | ✅ | ✅ | — | — | — |
+| Taac | `.vff`, `.taac`, `.suniff` | ✅ | ✅ | — | — | — |
+| TaquartInterlace | `.tip` | ✅ | ✅ | — | — | — |
+| TechnicolorDream | `.lum` | ✅ | ✅ | — | — | — |
+| TeliFax | `.mh` | ✅ | ✅ | — | — | — |
+| TextureEditorMikey | `.txe` | ✅ | ✅ | — | — | — |
+| TextureMaker0 | `.tx0` | ✅ | ✅ | — | — | — |
+| Tg4 | `.tg4` | ✅ | ✅ | — | — | — |
+| Tga | `.tga`, `.vda`, `.icb`, `.vst`, `.bpx`, `.targa`, `.ivb` | ✅ | ✅ | — | — | ✅ |
+| Thomson | `.map` | ✅ | ✅ | — | — | — |
+| TiBitmap | `.8xi`, `.89i` | ✅ | ✅ | — | — | — |
+| Tiff | `.tif`, `.tiff`, `.ftf`, `.stw`, `.fx3`, `.xif`, `.ctf` | ✅ | ✅ | — | ✅ | ✅ |
+| TilePic | `.tjp` | ✅ | ✅ | — | — | — |
+| TilezTexture | `.til` | ✅ | ✅ | — | — | — |
+| Tim | `.tim` | ✅ | ✅ | — | — | — |
+| Tim2 | `.tm2` | ✅ | ✅ | — | — | — |
+| TimexGigascreen | `.hrg`, `.scr` | ✅ | ✅ | — | — | — |
+| Tiny | `.tny`, `.tn1`, `.tn2`, `.tn3`, `.tn4`, `.tn5`, `.tn6` | ✅ | ✅ | — | — | — |
+| TiPicture | `.73i`, `.82i`, `.83i`, `.85i`, `.86i` | ✅ | ✅ | — | — | — |
+| TmSat | `.imi` | ✅ | ✅ | — | — | — |
+| TobiasRichterSlideshow | `.pci` | ✅ | ✅ | — | — | — |
+| TriPaint | `.tpf` | ✅ | ✅ | — | — | — |
+| Trs80 | `.hr` | ✅ | ✅ | — | — | — |
+| TrsPix | `.pix` | ✅ | ✅ | — | — | — |
+| TrueColorImg | `.timg` | ✅ | ✅ | — | — | — |
+| TruePaint | `.mci` | ✅ | ✅ | — | — | — |
+| TrueType | `.ttf` | ✅ | ✅ | — | — | — |
+| TrzmielCompressed | `.cpr` | ✅ | ✅ | — | — | — |
+| TurboRascal | `.flf` | ✅ | ✅ | — | — | — |
+| TurboView | `.tvw`, `.tbv` | ✅ | ✅ | — | — | — |
+| UfliEditor | `.ufl` | ✅ | ✅ | — | — | — |
+| Uhdr | `.uhdr` | ✅ | ✅ | — | — | — |
+| UifliEditor | `.uif` | ✅ | ✅ | — | — | — |
+| Uimg | `.bp1`, `.bp2`, `.bp4`, `.bp6`, `.bp8`, `.c01`, `.c02`, `.c04`, `.c06`, `.c08`, `.c16`, `.c24`, `.c32` | ✅ | ✅ | — | — | — |
+| UleadAlbumTemplate | `.pe4` | ✅ | ✅ | — | ✅ | — |
+| UleadImageLibrary | `.pst` | ✅ | ✅ | — | ✅ | — |
+| UtahRle | `.rle`, `.urt` | ✅ | ✅ | — | — | — |
+| UyvyRaw | `.uyvy`, `.qtl` | ✅ | ✅ | — | — | — |
+| VbxeSlideShow | `.dap` | ✅ | ✅ | — | — | — |
+| VdcBitmap | `.vbm`, `.bm` | ✅ | ✅ | — | — | — |
+| Vector06c | `.v06`, `.scr` | ✅ | ✅ | — | — | — |
+| VentaFax | `.vfx` | ✅ | ✅ | — | — | — |
+| VerticalHiresInterlace | `.vhi` | ✅ | ✅ | — | — | — |
+| VertiZontalInterlacing | `.vzi` | ✅ | ✅ | — | — | — |
+| Vic20 | `.vic20`, `.prg` | ✅ | ✅ | — | — | — |
+| Vicar | `.vic`, `.vicar`, `.img` | ✅ | ✅ | — | — | — |
+| Vidcom64 | `.vid` | ✅ | ✅ | — | — | — |
+| VidiChrome | `.vdc`, `.vdc2` | ✅ | ✅ | — | — | — |
+| VidigPaint | `.rap` | ✅ | ✅ | — | — | — |
+| Viff | `.viff`, `.xv`, `.vif` | ✅ | ✅ | — | — | — |
+| Vips | `.v`, `.vips` | ✅ | ✅ | — | — | — |
+| VirtualBoyTile | `.vbt`, `.vb`, `.vboy` | ✅ | ✅ | — | — | — |
+| Vitec | `.vit` | ✅ | ✅ | — | — | — |
+| Vivid | `.vivid`, `.dis` | ✅ | ✅ | — | — | — |
+| Vrml | `.wrl`, `.vrml` | ✅ | ✅ | — | — | — |
+| Vtf | `.vtf` | ✅ | ✅ | — | — | — |
+| Vue | `.vob` | ✅ | ✅ | — | — | — |
+| Wad2 | `.wad` | ✅ | ✅ | — | — | — |
+| Wad3 | `.wad` | ✅ | ✅ | — | — | — |
+| Wal | `.wal` | ✅ | ✅ | — | — | — |
+| Wbmp | `.wbmp`, `.wbm`, `.wap` | ✅ | ✅ | — | — | — |
+| WebP | `.webp`, `.wep` | ✅ | ✅ | — | ✅ | ✅ |
+| WebShots | `.wb1`, `.wbc`, `.wbp`, `.wbz` | ✅ | ✅ | — | — | — |
+| WigmoreArtist | `.wig` | ✅ | ✅ | — | — | — |
+| WinFax | `.fxs`, `.fxo`, `.fxr`, `.fxd`, `.fxm` | ✅ | ✅ | — | — | — |
+| WizSolitaireDeck | `.dec` | ✅ | ✅ | — | — | — |
+| Wmf | `.wmf` | ✅ | ✅ | — | — | — |
+| WonderSwanTile | `.wst`, `.ws` | ✅ | ✅ | — | — | — |
+| WorldportFax | `.wpf`, `.wfx` | ✅ | ✅ | — | — | — |
+| Wpg | `.wpg` | ✅ | ✅ | — | — | — |
+| Wsq | `.wsq` | ✅ | ✅ | — | — | — |
+| Wzl | `.wzl` | ✅ | ✅ | — | — | — |
+| X11Puzzle | `.pzl` | ✅ | ✅ | — | — | — |
+| X3f | `.x3f` | ✅ | ✅ | — | — | — |
+| Xar | `.xar` | ✅ | ✅ | — | — | — |
+| XBin | `.xb`, `.xbin` | ✅ | ✅ | — | — | — |
+| Xbm | `.xbm`, `.icon`, `.ico`, `.cbm`, `.x` | ✅ | ✅ | — | — | — |
+| XbmColor | `.xbm` | ✅ | ✅ | — | — | — |
+| Xcf | `.xcf` | ✅ | ✅ | — | — | — |
+| Xcursor | `.xcur`, `.cursor` | ✅ | ✅ | — | — | — |
+| XFliEditor | `.xfl` | ✅ | ✅ | — | — | — |
+| Ximage | `.xim` | ✅ | ✅ | — | — | — |
+| XionicsSmp | `.smp` | ✅ | ✅ | — | — | — |
+| Xld4 | `.q4` | ✅ | ✅ | — | — | — |
+| XlPaint | `.xlp` | ✅ | ✅ | — | — | — |
+| Xpm | `.xpm`, `.picon` | ✅ | ✅ | — | — | — |
+| XvThumbnail | `.xv`, `.p7` | ✅ | ✅ | — | — | — |
+| Xwd | `.xwd`, `.x11` | ✅ | ✅ | — | — | — |
+| Xyz | `.xyz` | ✅ | ✅ | — | — | — |
+| Ybm | `.ybm` | ✅ | ✅ | — | — | — |
+| YuvRaw | `.yuv` | ✅ | ✅ | — | — | — |
+| ZeissBivas | `.dta` | ✅ | ✅ | — | — | — |
+| ZeissLsm | `.lsm` | ✅ | ✅ | — | — | — |
+| Zinc | `.zinc` | ✅ | ✅ | — | — | — |
+| ZonerBrush | `.zbr` | ✅ | ✅ | — | — | — |
+| Zoom4 | `.zm4` | ✅ | ✅ | — | — | — |
+| Zoomatic | `.zom` | ✅ | ✅ | — | — | — |
+| ZsStaffKid98 | `.zim` | ✅ | ✅ | — | — | — |
+| Zx81 | `.zx81`, `.p81` | ✅ | ✅ | — | — | — |
+| ZxArtStudio | `.zas` | ✅ | ✅ | — | — | — |
+| ZxAttributes | `.atr` | ✅ | ✅ | — | — | — |
+| ZxAttributesGigascreen | `.hlr` | ✅ | ✅ | — | — | — |
+| ZxBigFont | `.chx` | ✅ | ✅ | — | — | — |
+| ZxBorderMulticolor | `.bmc4` | ✅ | ✅ | — | — | — |
+| ZxBorderScreen | `.bsc` | ✅ | ✅ | — | — | — |
+| ZxChrd | `.chr`, `.chrd` | ✅ | ✅ | — | — | — |
+| ZxFlash | `.zfl` | ✅ | ✅ | — | — | — |
+| ZxFont | `.ch8`, `.ch4`, `.ch6` | ✅ | ✅ | — | — | — |
+| ZxGigascreen | `.gsc`, `.img` | ✅ | ✅ | — | — | — |
+| ZxMlg | `.mlg` | ✅ | ✅ | — | — | — |
+| ZxMultiArtist | `.mg1`, `.mg2`, `.mg4`, `.mg8` | ✅ | ✅ | — | — | — |
+| ZxMulticolor | `.mlt`, `.mc` | ✅ | ✅ | — | — | — |
+| ZxNext | `.nxt` | ✅ | ✅ | — | — | — |
+| ZxNextImage | `.nxi` | ✅ | ✅ | — | — | — |
+| ZxPaintbrush | `.zxp` | ✅ | ✅ | — | — | — |
+| ZxPaintyOne | `.zp1` | ✅ | ✅ | — | — | — |
+| ZxRgb3 | `.3` | ✅ | ✅ | — | — | — |
+| ZxSnapshot | `.sna` | ✅ | ✅ | — | — | — |
+| ZxSpectrum | `.scr`, `.$s`, `.$c`, `.!s` | ✅ | ✅ | — | — | — |
+| ZxTimex | `.tmx`, `.scr` | ✅ | ✅ | — | — | — |
+| ZxTrefiBorderScreen | `.bsp` | ✅ | ✅ | — | — | — |
+| ZxTricolor | `.3cl` | ✅ | ✅ | — | — | — |
+| ZxUlaPlus | `.ulp`, `.scr` | ✅ | ✅ | — | — | — |
+| ZzRough | `.rgh` | ✅ | ✅ | — | — | — |
+<!-- IMAGE-FORMATS:END -->
+
+### Optimizers
+
+The optimizers live beside the package in the same repository ([`Optimizers/`](https://github.com/Hawkynt/PNGCrushCS/tree/main/Optimizers)) and drive the [`Crush.Image`](https://github.com/Hawkynt/PNGCrushCS/tree/main/Crush.Image) CLI. Every one of them is lossless by contract: the pixels that come out are the pixels that went in, and only the representation — compression, filter, palette order, container layout, metadata — changes. The smallest candidate wins; a candidate that would change a pixel is not a candidate.
+
+| Format | In place | What it searches | What it strips | Limits |
+| --- | :---: | --- | --- | --- |
+| PNG | pixels re-encoded, ancillary chunks carried over from the original bytes on request | colour type and bit depth valid for the picture, palette order, Adam7 against progressive, five row filters through single, scanline-adaptive, weighted-continuity and partition-aware strategies, DEFLATE at default, maximum and Zopfli-class Ultra/Hyper with two-phase screening | ancillary chunks unless `PreserveAncillaryChunks` | 8-bit pipeline: 16-bit sources are reduced only when every sample fits; palette *reduction* is an explicit lossy opt-in (`AllowLossyPalette`) and off by default |
+| APNG | untouched | — | — | detected as its own format so the PNG optimizer never flattens an animation to its first frame; per-frame optimisation is not attempted |
+| GIF | rewritten from the parsed `GifFile` | palette order (original, frequency, luminance, LZW-run aware), global against local colour tables, frame disposal, transparent-margin trimming, frame deduplication, frame differencing, standard against deferred-clear LZW | comment and application extensions except the Netscape loop | optimises the palette a file already has; never quantises |
+| TIFF | rewritten from the decoded page | none, PackBits, LZW, DEFLATE and Zopfli-class DEFLATE, horizontal-differencing predictor, original/grey/palette colour mode, rows per strip, optional tiles | private tags not needed to decode | first page only; alpha is carried as an unassociated extra sample and 16-bit sources keep their depth |
+| BMP | rewritten | 32/24/16/8/4/1-bit layouts the picture fits without loss, RLE8/RLE4 | gap and padding bytes | 16-bit 5/6/5 is tried only when every pixel survives it exactly |
+| TGA | rewritten | 32/24/8-bit and palette layouts, RLE against raw | developer and extension areas | 3-byte candidates only when the alpha channel is fully opaque |
+| PCX | rewritten | 8-bit palette, 24-bit planar, 1-bit; RLE | none | — |
+| SGI | rewritten | RLE against verbatim rows, 8-bit against 16-bit only where the samples fit | none | image name is kept |
+| JPEG | marker segments rewritten, entropy-coded data untouched | Huffman table optimisation, progressive against baseline scan scripts, restart-interval choice | APPn/COM metadata on request (`--strip`) | never re-quantises; arithmetic-coded and lossless JPEG are passed through |
+| WebP | chunks rewritten, VP8/VP8L payload untouched | RIFF layout with and without VP8X | EXIF/XMP/ICCP on request | alpha (`ALPH`) and animation (`ANIM`/`ANMF`) are carried through verbatim; the codec payload is never re-encoded |
+| ICO / CUR | directory rewritten, entries re-encoded | BMP against PNG storage per entry, bit depth per entry | none | one directory; the hotspot of a cursor is kept |
+| ANI | RIFF rewritten | per-frame cursor optimisation through the CUR optimizer | `INFO` list on request | frame timing and sequence chunks are kept |
+
+Formats not in this table are optimised by conversion only: `Crush.Image auto` writes the picture through every format that can encode it and keeps the smallest, which is a change of format rather than an optimisation of one. Formats with nothing to optimise are left alone on purpose — QOI has one encoding and no metadata; Farbfeld and the Netpbm family are raw samples behind a header.
+
+### Conformance evidence for the modern codecs
+
+For these formats `✅` means more than "the project can read what it wrote". A capability is promoted only with evidence beyond a self-round-trip: normative bitstream assertions for deterministic syntax, decoding files an independent implementation produced, an independent decoder accepting our output, or a pixel comparison against an independent decoder (exact for lossless, a justified error bound for lossy). Native codec bindings are never used to manufacture a green cell; the package stays managed code.
+
+| Format | Read | Write | Evidence and exact scope |
+| --- | :---: | :---: | --- |
+| WebP | ✅ | ✅ | VP8 lossy decode is bit-exact with `dwebp -nofancy` and, with the libwebp fancy chroma upsampler now the default, matches `dwebp` within ±1; VP8L lossless is exact. Animated read/write emits `VP8X`/`ANIM`/`ANMF` with offsets, durations, blend and disposal, verified frame by frame. Writer: keyframe-only VP8, no multi-pass rate control; alpha written as an uncompressed `ALPH`. |
+| MNG | ✅ | ✅ | Writer is MNG-VLC: `MHDR`/`TERM` wire values, VLC layer/frame/play-time accounting and a truthful simplicity profile are asserted byte for byte. Full MNG-LC/MNG object buffers, loops, JNG and delta-PNG are not written and not claimed. |
+| JPEG XR | ✅ | ✅ | T.832 core is a managed port of JXRLib (see `Formats/JpegXr/Reference/UPSTREAM.md`), oracle-tested upstream against `JxrEncApp`/`JxrDecApp`/WIC; the public path writes real `WMPHOTO` codestreams with standard WIC pixel-format GUIDs and decodes the independent JXRLib `red.jxr` fixture (frequency-order YUV444 plus a planar alpha plane). Gray8, RGB24 and RGBA32 are exposed; other WIC layouts may be refused at the container adapter even though the core handles them. |
+| JPEG 2000 | ✅ | ✅ | Both directions are settled against independent implementations. The reader decodes `opj_compress` codestreams sample for sample — measured over 90 lossless files covering 1–5 decomposition levels, 16/32/64 code-blocks, explicit precincts, tiles, all five progression orders, tile-part splitting, SOP/EPH, up to six quality layers, MCT on and off, vertically-causal contexts, segmentation symbols, a non-zero image origin, 8- and 16-bit samples. Irreversible 9/7 files cannot be bit-exact and land within 2 of 255 of OpenJPEG's own decode. The writer's output is accepted exactly by `opj_decompress`, ImageMagick and ffmpeg alike: 48 codestreams, 144 comparisons, zero differing samples. It writes one tile, one layer, reversible 5/3, LRCP; ROI, POC, packed packet headers and arithmetic bypass are refused rather than mis-decoded. |
+| HEIF / HEIC | ⚠️ | ✅ | Directly coded HEVC items decode through the shared managed H.265 decoder at 8, 10 and 12 bits, Main-profile intra — so what `libheif`/x265 and ImageMagick write by default now reads, measured against ffmpeg's HEVC decoder over 49 streams with zero differing samples. The writer builds the picture out of intra PCM coding units and is now verified by decoders other than our own: `dec265` returns all 15 test pictures byte-identical, `heif-dec` and ImageMagick decode all 15 at the right size. The colour description is read rather than assumed: the item's `colr` nclx property states the range and the matrix, the sequence's video usability information states them where the item carries no such property, and the container wins where the two disagree. Over 15 libheif- and ImageMagick-written files spanning quality, depth, matrix and range that took the mean error against libheif's own decode from 2.6–3.4% down to 0.3–1.7%, and flat colour comes back exact or within one level on every matrix and range; what is left is libheif replicating the half-size chroma samples where this reader interpolates them onto the siting H.265 states — replicate them here too and the same 15 files land within one level everywhere. Monochrome items decode too — libheif picks `chroma_format_idc` of zero for a greyscale or all-black picture, so it is not an exotic case — and land within one level of libheif over six greyscale files at 10 and 12 bits, lossy and lossless. The one disagreement there is libheif's: it writes monochrome luminance full-range whatever `--full_range_flag` said, so a file it tags studio swing is read here as it is tagged and comes out with more contrast than libheif gives it. It stays amber for what is still refused: 4:4:4, 4:2:2 and depths above 12. |
+| AVIF | ✅ | ✅ | The reader is a managed AV1 key-frame decoder whose default CDF, scan, quantiser, quantiser-matrix and context tables are transcribed value for value from libaom `v3.15.0`, named file by file in [`THIRD_PARTY_NOTICES.md`](https://github.com/Hawkynt/PNGCrushCS/blob/main/Hawkynt.FileFormats.Images/THIRD_PARTY_NOTICES.md) — a re-derived probability table is simply a wrong one. Scope: 8, 10 and 12 bits, monochrome and 4:2:0, 4:2:2 and 4:4:4, every in-loop filter (deblocking, CDEF, Wiener and self-guided restoration), per-superblock delta-Q and multiple tiles. Measured against dav1d 1.5.4 sample for sample over 95 files written by `avifenc`/libaom 3.15.0, ImageMagick/libheif, ffmpeg/libaom and SVT-AV1: **zero differing samples on every plane of every file**, nothing excluded. Weighted towards 8-bit, though — 10-bit is five files and 12-bit is one, so those two paths are exercised rather than swept, and alpha sits outside that sweep (checked separately against `avifdec`, the alpha channel byte for byte). Note the decoder works at the file's own depth but hands out 8-bit RGB, so a 10- or 12-bit file is narrowed on the way out. The writer emits a lossless 4:4:4 key frame with the identity matrix, and `avifdec`, ffmpeg and ImageMagick each decode it byte-identically to the input across 20 pictures from 1x1 to 4200x200, the last of which is wide enough to force two tiles. Scope is still pictures: inter prediction, film grain, super-resolution, scalability, palette blocks, intra block copy and segmentation are refused by name rather than approximated, and the writer makes no rate decisions — it is lossless or nothing, and does not write alpha. Of those, palette is the one to expect in practice rather than an exotic corner: libaom picks it for flat graphics, and a two-colour checkerboard is refused at every depth and chroma layout. |
+| JPEG XL | ⚠️ | ✅ | The reader is complete for still pictures: modular and VarDCT, splines, patches, noise, multi-frame composition, 16-bit samples and embedded ICC profiles, all measured against libjxl — 104 corpus files and 27 fixtures, the 8-bit ones within one level of `djxl`'s dithered output and the 16-bit ones byte-identical. An animation comes back as every moment it is shown at rather than only the first, each moment byte for byte what libjxl decodes it to. The writer emits a real ISO/IEC 18181-1 codestream: modular, lossless, 8- and 16-bit, grey/grey+alpha/RGB/RGBA, in one group where the picture fits one and in as many as it takes otherwise, so there is no size it refuses. `djxl` decodes it sample for sample — 22 curated files and 500 randomised ones, plus 41 sizes from 1x1 to 8192x8192 chosen to straddle group boundaries in both directions at every channel count and depth, zero differing samples. It is amber on the read side for one gap: an animation whose frames are lossy is refused outright, because blending VarDCT frames happens in XYB before the colour transform and nothing here has been measured against libjxl doing that — which is what `cjxl` writes unless it is asked for lossless. |
+
+### Measured against other decoders
+
+The claims above are checked, not asserted, by the parity tooling under [`Tools/parity/`](https://github.com/Hawkynt/PNGCrushCS/tree/main/Tools/parity): every format a third-party tool can write is written by that tool, kept only if the tool reads its own file back, and then decoded here and compared pixel for pixel against the tool's decode. As of this audit, against ImageMagick 7.1.2 (135 formats it writes and reads back) and ffmpeg (27): we open 116 and 26 of them. Of what opens, every sample decodes to the reference picture except the JPEG 2000 family (flat grey, see above), CALS Type I, JBIG1 and Palm pixmaps (wrong pixels — under repair), and one 16-bit RLE SGI variant. The refusals are the codec gaps tabled above (HEIC at 12 bits, JPEG XL) plus AVIF, which that audit predates and which now decodes, ImageMagick's own scratch formats and video containers. Lossy WebP from either tool is bit-exact with `dwebp -nofancy`; the difference to the default `dwebp` output is libwebp's fancy chroma upsampler alone.
+
+One gap that audit surfaces is worth naming, because it was closed by reading the tool's own file rather than by reasoning about the specification. ImageMagick writes PCL as a colour job: `ESC*v#W` configures the image data — indexed palette, eight bits an index — then forty-eight `ESC*v#a#b#c#I` commands build the palette a primary at a time, then delta-row rows follow. This reader refused the very first of those commands by name, so no PCL ImageMagick produced could be opened at all. It now reads the configure-image-data block, assembles the palette from the per-primary commands, and unpacks indices two, four or eight bits wide instead of assuming the one-bit-per-plane layout a simple job uses. Decoding ImageMagick's own 64x48 file reproduces the picture ImageMagick was given: all 9,216 samples identical, maximum difference zero.
+
+The same audit found the opposite failure in JPEG XL, and it is the worse of the two. Nine files were encoded from one picture with `cjxl` across its effort range and handed to the reader. Two decoded sample for sample against `djxl`. Five were refused. The other two — a lossless effort-9 file and a grayscale one — came back as pictures that differed from libjxl's decode in 1,383 of 3,072 and 237 of 3,072 samples, with nothing to tell a caller that anything had gone wrong. The modular decoder was catching a failed entropy setup, a failed channel, and the arithmetic decoder's end-of-frame state, and filling whatever it could not read with the zeros the buffers already held. The end-of-frame state is now enforced rather than discarded, which is what moved those files from wrong to refused.
+
+That check earns its place, but an earlier draft of this section overstated it, and a wider corpus settled the question: it catches a reader that has lost the bitstream, not a reader that has followed it and then rebuilt the picture wrongly. A flat 64x64 file decoded past it with one channel two levels low. Three defects were behind the refusals and that survivor, and all three were the decoder disagreeing with the format rather than declining to implement it. The property vector an MA tree splits on was in the wrong order from its fifth entry onward — right values, wrong slots — so any tree that split on a neighbour rather than on x or y sent its pixels down the wrong branch and read them from the wrong context; that alone accounts for the higher efforts. Two of the fourteen predictors were wrong, one averaging four neighbours where the format averages two and one standing in a half-sum for a six-term weighted average that reaches a pixel the decoder never even read. And the weighted predictor's parameters were read out of each group header and thrown away, so a group that tuned them was decoded with the defaults — near enough to look right, which is exactly the failure this package refuses, and the cause of that flat file's missing two levels.
+
+Two more followed, both about a frame coded in more than one group — which is every image wider or taller than a group, so every photograph. The picture is split: a global stream carries whatever channel fits inside a group and stops at the first that does not, and the channels it stopped at are carried a group at a time by streams at their own offsets in the file. Reaching those offsets was the smaller half. The larger half was that the arithmetic decoder had been bound to the bit reader it was built with, so a group asked it for tokens and it answered from wherever the global stream had left off; every group came back empty and the picture came out black. libjxl builds a fresh arithmetic reader for every stream, sharing only the histograms, and the state word each stream begins with has to be read again at that stream's own position.
+
+With all of that corrected, 36 files written by `cjxl` from six pictures across its effort range decode to **30 identical to `djxl`, none wrong**, and 6 refused — and the 6 were exactly the lossy ones, which decode too now. Before any of this the same corpus gave 10 identical, one wrong and 25 refused. Five are kept as fixtures with `djxl`'s own decode beside each, chosen for what they exercise rather than for passing: a tuned weighted-predictor header, a palette transform and a two-group frame among them, so the guarantee under test is the one that matters — a file decodes to what libjxl decodes it to, or it is refused.
+
+Writing a frame in more than one group was the last thing the writer could not do, and the arrangement itself is short. A picture past one group takes the largest group the format has; the global stream then carries no samples at all, because every channel is bigger than a group and the decoder stops at the first that is; and each group states a group header of its own and its own run of residuals at its own offset, with one code for all of them stated once in the global section. Prediction starts afresh inside each group, because a group is decodable on its own — the row above its first row is not the picture's, it is absent. The table of contents states a section per group plus the two the format asks for whether or not a modular frame has anything to put in them, since the offset of a group is the sum of the sections before it.
+
+What the arrangement turned up were two defects that had nothing to do with groups. The first was in the table of contents, in both directions at once. Its four section-size ranges abut, each starting where the one before it ends, and the fourth was being read and written as though it started at nothing — which is invisible under four megabytes and puts every section after a four-megabyte one four megabytes early above it. No picture small enough for a single group had ever reached it; a 1,024x1,024 sixteen-bit one is the first that does, and `djxl` refused it as truncated. The second was the alpha plane's depth. An extra channel states its own, and the default is eight bits whatever the colour channels are, so a sixteen-bit picture with alpha wrote a sixteen-bit alpha plane and said it was eight: half of a grey-and-alpha picture decoded wrongly while the grey half was exact, which is the shape of a defect that passes every check made against the bitstream rather than against the samples.
+
+With both corrected, 41 sizes from 1x1 to 8,192x8,192 — one pixel either side of a group boundary in each direction, many groups one way and part of a group the other, at one, two, three and four channels and at eight and sixteen bits — decode through `djxl` with **zero differing samples**, and every one of them reads back through this package's own reader as well.
+
+On the read side, a file may state several frames and mean two different things by them: in a still picture they are layers, and only their composition is a picture; in an animation they are moments, and each frame with a duration is the whole picture as it stands then. The reader knew the difference well enough to stop at the first moment, which is the right still picture and was also the only thing a caller could reach. It now reads an animation to its end and hands back every moment beside the still picture, which is unchanged — measured against libjxl over five animations and twenty moments, colour and grey, with and without alpha. An animation whose later frames cannot be read comes back as its still picture with no moments at all rather than with a count that is short, because a caller stepping through a truncated animation has no way to tell that is what it is.
+
+Asking the wider question the audit was for — whether any format is missing outright — comes down to comparing every extension ImageMagick can read against every extension this registry claims. Eighty names are on ImageMagick's side and not on this one, and the great majority are not formats: ImageMagick's own generated pictures (`gradient`, `label`, `plasma`, `xc`), names for formats already read here under another one (`.png24`, `.png32`, `.bmp2`, `.bmp3`, `.gif87`, `.pjpeg`, and `.dxt1`/`.dxt5`, which are DDS files and decode as such to within a pixel of ImageMagick), headerless dumps of raw samples, and documents and fonts. What is left after those are set aside is a short list, and it is now empty: Aseprite, which the next paragraph is about, Garmin's JNX, Brother's PES, AVCI and Canon's CR3.
+
+JNX is a map rather than a picture — one file is many JPEG tiles, each covering a patch of ground, in one or more levels of detail — so it is registered as a multi-image format beside MPO and hands its tiles over as they are rather than pasting them into one raster the file says nothing about. No real JNX was to hand, so the layout was taken from ImageMagick's own coder and what this writes is given back to ImageMagick to judge, which is the direction that can be checked: ImageMagick opens a four-tile map written here, counts its four tiles and reports each one's size correctly, and its decode of the map is identical to its decode of the JPEG the map carries. The one detail worth naming is that a tile is stored without the two-byte start-of-image marker every tile would otherwise repeat, and the length beside it counts the bytes that are actually there.
+
+PES came the same way and reaches a different answer, because the file is a different kind of thing. A Brother embroidery file holds a needle path: a run of moves, each a delta on the last, split into blocks that each name a thread from a chart the file does not carry. It is read here and rendered — one path per block, a pixel wide, over the extent the stitches reach — and it is not written from a picture, for the reason the read-only section gives. Verification again runs through ImageMagick, which reads PES by turning the stitches into an SVG: handed a file written here from known stitches it reports the extent it read back, and that extent is computed from every coordinate in the file, so agreeing about it is agreeing about the decode. It counts that extent as the distance between the outermost stitches where this counts the pixels needed to draw them, which is one more in each axis — the same measurement, counted differently.
+
+AVCI turned out not to be a format at all. An `.avci` is a HEIF: the same boxes, the same item structure, the same `iloc` and `ipco`, with an H.264 access unit where an HEVC one would be and an `avcC` property where an `hvcC` would be. So it is read by the container code that was already here, with the H.264 decoder from the video package linked in beside the H.265 one that HEIF already borrowed, and `.avci` and `.avcs` join `.heic` and `.heif` as names of that one format rather than becoming a format of their own. ImageMagick is no help here — asked for AVCI it writes HEVC and calls it that — so the reference is libheif, which reads AVCI properly: a file built from an x264 intra frame is one libheif reports the brand, item and size of and decodes, and its decode is what this is measured against. The two agree to within two levels a sample, which is the rounding of the conversion out of YCbCr and the same allowance every other lossy comparison here makes.
+
+CR3 was the last of them and the one that looked closed. It is an ISO base media file — the same boxes again — with Canon's own boxes inside two `uuid`s, and its sensor data coded with CRX, Canon's wavelet codec, which is not implemented here and is refused by name. What is read is what the camera stored beside it: the full-size preview and the thumbnail, both ordinary JPEGs, which is the same answer this package already gives for every other raw format whose sensor compression it does not know — the preview inside is a picture either way. The registry writer deliberately stops at that same boundary: an arbitrary `RawImage` is JPEG-encoded as the CR3 preview and wrapped in the same `ftyp`/Canon-`uuid`/`PRVW` structure; no CRX track, camera model, lens or exposure is fabricated. The Write tick therefore means a CR3 container carrying the requested picture, not a camera-authored raw capture. No CR3 was to hand and none could be produced, so the file the reader is measured on was built to the layout ExifTool reads, and ExifTool is what judges it: handed a file written here it reports the type as CR3, states the codec version out of the Canon box, and extracts the preview and the thumbnail byte for byte as they went in. The one detail that had to be taken from ExifTool's own tables rather than reasoned about is that the preview's JPEG begins at a fixed offset of forty-eight bytes into its `uuid` box, behind a header whose earlier fields disagree with the comments describing them.
+
+The audit's third finding was a format that was simply absent. Aseprite is what ImageMagick writes for `.ase` and `.aseprite`, and nothing here read it — the entry above used to say the format was "not yet registered", which read as a decision and was not one; no reader existed. There is one now, and a writer with it. A sprite is a stack of layers rather than a raster, so the reader composes the first frame's visible cels in layer order, each at the offset its own chunk states, and refuses a blend mode other than normal rather than approximating one. Reading ImageMagick's own 64x48 sprite gives back the picture ImageMagick was given to make it, every pixel identical.
+
+The judge for that one had to be chosen with care, because the obvious judge does not work: ImageMagick cannot read an Aseprite sprite at all. Handed the file it wrote itself, it returns a canvas of zeroes at zero alpha, and it returns exactly the same thing for the file written here — the two decodes are identical and both are empty. So the comparison is against the picture the sprite was made from rather than against ImageMagick's reading of the sprite, and `.ase` and `.aseprite` are named in the corpus test's exclusions and the writer's, in both cases saying that the tool's verdict would be about its own reader. That leaves the writer without an independent judge, which is recorded as unverifiable rather than counted as a pass, in the same way as every other format nothing else here can read.
+
+Mapletown ML1 is the entry that changed its answer, and the reason is worth keeping. It was listed below as unwritable because the format is a drawing rather than a raster: horizontal runs of colour, with a chain stroke that walks down the picture ahead of the scan to lay an outline the runs then stop at. That bears on how good a file is, not on whether it is one — runs alone tile a picture exactly, the chain bit is simply zero, and what comes out is longer than the drawing program would have made of the same picture and is the same picture. RECOIL 6.4.5 owns the only other ML1 decoder and it agrees: eighteen files written here — 1x1 up to 640x400, flat, checkerboard, nine grey levels, a full 128-colour palette, runs wrapping past the end of a row — decode identically on both sides across all 1,020,117 channel values, and the acceptance and round-trip pairings carry a 320x200 one so a regression shows up without the sweep. A picture the stream itself cannot state is refused by name rather than truncated: a corner is sixteen bits, and the marker that ends an image is a length, which stops at twenty-one. Colour is the one thing that does not survive untouched, and it cannot — a Mapletown colour is a number in base nine with a digit per channel, 128 of them to a picture — so `FromRawImage` reduces to that palette and hands back exactly what the file will hold, and a picture already inside it round-trips byte for byte.
+
+DCTV is the one entry here whose writer is honestly lossy, and saying so is the point of this paragraph. A DCTV file is an ordinary ILBM whose pixel values are not colours: two adjacent 4-bit pixels form one 8-bit sample of a composite television waveform, the decoder recovers luminance as the mean of two neighbouring samples and chrominance as their second difference, and chrominance is carried at half the horizontal and half the vertical rate. A picture therefore cannot survive the round trip exactly, and no encoder can make it — that is the encoding, not a shortcut. What is refused instead is what the format cannot carry at all: a screen under 264 pixels wide, which cannot hold the synchronisation sequence the decoder looks for; one over 2,048; and an odd width, which would strand a sample with no partner at the right edge. Digital Creations never published any of this, so nothing here was reasoned out: the colour map and the signature line are copied byte for byte out of genuine DCTV files, where all four agree exactly, and the reconstruction follows RECOIL. Reading those four files — both the interlaced and the non-interlaced screen — this decoder and `recoil2png` produce identical pictures, 0 differing bytes of 1,059,840, 1,245,312 and 2,181,120. Encoding each of those pictures back and handing the result to `recoil2png` returns them at 30.0 to 36.6 dB PSNR, mean absolute error 2.1 to 4.0 a sample, in files within a few per cent of the size the DCTV software itself produced; the error that remains is the two-sample average and the halved chrominance rate, and it concentrates at the first and last few columns of each line, where the reconstruction has no earlier sample to average against and no partner to pair with — visible in genuine DCTV files as the dark border down their left edge.
+
+ECI Graphic Editor is the case for reading the Read column as what it is — a note that a reader is registered, not that it works. This one decoded 160 by 200 as a multicolour screen and its own remarks admitted the reference decoder disagreed on nearly every pixel; four earlier attempts had gone looking for the colour rule behind multicolour's pattern 11, which does not exist, because the format is not multicolour. ECI is Extended Colour Interlace: two high-resolution FLI frames, one bit a pixel, averaged on alternate fields, in two sixteen-kilobyte banks that each carry a bitmap and eight video matrices. The `.ecp` form is the same payload behind a run-length coder, which is now unpacked rather than read as though it were raw. Both forms decode identically to RECOIL 6.4.5 on noise probes that exercise every bit pattern and every matrix nibble of both frames. The writer follows from that layout: eight pixels of one raster line are described by two matrix bytes naming two colours each, so a group can show the four blends of a two-by-two grid and no more — `FromRawImageExact` fits that grid or refuses by name, while the registry's path optimises the two frames in turn and approximates, which beats a single FLI frame by a sixth of the squared error on a full-colour gradient. RECOIL reads what is written back to the picture that went in, and the comparison bites: packing the matrices at 1000 bytes rather than a page apiece, the plausible wrong guess, drops that agreement to 15 per cent.
+
+Fun Painter II is the case that shows why a tick in the Read column is worth less than it looks. A reader was registered, so the column said yes; what it decoded was not the picture. The format stores two interlaced FLI screens and the reader drew one of them, over a payload it had never unpacked, at the 160 by 200 a single multicolour screen stores rather than the 296 by 200 the two fields are shown at — and its own remarks said as much, having measured a tenth of the sampled pixels against RECOIL, which is what chance gives. Both halves are settled now against RECOIL 6.4.5, which has `RECOIL_DecodeFunUnpacked`: thirty-six probes — packed and unpacked, black, striped, and byte-for-byte random so every colour source and every bit pattern is exercised — decode identically on both sides, 59,200 pixels each with nothing differing. The interlace then makes writing exact rather than approximate, which is unusual for this family. Averaging two of the machine's sixteen colours gives 135 distinct results from 136 pairs, so a blended pixel names the pair behind it; the fields line up on odd columns and straddle each other on even ones, so a scanline is a chain, and one sweep along it settles which field owns which pixel. A picture the two fields can hold therefore comes back exactly — read a file, write it again, and RECOIL decodes both to the same 59,200 pixels — and one they cannot is refused by name rather than quietly approximated, which is what `FunPainterFile.FromRawImageExact` is for. Corrupting one byte of either bitmap, either set of video matrices or the colour memory the two share moves RECOIL's decode, so the comparison is known to bite rather than merely to pass.
+
+Formats no installed tool writes are judged the other way round — what we write is handed to RECOIL, ImageMagick, XnView and IrfanView (whichever are present) and must be accepted; `WriterAcceptanceTests` walks the whole registry so a new writer is covered the day it appears. A format nothing else knows is recorded as unverifiable rather than counted as a pass.
+
+Spectrum 512 Smooshed is the newest entry judged that way, and acceptance was not the bar it was held to. It used to be read-only on the ground that the packing was unspecified, which was wrong twice over: the packing is documented, and what stood in for a decoder returned nothing at all — `ToRawImage` refused every file. Both directions exist now. The bitmap goes out in byte-wide vertical strips under a run-length coder whose runs are three to 130 bytes and whose literals are one to 128; the palette goes out as a bitstream, a fourteen-bit map naming which of a scanline's entries follow and nine bits for each named colour. Which of the two bitmap layouts a file uses is stated by nothing in it — the reference decoder reads that from the parity of the very last byte, so ours ends on an even one, and the plane-by-plane layout is exercised by a file built for it.
+
+Eight probes chosen for what they put through those two coders — all black, one flat colour, the full fourteen-colour budget in bars, the same with black beside it, one-pixel vertical stripes so the run coder can shorten nothing, a different palette on each of the 199 scanlines, colour changes sitting on the palette-reload boundaries, and 63,680 random pixels from 199 random palettes — are written, decoded by `recoil2png` from RECOIL 6.4.5, and compared to the picture that went in: **zero differing samples on all eight**, 191,040 samples apiece, and our own reader gives the same eight back exactly. Putting one bit of the palette map out of order costs four of the eight, so it is the comparison that proves this rather than the file merely opening.
+
+The colour budget is where the format's limit bites, and it is smaller than the sixteen pens suggest. A scanline's packed palette states fourteen entries; entries 0 and 15 have no bit and are black by definition in each of the three zones a line carries, so pen 0 and pen 15 draw black wherever they appear. A picture inside that — 320x199, at most fourteen colours beside black on every scanline — round-trips exactly. `FromExactRawImage` refuses anything else by name, naming the scanline and the count, rather than quantising it down to fit: a sixth of a picture's colours replaced by the nearest survivor is not the picture that went in, and nothing in the file would have said so. The registry's writer contract asks for a file out of an arbitrary picture, so `FromRawImage` samples to size and reduces the scanlines that overflow — it leaves the ones that do not alone, so a picture the format can hold comes back unchanged through that path as well. Colours are snapped to the ST's three-bits-a-primary palette either way, which is every colour the machine has.
+
+Graph2FontScroll needs that judgement more than most, because nearly everything it writes goes into files it only names. A .vsc is a list; the picture is in the Graph2Font projects the list points at, so a tool accepting the .vsc alone would say nothing about them. RECOIL resolves the names itself, from the path, which is what makes it able to tell. Scrolls of one, two and four screens written here decode through `recoil2png` to the same pixels this package reads back from the same files. The comparison is controlled by spoiling a project two ways: one flipped colour byte, which RECOIL accepts and draws differently, and an impossible column count, which it refuses outright.
+
+A caution about the Read column: it is `SupportsRead` from the registry, which says a reader is registered for the format, not that the reader returns a picture. Two entries currently take the tick without earning it — `IffSham` and `IconLibrary` refuse in `ToRawImage` for every file, honestly and by name, but the matrix cannot see that and shows them as read. Two more did until recently: `Spectrum512Smoosh` threw on every file and `IffDctv` rendered its compressed body as grey noise, both while showing a tick, and both were found only because someone came to write them. Treat a tick here as "the format is recognised"; the paragraphs above say which readers have been measured against another implementation, and that is the claim worth trusting.
+
+### HP-GL authoring
+
+`Hpgl` writes arbitrary raster input as standard HP-GL pen geometry: alpha is composited onto white, colours are reduced to the modelled eight-pen carousel, adjacent pixels using the same pen are joined into filled rectangles, and sources above 512 pixels on either side are sampled down with their aspect ratio intact to keep plot size bounded. The output deliberately uses ordinary `IN`/`SP`/`PU`/`RA` commands rather than a private raster payload.
+
+### Registered but read-only
+
+These 28 entries read but have no writer; each is a decision, not an oversight. **Not bounded** (an encoder or a model this package does not have): Crw, Mrw, X3f (camera-raw sensor models), Dwg, Dxf, Hpgl (CAD/vector), TrueType (font), PeResource, PowerPoint, Fpx, PocketPcTheme (executable, OLE and CAB containers), IffAnim8, IffDpan, IffHame (multi-frame or hardware-mode Amiga animation), IffSham, IffMultiPalette (per-line palette encoders whose identity is unverified), Xld4, Gem, IconLibrary, PhotoSuiteProject (compressed or container layouts read from one sample each). **Deliberately not written** because a file built from arbitrary pixels would not be what the name promises: EmbeddedDib, Eroiica, NeoBookCartoon, CartesMichelin, Cr3, Pes. A CR3 is a camera's file, and one made from arbitrary pixels would state a sensor, a lens and an exposure that never happened, which is why every camera format here is read-only; `Cr3Writer` builds the container around a preview so the reader can be checked against ExifTool, and stays off the registry's writer contract for the same reason. The last of those is a needle path rather than a raster — a Brother embroidery file states where the needle goes and in which thread, and the picture is what those moves draw — so writing one from a picture means deciding where to put every stitch, which is needlework and not serialisation. Writing one from stitches a caller already has is a different thing and `PesWriter` does it; it stays off the registry's writer contract because that contract asks for a picture. **Declined for what the file would be, not for difficulty**: ElectricImage, HalfLifeModel. This entry used to call both of them, and ML1 with them, "simple raster layouts with specified headers" that nothing blocked but the work. Each format's own source says otherwise and has for some time; ML1 has since been answered, and the paragraph above says how. ElectricImage is a renderer's output file, and `ElectricImageFile`'s remarks decline to write one on the ground that this package cannot produce a true example of one. A Half-Life model is not a picture; it carries skins, and writing an image into one means synthesising a whole `studiohdr_t` model around a single texture. Neither is a missing encoder waiting for someone's afternoon.
+
+## 🚀 Quick start
+
+```csharp
+using FileFormat.Core;
+using Hawkynt.FileFormats.Images;
+
+var input = new FileInfo("mystery.bin");
+var format = FormatRegistry.DetectFromFile(input);
+var raw = FormatRegistry.Read(input);
+var png = FormatRegistry.Write(raw!, ImageFormat.Png);
+File.WriteAllBytes("out.png", png!);
+```
+
+### Detect from different inputs
+
+```csharp
+ImageFormat fromExtension = FormatRegistry.DetectFromExtension(".webp");
+ImageFormat fromMime = FormatRegistry.DetectFromMimeType("image/png");
+ImageFormat fromBytes = FormatRegistry.DetectFromBytes(headerBuffer);
+
+using var stream = File.OpenRead("photo.bin");
+ImageFormat fromStream = FormatRegistry.DetectFromStream(stream);
+
+var (detected, replay) = FormatRegistry.DetectFromStreamRewound(networkStream);
+RawImage? image = FormatRegistry.Read(replay);
+```
+
+### Read and normalize any image
+
+```csharp
+RawImage? image = FormatRegistry.Read(new FileInfo("anything.tga"));
+if (image != null) {
+  Console.WriteLine($"{image.Width}x{image.Height} {image.Format} HasAlpha={image.HasAlpha}");
+  byte[] rgba = image.ToRgba32();
+}
+```
+
+### Encode a `RawImage`
+
+```csharp
+var raw = new RawImage {
+  Width = 256,
+  Height = 256,
+  Format = PixelFormat.Rgba32,
+  PixelData = pixelBytes,
+};
+
+byte[]? png = FormatRegistry.Write(raw, ImageFormat.Png);
+byte[]? webp = FormatRegistry.Write(raw, ImageFormat.WebP);
+byte[]? qoi = FormatRegistry.Write(raw, ImageFormat.Qoi);
+
+using var output = File.Create("out.bmp");
+bool ok = FormatRegistry.Write(raw, ImageFormat.Bmp, output);
+```
+
+### Look up extensions and MIME types
+
+```csharp
+string ext = FormatRegistry.PrimaryExtension(ImageFormat.Jpeg);
+var aliases = FormatRegistry.AllExtensions(ImageFormat.Jpeg);
+string mime = FormatRegistry.PrimaryMimeType(ImageFormat.WebP);
+var mimes = FormatRegistry.AllMimeTypes(ImageFormat.Png);
+```
+
+### Inspect and filter capabilities
+
+```csharp
+var roundTrippable = FormatRegistry.AllFormats
+  .Where(e => e.SupportsRead && e.SupportsWrite)
+  .OrderBy(e => e.Name);
+
+var multiImage = FormatRegistry.AllFormats.Where(e => e.SupportsMultiImage);
+var mimed = FormatRegistry.AllFormats.Where(e => e.MimeTypes.Length > 0);
+```
+
+### Cross-format conversion
+
+```csharp
+File.WriteAllBytes(
+  "out.png",
+  FormatRegistry.Write(FormatRegistry.Read(new FileInfo("in.tga"))!, ImageFormat.Png)!);
+```
+
+### Metadata without decoding pixels
+
+```csharp
+var entry = FormatRegistry.GetEntry(ImageFormat.Jpeg);
+ImageInfo? info = entry?.ReadImageInfo?.Invoke(File.ReadAllBytes("photo.jpg"));
+if (info is { } meta)
+  Console.WriteLine($"{meta.Width}x{meta.Height} @ {meta.BitsPerPixel}bpp ({meta.ColorMode})");
+```
+
+`ReadImageInfo` is `null` when a format has no fast metadata-only path; callers can fall back to `Read`.
+
+### Multi-image formats
+
+```csharp
+var entry = FormatRegistry.GetEntry(ImageFormat.Tiff);
+if (entry?.SupportsMultiImage == true) {
+  int pages = entry.GetImageCount!(new FileInfo("multi.tif"));
+  for (var i = 0; i < pages; ++i) {
+    RawImage? page = entry.LoadRawImageAtIndex!(new FileInfo("multi.tif"), i);
+    // ...
+  }
+
+  var allPages = entry.LoadAllRawImages!(new FileInfo("multi.tif"));
+}
+```
+
+## 🧭 Key types at a glance
+
+### `FormatRegistry`
+
+| Member | Purpose |
+| --- | --- |
+| `DetectFromExtension(string)` | Map an extension to `ImageFormat`. |
+| `DetectFromMimeType(string)` | Map MIME type or alias to `ImageFormat`. |
+| `DetectFromBytes(ReadOnlySpan<byte>)` | Detect from magic bytes/custom signature logic. |
+| `DetectFromStream(Stream, int)` | Detect while restoring seekable-stream position. |
+| `DetectFromStreamRewound(Stream, int)` | Detect and return a replayable stream for non-seekable inputs. |
+| `DetectFromFile(FileInfo)` | Magic detection with extension fallback. |
+| `Read(FileInfo / byte[] / Stream)` | Detect and decode to `RawImage`. |
+| `Write(RawImage, ImageFormat)` | Encode to bytes when a writer exists. |
+| `Write(RawImage, ImageFormat, Stream)` | Encode directly to a stream. |
+| `GetEntry(ImageFormat)` | Get extensions, MIME types, signatures and capabilities. |
+| `PrimaryExtension` / `AllExtensions` | Canonical extension and aliases. |
+| `PrimaryMimeType` / `AllMimeTypes` | Preferred MIME type and aliases. |
+| `AllFormats` | Enumerate every registered format. |
+| `SupportedReadFormats` / `SupportedWriteFormats` | Enumerate by capability. |
+
+### `FormatEntry`
+
+The source generator produces typed registry entries rather than using runtime reflection. The public record carries the format identity, names/extensions/MIME types, capabilities/signatures/detection priority, read/write delegates, optional metadata reader, and optional multi-image delegates.
+
+Key computed properties are:
+
+| Property | Meaning |
+| --- | --- |
+| `PrimaryMimeType` | First registered MIME type, otherwise `application/octet-stream`. |
+| `SupportsRead` | A reader is registered. |
+| `SupportsWrite` | A conversion from arbitrary `RawImage` is registered. |
+| `SupportsMultiImage` | Image count/index/all-image delegates are registered. |
+
+### `MagicSignature`
+
+```csharp
+public readonly record struct MagicSignature(
+  byte[] Signature,
+  int Offset,
+  int MinHeaderLength);
+```
+
+Signatures are emitted from `[FormatMagicBytes(...)]`; `MinHeaderLength` prevents matchers from reading beyond the supplied header.
+
+### `ImageFormat`
+
+`ImageFormat` is generated at compile time. `Unknown = 0`; every discovered image format contributes another member. Consumers should not copy a hand-maintained enum list into application code—use the package's generated enum/registry.
+
+### `RawImage`
+
+```csharp
+public sealed class RawImage {
+  public required int Width { get; init; }
+  public required int Height { get; init; }
+  public required PixelFormat Format { get; init; }
+  public required byte[] PixelData { get; init; }
+
+  public byte[]? Palette { get; init; }
+  public int PaletteCount { get; init; }
+  public byte[]? AlphaTable { get; init; }
+
+  public bool IsIndexed { get; }
+  public bool HasAlpha { get; }
+
+  public byte[] ToBgra32();
+  public byte[] ToRgba32();
+  public byte[] ToRgb24();
+
+  public static int BytesPerPixel(PixelFormat format);
+  public static int BitsPerPixel(PixelFormat format);
+}
+```
+
+### `PixelFormat`
+
+| Value | Layout | Bits |
+| --- | --- | ---: |
+| `Bgra32` | B, G, R, A | 32 |
+| `Rgba32` | R, G, B, A | 32 |
+| `Argb32` | A, R, G, B | 32 |
+| `Rgb24` | R, G, B | 24 |
+| `Bgr24` | B, G, R | 24 |
+| `Gray8` | grayscale | 8 |
+| `Gray16` | 16-bit grayscale | 16 |
+| `GrayAlpha16` | grayscale + alpha | 16 |
+| `Indexed8` | palette index | 8 |
+| `Indexed4` | packed palette index | 4 |
+| `Indexed1` | packed palette index | 1 |
+| `Rgba64` | 16-bit R/G/B/A | 64 |
+| `Rgb48` | 16-bit R/G/B | 48 |
+| `Rgb565` | 5/6/5 RGB | 16 |
+
+### `FormatCapability`
+
+`FormatCapability` contains format-level flags such as `HasDedicatedOptimizer` and `MultiImage`. Per-format geometry/palette/display restrictions are modeled separately through `VideoMode` rather than being flattened into capability bits.
+
+### `VideoMode`
+
+```csharp
+public sealed record VideoMode(
+  string Name,
+  (IntegerRange Width, IntegerRange Height)[] Dimensions,
+  IntegerRange[]? AllowedPaletteRanges = null,
+  FixedPalette[]? AvailablePalettes = null,
+  PixelAspectRatio? PixelAspectRatio = null,
+  DisplayFilter DisplayFilter = DisplayFilter.None,
+  string? Description = null);
+```
+
+A format declares its selectable modes through `IImageFormatMetadata<TSelf>.VideoModes`. Multiple resolutions sharing one palette profile stay in one mode; palette variants for the same dimensions belong in `AvailablePalettes`.
+
+Representative declarations include:
+
+```csharp
+// Arbitrary-resolution full colour.
+static VideoMode[] VideoModes => [
+  new("Default", [(IntegerRange.Any, IntegerRange.Any)])
+];
+
+// Atari ST NeoChrome.
+static VideoMode[] VideoModes => [
+  new("Low resolution", [(320, 200)], [16]),
+  new("Medium resolution", [(640, 200)], [4]),
+  new("High resolution", [(640, 400)], [2]),
+];
+
+// CGA palette variants stay attached to the same geometry/profile.
+static VideoMode[] VideoModes => [
+  new("4-colour", [(320, 200)], [4],
+      [_LowIntensity0, _HighIntensity0, _LowIntensity1, _HighIntensity1]),
+  new("Monochrome", [(640, 200)], [2], [_MonochromePalette]),
+];
+
+// NES CHR can additionally describe pixel aspect and display filtering.
+static VideoMode[] VideoModes => [
+  new("Tilesheet (2bpp)",
+      [(128, new IntegerRange(8, 8192, step: 8))],
+      [new IntegerRange(2, 4)],
+      [_NesMaster64],
+      (8, 7),
+      DisplayFilter.NtscComposite),
+];
+```
+
+### `ImageInfo`
+
+```csharp
+public readonly record struct ImageInfo(
+  int Width,
+  int Height,
+  int BitsPerPixel,
+  string? ColorMode = null,
+  string? Compression = null,
+  int FrameCount = 1);
+```
+
+It is the lightweight metadata result for formats that can inspect dimensions/properties without a full pixel decode.
+
+## 🏗️ Registry and detection architecture
+
+`FileFormat.Registry.Generator` scans the compilation and referenced format assemblies at build time for the static image contracts and emits the `ImageFormat` enum plus registration code wired directly to the concrete static methods. There is no runtime reflection step.
+
+Detection runs priority-ordered custom `MatchesSignature(ReadOnlySpan<byte>)` logic for formats that need more than fixed magic bytes, then the generated magic-signature table. `DetectFromFile` falls back to extension only after byte-level detection fails.
+
+MIME types come from `[FormatMimeType(...)]`. The first annotation is the primary MIME type and later values are aliases; formats without a MIME annotation simply expose no registered MIME values rather than receiving guessed ones.
+
+## 📚 Extended format-family reference
+
+The exact current Read/Write/Multi-image state for every individual entry remains `FormatRegistry.AllFormats`. The tables here preserve the package's long-form inventory without freezing old capability counts or resurrecting obsolete states.
+
+### Lossless / scientific / HDR long tail
+
+| Family / format | Coverage note | Reference |
+| --- | --- | --- |
+| Farbfeld | simple 16-bit-per-channel lossless raster | [farbfeld](https://tools.suckless.org/farbfeld/) |
+| Netpbm PBM/PGM/PPM/PAM/P7 | portable bitmap/graymap/pixmap/anymap family | [Netpbm](http://netpbm.sourceforge.net/doc/) |
+| Analyze 7.5 | medical/scientific volume imagery | [Analyze 7.5](https://eeg.sourceforge.net/ANALYZE75.pdf) |
+| MetaImage `.mhd` / `.mha` | ITK MetaIO image data | [MetaImage](https://itk.org/Wiki/ITK/MetaIO) |
+| MRC2014 | electron microscopy/volume data | [CCP-EM MRC](https://www.ccpem.ac.uk/mrc_format/mrc2014.php) |
+| DICOM | medical image/container paths | [DICOM](https://www.dicomstandard.org/) |
+| ENVI | remote-sensing raster/header format | [ENVI header files](https://www.l3harrisgeospatial.com/docs/enviheaderfiles.html) |
+| VICAR | NASA/JPL image format | [VICAR](https://www-mipl.jpl.nasa.gov/external/VICAR_file_fmt.pdf) |
+| PDS | NASA Planetary Data System imagery | [PDS](https://pds.nasa.gov/) |
+
+### Professional / authoring
+
+| Family / format | Coverage note | Reference |
+| --- | --- | --- |
+| Photoshop PSD / PSB | Adobe Photoshop documents; exact writer state is registry-defined | [Adobe PSD/PSB](https://www.adobe.com/devnet-apps/photoshop/fileformatashtml/) |
+| Krita KRA | Krita document container/image data | [Krita](https://docs.krita.org/) |
+| OpenRaster ORA | layered raster interchange | [OpenRaster](https://www.openraster.org/) |
+| GIMP XCF | GIMP native image document | [XCF specification](https://developer.gimp.org/core/standards/xcf/) |
+| MagicaVoxel VOX | voxel scene/image data | [VOX format](https://github.com/ephtracy/voxel-model/blob/master/MagicaVoxel-file-format-vox.txt) |
+| WMF / EMF | Windows metafile/vector-rendering paths | [MS-WMF](https://learn.microsoft.com/openspecs/windows_protocols/ms-wmf/) |
+| EPS / PostScript | raster-preview/extraction paths | [PostScript reference](https://www.adobe.com/jp/print/postscript/pdfs/PLRM.pdf) |
+| PDF | image extraction rather than page renderer/editor | [ISO 32000 background](https://opensource.adobe.com/dc-acrobat-sdk-docs/pdfstandards/) |
+| PE EXE/DLL | image/resource extraction, not executable editing | [PE/COFF](https://learn.microsoft.com/windows/win32/debug/pe-format) |
+| VIPS | libvips native image format | [libvips](https://www.libvips.org/) |
+| SoftImage / Maya IFF | authoring/renderer image outputs | [IFF](https://en.wikipedia.org/wiki/Interchange_File_Format) |
+
+### GPU textures / 3D
+
+| Format | Coverage note | Reference |
+| --- | --- | --- |
+| DDS | DirectDraw/DirectX textures | [DDS](https://learn.microsoft.com/windows/win32/direct3ddds/dx-graphics-dds) |
+| KTX / KTX2 | Khronos texture containers | [KTX](https://registry.khronos.org/KTX/specs/) |
+| PVR | PowerVR texture container | [PVR format](https://docs.imgtec.com/PVR-File-Format-Specification/) |
+| ASTC | Adaptive Scalable Texture Compression | [ASTC encoder/spec resources](https://github.com/ARM-software/astc-encoder) |
+| PKM / ETC1 / ETC2 | Ericsson texture compression container/data | [Khronos ETC](https://registry.khronos.org/OpenGL/extensions/OES/OES_compressed_ETC1_RGB8_texture.txt) |
+| VTF | Valve Texture Format | [Valve VTF](https://developer.valvesoftware.com/wiki/Valve_Texture_Format) |
+| BLP | Blizzard texture family | [BLP](https://wowdev.wiki/BLP) |
+| FSH | EA Sports texture container | [FSH](https://wiki.simtropolis.com/wiki/FSH) |
+| WAD/WAD2/WAD3, MipTex | Quake/Half-Life texture archives and embedded texture data | [Quake file formats](https://quakewiki.org/wiki/Quake_file_formats) |
+| Block codecs | BC1–BC7, ETC1/ETC2, ASTC LDR, PVRTC helpers used by texture formats | [DirectX BC formats](https://learn.microsoft.com/windows/win32/direct3d11/texture-block-compression-in-direct3d-11) |
+
+### Animation / multi-image
+
+| Format | Coverage note | Reference |
+| --- | --- | --- |
+| GIF | animated frame/page access through the multi-image contract | [GIF89a](https://www.w3.org/Graphics/GIF/spec-gif89a.txt) |
+| APNG | animated PNG | [APNG spec](https://wiki.mozilla.org/APNG_Specification) |
+| MNG | Multiple-image Network Graphics; writer is a documented subset | [MNG](http://www.libpng.org/pub/mng/spec/) |
+| FLI/FLC | Autodesk Animator family | [FLIC](https://www.compuphase.com/flic.htm) |
+| TIFF / BigTIFF | multi-page image families | [TIFF](https://www.adobe.io/open/standards/TIFF.html), [BigTIFF](https://www.awaresystems.be/imaging/tiff/bigtiff.html) |
+| DCX | multi-page PCX/WinFax family | [DCX](https://fileformats.archiveteam.org/wiki/DCX) |
+| MPO | multi-picture JPEG | [CIPA DC-007](https://www.cipa.jp/std/documents/e/DC-007_E.pdf) |
+| ICNS | Apple icon resources with multiple representations | [ICNS](https://en.wikipedia.org/wiki/Apple_Icon_Image_format) |
+
+### Icons / cursors / fonts
+
+| Format | Coverage note | Reference |
+| --- | --- | --- |
+| ICO / CUR | Windows icons/cursors | [ICO/CUR](https://en.wikipedia.org/wiki/ICO_(file_format)) |
+| ANI | animated Windows cursors | [ANI](https://en.wikipedia.org/wiki/ANI_(file_format)) |
+| ICNS | Apple icon images | [ICNS](https://en.wikipedia.org/wiki/Apple_Icon_Image_format) |
+| Xcursor | X11 cursor images | [Xcursor](https://www.x.org/releases/X11R7.7/doc/man/man3/Xcursor.3.xhtml) |
+| SunIcon | Sun/X bitmap-family icon data | [XBM background](https://en.wikipedia.org/wiki/X_BitMap) |
+| MS FONT / FNT | bitmap-font glyph imagery | [Windows font resources](https://learn.microsoft.com/windows/win32/menurc/font-resource) |
+
+### Document / fax
+
+The package includes CCITT Group 3/4 primitives plus numerous fax-container variants including AccessFax, AdTechFax, BfxBitware, BrotherFax, CanonNavFax, EverexFax, FaxMan, FremontFax, GammaFax, HayesJtfax, ImagingFax, KofaxKfx, MobileFax, OazFax, OlicomFax, RicohFax, SciFax, SmartFax, TeliFax, Tg4, VentaFax, WinFax, WorldportFax, BrooktroutFax, EdmicsC4 and AttGroup4. Exact writer state is per registry entry.
+
+| Format/family | Reference |
+| --- | --- |
+| CCITT Fax Group 3 / Group 4 | [ITU-T T.4](https://www.itu.int/rec/T-REC-T.4) / [T.6](https://www.itu.int/rec/T-REC-T.6) |
+| WSQ fingerprint imagery | [FBI WSQ specification](https://www.fbibiospecs.cjis.gov/Document/Get?fileName=WSQ_Gray-scale_Specification_Version_3_1_Final.pdf) |
+| Symbian MBM | [Symbian bitmap background](https://en.wikipedia.org/wiki/Symbian) |
+
+### RAW camera
+
+| Format | Coverage note | Reference |
+| --- | --- | --- |
+| Adobe DNG | TIFF-derived digital negative | [DNG specification](https://helpx.adobe.com/camera-raw/digital-negative.html) |
+| Canon CR2 | lossless-JPEG/slice-oriented paths | [CR2 background](https://en.wikipedia.org/wiki/Raw_image_format#Canon) |
+| Canon CR3 | HEIF/ISOBMFF-derived subset | [CR3 background](https://en.wikipedia.org/wiki/Raw_image_format#Canon) |
+| Nikon NEF | manufacturer RAW paths including compressed variants | [NEF background](https://en.wikipedia.org/wiki/Raw_image_format#Nikon) |
+| Sony ARW2 | Sony RAW path including delta coding | [ARW background](https://en.wikipedia.org/wiki/Raw_image_format#Sony) |
+| Olympus ORF | Olympus RAW | [ORF background](https://en.wikipedia.org/wiki/Raw_image_format#Olympus) |
+| Panasonic RW2 | Panasonic RAW | [RW2 background](https://en.wikipedia.org/wiki/Raw_image_format#Panasonic) |
+
+### Other notable formats
+
+The long tail also includes TGA/Targa, PCX, SGI/Iris, Sun Raster, X PixMap (XPM), X BitMap (XBM), Wireless Bitmap (WBMP), AAI/DuneHD, HRZ slow-scan TV, CMU bitmap, GEM/GTM, PageMaker-related formats, Macromedia FreeHand, Pixar PXR, GD2/libgd, MIFF/ImageMagick, ECW, JNG, VIFF/Khoros, RLA/RPF/Wavefront, ART/PFS and AliasPix. `FormatRegistry.AllFormats` is the definitive individual list.
+
+## 🧪 Detection, registration, and verification notes
+
+- Registry generation is compile-time and typed; adding a format that implements the static contracts extends the generated enum/registration without runtime reflection.
+- Custom signature matchers may return `true`, `false`, or `null` when a header is insufficient; fixed magic signatures run through the generated priority table.
+- A format's MIME aliases are explicit metadata, not guesses derived from extensions.
+- A registered reader is not evidence for a writer; `SupportsWrite` is derived from the actual conversion delegate.
+- Writers should be validated against a specification, external implementation, or other independent evidence. Two project methods agreeing only with each other is not treated as sufficient conformance evidence.
+- Exact fast-moving counts belong to the generated registry/build rather than repeated prose.
+
+## 📚 API reference
+
+<!-- API:BEGIN generated by Hawkynt/RepositoryTemplate/package-readme — edit the XML docs in source, not here -->
+
+Every public and protected member of all 3261 types, generated from the built assembly and its XML documentation, is in [REFERENCE.md](https://github.com/Hawkynt/PNGCrushCS/blob/main/Hawkynt.FileFormats.Images/REFERENCE.md).
+
+<!-- API:END -->
+
+## 🔌 Dependencies
+
+| Dependency | Role |
+| --- | --- |
+| `FileFormat.Core` | `RawImage`, pixel formats, metadata and format contracts; bundled from this repository. |
+| `Compression.Core` | Shared compression primitives used by several formats; bundled. |
+| `FileFormat.TextMode` | Text-mode image infrastructure; bundled. |
+| `BitMiracle.LibTiff.NET` | Managed TIFF support used by TIFF paths. |
+| `BitMiracle.LibJpeg.NET` | Managed JPEG support used by JPEG paths. |
+| `FrameworkExtensions.Backports` | Backported framework primitives. |
+| `System.IO.Hashing` | Managed hashing primitives. |
+
+## ⚠️ Limitations
+
+- **WebP lossy authoring** — VP8 writing remains keyframe-only, but coefficient-token partition authoring is implemented for the standard 1/2/4/8 layouts. Partition streams can be emitted serially or concurrently after raster-dependent contexts are fixed, and both paths are required to be byte-identical. `WebPLossyEncoder` also provides multi-pass rate control targeting encoded byte size or decoded PSNR. RGBA alpha is preserved losslessly in `ALPH`; method 1 (headerless VP8L) is used only when it is smaller than method 0.
+- **HEIF / HEIC** — Direct HEVC image items decode at 8, 10 and 12 bits for the managed Main-profile intra paths measured above, including monochrome and 4:2:0. HEVC 4:2:2, 4:4:4 and depths above 12 are still refused rather than approximated.
+- **AVIF** — AV1 pixel decoding is active, not container-only. The current managed reader covers still key frames at 8/10/12 bit, monochrome/4:2:0/4:2:2/4:4:4, tiles and the measured in-loop filters. Inter prediction, film grain, super-resolution, scalability, palette blocks, intra block copy and segmentation remain unsupported. The writer is lossless 4:4:4 only and does not write alpha or perform rate control.
+- **BPG** — The managed decoder remains a still-image HEVC subset; animation and CMYK are refused. Arbitrary `RawImage` authoring is deliberately not registered: the previous path merely relabelled raw samples as BPG picture data, which is not a conforming BPG file. `BpgWriter` remains available for serialising a `BpgFile` model that already contains valid picture data.
+- **JPEG 2000** — Reading covers the externally measured profiles listed above, including 8/16-bit lossless and irreversible 9/7 paths. The writer deliberately emits one tile, one layer, reversible 5/3 and LRCP; ROI, POC, packed packet headers and arithmetic bypass are outside that authoring profile and are refused.
+- **JPEG XL** — Still-image reading covers modular and VarDCT, splines, patches, noise, multi-frame composition, 16-bit samples and embedded ICC profiles within the measured libjxl corpus. Animations are exposed frame by frame, but animations containing lossy VarDCT frames are still refused because XYB-domain blending has not been validated. The writer is lossless modular only (8/16-bit gray/gray+alpha/RGB/RGBA); it does not author lossy VarDCT.
+- **JPEG XR** — Gray8, RGB24 and RGBA32 are exposed through the managed T.832 core. Component counts other than one, three or four and interleaved alpha are refused at the current adapter; other WIC layouts may also be rejected even where the codec core supports them.
+- **Camera RAW** — DNG lossless JPEG, Canon CR2, Nikon NEF and Sony ARW2 have managed paths; other manufacturer-specific sensor compression remains future work.
+- **Write coverage** — Read support does not imply authoring support. Use the exhaustive matrix above or filter `FormatRegistry.AllFormats` by `SupportsWrite` for the exact current set of formats that can encode an arbitrary `RawImage`.
+- **PDF / PE** — image extraction only. PDF rendering, page composition, vector graphics, and PE writing are out of scope.
+- **Bundle size** — `~4.9 MB`, four assemblies. There is no way to take only the formats you need; if that matters, per-format NuGet packages may be published in future.
+- **TFM** — targets `net8.0`. Older runtimes are not supported.
+- Coverage breadth is larger than conformance depth. Some historical formats have scarce or no public samples; registry presence is not a promise that every obscure producer variant has been verified.
+- The JPEG XL pixel path is measured against libjxl on 104 files plus the fixtures, not against every `.jxl` that exists. Do not treat its internal round-trip as proof of arbitrary `.jxl` compatibility.
+
+## 📚 References
+
+The format-specific links in [Extended format-family reference](#-extended-format-family-reference) are the detailed bibliography. This table records external material that materially shaped implementation, reverse engineering, cross-checking, or conformance work: normative specifications and manuals, foreign source code used as implementation references or provenance, third-party encoders/decoders used as behavioural oracles, and catalogues/corpora used to find coverage gaps. An **oracle** is evidence against an external implementation, not a claim that every tool listed is independent — broad tools can share the same underlying codec libraries. Where this repository carries explicit third-party licence notices, [`THIRD_PARTY_NOTICES.md`](https://github.com/Hawkynt/PNGCrushCS/blob/main/Hawkynt.FileFormats.Images/THIRD_PARTY_NOTICES.md) is authoritative for those licence terms; this table is technical provenance, not a licensing inventory.
+
+| Reference | Kind | Used for |
+| --- | --- | --- |
+| [RFC 6386 — VP8 Data Format and Decoding Guide](https://www.rfc-editor.org/rfc/rfc6386) | Specification | VP8 bitstream syntax and boolean arithmetic coding. |
+| [Go `x/image/vp8`](https://pkg.go.dev/golang.org/x/image/vp8) | Foreign source code | Source lineage for the managed VP8 lossy decoder. |
+| [libwebp](https://github.com/webmproject/libwebp) | Foreign source code + oracle | WebP animation-compositor behaviour and `dwebp` pixel parity, including fancy chroma upsampling. |
+| [AV1 Bitstream & Decoding Process Specification](https://aomediacodec.github.io/av1-spec/) | Specification | AV1 syntax, transforms, prediction, entropy contexts and in-loop filters. |
+| [libaom](https://aomedia.googlesource.com/aom/) | Foreign source code + oracle | AV1 normative tables/algorithms and `libaom`-produced AVIF conformance corpus. |
+| [rav1e](https://github.com/xiph/rav1e) | Foreign source code | AV1 range-encoder storage/carry logic used by the managed writer; see third-party notices. |
+| [dav1d](https://code.videolan.org/videolan/dav1d) | Oracle | Sample-for-sample AV1 decode parity. |
+| [libavif (`avifenc` / `avifdec`)](https://github.com/AOMediaCodec/libavif) | Oracle | Independent AVIF generation/acceptance and alpha-plane checks. |
+| [SVT-AV1](https://gitlab.com/AOMediaCodec/SVT-AV1) | Oracle / corpus producer | Additional independently encoded AV1 bitstreams in the AVIF corpus. |
+| [ITU-T T.800 / JPEG 2000 Part 1](https://www.itu.int/rec/T-REC-T.800) | Specification | JPEG 2000 codestream syntax and baseline coding rules. |
+| [OpenJPEG](https://github.com/uclouvain/openjpeg) | Oracle | `opj_compress` / `opj_decompress` interoperability and pixel comparisons for JPEG 2000. |
+| [JPEG XL / ISO/IEC 18181](https://jpeg.org/jpegxl/) | Specification / documentation | JPEG XL codestream, metadata, modular and VarDCT semantics. |
+| [libjxl (`cjxl` / `djxl`)](https://github.com/libjxl/libjxl) | Foreign source code + oracle | Fast-lossless encoder provenance, decoder behaviour and extensive JPEG XL pixel parity. |
+| [zune-jpegxl](https://github.com/etemesi254/zune-image/tree/dev/crates/zune-jpegxl) | Foreign source-code cross-check | Independent cross-check of the JPEG XL fast-lossless adaptation. |
+| [ITU-T T.832 — JPEG XR](https://www.itu.int/rec/T-REC-T.832) | Specification | JPEG XR / HD Photo core coding rules. |
+| [SharpAstro/Codecs](https://github.com/SharpAstro/Codecs) | Foreign source code | Vendored managed JPEG XR T.832 core; exact provenance is recorded in third-party notices. |
+| [JXRLib](https://github.com/4creators/jxrlib) | Reference implementation + oracle | JPEG XR source lineage, fixtures, `JxrEncApp` / `JxrDecApp` interoperability. |
+| [Microsoft Windows Imaging Component (WIC)](https://learn.microsoft.com/windows/win32/wic/-wic-about-windows-imaging-codec) | Documentation + oracle | JPEG XR container/pixel-format GUID behaviour and Windows interoperability. |
+| [libheif](https://github.com/strukturag/libheif) | Oracle | HEIF/HEIC and AVCI decoding, colour handling, container interpretation and writer acceptance. |
+| [libde265 (`dec265`)](https://github.com/strukturag/libde265) | Oracle | Independent HEVC decode acceptance for HEIF writer output. |
+| [x264](https://code.videolan.org/videolan/x264) / [x265](https://bitbucket.org/multicoreware/x265_git/) | Corpus producers | Intra H.264/HEVC streams used to exercise AVCI and HEIF container paths. |
+| [FFmpeg](https://ffmpeg.org/) | Oracle | HEVC, JPEG 2000, AVIF and broad cross-format decode comparisons. |
+| [DjVuLibre](https://djvu.sourceforge.net/) | Foreign source-code provenance / reference implementation | ZP coder/decoder behaviour and probability-table provenance for DjVu. |
+| [RECOIL](https://recoil.sourceforge.net/) | Reference implementation + oracle | Pixel-exact validation and writer acceptance for many retro-computing formats where it is the only complete external decoder. |
+| [ImageMagick](https://imagemagick.org/formats/) | Oracle + format catalogue | Broad writer-generated corpus, pixel comparisons, acceptance checks and format-gap discovery. |
+| [XnView / NConvert](https://www.xnview.com/en/image-formats/) | Oracle + format catalogue | Broad format coverage comparison and external writer/read acceptance. |
+| [IrfanView](https://www.irfanview.info/main_formats.htm) | Oracle + format catalogue | Broad format coverage comparison and writer/read acceptance. |
+| [ExifTool](https://exiftool.org/) | Documentation + oracle | CR3/Canon box layout cross-checks and byte-exact preview/thumbnail extraction. |
+| [Tom's Editor supported formats](https://tomseditor.com/blog/supported-formats) | Format catalogue / oracle | Coverage-gap checks and spot conversions for obscure formats. |
+| [Telparia file-format samples](https://telparia.com/fileFormatSamples/image) | External corpus | Additional real-world samples used by parity tooling. |
+| [Microsoft OpenType specification](https://learn.microsoft.com/typography/opentype/spec/) | Specification | TrueType/sfnt table and glyph parsing. |
+| [Apple TrueType Reference Manual](https://developer.apple.com/fonts/TrueType-Reference-Manual/index.html) | Reference manual | Independent cross-check for TrueType outlines and table semantics. |
+| [Autodesk DXF Reference](https://help.autodesk.com/cloudhelp/2025/ENU/AutoCAD-DXF/files/GUID-20172853-157D-4024-8E64-32F3BD64F883.htm) | Reference manual | ASCII DXF file structure, group codes, sections and entity semantics. |
+
+## ❤️ Support
+
+If this project saves you time or money, consider supporting its development:
+
+[![GitHub Sponsors](https://img.shields.io/badge/GitHub-Sponsor-EA4AAA?logo=githubsponsors)](https://github.com/sponsors/Hawkynt)
+[![PayPal](https://img.shields.io/badge/PayPal-Donate-00457C)](https://www.paypal.me/hawkynt)
+
+## 📜 License
+
+Licensed under LGPL-3.0-or-later — see the repository [LICENSE](https://github.com/Hawkynt/PNGCrushCS/blob/main/LICENSE).
+
+Several codecs here are managed adaptations of permissively licensed reference code, and the terms those came under travel with them. [THIRD_PARTY_NOTICES.md](https://github.com/Hawkynt/PNGCrushCS/blob/main/Hawkynt.FileFormats.Images/THIRD_PARTY_NOTICES.md) names each one, what was taken and under which licence — the AV1 range encoder from rav1e, the JPEG XL fast-lossless encoder from libjxl, and the JPEG XR T.832 core from SharpAstro. Attribution is a licence term, not a courtesy.
+
+## ❤️ Support
+
+If this project saves you time or money, consider supporting its development:
+
+[![GitHub Sponsors](https://img.shields.io/badge/GitHub-Sponsor-EA4AAA?logo=githubsponsors)](https://github.com/sponsors/Hawkynt)
+[![PayPal](https://img.shields.io/badge/PayPal-Donate-00457C)](https://www.paypal.me/hawkynt)
+
+## 📜 License
+
+Licensed under LGPL-3.0-or-later — see the repository [LICENSE](https://github.com/Hawkynt/PNGCrushCS/blob/main/LICENSE).
+
+Several codecs here are managed adaptations of permissively licensed reference code, and the terms those came under travel with them. [THIRD_PARTY_NOTICES.md](https://github.com/Hawkynt/PNGCrushCS/blob/main/Hawkynt.FileFormats.Images/THIRD_PARTY_NOTICES.md) names each one, what was taken and under which licence — the AV1 range encoder from rav1e, the JPEG XL fast-lossless encoder from libjxl, and the JPEG XR T.832 core from SharpAstro. Attribution is a licence term, not a courtesy.

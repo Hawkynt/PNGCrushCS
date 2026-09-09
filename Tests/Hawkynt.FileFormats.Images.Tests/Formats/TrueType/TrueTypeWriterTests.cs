@@ -80,7 +80,9 @@ public sealed class TrueTypeWriterTests {
   public void ToBytes_CmapMapsGlyphsAfterNotdefIntoThePrivateUseArea() {
     var bytes = TrueTypeWriter.ToBytes(_OutlineFont());
     var cmap = _Directory(bytes)["cmap"];
-    var table = bytes.AsSpan(cmap.Offset, cmap.Length);
+    // Copied out rather than sliced in place: a ref struct local cannot be captured by the lambda
+    // Assert.Multiple takes.
+    var table = bytes.AsSpan(cmap.Offset, cmap.Length).ToArray();
 
     Assert.Multiple(() => {
       Assert.That(_U16(table, 0), Is.Zero);
@@ -90,8 +92,8 @@ public sealed class TrueTypeWriterTests {
     var subtable = checked((int)_U32(table, 8));
     Assert.Multiple(() => {
       Assert.That(_U16(table, subtable), Is.EqualTo(4));
-      Assert.That(_MapFormat4(table.Slice(subtable), 0xE000), Is.EqualTo(1));
-      Assert.That(_MapFormat4(table.Slice(subtable), 0xE001), Is.EqualTo(0));
+      Assert.That(_MapFormat4(table.AsSpan(subtable), 0xE000), Is.EqualTo(1));
+      Assert.That(_MapFormat4(table.AsSpan(subtable), 0xE001), Is.EqualTo(0));
     });
   }
 

@@ -173,8 +173,10 @@ public sealed class X3fTests {
     const int directoryOffset = X3fFile.HeaderSize + sectionLength;
 
     var written = X3fWriter.ToBytes(X3fFile.FromRawImage(_Picture(width, height)));
-    var section = written.AsSpan(X3fFile.HeaderSize, sectionLength);
-    var directory = written.AsSpan(directoryOffset);
+    // Copied out rather than sliced in place: a ref struct local cannot be captured by the lambda
+    // Assert.Multiple takes.
+    var section = written.AsSpan(X3fFile.HeaderSize, sectionLength).ToArray();
+    var directory = written.AsSpan(directoryOffset).ToArray();
 
     Assert.Multiple(() => {
       Assert.That(written.AsSpan(0, 4).ToArray(), Is.EqualTo(X3fFile.Magic.ToArray()));
@@ -182,20 +184,20 @@ public sealed class X3fTests {
       Assert.That(BinaryPrimitives.ReadUInt32LittleEndian(written.AsSpan(X3fFile.ColumnsField)), Is.EqualTo((uint)width));
       Assert.That(BinaryPrimitives.ReadUInt32LittleEndian(written.AsSpan(X3fFile.RowsField)), Is.EqualTo((uint)height));
 
-      Assert.That(section[..4].ToArray(), Is.EqualTo(new byte[] { (byte)'S', (byte)'E', (byte)'C', (byte)'i' }));
-      Assert.That(BinaryPrimitives.ReadUInt32LittleEndian(section[4..]), Is.EqualTo(0x00020000u));
-      Assert.That(BinaryPrimitives.ReadUInt32LittleEndian(section[8..]), Is.EqualTo(2u));
-      Assert.That(BinaryPrimitives.ReadUInt32LittleEndian(section[12..]), Is.EqualTo((uint)X3fFile.FormatRgb24));
-      Assert.That(BinaryPrimitives.ReadUInt32LittleEndian(section[16..]), Is.EqualTo((uint)width));
-      Assert.That(BinaryPrimitives.ReadUInt32LittleEndian(section[20..]), Is.EqualTo((uint)height));
-      Assert.That(BinaryPrimitives.ReadUInt32LittleEndian(section[24..]), Is.EqualTo((uint)stride));
+      Assert.That(section[..4], Is.EqualTo(new byte[] { (byte)'S', (byte)'E', (byte)'C', (byte)'i' }));
+      Assert.That(BinaryPrimitives.ReadUInt32LittleEndian(section.AsSpan(4)), Is.EqualTo(0x00020000u));
+      Assert.That(BinaryPrimitives.ReadUInt32LittleEndian(section.AsSpan(8)), Is.EqualTo(2u));
+      Assert.That(BinaryPrimitives.ReadUInt32LittleEndian(section.AsSpan(12)), Is.EqualTo((uint)X3fFile.FormatRgb24));
+      Assert.That(BinaryPrimitives.ReadUInt32LittleEndian(section.AsSpan(16)), Is.EqualTo((uint)width));
+      Assert.That(BinaryPrimitives.ReadUInt32LittleEndian(section.AsSpan(20)), Is.EqualTo((uint)height));
+      Assert.That(BinaryPrimitives.ReadUInt32LittleEndian(section.AsSpan(24)), Is.EqualTo((uint)stride));
 
-      Assert.That(directory[..4].ToArray(), Is.EqualTo(X3fFile.DirectoryMagic.ToArray()));
-      Assert.That(BinaryPrimitives.ReadUInt32LittleEndian(directory[4..]), Is.EqualTo(0x00020000u));
-      Assert.That(BinaryPrimitives.ReadUInt32LittleEndian(directory[8..]), Is.EqualTo(1u));
-      Assert.That(BinaryPrimitives.ReadUInt32LittleEndian(directory[12..]), Is.EqualTo((uint)X3fFile.HeaderSize));
-      Assert.That(BinaryPrimitives.ReadUInt32LittleEndian(directory[16..]), Is.EqualTo((uint)sectionLength));
-      Assert.That(directory.Slice(20, 4).ToArray(), Is.EqualTo(new byte[] { (byte)'I', (byte)'M', (byte)'A', (byte)'G' }));
+      Assert.That(directory[..4], Is.EqualTo(X3fFile.DirectoryMagic.ToArray()));
+      Assert.That(BinaryPrimitives.ReadUInt32LittleEndian(directory.AsSpan(4)), Is.EqualTo(0x00020000u));
+      Assert.That(BinaryPrimitives.ReadUInt32LittleEndian(directory.AsSpan(8)), Is.EqualTo(1u));
+      Assert.That(BinaryPrimitives.ReadUInt32LittleEndian(directory.AsSpan(12)), Is.EqualTo((uint)X3fFile.HeaderSize));
+      Assert.That(BinaryPrimitives.ReadUInt32LittleEndian(directory.AsSpan(16)), Is.EqualTo((uint)sectionLength));
+      Assert.That(directory.AsSpan(20, 4).ToArray(), Is.EqualTo(new byte[] { (byte)'I', (byte)'M', (byte)'A', (byte)'G' }));
       Assert.That(BinaryPrimitives.ReadUInt32LittleEndian(written.AsSpan(written.Length - 4)), Is.EqualTo((uint)directoryOffset));
     });
 

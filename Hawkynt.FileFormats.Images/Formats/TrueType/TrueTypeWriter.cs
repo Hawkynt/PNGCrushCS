@@ -315,7 +315,7 @@ public static class TrueTypeWriter {
     }
     _I16(data, 68, yMax);
     _I16(data, 70, yMin);
-    _U16(data, 74, Math.Max(0, yMax));
+    _U16(data, 74, Math.Max(0, (int)yMax));
     _U16(data, 76, Math.Max(0, -(int)yMin));
     return data;
   }

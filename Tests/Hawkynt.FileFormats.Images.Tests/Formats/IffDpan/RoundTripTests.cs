@@ -25,17 +25,19 @@ public sealed class RoundTripTests {
     });
 
     var frameLength = checked(8 + (int)BinaryPrimitives.ReadUInt32BigEndian(bytes.AsSpan(16, 4)));
-    var frame = bytes.AsSpan(12, frameLength);
+    // Copied out rather than sliced in place: a ref struct local cannot be captured by the lambda
+    // Assert.Multiple takes.
+    var frame = bytes.AsSpan(12, frameLength).ToArray();
     var dpanOffset = _FindChunk(frame, "DPAN"u8);
     var bodyOffset = _FindChunk(frame, "BODY"u8);
 
     Assert.Multiple(() => {
       Assert.That(dpanOffset, Is.GreaterThanOrEqualTo(12));
       Assert.That(dpanOffset, Is.LessThan(bodyOffset), "Deluxe Paint places DPAN in the first ILBM before BODY.");
-      Assert.That(BinaryPrimitives.ReadUInt32BigEndian(frame.Slice(dpanOffset + 4, 4)), Is.EqualTo(8u));
-      Assert.That(BinaryPrimitives.ReadUInt16BigEndian(frame.Slice(dpanOffset + 8, 2)), Is.EqualTo(IffDpanFile.CurrentVersion));
-      Assert.That(BinaryPrimitives.ReadUInt16BigEndian(frame.Slice(dpanOffset + 10, 2)), Is.EqualTo(1));
-      Assert.That(BinaryPrimitives.ReadUInt32BigEndian(frame.Slice(dpanOffset + 12, 4)), Is.Zero);
+      Assert.That(BinaryPrimitives.ReadUInt32BigEndian(frame.AsSpan(dpanOffset + 4, 4)), Is.EqualTo(8u));
+      Assert.That(BinaryPrimitives.ReadUInt16BigEndian(frame.AsSpan(dpanOffset + 8, 2)), Is.EqualTo(IffDpanFile.CurrentVersion));
+      Assert.That(BinaryPrimitives.ReadUInt16BigEndian(frame.AsSpan(dpanOffset + 10, 2)), Is.EqualTo(1));
+      Assert.That(BinaryPrimitives.ReadUInt32BigEndian(frame.AsSpan(dpanOffset + 12, 4)), Is.Zero);
     });
   }
 

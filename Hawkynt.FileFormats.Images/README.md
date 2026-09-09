@@ -56,7 +56,7 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | AladdinPaint | `.alp` | ✅ | ✅ | — | — | — |
 | AliasPix | `.pix`, `.als`, `.alias`, `.img`, `.lux` | ✅ | ✅ | — | — | — |
 | AmicaPaint | `.ami` | ✅ | ✅ | — | — | — |
-| AmigaIcon | `.info` | ✅ | ✅ | — | ✅ | — |
+| AmigaIcon | `.info` | ✅ | ✅ | — | — | — |
 | AmosBank | `.abk` | ✅ | ✅ | — | — | — |
 | AmstradCpc | `.cpc` | ✅ | ✅ | — | — | — |
 | AmstradMode5 | `.cm5` | ✅ | ✅ | — | — | — |
@@ -169,7 +169,7 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | BodyPaint3D | `.b3d`, `.b2d` | ✅ | ✅ | — | — | — |
 | BoogieDownPaint | `.bdp` | ✅ | ✅ | — | — | — |
 | Botticelli | `.p4i` | ✅ | ✅ | — | — | — |
-| Bpg | `.bpg` | ✅ | ✅ | — | — | — |
+| Bpg | `.bpg` | ✅ | — | — | — | — |
 | BrooktroutFax | `.brk`, `.301`, `.brt` | ✅ | ✅ | — | — | — |
 | BrotherFax | `.uni` | ✅ | ✅ | — | — | — |
 | Brus | `.brus` | ✅ | ✅ | — | — | — |
@@ -194,6 +194,7 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | CartesMichelin | `.big` | ✅ | — | — | — | — |
 | CasioQv | `.cam` | ✅ | ✅ | — | — | — |
 | Ccitt | `.g3`, `.g4`, `.ccitt`, `.fax` | ✅ | ✅ | — | — | — |
+| Cdr | `.cdr` | ✅ | — | — | — | — |
 | CDUPaint | `.cdu` | ✅ | ✅ | — | — | — |
 | Cdxl | `.cdxl` | ✅ | ✅ | — | — | — |
 | Cel | `.cel` | ✅ | ✅ | — | — | — |
@@ -217,6 +218,7 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | Clp | `.clp` | ✅ | ✅ | — | — | — |
 | Cmu | `.cmu` | ✅ | ✅ | — | — | — |
 | CmuWindowManager | `.cmu`, `.cmuwm` | ✅ | ✅ | — | — | — |
+| Cmx | `.cmx` | ✅ | — | — | — | — |
 | CoCo | `.coc` | ✅ | ✅ | — | — | — |
 | CoCo3 | `.cc3` | ✅ | ✅ | — | — | — |
 | CoCoMax | `.max`, `.p41` | ✅ | ✅ | — | — | — |
@@ -247,7 +249,7 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | CranachPaint | `.esm` | ✅ | ✅ | — | — | — |
 | Crd | `.crd` | ✅ | ✅ | — | — | — |
 | CreateWithGarfield | `.cwg` | ✅ | ✅ | — | — | — |
-| Crw | `.crw` | ✅ | — | — | — | — |
+| Crw | `.crw` | ✅ | ✅ | — | — | — |
 | CsvImage | `.csv` | ✅ | ✅ | — | — | — |
 | Cur | `.cur` | ✅ | ✅ | — | ✅ | ✅ |
 | CutCreator | `.cut` | ✅ | ✅ | — | — | — |
@@ -288,8 +290,8 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | DuneGraph | `.dg1`, `.dc1` | ✅ | ✅ | — | — | — |
 | Duo | `.duo`, `.du1` | ✅ | ✅ | — | — | — |
 | DuoMedium | `.du2` | ✅ | ✅ | — | — | — |
-| Dwg | `.dwg` | ✅ | — | — | — | — |
-| Dxf | `.dxf` | ✅ | — | — | — | — |
+| Dwg | `.dwg` | ✅ | ✅ | — | — | — |
+| Dxf | `.dxf` | ✅ | ✅ | — | — | — |
 | EccHeader | `.ecc` | ✅ | ✅ | — | — | — |
 | EciGraphicEditor | `.eci`, `.ecp` | ✅ | ✅ | — | — | — |
 | EclipseTile | `.tile` | ✅ | ✅ | — | — | — |
@@ -298,14 +300,14 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | EggPaint | `.trp` | ✅ | ✅ | — | — | — |
 | ElectricImage | `.ei`, `.eidi` | ✅ | ✅ | — | ✅ | — |
 | Electronika | `.bk`, `.ekr` | ✅ | ✅ | — | — | — |
-| EmbeddedDib | `.cdr`, `.cmx`, `.zmf`, `.skf`, `.cad`, `.sdg`, `.ipg`, `.btn` | ✅ | — | — | — | — |
+| EmbeddedDib | `.zmf`, `.skf`, `.cad`, `.btn` | ✅ | — | — | — | — |
 | EmcEditor | `.emc` | ✅ | ✅ | — | — | — |
 | Emf | `.emf` | ✅ | ✅ | — | — | — |
 | Enterprise128 | `.ep`, `.elan` | ✅ | ✅ | — | — | — |
 | Envi | `.hdr` | ✅ | ✅ | — | — | — |
 | EpaBios | `.epa` | ✅ | ✅ | — | — | — |
 | Eps | `.eps`, `.epsf`, `.epsi`, `.epi`, `.ept` | ✅ | ✅ | — | — | — |
-| Eroiica | `.eif` | ✅ | — | — | ✅ | — |
+| Eroiica | `.eif` | ✅ | ✅ | — | ✅ | — |
 | EscapePaint | `.esp` | ✅ | ✅ | — | — | — |
 | EsmSoftwarePix | `.pix` | ✅ | ✅ | — | — | — |
 | EverexFax | `.efx`, `.ef3` | ✅ | ✅ | — | — | — |
@@ -364,7 +366,7 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | Gd2 | `.gd2` | ✅ | ✅ | — | — | — |
 | GedPicture | `.ged` | ✅ | ✅ | — | — | — |
 | GeGenesis | `.fre`, `.pd`, `.t1`, `.t2` | ✅ | ✅ | — | — | — |
-| Gem | `.gem` | ✅ | — | — | — | — |
+| Gem | `.gem` | ✅ | ✅ | — | — | — |
 | GemImg | `.img` | ✅ | ✅ | — | — | — |
 | GeoPaint | `.geo` | ✅ | ✅ | — | — | — |
 | GephardHires | `.ghg` | ✅ | ✅ | — | — | — |
@@ -394,7 +396,7 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | Grs16 | `.g16` | ✅ | ✅ | — | — | — |
 | GunPaint | `.gun`, `.ifl` | ✅ | ✅ | — | — | — |
 | HalfLifeMdl | `.mdltex` | ✅ | ✅ | — | — | — |
-| HalfLifeModel | `.mdl` | ✅ | — | — | — | — |
+| HalfLifeModel | `.mdl` | ✅ | ✅ | — | — | — |
 | HandyScanner | `.hs2` | ✅ | ✅ | — | — | — |
 | HardColorMap | `.hcm` | ✅ | ✅ | — | — | — |
 | HardInterlace | `.hip` | ✅ | ✅ | — | — | — |
@@ -430,23 +432,20 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | IcePcinPlus | `.ip2` | ✅ | ✅ | — | — | — |
 | Icns | `.icns` | ✅ | ✅ | — | ✅ | — |
 | Ico | `.ico` | ✅ | ✅ | — | ✅ | ✅ |
-| IconLibrary | `.icl` | ✅ | — | — | — | — |
+| IconLibrary | `.icl` | ✅ | ✅ | — | — | — |
 | Ics | `.ics` | ✅ | ✅ | — | — | — |
 | IffAcbm | `.acbm`, `.iff`, `.blk` | ✅ | ✅ | — | — | — |
-| IffAnim | `.anim` | ✅ | ✅ | — | ✅ | — |
-| IffAnim8 | `.an8`, `.anim8` | ✅ | — | — | — | — |
-
 | IffAnim | `.anim` | ✅ | ✅ | — | — | — |
 | IffAnim8 | `.an8`, `.anim8` | ✅ | ✅ | — | — | — |
 | IffDctv | `.dctv` | ✅ | ✅ | — | — | — |
 | IffDeep | `.deep`, `.iff`, `.blk` | ✅ | ✅ | — | — | — |
-| IffDpan | `.dpan` | ✅ | — | — | — | — |
-| IffHame | `.hame` | ✅ | — | — | — | — |
-| IffMultiPalette | `.mpl`, `.mpal` | ✅ | — | — | — | — |
+| IffDpan | `.dpan` | ✅ | ✅ | — | — | — |
+| IffHame | `.hame` | ✅ | ✅ | — | — | — |
+| IffMultiPalette | `.mpl`, `.mpal` | ✅ | ✅ | — | — | — |
 | IffPbm | `.lbm`, `.pbm`, `.blk` | ✅ | ✅ | — | — | — |
 | IffRgb8 | `.rgb8`, `.iff`, `.blk` | ✅ | ✅ | — | — | — |
 | IffRgbn | `.rgbn`, `.iff`, `.blk` | ✅ | ✅ | — | — | — |
-| IffSham | `.sham` | ✅ | — | — | — | — |
+| IffSham | `.sham` | ✅ | ✅ | — | — | — |
 | Ilbm | `.lbm`, `.ilbm`, `.iff`, `.blk`, `.ham`, `.ham6`, `.ham8`, `.256`, `.ap2`, `.beam`, `.dct`, `.dr`, `.mp`, `.bl1`, `.bl2`, `.bl3` | ✅ | ✅ | — | — | — |
 | Im5Visilog | `.im5` | ✅ | ✅ | — | — | — |
 | ImageLabBw | `.b&w`, `.b_w`, `.dit` | ✅ | ✅ | — | — | — |
@@ -473,6 +472,7 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | InterPaintMc | `.ipt`, `.lre` | ✅ | ✅ | — | — | — |
 | Ioca | `.ica`, `.ioca`, `.ioc`, `.mod` | ✅ | ✅ | — | — | — |
 | IPaint | `.ip` | ✅ | ✅ | — | — | — |
+| Ipg | `.ipg` | ✅ | — | — | ✅ | — |
 | Ipl | `.ipl` | ✅ | ✅ | — | — | — |
 | Ipsm | `.pan` | ✅ | ✅ | — | — | — |
 | Iss | `.iss` | ✅ | ✅ | — | — | — |
@@ -552,7 +552,7 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | Mpo | `.mpo` | ✅ | ✅ | — | ✅ | — |
 | Mrc | `.mrc`, `.map` | ✅ | ✅ | — | — | — |
 | Mrf | `.mrf` | ✅ | ✅ | — | — | — |
-| Mrw | `.mrw` | ✅ | — | — | — | — |
+| Mrw | `.mrw` | ✅ | ✅ | — | — | — |
 | Msp | `.msp` | ✅ | ✅ | — | — | — |
 | Msx | `.sc2`, `.sc5`, `.sc7`, `.sc8`, `.ge7`, `.ge8` | ✅ | ✅ | — | — | — |
 | MsxFont | `.fnt`, `.mft` | ✅ | ✅ | — | — | — |
@@ -579,7 +579,7 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | MultiPalettePicture | `.mpp` | ✅ | ✅ | — | — | — |
 | NcrImage | `.ncr` | ✅ | ✅ | — | — | — |
 | NdsTexture | `.nbfs`, `.nds` | ✅ | ✅ | — | — | — |
-| NeoBookCartoon | `.car` | ✅ | — | — | — | — |
+| NeoBookCartoon | `.car` | ✅ | ✅ | — | — | — |
 | Neochrome | `.neo` | ✅ | ✅ | — | — | — |
 | NeoGeoPocket | `.ngp`, `.ngpc` | ✅ | ✅ | — | — | — |
 | NeoGeoSprite | `.spr` | ✅ | ✅ | — | — | — |
@@ -742,6 +742,7 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | ScitexCt | `.sct`, `.ct`, `.ch` | ✅ | ✅ | — | — | — |
 | ScreenBlaster | `.sbl` | ✅ | ✅ | — | — | — |
 | ScreenMaker | `.smk` | ✅ | ✅ | — | — | — |
+| Sdg | `.sdg` | ✅ | — | — | ✅ | — |
 | Sdt | `.sdt` | ✅ | ✅ | — | — | — |
 | SeattleFilmWorks | `.sfw`, `.pwp` | ✅ | ✅ | — | — | — |
 | SecondNatureSlideShow | `.cat` | ✅ | ✅ | — | ✅ | — |
@@ -832,7 +833,7 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | TrsPix | `.pix` | ✅ | ✅ | — | — | — |
 | TrueColorImg | `.timg` | ✅ | ✅ | — | — | — |
 | TruePaint | `.mci` | ✅ | ✅ | — | — | — |
-| TrueType | `.ttf` | ✅ | — | — | — | — |
+| TrueType | `.ttf` | ✅ | ✅ | — | — | — |
 | TrzmielCompressed | `.cpr` | ✅ | ✅ | — | — | — |
 | TurboRascal | `.flf` | ✅ | ✅ | — | — | — |
 | TurboView | `.tvw`, `.tbv` | ✅ | ✅ | — | — | — |
@@ -889,7 +890,7 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | XFliEditor | `.xfl` | ✅ | ✅ | — | — | — |
 | Ximage | `.xim` | ✅ | ✅ | — | — | — |
 | XionicsSmp | `.smp` | ✅ | ✅ | — | — | — |
-| Xld4 | `.q4` | ✅ | — | — | — | — |
+| Xld4 | `.q4` | ✅ | ✅ | — | — | — |
 | XlPaint | `.xlp` | ✅ | ✅ | — | — | — |
 | Xpm | `.xpm`, `.picon` | ✅ | ✅ | — | — | — |
 | XvThumbnail | `.xv`, `.p7` | ✅ | ✅ | — | — | — |

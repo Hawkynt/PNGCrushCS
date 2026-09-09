@@ -34,9 +34,10 @@ public sealed class PhotoSuiteProjectTests {
         pixels[at + 2] = (byte)(x * y * 11 + 1);
       }
 
-    return PngWriter.ToBytes(PngFile.FromRawImage(new() {
+    var image = new RawImage {
       Width = width, Height = height, Format = PixelFormat.Rgb24, PixelData = pixels
-    }));
+    };
+    return PngWriter.ToBytes(PngFile.FromRawImage(image));
   }
 
   private static byte[] _Build(int gap = 0, bool withPng = true) {
@@ -150,8 +151,10 @@ public sealed class PhotoSuiteProjectTests {
     var actual = PhotoSuiteProjectFile.ToRawImage(PhotoSuiteProjectReader.FromBytes(data));
     var directorySector = BinaryPrimitives.ReadUInt32LittleEndian(data.AsSpan(48, 4));
     var directoryOffset = checked((int)(directorySector + 1) * 512);
-    var imageEntry = data.AsSpan(directoryOffset + 128, 128);
-    var nameLength = BinaryPrimitives.ReadUInt16LittleEndian(imageEntry.Slice(64, 2));
+    // Copied out rather than sliced in place: a ref struct local cannot be captured by the lambda
+    // Assert.Multiple takes.
+    var imageEntry = data.AsSpan(directoryOffset + 128, 128).ToArray();
+    var nameLength = BinaryPrimitives.ReadUInt16LittleEndian(imageEntry.AsSpan(64, 2));
     var name = Encoding.Unicode.GetString(imageEntry[..(nameLength - 2)]);
 
     Assert.Multiple(() => {
@@ -159,7 +162,7 @@ public sealed class PhotoSuiteProjectTests {
       Assert.That(BinaryPrimitives.ReadUInt32LittleEndian(data.AsSpan(64, 4)), Is.Zero);
       Assert.That(name, Is.EqualTo("Image"));
       Assert.That(imageEntry[66], Is.EqualTo(2));
-      Assert.That(BinaryPrimitives.ReadUInt64LittleEndian(imageEntry.Slice(120, 8)), Is.GreaterThanOrEqualTo(4096ul));
+      Assert.That(BinaryPrimitives.ReadUInt64LittleEndian(imageEntry.AsSpan(120, 8)), Is.GreaterThanOrEqualTo(4096ul));
       Assert.That(actual.PixelData, Is.EqualTo(expected.PixelData));
     });
   }
