@@ -3,8 +3,8 @@ using FileFormat.Core;
 
 namespace FileFormat.IffAnim8;
 
-/// <summary>In-memory representation of an IFF ANIM8 (Long-word delta animation) file.</summary>
-public readonly record struct IffAnim8File : IImageFormatReader<IffAnim8File>, IImageToRawImage<IffAnim8File>, IImageFormatWriter<IffAnim8File> {
+/// <summary>In-memory representation of an IFF ANIM method-8 (short/long vertical delta) file.</summary>
+public readonly record struct IffAnim8File : IImageFormatReader<IffAnim8File>, IImageToRawImage<IffAnim8File>, IImageFromRawImage<IffAnim8File>, IImageFormatWriter<IffAnim8File> {
 
   /// <summary>Minimum valid file size (FORM header = 12 bytes).</summary>
   internal const int MinFileSize = 12;
@@ -26,21 +26,45 @@ public readonly record struct IffAnim8File : IImageFormatReader<IffAnim8File>, I
   /// <summary>Image height in pixels.</summary>
   public int Height { get; init; }
 
-  /// <summary>Raw file data.</summary>
+  /// <summary>RGB24 pixels used when creating a new ANIM8 file.</summary>
+  public byte[] PixelData { get; init; }
+
+  /// <summary>Raw file data retained when a file was parsed by the legacy reader.</summary>
   public byte[] RawData { get; init; }
 
   /// <summary>Converts this ANIM8 file to a platform-independent <see cref="RawImage"/> in Rgb24 format.</summary>
   public static RawImage ToRawImage(IffAnim8File file) {
-
     var width = file.Width;
     var height = file.Height;
-    var rgb = new byte[width * height * 3];
+    var expectedLength = (long)width * height * 3;
 
+    if (file.PixelData is { } pixels && pixels.LongLength == expectedLength)
+      return new() {
+        Width = width,
+        Height = height,
+        Format = PixelFormat.Rgb24,
+        PixelData = pixels[..],
+      };
+
+    var rgb = new byte[checked(width * height * 3)];
     return new() {
       Width = width,
       Height = height,
       Format = PixelFormat.Rgb24,
       PixelData = rgb,
+    };
+  }
+
+  /// <summary>Creates an ANIM8 file representation from arbitrary image pixels.</summary>
+  public static IffAnim8File FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+    image = image.EnsureFormat(PixelFormat.Rgb24);
+
+    return new() {
+      Width = image.Width,
+      Height = image.Height,
+      PixelData = image.PixelData[..],
+      RawData = [],
     };
   }
 
