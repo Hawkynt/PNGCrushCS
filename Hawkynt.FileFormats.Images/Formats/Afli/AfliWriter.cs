@@ -10,7 +10,7 @@ public static class AfliWriter {
     ArgumentNullException.ThrowIfNull(file.BitmapData);
     ArgumentNullException.ThrowIfNull(file.Screens);
 
-    var result = new byte[AfliFile.MinimumFileSize];
+    var result = new byte[AfliFile.FileSize];
     BinaryPrimitives.WriteUInt16LittleEndian(result, file.LoadAddress);
 
     file.Screens

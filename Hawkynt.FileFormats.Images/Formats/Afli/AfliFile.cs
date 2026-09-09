@@ -19,6 +19,7 @@ namespace FileFormat.Afli;
 /// of every row are whatever the hardware was showing. They are not part of the picture and are not
 /// returned: the picture is 296 across, which is what RECOIL draws.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct AfliFile
   : IImageFormatReader<AfliFile>, IImageToRawImage<AfliFile>,
     IImageFromRawImage<AfliFile>, IImageFormatWriter<AfliFile> {
@@ -63,6 +64,17 @@ public readonly record struct AfliFile
 
   /// <summary>The least a whole AFLI takes; a file may run on to the end of its 16K block.</summary>
   public const int MinimumFileSize = BitmapOffset + BitmapDataSize;
+
+  /// <summary>
+  /// The length an AFLI is written at: the whole sixteen-kilobyte block it was saved from.
+  /// </summary>
+  /// <remarks>
+  /// Not padding for its own sake. The reference decoder takes this length and no other — an AFLI
+  /// has no signature and its length is what identifies it — so a file stopping at the last byte of
+  /// the bitmap is refused by everything but our own reader, which is the whole of what was wrong
+  /// with the rest of this family.
+  /// </remarks>
+  public const int FileSize = 16385;
 
   /// <summary>Default load address, putting the eight matrices at the start of a 16K bank.</summary>
   internal const ushort DefaultLoadAddress = 0x4000;

@@ -1,9 +1,10 @@
-﻿using System;
+using System;
+using System.Buffers.Binary;
 using System.IO;
 
 namespace FileFormat.SuperHiresEditor;
 
-/// <summary>Reads Super Hires Editor (.she) files from bytes, streams, or file paths.</summary>
+/// <summary>Reads Super Hires Editor (.she) logos from bytes, streams, or file paths.</summary>
 public static class SuperHiresEditorReader {
 
   public static SuperHiresEditorFile FromFile(FileInfo file) {
@@ -28,51 +29,20 @@ public static class SuperHiresEditorReader {
   }
 
   public static SuperHiresEditorFile FromSpan(ReadOnlySpan<byte> data) {
-
-
-    if (data.Length < SuperHiresEditorFile.LoadAddressSize + SuperHiresEditorFile.MinPayloadSize)
-      throw new InvalidDataException($"File too small for Super Hires Editor format (got {data.Length} bytes, need at least {SuperHiresEditorFile.LoadAddressSize + SuperHiresEditorFile.MinPayloadSize}).");
-
-    var offset = 0;
-
-    // Load address (2 bytes, little-endian)
-    var loadAddress = (ushort)(data[offset] | (data[offset + 1] << 8));
-    offset += SuperHiresEditorFile.LoadAddressSize;
-
-    // Bitmap 1 (8000 bytes)
-    var bitmap1 = new byte[SuperHiresEditorFile.BitmapDataSize];
-    data.Slice(offset, SuperHiresEditorFile.BitmapDataSize).CopyTo(bitmap1);
-    offset += SuperHiresEditorFile.BitmapDataSize;
-
-    // Screen 1 (1000 bytes)
-    var screen1 = new byte[SuperHiresEditorFile.ScreenDataSize];
-    data.Slice(offset, SuperHiresEditorFile.ScreenDataSize).CopyTo(screen1);
-    offset += SuperHiresEditorFile.ScreenDataSize;
-
-    // Bitmap 2 (8000 bytes)
-    var bitmap2 = new byte[SuperHiresEditorFile.BitmapDataSize];
-    data.Slice(offset, SuperHiresEditorFile.BitmapDataSize).CopyTo(bitmap2);
-    offset += SuperHiresEditorFile.BitmapDataSize;
-
-    // Screen 2 (1000 bytes)
-    var screen2 = new byte[SuperHiresEditorFile.ScreenDataSize];
-    data.Slice(offset, SuperHiresEditorFile.ScreenDataSize).CopyTo(screen2);
-    offset += SuperHiresEditorFile.ScreenDataSize;
-
-    // Any trailing data
-    var trailingData = Array.Empty<byte>();
-    if (offset < data.Length) {
-      trailingData = new byte[data.Length - offset];
-      data[offset..].CopyTo(trailingData);
-    }
+    if (data.Length < SuperHiresEditorFile.FileSize)
+      throw new InvalidDataException(
+        $"A Super Hires Editor logo takes {SuperHiresEditorFile.FileSize} bytes; this file is {data.Length}.");
 
     return new() {
-      LoadAddress = loadAddress,
-      Bitmap1 = bitmap1,
-      Screen1 = screen1,
-      Bitmap2 = bitmap2,
-      Screen2 = screen2,
-      TrailingData = trailingData,
+      LoadAddress = BinaryPrimitives.ReadUInt16LittleEndian(data),
+      BitmapData = data.Slice(SuperHiresEditorFile.BitmapOffset, SuperHiresEditorFile.BitmapSize).ToArray(),
+      ScreenData = data.Slice(SuperHiresEditorFile.ScreenOffset, SuperHiresEditorFile.ScreenSize).ToArray(),
+      Sprites = data.Slice(SuperHiresEditorFile.BackSpritesOffset, SuperHiresEditorFile.SpriteAreaSize).ToArray(),
+      BackSpriteColor = data[SuperHiresEditorFile.BackColorOffset],
+      FrontSpriteColor = data[SuperHiresEditorFile.FrontColorOffset],
+      Trailer = data.Slice(
+        SuperHiresEditorFile.FrontColorOffset + 1,
+        SuperHiresEditorFile.FileSize - SuperHiresEditorFile.FrontColorOffset - 1).ToArray(),
     };
   }
 

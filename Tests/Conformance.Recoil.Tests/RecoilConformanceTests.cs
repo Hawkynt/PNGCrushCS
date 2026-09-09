@@ -245,6 +245,8 @@ public sealed class RecoilConformanceTests {
     new(ImageFormat.InterlaceStudio, "Interlace Studio", 320, 200, ".ist"),
     new(ImageFormat.MultiLaceEditor, "Multi-Lace Editor", 320, 56, ".mle"),
     new(ImageFormat.HighresMedium, "HighresMedium", 640, 400, ".hrm"),
+    new(ImageFormat.SuperHiresEditor, "Super Hires Editor", 96, 88, ".she"),
+    new(ImageFormat.Afli, "AFLI-editor", 296, 200, ".afl"),
   ];
 
   [Test]

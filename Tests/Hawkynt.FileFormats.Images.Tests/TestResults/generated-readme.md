@@ -51,7 +51,7 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | AdexImage | `.adx` | ✅ | ✅ | — | — | — | none |
 | AdTechFax | `.adt` | ✅ | ✅ | — | — | — | none |
 | AdvancedArtStudio | `.ocp`, `.mpi`, `.mpic` | ✅ | ✅ | — | — | — | recoil2png |
-| Afli | `.afl` | ✅ | ✅ | — | — | — | none |
+| Afli | `.afl` | ✅ | ✅ | — | — | — | recoil2png |
 | Ai | `.ai` | ✅ | ✅ | — | — | — | none |
 | AimGreyScale | `.ima` | ✅ | ✅ | — | — | — | none |
 | AirNav | `.anv` | ✅ | ✅ | — | — | — | none |
@@ -799,7 +799,7 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | SunIcon | `.icon`, `.pr` | ✅ | ✅ | — | — | — | none |
 | SunRaster | `.ras`, `.sun`, `.rast`, `.rs`, `.sr` | ✅ | ✅ | — | — | — | ImageMagick, ffmpeg |
 | SuperHires | `.shi` | ✅ | ✅ | — | — | — | none |
-| SuperHiresEditor | `.she` | ✅ | ✅ | — | — | — | none |
+| SuperHiresEditor | `.she` | ✅ | ✅ | — | — | — | recoil2png |
 | SuperHiresEditor1 | `.sh1` | ✅ | ✅ | — | — | — | recoil2png |
 | SuperHiresEditor2 | `.sh2` | ✅ | ✅ | — | — | — | recoil2png |
 | SuperHiresFli | `.shf` | ✅ | ✅ | — | — | — | recoil2png |
