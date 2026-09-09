@@ -17,7 +17,7 @@ namespace FileFormat.ApplePreferred;
 /// row still shows all sixteen colours — and its rows are drawn twice, because at 640 across the
 /// machine ran only 200 lines.
 /// </remarks>
-[VerifiedBy(ConformanceOracle.Recoil2Png)]
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.IrfanView)]
 public readonly record struct ApplePreferredFile
   : IImageFormatReader<ApplePreferredFile>, IImageToRawImage<ApplePreferredFile>,
     IImageFromRawImage<ApplePreferredFile>, IImageFormatWriter<ApplePreferredFile> {

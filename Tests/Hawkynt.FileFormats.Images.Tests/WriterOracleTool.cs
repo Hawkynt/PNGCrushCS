@@ -53,7 +53,27 @@ internal static class WriterOracleTool {
     ConformanceOracle.HeifDec,
     ConformanceOracle.AvifDec,
     ConformanceOracle.FFmpeg,
+    ConformanceOracle.IrfanView,
+    ConformanceOracle.Ghostscript,
   ];
+
+  /// <summary>Where <c>i_view64.exe</c> is, in the shape the platform running it wants.</summary>
+  /// <remarks>
+  /// IrfanView is a Windows program with no build for anything else, so everywhere but Windows it is
+  /// started through Wine and reaches the host filesystem through the <c>Z:</c> drive. Which prefix
+  /// it lives in is Wine's business — <c>WINEPREFIX</c> — and not something this has to know.
+  /// </remarks>
+  private static string? _IrfanView {
+    get {
+      var configured = Environment.GetEnvironmentVariable("IRFANVIEW");
+
+      return string.IsNullOrWhiteSpace(configured) || !File.Exists(configured) ? null : configured;
+    }
+  }
+
+  /// <summary>A host path as the Windows program under Wine has to be handed it.</summary>
+  private static string _AsWindowsPath(string path)
+    => OperatingSystem.IsWindows() ? path : "Z:" + path.Replace('/', '\\');
 
   /// <summary>Whether this machine has the tool at all.</summary>
   public static bool IsAvailable(ConformanceOracle oracle) => _Executable(oracle) != null;
@@ -67,6 +87,14 @@ internal static class WriterOracleTool {
   /// already said. The general-purpose tools have no such list here on purpose: RECOIL's catalogue
   /// and ImageMagick's are both older than their binaries and each misses formats it reads
   /// perfectly well, so the file is handed over and the tool speaks for itself.
+  /// <para/>
+  /// IrfanView is in that second group for a reason worth stating, because its documentation invites
+  /// the opposite conclusion: the extension it is handed does not decide which reader it uses. A PNG
+  /// renamed to an extension it has never heard of comes back decoded, so a list of names would only
+  /// hide answers it is willing to give.
+  /// <para/>
+  /// Ghostscript has one because it is not general-purpose at all. It reads the PostScript language
+  /// and nothing else, and the names below are every one the four formats in that family go by.
   /// </remarks>
   public static IReadOnlyCollection<string>? OnlyForExtensions(ConformanceOracle oracle) => oracle switch {
     ConformanceOracle.DWebp => new[] { ".webp" },
@@ -74,6 +102,11 @@ internal static class WriterOracleTool {
     ConformanceOracle.OpjDecompress => new[] { ".jp2", ".j2k", ".jpc", ".jpf", ".jpx", ".j2c" },
     ConformanceOracle.HeifDec => new[] { ".heic", ".heif", ".hif", ".avci" },
     ConformanceOracle.AvifDec => new[] { ".avif", ".avifs" },
+    ConformanceOracle.Ghostscript => new[] {
+      ".ps", ".ps1", ".ps2", ".ps3", ".prn", ".pdx",
+      ".eps", ".epsf", ".epsi", ".epi", ".ept",
+      ".ai", ".pdf",
+    },
     _ => null,
   };
 
@@ -89,7 +122,7 @@ internal static class WriterOracleTool {
 
     var output = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName() + ".png");
     try {
-      var (exitCode, diagnostics) = _Run(executable, _Arguments(oracle, path, output), oracle == ConformanceOracle.ImageMagick);
+      var (exitCode, diagnostics) = _Run(executable, _Arguments(oracle, path, output), oracle);
       if (exitCode == null)
         return (Verdict.Rejected, diagnostics.Length == 0 ? "it would not run" : _FirstLine(diagnostics));
 
@@ -123,7 +156,7 @@ internal static class WriterOracleTool {
 
     var output = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName() + ".png");
     try {
-      var (exitCode, _) = _Run(executable, _Arguments(oracle, path, output), oracle == ConformanceOracle.ImageMagick);
+      var (exitCode, _) = _Run(executable, _Arguments(oracle, path, output), oracle);
       if (exitCode is not 0 || !File.Exists(output))
         return null;
 
@@ -172,6 +205,36 @@ internal static class WriterOracleTool {
     ConformanceOracle.HeifDec => [input, output],
     ConformanceOracle.AvifDec => [input, output],
     ConformanceOracle.FFmpeg => ["-hide_banner", "-loglevel", "error", "-y", "-i", input, "-frames:v", "1", output],
+
+    // Everywhere but Windows the executable is Wine and the program is its first argument. /silent
+    // is what makes it usable with nobody present: without it a file it cannot read raises a dialog
+    // and the process waits forever for somebody to dismiss it.
+    ConformanceOracle.IrfanView => OperatingSystem.IsWindows()
+      ? [input, "/convert=" + output, "/silent"]
+      : [_IrfanView!, _AsWindowsPath(input), "/convert=" + _AsWindowsPath(output), "/silent"],
+
+    ConformanceOracle.Ghostscript => [
+      "-dQUIET", "-dBATCH", "-dNOPAUSE", "-dSAFER",
+      "-sDEVICE=png16m",
+      // The bounding box the file states rather than whatever medium the interpreter defaults to,
+      // so the size that comes back is the size the file claims and not the size of a sheet of A4.
+      "-dEPSCrop", "-dUseCropBox",
+      "-dFirstPage=1", "-dLastPage=1",
+      // One point to the pixel, which is what the PDF and EPS writers mean: both state a box the
+      // size of the picture in points. The other two do not — the PostScript and Illustrator
+      // writers scale the picture by three quarters, as though a point were a pixel at ninety-six
+      // to the inch — so rendering at any one resolution can only match one convention, and this is
+      // the one the file says outright rather than the one that has to be inferred from a scale.
+      "-r72",
+      "-sOutputFile=" + output,
+      // A page painted black before the file gets to it. Ghostscript's default sheet is white, and
+      // a file that draws nothing at all therefore comes back as a white rectangle of exactly the
+      // right size — which is indistinguishable from a decode to anything looking at geometry, and
+      // one of the writers here does precisely that. Starting from black makes an undrawn page an
+      // empty one, which is what it is.
+      "-c", "<</BeginPage{pop gsave 0 0 0 setrgbcolor clippath fill grestore}>> setpagedevice",
+      "-f", input,
+    ],
     _ => throw new NotSupportedException($"{oracle} has no runner here."),
   };
 
@@ -181,6 +244,14 @@ internal static class WriterOracleTool {
   /// somewhere other than the path can point at them one by one.
   /// </remarks>
   private static string? _Executable(ConformanceOracle oracle) {
+    // The one oracle that is not a program of its own here: a Windows binary whose whereabouts is
+    // IRFANVIEW and which everywhere else is started by Wine, so both have to be present.
+    if (oracle == ConformanceOracle.IrfanView) {
+      var irfanView = _IrfanView;
+
+      return irfanView == null ? null : OperatingSystem.IsWindows() ? irfanView : _OnPath("wine");
+    }
+
     var (variable, name) = oracle switch {
       ConformanceOracle.Recoil2Png => ("RECOIL2PNG", "recoil2png"),
       ConformanceOracle.ImageMagick => ("IMAGEMAGICK", "magick"),
@@ -190,6 +261,7 @@ internal static class WriterOracleTool {
       ConformanceOracle.HeifDec => ("HEIF_DEC", "heif-dec"),
       ConformanceOracle.AvifDec => ("AVIFDEC", "avifdec"),
       ConformanceOracle.FFmpeg => ("FFMPEG", "ffmpeg"),
+      ConformanceOracle.Ghostscript => ("GHOSTSCRIPT", OperatingSystem.IsWindows() ? "gswin64c" : "gs"),
       _ => (null, null),
     };
 
@@ -224,7 +296,7 @@ internal static class WriterOracleTool {
     return null;
   }
 
-  private static (int? ExitCode, string Diagnostics) _Run(string executable, string[] arguments, bool quiet) {
+  private static (int? ExitCode, string Diagnostics) _Run(string executable, string[] arguments, ConformanceOracle oracle) {
     var startInfo = new ProcessStartInfo(executable) {
       RedirectStandardOutput = true,
       RedirectStandardError = true,
@@ -236,8 +308,13 @@ internal static class WriterOracleTool {
 
     // ImageMagick reads its policy and delegate configuration from the environment, and a machine
     // whose delegates shell out can take far longer than the picture warrants.
-    if (quiet)
+    if (oracle == ConformanceOracle.ImageMagick)
       startInfo.Environment["MAGICK_DEBUG"] = "None";
+
+    // Wine's own commentary is louder than anything IrfanView says, and what it says is the answer
+    // this is after.
+    if (oracle == ConformanceOracle.IrfanView)
+      startInfo.Environment["WINEDEBUG"] = "-all";
 
     try {
       using var process = Process.Start(startInfo);

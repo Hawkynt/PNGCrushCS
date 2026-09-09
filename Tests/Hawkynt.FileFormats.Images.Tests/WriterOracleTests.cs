@@ -32,6 +32,15 @@ public sealed class WriterOracleTests {
   /// <summary>Where <c>ORACLE_SURVEY_ONLY</c> narrows the survey to a few named formats.</summary>
   private const string _SURVEY_ONLY_VARIABLE = "ORACLE_SURVEY_ONLY";
 
+  /// <summary>Where <c>ORACLE_SURVEY_TOOLS</c> narrows the survey to a few of the installed tools.</summary>
+  /// <remarks>
+  /// A sweep costs one process per format per tool, and a tool newly taught to this fixture has to
+  /// be swept over the whole registry before anything can be claimed from it. Asking the seven that
+  /// have already been swept all over again multiplies that wait by seven for no new answer, so the
+  /// sweep can be pointed at the tools whose answers are not yet known.
+  /// </remarks>
+  private const string _SURVEY_TOOLS_VARIABLE = "ORACLE_SURVEY_TOOLS";
+
   // ============================================================================================
   // Checks that need no tool
   // ============================================================================================
@@ -197,7 +206,15 @@ public sealed class WriterOracleTests {
     if (string.IsNullOrWhiteSpace(destination))
       Assert.Inconclusive($"Set {_SURVEY_VARIABLE} to the file the survey should be written to.");
 
-    var available = WriterOracleTool.Runnable.Where(WriterOracleTool.IsAvailable).ToArray();
+    var wanted = (Environment.GetEnvironmentVariable(_SURVEY_TOOLS_VARIABLE) ?? string.Empty)
+      .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+      .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+    var available = WriterOracleTool.Runnable
+      .Where(oracle => wanted.Count == 0 || wanted.Contains(oracle.ToString()))
+      .Where(WriterOracleTool.IsAvailable)
+      .ToArray();
+
     if (available.Length == 0)
       Assert.Inconclusive("None of the oracles is installed here, so the survey would find nothing and mean nothing.");
 

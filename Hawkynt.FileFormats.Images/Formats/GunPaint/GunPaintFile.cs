@@ -16,7 +16,7 @@ namespace FileFormat.GunPaint;
 /// <para/>
 /// The raster work costs the leftmost characters, which is why the picture is 296 pixels wide.
 /// </remarks>
-[VerifiedBy(ConformanceOracle.Recoil2Png)]
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.IrfanView)]
 public readonly record struct GunPaintFile
   : IImageFormatReader<GunPaintFile>, IImageToRawImage<GunPaintFile>,
     IImageFromRawImage<GunPaintFile>, IImageFormatWriter<GunPaintFile> {

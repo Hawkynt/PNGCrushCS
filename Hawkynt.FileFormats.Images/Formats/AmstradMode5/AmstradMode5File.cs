@@ -14,7 +14,7 @@ namespace FileFormat.AmstradMode5;
 /// change; the .cm5 holds eight colour bytes per scanline, of which six belong to one of the four
 /// pen values and let it vary across the width.
 /// </remarks>
-[VerifiedBy(ConformanceOracle.Recoil2Png)]
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.IrfanView)]
 public readonly record struct AmstradMode5File
   : IImageFormatReader<AmstradMode5File>, IImageToRawImage<AmstradMode5File>,
     IImageFromRawImage<AmstradMode5File>, IImageFormatWriter<AmstradMode5File> {

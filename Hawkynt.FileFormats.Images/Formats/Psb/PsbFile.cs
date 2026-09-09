@@ -5,7 +5,7 @@ namespace FileFormat.Psb;
 
 /// <summary>In-memory representation of a PSB (Photoshop Big) image (flat composite only).</summary>
 [FormatDetectionPriority(50)]
-[VerifiedBy(ConformanceOracle.ImageMagick)]
+[VerifiedBy(ConformanceOracle.ImageMagick, ConformanceOracle.IrfanView)]
 public readonly record struct PsbFile : IImageFormatReader<PsbFile>, IImageToRawImage<PsbFile>, IImageFromRawImage<PsbFile>, IImageFormatWriter<PsbFile> {
 
   static string IImageFormatMetadata<PsbFile>.PrimaryExtension => ".psb";

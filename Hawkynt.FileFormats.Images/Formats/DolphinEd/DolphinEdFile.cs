@@ -4,7 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.DolphinEd;
 
 /// <summary>In-memory representation of a Dolphin Ed C64 multicolor image (Koala layout).</summary>
-[VerifiedBy(ConformanceOracle.Recoil2Png)]
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.IrfanView)]
 public readonly record struct DolphinEdFile : IImageFormatReader<DolphinEdFile>, IImageToRawImage<DolphinEdFile>, IImageFromRawImage<DolphinEdFile>, IImageFormatWriter<DolphinEdFile> {
 
   static string IImageFormatMetadata<DolphinEdFile>.PrimaryExtension => ".dol";

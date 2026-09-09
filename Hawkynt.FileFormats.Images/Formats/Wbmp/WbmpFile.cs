@@ -5,7 +5,7 @@ namespace FileFormat.Wbmp;
 
 /// <summary>In-memory representation of a WBMP (Wireless Bitmap) image.</summary>
 [FormatMimeType("image/vnd.wap.wbmp")]
-[VerifiedBy(ConformanceOracle.ImageMagick, ConformanceOracle.FFmpeg)]
+[VerifiedBy(ConformanceOracle.ImageMagick, ConformanceOracle.FFmpeg, ConformanceOracle.IrfanView)]
 public readonly record struct WbmpFile : IImageFormatReader<WbmpFile>, IImageToRawImage<WbmpFile>, IImageFromRawImage<WbmpFile>, IImageFormatWriter<WbmpFile> {
 
   static string IImageFormatMetadata<WbmpFile>.PrimaryExtension => ".wbmp";

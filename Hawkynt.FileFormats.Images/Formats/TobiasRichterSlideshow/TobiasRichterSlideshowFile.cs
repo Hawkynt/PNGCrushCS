@@ -11,7 +11,7 @@ namespace FileFormat.TobiasRichterSlideshow;
 /// one after another, each 12232 bytes, which is what a display list that reloads the palette every
 /// line needs.
 /// </remarks>
-[VerifiedBy(ConformanceOracle.Recoil2Png)]
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.IrfanView)]
 public readonly record struct TobiasRichterSlideshowFile
   : IImageFormatReader<TobiasRichterSlideshowFile>, IImageToRawImage<TobiasRichterSlideshowFile>,
     IImageFromRawImage<TobiasRichterSlideshowFile>, IImageFormatWriter<TobiasRichterSlideshowFile> {

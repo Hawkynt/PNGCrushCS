@@ -10,7 +10,7 @@ namespace FileFormat.AtariDoodle;
 /// dumps, but those files contain no mode or palette metadata and are therefore not auto-guessed.
 /// </remarks>
 [FormatDetectionPriority(10)]
-[VerifiedBy(ConformanceOracle.Recoil2Png)]
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.IrfanView)]
 public readonly record struct AtariDoodleFile : IImageFormatReader<AtariDoodleFile>, IImageToRawImage<AtariDoodleFile>, IImageFromRawImage<AtariDoodleFile>, IImageFormatWriter<AtariDoodleFile> {
 
   /// <summary>Fixed image width in pixels.</summary>

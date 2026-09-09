@@ -4,7 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.InterPaintHi;
 
 /// <summary>In-memory representation of a Commodore 64 InterPaint Hires image.</summary>
-[VerifiedBy(ConformanceOracle.Recoil2Png)]
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.IrfanView)]
 public readonly record struct InterPaintHiFile : IImageFormatReader<InterPaintHiFile>, IImageToRawImage<InterPaintHiFile>, IImageFromRawImage<InterPaintHiFile>, IImageFormatWriter<InterPaintHiFile> {
 
   static string IImageFormatMetadata<InterPaintHiFile>.PrimaryExtension => ".iph";

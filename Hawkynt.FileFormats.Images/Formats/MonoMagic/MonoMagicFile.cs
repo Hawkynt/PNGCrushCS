@@ -4,7 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.MonoMagic;
 
 /// <summary>In-memory representation of a Mono Magic C64 image image.</summary>
-[VerifiedBy(ConformanceOracle.Recoil2Png)]
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.IrfanView)]
 public readonly record struct MonoMagicFile : IImageFormatReader<MonoMagicFile>, IImageToRawImage<MonoMagicFile>, IImageFromRawImage<MonoMagicFile>, IImageFormatWriter<MonoMagicFile> {
 
   internal const int FixedWidth = 320;

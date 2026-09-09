@@ -4,7 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.PabloPaint;
 
 /// <summary>In-memory representation of an Atari ST Pablo Paint image (640x400, monochrome).</summary>
-[VerifiedBy(ConformanceOracle.Recoil2Png)]
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.IrfanView)]
 public readonly record struct PabloPaintFile : IImageFormatReader<PabloPaintFile>, IImageToRawImage<PabloPaintFile>, IImageFromRawImage<PabloPaintFile>, IImageFormatWriter<PabloPaintFile> {
 
   /// <summary>Image width (always 640).</summary>

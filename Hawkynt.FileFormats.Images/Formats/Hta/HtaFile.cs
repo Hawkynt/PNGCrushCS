@@ -6,6 +6,7 @@ using FileFormat.Png;
 namespace FileFormat.Hta;
 
 /// <summary>A Hemera Thumbs file (.hta): a directory of whole PNG files carried inside one file.</summary>
+[VerifiedBy(ConformanceOracle.IrfanView)]
 public sealed class HtaFile
   : IImageFormatReader<HtaFile>, IImageToRawImage<HtaFile>, IImageFromRawImage<HtaFile>, IImageFormatWriter<HtaFile>, IMultiImageFileFormat<HtaFile> {
 

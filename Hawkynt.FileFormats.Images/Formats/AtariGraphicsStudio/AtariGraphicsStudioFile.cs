@@ -15,7 +15,7 @@ namespace FileFormat.AtariGraphicsStudio;
 /// picture with twice the palette down its height. Mode 19 stores a Graphics 9 luminance field and
 /// draws every row of it four times, trading vertical resolution for a file a quarter the size.
 /// </remarks>
-[VerifiedBy(ConformanceOracle.Recoil2Png)]
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.IrfanView)]
 public readonly record struct AtariGraphicsStudioFile
   : IImageFormatReader<AtariGraphicsStudioFile>, IImageToRawImage<AtariGraphicsStudioFile>,
     IImageFromRawImage<AtariGraphicsStudioFile>, IImageFormatWriter<AtariGraphicsStudioFile> {

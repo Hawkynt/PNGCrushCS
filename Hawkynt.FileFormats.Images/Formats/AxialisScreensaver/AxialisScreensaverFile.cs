@@ -33,6 +33,7 @@ namespace FileFormat.AxialisScreensaver;
 /// what is written is a file whose pictures stand where a project's do and which the producer itself
 /// would not run.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.IrfanView)]
 public sealed class AxialisScreensaverFile
   : IImageFormatReader<AxialisScreensaverFile>, IImageToRawImage<AxialisScreensaverFile>,
     IImageFromRawImage<AxialisScreensaverFile>, IImageFormatWriter<AxialisScreensaverFile>,

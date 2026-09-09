@@ -4,7 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.Doodle;
 
 /// <summary>In-memory representation of a Commodore 64 Doodle hires image.</summary>
-[VerifiedBy(ConformanceOracle.Recoil2Png)]
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.IrfanView)]
 public readonly record struct DoodleFile : IImageFormatReader<DoodleFile>, IImageToRawImage<DoodleFile>, IImageFromRawImage<DoodleFile>, IImageFormatWriter<DoodleFile> {
 
   static string IImageFormatMetadata<DoodleFile>.PrimaryExtension => ".dd";

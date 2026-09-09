@@ -13,7 +13,7 @@ namespace FileFormat.DaliCompressed;
 /// run-count stream and the four-byte-value stream back to back. The file extension is the only
 /// resolution indicator: .LPK, .MPK, and .HPK select low, medium, and high resolution respectively.
 /// </remarks>
-[VerifiedBy(ConformanceOracle.Recoil2Png)]
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.IrfanView)]
 public readonly record struct DaliCompressedFile
   : IImageFormatReader<DaliCompressedFile>, IImageToRawImage<DaliCompressedFile>,
     IImageFromRawImage<DaliCompressedFile>, IImageFormatWriter<DaliCompressedFile> {

@@ -10,7 +10,7 @@ namespace FileFormat.SevenuP;
 /// consecutive bytes — its eight bitmap rows followed by its attribute — so the display file's
 /// interleaved addressing does not apply and a cell's data is contiguous.
 /// </remarks>
-[VerifiedBy(ConformanceOracle.Recoil2Png)]
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.IrfanView)]
 public readonly record struct SevenuPFile
   : IImageFormatReader<SevenuPFile>, IImageToRawImage<SevenuPFile>,
     IImageFromRawImage<SevenuPFile>, IImageFormatWriter<SevenuPFile> {

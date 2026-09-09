@@ -14,7 +14,7 @@ namespace FileFormat.PsionPic;
 /// second is the mask for the first — it comes out as the negative of it — so the first is the picture
 /// and the one the tools draw.
 /// </remarks>
-[VerifiedBy(ConformanceOracle.Recoil2Png)]
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.IrfanView)]
 public readonly record struct PsionPicFile
   : IImageFormatReader<PsionPicFile>, IImageToRawImage<PsionPicFile>,
     IImageFromRawImage<PsionPicFile>, IImageFormatWriter<PsionPicFile> {

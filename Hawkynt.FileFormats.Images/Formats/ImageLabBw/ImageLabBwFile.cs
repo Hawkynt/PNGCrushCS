@@ -12,7 +12,7 @@ namespace FileFormat.ImageLabBw;
 /// The two extensions are the same format under two spellings — <c>.b&amp;w</c> where the filesystem
 /// allowed an ampersand and <c>.b_w</c> where it did not.
 /// </remarks>
-[VerifiedBy(ConformanceOracle.Recoil2Png)]
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.IrfanView)]
 public readonly record struct ImageLabBwFile
   : IImageFormatReader<ImageLabBwFile>, IImageToRawImage<ImageLabBwFile>,
     IImageFromRawImage<ImageLabBwFile>, IImageFormatWriter<ImageLabBwFile> {

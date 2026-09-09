@@ -19,7 +19,7 @@ namespace FileFormat.FunPainter;
 /// and the one after it is the escape value. That packing is why this format read as noise until it
 /// was undone: the older reader treated the packed bytes as a bitmap.
 /// </remarks>
-[VerifiedBy(ConformanceOracle.Recoil2Png)]
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.IrfanView)]
 public readonly record struct FunPainterFile
   : IImageFormatReader<FunPainterFile>, IImageToRawImage<FunPainterFile>,
     IImageFromRawImage<FunPainterFile>, IImageFormatWriter<FunPainterFile> {

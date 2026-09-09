@@ -10,7 +10,7 @@ namespace FileFormat.Pl4Picture;
 /// written recently for an old machine has no reason to invent a packer — which is what lets it
 /// carry two whole screens and two palettes in a file smaller than one of them.
 /// </remarks>
-[VerifiedBy(ConformanceOracle.Recoil2Png)]
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.IrfanView)]
 public readonly record struct Pl4PictureFile
   : IImageFormatReader<Pl4PictureFile>, IImageToRawImage<Pl4PictureFile>,
     IImageFromRawImage<Pl4PictureFile>, IImageFormatWriter<Pl4PictureFile> {

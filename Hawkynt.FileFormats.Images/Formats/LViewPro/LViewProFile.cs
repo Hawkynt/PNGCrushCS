@@ -16,7 +16,7 @@ namespace FileFormat.LViewPro;
 /// begins. The reader finds the signature and then refuses the file unless the picture it found is
 /// the size the header promised, so a coincidental match cannot be drawn as the picture.
 /// </remarks>
-[VerifiedBy(ConformanceOracle.FFmpeg)]
+[VerifiedBy(ConformanceOracle.FFmpeg, ConformanceOracle.IrfanView)]
 public readonly record struct LViewProFile
   : IImageFormatReader<LViewProFile>, IImageToRawImage<LViewProFile>,
     IImageFromRawImage<LViewProFile>, IImageFormatWriter<LViewProFile> {

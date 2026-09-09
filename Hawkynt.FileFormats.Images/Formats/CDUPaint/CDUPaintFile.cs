@@ -4,7 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.CDUPaint;
 
 /// <summary>In-memory representation of a Commodore 64 CDU-Paint multicolor image.</summary>
-[VerifiedBy(ConformanceOracle.Recoil2Png)]
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.IrfanView)]
 public readonly record struct CDUPaintFile : IImageFormatReader<CDUPaintFile>, IImageToRawImage<CDUPaintFile>, IImageFromRawImage<CDUPaintFile>, IImageFormatWriter<CDUPaintFile> {
 
   static string IImageFormatMetadata<CDUPaintFile>.PrimaryExtension => ".cdu";
