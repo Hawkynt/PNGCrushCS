@@ -101,6 +101,7 @@ public static class GemReader {
       Extent = (_Word(data, 4), _Word(data, 5), _Word(data, 6), _Word(data, 7)),
       PageSize = (_Word(data, 8), _Word(data, 9)),
       Window = (_Word(data, 10), _Word(data, 11), _Word(data, 12), _Word(data, 13)),
+      HasBitImage = (_Word(data, 14) & 1) != 0,
       Records = records
     };
   }

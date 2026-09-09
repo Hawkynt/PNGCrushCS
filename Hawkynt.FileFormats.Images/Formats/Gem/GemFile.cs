@@ -28,9 +28,15 @@ namespace FileFormat.Gem;
 /// not drawn is text — the twenty-two justified strings across all forty-two files would need the
 /// GEM fonts to place, and those are not in the file.
 /// <para/>
-/// It does not write. Recording VDI calls that were never made is not what this format is.
+/// Writing a raster uses only standard VDI calls: the image is reduced to the workstation's sixteen
+/// standard colours and horizontal runs are emitted as solid <c>v_bar</c> primitives. A GEM
+/// metafile has no portable inline RGB raster payload — its cell-array call depends on control-array
+/// fields that the metafile record does not store, while GEM Paint's bitmap escape points at a
+/// separate IMG file — so tracing the raster into one-unit-high bars keeps the result self-contained.
 /// </remarks>
-public readonly record struct GemFile : IImageFormatReader<GemFile>, IImageToRawImage<GemFile> {
+public readonly record struct GemFile
+  : IImageFormatReader<GemFile>, IImageToRawImage<GemFile>,
+    IImageFromRawImage<GemFile>, IImageFormatWriter<GemFile> {
 
   /// <summary>The word every metafile opens with, and the word that ends the record list.</summary>
   public const short Magic = -1;
@@ -50,6 +56,7 @@ public readonly record struct GemFile : IImageFormatReader<GemFile>, IImageToRaw
   static string IImageFormatMetadata<GemFile>.PrimaryExtension => ".gem";
   static string[] IImageFormatMetadata<GemFile>.FileExtensions => [".gem"];
   static GemFile IImageFormatReader<GemFile>.FromSpan(ReadOnlySpan<byte> data) => GemReader.FromSpan(data);
+  static byte[] IImageFormatWriter<GemFile>.ToBytes(GemFile file) => GemWriter.ToBytes(file);
   static VideoMode[] IImageFormatMetadata<GemFile>.VideoModes => [
     new("Drawing", [(IntegerRange.Any, IntegerRange.Any)], [16777216])
   ];
@@ -81,8 +88,14 @@ public readonly record struct GemFile : IImageFormatReader<GemFile>, IImageToRaw
   /// <summary>The coordinate window the page stands for, in the file's own coordinates.</summary>
   public (int X1, int Y1, int X2, int Y2) Window { get; init; }
 
+  /// <summary>Whether the header says this metafile refers to an external bit image.</summary>
+  public bool HasBitImage { get; init; }
+
   /// <summary>Every record in the file, in order.</summary>
   public IReadOnlyList<GemRecord> Records { get; init; }
 
   public static RawImage ToRawImage(GemFile file) => GemRenderer.Render(file);
+
+  /// <summary>Creates a self-contained metafile drawing a palette-reduced raster as horizontal bars.</summary>
+  public static GemFile FromRawImage(RawImage image) => GemWriter.FromRawImage(image);
 }
