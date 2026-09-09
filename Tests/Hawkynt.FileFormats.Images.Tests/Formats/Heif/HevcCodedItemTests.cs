@@ -20,9 +20,10 @@ namespace FileFormat.Heif.Tests;
 /// size, announced as the picture. A wrong picture nothing announces is worse than a refusal.
 /// <para/>
 /// The picture is now really decoded, by the H.265 implementation shared with the video package, at
-/// eight, ten and twelve bits — ImageMagick's writer chooses twelve. What is still refused is
-/// refused by name: an item with an hvcC that is not a decoder configuration record, a subsampled
-/// chroma format other than 4:2:0, and the coding tools of the range and screen-content extensions.
+/// eight, ten and twelve bits — ImageMagick's writer chooses twelve — and in every chroma format
+/// the standard defines. What is still refused is refused by name: an item with an hvcC that is not
+/// a decoder configuration record, samples deeper than twelve bits, and the coding tools of the
+/// range and screen-content extensions.
 /// <para/>
 /// The extent is separately readable in every case, because it comes from the container's ispe and
 /// clap boxes rather than from the codestream, and <see cref="HeifFile.ReadImageInfo"/> answers it

@@ -66,8 +66,10 @@ internal static class H265MotionCompensation {
     // A monochrome sequence has no chrominance planes to predict into, so the two chrominance halves
     // of every step below become zero-sized and drop out rather than being guarded one at a time.
     var monochrome = frame.Picture.IsMonochrome;
-    var chromaWidth = monochrome ? 0 : width >> 1;
-    var chromaHeight = monochrome ? 0 : height >> 1;
+    var shiftX = frame.Picture.ChromaShiftX;
+    var shiftY = frame.Picture.ChromaShiftY;
+    var chromaWidth = monochrome ? 0 : width >> shiftX;
+    var chromaHeight = monochrome ? 0 : height >> shiftY;
 
     for (var list = 0; list < 2; ++list) {
       if (!motion.Predicts(list))
@@ -91,20 +93,28 @@ internal static class H265MotionCompensation {
       chromaCb[list] = new int[chromaWidth * chromaHeight];
       chromaCr[list] = new int[chromaWidth * chromaHeight];
 
-      // The chroma planes are half the size, so a vector stated in quarter luma samples is already
-      // in eighth chroma samples — the same number means a finer step.
+      // mvCLX of clause 8.5.3.2.10: the luma vector is stated in quarter luma samples and the chroma
+      // one in eighth chroma samples, so mvC = mvL * 2 / SubWidthC. Where the chrominance is half the
+      // width the two numbers coincide — which is why 4:2:0 needs no conversion at all and is exactly
+      // why leaving it out is invisible until a 4:2:2 or 4:4:4 stream arrives and every chrominance
+      // block is displaced by half of its own motion.
+      var mvChromaX = shiftX == 1 ? mvX : mvX << 1;
+      var mvChromaY = shiftY == 1 ? mvY : mvY << 1;
+
       _InterpolateChroma(reference.Cb, reference.ChromaWidth, reference.ChromaHeight,
-        x >> 1, y >> 1, chromaWidth, chromaHeight, mvX, mvY, chromaCb[list], frame.Sps.BitDepthChroma);
+        x >> shiftX, y >> shiftY, chromaWidth, chromaHeight, mvChromaX, mvChromaY, chromaCb[list],
+        frame.Sps.BitDepthChroma);
       _InterpolateChroma(reference.Cr, reference.ChromaWidth, reference.ChromaHeight,
-        x >> 1, y >> 1, chromaWidth, chromaHeight, mvX, mvY, chromaCr[list], frame.Sps.BitDepthChroma);
+        x >> shiftX, y >> shiftY, chromaWidth, chromaHeight, mvChromaX, mvChromaY, chromaCr[list],
+        frame.Sps.BitDepthChroma);
     }
 
     var picture = frame.Picture;
     _Combine(frame, motion, luma, picture.Luma, picture.Width, x, y, width, height,
       frame.Sps.BitDepthLuma, -1);
-    _Combine(frame, motion, chromaCb, picture.Cb, picture.ChromaWidth, x >> 1, y >> 1,
+    _Combine(frame, motion, chromaCb, picture.Cb, picture.ChromaWidth, x >> shiftX, y >> shiftY,
       chromaWidth, chromaHeight, frame.Sps.BitDepthChroma, 0);
-    _Combine(frame, motion, chromaCr, picture.Cr, picture.ChromaWidth, x >> 1, y >> 1,
+    _Combine(frame, motion, chromaCr, picture.Cr, picture.ChromaWidth, x >> shiftX, y >> shiftY,
       chromaWidth, chromaHeight, frame.Sps.BitDepthChroma, 1);
   }
 

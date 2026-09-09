@@ -35,31 +35,36 @@ internal static class H265SampleAdaptiveOffset {
         if (type == 0)
           continue;
 
-        var shift = component == 0 ? 0 : 1;
+        // The offsets are applied on each plane's own grid, so the coding tree block's corner and
+        // extent are brought into that grid by the plane's own subsampling — which is not the same
+        // in both directions at 4:2:2, and is no subsampling at all at 4:4:4.
+        var shiftX = component == 0 ? 0 : picture.ChromaShiftX;
+        var shiftY = component == 0 ? 0 : picture.ChromaShiftY;
         var target = component == 0 ? picture.Luma : picture.Chroma(component - 1);
         var stride = component == 0 ? picture.Width : picture.ChromaWidth;
         var width = stride;
         var height = component == 0 ? picture.Height : picture.ChromaHeight;
         var depth = component == 0 ? frame.Sps.BitDepthLuma : frame.Sps.BitDepthChroma;
 
-        var x0 = ctbX >> shift;
-        var y0 = ctbY >> shift;
-        var x1 = Math.Min(x0 + (1 << (log2Ctb - shift)), width);
-        var y1 = Math.Min(y0 + (1 << (log2Ctb - shift)), height);
+        var x0 = ctbX >> shiftX;
+        var y0 = ctbY >> shiftY;
+        var x1 = Math.Min(x0 + (1 << (log2Ctb - shiftX)), width);
+        var y1 = Math.Min(y0 + (1 << (log2Ctb - shiftY)), height);
 
         if (type == 1)
-          _ApplyBandOffset(frame, ctb, component, source[component], target, stride, x0, y0, x1, y1, depth, shift);
+          _ApplyBandOffset(
+            frame, ctb, component, source[component], target, stride, x0, y0, x1, y1, depth, shiftX, shiftY);
         else
           _ApplyEdgeOffset(
             frame, ctb, component, source[component], target, stride, width, height,
-            x0, y0, x1, y1, depth, shift);
+            x0, y0, x1, y1, depth, shiftX, shiftY);
       }
     }
   }
 
   private static void _ApplyBandOffset(
     H265FrameDecoder frame, int ctb, int component, ushort[] source, ushort[] target, int stride,
-    int x0, int y0, int x1, int y1, int depth, int shift) {
+    int x0, int y0, int x1, int y1, int depth, int shiftX, int shiftY) {
     var band = frame.SaoBandOrClassAt(ctb, component);
     var bandShift = depth - 5;
     var maximum = (1 << depth) - 1;
@@ -70,7 +75,7 @@ internal static class H265SampleAdaptiveOffset {
 
     for (var y = y0; y < y1; ++y)
       for (var x = x0; x < x1; ++x) {
-        if (_KeepsItsSamples(frame, x << shift, y << shift))
+        if (_KeepsItsSamples(frame, x << shiftX, y << shiftY))
           continue;
 
         var at = y * stride + x;
@@ -80,7 +85,7 @@ internal static class H265SampleAdaptiveOffset {
 
   private static void _ApplyEdgeOffset(
     H265FrameDecoder frame, int ctb, int component, ushort[] source, ushort[] target, int stride,
-    int width, int height, int x0, int y0, int x1, int y1, int depth, int shift) {
+    int width, int height, int x0, int y0, int x1, int y1, int depth, int shiftX, int shiftY) {
     var direction = frame.SaoBandOrClassAt(ctb, component) << 2;
     var firstX = _Neighbours[direction];
     var firstY = _Neighbours[direction + 1];
@@ -106,11 +111,11 @@ internal static class H265SampleAdaptiveOffset {
             || nx1 < 0 || ny1 < 0 || nx1 >= width || ny1 >= height)
           continue;
 
-        if (_KeepsItsSamples(frame, x << shift, y << shift))
+        if (_KeepsItsSamples(frame, x << shiftX, y << shiftY))
           continue;
 
-        if (!_MayReach(frame, x << shift, y << shift, nx0 << shift, ny0 << shift)
-            || !_MayReach(frame, x << shift, y << shift, nx1 << shift, ny1 << shift))
+        if (!_MayReach(frame, x << shiftX, y << shiftY, nx0 << shiftX, ny0 << shiftY)
+            || !_MayReach(frame, x << shiftX, y << shiftY, nx1 << shiftX, ny1 << shiftY))
           continue;
 
         var at = y * stride + x;
