@@ -107,6 +107,34 @@ internal static class WriterOracleTool {
     }
   }
 
+  /// <summary>
+  /// Hands one written file to one tool and returns the picture the tool rebuilt from it, or
+  /// <c>null</c> where the tool is absent, has no reader for the name, or would not decode it.
+  /// </summary>
+  /// <remarks>
+  /// <see cref="Ask"/> answers whether a tool got the geometry back, which is the question the
+  /// support table asks. A lossless writer has to answer a stronger one — whether the samples that
+  /// come back are the samples that went in — and that needs the picture itself.
+  /// </remarks>
+  public static RawImage? Rebuild(ConformanceOracle oracle, string path) {
+    var executable = _Executable(oracle);
+    if (executable == null)
+      return null;
+
+    var output = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName() + ".png");
+    try {
+      var (exitCode, _) = _Run(executable, _Arguments(oracle, path, output), oracle == ConformanceOracle.ImageMagick);
+      if (exitCode is not 0 || !File.Exists(output))
+        return null;
+
+      return FormatRegistry.GetEntry(ImageFormat.Png)?.LoadRawImageFromBytes(File.ReadAllBytes(output));
+    } catch (IOException) {
+      return null;
+    } finally {
+      try { File.Delete(output); } catch { /* best effort */ }
+    }
+  }
+
   private static string _FirstLine(string text) {
     var trimmed = text.Trim();
     var end = trimmed.IndexOf('\n');
