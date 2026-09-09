@@ -13,6 +13,11 @@ namespace FileFormat.Cr3;
 /// </remarks>
 [FormatDetectionPriority(210)]
 [FormatMimeType("image/x-canon-cr3")]
+// XnView reads what this writes through its `pmp` loader — the "JPEG based file" path — which is
+// to say it finds the JPEG preview rather than decoding a CRX track. That is the right check for
+// this writer and not a wider one: a preview inside a container is exactly what it builds, so the
+// claim means the container is well enough formed for another program to find it, and nothing about
+// sensor data this package never writes.
 [VerifiedBy(ConformanceOracle.XnView)]
 public sealed class Cr3File :
   IImageFormatReader<Cr3File>, IImageToRawImage<Cr3File>, IImageFromRawImage<Cr3File>, IImageFormatWriter<Cr3File> {

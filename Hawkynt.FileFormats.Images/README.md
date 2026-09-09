@@ -51,9 +51,7 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | AdexImage | `.adx` | ✅ | ✅ | — | — | — | none |
 | AdTechFax | `.adt` | ✅ | ✅ | — | — | — | none |
 | AdvancedArtStudio | `.ocp`, `.mpi`, `.mpic` | ✅ | ✅ | — | — | — | recoil2png |
-| Afli | `.afl` | ✅ | ✅ | — | — | — | recoil2png |
-
-| Afli | `.afl` | ✅ | ✅ | — | — | — | XnView |
+| Afli | `.afl` | ✅ | ✅ | — | — | — | recoil2png, XnView |
 | Ai | `.ai` | ✅ | ✅ | — | — | — | none |
 | AimGreyScale | `.ima` | ✅ | ✅ | — | — | — | XnView |
 | AirNav | `.anv` | ✅ | ✅ | — | — | — | XnView |
@@ -930,11 +928,8 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | ZxPaintbrush | `.zxp` | ✅ | ✅ | — | — | — | none |
 | ZxPaintyOne | `.zp1` | ✅ | ✅ | — | — | — | recoil2png |
 | ZxRgb3 | `.3` | ✅ | ✅ | — | — | — | recoil2png |
-| ZxSnapshot | `.sna` | ✅ | ✅ | — | — | — | none |
-| ZxSpectrum | `.scr`, `.$s`, `.$c`, `.!s` | ✅ | ✅ | — | — | — | recoil2png |
-
 | ZxSnapshot | `.sna` | ✅ | ✅ | — | — | — | XnView |
-| ZxSpectrum | `.scr`, `.$s`, `.$c`, `.!s` | ✅ | ✅ | — | — | — | none |
+| ZxSpectrum | `.scr`, `.$s`, `.$c`, `.!s` | ✅ | ✅ | — | — | — | recoil2png |
 | ZxTimex | `.tmx`, `.scr` | ✅ | ✅ | — | — | — | recoil2png, ImageMagick |
 | ZxTrefiBorderScreen | `.bsp` | ✅ | ✅ | — | — | — | none |
 | ZxTricolor | `.3cl` | ✅ | ✅ | — | — | — | none |

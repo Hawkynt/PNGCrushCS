@@ -51,7 +51,7 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | AdexImage | `.adx` | ✅ | ✅ | — | — | — | none |
 | AdTechFax | `.adt` | ✅ | ✅ | — | — | — | none |
 | AdvancedArtStudio | `.ocp`, `.mpi`, `.mpic` | ✅ | ✅ | — | — | — | recoil2png |
-| Afli | `.afl` | ✅ | ✅ | — | — | — | XnView |
+| Afli | `.afl` | ✅ | ✅ | — | — | — | recoil2png, XnView |
 | Ai | `.ai` | ✅ | ✅ | — | — | — | none |
 | AimGreyScale | `.ima` | ✅ | ✅ | — | — | — | XnView |
 | AirNav | `.anv` | ✅ | ✅ | — | — | — | XnView |
@@ -75,7 +75,7 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | Apple3201 | `.3201` | ✅ | ✅ | — | — | — | recoil2png |
 | AppleII | `.hgr`, `.dhgr` | ✅ | ✅ | — | — | — | recoil2png |
 | AppleIIDhr | `.dhr`, `.a2d` | ✅ | ✅ | — | — | — | none |
-| AppleIIgs | `.shr`, `.c1`, `.pic` | ✅ | ✅ | — | — | — | none |
+| AppleIIgs | `.shr`, `.c1`, `.pic` | ✅ | ✅ | — | — | — | recoil2png |
 | AppleIIHgr | `.hgr` | ✅ | ✅ | — | — | — | recoil2png |
 | ApplePreferred | `.32k`, `.gs`, `.iigs`, `.shr` | ✅ | ✅ | — | — | — | recoil2png |
 | AppleSh3 | `.sh3`, `.3200` | ✅ | ✅ | — | — | — | recoil2png |
@@ -131,7 +131,7 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | AtariMaxi | `.max8`, `.amx` | ✅ | ✅ | — | — | — | none |
 | AtariPaintworks | `.cl0`, `.cl1`, `.cl2`, `.pg0`, `.pg1`, `.pg2`, `.pg3`, `.sc0`, `.sc1`, `.sc2` | ✅ | ✅ | — | — | — | recoil2png |
 | AtariPi5 | `.pi5` | ✅ | ✅ | — | — | — | recoil2png |
-| AtariPi8 | `.pi8` | ✅ | ✅ | — | — | — | none |
+| AtariPi8 | `.pi8` | ✅ | ✅ | — | — | — | recoil2png |
 | AtariPi9 | `.pi9` | ✅ | ✅ | — | — | — | recoil2png |
 | AtariPicture | `.apc`, `.apa`, `.plm`, `.aps`, `.mga`, `.pls` | ✅ | ✅ | — | — | — | recoil2png |
 | AtariPicworks | `.cp3` | ✅ | ✅ | — | — | — | recoil2png |
@@ -279,7 +279,7 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | Dng | `.dng` | ✅ | ✅ | — | — | — | ffmpeg |
 | DolphinEd | `.dol`, `.bed` | ✅ | ✅ | — | — | — | recoil2png |
 | Doodle | `.dd`, `.ddp` | ✅ | ✅ | — | — | — | recoil2png |
-| DoodleAtari | `.doo` | ✅ | ✅ | — | — | — | none |
+| DoodleAtari | `.doo` | ✅ | ✅ | — | — | — | recoil2png |
 | DoodleComp | `.jj` | ✅ | ✅ | — | — | — | recoil2png |
 | DoodlePacked | `.dpk` | ✅ | ✅ | — | — | — | none |
 | DoomFlat | `.flat` | ✅ | ✅ | — | — | — | none |
@@ -389,7 +389,7 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | GraphicsMaster | `.gms`, `.gm8` | ✅ | ✅ | — | — | — | none |
 | GraphLogo | `.all` | ✅ | ✅ | — | — | — | recoil2png |
 | GraphSaurus | `.sr5`, `.grs`, `.sr8`, `.srs` | ✅ | ✅ | — | — | — | recoil2png |
-| GraphSaurus6 | `.sr6` | ✅ | ✅ | — | — | — | none |
+| GraphSaurus6 | `.sr6` | ✅ | ✅ | — | — | — | recoil2png |
 | GraphSaurus7 | `.sr7` | ✅ | ✅ | — | — | — | recoil2png |
 | GraphSaurusInterlaced | `.sri` | ✅ | ✅ | — | — | — | recoil2png |
 | GraspGl | `.gl` | ✅ | ✅ | — | — | — | none |
@@ -566,10 +566,10 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | MsxMig | `.mig` | ✅ | ✅ | — | — | — | none |
 | MsxScc | `.scc`, `.yjk` | ✅ | ✅ | — | — | — | recoil2png |
 | MsxScreen10 | `.sca`, `.scb` | ✅ | ✅ | — | — | — | recoil2png |
-| MsxScreen2 | `.sc2`, `.grp` | ✅ | ✅ | — | — | — | none |
+| MsxScreen2 | `.sc2`, `.grp` | ✅ | ✅ | — | — | — | recoil2png |
 | MsxScreen3 | `.sc3` | ✅ | ✅ | — | — | — | recoil2png |
 | MsxScreen4 | `.sc4` | ✅ | ✅ | — | — | — | recoil2png |
-| MsxScreen5 | `.sc5`, `.ge5` | ✅ | ✅ | — | — | — | none |
+| MsxScreen5 | `.sc5`, `.ge5` | ✅ | ✅ | — | — | — | recoil2png |
 | MsxScreen6 | `.sc6` | ✅ | ✅ | — | — | — | recoil2png |
 | MsxScreen8 | `.sc8` | ✅ | ✅ | — | — | — | recoil2png |
 | MsxSprite | `.spt` | ✅ | ✅ | — | — | — | none |
@@ -631,7 +631,7 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | Paradox | `.mcpp` | ✅ | ✅ | — | — | — | recoil2png |
 | Pat | `.pat` | ✅ | ✅ | — | — | — | XnView |
 | Pc88 | `.pc8` | ✅ | ✅ | — | — | — | none |
-| Pc98Ebd | `.ebd` | ✅ | ✅ | — | — | — | none |
+| Pc98Ebd | `.ebd` | ✅ | ✅ | — | — | — | recoil2png |
 | Pcd | `.pcd` | ✅ | ✅ | — | — | — | none |
 | Pcds | `.pcds` | ✅ | ✅ | — | — | — | none |
 | PcEngineTile | `.pce` | ✅ | ✅ | — | — | — | none |
@@ -929,7 +929,7 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | ZxPaintyOne | `.zp1` | ✅ | ✅ | — | — | — | recoil2png |
 | ZxRgb3 | `.3` | ✅ | ✅ | — | — | — | recoil2png |
 | ZxSnapshot | `.sna` | ✅ | ✅ | — | — | — | XnView |
-| ZxSpectrum | `.scr`, `.$s`, `.$c`, `.!s` | ✅ | ✅ | — | — | — | none |
+| ZxSpectrum | `.scr`, `.$s`, `.$c`, `.!s` | ✅ | ✅ | — | — | — | recoil2png |
 | ZxTimex | `.tmx`, `.scr` | ✅ | ✅ | — | — | — | recoil2png, ImageMagick |
 | ZxTrefiBorderScreen | `.bsp` | ✅ | ✅ | — | — | — | none |
 | ZxTricolor | `.3cl` | ✅ | ✅ | — | — | — | none |
