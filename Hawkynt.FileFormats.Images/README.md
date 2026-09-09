@@ -171,7 +171,7 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | BodyPaint3D | `.b3d`, `.b2d` | ✅ | ✅ | — | — | — | none |
 | BoogieDownPaint | `.bdp` | ✅ | ✅ | — | — | — | recoil2png |
 | Botticelli | `.p4i` | ✅ | ✅ | — | — | — | recoil2png |
-| Bpg | `.bpg` | ✅ | — | — | — | — | — |
+| Bpg | `.bpg` | ✅ | ✅ | — | — | — | none |
 | BrooktroutFax | `.brk`, `.301`, `.brt` | ✅ | ✅ | — | — | — | none |
 | BrotherFax | `.uni` | ✅ | ✅ | — | — | — | none |
 | Brus | `.brus` | ✅ | ✅ | — | — | — | recoil2png |
