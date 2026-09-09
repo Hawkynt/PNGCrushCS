@@ -8,7 +8,6 @@ namespace FileFormat.HalfLifeModel;
 /// <summary>Reads the skins out of Half-Life models from bytes, streams, or file paths.</summary>
 public static class HalfLifeModelReader {
 
-  private const int _MaxDimension = 8192;
   private const int _MaxSkins = 4096;
 
   public static HalfLifeModelFile FromFile(FileInfo file) {
@@ -77,7 +76,7 @@ public static class HalfLifeModelReader {
     var height = BinaryPrimitives.ReadInt32LittleEndian(entry[72..]);
     var pixelsAt = BinaryPrimitives.ReadInt32LittleEndian(entry[76..]);
 
-    if (width < 1 || height < 1 || width > _MaxDimension || height > _MaxDimension)
+    if (width < 1 || height < 1 || width > HalfLifeModelFile.MaxReadDimension || height > HalfLifeModelFile.MaxReadDimension)
       throw new InvalidDataException($"A Half-Life model's skin states a size of {width}x{height}.");
 
     var needed = (long)width * height + HalfLifeModelFile.PaletteEntries * 3;
