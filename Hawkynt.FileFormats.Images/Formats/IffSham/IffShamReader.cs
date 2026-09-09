@@ -1,5 +1,7 @@
-﻿using System;
+using System;
+using System.Buffers.Binary;
 using System.IO;
+using FileFormat.Ilbm;
 
 namespace FileFormat.IffSham;
 
@@ -21,6 +23,7 @@ public static class IffShamReader {
       stream.ReadExactly(data);
       return FromBytes(data);
     }
+
     using var ms = new MemoryStream();
     stream.CopyTo(ms);
     return FromBytes(ms.ToArray());
@@ -32,48 +35,61 @@ public static class IffShamReader {
   }
 
   public static IffShamFile FromSpan(ReadOnlySpan<byte> data) {
-    if (data.Length < IffShamFile.MinFileSize)
-      throw new InvalidDataException($"Invalid SHAM data: expected at least {IffShamFile.MinFileSize} bytes, got {data.Length}.");
+    var paletteSlices = _ValidateContainerAndFindSham(data);
+    var ilbm = IlbmReader.FromSpan(data);
 
-    var width = IffShamFile.DefaultWidth;
-    var height = IffShamFile.DefaultHeight;
-
-    // Try to extract dimensions from BMHD chunk if present
-    _TryParseBmhd(data, out width, out height);
-
-    var rawData = data.ToArray();
+    if (ilbm.NumPlanes != IffShamFile.NumPlanes)
+      throw new NotSupportedException($"SHAM requires six HAM bitplanes; this file declares {ilbm.NumPlanes}.");
+    if (ilbm.ScanlinePalettes is not { } palettes)
+      throw new InvalidDataException("SHAM chunk did not yield a sliced palette.");
+    if (palettes.Length != paletteSlices * IffShamFile.PaletteBytesPerScanline)
+      throw new InvalidDataException("SHAM palette payload is inconsistent with its declared slice count.");
 
     return new() {
-      Width = width,
-      Height = height,
-      RawData = rawData,
+      Width = ilbm.Width,
+      Height = ilbm.Height,
+      RawData = data.ToArray(),
+      PixelData = ilbm.PixelData,
+      ScanlinePalettes = palettes,
     };
   }
 
-  /// <summary>Attempts to find and parse a BMHD chunk for dimensions.</summary>
-  private static void _TryParseBmhd(ReadOnlySpan<byte> data, out int width, out int height) {
-    width = IffShamFile.DefaultWidth;
-    height = IffShamFile.DefaultHeight;
+  /// <summary>Validates the IFF envelope and returns the number of sixteen-colour SHAM slices.</summary>
+  private static int _ValidateContainerAndFindSham(ReadOnlySpan<byte> data) {
+    if (data.Length < IffShamFile.MinFileSize)
+      throw new InvalidDataException($"Invalid SHAM data: expected at least {IffShamFile.MinFileSize} bytes, got {data.Length}.");
+    if (!data[..4].SequenceEqual("FORM"u8))
+      throw new InvalidDataException("Invalid SHAM data: expected an IFF FORM container.");
+    if (!data.Slice(8, 4).SequenceEqual("ILBM"u8))
+      throw new InvalidDataException("Invalid SHAM data: expected an ILBM form.");
 
-    // Search for "BMHD" in the data
-    for (var i = 0; i < data.Length - 24; ++i) {
-      if (data[i] != 0x42 || data[i + 1] != 0x4D || data[i + 2] != 0x48 || data[i + 3] != 0x44)
-        continue;
+    var formSize = BinaryPrimitives.ReadUInt32BigEndian(data[4..]);
+    var end = (long)formSize + 8;
+    if (formSize < 4 || end > data.Length)
+      throw new InvalidDataException("Invalid SHAM data: FORM size extends past the available bytes.");
 
-      // BMHD found: skip 4-byte chunk ID + 4-byte size, then read 2-byte BE width + 2-byte BE height
-      var offset = i + 8;
-      if (offset + 4 > data.Length)
-        return;
+    for (var offset = 12; offset + 8 <= end;) {
+      var chunkSize = BinaryPrimitives.ReadUInt32BigEndian(data[(offset + 4)..]);
+      var chunkData = offset + 8;
+      var next = (long)chunkData + chunkSize + (chunkSize & 1);
+      if (next > end)
+        throw new InvalidDataException("Invalid SHAM data: an IFF chunk extends past the FORM boundary.");
 
-      width = (data[offset] << 8) | data[offset + 1];
-      height = (data[offset + 2] << 8) | data[offset + 3];
+      if (data.Slice(offset, 4).SequenceEqual("SHAM"u8)) {
+        const int BYTES_PER_SLICE = IffShamFile.PaletteEntries * 2;
+        if (chunkSize < 2 + BYTES_PER_SLICE || (chunkSize - 2) % BYTES_PER_SLICE != 0)
+          throw new InvalidDataException("Invalid SHAM chunk: expected a version word followed by complete sixteen-colour slices.");
 
-      if (width <= 0 || height <= 0) {
-        width = IffShamFile.DefaultWidth;
-        height = IffShamFile.DefaultHeight;
+        var version = BinaryPrimitives.ReadUInt16BigEndian(data[chunkData..]);
+        if (version != 0)
+          throw new NotSupportedException($"Unsupported SHAM version {version}; only version 0 is defined by known files.");
+
+        return checked((int)((chunkSize - 2) / BYTES_PER_SLICE));
       }
 
-      return;
+      offset = checked((int)next);
     }
+
+    throw new InvalidDataException("IFF ILBM file does not contain a SHAM chunk.");
   }
 }
