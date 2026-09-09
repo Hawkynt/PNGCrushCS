@@ -680,7 +680,7 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | Png | `.png`, `.frm` | ✅ | ✅ | — | — | ✅ |
 | PntrFalcon | `.pnf`, `.pfl` | ✅ | ✅ | — | — | — |
 | PocketPc2bp | `.2bp` | ✅ | ✅ | — | — | — |
-| PocketPcTheme | `.tsk` | ✅ | — | — | — | — |
+| PocketPcTheme | `.tsk` | ✅ | ✅ | — | — | — |
 | PortfolioGraphics | `.pgf`, `.pgc` | ✅ | ✅ | — | — | — |
 | Portrait | `.cvp` | ✅ | ✅ | — | — | — |
 | PostScript | `.ps`, `.ps1`, `.ps2`, `.ps3`, `.eps`, `.epsf`, `.epsi`, `.epi`, `.prn`, `.pdx` | ✅ | ✅ | — | — | — |
