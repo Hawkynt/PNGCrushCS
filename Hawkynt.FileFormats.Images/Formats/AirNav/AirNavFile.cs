@@ -25,6 +25,7 @@ namespace FileFormat.AirNav;
 /// 256-colour bitmap it is — forty bytes of information header and eight bits a pixel. A file that
 /// says anything else under this name is refused rather than read at offsets it never meant.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.XnView)]
 public readonly record struct AirNavFile
   : IImageFormatReader<AirNavFile>, IImageToRawImage<AirNavFile>,
     IImageFromRawImage<AirNavFile>, IImageFormatWriter<AirNavFile> {

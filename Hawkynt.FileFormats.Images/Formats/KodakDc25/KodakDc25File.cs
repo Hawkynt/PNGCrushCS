@@ -13,6 +13,7 @@ namespace FileFormat.KodakDc25;
 /// merely wrapped as a thumbnail.
 /// </remarks>
 [FormatDetectionPriority(10)]
+[VerifiedBy(ConformanceOracle.XnView)]
 public readonly record struct KodakDc25File :
   IImageFormatReader<KodakDc25File>, IImageToRawImage<KodakDc25File>,
   IImageFromRawImage<KodakDc25File>, IImageFormatWriter<KodakDc25File> {

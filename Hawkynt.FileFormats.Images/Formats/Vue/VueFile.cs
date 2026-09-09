@@ -18,6 +18,7 @@ namespace FileFormat.Vue;
 /// The picture is small because a Vue object has no larger one; it is what the file holds, not a
 /// reduction of something else.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.XnView)]
 public readonly record struct VueFile
   : IImageFormatReader<VueFile>, IImageToRawImage<VueFile>,
     IImageFromRawImage<VueFile>, IImageFormatWriter<VueFile> {

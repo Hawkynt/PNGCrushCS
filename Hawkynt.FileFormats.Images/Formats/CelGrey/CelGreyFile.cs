@@ -15,6 +15,7 @@ namespace FileFormat.CelGrey;
 /// a magic it does not carry. Nothing establishes whose this is; what there is is a sample, a tool
 /// that draws it, and a layout that reproduces that drawing on every pixel.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.XnView)]
 public readonly record struct CelGreyFile
   : IImageFormatReader<CelGreyFile>, IImageToRawImage<CelGreyFile>,
     IImageFromRawImage<CelGreyFile>, IImageFormatWriter<CelGreyFile> {

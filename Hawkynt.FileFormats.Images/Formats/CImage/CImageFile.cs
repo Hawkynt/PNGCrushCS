@@ -17,6 +17,7 @@ namespace FileFormat.CImage;
 /// On disk a set bit is white; <see cref="PixelData"/> holds the complement, a set bit being black,
 /// matching the other fax-derived formats here.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.XnView)]
 public readonly record struct CImageFile : IImageFormatReader<CImageFile>, IImageToRawImage<CImageFile>, IImageFromRawImage<CImageFile>, IImageFormatWriter<CImageFile> {
 
   static string IImageFormatMetadata<CImageFile>.PrimaryExtension => ".dsi";

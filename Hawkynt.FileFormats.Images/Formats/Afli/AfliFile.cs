@@ -19,7 +19,7 @@ namespace FileFormat.Afli;
 /// of every row are whatever the hardware was showing. They are not part of the picture and are not
 /// returned: the picture is 296 across, which is what RECOIL draws.
 /// </remarks>
-[VerifiedBy(ConformanceOracle.Recoil2Png)]
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.XnView)]
 public readonly record struct AfliFile
   : IImageFormatReader<AfliFile>, IImageToRawImage<AfliFile>,
     IImageFromRawImage<AfliFile>, IImageFormatWriter<AfliFile> {

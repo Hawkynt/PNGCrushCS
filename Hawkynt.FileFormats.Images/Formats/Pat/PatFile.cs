@@ -6,6 +6,7 @@ namespace FileFormat.Pat;
 
 /// <summary>In-memory representation of a GIMP Pattern (PAT) image.</summary>
 [FormatMagicBytes([0x47, 0x50, 0x41, 0x54], offset: 20)]
+[VerifiedBy(ConformanceOracle.XnView)]
 public readonly record struct PatFile : IImageFormatReader<PatFile>, IImageToRawImage<PatFile>, IImageFromRawImage<PatFile>, IImageFormatWriter<PatFile> {
 
   static string IImageFormatMetadata<PatFile>.PrimaryExtension => ".pat";

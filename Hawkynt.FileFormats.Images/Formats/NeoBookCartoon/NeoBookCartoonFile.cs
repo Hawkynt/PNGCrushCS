@@ -34,6 +34,7 @@ namespace FileFormat.NeoBookCartoon;
 /// take files away from formats that really are what they say they are. The reader still requires
 /// them; only content sniffing is left out of it.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.XnView)]
 public readonly record struct NeoBookCartoonFile
   : IImageFormatReader<NeoBookCartoonFile>, IImageToRawImage<NeoBookCartoonFile>,
     IImageFromRawImage<NeoBookCartoonFile>, IImageFormatWriter<NeoBookCartoonFile> {

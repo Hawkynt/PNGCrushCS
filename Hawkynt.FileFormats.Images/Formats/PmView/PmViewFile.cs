@@ -12,6 +12,7 @@ namespace FileFormat.PmView;
 /// <c>.pm</c> was claimed only by Print Master, which is a different format under the same name and
 /// read this one's header as a picture 150192 by 22341.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.XnView)]
 public readonly record struct PmViewFile
   : IImageFormatReader<PmViewFile>, IImageToRawImage<PmViewFile>,
     IImageFromRawImage<PmViewFile>, IImageFormatWriter<PmViewFile> {

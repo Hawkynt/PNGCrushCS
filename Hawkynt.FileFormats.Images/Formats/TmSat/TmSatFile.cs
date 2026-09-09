@@ -23,6 +23,7 @@ namespace FileFormat.TmSat;
 /// Three narrow-angle frames in different bands make one colour picture between them, and the
 /// compressed <c>.imc</c> variant is described nowhere. Neither is read: one file is one grey frame.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.XnView)]
 public readonly record struct TmSatFile
   : IImageFormatReader<TmSatFile>, IImageToRawImage<TmSatFile>,
     IImageFromRawImage<TmSatFile>, IImageFormatWriter<TmSatFile> {

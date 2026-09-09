@@ -20,6 +20,7 @@ namespace FileFormat.Mrf;
 /// same header and reads that byte as a depth and a plane count. Nought means one bit and one plane,
 /// so insisting on it is the same as insisting the file is monochrome.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.XnView)]
 public readonly record struct MrfFile
   : IImageFormatReader<MrfFile>, IImageToRawImage<MrfFile>,
     IImageFromRawImage<MrfFile>, IImageFormatWriter<MrfFile> {

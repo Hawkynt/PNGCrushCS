@@ -6,6 +6,7 @@ namespace FileFormat.XvThumbnail;
 /// <summary>In-memory representation of an XV thumbnail image (P7 332 format).</summary>
 [FormatDetectionPriority(90)]
 [FormatMagicBytes([0x50, 0x37, 0x20, 0x33, 0x33, 0x32])]
+[VerifiedBy(ConformanceOracle.XnView)]
 public readonly record struct XvThumbnailFile : IImageFormatReader<XvThumbnailFile>, IImageToRawImage<XvThumbnailFile>, IImageFromRawImage<XvThumbnailFile>, IImageFormatWriter<XvThumbnailFile> {
 
   static string IImageFormatMetadata<XvThumbnailFile>.PrimaryExtension => ".xv";

@@ -23,6 +23,7 @@ namespace FileFormat.Wzl;
 /// every pixel of all sixteen.
 /// </remarks>
 [FormatMagicBytes([(byte)'B' ^ 0x0D, (byte)'M' ^ 0x0D])]
+[VerifiedBy(ConformanceOracle.XnView)]
 public readonly record struct WzlFile
   : IImageFormatReader<WzlFile>, IImageToRawImage<WzlFile>,
     IImageFromRawImage<WzlFile>, IImageFormatWriter<WzlFile> {

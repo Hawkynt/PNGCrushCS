@@ -8,6 +8,7 @@ namespace FileFormat.Ani;
 
 /// <summary>In-memory representation of an ANI animated cursor file.</summary>
 [FormatMimeType("application/x-navi-animation", "image/x-ani")]
+[VerifiedBy(ConformanceOracle.XnView)]
 public sealed class AniFile : IImageFormatReader<AniFile>, IImageToRawImage<AniFile>, IImageFromRawImage<AniFile>, IImageFormatWriter<AniFile>, IMultiImageFileFormat<AniFile> {
 
   static FormatCapability IImageFormatMetadata<AniFile>.Capabilities => FormatCapability.HasDedicatedOptimizer;

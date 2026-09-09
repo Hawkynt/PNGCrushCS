@@ -7,6 +7,7 @@ namespace FileFormat.Nifti;
 
 /// <summary>Paired NIfTI .hdr/.img form. Reads NIfTI-1 and NIfTI-2; writes portable NIfTI-1 pairs.</summary>
 [FormatDetectionPriority(90)]
+[VerifiedBy(ConformanceOracle.XnView)]
 public sealed class NiftiPairFile :
   IImageFormatReader<NiftiPairFile>, IImageToRawImage<NiftiPairFile>,
   IImageFromRawImage<NiftiPairFile>, IImageFormatWriter<NiftiPairFile> {

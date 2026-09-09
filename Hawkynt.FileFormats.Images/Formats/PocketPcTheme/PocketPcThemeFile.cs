@@ -25,6 +25,7 @@ namespace FileFormat.PocketPcTheme;
 /// <c>FF D8 FF E1</c> and is not matched — checked against XnView's converter, which refuses such a
 /// file under this format's name and falls through to its own general JPEG scan instead.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.XnView)]
 public readonly record struct PocketPcThemeFile
   : IImageFormatReader<PocketPcThemeFile>, IImageToRawImage<PocketPcThemeFile>,
     IImageFromRawImage<PocketPcThemeFile>, IImageFormatWriter<PocketPcThemeFile> {
