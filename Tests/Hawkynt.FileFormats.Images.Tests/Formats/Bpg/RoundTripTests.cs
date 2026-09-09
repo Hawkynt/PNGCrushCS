@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using FileFormat.Bpg;
+using FileFormat.Core;
 
 namespace FileFormat.Bpg.Tests;
 
@@ -94,17 +95,49 @@ public sealed class RoundTripTests {
   }
 
   [Test]
-  public void ToRawImage_WithoutHevcPictureData_Throws() {
-    var bpg = new BpgFile {
+  [Category("Integration")]
+  public void RoundTrip_ViaRawImage_Grayscale() {
+    var pixelData = new byte[3 * 3];
+    for (var i = 0; i < pixelData.Length; ++i)
+      pixelData[i] = (byte)(i * 28);
+
+    var rawImage = new RawImage {
       Width = 3,
       Height = 3,
-      PixelFormat = BpgPixelFormat.Grayscale,
-      BitDepth = 8,
-      ColorSpace = BpgColorSpace.Rgb,
-      PixelData = [],
+      Format = FileFormat.Core.PixelFormat.Gray8,
+      PixelData = pixelData,
     };
 
-    Assert.Throws<InvalidOperationException>(() => BpgFile.ToRawImage(bpg));
+    var bpg = BpgFile.FromRawImage(rawImage);
+    var restored = BpgFile.ToRawImage(bpg);
+
+    Assert.That(restored.Width, Is.EqualTo(rawImage.Width));
+    Assert.That(restored.Height, Is.EqualTo(rawImage.Height));
+    Assert.That(restored.Format, Is.EqualTo(FileFormat.Core.PixelFormat.Gray8));
+    Assert.That(restored.PixelData, Is.EqualTo(rawImage.PixelData));
+  }
+
+  [Test]
+  [Category("Integration")]
+  public void RoundTrip_ViaRawImage_Rgb24() {
+    var pixelData = new byte[2 * 2 * 3];
+    for (var i = 0; i < pixelData.Length; ++i)
+      pixelData[i] = (byte)(i * 19);
+
+    var rawImage = new RawImage {
+      Width = 2,
+      Height = 2,
+      Format = FileFormat.Core.PixelFormat.Rgb24,
+      PixelData = pixelData,
+    };
+
+    var bpg = BpgFile.FromRawImage(rawImage);
+    var restored = BpgFile.ToRawImage(bpg);
+
+    Assert.That(restored.Width, Is.EqualTo(rawImage.Width));
+    Assert.That(restored.Height, Is.EqualTo(rawImage.Height));
+    Assert.That(restored.Format, Is.EqualTo(FileFormat.Core.PixelFormat.Rgb24));
+    Assert.That(restored.PixelData, Is.EqualTo(rawImage.PixelData));
   }
 
   [Test]

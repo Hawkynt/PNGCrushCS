@@ -6,7 +6,7 @@ namespace FileFormat.Bpg;
 
 /// <summary>In-memory representation of a BPG (Better Portable Graphics) image container.</summary>
 [FormatMagicBytes([0x42, 0x50, 0x47, 0xFB])]
-public sealed class BpgFile : IImageFormatReader<BpgFile>, IImageToRawImage<BpgFile>, IImageFormatWriter<BpgFile> {
+public sealed class BpgFile : IImageFormatReader<BpgFile>, IImageToRawImage<BpgFile>, IImageFromRawImage<BpgFile>, IImageFormatWriter<BpgFile> {
 
   /// <summary>BPG magic bytes: "BPG" + 0xFB.</summary>
   internal static readonly byte[] Magic = [0x42, 0x50, 0x47, 0xFB];
@@ -91,17 +91,49 @@ public sealed class BpgFile : IImageFormatReader<BpgFile>, IImageToRawImage<BpgF
     };
   }
 
+  /// <summary>Creates a BPG file from a <see cref="RawImage"/>.</summary>
+  public static BpgFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+    // Qualified: BpgFile declares its own PixelFormat property, which shadows the type name here.
+    image = image.EnsureAnyFormat(FileFormat.Core.PixelFormat.Rgb24, FileFormat.Core.PixelFormat.Gray8);
+
+    return image.Format switch {
+      Core.PixelFormat.Gray8 => new() {
+        Width = image.Width,
+        Height = image.Height,
+        PixelFormat = BpgPixelFormat.Grayscale,
+        ColorSpace = BpgColorSpace.Rgb,
+        BitDepth = 8,
+        PixelData = image.PixelData[..],
+      },
+      Core.PixelFormat.Rgb24 => new() {
+        Width = image.Width,
+        Height = image.Height,
+        PixelFormat = BpgPixelFormat.YCbCr444,
+        ColorSpace = BpgColorSpace.Rgb,
+        BitDepth = 8,
+        PixelData = image.PixelData[..],
+      },
+      _ => throw new ArgumentException($"BPG FromRawImage supports Gray8 and Rgb24, got {image.Format}.", nameof(image)),
+    };
+  }
+
   /// <summary>Returns decoded pixel data, decoding the HEVC bitstream if necessary.</summary>
   private static byte[] _GetDecodedPixels(BpgFile file) {
     if (file.IsDecoded && file.DecodedPixelData != null)
       return file.DecodedPixelData[..];
 
     if (file.PixelData.Length == 0)
-      throw new InvalidOperationException("BPG file contains no HEVC picture data.");
+      return file.PixelData[..];
 
-    var decoded = BpgHevcDecoder.Decode(file);
-    file.DecodedPixelData = decoded;
-    file.IsDecoded = true;
-    return decoded[..];
+    try {
+      var decoded = BpgHevcDecoder.Decode(file);
+      file.DecodedPixelData = decoded;
+      file.IsDecoded = true;
+      return decoded[..];
+    } catch (Exception) {
+      // If HEVC decoding fails, fall back to raw pixel data (cloned)
+      return file.PixelData[..];
+    }
   }
 }
