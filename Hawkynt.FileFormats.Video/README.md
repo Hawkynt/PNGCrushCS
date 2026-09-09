@@ -231,7 +231,6 @@ nothing could be verified even with a description in hand.
 | Windows Media Video 8 (`WMV2`) | WMV1's whole wall plus its own undocumented joint type/CBP table |
 | Microsoft Screen 2 (`MSS2`) | The absent source MS Screen 1 had, plus embedded WMV9 rectangles whose boundaries within a packet are stated nowhere |
 | Lagarith (`LAGS`) | The wrapper comes out completely; the range coder inside it is defined by one implementation's floating-point rounding rather than by anything written down, so even a reference decode is not a sound oracle |
-| DV (`dvsd`) | The frame layer is recovered and measured against real files; the entropy code and the macroblock shuffle live only in IEC 61834 / SMPTE 314M, and for one of them in exactly one secondary source describing a different chroma variant |
 | NewTek SpeedHQ | Container, framing and DC coding match ISO/IEC 13818-2 exactly; some unknown number of AC codewords are reassigned, and the one source printing the reassignment copied it from FFmpeg |
 | Canopus HQ, HQA, HQX | The vendor's papers are marketing; the one bitstream write-up is the decoder author's own account of reverse-engineering the format |
 | Dxtory | The one page states only that frames hold YV12 blocks behind a 16-byte header, and was written by the decoder's author on the day of his decoder commit |
