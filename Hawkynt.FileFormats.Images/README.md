@@ -685,7 +685,7 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | Portrait | `.cvp` | ✅ | ✅ | — | — | — |
 | PostScript | `.ps`, `.ps1`, `.ps2`, `.ps3`, `.eps`, `.epsf`, `.epsi`, `.epi`, `.prn`, `.pdx` | ✅ | ✅ | — | — | — |
 | PowerGraphics | `.pgr` | ✅ | ✅ | — | — | — |
-| PowerPoint | `.ppt`, `.pps` | ✅ | — | — | — | — |
+| PowerPoint | `.ppt`, `.pps` | ✅ | ✅ | — | — | — |
 | PrinterPageSegment | `.pse`, `.psg` | ✅ | ✅ | — | — | — |
 | Printfox | `.gb` | ✅ | ✅ | — | — | — |
 | PrintfoxPagefox | `.bs`, `.pg` | ✅ | ✅ | — | — | — |
