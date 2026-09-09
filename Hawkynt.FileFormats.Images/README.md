@@ -418,7 +418,7 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | HiresManager | `.him` | ✅ | ✅ | — | — | — |
 | HomeworldLif | `.lif` | ✅ | ✅ | — | — | — |
 | Hp48Grob | `.grb`, `.gro` | ✅ | ✅ | — | — | — |
-| Hpgl | `.hpgl`, `.hgl`, `.hpg`, `.prn`, `.prt`, `.spl` | ✅ | — | — | — | — |
+| Hpgl | `.hpgl`, `.hgl`, `.hpg`, `.prn`, `.prt`, `.spl` | ✅ | ✅ | — | — | — |
 | HpGrob | `.grob`, `.hp`, `.gro2`, `.gro4` | ✅ | ✅ | — | — | — |
 | Hpi | `.hpi` | ✅ | ✅ | — | — | — |
 | Hru | `.hru` | ✅ | ✅ | — | — | — |
@@ -1022,6 +1022,10 @@ The colour budget is where the format's limit bites, and it is smaller than the 
 Graph2FontScroll needs that judgement more than most, because nearly everything it writes goes into files it only names. A .vsc is a list; the picture is in the Graph2Font projects the list points at, so a tool accepting the .vsc alone would say nothing about them. RECOIL resolves the names itself, from the path, which is what makes it able to tell. Scrolls of one, two and four screens written here decode through `recoil2png` to the same pixels this package reads back from the same files. The comparison is controlled by spoiling a project two ways: one flipped colour byte, which RECOIL accepts and draws differently, and an impossible column count, which it refuses outright.
 
 A caution about the Read column: it is `SupportsRead` from the registry, which says a reader is registered for the format, not that the reader returns a picture. Two entries currently take the tick without earning it — `IffSham` and `IconLibrary` refuse in `ToRawImage` for every file, honestly and by name, but the matrix cannot see that and shows them as read. Two more did until recently: `Spectrum512Smoosh` threw on every file and `IffDctv` rendered its compressed body as grey noise, both while showing a tick, and both were found only because someone came to write them. Treat a tick here as "the format is recognised"; the paragraphs above say which readers have been measured against another implementation, and that is the claim worth trusting.
+
+### HP-GL authoring
+
+`Hpgl` writes arbitrary raster input as standard HP-GL pen geometry: alpha is composited onto white, colours are reduced to the modelled eight-pen carousel, adjacent pixels using the same pen are joined into filled rectangles, and sources above 512 pixels on either side are sampled down with their aspect ratio intact to keep plot size bounded. The output deliberately uses ordinary `IN`/`SP`/`PU`/`RA` commands rather than a private raster payload.
 
 ### Registered but read-only
 
