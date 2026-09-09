@@ -121,9 +121,17 @@ public static class IpgReader {
   }
 
   private static RawImage _Decode(ReadOnlySpan<byte> data, uint imageAt, uint imageLength, uint imageType, int minimumOffset) {
-    var start = checked((int)imageAt);
-    var length = checked((int)imageLength);
-    if (start < minimumOffset || length > data.Length - start)
+    // Range-checked before narrowing rather than after: a file stating an offset or a length that
+    // does not fit an int is a malformed file, and a malformed file is refused by name here like any
+    // other. Casting first turned it into an OverflowException from somewhere further in, which says
+    // nothing about which field was wrong.
+    if (imageAt > int.MaxValue || imageLength > int.MaxValue)
+      throw new InvalidDataException(
+        $"An IPG image entry states offset {imageAt} and length {imageLength}, which is past the end of any file this can read.");
+
+    var start = (int)imageAt;
+    var length = (int)imageLength;
+    if (start < minimumOffset || start > data.Length || length > data.Length - start)
       throw new InvalidDataException("An IPG image entry points outside its image-data area.");
 
     var payload = data.Slice(start, length);

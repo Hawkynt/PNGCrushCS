@@ -169,7 +169,7 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | BodyPaint3D | `.b3d`, `.b2d` | ✅ | ✅ | — | — | — |
 | BoogieDownPaint | `.bdp` | ✅ | ✅ | — | — | — |
 | Botticelli | `.p4i` | ✅ | ✅ | — | — | — |
-| Bpg | `.bpg` | ✅ | — | — | — | — |
+| Bpg | `.bpg` | ✅ | ✅ | — | — | — |
 | BrooktroutFax | `.brk`, `.301`, `.brt` | ✅ | ✅ | — | — | — |
 | BrotherFax | `.uni` | ✅ | ✅ | — | — | — |
 | Brus | `.brus` | ✅ | ✅ | — | — | — |
@@ -432,7 +432,7 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | IcePcinPlus | `.ip2` | ✅ | ✅ | — | — | — |
 | Icns | `.icns` | ✅ | ✅ | — | ✅ | — |
 | Ico | `.ico` | ✅ | ✅ | — | ✅ | ✅ |
-| IconLibrary | `.icl` | ✅ | ✅ | — | — | — |
+| IconLibrary | `.icl` | ✅ | — | — | — | — |
 | Ics | `.ics` | ✅ | ✅ | — | — | — |
 | IffAcbm | `.acbm`, `.iff`, `.blk` | ✅ | ✅ | — | — | — |
 | IffAnim | `.anim` | ✅ | ✅ | — | — | — |
@@ -1028,9 +1028,12 @@ A caution about the Read column: it is `SupportsRead` from the registry, which s
 
 `Hpgl` writes arbitrary raster input as standard HP-GL pen geometry: alpha is composited onto white, colours are reduced to the modelled eight-pen carousel, adjacent pixels using the same pen are joined into filled rectangles, and sources above 512 pixels on either side are sampled down with their aspect ratio intact to keep plot size bounded. The output deliberately uses ordinary `IN`/`SP`/`PU`/`RA` commands rather than a private raster payload.
 
+This list used to be far longer, and the entries that left it did so by argument rather than by anyone's afternoon. It once declined the camera-raw formats on the ground that a CR3 built from arbitrary pixels would state a sensor, a lens and an exposure that never happened; it declined TrueType because a font is not a picture, ElectricImage because this package cannot produce a true example of one, and a Half-Life model because it carries skins rather than an image. Those writers now exist and are registered, and each states in its own row and remarks what it does and does not claim to be — a CR3 whose metadata describes the preview it wraps rather than a capture that never happened, a font whose glyphs are the traced runs of the raster it was given. The objection they answer was never that the bytes could not be produced; it was that producing them would assert something untrue. Where a row cannot make that claim honestly it says so.
+
 ### Registered but read-only
 
-These 28 entries read but have no writer; each is a decision, not an oversight. **Not bounded** (an encoder or a model this package does not have): Crw, Mrw, X3f (camera-raw sensor models), Dwg, Dxf, Hpgl (CAD/vector), TrueType (font), PeResource, PowerPoint, Fpx, PocketPcTheme (executable, OLE and CAB containers), IffAnim8, IffDpan, IffHame (multi-frame or hardware-mode Amiga animation), IffSham, IffMultiPalette (per-line palette encoders whose identity is unverified), Xld4, Gem, IconLibrary, PhotoSuiteProject (compressed or container layouts read from one sample each). **Deliberately not written** because a file built from arbitrary pixels would not be what the name promises: EmbeddedDib, Eroiica, NeoBookCartoon, CartesMichelin, Cr3, Pes. A CR3 is a camera's file, and one made from arbitrary pixels would state a sensor, a lens and an exposure that never happened, which is why every camera format here is read-only; `Cr3Writer` builds the container around a preview so the reader can be checked against ExifTool, and stays off the registry's writer contract for the same reason. The last of those is a needle path rather than a raster — a Brother embroidery file states where the needle goes and in which thread, and the picture is what those moves draw — so writing one from a picture means deciding where to put every stitch, which is needlework and not serialisation. Writing one from stitches a caller already has is a different thing and `PesWriter` does it; it stays off the registry's writer contract because that contract asks for a picture. **Declined for what the file would be, not for difficulty**: ElectricImage, HalfLifeModel. This entry used to call both of them, and ML1 with them, "simple raster layouts with specified headers" that nothing blocked but the work. Each format's own source says otherwise and has for some time; ML1 has since been answered, and the paragraph above says how. ElectricImage is a renderer's output file, and `ElectricImageFile`'s remarks decline to write one on the ground that this package cannot produce a true example of one. A Half-Life model is not a picture; it carries skins, and writing an image into one means synthesising a whole `studiohdr_t` model around a single texture. Neither is a missing encoder waiting for someone's afternoon.
+These 11 entries read but have no writer; each is a decision, not an oversight. **Not bounded** (an encoder or a model this package does not have): PeResource, PowerPoint, Fpx (executable, OLE and compound-document containers). **Holders of other files rather than pictures of their own**: IconLibrary, Ipg, Sdg, Cdr, Cmx — an icon library, a tileset and a gallery carry whole files of other formats, and CorelDRAW's streams are vector scenes whose raster part is only an embedded preview, so writing any of them means deciding what belongs in a collection or composing a drawing, neither of which is serialising a picture. **Deliberately not written** because a file built from arbitrary pixels would not be what the name promises: EmbeddedDib, CartesMichelin, Pes. The last is a needle path rather than a raster — a Brother embroidery file states where the needle goes and in which thread, and the picture is what those moves draw — so writing one from a picture means deciding where to put every stitch, which is needlework and not serialisation. Writing one from stitches a caller already has is a different thing and `PesWriter` does it; it stays off the registry's writer contract because that contract asks for a picture.
+
 
 ## 🚀 Quick start
 
