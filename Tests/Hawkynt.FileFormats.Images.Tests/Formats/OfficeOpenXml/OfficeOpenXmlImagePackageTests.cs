@@ -188,7 +188,8 @@ public sealed class OfficeOpenXmlImagePackageTests {
     using var image = archive.GetEntry(media)!.Open();
     Span<byte> signature = stackalloc byte[8];
     image.ReadExactly(signature);
-    Assert.That(signature.SequenceEqual([137, 80, 78, 71, 13, 10, 26, 10]), Is.True, "embedded PNG signature");
+    ReadOnlySpan<byte> pngSignature = [137, 80, 78, 71, 13, 10, 26, 10];
+    Assert.That(signature.SequenceEqual(pngSignature), Is.True, "embedded PNG signature");
   }
 
   private static void _AssertSameImage(RawImage expected, RawImage actual) {
