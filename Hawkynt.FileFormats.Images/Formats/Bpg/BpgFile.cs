@@ -6,7 +6,11 @@ namespace FileFormat.Bpg;
 
 /// <summary>In-memory representation of a BPG (Better Portable Graphics) image container.</summary>
 [FormatMagicBytes([0x42, 0x50, 0x47, 0xFB])]
-public sealed class BpgFile : IImageFormatReader<BpgFile>, IImageToRawImage<BpgFile>, IImageFormatWriter<BpgFile> {
+public sealed class BpgFile :
+  IImageFormatReader<BpgFile>,
+  IImageToRawImage<BpgFile>,
+  IImageFromRawImage<BpgFile>,
+  IImageFormatWriter<BpgFile> {
 
   /// <summary>BPG magic bytes: "BPG" + 0xFB.</summary>
   internal static readonly byte[] Magic = [0x42, 0x50, 0x47, 0xFB];
@@ -18,6 +22,9 @@ public sealed class BpgFile : IImageFormatReader<BpgFile>, IImageToRawImage<BpgF
   static string[] IImageFormatMetadata<BpgFile>.FileExtensions => [".bpg"];
   static BpgFile IImageFormatReader<BpgFile>.FromSpan(ReadOnlySpan<byte> data) => BpgReader.FromSpan(data);
   static byte[] IImageFormatWriter<BpgFile>.ToBytes(BpgFile file) => BpgWriter.ToBytes(file);
+
+  /// <summary>Encodes a picture as an HEVC intra picture of PCM coding units — see <see cref="BpgWriter.FromRawImage"/>.</summary>
+  public static BpgFile FromRawImage(RawImage image) => BpgWriter.FromRawImage(image);
 
   /// <summary>Image width in pixels.</summary>
   public int Width { get; init; }
