@@ -116,6 +116,17 @@ public sealed class WriterOracleTests {
     var entry = FormatRegistry.GetEntry(format)!;
     var (verdict, detail) = _AskAbout(entry, oracle);
 
+    // A tool that is installed but has no reader for this format cannot confirm the claim and cannot
+    // refute it either, so it is inconclusive rather than a failure. The distinction matters because
+    // the claims were placed from a survey on one machine: ImageMagick is built with different
+    // delegates on different platforms, and its Windows build reads neither Aseprite nor EPS, which
+    // says nothing about what this writer produces. A rejection is still a failure — that is the tool
+    // reading the file and disagreeing, which is the whole point of the column.
+    if (verdict == WriterOracleTool.Verdict.NoOpinion)
+      Assert.Inconclusive(
+        $"{oracle.DisplayName()} on this machine has no reader for {entry.Name}, so the claim is "
+        + $"unconfirmed here rather than wrong: {detail}");
+
     Assert.That(verdict, Is.EqualTo(WriterOracleTool.Verdict.Accepted),
       $"{entry.Name} says {oracle.DisplayName()} has read what it writes, and it has not: {detail}");
   }
