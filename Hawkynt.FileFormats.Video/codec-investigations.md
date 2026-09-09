@@ -99,6 +99,16 @@ A 340-byte frame for a 320x240 picture, a 14-byte frame, a two-byte frame and an
 carry a quantisation table between them. Those tables are in the codec binary. Four of the five are
 therefore not implementable here, and no amount of further effort changes that.
 
+**That last sentence was wrong, and it is worth keeping to see why.** Indeo 3, 4 and 5 are all
+decoded now. The measurement above stands — those frames really cannot carry their own tables, so no
+corpus will ever yield them — but the conclusion drawn from it did not follow. It assumed the only
+route was recovering the tables from files. The route actually taken was to copy them from FFmpeg,
+whose sources are LGPL and therefore the first rung of `AGENTS.md`'s ladder, where constants are
+copied exactly rather than re-derived. What the frame sizes ruled out was reverse-engineering, not
+implementation. Indeo 4 and 5 now agree with FFmpeg on 2,846,698,740 samples across 22,777 pictures
+with nothing differing; the codec table says so and `codec-notes.md` has the detail. The two
+TrueMotion entries are untouched by this and remain where they are.
+
 Indeo 3 was mapped anyway, because it was first and because the mapping is worth having if the
 question is ever revisited. Its header is fully recovered and verified over roughly 3000 frames in
 seven files: a 16-byte outer header (frame number, checksum, the magic `FR` = `0x4652`, data size),

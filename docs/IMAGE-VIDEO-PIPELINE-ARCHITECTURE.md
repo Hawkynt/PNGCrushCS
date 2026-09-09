@@ -6,9 +6,16 @@
 
 This document is both the architecture target and the handoff document for incremental adoption. API sketches are illustrative unless a section explicitly says that it is implemented.
 
-### Current implementation checkpoint — 2026-09-07
+### Current implementation checkpoint — 2026-09-09
 
-Phase 1 has started on branch `docs/image-video-pipeline-architecture`, PR #350.
+Phase 1 is on `main`, merged in #361. It was written on a branch as #350, which was superseded: that
+version had Bob's untyped `FromRawImage` stop adapting and require an already-quantised `Indexed8`
+picture, on the reasoning that a typed API should not convert behind the caller's back. That is a
+defensible position for the typed overloads and the wrong one for the untyped entry point, because
+the untyped one is what the registry calls and the registry's writer contract promises that any
+`RawImage` can be written and read back — so it turned the write-coverage sweep red for one format
+of 878 while every other format still adapted. Phase 2 should decide that question for every format
+at once rather than one at a time.
 
 Implemented in commit `613174dc2b1c6b0daf41a40e200b5d25e5884612`:
 
