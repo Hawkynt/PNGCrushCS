@@ -52,8 +52,6 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | AdTechFax | `.adt` | ✅ | ✅ | — | — | — | none |
 | AdvancedArtStudio | `.ocp`, `.mpi`, `.mpic` | ✅ | ✅ | — | — | — | recoil2png |
 | Afli | `.afl` | ✅ | ✅ | — | — | — | recoil2png, XnView |
-
-| Afli | `.afl` | ✅ | ✅ | — | — | — | recoil2png |
 | Ai | `.ai` | ✅ | ✅ | — | — | — | none |
 | AimGreyScale | `.ima` | ✅ | ✅ | — | — | — | XnView |
 | AirNav | `.anv` | ✅ | ✅ | — | — | — | XnView |
@@ -332,11 +330,8 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | FaxMan | `.fmf` | ✅ | ✅ | — | — | — | none |
 | Fbm | `.fbm` | ✅ | ✅ | — | — | — | XnView |
 | Fff | `.fff` | ✅ | ✅ | — | — | — | ffmpeg |
-| Ffli | `.ffli`, `.ffl` | ✅ | ✅ | — | — | — | none |
-| FirstPublisher | `.art` | ✅ | ✅ | — | — | — | XnView |
-
 | Ffli | `.ffli`, `.ffl` | ✅ | ✅ | — | — | — | recoil2png |
-| FirstPublisher | `.art` | ✅ | ✅ | — | — | — | none |
+| FirstPublisher | `.art` | ✅ | ✅ | — | — | — | XnView |
 | Fits | `.fits`, `.fit`, `.fts` | ✅ | ✅ | — | — | — | ImageMagick |
 | FitsDocument | `.fits`, `.fit`, `.fts` | ✅ | ✅ | — | ✅ | — | ImageMagick |
 | Fl32 | `.fl32` | ✅ | ✅ | — | — | — | ImageMagick |
@@ -473,11 +468,8 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | InterlaceGraphicsEditor | `.ige` | ✅ | ✅ | — | — | — | recoil2png |
 | InterlaceHiresEditor | `.ihe` | ✅ | ✅ | — | — | — | none |
 | InterlaceLogoDesigner | `.ild` | ✅ | ✅ | — | — | — | recoil2png |
-| InterlaceStudio | `.ist` | ✅ | ✅ | — | — | — | none |
-| InterleafImage | `.iimg` | ✅ | ✅ | — | — | — | XnView |
-
 | InterlaceStudio | `.ist` | ✅ | ✅ | — | — | — | recoil2png |
-| InterleafImage | `.iimg` | ✅ | ✅ | — | — | — | none |
+| InterleafImage | `.iimg` | ✅ | ✅ | — | — | — | XnView |
 | InterPainter | `.inp`, `.ing`, `.ins` | ✅ | ✅ | — | — | — | recoil2png |
 | InterPaintHi | `.iph`, `.hre` | ✅ | ✅ | — | — | — | recoil2png |
 | InterPaintMc | `.ipt`, `.lre` | ✅ | ✅ | — | — | — | recoil2png |
