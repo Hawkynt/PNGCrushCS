@@ -433,7 +433,7 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | IconLibrary | `.icl` | ✅ | — | — | — | — |
 | Ics | `.ics` | ✅ | ✅ | — | — | — |
 | IffAcbm | `.acbm`, `.iff`, `.blk` | ✅ | ✅ | — | — | — |
-| IffAnim | `.anim` | ✅ | ✅ | — | — | — |
+| IffAnim | `.anim` | ✅ | ✅ | — | ✅ | — |
 | IffAnim8 | `.an8`, `.anim8` | ✅ | — | — | — | — |
 | IffDctv | `.dctv` | ✅ | ✅ | — | — | — |
 | IffDeep | `.deep`, `.iff`, `.blk` | ✅ | ✅ | — | — | — |
@@ -876,7 +876,7 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | Wsq | `.wsq` | ✅ | ✅ | — | — | — |
 | Wzl | `.wzl` | ✅ | ✅ | — | — | — |
 | X11Puzzle | `.pzl` | ✅ | ✅ | — | — | — |
-| X3f | `.x3f` | ✅ | — | — | — | — |
+| X3f | `.x3f` | ✅ | ✅ | — | — | — |
 | Xar | `.xar` | ✅ | ✅ | — | — | — |
 | XBin | `.xb`, `.xbin` | ✅ | ✅ | — | — | — |
 | Xbm | `.xbm`, `.icon`, `.ico`, `.cbm`, `.x` | ✅ | ✅ | — | — | — |
