@@ -1,0 +1,49 @@
+name: Update CDR generated docs
+
+on:
+  push:
+    branches: [feature/cdr-read-write]
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  update:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Restore generated package docs
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api repos/${GITHUB_REPOSITORY}/actions/artifacts/10140590288/zip > /tmp/package-readmes.zip
+          mkdir -p /tmp/package-readmes
+          unzip -q /tmp/package-readmes.zip -d /tmp/package-readmes
+          cp /tmp/package-readmes/PNGCrushCS/Hawkynt.FileFormats.Images/README.md Hawkynt.FileFormats.Images/README.md
+          cp /tmp/package-readmes/PNGCrushCS/Hawkynt.FileFormats.Images/REFERENCE.md Hawkynt.FileFormats.Images/REFERENCE.md
+
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('Hawkynt.FileFormats.Images/README.md')
+          text = path.read_text(encoding='utf-8-sig')
+          old = "These 9 entries read but have no writer; each is a decision, not an oversight. **Not bounded** (an encoder or a model this package does not have): PeResource, Fpx (executable, OLE and compound-document containers). **Holders of other files rather than pictures of their own**: IconLibrary, Ipg, Sdg, Cdr, Cmx — an icon library, a tileset and a gallery carry whole files of other formats, and CorelDRAW's streams are vector scenes whose raster part is only an embedded preview, so writing any of them means deciding what belongs in a collection or composing a drawing, neither of which is serialising a picture. **Deliberately not written** because a file built from arbitrary pixels would not be what the name promises: EmbeddedDib, CartesMichelin."
+          new = "These 8 entries read but have no writer; each is a decision, not an oversight. **Not bounded** (an encoder or a model this package does not have): PeResource, Fpx (executable, OLE and compound-document containers). **Holders of other files rather than pictures of their own**: IconLibrary, Ipg, Sdg, Cmx — an icon library, a tileset and a gallery carry whole files of other formats, so writing any of them means deciding what belongs in a collection rather than serialising a picture. **Deliberately not written** because a file built from arbitrary pixels would not be what the name promises: EmbeddedDib, CartesMichelin."
+          if old not in text:
+              raise SystemExit('read-only paragraph did not match expected text')
+          path.write_text(text.replace(old, new), encoding='utf-8', newline='\r\n')
+          PY
+
+      - name: Commit generated docs and remove this workflow
+        shell: bash
+        run: |
+          rm .github/workflows/update-cdr-generated-docs.yml
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add Hawkynt.FileFormats.Images/README.md Hawkynt.FileFormats.Images/REFERENCE.md .github/workflows/update-cdr-generated-docs.yml
+          git commit -m "Sync CDR generated package documentation"
+          git push
