@@ -3,6 +3,7 @@ name: Temporary PeResource README regeneration
 on:
   push:
     branches: [feat/peresource-read-write]
+  workflow_dispatch: {}
 
 permissions:
   contents: write
