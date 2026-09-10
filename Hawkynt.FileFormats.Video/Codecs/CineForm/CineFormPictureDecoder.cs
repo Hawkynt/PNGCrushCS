@@ -38,7 +38,13 @@ internal static class CineFormPictureDecoder {
   }
 
   internal static Result Decode(ReadOnlyMemory<byte> data) {
-    _PeekImageHeader(data.Span, out var imageWidth, out var codedHeight, out var displayHeight, out var channelCount);
+    _PeekImageHeader(
+      data.Span,
+      out var imageWidth,
+      out var codedHeight,
+      out var displayHeight,
+      out var channelCount,
+      out var channelHeaderPosition);
 
     if (imageWidth <= 0 || codedHeight <= 0)
       throw new InvalidDataException("A CineForm frame's tag-value header does not state a positive ImageWidth and ImageHeight before its first channel.");
@@ -52,7 +58,10 @@ internal static class CineFormPictureDecoder {
       throw new NotSupportedException(
         $"This decoder reads only the three-channel layouts ffmpeg's own cfhd encoder writes — 4:2:2 YUV and RGB without alpha. This frame states ChannelCount {channelCount}, which was never measured against a real file and is refused rather than guessed at.");
 
-    var position = 0;
+    // With a raw index present, begin after its size words. Every tag the channel decoder needs sits
+    // after the index; starting at packet zero would reinterpret those size words as tag/value pairs.
+    // Sparse VC-5-style fixtures have no index and therefore keep the historical start at zero.
+    var position = channelHeaderPosition;
     var channels = new CineFormChannelDecoder.ParsedChannel[channelCount];
     for (var i = 0; i < channelCount; ++i)
       channels[i] = CineFormChannelDecoder.Parse(data, ref position);
@@ -83,12 +92,14 @@ internal static class CineFormPictureDecoder {
     out int imageWidth,
     out int imageHeight,
     out int displayHeight,
-    out int channelCount) {
+    out int channelCount,
+    out int channelHeaderPosition) {
 
     imageWidth = 0;
     imageHeight = 0;
     displayHeight = 0;
     channelCount = 0;
+    channelHeaderPosition = 0;
 
     var position = 0;
     while (position + 4 <= span.Length) {
@@ -103,6 +114,7 @@ internal static class CineFormPictureDecoder {
           throw new InvalidDataException(
             $"A CineForm channel-size index declares {value} entries but the packet ends inside the index.");
         position += (int)bytes;
+        channelHeaderPosition = position;
         continue;
       }
 
