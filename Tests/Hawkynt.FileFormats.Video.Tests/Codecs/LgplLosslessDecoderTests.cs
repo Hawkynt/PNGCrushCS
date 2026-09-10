@@ -45,6 +45,94 @@ public sealed class LgplLosslessDecoderTests {
 
   [Test]
   [Category("Unit")]
+  public void LocoOddWidthRgbAppliesTheHistoricalRowRotation() {
+    var decoder = LocoVideoDecoder.Create(_LocoStream(3, 3, 3));
+
+    // Produced from nine deliberately distinct RGB pixels through the independently derived LOCO
+    // plane writer, then decoded by FFmpeg 7.1.5. Odd-width RGB is not a normal raster permutation:
+    // the historical codec repaired a diagonal walk after entropy decoding, including its duplicated
+    // edge samples. Pin the external decoder's bytes rather than our own interpretation of the quirk.
+    var packet = Convert.FromHexString("00000CF9F8E7021D4E702000000023E7E39C087539C08000019F3E1CE050670200");
+    var expected = Convert.FromHexString("46505A28323C46505A828C96A0AAB40A141EBEC8D2DCE6F0FA050F");
+
+    Assert.That(decoder.TryDecode(new(0, packet), out var frame), Is.True);
+    Assert.That(frame.Format, Is.EqualTo(PixelFormat.Rgb24));
+    Assert.That(frame.PixelData, Is.EqualTo(expected));
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void LocoEncoderWritesTheFfmpegVerifiedRgbPacketAndRoundTrips() {
+    var encoder = LocoVideoEncoder.Create(_LocoStream(2, 2, 3));
+    var pixels = new byte[] {
+      10, 20, 30, 40, 60, 80,
+      90, 120, 150, 200, 210, 220,
+    };
+
+    Assert.That(encoder.TryEncode(new() {
+      Width = 2,
+      Height = 2,
+      Format = PixelFormat.Rgb24,
+      PixelData = pixels,
+    }, 17, out var packet), Is.True);
+
+    // This complete packet was independently generated from the documented predictor/Rice rules and
+    // decoded by FFmpeg 7.1.5 back to the twelve source bytes exactly. Holding the bytes also exercises
+    // adaptive-k transitions and the stateful zero coding instead of merely making our two halves agree.
+    Assert.That(packet.Data.ToArray(), Is.EqualTo(Convert.FromHexString("0600706FCE7800001823B18000581E17CBE0")));
+    Assert.That(packet.IsKeyFrame, Is.True);
+
+    var described = encoder.DescribeStream();
+    var extra = described.CodecPrivateData.Span[BitmapInfoHeader.StructSize..];
+    Assert.Multiple(() => {
+      Assert.That(described.BitsPerPixel, Is.EqualTo(24));
+      Assert.That(BinaryPrimitives.ReadInt32LittleEndian(extra), Is.EqualTo(1));
+      Assert.That(BinaryPrimitives.ReadInt32LittleEndian(extra[4..]), Is.EqualTo(3));
+      Assert.That(BinaryPrimitives.ReadInt32LittleEndian(extra[8..]), Is.Zero);
+    });
+
+    var decoder = LocoVideoDecoder.Create(described);
+    Assert.That(decoder.TryDecode(packet, out var decoded), Is.True);
+    Assert.That(decoded.PixelData, Is.EqualTo(pixels));
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void LocoRgbaEncoderPreservesAlphaAtOddWidth() {
+    var encoder = LocoVideoEncoder.Create(_LocoStream(3, 1, 4));
+    var pixels = new byte[] {
+      10, 20, 30, 40,
+      50, 60, 70, 80,
+      90, 100, 110, 120,
+    };
+
+    Assert.That(encoder.TryEncode(new() {
+      Width = 3,
+      Height = 1,
+      Format = PixelFormat.Rgba32,
+      PixelData = pixels,
+    }, null, out var packet), Is.True);
+
+    var described = encoder.DescribeStream();
+    Assert.That(BinaryPrimitives.ReadInt32LittleEndian(described.CodecPrivateData.Span[(BitmapInfoHeader.StructSize + 4)..]), Is.EqualTo(4));
+
+    var decoder = LocoVideoDecoder.Create(described);
+    Assert.That(decoder.TryDecode(packet, out var decoded), Is.True);
+    Assert.Multiple(() => {
+      Assert.That(decoded.Format, Is.EqualTo(PixelFormat.Rgba32));
+      Assert.That(decoded.PixelData, Is.EqualTo(pixels));
+    });
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void LocoRgbEncoderRefusesOddWidthBecauseTheCompatibilityRotationIsNotInvertible() {
+    var exception = Assert.Throws<NotSupportedException>(() => LocoVideoEncoder.Create(_LocoStream(3, 1, 3)));
+    Assert.That(exception!.Message, Does.Contain("non-invertible row rotation"));
+  }
+
+  [Test]
+  [Category("Unit")]
   public void LocoRequiresItsTwelveByteAviTrailer() {
     var stream = _LocoStream(2, 1, 3);
     stream = new() {
@@ -106,6 +194,9 @@ public sealed class LgplLosslessDecoderTests {
     Assert.That(names, Does.Contain("Canopus Lossless Codec"));
     Assert.That(VideoFormatRegistry.CanDecode(_LocoStream(2, 2, 3)), Is.True);
     Assert.That(VideoFormatRegistry.CanDecode(_Stream("CLLC", 2, 2)), Is.True);
+
+    var encoders = VideoFormatRegistry.AllEncoders.Select(codec => codec.CodecName).ToArray();
+    Assert.That(encoders, Does.Contain("LOCO"));
   }
 
   private static MediaStreamInfo _LocoStream(int width, int height, int mode) {
