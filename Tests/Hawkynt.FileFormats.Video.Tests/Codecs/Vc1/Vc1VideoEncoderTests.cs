@@ -27,16 +27,16 @@ public sealed class Vc1VideoEncoderTests {
       Assert.That(stream.CodecPrivateData.Length, Is.EqualTo(44));
     });
 
-    var format = stream.CodecPrivateData.Span;
+    var format = stream.CodecPrivateData.ToArray();
     Assert.Multiple(() => {
-      Assert.That(BinaryPrimitives.ReadInt32LittleEndian(format), Is.EqualTo(44), "biSize includes STRUCT_C");
-      Assert.That(BinaryPrimitives.ReadInt32LittleEndian(format[4..]), Is.EqualTo(20), "biWidth");
-      Assert.That(BinaryPrimitives.ReadInt32LittleEndian(format[8..]), Is.EqualTo(12), "biHeight");
-      Assert.That(BinaryPrimitives.ReadInt16LittleEndian(format[14..]), Is.EqualTo(24), "biBitCount");
-      Assert.That(format[16..20].ToArray(), Is.EqualTo("WMV3"u8.ToArray()), "biCompression");
+      Assert.That(BinaryPrimitives.ReadInt32LittleEndian(format.AsSpan()), Is.EqualTo(44), "biSize includes STRUCT_C");
+      Assert.That(BinaryPrimitives.ReadInt32LittleEndian(format.AsSpan(4)), Is.EqualTo(20), "biWidth");
+      Assert.That(BinaryPrimitives.ReadInt32LittleEndian(format.AsSpan(8)), Is.EqualTo(12), "biHeight");
+      Assert.That(BinaryPrimitives.ReadInt16LittleEndian(format.AsSpan(14)), Is.EqualTo(24), "biBitCount");
+      Assert.That(format[16..20], Is.EqualTo("WMV3"u8.ToArray()), "biCompression");
     });
 
-    var sequence = Vc1SequenceHeader.ReadFrom(format[40..]);
+    var sequence = Vc1SequenceHeader.ReadFrom(format.AsSpan(40));
     Assert.Multiple(() => {
       Assert.That(sequence.Profile, Is.EqualTo(Vc1Profile.Main));
       Assert.That(sequence.Quantiser, Is.EqualTo(3));
