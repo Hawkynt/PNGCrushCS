@@ -79,32 +79,29 @@ public sealed record VideoCodecEntry(
   Func<MediaStreamInfo, IVideoFrameDecoder> CreateDecoder);
 
 /// <summary>
-/// One registered encoder: what it is called, the code it writes by default, and how to build an
-/// encoder that produces those packets.
+/// One registered encoder: what it is called, the code it writes, and how to build an encoder that
+/// produces that codec's packets.
 /// </summary>
 /// <remarks>
 /// The mirror of <see cref="VideoCodecEntry"/> and a separate table from it, because the two answer
-/// different questions. A decoder is chosen by what a stream <i>says it is</i>, and an encoder by what
-/// a caller <i>wants written</i>. A codec with both has a row in each table under the same
-/// <see cref="CodecName"/>, and that shared name is what joins them.
+/// different questions. A decoder is chosen by what a stream <i>says it is</i>, so it is asked
+/// whether it accepts a whole stream description; an encoder is chosen by what a caller <i>wants
+/// written</i>, which is one four-character code. A codec with both has a row in each table under
+/// the same <see cref="CodecName"/>, and that shared name is what joins them.
 /// <para/>
-/// <see cref="Codec"/> remains the preferred/default code for display. <see cref="Accepts"/> decides
-/// lookup where the generated registry supplies it, so an encoder whose identical bitstream is
-/// carried under aliases can advertise those without multiplying registry rows. Leaving it unset
-/// preserves the original exact-<see cref="Codec"/> behavior.
+/// <see cref="Codec"/> is the one code the encoder writes, not every code it would answer to when
+/// reading. HuffYUV writes <c>HFYU</c> and FFVHUFF <c>FFVH</c>, and the same encoder produces either
+/// on request; the table names the one it writes when nothing is asked for.
 /// </remarks>
 /// <param name="CodecName">The codec's name as a person would say it, spelt exactly as the decoder
 /// of the same codec spells it.</param>
-/// <param name="Codec">The preferred/default code a container names this codec by.</param>
+/// <param name="Codec">The code a container names this codec by in its stream headers.</param>
 /// <param name="CreateEncoder">Builds an encoder producing the stream described; throws
 /// <see cref="NotSupportedException"/> for a stream this codec cannot be asked to write.</param>
 public sealed record VideoCodecEncoderEntry(
   string CodecName,
   CodecTag Codec,
   Func<MediaStreamInfo, IVideoPacketEncoder> CreateEncoder) {
-
-  /// <summary>Whether this encoder can produce the code a stream asks to have written.</summary>
-  public Func<MediaStreamInfo, bool>? Accepts { get; init; }
 
   /// <summary>
   /// Tools from outside this repository that have read what this encoder produces.
