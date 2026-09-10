@@ -137,7 +137,7 @@ public sealed class MsMpeg4VideoEncoder : IVideoCodecEncoder<MsMpeg4VideoEncoder
   public static CodecTag Codec => _MP43;
 
   /// <summary>Whether the stream asks for any FourCC carried by versions 1, 2 or 3.</summary>
-  public static bool Accepts(MediaStreamInfo stream) {
+  static bool IVideoCodecEncoder<MsMpeg4VideoEncoder>.Accepts(MediaStreamInfo stream) {
     ArgumentNullException.ThrowIfNull(stream);
     return _TryVersionOf(stream.Codec, out _);
   }
