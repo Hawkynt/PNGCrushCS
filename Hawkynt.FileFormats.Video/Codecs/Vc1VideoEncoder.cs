@@ -10,19 +10,19 @@ namespace FileFormat.Codecs;
 /// Encodes VC-1 / Windows Media Video 9 as progressive Main-profile intra pictures.
 /// </summary>
 /// <remarks>
-/// The writer deliberately starts with the smallest complete VC-1 coding subset rather than a
-/// half-implemented motion coder. Every input picture becomes an I picture. Each 8x8 block carries its
-/// predicted DC coefficient and no AC coefficients, so the result is a block-average representation of
-/// the source: visibly coarse, but fully specified, independently decodable, and a valid foundation for
-/// adding the transform/AC and inter-picture layers later without changing the stream contract.
+/// Every input picture becomes an independently decodable I picture. Each 8x8 block is transformed
+/// with the analytical forward transform from SMPTE 421M Annex A.2, quantised with the same uniform
+/// quantiser the decoder reverses, and carries both its predicted DC coefficient and all non-zero AC
+/// coefficients. AC values use the standard's Escape Mode 3 representation; it is larger than choosing
+/// an optimal trained VLC for every run/level pair, but it covers the complete coefficient domain and
+/// keeps the first writer focused on reconstruction rather than a rate-control heuristic.
 /// <para/>
 /// The sequence is Main profile, progressive, one reference-independent picture per packet, uniform
 /// quantiser 3, no overlap smoothing, no range reduction, no multi-resolution coding and no in-loop
-/// filter. Those choices are exactly the subset <see cref="Vc1VideoDecoder"/> reads today. The
-/// container receives a Video-for-Windows <c>BITMAPINFOHEADER</c> followed by the four-byte
+/// filter. The container receives a Video-for-Windows <c>BITMAPINFOHEADER</c> followed by the four-byte
 /// <c>STRUCT_C</c> sequence header, which is how <c>WMV3</c> carries Simple/Main profile state.
 /// <para/>
-/// RGB is converted to studio-swing BT.601 YCbCr 4:2:0 before block averaging. Chroma is averaged over
+/// RGB is converted to studio-swing BT.601 YCbCr 4:2:0 before transformation. Chroma is averaged over
 /// each 2x2 luma square and picture edges are replicated out to the macroblock boundary; the crop back
 /// to the declared display size belongs to the decoder.
 /// </remarks>
@@ -39,10 +39,11 @@ public sealed class Vc1VideoEncoder : IVideoCodecEncoder<Vc1VideoEncoder> {
 
   private const int _PICTURE_QUANTISER = 3;
   private const int _DC_STEP_SIZE = 8;
+  private const int _AC_STEP_SIZE = _PICTURE_QUANTISER * 2;
   private const int _DEFAULT_DC_PREDICTOR = 128;
   private const int _DC_ESCAPE_INDEX = 119;
-
-  private static readonly byte[] _DcForSample = _BuildDcForSample();
+  private const int _MODE3_LEVEL_BITS = 11;
+  private const int _MODE3_RUN_BITS = 6;
 
   private readonly MediaStreamInfo _stream;
   private readonly int _width;
@@ -156,7 +157,7 @@ public sealed class Vc1VideoEncoder : IVideoCodecEncoder<Vc1VideoEncoder> {
     writer.WriteBit(false); // HALFQP, present because PQINDEX <= 8.
 
     // TRANSACFRM, TRANSACFRM2 and TRANSDCTAB: coding-set index zero for luma/chroma and the low-motion
-    // DC tables. No AC symbol follows in the subset written here, but these fields are still mandatory.
+    // DC tables. At PQINDEX 3 this selects the High Rate intra/inter AC sets.
     writer.WriteBit(false);
     writer.WriteBit(false);
     writer.WriteBit(false);
@@ -164,36 +165,134 @@ public sealed class Vc1VideoEncoder : IVideoCodecEncoder<Vc1VideoEncoder> {
     var luma = new Vc1IntraPrediction(this._macroblockWidth * 2, this._macroblockHeight * 2);
     var cb = new Vc1IntraPrediction(this._macroblockWidth, this._macroblockHeight);
     var cr = new Vc1IntraPrediction(this._macroblockWidth, this._macroblockHeight);
-    Span<int> quantised = stackalloc int[64];
+    var lumaCoded = new byte[checked(this._macroblockWidth * this._macroblockHeight * 4)];
+    var escape = new Vc1EscapeState();
+
+    Span<int> blocks = stackalloc int[6 * 64];
 
     for (var mbY = 0; mbY < this._macroblockHeight; ++mbY)
       for (var mbX = 0; mbX < this._macroblockWidth; ++mbX) {
-        // Table 168 index zero is the all-clear coded-block pattern. Since every neighbouring luma
-        // block is all-clear as well, the prediction of 8.1.2.1 leaves all six blocks uncoded for AC.
-        writer.WriteCode(Vc1Tables.IPictureCbpcy, 0);
-        writer.WriteBit(false); // ACPRED
+        var pattern = 0;
+        for (var blockIndex = 0; blockIndex < 6; ++blockIndex) {
+          var isLuma = blockIndex < 4;
+          var (plane, stride) = samples.PlaneOf(blockIndex);
+          var x = isLuma ? (mbX * 16) + ((blockIndex & 1) * 8) : mbX * 8;
+          var y = isLuma ? (mbY * 16) + ((blockIndex >> 1) * 8) : mbY * 8;
+          var block = blocks.Slice(blockIndex * 64, 64);
+
+          Vc1ForwardTransform.Quantise8x8(plane, stride, x, y, _DC_STEP_SIZE, _AC_STEP_SIZE, block);
+          if (_HasAc(block))
+            pattern |= 1 << (5 - blockIndex);
+        }
+
+        writer.WriteCode(Vc1Tables.IPictureCbpcy, _EncodeCodedBlockPattern(pattern, mbX, mbY, lumaCoded));
+        writer.WriteBit(false); // ACPRED: coefficients are stated without neighbour-edge prediction.
 
         for (var blockIndex = 0; blockIndex < 6; ++blockIndex) {
           var isLuma = blockIndex < 4;
           var prediction = isLuma ? luma : blockIndex == 4 ? cb : cr;
           var column = isLuma ? (mbX * 2) + (blockIndex & 1) : mbX;
           var row = isLuma ? (mbY * 2) + (blockIndex >> 1) : mbY;
-          var (plane, stride) = samples.PlaneOf(blockIndex);
-          var x = isLuma ? (mbX * 16) + ((blockIndex & 1) * 8) : mbX * 8;
-          var y = isLuma ? (mbY * 16) + ((blockIndex >> 1) * 8) : mbY * 8;
-          var average = _BlockAverage(plane, stride, x, y);
-          var dc = _DcForSample[average];
+          var block = blocks.Slice(blockIndex * 64, 64);
           var (predictor, _) = prediction.Predict(column, row, _DEFAULT_DC_PREDICTOR);
 
-          _WriteDcDifferential(writer, dc - predictor, isLuma);
+          _WriteDcDifferential(writer, block[0] - predictor, isLuma);
+          if ((pattern & (1 << (5 - blockIndex))) != 0)
+            _WriteAcCoefficients(writer, block, isLuma, escape);
 
-          quantised.Clear();
-          quantised[0] = dc;
-          prediction.Store(column, row, quantised);
+          prediction.Store(column, row, block);
         }
       }
 
     return writer.ToArray();
+  }
+
+  /// <summary>Applies the inverse of the I-picture luma coded-block-pattern prediction in 8.1.2.1.</summary>
+  private int _EncodeCodedBlockPattern(int pattern, int mbX, int mbY, byte[] coded) {
+    var y0 = (pattern >> 5) & 1;
+    var y1 = (pattern >> 4) & 1;
+    var y2 = (pattern >> 3) & 1;
+    var y3 = (pattern >> 2) & 1;
+
+    var left = mbX > 0;
+    var above = mbY > 0;
+    var l1 = left ? _Coded(coded, mbX - 1, mbY, 1) : 0;
+    var l3 = left ? _Coded(coded, mbX - 1, mbY, 3) : 0;
+    var t2 = above ? _Coded(coded, mbX, mbY - 1, 2) : 0;
+    var t3 = above ? _Coded(coded, mbX, mbY - 1, 3) : 0;
+    var lt3 = left && above ? _Coded(coded, mbX - 1, mbY - 1, 3) : 0;
+
+    var encoded = ((y0 ^ (lt3 == t2 ? l1 : t2)) << 5)
+                  | ((y1 ^ (t2 == t3 ? y0 : t3)) << 4)
+                  | ((y2 ^ (l1 == y0 ? l3 : y0)) << 3)
+                  | ((y3 ^ (y0 == y1 ? y2 : y1)) << 2)
+                  | (pattern & 0x03);
+
+    var at = ((mbY * this._macroblockWidth) + mbX) * 4;
+    coded[at] = (byte)y0;
+    coded[at + 1] = (byte)y1;
+    coded[at + 2] = (byte)y2;
+    coded[at + 3] = (byte)y3;
+    return encoded;
+  }
+
+  private int _Coded(byte[] coded, int mbX, int mbY, int block)
+    => coded[(((mbY * this._macroblockWidth) + mbX) * 4) + block];
+
+  private static bool _HasAc(ReadOnlySpan<int> block) {
+    for (var i = 1; i < 64; ++i)
+      if (block[i] != 0)
+        return true;
+
+    return false;
+  }
+
+  /// <summary>Writes all non-zero AC coefficients in normal scan order through Escape Mode 3.</summary>
+  private static void _WriteAcCoefficients(
+    Vc1BitWriter writer,
+    ReadOnlySpan<int> block,
+    bool luma,
+    Vc1EscapeState escape) {
+    var scan = Vc1Tables.NormalScan;
+    var last = 63;
+    while (last > 0 && block[scan[last]] == 0)
+      --last;
+
+    var run = 0;
+    for (var position = 1; position <= last; ++position) {
+      var level = block[scan[position]];
+      if (level == 0) {
+        ++run;
+        continue;
+      }
+
+      var table = luma ? Vc1Tables.HighRateIntraCodes : Vc1Tables.HighRateInterCodes;
+      var escapeIndex = luma ? Vc1Tables.HighRateIntraEscapeIndex : Vc1Tables.HighRateInterEscapeIndex;
+      writer.WriteCode(table, escapeIndex);
+      writer.WriteBit(false);
+      writer.WriteBit(false); // ESCMODE 00b: Mode 3.
+      writer.WriteBit(position == last); // ESCLR.
+
+      if (escape.First) {
+        // Table 59 because PQUANT=3: 00011b states an eleven-bit level. Table 61: 11b states a
+        // six-bit run. These are the widest forms and therefore cover every coefficient position.
+        writer.WriteBits(0b00011, 5);
+        writer.WriteBits(0b11, 2);
+        escape.First = false;
+        escape.LevelCodeSize = _MODE3_LEVEL_BITS;
+        escape.RunCodeSize = _MODE3_RUN_BITS;
+      }
+
+      var magnitude = level < 0 ? -level : level;
+      if ((uint)magnitude >= 1u << escape.LevelCodeSize)
+        throw new InvalidOperationException(
+          $"A quantised VC-1 AC level of {level} does not fit the {escape.LevelCodeSize}-bit Mode 3 field.");
+
+      writer.WriteBits(run, escape.RunCodeSize);
+      writer.WriteBit(level < 0);
+      writer.WriteBits(magnitude, escape.LevelCodeSize);
+      run = 0;
+    }
   }
 
   private static void _WriteDcDifferential(Vc1BitWriter writer, int differential, bool luma) {
@@ -216,17 +315,6 @@ public sealed class Vc1VideoEncoder : IVideoCodecEncoder<Vc1VideoEncoder> {
     }
 
     writer.WriteBit(differential < 0);
-  }
-
-  private static int _BlockAverage(int[] plane, int stride, int x, int y) {
-    var sum = 0;
-    for (var row = 0; row < 8; ++row) {
-      var at = ((y + row) * stride) + x;
-      for (var column = 0; column < 8; ++column)
-        sum += plane[at + column];
-    }
-
-    return (sum + 32) >> 6;
   }
 
   // ============================================================================================
@@ -285,41 +373,4 @@ public sealed class Vc1VideoEncoder : IVideoCodecEncoder<Vc1VideoEncoder> {
   }
 
   private static int _Clamp8(int value) => value < 0 ? 0 : value > 255 ? 255 : value;
-
-  // ============================================================================================
-  // DC-only quantisation
-  // ============================================================================================
-
-  /// <summary>
-  /// For every possible target sample, picks the quantised DC whose exact VC-1 inverse transform is
-  /// nearest. This is derived from Annex A's integer transform rather than from a floating-point DCT.
-  /// </summary>
-  private static byte[] _BuildDcForSample() {
-    var result = new byte[256];
-
-    for (var sample = 0; sample < result.Length; ++sample) {
-      var best = 0;
-      var bestError = int.MaxValue;
-      for (var dc = 0; dc <= byte.MaxValue; ++dc) {
-        var error = Math.Abs(_ReconstructDc(dc) - sample);
-        if (error >= bestError)
-          continue;
-
-        best = dc;
-        bestError = error;
-        if (error == 0)
-          break;
-      }
-
-      result[sample] = (byte)best;
-    }
-
-    return result;
-  }
-
-  private static int _ReconstructDc(int quantisedDc) {
-    var coefficient = quantisedDc * _DC_STEP_SIZE;
-    var firstStage = ((coefficient * 12) + 4) >> 3;
-    return ((firstStage * 12) + 64) >> 7;
-  }
 }
