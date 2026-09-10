@@ -1,0 +1,53 @@
+name: Matrox documentation patch
+
+on:
+  push:
+    branches:
+      - codec/matrox-read-write
+    paths:
+      - .github/workflows/_matrox_readme_patch.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: codec/matrox-read-write
+      - name: Patch video support ledger
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('Hawkynt.FileFormats.Video/README.md')
+          text = path.read_text(encoding='utf-8')
+
+          replacements = {
+            'builds, 100 of them; `Encode` is': 'builds, 101 of them; `Encode` is',
+            'builds, 46 of them. The two': 'builds, 48 of them. The two',
+            '| Matrox Uncompressed SD | ✅ | — | — | `M101`; 8- and 10-bit 4:2:2 read from the 24-byte Matrox AVI trailer. Odd widths and other sample depths refused. Adapted from FFmpeg\'s LGPL-2.1-or-later decoder. No neutral overview of this format is published | [FFmpeg `m101.c`](https://github.com/FFmpeg/FFmpeg/blob/master/libavcodec/m101.c) |': '| Matrox Uncompressed SD | ✅ | ✅ | none | `M101`; 8- and 10-bit 4:2:2 from the 24-byte Matrox AVI trailer, including progressive and field-ordered storage. The encoder writes the exact inverse packing, preserves unknown trailer bytes when supplied and defaults new streams to progressive 8-bit (20 stored bits per pixel requests 10-bit). Odd widths and other sample depths refused | [Matrox MXO2 guide](https://ftp.matrox.com/pub/video/doc/Matrox%20MXO2%20Installation%20and%20User%20Guide_2.0.pdf) / [FFmpeg `m101.c`](https://github.com/FFmpeg/FFmpeg/blob/master/libavcodec/m101.c) |\n| Matrox Uncompressed HD | ✅ | ✅ | none | `M102`; Matrox documents the same 8/10-bit and scan-mode choices as SD, and FFmpeg maps `M102` to the same lossless `m101` layout. The encoder therefore shares the SD packing and trailer rules while writing the HD FourCC | [Matrox MXO2 guide](https://ftp.matrox.com/pub/video/doc/Matrox%20MXO2%20Installation%20and%20User%20Guide_2.0.pdf) / [FFmpeg RIFF tags](https://github.com/FFmpeg/FFmpeg/blob/master/libavformat/riff.c) |',
+            'encoder nothing else has looked at: MagicYUV, because this ffmpeg build ships that codec\'s encoder\nand not its decoder, and Planar raw YUV, because no container here names it with a code ffmpeg maps\nto a decoder.': 'encoder nothing else has looked at: MagicYUV, because this ffmpeg build ships that codec\'s encoder\nand not its decoder; Matrox Uncompressed SD and HD, whose writers are checked here against the\nreference layout but have not yet been opened by an external decoder; and Planar raw YUV, because\nno container here names it with a code ffmpeg maps to a decoder.',
+            'Canopus Lossless, Matrox M101, VBLE': 'Canopus Lossless, Matrox M101/M102, VBLE',
+            'Encoding is a smaller domain than decoding on purpose: 46 codecs of the 100 read can also be written.': 'Encoding is a smaller domain than decoding on purpose: 48 codecs of the 101 read can also be written.',
+          }
+
+          for old, new in replacements.items():
+            count = text.count(old)
+            if count != 1:
+              raise SystemExit(f'expected exactly one occurrence of {old!r}, found {count}')
+            text = text.replace(old, new)
+
+          path.write_text(text, encoding='utf-8')
+          PY
+      - name: Commit support ledger
+        shell: bash
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add Hawkynt.FileFormats.Video/README.md
+          git commit -m "Document Matrox M101/M102 read-write support"
+          git push origin HEAD:codec/matrox-read-write
