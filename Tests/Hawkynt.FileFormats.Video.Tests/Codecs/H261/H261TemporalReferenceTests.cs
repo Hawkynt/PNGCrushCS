@@ -1,3 +1,4 @@
+using System;
 using System.IO;
 using FileFormat.Codecs.H263;
 using FileFormat.Core;
