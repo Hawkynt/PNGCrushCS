@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using FileFormat.Bpg;
 
 namespace FileFormat.Bpg.Tests;
@@ -12,29 +13,16 @@ public sealed class BpgUe7Tests {
   public void Encode_Zero_SingleByte() {
     var output = new List<byte>();
     BpgUe7.Write(output, 0);
-
-    Assert.That(output, Has.Count.EqualTo(1));
-    Assert.That(output[0], Is.EqualTo(0));
+    Assert.That(output, Is.EqualTo(new byte[] { 0 }));
   }
 
-  [Test]
+  [TestCase(100)]
+  [TestCase(127)]
   [Category("Unit")]
-  public void Encode_SmallValue_SingleByte() {
+  public void Encode_SmallValue_SingleByte(int value) {
     var output = new List<byte>();
-    BpgUe7.Write(output, 100);
-
+    BpgUe7.Write(output, value);
     Assert.That(output, Has.Count.EqualTo(1));
-    Assert.That(output[0], Is.EqualTo(100));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void Encode_127_SingleByte() {
-    var output = new List<byte>();
-    BpgUe7.Write(output, 127);
-
-    Assert.That(output, Has.Count.EqualTo(1));
-    Assert.That(output[0], Is.EqualTo(127));
   }
 
   [Test]
@@ -42,23 +30,7 @@ public sealed class BpgUe7Tests {
   public void Encode_128_TwoBytes() {
     var output = new List<byte>();
     BpgUe7.Write(output, 128);
-
-    Assert.That(output, Has.Count.EqualTo(2));
-    // 128 = 0b10_0000000 => two 7-bit groups: [1, 0]
-    // First byte: 0x80 | 1 = 0x81
-    // Second byte: 0
-    Assert.That(output[0], Is.EqualTo(0x81));
-    Assert.That(output[1], Is.EqualTo(0x00));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void Encode_VeryLarge_ThreeBytes() {
-    var output = new List<byte>();
-    BpgUe7.Write(output, 16384);
-
-    // 16384 = 0x4000 = 0b1_0000000_0000000 => three 7-bit groups
-    Assert.That(output, Has.Count.EqualTo(3));
+    Assert.That(output, Is.EqualTo(new byte[] { 0x81, 0x00 }));
   }
 
   [Test]
@@ -68,101 +40,78 @@ public sealed class BpgUe7Tests {
     Assert.Throws<ArgumentOutOfRangeException>(() => BpgUe7.Write(output, -1));
   }
 
-  [Test]
+  [TestCase(new byte[] { 0x00 }, 0)]
+  [TestCase(new byte[] { 0x2a }, 42)]
+  [TestCase(new byte[] { 0x81, 0x00 }, 128)]
+  [TestCase(new byte[] { 0x84, 0x1e }, 542)]
   [Category("Unit")]
-  public void Decode_Zero_ReturnsZero() {
-    var data = new byte[] { 0 };
+  public void Decode_CanonicalValue_ReturnsValue(byte[] data, int expected) {
     var offset = 0;
     var result = BpgUe7.Read(data, ref offset);
-
-    Assert.That(result, Is.EqualTo(0));
-    Assert.That(offset, Is.EqualTo(1));
+    Assert.Multiple(() => {
+      Assert.That(result, Is.EqualTo(expected));
+      Assert.That(offset, Is.EqualTo(data.Length));
+    });
   }
 
   [Test]
   [Category("Unit")]
-  public void Decode_SmallValue_ReturnsSingleByte() {
-    var data = new byte[] { 42 };
-    var offset = 0;
-    var result = BpgUe7.Read(data, ref offset);
-
-    Assert.That(result, Is.EqualTo(42));
-    Assert.That(offset, Is.EqualTo(1));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void Decode_TwoBytes_ReturnsLargeValue() {
-    // Encode 128: first byte = 0x81 (more=1, value=1), second byte = 0x00 (more=0, value=0)
-    var data = new byte[] { 0x81, 0x00 };
-    var offset = 0;
-    var result = BpgUe7.Read(data, ref offset);
-
-    Assert.That(result, Is.EqualTo(128));
-    Assert.That(offset, Is.EqualTo(2));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void Decode_EmptyData_Throws() {
+  public void Decode_EmptyData_ThrowsInvalidData() {
     var data = Array.Empty<byte>();
     var offset = 0;
-    Assert.Throws<InvalidOperationException>(() => BpgUe7.Read(data, ref offset));
+    Assert.Throws<InvalidDataException>(() => BpgUe7.Read(data, ref offset));
+  }
+
+  [TestCase(new byte[] { 0x80, 0x00 }, TestName = "Decode_LeadingZeroGroup_IsRejected")]
+  [TestCase(new byte[] { 0x90, 0x80, 0x80, 0x80, 0x00 }, TestName = "Decode_MoreThan32Bits_IsRejected")]
+  [TestCase(new byte[] { 0x81, 0x80, 0x80, 0x80, 0x80 }, TestName = "Decode_UnterminatedFiveByteValue_IsRejected")]
+  [Category("Unit")]
+  public void Decode_NonCanonicalOrOverflowingValue_Throws(byte[] data) {
+    var offset = 0;
+    Assert.Throws<InvalidDataException>(() => BpgUe7.ReadUInt32(data, ref offset));
   }
 
   [Test]
   [Category("Unit")]
-  public void RoundTrip_SmallValues() {
-    for (var i = 0; i < 128; ++i) {
-      var output = new List<byte>();
-      BpgUe7.Write(output, i);
-
-      var offset = 0;
-      var result = BpgUe7.Read(output.ToArray(), ref offset);
-      Assert.That(result, Is.EqualTo(i), $"Round-trip failed for value {i}");
-    }
+  public void Decode_UInt32Maximum_IsAcceptedByUnsignedReader() {
+    byte[] data = [0x8f, 0xff, 0xff, 0xff, 0x7f];
+    var offset = 0;
+    Assert.That(BpgUe7.ReadUInt32(data, ref offset), Is.EqualTo(uint.MaxValue));
   }
 
   [Test]
   [Category("Unit")]
-  public void RoundTrip_LargeValues() {
-    int[] values = [128, 255, 256, 1000, 1920, 4096, 16383, 16384, 65535, 100000];
+  public void Decode_ValuePastSignedModel_IsRejectedBySignedReader() {
+    byte[] data = [0x88, 0x80, 0x80, 0x80, 0x00]; // 2^31
+    var offset = 0;
+    Assert.Throws<InvalidDataException>(() => BpgUe7.Read(data, ref offset));
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void RoundTrip_RepresentativeSignedValues() {
+    int[] values = [0, 1, 127, 128, 255, 256, 1000, 16383, 16384, 65535, 100000, int.MaxValue];
     foreach (var value in values) {
       var output = new List<byte>();
       BpgUe7.Write(output, value);
-
       var offset = 0;
-      var result = BpgUe7.Read(output.ToArray(), ref offset);
-      Assert.That(result, Is.EqualTo(value), $"Round-trip failed for value {value}");
+      Assert.That(BpgUe7.Read([.. output], ref offset), Is.EqualTo(value), $"Round-trip failed for {value}");
+      Assert.That(offset, Is.EqualTo(output.Count));
     }
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void RoundTrip_VeryLargeValue() {
-    var output = new List<byte>();
-    BpgUe7.Write(output, 0x7FFFFFFF);
-
-    var offset = 0;
-    var result = BpgUe7.Read(output.ToArray(), ref offset);
-    Assert.That(result, Is.EqualTo(0x7FFFFFFF));
   }
 
   [Test]
   [Category("Unit")]
   public void Decode_WithOffset_AdvancesCorrectly() {
-    // Two ue7 values back to back: 5 (single byte), then 200 (two bytes)
     var output = new List<byte>();
     BpgUe7.Write(output, 5);
     BpgUe7.Write(output, 200);
-
     var data = output.ToArray();
     var offset = 0;
 
-    var first = BpgUe7.Read(data, ref offset);
-    var second = BpgUe7.Read(data, ref offset);
-
-    Assert.That(first, Is.EqualTo(5));
-    Assert.That(second, Is.EqualTo(200));
+    Assert.Multiple(() => {
+      Assert.That(BpgUe7.Read(data, ref offset), Is.EqualTo(5));
+      Assert.That(BpgUe7.Read(data, ref offset), Is.EqualTo(200));
+    });
   }
 }
