@@ -24,13 +24,16 @@ namespace FileFormat.Codecs;
 /// field. Those are the rules used by FFmpeg's <c>avrndec.c</c>, expressed here through the package's
 /// shared <see cref="PackedYuv422Packing"/> rather than through a second UYVY implementation.
 /// <para/>
-/// <b>The older subtype is ordinary Motion JPEG.</b> It is delegated to
-/// <see cref="MotionJpegDecoder"/> unchanged. In particular, the JPEG's own dimensions win there;
-/// cropping it to the AVI header is wrong for this subtype and was the defect in the previous AVRn
-/// implementation.
+/// <b>The older subtype is Motion JPEG with one Avid-specific display crop.</b> Its coded bytes are
+/// delegated to <see cref="MotionJpegDecoder"/>, then a smaller container geometry keeps the bottom
+/// rows and left columns of that decoded JPEG. That crop is deliberate: FFmpeg's old AVRn wrapper did
+/// it before the subtype split, and when AVRn-MJPEG was moved into the general MJPEG path in 2021 the
+/// same rule was recreated there as a top crop for <c>AVRn</c> and <c>AVDJ</c>. A coded JPEG may thus
+/// be taller than the displayed Avid frame without those extra top rows becoming part of the picture.
 /// <para/>
 /// The implementation was derived clean-room from the observable stream rules in FFmpeg's
-/// LGPL-2.1-or-later AVRn decoder and AVI demuxer; no implementation code is reproduced here.
+/// LGPL-2.1-or-later AVRn decoder, AVI demuxer and AVRn/MJPEG compatibility handling; no
+/// implementation code is reproduced here.
 /// </remarks>
 public sealed class AvrnVideoDecoder : IVideoCodecDecoder<AvrnVideoDecoder> {
 
@@ -51,7 +54,12 @@ public sealed class AvrnVideoDecoder : IVideoCodecDecoder<AvrnVideoDecoder> {
   private readonly bool _interlaced;
   private readonly bool _firstFieldOnOddRows;
 
-  private AvrnVideoDecoder(MotionJpegDecoder motionJpeg) => this._motionJpeg = motionJpeg;
+  private AvrnVideoDecoder(MediaStreamInfo stream, MotionJpegDecoder motionJpeg) {
+    this._motionJpeg = motionJpeg;
+    this._streamIndex = stream.Index;
+    this._width = stream.Width;
+    this._height = stream.Height;
+  }
 
   private AvrnVideoDecoder(MediaStreamInfo stream, ReadOnlySpan<byte> extraData) {
     this._streamIndex = stream.Index;
@@ -100,12 +108,12 @@ public sealed class AvrnVideoDecoder : IVideoCodecDecoder<AvrnVideoDecoder> {
     var extraData = _AvidExtraData(stream.CodecPrivateData.Span);
     return _IsOneToOne(extraData)
       ? new(stream, extraData)
-      : new(MotionJpegDecoder.Create(stream));
+      : new(stream, MotionJpegDecoder.Create(stream));
   }
 
   public bool TryDecode(CodedPacket packet, out RawImage frame) {
     if (this._motionJpeg != null)
-      return this._motionJpeg.TryDecode(packet, out frame);
+      return this._TryDecodeMotionJpeg(packet, out frame);
 
     var data = packet.Data.Span;
     this._ValidateRawPacket(data);
@@ -116,6 +124,56 @@ public sealed class AvrnVideoDecoder : IVideoCodecDecoder<AvrnVideoDecoder> {
 
     frame = this._packing!.ToImage(this._packing.Unpack(packed));
     return true;
+  }
+
+  private bool _TryDecodeMotionJpeg(CodedPacket packet, out RawImage frame) {
+    if (!this._motionJpeg!.TryDecode(packet, out var decoded)) {
+      frame = decoded;
+      return false;
+    }
+
+    var width = this._width > 0 ? this._width : decoded.Width;
+    var height = this._height > 0 ? this._height : decoded.Height;
+    if (width > decoded.Width || height > decoded.Height)
+      throw new InvalidDataException(
+        $"Video stream {this._streamIndex} states a picture size of {width}x{height}, larger than the "
+        + $"{decoded.Width}x{decoded.Height} its AVRn Motion JPEG packet codes.");
+
+    if (width == decoded.Width && height == decoded.Height) {
+      frame = decoded;
+      return true;
+    }
+
+    frame = new() {
+      Width = width,
+      Height = height,
+      Format = decoded.Format,
+      PixelData = _CropBottomLeft(decoded, width, height),
+      ColorInfo = decoded.ColorInfo,
+      Palette = decoded.Palette,
+      PaletteCount = decoded.PaletteCount,
+      AlphaTable = decoded.AlphaTable,
+      Metadata = decoded.Metadata,
+    };
+    return true;
+  }
+
+  /// <summary>
+  /// Keeps the bottom rows and left columns of an AVRn Motion JPEG picture. The vertical choice is
+  /// the Avid-specific part: coded macroblock padding is above the displayed picture, not below it.
+  /// </summary>
+  private static byte[] _CropBottomLeft(RawImage source, int width, int height) {
+    var bytesPerPixel = RawImage.BytesPerPixel(source.Format);
+    var sourceStride = checked(source.Width * bytesPerPixel);
+    var targetStride = checked(width * bytesPerPixel);
+    var target = new byte[checked(targetStride * height)];
+    var firstRow = source.Height - height;
+
+    for (var row = 0; row < height; ++row)
+      source.PixelData.AsSpan((firstRow + row) * sourceStride, targetStride)
+        .CopyTo(target.AsSpan(row * targetStride, targetStride));
+
+    return target;
   }
 
   /// <summary>
