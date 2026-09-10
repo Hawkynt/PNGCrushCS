@@ -33,6 +33,7 @@ namespace FileFormat.Codecs;
 /// layout and is the whole-frame coding used by real Animator files, so interoperability does not need
 /// to pick a side in that disagreement.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.FFmpeg)]
 public sealed class FlicVideoEncoder : IVideoCodecEncoder<FlicVideoEncoder> {
 
   private static readonly CodecTag _FLIC = CodecTag.FromCharacters("FLIC");
