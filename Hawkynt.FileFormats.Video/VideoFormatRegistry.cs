@@ -257,9 +257,11 @@ public static class VideoFormatRegistry {
   }
 
   private static VideoCodecEncoderEntry? _EncoderFor(MediaStreamInfo stream) {
-    foreach (var encoder in _encoders)
-      if (encoder.Accepts(stream))
+    foreach (var encoder in _encoders) {
+      var accepts = encoder.Accepts;
+      if (accepts != null ? accepts(stream) : stream.Codec.EqualsIgnoringCase(encoder.Codec))
         return encoder;
+    }
 
     return null;
   }
