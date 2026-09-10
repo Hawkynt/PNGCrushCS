@@ -7,10 +7,11 @@ namespace FileFormat.Cdr;
 
 /// <summary>A RIFF-era CorelDRAW document, with its top-level chunks preserved as opaque payloads.</summary>
 /// <remarks>
-/// CorelDRAW files through the RIFF generation use a <c>CDR?</c> (and, for one version, <c>cdr?</c>)
-/// RIFF form. Some of their <c>LIST</c> chunks, notably <c>cmpr</c>, contain Corel-compressed data
-/// rather than ordinary RIFF sub-chunks, so parsed files deliberately preserve every top-level chunk
-/// byte-for-byte instead of projecting the file onto the generic recursive RIFF object model.
+/// CorelDRAW files through the RIFF generation use a <c>CDR?</c> RIFF form; CorelDRAW 8.01 additionally
+/// uses the lowercase <c>cdr8</c> form. Some of their <c>LIST</c> chunks, notably <c>cmpr</c>, contain
+/// Corel-compressed data rather than ordinary RIFF sub-chunks, so parsed files deliberately preserve
+/// every top-level chunk byte-for-byte instead of projecting the file onto the generic recursive RIFF
+/// object model.
 /// <para/>
 /// Existing documents can be re-serialized and their <c>DISP</c> thumbnail replaced. Arbitrary raster
 /// input is authored as a CorelDRAW 4 document containing one real bitmap object backed by a standard
@@ -18,7 +19,7 @@ namespace FileFormat.Cdr;
 /// an encoder for the later compressed or ZIP-based CorelDRAW generations.
 /// </remarks>
 [FormatMagicBytes([(byte)'C', (byte)'D', (byte)'R'], 8)]
-[FormatMagicBytes([(byte)'c', (byte)'d', (byte)'r'], 8)]
+[FormatMagicBytes([(byte)'c', (byte)'d', (byte)'r', (byte)'8'], 8)]
 [VerifiedBy(ConformanceOracle.LibreOffice)]
 public sealed class CdrFile :
   IImageFormatReader<CdrFile>, IImageToRawImage<CdrFile>, IImageFromRawImage<CdrFile>, IImageFormatWriter<CdrFile> {
