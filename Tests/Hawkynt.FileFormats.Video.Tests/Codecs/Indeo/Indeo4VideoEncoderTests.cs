@@ -24,8 +24,8 @@ public sealed class Indeo4VideoEncoderTests {
   [Category("Unit")]
   public void TheRegistryBuildsTheIndeo4Encoder() {
     var stream = _Stream(64, 48);
-    Assert.That(VideoFormatRegistry.CanEncode(CodecTag.FromCharacters("IV41")), Is.True);
-    Assert.That(VideoFormatRegistry.CreateEncoder(stream, CodecTag.FromCharacters("IV41")), Is.InstanceOf<Indeo4VideoEncoder>());
+    Assert.That(VideoFormatRegistry.CanEncode(stream), Is.True);
+    Assert.That(VideoFormatRegistry.CreateEncoder(stream), Is.InstanceOf<Indeo4VideoEncoder>());
   }
 
   [Test]
