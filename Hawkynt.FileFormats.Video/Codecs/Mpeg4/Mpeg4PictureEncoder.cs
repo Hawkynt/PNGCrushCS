@@ -174,12 +174,15 @@ internal sealed class Mpeg4PictureEncoder {
     var sign = coefficient < 0 ? -1 : 1;
     var magnitude = Math.Abs(coefficient);
     var evenAdjustment = (quantiser & 1) == 0 ? 1 : 0;
-    var estimate = (int)Math.Round(
-      (magnitude - quantiser + evenAdjustment) / (2d * quantiser),
-      MidpointRounding.AwayFromZero);
+    var estimate = Math.Clamp(
+      (int)Math.Round(
+        (magnitude - quantiser + evenAdjustment) / (2d * quantiser),
+        MidpointRounding.AwayFromZero),
+      0,
+      _MAX_LEVEL);
 
     var first = Math.Max(0, estimate - 2);
-    var last = Math.Min(_MAX_LEVEL, Math.Max(2, estimate + 2));
+    var last = Math.Min(_MAX_LEVEL, estimate + 2);
     var best = 0;
     var bestError = magnitude;
 
