@@ -11,9 +11,9 @@ namespace FileFormat.Codecs;
 /// <remarks>
 /// Apple Motion JPEG-B carries the contents of JPEG DQT, DHT, SOF and SOS segments without their
 /// marker bytes, locates those sections with a 48-byte big-endian header, and stores entropy data
-/// without JPEG byte stuffing. This encoder deliberately emits the progressive/single-field form:
-/// every input picture is one independently coded field, with its tables inline and all offsets that
-/// the QuickTime specification requires aligned to a 16-byte boundary. The actual JPEG coding is
+/// without JPEG byte stuffing. This encoder deliberately emits one field per sample: every input
+/// picture is one independently coded field, with its tables inline and all offsets that the
+/// QuickTime specification requires aligned to a 16-byte boundary. The actual JPEG coding is
 /// delegated to the image package's managed baseline writer; this class only converts the resulting
 /// JPEG framing into Motion JPEG-B framing.
 /// </remarks>
@@ -33,6 +33,9 @@ public sealed class MjpegBVideoEncoder : IVideoCodecEncoder<MjpegBVideoEncoder> 
     if (stream.Width <= 0 || stream.Height <= 0)
       throw new NotSupportedException(
         $"An Apple Motion JPEG-B encoder needs the output dimensions before the muxer is created; {stream.Width}x{stream.Height} was supplied.");
+    if (stream.Width > ushort.MaxValue || stream.Height > ushort.MaxValue)
+      throw new NotSupportedException(
+        $"A picture of {stream.Width}x{stream.Height} does not fit the sixteen-bit size fields of a QuickTime image description.");
 
     this._stream = new() {
       Index = stream.Index,
@@ -44,6 +47,7 @@ public sealed class MjpegBVideoEncoder : IVideoCodecEncoder<MjpegBVideoEncoder> 
       DeclaredFrameCount = stream.DeclaredFrameCount,
       Width = stream.Width,
       Height = stream.Height,
+      CodecPrivateData = _SampleEntry(stream.Width, stream.Height),
       Language = stream.Language,
       Name = stream.Name,
     };
@@ -94,7 +98,7 @@ public sealed class MjpegBVideoEncoder : IVideoCodecEncoder<MjpegBVideoEncoder> 
     "mjpg"u8.CopyTo(span[4..8]);
     BinaryPrimitives.WriteUInt32BigEndian(span[8..12], checked((uint)fieldSize));
     BinaryPrimitives.WriteUInt32BigEndian(span[12..16], checked((uint)paddedFieldSize));
-    // Offset to a second field stays zero: this writer emits one progressive field per sample.
+    // Offset to a second field stays zero: this writer emits one field per sample.
     BinaryPrimitives.WriteUInt32BigEndian(span[20..24], checked((uint)quantOffset));
     BinaryPrimitives.WriteUInt32BigEndian(span[24..28], checked((uint)huffmanOffset));
     BinaryPrimitives.WriteUInt32BigEndian(span[28..32], checked((uint)frameOffset));
@@ -233,11 +237,46 @@ public sealed class MjpegBVideoEncoder : IVideoCodecEncoder<MjpegBVideoEncoder> 
     BinaryPrimitives.WriteUInt16BigEndian(result, (ushort)length);
     var position = 2;
     foreach (var payload in payloads) {
-      payload.CopyTo(result, position);
+      payload.AsSpan().CopyTo(result.AsSpan(position));
       position += payload.Length;
     }
 
     return result;
+  }
+
+  /// <summary>
+  /// Builds the QuickTime visual sample entry the MOV/MP4 muxer needs, including a <c>fiel</c>
+  /// extension that explicitly says every sample contains one field.
+  /// </summary>
+  private static byte[] _SampleEntry(int width, int height) {
+    const int _BODY = 78;
+    const int _FIEL = 10;
+    const ushort _NO_COLOUR_TABLE = 0xFFFF;
+
+    var entry = new byte[8 + _BODY + _FIEL];
+    var span = entry.AsSpan();
+    BinaryPrimitives.WriteInt32BigEndian(span, entry.Length);
+    "mjpb"u8.CopyTo(span[4..8]);
+
+    var body = span.Slice(8, _BODY);
+    BinaryPrimitives.WriteUInt16BigEndian(body[6..], 1);                   // data reference index
+    BinaryPrimitives.WriteUInt16BigEndian(body[24..], checked((ushort)width));
+    BinaryPrimitives.WriteUInt16BigEndian(body[26..], checked((ushort)height));
+    BinaryPrimitives.WriteUInt32BigEndian(body[28..], 0x00480000);         // 72 dpi
+    BinaryPrimitives.WriteUInt32BigEndian(body[32..], 0x00480000);
+    BinaryPrimitives.WriteUInt16BigEndian(body[40..], 1);                  // frames per sample
+    var name = "Motion JPEG-B"u8;
+    body[42] = (byte)name.Length;
+    name.CopyTo(body[43..]);
+    BinaryPrimitives.WriteUInt16BigEndian(body[74..], 24);
+    BinaryPrimitives.WriteUInt16BigEndian(body[76..], _NO_COLOUR_TABLE);
+
+    var fiel = span[(8 + _BODY)..];
+    BinaryPrimitives.WriteInt32BigEndian(fiel, _FIEL);
+    "fiel"u8.CopyTo(fiel[4..8]);
+    fiel[8] = 1;                                                           // one field
+    fiel[9] = 0;                                                           // no field dominance
+    return entry;
   }
 
   private static int _Align(int value) => checked((value + (_ALIGNMENT - 1)) & ~(_ALIGNMENT - 1));
