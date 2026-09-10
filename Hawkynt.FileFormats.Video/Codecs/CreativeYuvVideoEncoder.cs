@@ -94,7 +94,7 @@ public sealed class CreativeYuvVideoEncoder : IVideoCodecEncoder<CreativeYuvVide
         "The source RawImage does not contain enough pixel data for its declared format and dimensions.");
 
     var topDown = this._packing.Pack(this._packing.PlanesOf(frame));
-    var data = this._ToBottomUp(topDown);
+    var data = this.ToBottomUp(topDown);
     packet = new(
       this._stream.Index,
       data,
