@@ -51,7 +51,10 @@ public readonly record struct CartesMichelinFile
     => CartesMichelinWriter.ToBytes(file);
 
   static VideoMode[] IImageFormatMetadata<CartesMichelinFile>.VideoModes => [
-    new("Default", [(IntegerRange.Any, IntegerRange.Any)], [16777216])
+    new("Default", [(
+      new IntegerRange(MinImageSize, MaxImageSize),
+      new IntegerRange(MinImageSize, MaxImageSize)
+    )], [16777216])
   ];
 
   /// <summary>
@@ -88,9 +91,11 @@ public readonly record struct CartesMichelinFile
   public static RawImage ToRawImage(CartesMichelinFile file) {
     if (file.PixelData == null)
       throw new InvalidOperationException("No Cartes Michelin picture was read.");
+    if (file.Width is < MinImageSize or > MaxImageSize || file.Height is < MinImageSize or > MaxImageSize)
+      throw new InvalidOperationException($"A Cartes Michelin picture of {file.Width}x{file.Height} is outside the format's supported bounds.");
 
     var required = (long)file.Width * file.Height * 3;
-    if (required < 0 || required > file.PixelData.Length)
+    if (required > file.PixelData.Length)
       throw new InvalidOperationException("The Cartes Michelin picture does not contain enough RGB pixel data for its dimensions.");
 
     return new() {
