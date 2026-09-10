@@ -27,8 +27,8 @@ namespace FileFormat.Codecs;
 /// <b>What it does not do refuses by name.</b> Predicted and bidirectionally predicted pictures need
 /// motion compensation against reference sample planes this decoder does not build, so each is
 /// refused as what it is. A skipped picture is different: it carries no motion or residual syntax and
-/// means the previous picture over again, so the last displayed RGB frame is retained solely to honour
-/// that case. The Advanced profile is refused at the stream, under its own codes <c>WVC1</c> and
+/// means the previous picture over again, so the last displayed RGB samples are retained solely to
+/// honour that case. The Advanced profile is refused at the stream, under its own codes <c>WVC1</c> and
 /// <c>WMVA</c>, since it carries a sequence header and an entry point structure of its own inside a byte
 /// stream and shares only its block layer with what is here.
 /// Multi-resolution coding, range reduction and the in-loop deblocking filter are refused where the
@@ -66,7 +66,7 @@ public sealed class Vc1VideoDecoder : IVideoCodecDecoder<Vc1VideoDecoder> {
   private readonly int _width;
   private readonly int _height;
   private readonly Vc1PictureDecoder _pictures;
-  private RawImage? _previous;
+  private byte[]? _previousPixels;
 
   private Vc1VideoDecoder(Vc1SequenceHeader sequence, int width, int height) {
     this._sequence = sequence;
@@ -185,31 +185,32 @@ public sealed class Vc1VideoDecoder : IVideoCodecDecoder<Vc1VideoDecoder> {
 
     // A Simple or Main profile picture of one byte or fewer is a skipped picture: the previous picture
     // over again (7.1.1.4). A stream that begins with one has nothing to repeat; after the first real
-    // picture the retained RGB frame is enough because a skipped picture changes no sample.
+    // picture the retained RGB samples are enough because a skipped picture changes no sample.
     if (data.Length <= 1) {
-      if (this._previous == null) {
+      if (this._previousPixels == null) {
         frame = null!;
         return false;
       }
 
       frame = new() {
-        Width = this._previous.Width,
-        Height = this._previous.Height,
-        Format = this._previous.Format,
-        PixelData = (byte[])this._previous.PixelData.Clone(),
+        Width = this._width,
+        Height = this._height,
+        Format = PixelFormat.Rgb24,
+        PixelData = (byte[])this._previousPixels.Clone(),
       };
       return true;
     }
 
     var picture = this._pictures.Decode(data, default, out _);
+    var pixels = Vc1ColorConversion.ToRgb24(picture, this._width, this._height);
 
     frame = new() {
       Width = this._width,
       Height = this._height,
       Format = PixelFormat.Rgb24,
-      PixelData = Vc1ColorConversion.ToRgb24(picture, this._width, this._height),
+      PixelData = pixels,
     };
-    this._previous = frame;
+    this._previousPixels = (byte[])pixels.Clone();
 
     return true;
   }
