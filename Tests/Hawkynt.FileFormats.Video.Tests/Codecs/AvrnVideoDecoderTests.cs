@@ -41,16 +41,39 @@ public class AvrnVideoDecoderTests {
 
   [Test]
   [Category("Unit")]
-  public void WithoutOneToOneMarkerAvrnIsMotionJpegAndKeepsTheJpegGeometry() {
+  public void WithoutOneToOneMarkerAvrnIsMotionJpegAndKeepsBottomContainerRows() {
     var decoder = AvrnVideoDecoder.Create(_Stream(16, 16));
+
+    Assert.That(decoder.TryDecode(new(0, _RedOverBlue), out var frame), Is.True);
+    Assert.Multiple(() => {
+      Assert.That(frame.Width, Is.EqualTo(16));
+      Assert.That(frame.Height, Is.EqualTo(16));
+      Assert.That(frame.PixelData[..3], Is.EqualTo(new byte[] { 0x00, 0x00, 0xFE }));
+      Assert.That(frame.PixelData[^3..], Is.EqualTo(new byte[] { 0x00, 0x00, 0xFE }));
+    });
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void MotionJpegWithoutContainerGeometryKeepsTheWholeJpeg() {
+    var decoder = AvrnVideoDecoder.Create(_Stream(0, 0));
 
     Assert.That(decoder.TryDecode(new(0, _RedOverBlue), out var frame), Is.True);
     Assert.Multiple(() => {
       Assert.That(frame.Width, Is.EqualTo(16));
       Assert.That(frame.Height, Is.EqualTo(32));
       Assert.That(frame.PixelData[..3], Is.EqualTo(new byte[] { 0xFE, 0x00, 0x00 }));
-      Assert.That(frame.PixelData[(31 * 16 * 3)..(31 * 16 * 3 + 3)], Is.EqualTo(new byte[] { 0x00, 0x00, 0xFE }));
+      Assert.That(frame.PixelData[^3..], Is.EqualTo(new byte[] { 0x00, 0x00, 0xFE }));
     });
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void MotionJpegRefusesContainerGeometryLargerThanTheCodedPicture() {
+    var decoder = AvrnVideoDecoder.Create(_Stream(16, 33));
+
+    var failure = Assert.Throws<InvalidDataException>(() => decoder.TryDecode(new(0, _RedOverBlue), out _));
+    Assert.That(failure!.Message, Does.Contain("larger than the 16x32"));
   }
 
   [Test]
