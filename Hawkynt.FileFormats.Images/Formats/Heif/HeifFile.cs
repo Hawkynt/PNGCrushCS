@@ -45,7 +45,7 @@ public readonly record struct HeifFile :
   /// with an H.264 picture in it rather than an H.265 one, which is a different
   /// codec inside the same boxes and not a different format.
   /// </summary>
-  static string[] IImageFormatMetadata<HeifFile>.FileExtensions => [".heic", ".heif", ".hif", ".avci", ".avcs"];
+  static string[] IImageFormatMetadata<HeifFile>.FileExtensions => [".heic", ".heif", ".avci", ".avcs"];
   static FormatCapability IImageFormatMetadata<HeifFile>.Capabilities => FormatCapability.MultiImage;
   static HeifFile IImageFormatReader<HeifFile>.FromSpan(ReadOnlySpan<byte> data) => HeifReader.FromSpan(data);
   static byte[] IImageFormatWriter<HeifFile>.ToBytes(HeifFile file) => HeifWriter.ToBytes(file);
