@@ -6397,7 +6397,7 @@ Implements `IImageFormatMetadata<CcittFile>`, `IImageFormatReader<CcittFile>`, `
 
 #### `CdrFile`
 
-Implements `IImageFormatMetadata<CdrFile>`, `IImageFormatReader<CdrFile>`, `IImageFormatWriter<CdrFile>`, `IImageToRawImage<CdrFile>`.
+Implements `IImageFormatMetadata<CdrFile>`, `IImageFormatReader<CdrFile>`, `IImageFormatWriter<CdrFile>`, `IImageFromRawImage<CdrFile>`, `IImageToRawImage<CdrFile>`.
 
 | Member | Signature | Summary |
 | --- | --- | --- |
@@ -6420,6 +6420,7 @@ Implements `IImageFormatMetadata<CdrFile>`, `IImageFormatReader<CdrFile>`, `IIma
 
 | Member | Signature | Summary |
 | --- | --- | --- |
+| `FromRawImage` | `static CdrFile FromRawImage(RawImage image)` |  |
 | `ToBytes` | `static byte[] ToBytes(CdrFile file)` |  |
 | `ToBytes` | `static byte[] ToBytes(CdrFile file, RawImage preview)` |  |
 
