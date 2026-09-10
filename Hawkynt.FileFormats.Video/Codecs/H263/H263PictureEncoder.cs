@@ -14,8 +14,11 @@ namespace FileFormat.Codecs.H263;
 /// </remarks>
 internal sealed class H263PictureEncoder {
 
-  /// <summary>PSC plus GN=0, ITU-T H.263 clause 5.1.1: twenty-two bits whose numeric value is one.</summary>
-  private const int _PICTURE_START_CODE = 1;
+  /// <summary>
+  /// PSC followed by GN=0, ITU-T H.263 clause 5.1.1: the 17-bit PSC has numeric value one and the
+  /// following five zero bits move that one five places left in the complete 22-bit picture start field.
+  /// </summary>
+  private const int _PICTURE_START_CODE = 1 << 5;
   private const int _PICTURE_START_CODE_LENGTH = 22;
 
   private readonly int _sourceFormat;

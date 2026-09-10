@@ -17,6 +17,7 @@ namespace FileFormat.Codecs.H263.Tests;
 public sealed class H263VideoEncoderTests {
 
   private const int _SUB_QCIF_MACROBLOCKS = 8 * 6;
+  private const int _PICTURE_START_CODE = 1 << 5;
 
   [TestCase(128, 96)]
   [TestCase(176, 144)]
@@ -117,7 +118,7 @@ public sealed class H263VideoEncoderTests {
     for (var index = 0; index < 2; ++index) {
       encoder.TryEncode(_Flat(128, 96, 128, 128), index, out var packet);
       var reader = new H263BitReader(packet.Data.Span);
-      Assert.That(reader.ReadBits(22), Is.EqualTo(1));
+      Assert.That(reader.ReadBits(22), Is.EqualTo(_PICTURE_START_CODE));
       var header = H263PictureHeader.Parse(ref reader);
       Assert.That(header.TemporalReference, Is.EqualTo(index), $"picture {index}");
     }
@@ -190,7 +191,7 @@ public sealed class H263VideoEncoderTests {
 
   private static byte[] _DecodePlanes(CodedPacket packet, int width, int height) {
     var reader = new H263BitReader(packet.Data.Span);
-    Assert.That(reader.ReadBits(22), Is.EqualTo(1), "picture start code");
+    Assert.That(reader.ReadBits(22), Is.EqualTo(_PICTURE_START_CODE), "picture start code");
 
     var header = H263PictureHeader.Parse(ref reader);
     var picture = H263PictureDecoder.BeginPicture(
