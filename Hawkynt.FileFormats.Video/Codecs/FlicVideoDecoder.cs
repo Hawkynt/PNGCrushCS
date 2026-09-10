@@ -270,13 +270,24 @@ public sealed class FlicVideoDecoder : IVideoCodecDecoder<FlicVideoDecoder> {
   }
 
   private void _DecodeCopy(ReadOnlySpan<byte> payload) {
-    var expected = this._width * this._height;
-    if (payload.Length != expected)
+    var packedLength = this._canvas.Length;
+    if (payload.Length == packedLength) {
+      payload.CopyTo(this._canvas);
+      return;
+    }
+
+    var paddedStride = ((long)this._width + 3) & ~3L;
+    var paddedLength = paddedStride * this._height;
+    if (payload.Length != paddedLength)
       throw new InvalidDataException(
         $"A FLI_COPY chunk carries {payload.Length} byte(s) for a {this._width}x{this._height} picture, which "
-        + $"needs exactly {expected}.");
+        + $"needs either {packedLength} packed byte(s) or {paddedLength} byte(s) with rows padded to four-byte boundaries.");
 
-    payload.CopyTo(this._canvas);
+    for (var row = 0; row < this._height; ++row) {
+      var sourceStart = checked((int)(row * paddedStride));
+      var destinationStart = row * this._width;
+      payload.Slice(sourceStart, this._width).CopyTo(this._canvas.AsSpan(destinationStart, this._width));
+    }
   }
 
   // ============================================================================================
