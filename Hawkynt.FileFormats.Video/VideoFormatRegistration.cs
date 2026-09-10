@@ -56,6 +56,7 @@ internal static partial class VideoFormatRegistration {
     => VideoFormatRegistry.RegisterEncoder(new(
       CodecName: T.CodecName,
       Codec: T.Codec,
+      Accepts: static stream => T.Accepts(stream),
       CreateEncoder: static stream => T.Create(stream)) {
       VerifiedBy = verifiedBy,
     });
