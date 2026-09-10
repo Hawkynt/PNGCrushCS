@@ -116,7 +116,7 @@ public sealed class H265VideoEncoder : IVideoCodecEncoder<H265VideoEncoder> {
   /// private encoder fail here rather than silently patching an unrelated field.
   /// </remarks>
   private static byte[] _AsMainProfile(byte[] stillConfiguration) {
-    var result = stillConfiguration.ToArray();
+    var result = stillConfiguration.AsSpan().ToArray();
     if (result.Length < 23 || result[0] != 1)
       throw new InvalidDataException("The shared HEVC encoder returned no decoder configuration record.");
 
