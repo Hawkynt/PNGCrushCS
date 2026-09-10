@@ -38,7 +38,7 @@ jobs:
           $readmePath = 'Hawkynt.FileFormats.Video/README.md'
           $readme = Get-Content -Raw $readmePath
           $oldRow = '| [Avid AVRn](https://wiki.multimedia.cx/index.php/Motion_JPEG) | ✅ | — | — | `AVRn`; baseline JPEG, but the container''s picture size is trusted over the JPEG frame header''s | [ITU-T T.81](https://www.itu.int/rec/T-REC-T.81) |'
-          $newRow = '| [Avid AVRn](https://ffmpeg.org/) | ✅ | ✅ | ffmpeg | `AVRn`; historical marker-less streams are Motion JPEG. Avid Resolution 1:1 is lossless UYVY 4:2:2; progressive and interlaced 1:1 decode, while the encoder writes progressive 1:1 with the VFW `1:1` discriminator | [FFmpeg AVRn decoder](https://github.com/FFmpeg/FFmpeg/blob/master/libavcodec/avrndec.c) |'
+          $newRow = '| [Avid AVRn](https://ffmpeg.org/) | ✅ | ✅ | ffmpeg | `AVRn`; non-1:1 streams are Motion JPEG with Avid''s top-padding crop. Resolution 1:1 is lossless UYVY 4:2:2; progressive and interlaced 1:1 decode, while the encoder writes progressive 1:1 with the VFW `1:1` discriminator | [FFmpeg AVRn decoder](https://github.com/FFmpeg/FFmpeg/blob/master/libavcodec/avrndec.c) |'
           if (-not $readme.Contains($oldRow)) { throw 'The AVRn support row changed upstream.' }
           $readme = $readme.Replace($oldRow, $newRow)
           $readme = $readme.Replace('builds, 46 of them', 'builds, 47 of them')
@@ -58,9 +58,13 @@ jobs:
           reader deliberately hands the complete `strf` to the codec instead of changing codec identity in
           the container layer.
 
-          The MJPEG subtype is delegated to the package's existing Motion JPEG decoder. Its JPEG frame header
-          owns the coded geometry; the previous AVRn implementation cropped that picture to the AVI's copy of
-          the dimensions, which is not what ffmpeg's MJPEG path does and silently removed valid rows.
+          The MJPEG subtype is delegated to the package's existing Motion JPEG decoder, but Avid still owns
+          the displayed geometry. If the container states a smaller picture, the bottom rows and left columns
+          of the coded JPEG are kept. That is not an obsolete wrapper quirk: ffmpeg's old AVRn decoder did the
+          crop itself, and the 2021 change that moved non-1:1 streams to the general MJPEG decoder recreated the
+          same rule there as a top crop for `AVRn` and `AVDJ`. The old decoder in this package therefore had
+          this crop right; its defect was assuming that every `AVRn` packet was JPEG and never recognizing the
+          Resolution 1:1 raw subtype.
 
           Resolution 1:1 is lossless packed UYVY 4:2:2. A progressive packet is two bytes a pixel, with any
           surplus whole coded rows before the displayed picture; `packet_size / (2 * width)` gives the coded
@@ -77,10 +81,10 @@ jobs:
           against; interoperability is checked in the other direction by muxing the output into AVI and asking
           ffmpeg's decoder to read it.
 
-          Provenance is clean-room behavior, not a translation. The two consulted ffmpeg files are
-          LGPL-2.1-or-later and therefore licence-compatible with this LGPL-3.0-or-later project anyway, but no
-          implementation structure or expressive code is reproduced; the repository's existing
-          `PackedYuv422Packing` supplies the actual sample packing.
+          Provenance is clean-room behavior, not a translation. The consulted ffmpeg decoder, demuxer and
+          AVRn/MJPEG compatibility change are LGPL-2.1-or-later and therefore licence-compatible with this
+          LGPL-3.0-or-later project anyway, but no implementation structure or expressive code is reproduced;
+          the repository's existing `PackedYuv422Packing` supplies the actual sample packing.
           '@
           $pattern = '(?s)### Avid AVRn\r?\n.*?(?=\r?\n### )'
           if (-not [regex]::IsMatch($notes, $pattern)) { throw 'The AVRn codec-notes section could not be found.' }
