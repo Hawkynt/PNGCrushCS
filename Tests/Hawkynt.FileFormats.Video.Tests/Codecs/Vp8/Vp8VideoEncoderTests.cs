@@ -39,7 +39,7 @@ public sealed class Vp8VideoEncoderTests {
     });
 
     Assert.That(encoder.TryEncode(image, 12, out var packet), Is.True);
-    var data = packet.Data.Span;
+    var data = packet.Data.ToArray();
     Assert.That(data.Length, Is.GreaterThanOrEqualTo(10));
 
     var frameTag = data[0] | data[1] << 8 | data[2] << 16;
@@ -52,7 +52,7 @@ public sealed class Vp8VideoEncoderTests {
       Assert.That(frameTag >> 1 & 7, Is.Zero, "the encoder writes VP8 bitstream version 0");
       Assert.That(frameTag >> 4 & 1, Is.EqualTo(1), "show_frame must be set");
       Assert.That(frameTag >> 5, Is.GreaterThan(0), "the first partition must not be empty");
-      Assert.That(data[3..6].ToArray(), Is.EqualTo(new byte[] { 0x9D, 0x01, 0x2A }));
+      Assert.That(data[3..6], Is.EqualTo(new byte[] { 0x9D, 0x01, 0x2A }));
       Assert.That((data[6] | data[7] << 8) & 0x3FFF, Is.EqualTo(width));
       Assert.That((data[8] | data[9] << 8) & 0x3FFF, Is.EqualTo(height));
     });
