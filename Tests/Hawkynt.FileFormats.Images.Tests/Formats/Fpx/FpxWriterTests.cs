@@ -1,5 +1,6 @@
 using System;
 using System.Text;
+using FileFormat.Core;
 using FileFormat.Fpx;
 
 namespace FileFormat.Fpx.Tests;
@@ -85,7 +86,36 @@ public sealed class FpxWriterTests {
       PixelData = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
     };
 
-    Assert.That(FpxWriter.ToBytes(file), Is.EqualTo(FpxWriter.ToBytes(file)));
+    var first = FpxWriter.ToBytes(file);
+    var second = FpxWriter.ToBytes(file);
+    Assert.That(second, Is.EqualTo(first));
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void FromRawImage_MixExtension_IsRefusedRatherThanWritingFlashPixUnderTheWrongName() {
+    var image = new RawImage {
+      Width = 1,
+      Height = 1,
+      Format = PixelFormat.Rgb24,
+      PixelData = [1, 2, 3],
+    };
+
+    var thrown = Assert.Throws<ArgumentException>(() => FpxFile.FromRawImage(image, ".mix"));
+    Assert.That(thrown!.ParamName, Is.EqualTo("extension"));
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void FromRawImage_FpxExtension_IsAcceptedCaseInsensitively() {
+    var image = new RawImage {
+      Width = 1,
+      Height = 1,
+      Format = PixelFormat.Rgb24,
+      PixelData = [1, 2, 3],
+    };
+
+    Assert.That(FpxFile.FromRawImage(image, ".FPX").PixelData, Is.EqualTo(image.PixelData));
   }
 
   [Test]
