@@ -57,49 +57,41 @@ public static class BpgWriter {
     ArgumentNullException.ThrowIfNull(file);
     if (file.Width <= 0 || file.Height <= 0)
       throw new ArgumentOutOfRangeException(nameof(file), "BPG requires a positive image size.");
+    if ((uint)file.PixelFormat > (uint)BpgPixelFormat.YCbCr422Mpeg2)
+      throw new ArgumentOutOfRangeException(nameof(file),
+        $"BPG pixel_format {(int)file.PixelFormat} is reserved; version 0.9.5 defines values 0 through 5.");
     if (file.BitDepth is < 8 or > 14)
       throw new NotSupportedException(
         $"BPG states its bit depth as bit_depth_minus_8 in four bits and caps it at 14; {file.BitDepth} is outside that.");
+    if ((uint)file.ColorSpace > (uint)BpgColorSpace.YCbCrBT2020Ncl)
+      throw new ArgumentOutOfRangeException(nameof(file),
+        $"BPG color_space {(int)file.ColorSpace} is reserved; version 0.9.5 defines values 0 through 4.");
     if (file.PixelFormat == BpgPixelFormat.Grayscale && file.ColorSpace != BpgColorSpace.YCbCrBT601)
       throw new NotSupportedException(
         "A grayscale BPG picture has one plane and therefore no colour matrix: color_space must be zero.");
 
     var output = new List<byte>();
-
-    // Magic bytes
     output.AddRange(BpgFile.Magic);
 
-    // Byte 4: pixel_format(3) | alpha1_flag(1) | bit_depth_minus_8(4)
     var bitDepthMinus8 = file.BitDepth - 8;
-    var byte4 = (byte)((((int)file.PixelFormat & 0x07) << 5) | ((file.HasAlpha ? 1 : 0) << 4) | (bitDepthMinus8 & 0x0F));
-    output.Add(byte4);
-
-    // Byte 5: color_space(4) | extension_present(1) | alpha2_flag(1) | limited_range(1) | animation_flag(1)
-    var byte5 = (byte)(
-      (((int)file.ColorSpace & 0x0F) << 4) |
+    output.Add((byte)((((int)file.PixelFormat & 0x07) << 5) | ((file.HasAlpha ? 1 : 0) << 4) | (bitDepthMinus8 & 0x0f)));
+    output.Add((byte)(
+      (((int)file.ColorSpace & 0x0f) << 4) |
       ((file.ExtensionPresent ? 1 : 0) << 3) |
       ((file.HasAlpha2 ? 1 : 0) << 2) |
       ((file.LimitedRange ? 1 : 0) << 1) |
-      (file.IsAnimation ? 1 : 0)
-    );
-    output.Add(byte5);
+      (file.IsAnimation ? 1 : 0)));
 
-    // Width and Height as ue7
     BpgUe7.Write(output, file.Width);
     BpgUe7.Write(output, file.Height);
-
-    // Picture data length as ue7
     BpgUe7.Write(output, file.PixelData.Length);
 
-    // Extension data if present
     if (file.ExtensionPresent) {
       BpgUe7.Write(output, file.ExtensionData.Length);
       output.AddRange(file.ExtensionData);
     }
 
-    // Pixel/picture data
     output.AddRange(file.PixelData);
-
-    return output.ToArray();
+    return [.. output];
   }
 }
