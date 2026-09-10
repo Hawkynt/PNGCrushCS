@@ -284,6 +284,7 @@ public sealed class Indeo4VideoEncoder : IVideoCodecEncoder<Indeo4VideoEncoder> 
     var macroblockHeaders = new _BitWriter();
     var blockData = new _BitWriter();
     var previousDc = 0;
+    Span<int> coefficients = stackalloc int[64];
 
     for (var y = tileY; y < tileY + tileHeight; y += macroblockSize)
       for (var x = tileX; x < tileX + tileWidth; x += macroblockSize) {
@@ -294,7 +295,7 @@ public sealed class Indeo4VideoEncoder : IVideoCodecEncoder<Indeo4VideoEncoder> 
         for (var block = 0; block < blocksPerMacroblock; ++block) {
           var blockX = x + ((block & 1) != 0 ? blockSize : 0);
           var blockY = y + ((block & 2) != 0 ? blockSize : 0);
-          Span<int> coefficients = stackalloc int[64];
+          coefficients.Clear();
 
           if (haar)
             _ForwardHaar4x4(residuals, pitch, blockX, blockY, coefficients);
