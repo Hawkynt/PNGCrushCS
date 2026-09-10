@@ -294,7 +294,9 @@ public sealed class H261VideoEncoder : IVideoCodecEncoder<H261VideoEncoder> {
     // External container clocks are commonly coarser than 30000/1001 Hz. Assign the picture to the
     // nearest source interval rather than systematically one interval early when its timestamp was
     // rounded by such a clock; exact H.261/NTSC time bases of course divide without a remainder.
-    return (numerator + denominator / 2) / denominator;
+    var quotient = numerator / denominator;
+    var remainder = numerator % denominator;
+    return remainder >= (denominator + 1) / 2 ? checked(quotient + 1) : quotient;
   }
 
   private static bool _IsPositive(Rational value)
