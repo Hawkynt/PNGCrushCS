@@ -19,6 +19,7 @@ internal sealed class Indeo2FrameEncoder {
 
   private const int _FRAME_HEADER_LENGTH = 48;
   private const int _INTRA_FLAG_OFFSET = 18;
+  private const byte _INTRA_FRAME_FLAG = 0x04;
   private const int _TABLE_SELECTOR_OFFSET = 0x22;
   private const byte _NEUTRAL = 0x80;
   private const int _RUN_BASE = 0x7F;
@@ -61,7 +62,10 @@ internal sealed class Indeo2FrameEncoder {
 
     var body = bits.ToArray();
     var result = new byte[_FRAME_HEADER_LENGTH + body.Length];
-    result[_INTRA_FLAG_OFFSET] = 1;
+    // Real RT21 key frames in the fixture corpus use bit 2 here. FFmpeg treats any non-zero value as
+    // intra, but writing the observed value costs nothing and is friendlier to older decoders that may
+    // interpret this as a flag byte rather than as a Boolean.
+    result[_INTRA_FLAG_OFFSET] = _INTRA_FRAME_FLAG;
     result[_TABLE_SELECTOR_OFFSET] = (byte)(lumaTable | (chromaTable << 2));
     body.CopyTo(result.AsSpan(_FRAME_HEADER_LENGTH));
     return result;
