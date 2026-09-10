@@ -35,6 +35,7 @@ jobs:
         working-directory: PNGCrushCS
         shell: pwsh
         run: |
+          $utf8 = [System.Text.UTF8Encoding]::new($false)
           $readmePath = 'Hawkynt.FileFormats.Video/README.md'
           $readme = Get-Content -Raw $readmePath
           $oldRow = '| [Avid AVRn](https://wiki.multimedia.cx/index.php/Motion_JPEG) | ✅ | — | — | `AVRn`; baseline JPEG, but the container''s picture size is trusted over the JPEG frame header''s | [ITU-T T.81](https://www.itu.int/rec/T-REC-T.81) |'
@@ -43,7 +44,7 @@ jobs:
           $readme = $readme.Replace($oldRow, $newRow)
           $readme = $readme.Replace('builds, 46 of them', 'builds, 47 of them')
           $readme = $readme.Replace('46 codecs of the 100 read can also be written', '47 codecs of the 100 read can also be written')
-          Set-Content -NoNewline $readmePath $readme
+          [System.IO.File]::WriteAllText($readmePath, $readme, $utf8)
 
           $notesPath = 'Hawkynt.FileFormats.Video/codec-notes.md'
           $notes = Get-Content -Raw $notesPath
@@ -89,7 +90,7 @@ jobs:
           $pattern = '(?s)### Avid AVRn\r?\n.*?(?=\r?\n### )'
           if (-not [regex]::IsMatch($notes, $pattern)) { throw 'The AVRn codec-notes section could not be found.' }
           $notes = [regex]::Replace($notes, $pattern, $replacement.TrimEnd(), 1)
-          Set-Content -NoNewline $notesPath $notes
+          [System.IO.File]::WriteAllText($notesPath, $notes, $utf8)
 
       - name: Restore
         working-directory: PNGCrushCS
