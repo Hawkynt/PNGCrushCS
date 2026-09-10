@@ -67,13 +67,13 @@ quietly come to mean "some of it". How each codec was measured is in
 | [id RoQ](https://en.wikipedia.org/wiki/RoQ) | `Roq` | `.roq` | ✅ | ✅ | ffmpeg | [MultimediaWiki RoQ](https://wiki.multimedia.cx/index.php/RoQ) |
 | [Interplay MVE](https://wiki.multimedia.cx/index.php/Interplay_MVE) | `Mve` | `.mve` | ✅ | ✅ | none | [MultimediaWiki MVE](https://wiki.multimedia.cx/index.php/Interplay_MVE) |
 | [id Cinematic](https://wiki.multimedia.cx/index.php/Id_Cinematic) | `Idcin` | `.cin` | ✅ | ✅ | none | [MultimediaWiki CIN](https://wiki.multimedia.cx/index.php/Id_Cinematic) |
-| [Westwood VQA](https://wiki.multimedia.cx/index.php/Westwood_VQA) | `Vqa` | `.vqa` | ✅ | ✅ | none | [MultimediaWiki VQA](https://wiki.multimedia.cx/index.php/Westwood_VQA) |
+| [Westwood VQA](https://wiki.multimedia.cx/index.php/Westwood_VQA) | `Vqa` | `.vqa` | ✅ | ✅ | none | [MultimediaWiki VQA](https://wiki.multimedia.cx/index.php/VQA) |
 | [Smacker](https://en.wikipedia.org/wiki/Smacker_video) | `Smacker` | `.smk` | ✅ | ✅ | none | [RAD Game Tools](https://www.radgametools.com/smkmain.htm) |
 | [Electronic Arts Multimedia](https://wiki.multimedia.cx/index.php/Electronic_Arts_Formats) | `Ea` | `.wve`, `.cmv`, `.tgv`, `.uv`, `.uv2` | ✅ | ✅ | none | [MultimediaWiki EA formats](https://wiki.multimedia.cx/index.php/Electronic_Arts_Formats) |
 | [BFI](https://wiki.multimedia.cx/index.php/Brute_Force_%26_Ignorance) | `Bfi` | `.bfi` | ✅ | ✅ | none | [MultimediaWiki BFI](https://wiki.multimedia.cx/index.php/Brute_Force_%26_Ignorance) |
 | [Commodore CDXL](https://en.wikipedia.org/wiki/CDXL) | `Cdxl` | `.cdxl` | ✅ | ✅ | none | [MultimediaWiki CDXL](https://wiki.multimedia.cx/index.php/CDXL) |
 | [IFF ANIM](https://en.wikipedia.org/wiki/ANIM) | `Anim` | `.anim`, `.iff` | ✅ | ✅ | none | [Amiga ANIM IFF](https://wiki.amigaos.net/wiki/ANIM_IFF_Animation) |
-| [Sierra VMD](https://wiki.multimedia.cx/index.php/Sierra_VMD) | `Vmd` | `.vmd` | ✅ | ✅ | none | [MultimediaWiki VMD](https://wiki.multimedia.cx/index.php/Sierra_VMD) |
+| [Sierra VMD](https://wiki.multimedia.cx/index.php/Sierra_VMD) | `Vmd` | `.vmd` | ✅ | ✅ | none | [MultimediaWiki VMD](https://wiki.multimedia.cx/index.php/VMD) |
 | [PlayStation STR](https://wiki.multimedia.cx/index.php/PlayStation_STR) | `Str` | `.str` | ✅ | ✅ | none | [MultimediaWiki STR](https://wiki.multimedia.cx/index.php/PlayStation_STR) |
 | [ARMovie/RPL](https://wiki.multimedia.cx/index.php/ARMovie) | `Rpl` | `.rpl` | ✅ | ✅ | none | [MultimediaWiki ARMovie](https://wiki.multimedia.cx/index.php/ARMovie) |
 
@@ -93,7 +93,7 @@ the size that went in.
 Every codec the package registers has a row, and the name in the first column is the codec's own
 `CodecName` — the same string a refusal message names it by. `Decode` is what
 [`VideoFormatRegistry.CreateDecoder`](https://github.com/Hawkynt/PNGCrushCS/blob/main/Hawkynt.FileFormats.Video/VideoFormatRegistry.cs) builds, 100 of them; `Encode` is
-what [`VideoFormatRegistry.CreateEncoder`](https://github.com/Hawkynt/PNGCrushCS/blob/main/Hawkynt.FileFormats.Video/VideoFormatRegistry.cs) builds, 46 of them. The two
+what [`VideoFormatRegistry.CreateEncoder`](https://github.com/Hawkynt/PNGCrushCS/blob/main/Hawkynt.FileFormats.Video/VideoFormatRegistry.cs) builds, 47 of them. The two
 are separate tables in the registry because they are looked up by different things: a decoder by a
 whole stream description, an encoder by the four-character code a caller wants written.
 
@@ -104,7 +104,7 @@ forms no encoder produces, because a plausible wrong picture is worse than a ref
 silently misdecodes what it will not read. An `Encode` tick is a lossless or format-faithful writer.
 Where the codec has a lossless form the encoder writes it and refuses by name any picture it would
 have to reduce to fit; where the format itself is lossy — Motion JPEG, Microsoft Video 1, Cinepak, DV,
-Microsoft's MPEG-4, ASUS V1 and V2, Apple Video, H.261, Hap, Apple ProRes, id RoQ — the row says so, because there is nothing else such an encoder
+Microsoft's MPEG-4, ASUS V1 and V2, Apple Video, H.261, H.263, Hap, Apple ProRes, id RoQ — the row says so, because there is nothing else such an encoder
 could write. Codec-by-codec provenance and
 measurement notes are in
 [`codec-notes.md`](https://github.com/Hawkynt/PNGCrushCS/blob/main/Hawkynt.FileFormats.Video/codec-notes.md).
@@ -118,7 +118,7 @@ measurement notes are in
 | [MPEG-2 video (ISO/IEC 13818-2)](https://en.wikipedia.org/wiki/H.262/MPEG-2_Part_2) | ⚠️ | — | — | Frame pictures at 4:2:0 and 4:2:2, including field DCT and field motion compensation. Field pictures, dual-prime prediction, 4:4:4 High profile and the scalability extensions refused | [ITU-T H.262](https://www.itu.int/rec/T-REC-H.262) |
 | [MPEG-4 Part 2 video (ISO/IEC 14496-2)](https://en.wikipedia.org/wiki/MPEG-4_Part_2) | ⚠️ | — | — | Rectangular, progressive, 8-bit 4:2:0 I/P/B. Quarter-sample vectors, sprites/GMC, interlace, OBMC, data partitioning, scalability, shape coding, newpred, reduced resolution and the complexity-estimation header each refused where signalled | [ISO/IEC 14496-2](https://www.iso.org/standard/39259.html) |
 | [H.261 (ITU-T H.261)](https://en.wikipedia.org/wiki/H.261) | ⚠️ | ✅ | ffmpeg | QCIF and CIF, clauses 3 and 4 entire, in-loop filter included. Annex D still-image transmission refused. The encoder writes those same two formats and refuses every other picture size by name — clause 3.1 defines two and one bit of PTYPE names which, so there is no syntax here for a third — coding an intra picture every twelfth frame and choosing per macroblock between an intra coding, a prediction with or without a searched whole-pixel vector, either of those with the loop filter of clause 3.2.3, and not transmitting the macroblock at all. It never states MQUANT: one quantiser per group of blocks, held across the picture. Lossy by construction, because H.261 is — every coded block goes through the transform and a five-bit quantiser and the Recommendation has no lossless form at all | [ITU-T H.261](https://www.itu.int/rec/T-REC-H.261) |
-| [H.263 (ITU-T H.263 baseline, and Sorenson Spark)](https://en.wikipedia.org/wiki/H.263) | ⚠️ | — | — | Baseline (clauses 5-6) and Sorenson Spark. Annexes C, D, E, F, G and T, and the extended PTYPE of 5.1.4, each refused where signalled | [ITU-T H.263](https://www.itu.int/rec/T-REC-H.263) |
+| [H.263 (ITU-T H.263 baseline, and Sorenson Spark)](https://en.wikipedia.org/wiki/H.263) | ⚠️ | ✅ | ffmpeg | Baseline (clauses 5-6) and Sorenson Spark decoded. The encoder writes baseline intra pictures in the five standard Table 5 formats — sub-QCIF, QCIF, CIF, 4CIF and 16CIF — at picture quantiser 8, with no optional annex modes or GOB headers. Other sizes require the extended PTYPE of 5.1.4 and are refused by name. H.263 is lossy by construction: every coded block goes through the transform and quantiser | [ITU-T H.263](https://www.itu.int/rec/T-REC-H.263) |
 | [H.264/AVC (ITU-T H.264 \| ISO/IEC 14496-10)](https://en.wikipedia.org/wiki/Advanced_Video_Coding) | ⚠️ | — | — | Progressive 8-bit 4:2:0; CAVLC and CABAC I/P/B slices, High-profile 8x8 transform and scaling lists, long-term references, weighted and direct prediction. 4:2:2/4:4:4, depths above 8 bits, interlace/MBAFF, FMO, data partitioning, SVC/MVC and lossless bypass refused | [ITU-T H.264](https://www.itu.int/rec/T-REC-H.264) |
 | [H.265/HEVC (ITU-T H.265 \| ISO/IEC 23008-2)](https://en.wikipedia.org/wiki/High_Efficiency_Video_Coding) | ⚠️ | — | — | Main profile, 8-bit 4:2:0; intra and inter slices, reference management, CABAC, weighted prediction, scaling lists, deblocking, SAO, tiles and dependent slices. PCM coding units, the format range extensions, screen-content coding, multilayer/3D and separate colour planes refused | [ITU-T H.265](https://www.itu.int/rec/T-REC-H.265) |
 | [VC-1 / Windows Media Video 9 (SMPTE 421M, Simple and Main profile intra pictures)](https://en.wikipedia.org/wiki/VC-1) | ⚠️ | — | — | `WMV3`, Simple and Main profile **intra pictures only**; sequence header read from container private data. Predicted, bidirectional and skipped pictures, Advanced profile (`WVC1`, `WMVA`), MULTIRES, RANGERED and LOOPFILTER each refused by name | [SMPTE ST 421](https://ieeexplore.ieee.org/document/7290900) |
@@ -285,7 +285,7 @@ Apple Graphics, Apple Video, Cinepak's bitstream, CLJR, DV, FFV1, Flash Screen V
 compression, HuffYUV, LCL ZLIB, MagicYUV, Microsoft RLE, Microsoft Video 1's mode decision,
 QuickTime Animation, Ut Video and ZMBV. Hap's is the one of those not under the LGPL: FFmpeg's
 `texturedspenc.c` carries its own MIT grant and states it derives from public-domain code, and the
-notice beside it says so. The ASUS, H.261, id RoQ and Apple ProRes encoders are not among them at
+notice beside it says so. The ASUS, H.261, H.263, id RoQ and Apple ProRes encoders are not among them at
 all: those were written from published descriptions. ProRes takes FFmpeg's quantisation matrices,
 which RDD 36 prints nowhere, but constants are not expression and the notice beside it records
 where they came from. Every one of those files
@@ -435,7 +435,7 @@ Every public and protected member of all 471 types, generated from the built ass
 - Large RealVideo pictures require preserved slice offsets when they must be split across 16-bit RealMedia packet lengths, and RoQ sound requires its original predictor argument.
 - Several advanced codecs intentionally implement well-defined subsets (for example H.264 progressive 8-bit 4:2:0, HEVC without the range and screen-content extensions, and VC-1 Simple/Main intra pictures). Every row marked ⚠️ in the codec table names its own subset. Unsupported profiles/features are refused by name rather than silently misdecoded.
 - Codec support is more precise than a single green check can express; consult [`codec-notes.md`](https://github.com/Hawkynt/PNGCrushCS/blob/main/Hawkynt.FileFormats.Video/codec-notes.md) before relying on a profile/level/feature not named in this README.
-- Encoding is a smaller domain than decoding on purpose: 46 codecs of the 100 read can also be written. Most are lossless; twelve are not, and each says so in its own row. Motion JPEG writes baseline JPEG, whose loss is a matter of degree, and DV's fixed-length frames, Microsoft Video 1's two-colours-to-a-block coding, Cinepak's vector quantisation, Microsoft's MPEG-4 transform, the ASUS codecs' quantised DCT, Apple Video's 15-bit blocks, H.261's and Apple ProRes's quantised transforms, Hap's texture blocks and id RoQ's vector quantisation have no lossless form at all — a picture that codec can hold exactly comes back exactly, and one it cannot does not. What is still not written back is the modern lossy codecs: a stream read as H.264 cannot be written back as H.264.
+- Encoding is a smaller domain than decoding on purpose: 47 codecs of the 100 read can also be written. Most are lossless; thirteen are not, and each says so in its own row. Motion JPEG writes baseline JPEG, whose loss is a matter of degree, and DV's fixed-length frames, Microsoft Video 1's two-colours-to-a-block coding, Cinepak's vector quantisation, Microsoft's MPEG-4 transform, the ASUS codecs' quantised DCT, Apple Video's 15-bit blocks, H.261's, H.263's and Apple ProRes's quantised transforms, Hap's texture blocks and id RoQ's vector quantisation have no lossless form at all — a picture that codec can hold exactly comes back exactly, and one it cannot does not. What is still not written back is the modern lossy codecs: a stream read as H.264 cannot be written back as H.264.
 - Video correctness depends on real-world packetization as much as codec math. The project therefore validates packet counts, sizes, timestamps, and key-frame flags against external tools where samples are available.
 
 ## ❤️ Support
