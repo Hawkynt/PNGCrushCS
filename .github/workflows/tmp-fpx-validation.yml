@@ -118,7 +118,7 @@ jobs:
           mode: write
           root: PNGCrushCS
           configuration: Release
-          project: Hawkynt.FileFormats.Images/Hawkynt.FileFormats.Images.csproj
+          project: PNGCrushCS/Hawkynt.FileFormats.Images/Hawkynt.FileFormats.Images.csproj
 
       - name: Write external FPX probe
         shell: bash
@@ -131,6 +131,7 @@ jobs:
           </Project>
           EOF
           cat >/tmp/fpxprobe/Program.cs <<'EOF'
+          using System.IO;
           using FileFormat.Fpx;
           const int width = 65, height = 65;
           var pixels = new byte[width * height * 3];
