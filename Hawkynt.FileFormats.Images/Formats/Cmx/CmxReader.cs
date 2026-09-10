@@ -1,6 +1,7 @@
 using System;
 using System.Buffers.Binary;
 using System.IO;
+using FileFormat.Core;
 using FileFormat.EmbeddedDib;
 
 namespace FileFormat.Cmx;
@@ -149,7 +150,7 @@ public static class CmxReader {
   }
 
   private static uint _ReadUInt32(ReadOnlySpan<byte> data, int offset, bool bigEndian) {
-    if ((uint)offset > (uint)(data.Length - sizeof(uint)))
+    if (offset < 0 || data.Length - offset < sizeof(uint))
       throw new InvalidDataException("CMX data ended while reading a 32-bit field.");
 
     return bigEndian
