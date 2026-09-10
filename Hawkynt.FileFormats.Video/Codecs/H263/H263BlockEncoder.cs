@@ -39,9 +39,15 @@ internal static class H263BlockEncoder {
       _WriteCoefficients(writer, levels);
   }
 
+  /// <summary>Chooses the level whose clause 6.2.1 reconstruction is nearest to the coefficient.</summary>
   private static int _Level(double coefficient, int quantiser) {
-    var level = (int)(coefficient / (2d * quantiser));
-    return level < -_MAX_LEVEL ? -_MAX_LEVEL : level > _MAX_LEVEL ? _MAX_LEVEL : level;
+    var sign = coefficient < 0 ? -1 : 1;
+    var magnitude = Math.Abs(coefficient);
+    var reconstructionOffset = quantiser - ((quantiser & 1) == 0 ? 1 : 0);
+    var level = (int)Math.Round(
+      Math.Max(0d, magnitude - reconstructionOffset) / (2d * quantiser),
+      MidpointRounding.AwayFromZero);
+    return sign * Math.Min(level, _MAX_LEVEL);
   }
 
   private static void _WriteCoefficients(H263BitWriter writer, scoped ReadOnlySpan<int> levels) {
