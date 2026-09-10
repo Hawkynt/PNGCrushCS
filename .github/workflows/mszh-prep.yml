@@ -1,0 +1,52 @@
+name: MSZH documentation preparation
+
+on: [push]
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Prepare documentation
+        shell: python
+        run: |
+          from pathlib import Path
+
+          readme_path = Path("Hawkynt.FileFormats.Video/README.md")
+          readme = readme_path.read_text(encoding="utf-8")
+          for old, new in {
+              "builds, 46 of them": "builds, 47 of them",
+              "46 codecs of the 100 read can also be written": "47 codecs of the 100 read can also be written",
+          }.items():
+              if readme.count(old) != 1:
+                  raise SystemExit(f"README anchor occurs {readme.count(old)} times: {old!r}")
+              readme = readme.replace(old, new)
+
+          lines = readme.splitlines()
+          matches = [i for i, line in enumerate(lines) if line.startswith("| [LCL MSZH](")]
+          if len(matches) != 1:
+              raise SystemExit(f"expected one LCL MSZH row, found {len(matches)}")
+          lines[matches[0]] = (
+              "| [LCL MSZH](https://wiki.multimedia.cx/index.php/Lossless_Codec_Libraries) | ⚠️ | ✅ | ffmpeg | "
+              "`MSZH`; RGB24 only on decode. Reads compressed, uncompressed and two-section MSZH packets. "
+              "The encoder writes single-section bottom-up RGB24 with DWORD-padded rows, using MSZH back-references "
+              "when they shrink the frame and the reference decoder's equal-size raw-frame form otherwise | "
+              "[FFmpeg `lcldec.c`](https://github.com/FFmpeg/FFmpeg/blob/master/libavcodec/lcldec.c) |"
+          )
+          readme_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+          decoder_path = Path("Hawkynt.FileFormats.Video/Codecs/MszhVideoDecoder.cs")
+          decoder = decoder_path.read_text(encoding="utf-8")
+          old = "A zero backward distance produces zero bytes, matching the reference decoder's defined defensive"
+          new = "A zero backward distance produces zero-valued bytes, matching the reference decoder's defensive"
+          if decoder.count(old) != 1:
+              raise SystemExit(f"decoder wording anchor occurs {decoder.count(old)} times")
+          decoder_path.write_text(decoder.replace(old, new), encoding="utf-8")
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mszh-docs
+          path: |
+            Hawkynt.FileFormats.Video/README.md
+            Hawkynt.FileFormats.Video/Codecs/MszhVideoDecoder.cs
