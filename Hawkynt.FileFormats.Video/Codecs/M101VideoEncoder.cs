@@ -3,6 +3,7 @@ using FileFormat.Core;
 namespace FileFormat.Codecs;
 
 /// <summary>Encodes Matrox Uncompressed SD (<c>M101</c>) as eight- or ten-bit 4:2:2.</summary>
+[VerifiedBy(ConformanceOracle.FFmpeg)]
 public sealed class M101VideoEncoder : IVideoCodecEncoder<M101VideoEncoder> {
 
   private static readonly CodecTag _Tag = CodecTag.FromCharacters("M101");
