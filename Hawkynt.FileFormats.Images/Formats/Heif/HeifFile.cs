@@ -1,4 +1,5 @@
 using System;
+using System.Buffers.Binary;
 using System.Collections.Generic;
 using FileFormat.Core;
 
@@ -17,16 +18,18 @@ public readonly record struct HeifImage {
 
 /// <summary>In-memory representation of HEIF/HEIC (ISO/IEC 23008-12).</summary>
 /// <remarks>
-/// Directly coded HEVC image items are resolved through iinf/iloc/ipma and decoded with the managed
-/// H.265 implementation shared with the video package. The primary item is exposed through the
-/// ordinary single-image contract, while every directly coded top-level image is available through
+/// Directly coded HEVC and AVC image items are resolved through iinf/iloc/ipma and decoded with the
+/// managed H.265/H.264 implementations shared with the video package. HEIF <c>grid</c> and
+/// <c>iden</c> derived images are resolved through their <c>dimg</c> references, including the
+/// normative clean-aperture, rotation and mirror transforms. The primary item is exposed through the
+/// ordinary single-image contract, while every independent top-level image is available through
 /// <see cref="IMultiImageFileFormat{TSelf}"/>.
 /// <para/>
 /// Writing emits one <c>hvc1</c> Main-Still-Picture item. The first encoder profile deliberately uses
 /// HEVC's normative PCM coding-unit mode: the output is large but lossless at the YUV sample level
-/// and is a real HEVC bitstream rather than the former raw-RGB payload in an HEIF-shaped box tree.
+/// and is a real HEVC bitstream rather than a raw-RGB payload in an HEIF-shaped box tree.
 /// </remarks>
-[FormatMimeType("image/heif")]
+[FormatMimeType("image/heic", "image/heif", "image/avci", "image/avcs")]
 [VerifiedBy(ConformanceOracle.ImageMagick, ConformanceOracle.HeifDec, ConformanceOracle.FFmpeg)]
 public readonly record struct HeifFile :
   IImageFormatReader<HeifFile>,
@@ -42,7 +45,7 @@ public readonly record struct HeifFile :
   /// with an H.264 picture in it rather than an H.265 one, which is a different
   /// codec inside the same boxes and not a different format.
   /// </summary>
-  static string[] IImageFormatMetadata<HeifFile>.FileExtensions => [".heic", ".heif", ".avci", ".avcs"];
+  static string[] IImageFormatMetadata<HeifFile>.FileExtensions => [".heic", ".heif", ".hif", ".avci", ".avcs"];
   static FormatCapability IImageFormatMetadata<HeifFile>.Capabilities => FormatCapability.MultiImage;
   static HeifFile IImageFormatReader<HeifFile>.FromSpan(ReadOnlySpan<byte> data) => HeifReader.FromSpan(data);
   static byte[] IImageFormatWriter<HeifFile>.ToBytes(HeifFile file) => HeifWriter.ToBytes(file);
@@ -50,28 +53,72 @@ public readonly record struct HeifFile :
   public static ImageInfo? ReadImageInfo(ReadOnlySpan<byte> header) => HeifReader.ReadImageInfo(header);
 
   static bool? IImageFormatMetadata<HeifFile>.MatchesSignature(ReadOnlySpan<byte> header) {
-    if (header.Length < 12
-        || header[4] != (byte)'f'
-        || header[5] != (byte)'t'
-        || header[6] != (byte)'y'
-        || header[7] != (byte)'p')
+    if (header.Length < 12 || !header.Slice(4, 4).SequenceEqual("ftyp"u8))
       return null;
 
-    if (header[8] == (byte)'h' && header[9] == (byte)'e' && header[10] == (byte)'i' && header[11] == (byte)'c')
-      return true;
-    if (header[8] == (byte)'h' && header[9] == (byte)'e' && header[10] == (byte)'i' && header[11] == (byte)'x')
-      return true;
-    if (header[8] == (byte)'h' && header[9] == (byte)'e' && header[10] == (byte)'v' && header[11] == (byte)'c')
-      return true;
-    if (header[8] == (byte)'m' && header[9] == (byte)'i' && header[10] == (byte)'f' && header[11] == (byte)'1')
-      return true;
-    return null;
+    var size32 = BinaryPrimitives.ReadUInt32BigEndian(header);
+    var boxHeaderSize = 8;
+    ulong boxSize = size32;
+    if (size32 == 1) {
+      if (header.Length < 20)
+        return null;
+      boxSize = BinaryPrimitives.ReadUInt64BigEndian(header[8..]);
+      boxHeaderSize = 16;
+    } else if (size32 == 0) {
+      boxSize = (ulong)header.Length;
+    }
+
+    if (boxSize < (ulong)(boxHeaderSize + 8))
+      return null;
+
+    var availableEnd = (int)Math.Min((ulong)header.Length, boxSize);
+    var majorOffset = boxHeaderSize;
+    if (majorOffset + 4 > availableEnd)
+      return null;
+
+    var hasGenericHeifBrand = false;
+    var hasSpecificHeifBrand = false;
+    var hasAvifBrand = false;
+
+    void InspectBrand(ReadOnlySpan<byte> brand) {
+      if (brand.SequenceEqual("avif"u8) || brand.SequenceEqual("avis"u8)) {
+        hasAvifBrand = true;
+        return;
+      }
+
+      if (brand.SequenceEqual("mif1"u8)) {
+        hasGenericHeifBrand = true;
+        return;
+      }
+
+      if (brand.SequenceEqual("heic"u8)
+          || brand.SequenceEqual("heix"u8)
+          || brand.SequenceEqual("hevc"u8)
+          || brand.SequenceEqual("heim"u8)
+          || brand.SequenceEqual("heis"u8)
+          || brand.SequenceEqual("hevm"u8)
+          || brand.SequenceEqual("hevs"u8)
+          || brand.SequenceEqual("avci"u8)
+          || brand.SequenceEqual("avcs"u8))
+        hasSpecificHeifBrand = true;
+    }
+
+    InspectBrand(header.Slice(majorOffset, 4));
+    for (var at = majorOffset + 8; at + 4 <= availableEnd; at += 4)
+      InspectBrand(header.Slice(at, 4));
+
+    // AVIF is itself a HEIF-conformant format and commonly carries mif1 as a compatible brand.
+    // The dedicated AVIF format must win whenever avif/avis is explicitly advertised.
+    if (hasAvifBrand)
+      return null;
+
+    return hasSpecificHeifBrand || hasGenericHeifBrand ? true : null;
   }
 
-  /// <summary>The primary image width, after its clean-aperture crop.</summary>
+  /// <summary>The primary image width, after its clean-aperture crop and orientation transforms.</summary>
   public int Width { get; init; }
 
-  /// <summary>The primary image height, after its clean-aperture crop.</summary>
+  /// <summary>The primary image height, after its clean-aperture crop and orientation transforms.</summary>
   public int Height { get; init; }
 
   /// <summary>The primary image pixels in Rgb24.</summary>
@@ -80,12 +127,12 @@ public readonly record struct HeifFile :
   /// <summary>The major brand from ftyp.</summary>
   public string Brand { get; init; }
 
-  /// <summary>The primary item's coded payload, after iloc extent assembly.</summary>
+  /// <summary>The primary item's coded or derived-item payload, after iloc extent assembly.</summary>
   public byte[] RawImageData { get; init; }
 
   /// <summary>
-  /// Directly coded top-level image items, with the primary item first. Thumbnail and auxiliary
-  /// items are deliberately not counted as pages.
+  /// Independent top-level image items, with the primary item first. Thumbnail, auxiliary and
+  /// component images used only as inputs to a derived image are deliberately not counted as pages.
   /// </summary>
   public IReadOnlyList<HeifImage> Images { get; init; }
 
