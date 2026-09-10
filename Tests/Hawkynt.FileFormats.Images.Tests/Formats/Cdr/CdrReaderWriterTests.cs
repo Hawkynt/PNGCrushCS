@@ -80,6 +80,12 @@ public sealed class CdrReaderWriterTests {
 
   [Test]
   [Category("Unit")]
+  public void FromSpan_OtherLowercaseCdrForm_Throws() {
+    Assert.That(() => CdrReader.FromSpan(_Riff("cdr9", ("sumi", [0x42]))), Throws.TypeOf<InvalidDataException>());
+  }
+
+  [Test]
+  [Category("Unit")]
   public void FromSpan_TruncatedChunk_Throws() {
     var bytes = _Riff("CDR9", ("sumi", [0x01, 0x02]));
     BinaryPrimitives.WriteUInt32LittleEndian(bytes.AsSpan(16), uint.MaxValue);
