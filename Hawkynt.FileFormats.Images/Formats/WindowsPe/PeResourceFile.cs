@@ -8,17 +8,27 @@ using FileFormat.Ico;
 
 namespace FileFormat.WindowsPe;
 
-/// <summary>In-memory representation of image resources extracted from a Windows PE file.</summary>
+/// <summary>In-memory representation of image resources extracted from or written to a Windows PE file.</summary>
+/// <remarks>
+/// Reading enumerates grouped icons/cursors, RT_BITMAP resources and image files embedded in other
+/// resource types. Writing creates a native PE32 image with a conventional <c>.rsrc</c> tree: pixels
+/// supplied through <see cref="FromRawImage(RawImage)"/> become one RT_BITMAP resource, while a
+/// parsed <see cref="PeResourceFile"/> can be re-serialized from its complete BMP/ICO/CUR/embedded
+/// payloads. EXE/SCR output receives a minimal entry point; DLL/OCX/CPL output is a no-entry resource DLL.
+/// </remarks>
 [FormatMagicBytes([0x4D, 0x5A])] // MZ
 [FormatDetectionPriority(999)]    // Very common signature, low priority for image detection
 public sealed class PeResourceFile :
   IImageFormatReader<PeResourceFile>, IImageToRawImage<PeResourceFile>,
+  IImageFromRawImage<PeResourceFile>, IImageFormatWriter<PeResourceFile>,
   IMultiImageFileFormat<PeResourceFile> {
 
   static string IImageFormatMetadata<PeResourceFile>.PrimaryExtension => ".exe";
   static string[] IImageFormatMetadata<PeResourceFile>.FileExtensions => [".exe", ".dll", ".ocx", ".scr", ".cpl"];
   static FormatCapability IImageFormatMetadata<PeResourceFile>.Capabilities => FormatCapability.MultiImage;
   static PeResourceFile IImageFormatReader<PeResourceFile>.FromSpan(ReadOnlySpan<byte> data) => PeResourceReader.FromSpan(data);
+  static PeResourceFile IImageFromRawImage<PeResourceFile>.FromRawImage(RawImage image, string extension) => FromRawImage(image, extension);
+  static byte[] IImageFormatWriter<PeResourceFile>.ToBytes(PeResourceFile file) => PeResourceWriter.ToBytes(file);
 
   static bool? IImageFormatMetadata<PeResourceFile>.MatchesSignature(ReadOnlySpan<byte> header) {
     if (header.Length < 64)
@@ -41,6 +51,34 @@ public sealed class PeResourceFile :
 
   /// <summary>All image resources found in the PE resource section (icons, cursors, bitmaps, embedded images).</summary>
   public IReadOnlyList<PeImageResource> ImageResources { get; init; } = [];
+
+  internal PeResourceModuleKind ModuleKind { get; init; }
+
+  public static PeResourceFile FromRawImage(RawImage image) => FromRawImage(image, ".exe");
+
+  /// <summary>Creates a PE resource image for one of the supported executable or library extensions.</summary>
+  public static PeResourceFile FromRawImage(RawImage image, string extension) {
+    ArgumentNullException.ThrowIfNull(image);
+    ArgumentException.ThrowIfNullOrWhiteSpace(extension);
+
+    var kind = extension.ToLowerInvariant() switch {
+      ".exe" or ".scr" => PeResourceModuleKind.Executable,
+      ".dll" or ".ocx" or ".cpl" => PeResourceModuleKind.Dll,
+      _ => throw new ArgumentException($"Unsupported PE resource extension '{extension}'.", nameof(extension)),
+    };
+
+    var bmp = BmpWriter.ToBytes(BmpFile.FromRawImage(image));
+    return new PeResourceFile {
+      ImageResources = [
+        new PeImageResource {
+          ResourceType = PeImageResourceType.Bitmap,
+          ResourceId = 1,
+          Data = bmp,
+        }
+      ],
+      ModuleKind = kind,
+    };
+  }
 
   public static RawImage ToRawImage(PeResourceFile file) {
     ArgumentNullException.ThrowIfNull(file);
@@ -91,4 +129,9 @@ public sealed class PeResourceFile :
         + "Use the Data property to access the raw bytes and an appropriate reader."
       ),
     };
+}
+
+internal enum PeResourceModuleKind {
+  Executable,
+  Dll,
 }
