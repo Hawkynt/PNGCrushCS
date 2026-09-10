@@ -7,7 +7,7 @@ using Hawkynt.FileFormats.Video;
 
 namespace FileFormat.Codecs.Vc1.Tests;
 
-/// <summary>The deliberately small VC-1 writer: Main-profile, progressive, all-intra and DC-only.</summary>
+/// <summary>The VC-1 writer: Main-profile, progressive, all-intra with transformed DC and AC coefficients.</summary>
 [TestFixture]
 public sealed class Vc1VideoEncoderTests {
 
@@ -85,6 +85,37 @@ public sealed class Vc1VideoEncoderTests {
 
   [Test]
   [Category("Unit")]
+  public void SpatialDetailIsCarriedByAcCoefficients() {
+    const int width = 32;
+    const int height = 16;
+    var source = _GreyscaleDetail(width, height);
+    var encoder = Vc1VideoEncoder.Create(_Requested(width, height));
+
+    Assert.That(encoder.TryEncode(source, 0, out var detailed), Is.True);
+
+    var flatEncoder = Vc1VideoEncoder.Create(_Requested(width, height));
+    Assert.That(flatEncoder.TryEncode(_Flat(width, height, 128), 0, out var flat), Is.True);
+    Assert.That(detailed.Data.Length, Is.GreaterThan(flat.Data.Length), "non-flat blocks must carry AC syntax");
+
+    var decoder = Vc1VideoDecoder.Create(encoder.DescribeStream());
+    Assert.That(decoder.TryDecode(detailed, out var decoded), Is.True);
+
+    var maximumError = 0;
+    long totalError = 0;
+    for (var i = 0; i < source.PixelData.Length; ++i) {
+      var error = Math.Abs(source.PixelData[i] - decoded.PixelData[i]);
+      maximumError = Math.Max(maximumError, error);
+      totalError += error;
+    }
+
+    Assert.Multiple(() => {
+      Assert.That(maximumError, Is.LessThanOrEqualTo(4), "uniform quantiser 3 should preserve greyscale detail closely");
+      Assert.That((double)totalError / source.PixelData.Length, Is.LessThan(1.5), "AC coding must beat block-average reconstruction");
+    });
+  }
+
+  [Test]
+  [Category("Unit")]
   public void EveryPictureCanBeDecodedWithoutTheOneBeforeIt() {
     var encoder = Vc1VideoEncoder.Create(_Requested(16, 16));
     Assert.That(encoder.TryEncode(_Flat(16, 16, 32), 0, out _), Is.True);
@@ -143,6 +174,20 @@ public sealed class Vc1VideoEncoderTests {
   private static RawImage _Flat(int width, int height, byte value) {
     var pixels = new byte[width * height * 3];
     Array.Fill(pixels, value);
+    return new() { Width = width, Height = height, Format = PixelFormat.Rgb24, PixelData = pixels };
+  }
+
+  private static RawImage _GreyscaleDetail(int width, int height) {
+    var pixels = new byte[width * height * 3];
+    for (var y = 0; y < height; ++y)
+      for (var x = 0; x < width; ++x) {
+        var value = (byte)((x * 11 + y * 7) & 0xFF);
+        var at = ((y * width) + x) * 3;
+        pixels[at] = value;
+        pixels[at + 1] = value;
+        pixels[at + 2] = value;
+      }
+
     return new() { Width = width, Height = height, Format = PixelFormat.Rgb24, PixelData = pixels };
   }
 
