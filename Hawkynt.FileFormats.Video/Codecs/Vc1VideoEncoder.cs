@@ -26,6 +26,7 @@ namespace FileFormat.Codecs;
 /// each 2x2 luma square and picture edges are replicated out to the macroblock boundary; the crop back
 /// to the declared display size belongs to the decoder.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.FFmpeg)]
 public sealed class Vc1VideoEncoder : IVideoCodecEncoder<Vc1VideoEncoder> {
 
   private static readonly CodecTag _Tag = CodecTag.FromCharacters("WMV3");
