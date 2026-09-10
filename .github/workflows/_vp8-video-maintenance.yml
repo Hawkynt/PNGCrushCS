@@ -84,18 +84,11 @@ jobs:
             notes = notes.replace(marker, marker + addition)
             notes_path.write_text(notes, encoding='utf-8')
 
-      - name: Generate package documentation
-        uses: Hawkynt/RepositoryTemplate/package-readme@v1
-        with:
-          mode: write
-          root: PNGCrushCS
-          configuration: Release
-
       - name: Test
         working-directory: PNGCrushCS
         run: dotnet test PngCrush.slnx --configuration Release --no-build -p:EnableWindowsTargeting=true --filter "TestCategory!=Regression&TestCategory!=Performance"
 
-      - name: Commit generated documentation
+      - name: Commit support documentation
         shell: bash
         run: |
           cd PNGCrushCS
@@ -104,6 +97,6 @@ jobs:
           fi
           git config user.name "Hawkynt"
           git config user.email "14230988+Hawkynt@users.noreply.github.com"
-          git add -- '*README.md' '*REFERENCE.md' 'Hawkynt.FileFormats.Video/codec-notes.md'
-          git commit -m "* document VP8 video encoding and regenerate reference"
+          git add -- 'Hawkynt.FileFormats.Video/README.md' 'Hawkynt.FileFormats.Video/codec-notes.md'
+          git commit -m "* document VP8 video encoding"
           git push origin HEAD:${{ github.head_ref }}
