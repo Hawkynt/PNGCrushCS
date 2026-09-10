@@ -112,16 +112,16 @@ public sealed class Indeo2VideoEncoderTests {
 
   [Test]
   [Category("Unit")]
-  public void UnsupportedInputIsRefusedRatherThanDroppingAlpha() {
+  public void TruncatedSourceRefuses() {
     var encoder = Indeo2VideoEncoder.Create(_Stream(8, 4));
     var image = new RawImage {
       Width = 8,
       Height = 4,
       Format = PixelFormat.Rgba32,
-      PixelData = new byte[8 * 4 * 4],
+      PixelData = [0],
     };
 
-    Assert.Throws<NotSupportedException>(() => encoder.TryEncode(image, 0, out _));
+    Assert.Throws<InvalidDataException>(() => encoder.TryEncode(image, 0, out _));
   }
 
   [Test]
