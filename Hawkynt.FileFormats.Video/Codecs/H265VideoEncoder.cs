@@ -47,6 +47,11 @@ public sealed class H265VideoEncoder : IVideoCodecEncoder<H265VideoEncoder> {
     if (stream.Width <= 0 || stream.Height <= 0)
       throw new NotSupportedException(
         $"An H.265 encoder needs the output dimensions before coding begins; {stream.Width}x{stream.Height} was supplied.");
+    if ((stream.Width & 1) != 0 || (stream.Height & 1) != 0)
+      throw new NotSupportedException(
+        $"This H.265 writer codes 4:2:0 pictures, whose conformance-window crop units are two luma samples. "
+        + $"{stream.Width}x{stream.Height} cannot therefore be represented exactly without a container clean-aperture property, "
+        + "which a codec packet does not own. Use even dimensions rather than silently changing the displayed picture size.");
 
     return new(stream);
   }
