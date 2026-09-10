@@ -36,16 +36,18 @@ jobs:
         run: |
           from pathlib import Path
 
-          def replace_once(path_name, old, new):
+          def replace_once_or_verify(path_name, old, new):
               path = Path(path_name)
               text = path.read_text(encoding='utf-8-sig')
-              if old not in text:
-                  raise SystemExit(f'expected block not found in {path_name}')
-              if text.count(old) != 1:
-                  raise SystemExit(f'expected one block in {path_name}, found {text.count(old)}')
-              path.write_text(text.replace(old, new, 1), encoding='utf-8')
+              if old in text:
+                  if text.count(old) != 1:
+                      raise SystemExit(f'expected one old block in {path_name}, found {text.count(old)}')
+                  path.write_text(text.replace(old, new, 1), encoding='utf-8')
+                  return
+              if new not in text:
+                  raise SystemExit(f'neither old nor reconciled block found in {path_name}')
 
-          replace_once(
+          replace_once_or_verify(
               'Tests/Optimizer.Image.Tests/ImageFormatDetectorTests.cs',
               '''  [Test]
           public void DetectFromSignature_FpxMagic_ReturnsFpx() {
@@ -72,7 +74,7 @@ jobs:
             => Assert.That(ImageFormatDetector.DetectFromExtension(new FileInfo("test.mix")), Is.EqualTo(ImageFormat.Fpx));
           ''')
 
-          replace_once(
+          replace_once_or_verify(
               'Hawkynt.FileFormats.Images/Formats/Fpx/FpxReader.cs',
               '''    if (header.Length != expectedHeaderLength)
                 throw new InvalidDataException(
@@ -89,17 +91,7 @@ jobs:
               var canvas = new byte[checked(width * height * 3)];
           ''')
 
-          replace_once(
-              'Tests/Hawkynt.FileFormats.Images.Tests/Formats/Fpx/FpxWriterTests.cs',
-              '''    Assert.That(FpxWriter.ToBytes(file), Is.EqualTo(FpxWriter.ToBytes(file)));
-          ''',
-              '''    var first = FpxWriter.ToBytes(file);
-              var second = FpxWriter.ToBytes(file);
-
-              Assert.That(second, Is.EqualTo(first));
-          ''')
-
-          replace_once(
+          replace_once_or_verify(
               'Hawkynt.FileFormats.Images/README.md',
               '''These 9 entries read but have no writer; each is a decision, not an oversight. **Not bounded** (an encoder or a model this package does not have): PeResource, Fpx (executable, OLE and compound-document containers). **Holders of other files rather than pictures of their own**: IconLibrary, Ipg, Sdg, Cdr, Cmx — an icon library, a tileset and a gallery carry whole files of other formats, and CorelDRAW's streams are vector scenes whose raster part is only an embedded preview, so writing any of them means deciding what belongs in a collection or composing a drawing, neither of which is serialising a picture. **Deliberately not written** because a file built from arbitrary pixels would not be what the name promises: EmbeddedDib, CartesMichelin.''',
               '''These 8 entries read but have no writer; each is a decision, not an oversight. **Not bounded** (an encoder or a model this package does not have): PeResource (executable container). **Holders of other files rather than pictures of their own**: IconLibrary, Ipg, Sdg, Cdr, Cmx — an icon library, a tileset and a gallery carry whole files of other formats, and CorelDRAW's streams are vector scenes whose raster part is only an embedded preview, so writing any of them means deciding what belongs in a collection or composing a drawing, neither of which is serialising a picture. **Deliberately not written** because a file built from arbitrary pixels would not be what the name promises: EmbeddedDib, CartesMichelin.''')
@@ -201,7 +193,6 @@ jobs:
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
           git add \
             Hawkynt.FileFormats.Images/Formats/Fpx/FpxReader.cs \
-            Tests/Hawkynt.FileFormats.Images.Tests/Formats/Fpx/FpxWriterTests.cs \
             Tests/Optimizer.Image.Tests/ImageFormatDetectorTests.cs \
             Hawkynt.FileFormats.Images/README.md \
             Hawkynt.FileFormats.Images/REFERENCE.md
