@@ -3,6 +3,10 @@ using FileFormat.Core;
 namespace FileFormat.Codecs;
 
 /// <summary>Encodes Matrox Uncompressed SD (<c>M101</c>) as eight- or ten-bit 4:2:2.</summary>
+/// <remarks>
+/// The shared Matrox core writes the inverse of the decoder's packed layout and supplies the AVI
+/// private trailer the codec needs; this wrapper keeps the SD FourCC distinct in the encoder registry.
+/// </remarks>
 [VerifiedBy(ConformanceOracle.FFmpeg)]
 public sealed class M101VideoEncoder : IVideoCodecEncoder<M101VideoEncoder> {
 
