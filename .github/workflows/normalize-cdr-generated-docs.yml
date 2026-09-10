@@ -1,0 +1,40 @@
+name: Normalize CDR generated docs
+
+on:
+  push:
+    branches: [feature/cdr-read-write]
+
+permissions:
+  contents: write
+
+jobs:
+  normalize:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Normalize generated docs
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          for name in (
+              'Hawkynt.FileFormats.Images/README.md',
+              'Hawkynt.FileFormats.Images/REFERENCE.md',
+          ):
+              path = Path(name)
+              text = path.read_text(encoding='utf-8-sig')
+              path.write_text(text, encoding='utf-8', newline='\n')
+          PY
+
+      - name: Commit normalization and remove this workflow
+        shell: bash
+        run: |
+          rm .github/workflows/normalize-cdr-generated-docs.yml
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add Hawkynt.FileFormats.Images/README.md Hawkynt.FileFormats.Images/REFERENCE.md .github/workflows/normalize-cdr-generated-docs.yml
+          git commit -m "Normalize generated CDR documentation"
+          git push
