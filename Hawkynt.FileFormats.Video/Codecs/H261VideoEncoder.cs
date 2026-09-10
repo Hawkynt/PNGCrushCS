@@ -29,6 +29,14 @@ namespace FileFormat.Codecs;
 /// transmitted macroblock steps over it (clause 4.2.3.1) and the decoder reads back what the reference
 /// left there.
 /// <para/>
+/// <b>The temporal reference is a clock, not a frame counter.</b> Clause 3.1 fixes the source picture
+/// clock at 30000/1001 Hz and clause 4.2.1.2 says TR advances by one plus every source picture not
+/// transmitted since the previous coded one. When packet timestamps and a time base are supplied they
+/// are mapped onto that clock relative to the first picture; otherwise a stated frame rate determines
+/// the skipped source pictures. With neither, consecutive input pictures are treated as consecutive
+/// H.261 source pictures. A declared rate faster than the source clock is refused because no TR
+/// sequence can represent it.
+/// <para/>
 /// <b>What it does not write.</b> The four macroblock types carrying MQUANT (Table 2 rows 2, 4, 7 and
 /// 10). The quantiser is stated once in each group's header and held across the picture, which is a
 /// choice rather than a limitation: there is no rate control here for a mid-group change to serve, and
@@ -85,6 +93,12 @@ public sealed class H261VideoEncoder : IVideoCodecEncoder<H261VideoEncoder> {
   /// <summary>The temporal reference field is five bits (clause 4.2.1.2), so it counts modulo this.</summary>
   private const int _TEMPORAL_REFERENCE_PERIOD = 32;
 
+  /// <summary>The source picture clock numerator fixed by clause 3.1.</summary>
+  private const int _SOURCE_PICTURE_RATE_NUMERATOR = 30_000;
+
+  /// <summary>The source picture clock denominator fixed by clause 3.1.</summary>
+  private const int _SOURCE_PICTURE_RATE_DENOMINATOR = 1_001;
+
   private readonly MediaStreamInfo _requested;
   private readonly int _width;
   private readonly int _height;
@@ -96,6 +110,8 @@ public sealed class H261VideoEncoder : IVideoCodecEncoder<H261VideoEncoder> {
   private H263Frame? _reference;
   private int _pictureIndex;
   private int _sinceKeyFrame;
+  private long? _firstPresentationTimestamp;
+  private Int128? _lastSourcePictureNumber;
   private MediaStreamInfo? _stream;
 
   private H261VideoEncoder(MediaStreamInfo stream, bool isCif) {
@@ -123,6 +139,15 @@ public sealed class H261VideoEncoder : IVideoCodecEncoder<H261VideoEncoder> {
     if (stream.Kind != MediaStreamKind.Video)
       throw new NotSupportedException("H.261 can only encode a video stream.");
 
+    var frameRate = stream.FrameRate;
+    if (_IsPositive(frameRate)
+        && (Int128)frameRate.Numerator * _SOURCE_PICTURE_RATE_DENOMINATOR
+          > (Int128)_SOURCE_PICTURE_RATE_NUMERATOR * frameRate.Denominator)
+      throw new NotSupportedException(
+        $"H.261's source coder runs at {_SOURCE_PICTURE_RATE_NUMERATOR}/{_SOURCE_PICTURE_RATE_DENOMINATOR} pictures "
+        + $"per second (ITU-T H.261 clause 3.1); the requested {frameRate} frame rate is faster, so its pictures "
+        + "cannot be assigned distinct temporal-reference values on the H.261 source picture clock.");
+
     if (stream.Width == _Qcif.Width && stream.Height == _Qcif.Height)
       return new(stream, isCif: false);
 
@@ -149,11 +174,11 @@ public sealed class H261VideoEncoder : IVideoCodecEncoder<H261VideoEncoder> {
 
     var intra = this._reference == null || this._sinceKeyFrame >= _KEY_FRAME_INTERVAL;
     var source = this._ToPlanes(frame);
+    var temporalReference = this._TemporalReference(presentationTimestamp);
     var target = new H263Frame(this._macroblockWidth, this._macroblockHeight);
 
     var encoder = new H261PictureEncoder(
-      intra, this._pictureIndex % _TEMPORAL_REFERENCE_PERIOD, _QUANTISER, source, target, this._reference,
-      this._isCif, this._groupCount);
+      intra, temporalReference, _QUANTISER, source, target, this._reference, this._isCif, this._groupCount);
 
     var bytes = encoder.Encode();
     this._reference = target;
@@ -216,6 +241,64 @@ public sealed class H261VideoEncoder : IVideoCodecEncoder<H261VideoEncoder> {
       CodecPrivateData = format,
     };
   }
+
+  /// <summary>
+  /// Maps this picture onto H.261's 30000/1001 Hz source picture clock and returns the five low bits.
+  /// </summary>
+  private int _TemporalReference(long? presentationTimestamp) {
+    var sourcePictureNumber = this._SourcePictureNumber(presentationTimestamp);
+    if (this._lastSourcePictureNumber is { } previous && sourcePictureNumber <= previous)
+      throw new InvalidDataException(
+        $"This H.261 picture maps to source picture {sourcePictureNumber}, not after the previously coded source "
+        + $"picture {previous}. ITU-T H.261 clauses 3.1 and 4.2.1.2 require each transmitted picture to occupy a "
+        + "later 30000/1001 Hz source-picture interval; reduce the frame rate or supply increasing timestamps.");
+
+    this._lastSourcePictureNumber = sourcePictureNumber;
+    return (int)(sourcePictureNumber % _TEMPORAL_REFERENCE_PERIOD);
+  }
+
+  /// <summary>
+  /// The number of the H.261 source-picture interval occupied by this input picture, relative to the first one.
+  /// </summary>
+  private Int128 _SourcePictureNumber(long? presentationTimestamp) {
+    var timeBase = this._requested.TimeBase;
+    if (this._pictureIndex == 0 && presentationTimestamp is { } firstTimestamp && _IsPositive(timeBase))
+      this._firstPresentationTimestamp = firstTimestamp;
+
+    if (this._firstPresentationTimestamp is { } origin
+        && presentationTimestamp is { } timestamp
+        && _IsPositive(timeBase)) {
+      var elapsed = (Int128)timestamp - origin;
+      if (elapsed < 0)
+        throw new InvalidDataException(
+          $"This H.261 picture has presentation timestamp {timestamp}, before the stream's first timestamp {origin}. "
+          + "H.261 has no reordered pictures, so coding order is presentation order.");
+
+      return _ScaleToSourcePictureClock(elapsed, timeBase.Numerator, timeBase.Denominator);
+    }
+
+    var frameRate = this._requested.FrameRate;
+    if (_IsPositive(frameRate))
+      return _ScaleToSourcePictureClock(this._pictureIndex, frameRate.Denominator, frameRate.Numerator);
+
+    // With no timing information at all there is no evidence that source pictures were omitted, so
+    // consecutive inputs are the consecutive 29.97 Hz source pictures clause 4.2.1.2 describes.
+    return this._pictureIndex;
+  }
+
+  /// <summary>Scales non-negative units of a rational number of seconds onto H.261's source clock.</summary>
+  private static Int128 _ScaleToSourcePictureClock(Int128 units, long secondsNumerator, long secondsDenominator) {
+    var numerator = checked(units * secondsNumerator * _SOURCE_PICTURE_RATE_NUMERATOR);
+    var denominator = checked((Int128)secondsDenominator * _SOURCE_PICTURE_RATE_DENOMINATOR);
+
+    // External container clocks are commonly coarser than 30000/1001 Hz. Assign the picture to the
+    // nearest source interval rather than systematically one interval early when its timestamp was
+    // rounded by such a clock; exact H.261/NTSC time bases of course divide without a remainder.
+    return (numerator + denominator / 2) / denominator;
+  }
+
+  private static bool _IsPositive(Rational value)
+    => value.IsKnown && value.Numerator > 0 && value.Denominator > 0;
 
   /// <summary>
   /// The picture as the 4:2:0 planes the coding works on.
