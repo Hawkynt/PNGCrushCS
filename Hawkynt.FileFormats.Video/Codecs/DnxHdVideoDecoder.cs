@@ -64,7 +64,7 @@ public sealed class DnxHdVideoDecoder : IVideoCodecDecoder<DnxHdVideoDecoder> {
   ];
 
   /// <summary>The names Matroska gives this codec, which states no four-character code.</summary>
-  private static readonly string[] _CodecIds = ["V_DNXHD", "V_MS/VFW/FOURCC/AVdn"];
+  private static readonly string[] _CodecIds = ["V_DNXHD", "V_MS/VFW/FOURCC/AVdn", "V_MS/VFW/FOURCC/AVdh"];
 
   private readonly int _width;
   private readonly int _height;
