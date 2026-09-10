@@ -53,11 +53,12 @@ internal static partial class VideoFormatRegistration {
       CreateDecoder: static stream => T.Create(stream)));
 
   private static void _RegisterEncoder<T>(ConformanceOracle[] verifiedBy) where T : IVideoCodecEncoder<T>
-    => VideoFormatRegistry.RegisterEncoder(new(
-      CodecName: T.CodecName,
-      Codec: T.Codec,
-      CreateEncoder: static stream => T.Create(stream)) {
-      Accepts = static stream => T.Accepts(stream),
-      VerifiedBy = verifiedBy,
-    });
+    => VideoFormatRegistry.RegisterEncoder(
+      new(
+        CodecName: T.CodecName,
+        Codec: T.Codec,
+        CreateEncoder: static stream => T.Create(stream)) {
+        VerifiedBy = verifiedBy,
+      },
+      static stream => T.Accepts(stream));
 }
