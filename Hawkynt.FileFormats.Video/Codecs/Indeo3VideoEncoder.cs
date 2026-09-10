@@ -18,6 +18,7 @@ namespace FileFormat.Codecs;
 /// solving against the decoder's actual packed-delta arithmetic, so the output is deterministic and
 /// the quantisation error is the format's error, not a disagreement between encoder and decoder math.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.FFmpeg)]
 public sealed class Indeo3VideoEncoder : IVideoCodecEncoder<Indeo3VideoEncoder> {
 
   private static readonly CodecTag _IV32 = CodecTag.FromCharacters("IV32");
