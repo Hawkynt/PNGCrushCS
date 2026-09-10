@@ -166,7 +166,7 @@ public class Vp9VideoEncoderTests {
         coefficients[i] *= 4; // lossless dequantiser at qindex zero
 
       inverse.Apply(coefficients, 2, Vp9Constants.DCT_DCT, true);
-      Assert.That(coefficients.ToArray(), Is.EqualTo(residual.ToArray()), $"sample {sample}");
+      Assert.That(coefficients, Is.EqualTo(residual), $"sample {sample}");
     }
   }
 
