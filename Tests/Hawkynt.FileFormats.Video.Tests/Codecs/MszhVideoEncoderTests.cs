@@ -103,7 +103,7 @@ public sealed class MszhVideoEncoderTests {
 
     var decoder = MszhVideoDecoder.Create(encoder.DescribeStream());
     Assert.That(decoder.TryDecode(packet, out var decoded), Is.True);
-    LosslessEncoderPictures.AssertSame(picture, decoded);
+    LosslessEncoderPictures.AssertSame(picture, decoded, "raw fallback");
   }
 
   [Test]
