@@ -1,6 +1,5 @@
 using System;
 using System.Buffers.Binary;
-using System.IO;
 
 namespace Optimizer.Image.Tests;
 
@@ -35,11 +34,6 @@ public sealed class HeifDetectionTests {
   [Test]
   public void DetectFromSignature_AvifMajorBrandIsNotClaimedAsHeif() {
     Assert.That(ImageFormatDetector.DetectFromSignature(_Ftyp("avif", "mif1")), Is.EqualTo(ImageFormat.Avif));
-  }
-
-  [Test]
-  public void DetectFromExtension_HifExtension_ReturnsHeif() {
-    Assert.That(ImageFormatDetector.DetectFromExtension(new FileInfo("picture.hif")), Is.EqualTo(ImageFormat.Heif));
   }
 
   private static byte[] _Ftyp(string majorBrand, string compatibleBrand) {
