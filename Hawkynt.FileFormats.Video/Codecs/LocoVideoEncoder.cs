@@ -44,7 +44,7 @@ public sealed class LocoVideoEncoder : IVideoCodecEncoder<LocoVideoEncoder> {
       Width: stream.Width,
       Height: stream.Height,
       Planes: 1,
-      BitsPerPixel: (ushort)bitsPerPixel,
+      BitsPerPixel: (short)bitsPerPixel,
       Compression: unchecked((int)_Tag.Value),
       ImageSize: 0,
       XPixelsPerMeter: 0,
