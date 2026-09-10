@@ -1,6 +1,5 @@
 using System;
 using System.IO;
-using System.Linq;
 using FileFormat.Codecs;
 using FileFormat.Core;
 
@@ -152,8 +151,13 @@ public sealed class H265VideoEncoderTests {
   [Category("Unit")]
   public void RefusesTruncatedSourceSamples() {
     var encoder = H265VideoEncoder.Create(_Stream());
-    var source = _Picture();
-    source.PixelData = source.PixelData[..^1];
+    var full = _Picture();
+    var source = new RawImage {
+      Width = full.Width,
+      Height = full.Height,
+      Format = full.Format,
+      PixelData = full.PixelData[..^1],
+    };
 
     Assert.That(() => encoder.TryEncode(source, 0, out _),
       Throws.TypeOf<InvalidDataException>().With.Message.Contains("needs"));
