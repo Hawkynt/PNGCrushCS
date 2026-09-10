@@ -26,6 +26,7 @@ public static class VideoFormatRegistry {
   private static readonly Dictionary<string, VideoFormat> _byMimeType = new(StringComparer.OrdinalIgnoreCase);
   private static readonly List<VideoCodecEntry> _codecs = [];
   private static readonly List<VideoCodecEncoderEntry> _encoders = [];
+  private static readonly List<(VideoCodecEncoderEntry Entry, Func<MediaStreamInfo, bool> Accepts)> _encoderRoutes = [];
   private static VideoFormatEntry[] _detectionOrder = [];
 
   static VideoFormatRegistry() => VideoFormatRegistration.Initialize();
@@ -52,7 +53,10 @@ public static class VideoFormatRegistry {
 
   internal static void RegisterCodec(VideoCodecEntry entry) => _codecs.Add(entry);
 
-  internal static void RegisterEncoder(VideoCodecEncoderEntry entry) => _encoders.Add(entry);
+  internal static void RegisterEncoder(VideoCodecEncoderEntry entry, Func<MediaStreamInfo, bool> accepts) {
+    _encoders.Add(entry);
+    _encoderRoutes.Add((entry, accepts));
+  }
 
   /// <summary>Sorts the containers into the order detection tries them. Called once, after registration.</summary>
   internal static void BuildDetectionOrder()
@@ -257,11 +261,9 @@ public static class VideoFormatRegistry {
   }
 
   private static VideoCodecEncoderEntry? _EncoderFor(MediaStreamInfo stream) {
-    foreach (var encoder in _encoders) {
-      var accepts = encoder.Accepts;
-      if (accepts != null ? accepts(stream) : stream.Codec.EqualsIgnoringCase(encoder.Codec))
-        return encoder;
-    }
+    foreach (var (entry, accepts) in _encoderRoutes)
+      if (accepts(stream))
+        return entry;
 
     return null;
   }
