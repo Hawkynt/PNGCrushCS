@@ -106,21 +106,18 @@ internal static class H263BlockDecoder {
   }
 
   /// <summary>
-  /// Reads the escape form of a coefficient code, in whichever of the two shapes the picture header
-  /// settled on.
+  /// Reads the escape form of a coefficient code, in whichever shape this H.263-derived bitstream uses.
   /// </summary>
   /// <remarks>
   /// H.263's shape (5.4.2 and Table 17) is a last flag, a six-bit run and an eight-bit level that
-  /// carries its own sign inside the value rather than as a bit after it — the one place in the block
-  /// layer where that is so. Two of its values are not codes: zero, which is not a coefficient, and
-  /// minus one hundred and twenty-eight, which the Recommendation reserves for the Modified
-  /// Quantization mode of Annex T.
+  /// carries its own sign inside the value rather than as a bit after it. Zero is not a coefficient,
+  /// and minus one hundred and twenty-eight is reserved by H.263 for Modified Quantization (Annex T).
+  /// RealVideo 1 assigns that reserved value a different meaning: it is an escape to a following
+  /// signed twelve-bit level. The reader knows which codec owns the surrounding bitstream, so Annex T
+  /// remains refused for H.263 while the RV10 extension is decoded only for RealVideo.
   /// <para/>
   /// A Sorenson Spark stream of version 1 puts a bit in front of all that, choosing between a level
-  /// of seven bits and one of eleven. That widens the range a level can take from the ±127 of H.263
-  /// to ±1023 at the cost of one bit on the common case, and it is why a version 1 stream read as an
-  /// H.263 one keeps its place exactly until the first block that needs an escape and then loses the
-  /// bitstream completely.
+  /// of seven bits and one of eleven.
   /// </remarks>
   private static (bool Last, int Run, int Level) _ReadEscape(ref H263BitReader reader, bool wideLevel) {
     if (wideLevel) {
@@ -132,24 +129,29 @@ internal static class H263BlockDecoder {
       return (last, run, value >= sign ? value - 2 * sign : value);
     }
 
-    {
-      var last = reader.ReadBit() == 1;
-      var run = reader.ReadBits(6);
-      var level = reader.ReadBits(8);
-      if (level > 127)
-        level -= 256;
+    var escapedLast = reader.ReadBit() == 1;
+    var escapedRun = reader.ReadBits(6);
+    var escapedLevel = _ReadSigned(ref reader, 8);
 
-      if (level == 0)
-        throw new InvalidDataException(
-          "An escaped coefficient code in the H.263 block layer states a level of zero, which ITU-T H.263 5.4.2 "
-          + "forbids.");
-
-      if (level == -128)
+    if (escapedLevel == -128) {
+      if (!reader.HasRealVideoExtendedEscapeLevel)
         throw new NotSupportedException(
           "An escaped coefficient code in the H.263 block layer states a level of -128, which ITU-T H.263 5.4.2 "
           + "allows only in the Modified Quantization mode of Annex T. That mode is not implemented.");
 
-      return (last, run, level);
+      escapedLevel = _ReadSigned(ref reader, 12);
     }
+
+    if (escapedLevel == 0)
+      throw new InvalidDataException(
+        "An escaped coefficient code in the H.263 block layer states a level of zero, which the coefficient syntax forbids.");
+
+    return (escapedLast, escapedRun, escapedLevel);
+  }
+
+  private static int _ReadSigned(ref H263BitReader reader, int bits) {
+    var value = reader.ReadBits(bits);
+    var sign = 1 << (bits - 1);
+    return value >= sign ? value - (1 << bits) : value;
   }
 }
