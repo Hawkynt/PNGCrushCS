@@ -176,5 +176,5 @@ public static class CdrWriter {
 
   private static bool _IsCdrForm(FourCC form)
     => form is { A: (byte)'C', B: (byte)'D', C: (byte)'R' }
-      or { A: (byte)'c', B: (byte)'d', C: (byte)'r' };
+      or { A: (byte)'c', B: (byte)'d', C: (byte)'r', D: (byte)'8' };
 }
