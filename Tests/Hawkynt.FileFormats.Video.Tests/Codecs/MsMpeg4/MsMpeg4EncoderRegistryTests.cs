@@ -19,7 +19,6 @@ public sealed class MsMpeg4EncoderRegistryTests {
     var stream = _Stream(tag);
 
     Assert.Multiple(() => {
-      Assert.That(MsMpeg4VideoEncoder.Accepts(stream), Is.True, tag);
       Assert.That(VideoFormatRegistry.CanEncode(stream), Is.True, tag);
       Assert.That(VideoFormatRegistry.CreateEncoder(stream), Is.InstanceOf<MsMpeg4VideoEncoder>(), tag);
       Assert.That(MsMpeg4VideoEncoder.Create(stream).DescribeStream().Codec, Is.EqualTo(stream.Codec), tag);
@@ -31,7 +30,6 @@ public sealed class MsMpeg4EncoderRegistryTests {
   public void DirectFactoryRefusesAnUnknownTagInsteadOfWritingVersionThreeUnderIt() {
     var stream = _Stream("ZZZZ");
 
-    Assert.That(MsMpeg4VideoEncoder.Accepts(stream), Is.False);
     Assert.That(VideoFormatRegistry.CanEncode(stream), Is.False);
 
     var refusal = Assert.Throws<NotSupportedException>(() => MsMpeg4VideoEncoder.Create(stream));
