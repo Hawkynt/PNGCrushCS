@@ -26,7 +26,8 @@ public readonly record struct FpxFile
   /// Nineteen of the twenty-one <c>.mix</c> samples here are compound files carrying the same Data
   /// Object Store, Resolution and Subimage structure a <c>.fpx</c> does, so they are the same
   /// picture format under another program's name. The other two are neither, and are refused on the
-  /// signature.
+  /// signature. Reading that embedded picture does not make <c>.mix</c> a writable FlashPix alias:
+  /// writing one would require composing the surrounding Picture It!/PhotoDraw document as well.
   /// </remarks>
   static string[] IImageFormatMetadata<FpxFile>.FileExtensions => [".fpx", ".mix"];
 
@@ -34,6 +35,7 @@ public readonly record struct FpxFile
     => header.Length < CompoundFile.Signature.Length ? null : CompoundFile.HasSignature(header) ? null : false;
 
   static FpxFile IImageFormatReader<FpxFile>.FromSpan(ReadOnlySpan<byte> data) => FpxReader.FromSpan(data);
+  static FpxFile IImageFromRawImage<FpxFile>.FromRawImage(RawImage image, string extension) => FromRawImage(image, extension);
   static byte[] IImageFormatWriter<FpxFile>.ToBytes(FpxFile file) => FpxWriter.ToBytes(file);
 
   static VideoMode[] IImageFormatMetadata<FpxFile>.VideoModes
@@ -63,5 +65,16 @@ public readonly record struct FpxFile
       Height = rgb.Height,
       PixelData = rgb.PixelData[..],
     };
+  }
+
+  /// <summary>Creates a FlashPix image only for the extension the writer actually implements.</summary>
+  public static FpxFile FromRawImage(RawImage image, string extension) {
+    ArgumentNullException.ThrowIfNull(image);
+    if (!string.Equals(extension, ".fpx", StringComparison.OrdinalIgnoreCase))
+      throw new ArgumentException(
+        $"FlashPix writing requires the .fpx extension; '{extension}' is only supported for reading.",
+        nameof(extension));
+
+    return FromRawImage(image);
   }
 }
