@@ -20,9 +20,7 @@ namespace FileFormat.Codecs;
 /// <b>Why a video object layer is in every packet.</b> AVI and VFW-style Matroska descriptions name
 /// MPEG-4 Part 2 but do not necessarily carry its VOL beside the stream header. Repeating this small
 /// header makes every packet a legal random-access point and lets the same packets cross those
-/// containers without depending on out-of-band configuration. ISO base media can still obtain the VOL
-/// from the first packet when remuxing, but this encoder describes itself in the VFW form because that
-/// is the neutral stream description the existing container writers can share.
+/// containers without depending on out-of-band configuration.
 /// <para/>
 /// <b>Lossy.</b> The source is converted to the codec's 8-bit 4:2:0 sample grid and every block passes
 /// through an 8x8 transform and a fixed quantiser. The encoder chooses the nearest reconstruction level
@@ -196,7 +194,10 @@ public sealed class Mpeg4VideoEncoder : IVideoCodecEncoder<Mpeg4VideoEncoder> {
       var rate = frameRate.ToDouble();
       if (double.IsFinite(rate) && rate > 0) {
         const int fallbackResolution = 60000;
-        var fallbackStep = Math.Max(1, (int)Math.Round(fallbackResolution / rate, MidpointRounding.AwayFromZero));
+        var fallbackStep = (int)Math.Clamp(
+          Math.Round(fallbackResolution / rate, MidpointRounding.AwayFromZero),
+          1d,
+          int.MaxValue);
         return (fallbackResolution, fallbackStep);
       }
     }
