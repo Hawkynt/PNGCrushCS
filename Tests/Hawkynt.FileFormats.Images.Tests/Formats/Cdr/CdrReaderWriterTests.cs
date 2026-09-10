@@ -53,6 +53,31 @@ public sealed class CdrReaderWriterTests {
     Assert.That(file.Version, Is.EqualTo(1300));
   }
 
+  [TestCase("CDRH", 1700)]
+  [TestCase("CDRI", 0)]
+  [TestCase("CDRJ", 1800)]
+  [TestCase("CDRK", 1900)]
+  [Category("Unit")]
+  public void FromSpan_LetterVersionForms_FollowCorelVersionMapping(string form, int expectedVersion) {
+    var file = CdrReader.FromSpan(_Riff(form, ("sumi", [0x00])));
+    Assert.That(file.Version, Is.EqualTo(expectedVersion));
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void FromSpan_LowercaseCdr8_IsVersion801AndCanBeRewritten() {
+    var original = _Riff("cdr8", ("sumi", [0x42]));
+
+    var file = CdrReader.FromSpan(original);
+    var rewritten = CdrWriter.ToBytes(file);
+
+    Assert.Multiple(() => {
+      Assert.That(file.FormType.ToString(), Is.EqualTo("cdr8"));
+      Assert.That(file.Version, Is.EqualTo(801));
+      Assert.That(rewritten, Is.EqualTo(original));
+    });
+  }
+
   [Test]
   [Category("Unit")]
   public void FromSpan_TruncatedChunk_Throws() {
@@ -66,6 +91,58 @@ public sealed class CdrReaderWriterTests {
   [Category("Unit")]
   public void FromSpan_NonCdrRiff_Throws() {
     Assert.That(() => CdrReader.FromSpan(_Riff("WAVE", ("fmt ", [0x00]))), Throws.TypeOf<InvalidDataException>());
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void FromRawImage_WritesCdr4BitmapPageAndPreview() {
+    var image = _Quadrants();
+
+    var authored = CdrWriter.FromRawImage(image);
+    var written = CdrWriter.ToBytes(authored);
+    var reparsed = CdrReader.FromSpan(written);
+    var bitmap = reparsed.Chunks.Single(static chunk => chunk.Id.ToString() == "bmp ").Data;
+    var pageConfiguration = reparsed.Chunks.Single(static chunk => chunk.Id.ToString() == "mcfg").Data;
+    var page = reparsed.Chunks.Single(static chunk => chunk.Id.ToString() == "LIST").Data;
+    var expectedBitmap = BmpWriter.ToBytes(BmpFile.FromRawImage(image));
+
+    Assert.Multiple(() => {
+      Assert.That(authored.FormType.ToString(), Is.EqualTo("CDR4"));
+      Assert.That(authored.Version, Is.EqualTo(400));
+      Assert.That(reparsed.Version, Is.EqualTo(400));
+      Assert.That(reparsed.Chunks.Select(static chunk => chunk.Id.ToString()),
+        Is.EqualTo(new[] { "vrsn", "DISP", "mcfg", "bmp ", "LIST" }));
+      Assert.That(reparsed.Preview, Is.Not.Null);
+      Assert.That(reparsed.Preview!.PixelData, Is.EqualTo(image.PixelData));
+
+      Assert.That(BinaryPrimitives.ReadUInt16LittleEndian(bitmap), Is.EqualTo(1));
+      Assert.That(bitmap.AsSpan(2).SequenceEqual(expectedBitmap), Is.True);
+      Assert.That(bitmap.AsSpan(2, 2).SequenceEqual("BM"u8), Is.True);
+
+      Assert.That(BinaryPrimitives.ReadInt16LittleEndian(pageConfiguration), Is.EqualTo(2000));
+      Assert.That(BinaryPrimitives.ReadInt16LittleEndian(pageConfiguration.AsSpan(2)), Is.EqualTo(2000));
+
+      Assert.That(page.AsSpan(0, 4).SequenceEqual("page"u8), Is.True);
+      Assert.That(page.AsSpan(16, 4).SequenceEqual("LIST"u8), Is.True);
+      Assert.That(page.AsSpan(24, 4).SequenceEqual("obj "u8), Is.True);
+      Assert.That(page.AsSpan(28, 4).SequenceEqual("trfd"u8), Is.True);
+      Assert.That(BinaryPrimitives.ReadInt32LittleEndian(page.AsSpan(54)), Is.EqualTo(1000));
+      Assert.That(BinaryPrimitives.ReadInt32LittleEndian(page.AsSpan(66)), Is.EqualTo(1000));
+      Assert.That(page.AsSpan(70, 4).SequenceEqual("loda"u8), Is.True);
+      Assert.That(BinaryPrimitives.ReadInt16LittleEndian(page.AsSpan(92)), Is.EqualTo(-2000));
+      Assert.That(BinaryPrimitives.ReadInt16LittleEndian(page.AsSpan(94)), Is.EqualTo(-2000));
+      Assert.That(BinaryPrimitives.ReadUInt16LittleEndian(page.AsSpan(104)), Is.EqualTo(1));
+    });
+  }
+
+  [TestCase(0, 1)]
+  [TestCase(1, 0)]
+  [TestCase(CdrFile.MaxDimension + 1, 1)]
+  [TestCase(1, CdrFile.MaxDimension + 1)]
+  [Category("Unit")]
+  public void FromRawImage_UnsupportedDimensions_Throw(int width, int height) {
+    var image = new RawImage { Width = width, Height = height, Format = PixelFormat.Bgr24, PixelData = [] };
+    Assert.That(() => CdrWriter.FromRawImage(image), Throws.TypeOf<ArgumentOutOfRangeException>());
   }
 
   [Test]
@@ -142,6 +219,16 @@ public sealed class CdrReaderWriterTests {
     PixelData = [
       seed, (byte)(seed + 1), (byte)(seed + 2), (byte)(seed + 3), (byte)(seed + 4), (byte)(seed + 5),
       (byte)(seed + 6), (byte)(seed + 7), (byte)(seed + 8), (byte)(seed + 9), (byte)(seed + 10), (byte)(seed + 11),
+    ],
+  };
+
+  private static RawImage _Quadrants() => new() {
+    Width = 2,
+    Height = 2,
+    Format = PixelFormat.Bgr24,
+    PixelData = [
+      0x00, 0x00, 0xFF, 0x00, 0xFF, 0x00,
+      0xFF, 0x00, 0x00, 0x00, 0xFF, 0xFF,
     ],
   };
 
