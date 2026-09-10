@@ -37,12 +37,22 @@ public sealed class MjpegBVideoEncoderTests {
 
     var encoder = MjpegBVideoEncoder.Create(stream);
     var described = encoder.DescribeStream();
+    var entry = described.CodecPrivateData.Span;
     Assert.Multiple(() => {
       Assert.That(described.Codec, Is.EqualTo(_Mjpb));
       Assert.That(described.Handler, Is.EqualTo(_Mjpb));
       Assert.That(described.Width, Is.EqualTo(16));
       Assert.That(described.Height, Is.EqualTo(16));
       Assert.That(described.TimeBase, Is.EqualTo(new Rational(1, 25)));
+      Assert.That(entry.Length, Is.EqualTo(96));
+      Assert.That(BinaryPrimitives.ReadInt32BigEndian(entry), Is.EqualTo(96));
+      Assert.That(entry[4..8].SequenceEqual("mjpb"u8), Is.True);
+      Assert.That(BinaryPrimitives.ReadUInt16BigEndian(entry[(8 + 24)..]), Is.EqualTo(16));
+      Assert.That(BinaryPrimitives.ReadUInt16BigEndian(entry[(8 + 26)..]), Is.EqualTo(16));
+      Assert.That(BinaryPrimitives.ReadInt32BigEndian(entry[(8 + 78)..]), Is.EqualTo(10));
+      Assert.That(entry[(8 + 78 + 4)..(8 + 78 + 8)].SequenceEqual("fiel"u8), Is.True);
+      Assert.That(entry[8 + 78 + 8], Is.EqualTo(1));
+      Assert.That(entry[8 + 78 + 9], Is.Zero);
     });
 
     Assert.That(encoder.TryEncode(image, 7, out var packet), Is.True);
@@ -147,6 +157,20 @@ public sealed class MjpegBVideoEncoderTests {
     };
 
     Assert.Throws<InvalidDataException>(() => encoder.TryEncode(wrongSize, 0, out _));
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void CreateRejectsDimensionsThatDoNotFitQuickTimeDescription() {
+    var stream = new MediaStreamInfo {
+      Index = 0,
+      Kind = MediaStreamKind.Video,
+      Codec = _Mjpb,
+      Width = ushort.MaxValue + 1,
+      Height = 1,
+    };
+
+    Assert.Throws<NotSupportedException>(() => MjpegBVideoEncoder.Create(stream));
   }
 
   private static (MediaStreamInfo Stream, CodedPacket Packet) _EncodeGray8() {
