@@ -27,7 +27,12 @@ public sealed class Indeo2VideoEncoderTests {
   [Test]
   [Category("Unit")]
   public void DescribeStreamWritesTheVfwRt21Description() {
-    var requested = _Stream(8, 4) with {
+    var requested = new MediaStreamInfo {
+      Index = 0,
+      Kind = MediaStreamKind.Video,
+      Codec = CodecTag.FromCharacters("RT21"),
+      Width = 8,
+      Height = 4,
       TimeBase = new Rational(1, 25),
       FrameRate = new Rational(25, 1),
       DeclaredFrameCount = 7,
@@ -58,7 +63,15 @@ public sealed class Indeo2VideoEncoderTests {
   [Test]
   [Category("Unit")]
   public void AnotherBitDepthRefuses() {
-    var stream = _Stream(8, 4) with { BitsPerPixel = 16 };
+    var stream = new MediaStreamInfo {
+      Index = 0,
+      Kind = MediaStreamKind.Video,
+      Codec = CodecTag.FromCharacters("RT21"),
+      Width = 8,
+      Height = 4,
+      BitsPerPixel = 16,
+    };
+
     Assert.Throws<NotSupportedException>(() => Indeo2VideoEncoder.Create(stream));
   }
 
