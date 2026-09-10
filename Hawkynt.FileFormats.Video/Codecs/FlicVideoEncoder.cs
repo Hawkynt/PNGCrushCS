@@ -101,7 +101,7 @@ public sealed class FlicVideoEncoder : IVideoCodecEncoder<FlicVideoEncoder> {
     var pictureChunk = this._PictureChunk(pixels);
     var data = _Join(paletteChunk, pictureChunk);
 
-    palette.CopyTo(this._previousPalette);
+    palette.AsSpan().CopyTo(this._previousPalette);
     this._previousPixels = pixels.ToArray();
 
     packet = new(
@@ -135,7 +135,8 @@ public sealed class FlicVideoEncoder : IVideoCodecEncoder<FlicVideoEncoder> {
 
   /// <summary>Returns a complete 256-entry RGB palette, padding undeclared entries with black.</summary>
   private byte[] _Palette(RawImage frame) {
-    if (frame.Palette == null || frame.PaletteCount <= 0)
+    var sourcePalette = frame.Palette;
+    if (sourcePalette == null || frame.PaletteCount <= 0)
       throw new InvalidDataException(
         "A palettised picture without a palette cannot be coded: FLIC frames hold palette indices and palette "
         + "updates, and there are no colours to state.");
@@ -144,12 +145,12 @@ public sealed class FlicVideoEncoder : IVideoCodecEncoder<FlicVideoEncoder> {
         $"The picture states {frame.PaletteCount} palette entries, but an eight-bit FLIC palette holds at most 256.");
 
     var needed = frame.PaletteCount * 3;
-    if (frame.Palette.Length < needed)
+    if (sourcePalette.Length < needed)
       throw new InvalidDataException(
-        $"The picture states a palette of {frame.PaletteCount} entries but carries {frame.Palette.Length / 3}.");
+        $"The picture states a palette of {frame.PaletteCount} entries but carries {sourcePalette.Length / 3}.");
 
     var result = new byte[_PALETTE_BYTES];
-    frame.Palette.AsSpan(0, needed).CopyTo(result);
+    sourcePalette.AsSpan(0, needed).CopyTo(result);
     return result;
   }
 
