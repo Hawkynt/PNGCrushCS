@@ -20,10 +20,10 @@ namespace FileFormat.Codecs;
 /// makes packet loss or seeking unable to poison a later picture. No undocumented rate-control or
 /// inter-frame heuristic is invented merely to save bytes in a codec from the early 1990s.
 /// <para/>
-/// <b>Input.</b> <see cref="PixelFormat.Yuv444P8"/> is subsampled by averaging each 4x4 chrominance
-/// block with round-to-nearest integer arithmetic. <see cref="PixelFormat.Rgb24"/> first passes through
-/// the package's ITU-R BT.601 studio-swing converter and is then subsampled the same way. Other formats
-/// are refused rather than silently dropping alpha or narrowing deeper samples.
+/// <b>Input.</b> Eight-bit planar YUV keeps its luminance samples and has chrominance averaged onto the
+/// codec's 4:1:0 grid. Other picture layouts pass through the package's shared ITU-R BT.601
+/// studio-swing conversion before the same averaging, so this codec does not grow a second YUV path
+/// with subtly different rounding from the rest of the video package.
 /// <para/>
 /// The 48-byte packet header is only partly understood publicly: the reference decoder hard-codes its
 /// length and reads the intra flag at byte 18 plus the two table selectors at byte 0x22. The writer
@@ -35,7 +35,7 @@ namespace FileFormat.Codecs;
 public sealed class Indeo2VideoEncoder : IVideoCodecEncoder<Indeo2VideoEncoder> {
 
   private static readonly CodecTag _TAG = CodecTag.FromCharacters("RT21");
-  private const int _CHROMA_SUBSAMPLING = 4;
+  private const int _CHROMA_DIVISOR = 4;
   private const int _WIDTH_MULTIPLE = 8;
   private const int _AVI_BIT_DEPTH = 24;
 
@@ -43,10 +43,14 @@ public sealed class Indeo2VideoEncoder : IVideoCodecEncoder<Indeo2VideoEncoder> 
   private readonly Indeo2FrameEncoder _frameEncoder;
   private readonly int _width;
   private readonly int _height;
+  private readonly int _lumaSamples;
+  private readonly int _chromaSamples;
 
   private Indeo2VideoEncoder(MediaStreamInfo stream) {
     this._width = stream.Width;
     this._height = stream.Height;
+    this._lumaSamples = checked(stream.Width * stream.Height);
+    this._chromaSamples = checked((stream.Width / _CHROMA_DIVISOR) * (stream.Height / _CHROMA_DIVISOR));
     this._frameEncoder = new(stream.Width, stream.Height);
 
     var header = new BitmapInfoHeader(
@@ -94,10 +98,10 @@ public sealed class Indeo2VideoEncoder : IVideoCodecEncoder<Indeo2VideoEncoder> 
     if (stream.Width <= 0 || stream.Height <= 0)
       throw new NotSupportedException(
         $"An Indeo 2 encoder needs a positive picture size up front; {stream.Width}x{stream.Height} was supplied.");
-    if (stream.Width % _WIDTH_MULTIPLE != 0 || stream.Height % _CHROMA_SUBSAMPLING != 0)
+    if (stream.Width % _WIDTH_MULTIPLE != 0 || stream.Height % _CHROMA_DIVISOR != 0)
       throw new NotSupportedException(
         $"Indeo 2 codes sample pairs into chrominance planes a quarter of the picture size, so the width "
-        + $"must divide by {_WIDTH_MULTIPLE} and the height by {_CHROMA_SUBSAMPLING}; "
+        + $"must divide by {_WIDTH_MULTIPLE} and the height by {_CHROMA_DIVISOR}; "
         + $"{stream.Width}x{stream.Height} does not.");
     if ((long)stream.Width * stream.Height * 3 > int.MaxValue)
       throw new NotSupportedException(
@@ -115,13 +119,11 @@ public sealed class Indeo2VideoEncoder : IVideoCodecEncoder<Indeo2VideoEncoder> 
     if (frame.Width != this._width || frame.Height != this._height)
       throw new InvalidDataException(
         $"Indeo 2 geometry is fixed at {this._width}x{this._height}; received {frame.Width}x{frame.Height}.");
-    if (!frame.HasEnoughPixelData)
-      throw new InvalidDataException("The source RawImage does not contain enough pixel data for its declared format and dimensions.");
 
-    var yuv = _ToYuv444(frame);
-    var luma = yuv.GetPlaneData(0);
-    var cb = _DownsampleChroma(yuv.GetPlaneData(1), this._width, this._height);
-    var cr = _DownsampleChroma(yuv.GetPlaneData(2), this._width, this._height);
+    var planes = RawYuvPlanes.Subsampled(frame, this._width / _CHROMA_DIVISOR, this._height / _CHROMA_DIVISOR);
+    var luma = planes.AsSpan(0, this._lumaSamples);
+    var cb = planes.AsSpan(this._lumaSamples, this._chromaSamples);
+    var cr = planes.AsSpan(this._lumaSamples + this._chromaSamples, this._chromaSamples);
     var data = this._frameEncoder.EncodeIntra(luma, cb, cr);
 
     packet = new(
@@ -135,35 +137,4 @@ public sealed class Indeo2VideoEncoder : IVideoCodecEncoder<Indeo2VideoEncoder> 
   }
 
   public MediaStreamInfo DescribeStream() => this._stream;
-
-  private static RawImage _ToYuv444(RawImage frame) => frame.Format switch {
-    PixelFormat.Yuv444P8 => frame,
-    PixelFormat.Rgb24 => FastRawImageConverter.Convert(frame, PixelFormat.Yuv444P8, RawImageColorInfo.Bt601Limited),
-    _ => throw new NotSupportedException(
-      $"Indeo 2 takes {PixelFormat.Yuv444P8} for explicit 4x4 chroma subsampling or {PixelFormat.Rgb24} through "
-      + $"the decoder's BT.601 studio-swing display convention; {frame.Format} is refused rather than reduced silently."),
-  };
-
-  private static byte[] _DownsampleChroma(ReadOnlySpan<byte> source, int width, int height) {
-    var chromaWidth = width >> 2;
-    var chromaHeight = height >> 2;
-    var result = new byte[chromaWidth * chromaHeight];
-
-    for (var y = 0; y < chromaHeight; ++y) {
-      var sourceY = y << 2;
-      var destinationRow = y * chromaWidth;
-      for (var x = 0; x < chromaWidth; ++x) {
-        var sourceX = x << 2;
-        var sum = 0;
-        for (var dy = 0; dy < _CHROMA_SUBSAMPLING; ++dy) {
-          var at = (sourceY + dy) * width + sourceX;
-          sum += source[at] + source[at + 1] + source[at + 2] + source[at + 3];
-        }
-
-        result[destinationRow + x] = (byte)((sum + 8) >> 4);
-      }
-    }
-
-    return result;
-  }
 }
