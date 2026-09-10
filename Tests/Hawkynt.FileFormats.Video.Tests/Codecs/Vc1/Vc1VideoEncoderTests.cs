@@ -107,10 +107,14 @@ public sealed class Vc1VideoEncoderTests {
 
     var decoder = Vc1VideoDecoder.Create(encoder.DescribeStream());
     Assert.That(decoder.TryDecode(coded, out var first), Is.True);
+    var expected = (byte[])first.PixelData.Clone();
+
+    // Returned images belong to the caller. Mutating one must not alter the decoder's retained picture.
+    Array.Fill(first.PixelData, (byte)0);
     Assert.That(decoder.TryDecode(new(0, new byte[1]), out var repeated), Is.True);
 
     Assert.Multiple(() => {
-      Assert.That(repeated.PixelData, Is.EqualTo(first.PixelData));
+      Assert.That(repeated.PixelData, Is.EqualTo(expected));
       Assert.That(repeated.PixelData, Is.Not.SameAs(first.PixelData));
     });
   }
