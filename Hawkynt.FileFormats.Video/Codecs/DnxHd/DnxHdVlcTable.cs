@@ -4,20 +4,17 @@ using System.IO;
 namespace FileFormat.Codecs.DnxHd;
 
 /// <summary>
-/// One of Annex E's variable-length code tables, prepared for decoding.
+/// One of Annex E's canonical variable-length code tables, prepared for decoding and encoding.
 /// </summary>
 /// <remarks>
 /// Every code in SMPTE ST 2019-1:2016, Annex E is canonical: sorted by length and then by value, the
 /// codewords are consecutive within each length and shift left by one at each step to the next.
 /// That means a table is fully described by its codeword lengths in that order — which is how
-/// <see cref="DnxHdVlcTables"/> stores them — and decoding is a running comparison rather than a
-/// walk down a tree or a lookup into a table of 65536 entries.
+/// <see cref="DnxHdVlcTables"/> stores them — and the same assignment can serve both directions.
 /// <para/>
-/// Decoding reads one bit at a time into an accumulator. At each length, the codewords of that
-/// length occupy a contiguous run of values starting at <c>_firstCode</c>; if the accumulator has
-/// reached that run, the symbol is at the matching offset and the codeword is complete. Since the
-/// code is complete — Kraft's sum over all eighteen tables is exactly one — a valid bitstream always
-/// terminates, and one that does not is refused rather than read past the end.
+/// Decoding reads one bit at a time into an accumulator. Encoding keeps the inverse mapping from a
+/// symbol to the canonical codeword built from those same lengths, so the two paths cannot quietly
+/// disagree about the spelling of an Annex E code.
 /// </remarks>
 internal sealed class DnxHdVlcTable {
 
@@ -30,14 +27,17 @@ internal sealed class DnxHdVlcTable {
   /// <summary>What each codeword stands for, in the canonical order of the codewords.</summary>
   private readonly int[] _symbols;
 
+  /// <summary>The canonical codeword and its bit length, indexed by symbol for the encoder.</summary>
+  private readonly int[] _codeBySymbol;
+  private readonly byte[] _lengthBySymbol;
+
   /// <summary>
   /// Builds a table from Annex E's codeword lengths and the meanings that go with them.
   /// </summary>
   /// <remarks>
-  /// The two arrays are parallel and in canonical order, so entry <c>i</c> of one belongs with entry
-  /// <c>i</c> of the other. The lengths are checked to describe a complete code — Kraft's inequality
-  /// met with equality — which catches a mistranscribed table immediately instead of letting it
-  /// decode most of a picture and then diverge.
+  /// The two input arrays are parallel. The lengths are checked to describe a complete code —
+  /// Kraft's inequality met with equality — which catches a mistranscribed table immediately instead
+  /// of letting it decode most of a picture and then diverge.
   /// </remarks>
   internal DnxHdVlcTable(ReadOnlySpan<byte> lengths, ReadOnlySpan<int> symbols) {
     if (lengths.Length != symbols.Length)
@@ -45,12 +45,21 @@ internal sealed class DnxHdVlcTable {
 
     var shortest = int.MaxValue;
     var longest = 0;
+    var largestSymbol = 0;
     foreach (var length in lengths) {
       if (length < shortest)
         shortest = length;
 
       if (length > longest)
         longest = length;
+    }
+
+    foreach (var symbol in symbols) {
+      if (symbol < 0)
+        throw new InvalidDataException("A VC-3 code table contains a negative symbol.");
+
+      if (symbol > largestSymbol)
+        largestSymbol = symbol;
     }
 
     this._shortest = shortest;
@@ -85,6 +94,19 @@ internal sealed class DnxHdVlcTable {
 
     for (var i = 0; i < lengths.Length; ++i)
       this._symbols[at[lengths[i]]++] = symbols[i];
+
+    this._codeBySymbol = new int[largestSymbol + 1];
+    this._lengthBySymbol = new byte[largestSymbol + 1];
+
+    for (var length = shortest; length <= longest; ++length)
+      for (var offset = 0; offset < this._count[length]; ++offset) {
+        var symbol = this._symbols[this._firstIndex[length] + offset];
+        if (this._lengthBySymbol[symbol] != 0)
+          throw new InvalidDataException($"A VC-3 code table gives symbol {symbol} more than one codeword.");
+
+        this._codeBySymbol[symbol] = this._firstCode[length] + offset;
+        this._lengthBySymbol[symbol] = (byte)length;
+      }
   }
 
   /// <summary>Reads one codeword and returns what it stands for.</summary>
@@ -107,6 +129,16 @@ internal sealed class DnxHdVlcTable {
       if (offset >= 0 && offset < this._count[length])
         return this._symbols[this._firstIndex[length] + offset];
     }
+  }
+
+  /// <summary>Writes the canonical codeword belonging to one Annex E symbol.</summary>
+  internal void Write(DnxHdBitWriter bits, int symbol) {
+    ArgumentNullException.ThrowIfNull(bits);
+
+    if ((uint)symbol >= (uint)this._lengthBySymbol.Length || this._lengthBySymbol[symbol] == 0)
+      throw new InvalidDataException($"VC-3 code table has no codeword for symbol {symbol}.");
+
+    bits.Bits(this._codeBySymbol[symbol], this._lengthBySymbol[symbol]);
   }
 
   /// <summary>Builds a table from the parallel arrays of <see cref="DnxHdVlcTables"/>.</summary>
