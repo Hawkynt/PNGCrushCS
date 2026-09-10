@@ -67,7 +67,7 @@ quietly come to mean "some of it". How each codec was measured is in
 | [id RoQ](https://en.wikipedia.org/wiki/RoQ) | `Roq` | `.roq` | ✅ | ✅ | ffmpeg | [MultimediaWiki RoQ](https://wiki.multimedia.cx/index.php/RoQ) |
 | [Interplay MVE](https://wiki.multimedia.cx/index.php/Interplay_MVE) | `Mve` | `.mve` | ✅ | ✅ | none | [MultimediaWiki MVE](https://wiki.multimedia.cx/index.php/Interplay_MVE) |
 | [id Cinematic](https://wiki.multimedia.cx/index.php/Id_Cinematic) | `Idcin` | `.cin` | ✅ | ✅ | none | [MultimediaWiki CIN](https://wiki.multimedia.cx/index.php/Id_Cinematic) |
-| [Westwood VQA](https://wiki.multimedia.cx/index.php/Westwood_VQA) | `Vqa` | `.vqa` | ✅ | ✅ | none | [MultimediaWiki VQA](https://wiki.multimedia.cx/index.php/VQA) |
+| [Westwood VQA](https://wiki.multimedia.cx/index.php/Westwood_VQA) | `Vqa` | `.vqa` | ✅ | ✅ | none | [MultimediaWiki VQA](https://wiki.multimedia.cx/index.php/Westwood_VQA) |
 | [Smacker](https://en.wikipedia.org/wiki/Smacker_video) | `Smacker` | `.smk` | ✅ | ✅ | none | [RAD Game Tools](https://www.radgametools.com/smkmain.htm) |
 | [Electronic Arts Multimedia](https://wiki.multimedia.cx/index.php/Electronic_Arts_Formats) | `Ea` | `.wve`, `.cmv`, `.tgv`, `.uv`, `.uv2` | ✅ | ✅ | none | [MultimediaWiki EA formats](https://wiki.multimedia.cx/index.php/Electronic_Arts_Formats) |
 | [BFI](https://wiki.multimedia.cx/index.php/Brute_Force_%26_Ignorance) | `Bfi` | `.bfi` | ✅ | ✅ | none | [MultimediaWiki BFI](https://wiki.multimedia.cx/index.php/Brute_Force_%26_Ignorance) |
