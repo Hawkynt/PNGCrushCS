@@ -30,51 +30,60 @@ public static class BpgReader {
     if (data.Length < BpgFile.MinHeaderSize)
       throw new InvalidDataException("Data too small for a valid BPG file.");
 
-    if (data[0] != BpgFile.Magic[0] || data[1] != BpgFile.Magic[1] || data[2] != BpgFile.Magic[2] || data[3] != BpgFile.Magic[3])
+    if (!data[..4].SequenceEqual(BpgFile.Magic))
       throw new InvalidDataException("Invalid BPG magic bytes (expected 42 50 47 FB).");
 
     // Byte 4: pixel_format(3) | alpha1_flag(1) | bit_depth_minus_8(4)
     var byte4 = data[4];
-    var pixelFormat = (BpgPixelFormat)((byte4 >> 5) & 0x07);
-    var alpha1Flag = ((byte4 >> 4) & 0x01) != 0;
-    var bitDepthMinus8 = byte4 & 0x0F;
+    var pixelFormatValue = (byte4 >> 5) & 0x07;
+    if (pixelFormatValue > (int)BpgPixelFormat.YCbCr422Mpeg2)
+      throw new InvalidDataException($"BPG pixel_format {pixelFormatValue} is reserved.");
+
+    var pixelFormat = (BpgPixelFormat)pixelFormatValue;
+    var alpha1Flag = (byte4 & 0x10) != 0;
+    var bitDepthMinus8 = byte4 & 0x0f;
+    if (bitDepthMinus8 > 6)
+      throw new InvalidDataException(
+        $"BPG bit_depth_minus_8 is {bitDepthMinus8}; version 0.9.5 permits only component depths from 8 through 14 bits.");
+
     var bitDepth = bitDepthMinus8 + 8;
 
     // Byte 5: color_space(4) | extension_present(1) | alpha2_flag(1) | limited_range(1) | animation_flag(1)
     var byte5 = data[5];
-    var colorSpace = (BpgColorSpace)((byte5 >> 4) & 0x0F);
-    var extensionPresent = ((byte5 >> 3) & 0x01) != 0;
-    var alpha2Flag = ((byte5 >> 2) & 0x01) != 0;
-    var limitedRange = ((byte5 >> 1) & 0x01) != 0;
+    var colorSpaceValue = (byte5 >> 4) & 0x0f;
+    if (colorSpaceValue > (int)BpgColorSpace.YCbCrBT2020Ncl)
+      throw new InvalidDataException($"BPG color_space {colorSpaceValue} is reserved by version 0.9.5.");
+
+    var colorSpace = (BpgColorSpace)colorSpaceValue;
+    if (pixelFormat == BpgPixelFormat.Grayscale && colorSpace != BpgColorSpace.YCbCrBT601)
+      throw new InvalidDataException("BPG grayscale pictures require color_space 0.");
+
+    var extensionPresent = (byte5 & 0x08) != 0;
+    var alpha2Flag = (byte5 & 0x04) != 0;
+    var limitedRange = (byte5 & 0x02) != 0;
     var animationFlag = (byte5 & 0x01) != 0;
 
     var offset = 6;
-
-    var width = BpgUe7.Read(data, ref offset);
-    var height = BpgUe7.Read(data, ref offset);
-    var pictureDataLength = BpgUe7.Read(data, ref offset);
+    var width = _ReadPositiveSize(data, ref offset, "picture_width");
+    var height = _ReadPositiveSize(data, ref offset, "picture_height");
+    var pictureDataLength = BpgUe7.ReadUInt32(data, ref offset);
 
     var extensionData = Array.Empty<byte>();
     if (extensionPresent) {
-      var extensionDataLength = BpgUe7.Read(data, ref offset);
-      extensionData = new byte[extensionDataLength];
-      var available = Math.Min(extensionDataLength, data.Length - offset);
-      if (available > 0)
-        data.Slice(offset, available).CopyTo(extensionData.AsSpan(0));
-
-      offset += extensionDataLength;
+      var extensionDataLength = BpgUe7.ReadUInt32(data, ref offset);
+      extensionData = _TakeDeclaredBytes(data, ref offset, extensionDataLength, "extension_data_length");
     }
 
-    // A stated length of zero is not an empty picture: the specification gives that value the
-    // meaning "the picture data runs to the end of the file", which is how an encoder that does not
-    // know the length in advance writes one.
-    if (pictureDataLength == 0)
-      pictureDataLength = data.Length - offset;
+    // A stated length of zero means that the picture data runs to EOF.
+    var remaining = data.Length - offset;
+    var actualPictureLength = pictureDataLength == 0 ? (uint)remaining : pictureDataLength;
+    if (actualPictureLength > (uint)remaining)
+      throw new InvalidDataException(
+        $"BPG picture_data_length declares {actualPictureLength} byte(s), but only {remaining} remain in the file.");
+    if (actualPictureLength > int.MaxValue)
+      throw new InvalidDataException("The BPG picture payload is too large for this implementation to materialize.");
 
-    var pixelDataLength = Math.Min(pictureDataLength, data.Length - offset);
-    var pixelData = new byte[pixelDataLength > 0 ? pixelDataLength : 0];
-    if (pixelDataLength > 0)
-      data.Slice(offset, pixelDataLength).CopyTo(pixelData.AsSpan(0));
+    var pixelData = data.Slice(offset, (int)actualPictureLength).ToArray();
 
     return new() {
       Width = width,
@@ -95,5 +104,27 @@ public static class BpgReader {
   public static BpgFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     return FromSpan(data);
+  }
+
+  private static int _ReadPositiveSize(ReadOnlySpan<byte> data, ref int offset, string fieldName) {
+    var value = BpgUe7.ReadUInt32(data, ref offset);
+    if (value == 0)
+      throw new InvalidDataException($"BPG {fieldName} must not be zero.");
+    if (value > int.MaxValue)
+      throw new InvalidDataException($"BPG {fieldName} {value} exceeds this implementation's image-size model.");
+    return (int)value;
+  }
+
+  private static byte[] _TakeDeclaredBytes(ReadOnlySpan<byte> data, ref int offset, uint length, string fieldName) {
+    var remaining = data.Length - offset;
+    if (length > (uint)remaining)
+      throw new InvalidDataException(
+        $"BPG {fieldName} declares {length} byte(s), but only {remaining} remain in the file.");
+    if (length > int.MaxValue)
+      throw new InvalidDataException($"BPG {fieldName} is too large for this implementation to materialize.");
+
+    var result = data.Slice(offset, (int)length).ToArray();
+    offset += (int)length;
+    return result;
   }
 }
