@@ -33,7 +33,7 @@ public sealed class PeResourceFile :
   static string IImageFormatMetadata<PeResourceFile>.PrimaryExtension => ".exe";
   static string[] IImageFormatMetadata<PeResourceFile>.FileExtensions => [".exe", ".dll", ".ocx", ".scr", ".cpl"];
   static FormatCapability IImageFormatMetadata<PeResourceFile>.Capabilities => FormatCapability.MultiImage;
-  static PeResourceFile IImageFormatReader<PeResourceFile>.FromSpan(ReadOnlySpan<byte> data) => PeResourceReader.FromSpan(data);
+  static PeResourceFile IImageFormatReader<PeResourceFile>.FromSpan(ReadOnlySpan<byte> data) => ReadEditable(data);
   static PeResourceFile IImageFromRawImage<PeResourceFile>.FromRawImage(RawImage image, string extension) => FromRawImage(image, extension);
   static byte[] IImageFormatWriter<PeResourceFile>.ToBytes(PeResourceFile file)
     => file.SourceData is { } source ? source[..] : PeResourceWriter.ToBytes(file);
@@ -69,6 +69,12 @@ public sealed class PeResourceFile :
   internal byte[]? SourceData { get; init; }
 
   public static PeResourceFile FromRawImage(RawImage image) => FromRawImage(image, ".exe");
+
+  /// <summary>Reads a PE while retaining the complete source image for later in-place resource replacement.</summary>
+  public static PeResourceFile ReadEditable(ReadOnlySpan<byte> data) {
+    var source = data.ToArray();
+    return _AttachSource(PeResourceReader.FromBytes(source), source);
+  }
 
   /// <summary>Creates a PE resource image for one of the supported executable or library extensions.</summary>
   public static PeResourceFile FromRawImage(RawImage image, string extension) {
@@ -167,7 +173,8 @@ public sealed class PeResourceFile :
     if (SourceData is not { } source)
       throw new InvalidOperationException("Raw PE resources can only be replaced on a file parsed from an existing executable or library.");
 
-    return PeResourceReader.FromBytes(PeResourceEditor.ReplaceResource(source, typeId, resourceId, languageId, data));
+    var updated = PeResourceEditor.ReplaceResource(source, typeId, resourceId, languageId, data);
+    return ReadEditable(updated);
   }
 
   private PeResourceFile _ReplaceImage(
@@ -180,39 +187,39 @@ public sealed class PeResourceFile :
     if (SourceData is not { } source)
       throw new InvalidOperationException("Images can only be replaced in-place on a PE file parsed from an existing executable or library.");
 
-    return resource.ResourceType switch {
+    byte[] updated = resource.ResourceType switch {
       PeImageResourceType.Bitmap when groupImageIndex is null
-        => PeResourceReader.FromBytes(PeResourceEditor.ReplaceResource(
+        => PeResourceEditor.ReplaceResource(
           source,
           2,
           resource.ResourceId,
           languageId,
           BmpWriter.ToBytes(BmpFile.FromRawImage(image)).AsSpan(14)
-        )),
+        ),
 
       PeImageResourceType.Icon
-        => PeResourceReader.FromBytes(PeResourceEditor.ReplaceGroupImage(
-          source, false, resource.ResourceId, languageId, groupImageIndex, image
-        )),
+        => PeResourceEditor.ReplaceGroupImage(source, false, resource.ResourceId, languageId, groupImageIndex, image),
 
       PeImageResourceType.Cursor
-        => PeResourceReader.FromBytes(PeResourceEditor.ReplaceGroupImage(
-          source, true, resource.ResourceId, languageId, groupImageIndex, image
-        )),
+        => PeResourceEditor.ReplaceGroupImage(source, true, resource.ResourceId, languageId, groupImageIndex, image),
 
       PeImageResourceType.EmbeddedImage when groupImageIndex is null
-        => _ReplaceEmbedded(resource, image, languageId),
+        => _ReplaceEmbeddedBytes(resource, image, languageId),
 
       PeImageResourceType.Bitmap or PeImageResourceType.EmbeddedImage
         => throw new ArgumentException("A group-image index is only valid for icon and cursor groups.", nameof(groupImageIndex)),
 
       _ => throw new NotSupportedException($"Unknown PE image resource type {resource.ResourceType}."),
     };
+
+    return ReadEditable(updated);
   }
 
-  private PeResourceFile _ReplaceEmbedded(PeImageResource resource, RawImage image, int? languageId) {
+  private byte[] _ReplaceEmbeddedBytes(PeImageResource resource, RawImage image, int? languageId) {
     if (resource.ResourceTypeId <= 0)
-      throw new InvalidOperationException("The embedded image does not retain the PE resource type needed for in-place replacement.");
+      throw new InvalidOperationException(
+        "The embedded image does not expose its owning PE resource type; use ReplaceResource(typeId, resourceId, ...) with encoded bytes instead."
+      );
 
     byte[] encoded = resource.FormatHint switch {
       "bmp" => BmpWriter.ToBytes(BmpFile.FromRawImage(image)),
@@ -224,7 +231,7 @@ public sealed class PeResourceFile :
       ),
     };
 
-    return _ReplaceResource(resource.ResourceTypeId, resource.ResourceId, languageId, encoded);
+    return PeResourceEditor.ReplaceResource(SourceData!, resource.ResourceTypeId, resource.ResourceId, languageId, encoded);
   }
 
   private PeImageResource _ImageAt(int index) {
@@ -241,6 +248,32 @@ public sealed class PeResourceFile :
       _ => throw new InvalidOperationException(
         $"PE image resource {type}/{resourceId} is ambiguous; select it by ImageResources index instead."
       ),
+    };
+  }
+
+  private static PeResourceFile _AttachSource(PeResourceFile parsed, byte[] source) {
+    var images = new PeImageResource[parsed.ImageResources.Count];
+    for (var i = 0; i < images.Length; ++i) {
+      var image = parsed.ImageResources[i];
+      images[i] = new PeImageResource {
+        ResourceType = image.ResourceType,
+        ResourceTypeId = image.ResourceTypeId != 0 ? image.ResourceTypeId : image.ResourceType switch {
+          PeImageResourceType.Bitmap => 2,
+          PeImageResourceType.Cursor => 12,
+          PeImageResourceType.Icon => 14,
+          _ => 0,
+        },
+        ResourceId = image.ResourceId,
+        Data = image.Data,
+        FormatHint = image.FormatHint,
+      };
+    }
+
+    return new PeResourceFile {
+      IconGroups = parsed.IconGroups,
+      ImageResources = images,
+      ModuleKind = parsed.ModuleKind,
+      SourceData = source,
     };
   }
 
