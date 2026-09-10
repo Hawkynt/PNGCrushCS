@@ -2,6 +2,9 @@ name: MSZH documentation preparation
 
 on: [push]
 
+permissions:
+  contents: write
+
 jobs:
   prepare:
     runs-on: ubuntu-latest
@@ -44,9 +47,12 @@ jobs:
               raise SystemExit(f"decoder wording anchor occurs {decoder.count(old)} times")
           decoder_path.write_text(decoder.replace(old, new), encoding="utf-8")
 
-      - uses: actions/upload-artifact@v4
-        with:
-          name: mszh-docs
-          path: |
-            Hawkynt.FileFormats.Video/README.md
-            Hawkynt.FileFormats.Video/Codecs/MszhVideoDecoder.cs
+      - name: Commit documentation and remove helper
+        shell: bash
+        run: |
+          rm .github/workflows/mszh-prep.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Document LCL MSZH read/write support"
+          git push origin HEAD:codec/lcl-mszh-read-write
