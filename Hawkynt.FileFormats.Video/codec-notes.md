@@ -1079,6 +1079,38 @@ tables. A first run that leaves its macroblock position out is refused for the s
 measured stream does it, so the shape of such a header is unverified, and reading it wrongly would
 produce noise shaped like a picture instead of an error. A PB-frame is refused where it is signalled.
 
+**Encoding writes intra and predicted pictures.** The shape is the one MPEG-1 and H.261 use here —
+groups of twelve, prediction taken from a decoder this encoder drives with its own output rather than
+from the source, a whole-pixel search whose incumbent is the zero vector so a background macroblock
+can reach the state that lets it go untransmitted — but two things in the macroblock layer are H.263's
+alone and are where a writer built from the MPEG one would go wrong.
+
+The first is the vector predictor. Clause 6.1.1 predicts from the **median of three neighbours** —
+left, above, above-right, with substitutions at the edges applied in the Recommendation's own order —
+and not from the previous macroblock's vector. The predictor a decoder forms therefore depends on
+macroblocks a whole row apart, so an encoder keeping a running vector of its own would agree with the
+decoder about the first macroblock of a picture and about nothing after it. The rule is read here in
+the same order it is read there, which is what makes the first macroblock predict from zero instead of
+from whatever the arrays happen to hold.
+
+The second is CBPY, which **states the complement of an inter macroblock's luminance pattern** and the
+plain value of an intra one's. Writing it uncomplemented names exactly the blocks that were coded as
+pure prediction: a picture, and the wrong one. Alongside it, COD (5.3.1) is the bit that makes a
+predicted picture cheap at all — set, and the macroblock is not transmitted, is the co-located
+macroblock of the reference, and counts as a zero vector for every later predictor.
+
+Vectors are whole-pixel in luminance and so land between chrominance samples half the time, where the
+prediction is formed by the decoder's own interpolation rather than rounded to the nearer sample; the
+search is kept inside the -16 to 15.5 whole pixels the baseline allows, because each Table 14 code
+stands for two differences sixty-four half-pixels apart and a vector beyond the range comes back as
+the other member of the pair.
+
+Verification runs outward: a twenty-four frame clip crossing a group boundary is written out and
+decoded by **ffmpeg**, every frame compared rather than only the first — the registry's own oracle asks
+for frame one, which in a group is the intra picture, so a vector coded against the wrong predictor, a
+CBPY written uncomplemented or a misplaced COD bit would pass it and fail in a real player on frame
+two. A still scene is also required to converge, which is what actually demonstrates COD firing.
+
 ### H.264 / AVC
 
 I and P slices of the Baseline and Constrained Baseline profiles, and every Main or High profile
