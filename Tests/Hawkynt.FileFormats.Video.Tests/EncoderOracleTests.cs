@@ -9,6 +9,7 @@ using FileFormat.FlicVideo;
 using FileFormat.Flv;
 using FileFormat.Matroska;
 using FileFormat.Mjpeg;
+using FileFormat.RealMedia;
 using FileFormat.Mp4;
 using FileFormat.RoqVideo;
 using FileFormat.Yuv4Mpeg;
@@ -250,6 +251,10 @@ public sealed class EncoderOracleTests {
     ("Avi", ".avi", static (streams, packets) => VideoIO.Mux<AviWriter>(streams, packets)),
     ("Mp4", ".mp4", static (streams, packets) => VideoIO.Mux<Mp4Writer>(streams, packets)),
     ("Matroska", ".mkv", static (streams, packets) => VideoIO.Mux<MatroskaWriter>(streams, packets)),
+    // RealVideo carries its bitstream version in the container, and only this one carries it in
+    // the shape a RealVideo decoder expects; without it the codec has no container to be asked
+    // about in.
+    ("RealMedia", ".rm", static (streams, packets) => VideoIO.Mux<RealMediaWriter>(streams, packets)),
     ("Flv", ".flv", static (streams, packets) => VideoIO.Mux<FlvWriter>(streams, packets)),
     ("Fli", ".flc", static (streams, packets) => VideoIO.Mux<FliWriter>(streams, packets)),
     ("Roq", ".roq", static (streams, packets) => VideoIO.Mux<RoqWriter>(streams, packets)),
