@@ -64,14 +64,30 @@ public readonly record struct Vp8LFile :
   public static Vp8LFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
 
-    // The WebP lossless path is exactly a VP8L encoder followed by a RIFF wrapper. Reuse the former
-    // instead of maintaining a second ARGB packing path for the same bitstream.
+    // Keep the shared WebP encoder as the one VP8L implementation, but derive the standalone
+    // alpha_is_used hint from pixel content. WebP conservatively treats every RGBA source as
+    // alpha-bearing; VP8L specifies that the hint should be clear when every alpha sample is 255.
+    image = image.EnsureAnyFormat(PixelFormat.Rgba32, PixelFormat.Rgb24);
+    var alphaHint = image.Format == PixelFormat.Rgba32 && _HasTransparency(image);
     var webp = WebPFile.FromRawImage(image);
+    var bitstream = webp.ImageData[..];
+    if (!alphaHint)
+      bitstream[4] &= 0xEF; // Bit 28 of the little-endian VP8L header.
+
     return new() {
       Width = webp.Features.Width,
       Height = webp.Features.Height,
-      AlphaHint = webp.Features.HasAlpha,
-      Bitstream = webp.ImageData[..],
+      AlphaHint = alphaHint,
+      Bitstream = bitstream,
     };
+  }
+
+  private static bool _HasTransparency(RawImage image) {
+    var pixelCount = checked(image.Width * image.Height);
+    for (var i = 0; i < pixelCount; ++i)
+      if (image.PixelData[i * 4 + 3] != 0xFF)
+        return true;
+
+    return false;
   }
 }

@@ -95,6 +95,38 @@ public sealed class Vp8LFileTests {
 
   [Test]
   [Category("Unit")]
+  public void OpaqueRgba_EncoderClearsAlphaHint() {
+    var source = new RawImage {
+      Width = 2,
+      Height = 2,
+      Format = PixelFormat.Rgba32,
+      PixelData = [
+        10, 20, 30, 255,
+        40, 50, 60, 255,
+        70, 80, 90, 255,
+        100, 110, 120, 255,
+      ],
+    };
+
+    var encoded = FormatIO.Encode<Vp8LFile>(source);
+    var parsed = FormatIO.Read<Vp8LFile>(encoded);
+    var decoded = Vp8LFile.ToRawImage(parsed);
+
+    Assert.Multiple(() => {
+      Assert.That(encoded[4] & 0x10, Is.Zero, "alpha_is_used should be clear for an opaque picture");
+      Assert.That(parsed.AlphaHint, Is.False);
+      Assert.That(decoded.Format, Is.EqualTo(PixelFormat.Rgb24));
+      Assert.That(decoded.PixelData, Is.EqualTo(new byte[] {
+        10, 20, 30,
+        40, 50, 60,
+        70, 80, 90,
+        100, 110, 120,
+      }));
+    });
+  }
+
+  [Test]
+  [Category("Unit")]
   public void Reader_RejectsNonZeroVersion() {
     var source = new RawImage {
       Width = 1,
