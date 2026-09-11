@@ -85,6 +85,18 @@ public sealed class H263VideoDecoder : IVideoCodecDecoder<H263VideoDecoder> {
 
   private readonly bool _isSorenson;
   private H263Frame? _reference;
+
+  /// <summary>
+  /// The picture a predicted one would be built on, in the decoder's own planes.
+  /// </summary>
+  /// <remarks>
+  /// This exists for the encoder beside this one, which drives a decoder with its own output so that
+  /// it predicts from the samples a receiving decoder will hold rather than from the frame it was
+  /// handed. Handing back the planes rather than an image is the point: a round trip through RGB
+  /// would quantise the reference a second time, and the residual would then be measured against
+  /// something no decoder ever holds.
+  /// </remarks>
+  internal H263Frame? CurrentReference => this._reference;
   private H263PictureHeader? _geometry;
 
   private H263VideoDecoder(bool isSorenson) => this._isSorenson = isSorenson;
