@@ -72,29 +72,64 @@ public sealed class Mpeg4VideoEncoderTests {
 
   [Test]
   [Category("Unit")]
-  public void EveryPacketIsARandomAccessPointWithItsOwnVolAndVop() {
+  public void PacketsAreReorderedIntoIPBBGroups() {
     var encoder = Mpeg4VideoEncoder.Create(_Stream(32, 32));
+    var packets = new List<CodedPacket>();
 
-    for (var index = 0; index < 3; ++index) {
-      Assert.That(encoder.TryEncode(_Picture(32, 32, index), index, out var packet), Is.True);
+    for (var index = 0; index < 7; ++index)
+      if (encoder.TryEncode(_Picture(32, 32, index), index, out var packet))
+        packets.Add(packet);
 
-      Assert.Multiple(() => {
-        Assert.That(packet.IsKeyFrame, Is.True);
-        Assert.That(packet.DecodeTimestamp, Is.EqualTo(index));
-        Assert.That(packet.PresentationTimestamp, Is.EqualTo(index));
-        Assert.That(_ContainsStartCode(packet.Data.Span, Mpeg4StartCode.FirstVideoObjectLayer), Is.True, "VOL");
-        Assert.That(_ContainsStartCode(packet.Data.Span, Mpeg4StartCode.VideoObjectPlane), Is.True, "VOP");
-      });
-    }
+    packets.AddRange(encoder.Flush());
+
+    Assert.That(packets, Has.Count.EqualTo(7));
+    Assert.Multiple(() => {
+      Assert.That(packets.Select(_VopType).ToArray(), Is.EqualTo(new[] {
+        Mpeg4VideoObjectPlane.IntraCoded,
+        Mpeg4VideoObjectPlane.PredictiveCoded,
+        Mpeg4VideoObjectPlane.BidirectionallyCoded,
+        Mpeg4VideoObjectPlane.BidirectionallyCoded,
+        Mpeg4VideoObjectPlane.PredictiveCoded,
+        Mpeg4VideoObjectPlane.BidirectionallyCoded,
+        Mpeg4VideoObjectPlane.BidirectionallyCoded,
+      }));
+      Assert.That(packets.Select(packet => packet.PresentationTimestamp).ToArray(),
+        Is.EqualTo(new long?[] { 0, 3, 1, 2, 6, 4, 5 }));
+      Assert.That(packets.Select(packet => packet.DecodeTimestamp).ToArray(),
+        Is.EqualTo(new long?[] { 0, 1, 2, 3, 4, 5, 6 }));
+      Assert.That(packets.Select(packet => packet.IsKeyFrame).ToArray(),
+        Is.EqualTo(new[] { true, false, false, false, false, false, false }));
+      Assert.That(packets.All(packet => _ContainsStartCode(packet.Data.Span, Mpeg4StartCode.FirstVideoObjectLayer)), Is.True);
+      Assert.That(packets.All(packet => _ContainsStartCode(packet.Data.Span, Mpeg4StartCode.VideoObjectPlane)), Is.True);
+    });
   }
 
   [Test]
   [Category("Unit")]
-  public void WhatTheEncoderWritesIsWhatTheDecoderReadsInOrder() {
+  public void TheTwelfthDisplayFrameStartsANewIntraGroup() {
+    var encoder = Mpeg4VideoEncoder.Create(_Stream(32, 32));
+    var packets = new List<CodedPacket>();
+
+    for (var index = 0; index <= 12; ++index)
+      if (encoder.TryEncode(_Picture(32, 32, index), index, out var packet))
+        packets.Add(packet);
+
+    packets.AddRange(encoder.Flush());
+
+    var secondIntra = packets.Single(packet => packet.PresentationTimestamp == 12);
+    Assert.Multiple(() => {
+      Assert.That(_VopType(secondIntra), Is.EqualTo(Mpeg4VideoObjectPlane.IntraCoded));
+      Assert.That(secondIntra.IsKeyFrame, Is.True);
+    });
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void WhatTheEncoderWritesIsWhatTheDecoderReadsInDisplayOrder() {
     const int width = 64;
     const int height = 48;
-    const int frames = 5;
-    const double worstMeanSquaredError = 100d;
+    const int frames = 8;
+    const double worstMeanSquaredError = 140d;
 
     var encoder = Mpeg4VideoEncoder.Create(_Stream(width, height));
     var packets = new List<CodedPacket>();
@@ -103,9 +138,12 @@ public sealed class Mpeg4VideoEncoderTests {
     for (var index = 0; index < frames; ++index) {
       var source = _Picture(width, height, index);
       sources.Add(source);
-      Assert.That(encoder.TryEncode(source, index, out var packet), Is.True);
-      packets.Add(packet);
+      if (encoder.TryEncode(source, index, out var packet))
+        packets.Add(packet);
     }
+    packets.AddRange(encoder.Flush());
+
+    Assert.That(packets, Has.Count.EqualTo(frames));
 
     var decoder = Mpeg4VideoDecoder.Create(encoder.DescribeStream());
     var decoded = new List<RawImage>();
@@ -126,6 +164,24 @@ public sealed class Mpeg4VideoEncoderTests {
       Assert.That(error, Is.LessThan(worstMeanSquaredError),
         $"frame {index} came back {error:F1} squared levels from what went in");
     }
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void AShortTailIsFlushedAsPredictedPicturesRatherThanDropped() {
+    var encoder = Mpeg4VideoEncoder.Create(_Stream(32, 32));
+
+    Assert.That(encoder.TryEncode(_Picture(32, 32, 0), 0, out _), Is.True);
+    Assert.That(encoder.TryEncode(_Picture(32, 32, 1), 1, out _), Is.False);
+    Assert.That(encoder.TryEncode(_Picture(32, 32, 2), 2, out _), Is.False);
+
+    var tail = encoder.Flush().ToArray();
+    Assert.Multiple(() => {
+      Assert.That(tail, Has.Length.EqualTo(2));
+      Assert.That(tail.Select(_VopType).ToArray(),
+        Is.EqualTo(new[] { Mpeg4VideoObjectPlane.PredictiveCoded, Mpeg4VideoObjectPlane.PredictiveCoded }));
+      Assert.That(tail.Select(packet => packet.PresentationTimestamp).ToArray(), Is.EqualTo(new long?[] { 1, 2 }));
+    });
   }
 
   [Test]
@@ -154,11 +210,6 @@ public sealed class Mpeg4VideoEncoderTests {
       Assert.That(VideoFormatRegistry.CreateEncoder(stream), Is.InstanceOf<Mpeg4VideoEncoder>());
     });
   }
-
-  [Test]
-  [Category("Unit")]
-  public void NothingIsHeldBackByTheEncoder()
-    => Assert.That(Mpeg4VideoEncoder.Create(_Stream(64, 48)).Flush(), Is.Empty);
 
   private static MediaStreamInfo _Stream(int width, int height) => new() {
     Index = 0,
@@ -190,6 +241,16 @@ public sealed class Mpeg4VideoEncoderTests {
       }
 
     return new() { Width = width, Height = height, Format = PixelFormat.Rgb24, PixelData = pixels };
+  }
+
+  private static int _VopType(CodedPacket packet) {
+    var bytes = packet.Data.Span;
+    for (var i = 0; i + 4 < bytes.Length; ++i)
+      if (bytes[i] == 0 && bytes[i + 1] == 0 && bytes[i + 2] == 1 && bytes[i + 3] == Mpeg4StartCode.VideoObjectPlane)
+        return bytes[i + 4] >> 6;
+
+    Assert.Fail("packet has no MPEG-4 VOP start code");
+    return -1;
   }
 
   private static bool _ContainsStartCode(ReadOnlySpan<byte> bytes, byte code) {
