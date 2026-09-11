@@ -8,23 +8,24 @@ using FileFormat.Core;
 namespace FileFormat.Codecs;
 
 /// <summary>
-/// Encodes MPEG-4 Part 2 rectangular video as independently decodable intra video object planes.
+/// Encodes MPEG-4 Part 2 rectangular Advanced Simple video with I-, P- and B-VOPs.
 /// </summary>
 /// <remarks>
-/// ISO/IEC 14496-2 specifies the decoder and the syntax rather than an encoder strategy, so this writer
-/// deliberately chooses the smallest useful strategy: every picture is an I-VOP, every macroblock is
-/// intra coded, AC prediction is disabled, the H.263 quantisation method is used and every coefficient
-/// that needs an escape uses the standard's third escape form. There is no motion search, no picture
-/// reordering and no rate-control state for a caller to configure or accidentally make non-deterministic.
+/// The encoder writes a twelve-picture GOP with two bidirectionally coded pictures between anchors:
+/// <c>I B B P B B P B B P B B I</c>. P-VOPs use zero-vector temporal prediction plus a coded
+/// residual; B-VOP macroblocks choose independently between the preceding anchor, the following
+/// anchor and their interpolated average. The latter is selected by source-sample squared error before
+/// quantisation. Motion search is deliberately not mixed into this first predictive implementation:
+/// it is an encoder optimisation, while I/P/B syntax, reference reconstruction and decode-order
+/// packetisation are format correctness.
 /// <para/>
-/// <b>Why a video object layer is in every packet.</b> AVI and VFW-style Matroska descriptions name
-/// MPEG-4 Part 2 but do not necessarily carry its VOL beside the stream header. Repeating this small
-/// header makes every packet a legal random-access point and lets the same packets cross those
-/// containers without depending on out-of-band configuration.
+/// Every anchor is reconstructed locally from the quantised coefficients before it becomes a
+/// reference. Predicting from the unquantised source instead would make this encoder and every
+/// conforming decoder disagree from the first P-VOP onward and turn quantisation error into drift.
 /// <para/>
-/// <b>Lossy.</b> The source is converted to the codec's 8-bit 4:2:0 sample grid and every block passes
-/// through an 8x8 transform and a fixed quantiser. The encoder chooses the nearest reconstruction level
-/// the decoder's H.263 inverse quantiser can produce rather than merely truncating a coefficient.
+/// B-VOPs require packet reordering. <see cref="TryEncode"/> therefore may accept a source picture and
+/// return no packet yet, or return a packet belonging to an earlier source picture. Presentation
+/// timestamps stay with their pictures; decode timestamps consume the input timeline in coding order.
 /// <para/>
 /// The syntax is taken from ISO/IEC 14496-2 clauses 6 and 7 and Annex B. FFmpeg is used only as a
 /// conformance oracle for the produced bytes; no FFmpeg implementation code is copied here.
@@ -37,8 +38,14 @@ public sealed class Mpeg4VideoEncoder : IVideoCodecEncoder<Mpeg4VideoEncoder> {
   /// <summary>The thirteen-bit dimensions of a rectangular video object layer.</summary>
   private const int _MAX_DIMENSION = (1 << 13) - 1;
 
-  /// <summary>The five-bit quantiser written in every I-VOP.</summary>
+  /// <summary>The five-bit quantiser written in every VOP.</summary>
   private const int _QUANTISER = 8;
+
+  /// <summary>Distance between intra anchors in display order.</summary>
+  private const int _KEY_FRAME_INTERVAL = 12;
+
+  /// <summary>Bidirectionally coded pictures between consecutive anchors.</summary>
+  private const int _B_FRAMES = 2;
 
   private readonly MediaStreamInfo _requested;
   private readonly int _width;
@@ -47,10 +54,14 @@ public sealed class Mpeg4VideoEncoder : IVideoCodecEncoder<Mpeg4VideoEncoder> {
   private readonly int _macroblockHeight;
   private readonly int _timeIncrementResolution;
   private readonly int _timeIncrementStep;
+  private readonly List<PendingFrame> _pending = [];
+  private readonly Queue<CodedPacket> _ready = new();
+  private readonly Queue<long?> _decodeTimestamps = new();
 
   private MediaStreamInfo? _stream;
-  private long _frameIndex;
-  private long _previousSeconds;
+  private Mpeg4Frame? _anchor;
+  private long _anchorSeconds;
+  private long _displayIndex;
 
   private Mpeg4VideoEncoder(MediaStreamInfo stream, int resolution, int step) {
     this._requested = stream;
@@ -66,7 +77,7 @@ public sealed class Mpeg4VideoEncoder : IVideoCodecEncoder<Mpeg4VideoEncoder> {
 
   public static CodecTag Codec => _MP4V;
 
-  /// <summary>Builds an all-intra MPEG-4 Part 2 encoder for a fixed rectangular picture size.</summary>
+  /// <summary>Builds a predictive MPEG-4 Part 2 encoder for a fixed rectangular picture size.</summary>
   public static Mpeg4VideoEncoder Create(MediaStreamInfo stream) {
     ArgumentNullException.ThrowIfNull(stream);
 
@@ -86,7 +97,9 @@ public sealed class Mpeg4VideoEncoder : IVideoCodecEncoder<Mpeg4VideoEncoder> {
     return new(stream, resolution, step);
   }
 
-  /// <summary>Encodes one independently decodable I-VOP.</summary>
+  /// <summary>
+  /// Accepts one display-order picture and returns the next coding-order packet when one is available.
+  /// </summary>
   public bool TryEncode(RawImage frame, long? presentationTimestamp, out CodedPacket packet) {
     ArgumentNullException.ThrowIfNull(frame);
 
@@ -98,39 +111,83 @@ public sealed class Mpeg4VideoEncoder : IVideoCodecEncoder<Mpeg4VideoEncoder> {
       throw new InvalidDataException(
         "The source RawImage does not contain enough pixel data for its declared format and dimensions.");
 
-    var source = new Mpeg4Frame(this._macroblockWidth, this._macroblockHeight);
-    Mpeg4ColorConversion.FromRgb24(frame.ToRgb24(), source, this._width, this._height);
+    var index = this._displayIndex++;
+    var pending = new PendingFrame(this._ToPlanes(frame), index, presentationTimestamp);
+    this._decodeTimestamps.Enqueue(presentationTimestamp);
 
-    var absoluteTicks = checked(this._frameIndex * this._timeIncrementStep);
-    var seconds = absoluteTicks / this._timeIncrementResolution;
-    var increment = (int)(absoluteTicks % this._timeIncrementResolution);
-    var moduloSeconds = checked((int)(seconds - this._previousSeconds));
+    if (this._anchor == null) {
+      var (seconds, increment) = this._PictureTime(index);
+      var encoder = new Mpeg4PictureEncoder(
+        pending.Source,
+        forwardReference: null,
+        backwardReference: null,
+        Mpeg4VideoObjectPlane.IntraCoded,
+        this._width,
+        this._height,
+        this._macroblockWidth,
+        this._macroblockHeight,
+        _QUANTISER,
+        this._timeIncrementResolution,
+        increment,
+        moduloSeconds: checked((int)seconds),
+        roundingType: 0);
 
-    var bytes = new Mpeg4PictureEncoder(
-      source,
-      this._width,
-      this._height,
-      this._macroblockWidth,
-      this._macroblockHeight,
-      _QUANTISER,
-      this._timeIncrementResolution,
-      increment,
-      moduloSeconds).Encode();
+      var bytes = encoder.Encode();
+      this._anchor = encoder.Reconstructed;
+      this._anchorSeconds = seconds;
+      this._ready.Enqueue(this._Packet(bytes, pending.PresentationTimestamp, isKeyFrame: true));
+    } else {
+      this._pending.Add(pending);
+      if (this._pending.Count == _B_FRAMES + 1)
+        this._EncodeGroup();
+    }
 
-    ++this._frameIndex;
-    this._previousSeconds = seconds;
+    if (this._ready.TryDequeue(out packet))
+      return true;
 
-    packet = new(
-      this._requested.Index,
-      bytes,
-      PresentationTimestamp: presentationTimestamp,
-      DecodeTimestamp: presentationTimestamp,
-      IsKeyFrame: true);
-    return true;
+    packet = default;
+    return false;
   }
 
-  /// <summary>Nothing is delayed because every input picture produces one packet immediately.</summary>
-  public IEnumerable<CodedPacket> Flush() => [];
+  /// <summary>
+  /// Emits packets already delayed by B-VOP reordering, then turns a short tail with no following
+  /// anchor into ordinary P-VOPs so no input picture is discarded at end of stream.
+  /// </summary>
+  public IEnumerable<CodedPacket> Flush() {
+    while (this._ready.TryDequeue(out var ready))
+      yield return ready;
+
+    foreach (var pending in this._pending) {
+      var keyFrame = pending.DisplayIndex % _KEY_FRAME_INTERVAL == 0;
+      var codingType = keyFrame ? Mpeg4VideoObjectPlane.IntraCoded : Mpeg4VideoObjectPlane.PredictiveCoded;
+      var oldSeconds = this._anchorSeconds;
+      var (seconds, increment) = this._PictureTime(pending.DisplayIndex);
+      var encoder = new Mpeg4PictureEncoder(
+        pending.Source,
+        codingType == Mpeg4VideoObjectPlane.IntraCoded ? null : this._anchor,
+        backwardReference: null,
+        codingType,
+        this._width,
+        this._height,
+        this._macroblockWidth,
+        this._macroblockHeight,
+        _QUANTISER,
+        this._timeIncrementResolution,
+        increment,
+        moduloSeconds: checked((int)(seconds - oldSeconds)),
+        roundingType: (int)(pending.DisplayIndex & 1));
+
+      var bytes = encoder.Encode();
+      this._anchor = encoder.Reconstructed;
+      this._anchorSeconds = seconds;
+      yield return this._Packet(bytes, pending.PresentationTimestamp, keyFrame);
+    }
+
+    this._pending.Clear();
+
+    while (this._ready.TryDequeue(out var ready))
+      yield return ready;
+  }
 
   /// <summary>
   /// Describes the stream as the VFW-style <c>mp4v</c> form used by AVI and accepted by Matroska.
@@ -138,7 +195,7 @@ public sealed class Mpeg4VideoEncoder : IVideoCodecEncoder<Mpeg4VideoEncoder> {
   /// <remarks>
   /// The VOL itself is repeated in every packet, so the private bytes need only be the container's
   /// conventional BITMAPINFOHEADER. This also keeps codec configuration out of the container writer:
-  /// a decoder starting with the first packet learns the same geometry and coding tools from the
+  /// a decoder starting with an intra packet learns the same geometry and coding tools from the
   /// bitstream itself.
   /// </remarks>
   public MediaStreamInfo DescribeStream() {
@@ -179,6 +236,82 @@ public sealed class Mpeg4VideoEncoder : IVideoCodecEncoder<Mpeg4VideoEncoder> {
     };
   }
 
+  /// <summary>Codes one anchor followed by the two B-VOPs that precede it in display order.</summary>
+  private void _EncodeGroup() {
+    var oldAnchor = this._anchor!;
+    var oldAnchorSeconds = this._anchorSeconds;
+    var next = this._pending[^1];
+    var keyFrame = next.DisplayIndex % _KEY_FRAME_INTERVAL == 0;
+    var codingType = keyFrame ? Mpeg4VideoObjectPlane.IntraCoded : Mpeg4VideoObjectPlane.PredictiveCoded;
+    var (nextSeconds, nextIncrement) = this._PictureTime(next.DisplayIndex);
+
+    var anchorEncoder = new Mpeg4PictureEncoder(
+      next.Source,
+      codingType == Mpeg4VideoObjectPlane.IntraCoded ? null : oldAnchor,
+      backwardReference: null,
+      codingType,
+      this._width,
+      this._height,
+      this._macroblockWidth,
+      this._macroblockHeight,
+      _QUANTISER,
+      this._timeIncrementResolution,
+      nextIncrement,
+      moduloSeconds: checked((int)(nextSeconds - oldAnchorSeconds)),
+      roundingType: (int)(next.DisplayIndex & 1));
+
+    var anchorBytes = anchorEncoder.Encode();
+    var newAnchor = anchorEncoder.Reconstructed;
+    this._ready.Enqueue(this._Packet(anchorBytes, next.PresentationTimestamp, keyFrame));
+
+    for (var index = 0; index < _B_FRAMES; ++index) {
+      var between = this._pending[index];
+      var (seconds, increment) = this._PictureTime(between.DisplayIndex);
+      var bEncoder = new Mpeg4PictureEncoder(
+        between.Source,
+        oldAnchor,
+        newAnchor,
+        Mpeg4VideoObjectPlane.BidirectionallyCoded,
+        this._width,
+        this._height,
+        this._macroblockWidth,
+        this._macroblockHeight,
+        _QUANTISER,
+        this._timeIncrementResolution,
+        increment,
+        moduloSeconds: checked((int)(seconds - oldAnchorSeconds)),
+        roundingType: 0);
+
+      var bytes = bEncoder.Encode();
+      this._ready.Enqueue(this._Packet(bytes, between.PresentationTimestamp, isKeyFrame: false));
+    }
+
+    this._anchor = newAnchor;
+    this._anchorSeconds = nextSeconds;
+    this._pending.Clear();
+  }
+
+  private CodedPacket _Packet(byte[] bytes, long? presentationTimestamp, bool isKeyFrame) {
+    var decodeTimestamp = this._decodeTimestamps.Count == 0 ? null : this._decodeTimestamps.Dequeue();
+    return new(
+      this._requested.Index,
+      bytes,
+      PresentationTimestamp: presentationTimestamp,
+      DecodeTimestamp: decodeTimestamp,
+      IsKeyFrame: isKeyFrame);
+  }
+
+  private Mpeg4Frame _ToPlanes(RawImage frame) {
+    var source = new Mpeg4Frame(this._macroblockWidth, this._macroblockHeight);
+    Mpeg4ColorConversion.FromRgb24(frame.ToRgb24(), source, this._width, this._height);
+    return source;
+  }
+
+  private (long Seconds, int Increment) _PictureTime(long displayIndex) {
+    var absoluteTicks = checked(displayIndex * this._timeIncrementStep);
+    return (absoluteTicks / this._timeIncrementResolution, (int)(absoluteTicks % this._timeIncrementResolution));
+  }
+
   /// <summary>
   /// Chooses an exact VOP clock for ordinary rational frame rates, and a close legal one otherwise.
   /// </summary>
@@ -213,4 +346,9 @@ public sealed class Mpeg4VideoEncoder : IVideoCodecEncoder<Mpeg4VideoEncoder> {
 
     return left == 0 ? 1 : left;
   }
+
+  private readonly record struct PendingFrame(
+    Mpeg4Frame Source,
+    long DisplayIndex,
+    long? PresentationTimestamp);
 }
