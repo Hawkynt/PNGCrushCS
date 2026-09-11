@@ -64,6 +64,13 @@ internal sealed class JxlSpecFrameHeader {
   /// <summary>Last AC pass included in each progressive preview bracket.</summary>
   public uint[] PassLastPass { get; init; } = [];
 
+  /// <summary>
+  /// Recursive low-frequency level of a hidden <see cref="JxlFrameType.DcFrame"/>.
+  /// Level one is the 1:8 DC image, level two is 1:64, and so on. Regular
+  /// frames expose zero and may consume level one through <c>kUseDcFrame</c>.
+  /// </summary>
+  public uint DcLevel { get; init; }
+
   public bool IsLast { get; init; } = true;
 
   /// <summary>Where the frame sits in the picture, and how much of it the frame
@@ -223,8 +230,9 @@ internal sealed class JxlSpecFrameHeader {
       passes = _ReadPasses(r);
 
     // 10. dc_level for DCFrame: U32(Val(1), Val(2), Val(3), Val(4)).
+    var dcLevel = 0u;
     if (frameType == JxlFrameType.DcFrame)
-      r.ReadU32(1, 0, 2, 0, 3, 0, 4, 0);
+      dcLevel = r.ReadU32(1, 0, 2, 0, 3, 0, 4, 0);
 
     // 11. custom_size_or_origin and conditional crop fields when !DCFrame.
     var customSizeOrOrigin = false;
@@ -341,6 +349,7 @@ internal sealed class JxlSpecFrameHeader {
       PassShifts = passes.Shifts,
       PassDownsample = passes.Downsample,
       PassLastPass = passes.LastPass,
+      DcLevel = dcLevel,
       IsLast = isLast,
       OriginX = originX,
       OriginY = originY,
