@@ -82,6 +82,67 @@ internal static class FFmpegOracle {
     }
   }
 
+  /// <summary>
+  /// Decodes the complete first video stream to unframed RGB and requires exactly the stated number
+  /// of pictures. Unlike <see cref="TryDecodeFirstFrame"/>, this reaches reordered B pictures and the
+  /// references behind them rather than proving only that the opening intra picture was readable.
+  /// </summary>
+  public static (bool Decoded, string Output) TryDecodeFrameCount(
+    string path, int width, int height, int expectedFrames) {
+    var raw = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName() + ".rgb");
+
+    try {
+      var startInfo = new ProcessStartInfo(ExecutablePath!) {
+        RedirectStandardOutput = true,
+        RedirectStandardError = true,
+        UseShellExecute = false,
+      };
+
+      foreach (var argument in new[] {
+        "-hide_banner", "-loglevel", "error", "-y", "-i", path,
+        "-map", "0:v:0", "-an", "-sn", "-dn", "-vsync", "0",
+        "-f", "rawvideo", "-pix_fmt", "rgb24", raw,
+      })
+        startInfo.ArgumentList.Add(argument);
+
+      using var process = Process.Start(startInfo);
+      if (process == null)
+        return (false, "ffmpeg would not start");
+
+      var stdout = process.StandardOutput.ReadToEndAsync();
+      var stderr = process.StandardError.ReadToEndAsync();
+
+      if (!process.WaitForExit(_TIMEOUT_MILLISECONDS)) {
+        try { process.Kill(entireProcessTree: true); } catch { /* already gone */ }
+        return (false, "ffmpeg timed out");
+      }
+
+      var diagnostics = string.Concat(stdout.Result, stderr.Result).Trim();
+      if (diagnostics.Length != 0)
+        return (false, diagnostics);
+
+      if (!File.Exists(raw))
+        return (false, "it produced no decoded video bytes");
+
+      var frameBytes = checked((long)width * height * 3);
+      var actualBytes = new FileInfo(raw).Length;
+      var expectedBytes = checked(frameBytes * expectedFrames);
+      if (actualBytes != expectedBytes)
+        return (false,
+          actualBytes % frameBytes == 0
+            ? $"it decoded {actualBytes / frameBytes} frames instead of {expectedFrames}"
+            : $"it produced {actualBytes} bytes, which is not a whole number of {width}x{height} RGB24 frames");
+
+      return (true, $"it decoded all {expectedFrames} {width}x{height} frames");
+    } catch (Win32Exception) {
+      return (false, "no ffmpeg on this machine");
+    } catch (Exception exception) {
+      return (false, $"{exception.GetType().Name}: {exception.Message}");
+    } finally {
+      try { File.Delete(raw); } catch { /* best effort */ }
+    }
+  }
+
   private static (int Width, int Height)? _PngSize(string path) {
     try {
       if (!File.Exists(path))
