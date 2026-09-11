@@ -226,6 +226,8 @@ internal static class JxlVarDctSpecDecoder {
     // the plane sits in the bitstream and everything after it was read a plane
     // too late.
     var extraChannels = Array.Empty<JxlChannel>();
+    var extraChannelTransforms = Array.Empty<JxlModularTransform>();
+    var firstGroupedExtraChannel = 0;
     if (numExtraChannels > 0) {
       extraChannels = new JxlChannel[numExtraChannels];
       for (var i = 0; i < numExtraChannels; ++i)
@@ -237,21 +239,35 @@ internal static class JxlVarDctSpecDecoder {
           Pixels = new int[checked(width * height)],
         };
 
-      // A plane bigger than a group is not carried here at all: the groups carry
-      // it a piece at a time, and this decoder does not follow it there. Leaving
-      // the transforms on then, and handing back nothing rather than the zeros
-      // the buffers still hold, is what stops a plane that was never read from
-      // being taken for one that was.
-      var carriedWhole = width <= groupSize && height <= groupSize;
+      // The global stream carries every extra channel that fits in one group.
+      // Larger planes stay allocated at full size but their samples follow the
+      // colour coefficients in each AC-group section. Keep the transforms on
+      // until all those windows have been filled; they describe the full image,
+      // not one group at a time.
       var stream = JxlModularSpecDecoder.DecodeStream(
         reader, extraChannels, bitDepth, modularGlobalTree, modularGlobalEntropy,
         new JxlModularStreamOptions {
           MaxChannelSize = groupSize,
           StreamId = 0,
-          UndoTransforms = carriedWhole,
+          UndoTransforms = false,
         });
 
-      extraChannels = carriedWhole ? stream.Image.Channels : [];
+      extraChannels = stream.Image.Channels;
+      extraChannelTransforms = stream.Transforms;
+
+      // Palette transforms prepend one meta-channel. libjxl's DecodeGroup starts
+      // after those and after every ordinary channel that the global stream was
+      // able to carry whole, at the first plane larger than the group dimension.
+      var metaChannels = 0;
+      foreach (var transform in extraChannelTransforms)
+        if (transform.Type == JxlModularTransformType.Palette)
+          ++metaChannels;
+
+      firstGroupedExtraChannel = metaChannels;
+      while (firstGroupedExtraChannel < extraChannels.Length
+             && extraChannels[firstGroupedExtraChannel].Width <= groupSize
+             && extraChannels[firstGroupedExtraChannel].Height <= groupSize)
+        ++firstGroupedExtraChannel;
     }
 
     // ProcessDCGroup for VarDCT (libjxl `dec_modular.cc::DecodeVarDCTDC`):
@@ -548,6 +564,61 @@ internal static class JxlVarDctSpecDecoder {
           acGroupReader, acEntropy, strategies, blockCtxMap,
           blocksX, blocksY, _NumXybChannels, groupQuant[groupIdx], groupOrigins[groupIdx], coeffOrders);
 
+        // A VarDCT AC-group section continues after its coefficients with the
+        // modular pieces of any extra channels too large for the global stream.
+        // This must use the SAME reader: starting another one at the section
+        // offset would decode the coefficients a second time and lose alignment.
+        if (firstGroupedExtraChannel < extraChannels.Length) {
+          var originX = gx * groupSize;
+          var originY = gy * groupSize;
+          var windows = new System.Collections.Generic.List<(int Channel, JxlChannel Piece, int X, int Y)>();
+          for (var c = firstGroupedExtraChannel; c < extraChannels.Length; ++c) {
+            var channel = extraChannels[c];
+            var x = originX >> channel.HShift;
+            var y = originY >> channel.VShift;
+            var pieceWidth = Math.Min(groupSize >> channel.HShift, channel.Width - x);
+            var pieceHeight = Math.Min(groupSize >> channel.VShift, channel.Height - y);
+            if (pieceWidth <= 0 || pieceHeight <= 0)
+              continue;
+
+            windows.Add((c, new JxlChannel {
+              Width = pieceWidth,
+              Height = pieceHeight,
+              HShift = channel.HShift,
+              VShift = channel.VShift,
+              Pixels = new int[checked(pieceWidth * pieceHeight)],
+            }, x, y));
+          }
+
+          if (windows.Count > 0) {
+            var pieces = new JxlChannel[windows.Count];
+            for (var i = 0; i < windows.Count; ++i)
+              pieces[i] = windows[i].Piece;
+
+            // libjxl ModularStreamId::ModularAC for pass zero:
+            // 1 + 3*num_dc_groups + kNumQuantTables(17) + group_id.
+            var extraStreamId = checked(1 + 3 * numDcGroupsForStreams + 17 + groupIdx);
+            var decodedExtra = JxlModularSpecDecoder.DecodeStream(
+              acGroupReader, pieces, bitDepth, modularGlobalTree, modularGlobalEntropy,
+              new JxlModularStreamOptions {
+                MaxChannelSize = int.MaxValue,
+                StreamId = extraStreamId,
+                UndoTransforms = true,
+              });
+
+            for (var i = 0; i < windows.Count; ++i) {
+              var (channelIndex, _, x, y) = windows[i];
+              var piece = decodedExtra.Image.Channels[i];
+              var target = extraChannels[channelIndex];
+              for (var row = 0; row < piece.Height; ++row)
+                Array.Copy(
+                  piece.Pixels, row * piece.Width,
+                  target.Pixels, checked((y + row) * target.Width + x),
+                  piece.Width);
+            }
+          }
+        }
+
         // Inject DC values into AC blocks at scan position 0. The AC decoder
         // skips position 0 (DC) per spec; combining LF DC with AC produces
         // the full quantized coefficient block fed into dequant + IDCT.
@@ -665,6 +736,11 @@ internal static class JxlVarDctSpecDecoder {
     } catch (System.ArgumentException) {
       // Degenerate dimensions (e.g. 0×N); skip.
     }
+
+    // Global modular transforms describe the complete extra-channel image and
+    // can only be inverted after every group-carried window has been stitched in.
+    if (extraChannels.Length > 0)
+      extraChannels = JxlModularTransforms.InvertAll(extraChannels, extraChannelTransforms);
 
     return new JxlVarDctImage {
       Width = width,
