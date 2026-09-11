@@ -8,11 +8,12 @@ using FileFormat.Core;
 
 namespace FileFormat.Heif;
 
-/// <summary>Reads HEIF/HEIC files, resolving image items rather than treating the whole mdat as one image.</summary>
+/// <summary>Reads HEIF/HEIC files, resolving coded and derived image items through the item graph.</summary>
 public static class HeifReader {
 
   private const int _MIN_FILE_SIZE = 12;
   private const int _CLAP_PAYLOAD_SIZE = 32;
+  private const int _MAX_DERIVATION_DEPTH = 32;
 
   /// <summary>Four bytes of colour_type plus three 16-bit code points and the range flag's byte.</summary>
   private const int _NCLX_PAYLOAD_SIZE = 11;
@@ -30,6 +31,10 @@ public static class HeifReader {
   /// <summary>The item types whose picture is an H.264 access unit.</summary>
   private static readonly HashSet<string> _AVC_ITEM_TYPES = new(StringComparer.Ordinal) {
     "avc1", "avc2", "avc3", "avc4",
+  };
+
+  private static readonly HashSet<string> _DERIVED_ITEM_TYPES = new(StringComparer.Ordinal) {
+    "grid", "iden",
   };
 
   public static HeifFile FromFile(FileInfo file) {
@@ -69,7 +74,7 @@ public static class HeifReader {
       var primaryType = container.ItemInfos.TryGetValue(container.PrimaryItemId, out var type) ? type : "unknown";
       throw new NotSupportedException(
         $"HEIF: the primary item {container.PrimaryItemId} has type '{primaryType}', "
-        + "but this reader currently decodes directly coded HEVC image items.");
+        + "but this reader currently decodes directly coded HEVC/AVC items and grid/identity derived images.");
     }
 
     var images = new HeifImage[visible.Count];
@@ -87,7 +92,7 @@ public static class HeifReader {
     };
   }
 
-  /// <summary>Reads the primary image's extent without decoding its HEVC payload.</summary>
+  /// <summary>Reads the primary image's transformed extent without decoding its coded picture payload.</summary>
   public static ImageInfo? ReadImageInfo(ReadOnlySpan<byte> data) {
     try {
       var bytes = data.ToArray();
@@ -117,26 +122,16 @@ public static class HeifReader {
       if (itemId == 0)
         return null;
 
-      var descriptor = _DescribeItem(container, itemId);
-      var width = descriptor.CodedWidth;
-      var height = descriptor.CodedHeight;
-      if (width <= 0 || height <= 0)
+      var geometry = _ReadItemGeometry(container, bytes, itemId, [], 0);
+      if (geometry.Width <= 0 || geometry.Height <= 0)
         return null;
 
-      if (descriptor.Aperture != null
-          && _TryResolveCleanAperture(
-            descriptor.Aperture.Value, width, height,
-            out _, out _, out var cleanWidth, out var cleanHeight)) {
-        width = cleanWidth;
-        height = cleanHeight;
-      }
-
       return new(
-        width,
-        height,
+        geometry.Width,
+        geometry.Height,
         24,
         "Rgb24",
-        descriptor.HevcConfiguration != null ? "HEVC" : "None",
+        _CompressionForItem(container, itemId, [], 0),
         Math.Max(1, visible.Count));
     } catch {
       return null;
@@ -193,8 +188,39 @@ public static class HeifReader {
     };
   }
 
-  private static HeifImage _DecodeItem(HeifContainer container, byte[] bytes, uint itemId) {
-    var descriptor = _DescribeItem(container, itemId);
+  private static HeifImage _DecodeItem(HeifContainer container, byte[] bytes, uint itemId)
+    => _DecodeItem(container, bytes, itemId, [], 0);
+
+  private static HeifImage _DecodeItem(
+    HeifContainer container,
+    byte[] bytes,
+    uint itemId,
+    HashSet<uint> activeItems,
+    int depth
+  ) {
+    if (depth >= _MAX_DERIVATION_DEPTH)
+      throw new InvalidDataException($"HEIF: image-item derivation exceeds {_MAX_DERIVATION_DEPTH} levels.");
+    if (!activeItems.Add(itemId))
+      throw new InvalidDataException($"HEIF: image-item derivation contains a cycle at item {itemId}.");
+
+    try {
+      var descriptor = _DescribeItem(container, itemId);
+      return descriptor.ItemType switch {
+        "grid" => _DecodeGridItem(container, bytes, itemId, descriptor, activeItems, depth),
+        "iden" => _DecodeIdentityItem(container, bytes, itemId, descriptor, activeItems, depth),
+        _ => _DecodeCodedItem(container, bytes, itemId, descriptor),
+      };
+    } finally {
+      activeItems.Remove(itemId);
+    }
+  }
+
+  private static HeifImage _DecodeCodedItem(
+    HeifContainer container,
+    byte[] bytes,
+    uint itemId,
+    ItemDescriptor descriptor
+  ) {
     if (descriptor.HevcConfiguration == null && descriptor.AvcConfiguration == null)
       throw new NotSupportedException(
         $"HEIF: image item {itemId} ('{descriptor.ItemType}') has neither an hvcC nor an avcC property. "
@@ -205,41 +231,38 @@ public static class HeifReader {
 
     var sample = _ReadItemData(container, bytes, location);
     RawImage decoded;
+    var codec = descriptor.HevcConfiguration != null ? "HEVC" : "AVC";
     try {
-      // The property is what says which codec the item is coded in; the item
-      // type agrees with it, and an item carrying both is coded in neither.
+      // The property says which codec the item is coded in; the item type agrees with it.
       decoded = descriptor.HevcConfiguration != null
         ? HeifHevcDecoder.Decode(sample, descriptor.HevcConfiguration, descriptor.Colour)
         : HeifAvcDecoder.Decode(sample, descriptor.AvcConfiguration!);
     } catch (NotSupportedException e) {
-      throw new NotSupportedException($"HEIF/HEVC item {itemId}: {e.Message}", e);
+      throw new NotSupportedException($"HEIF/{codec} item {itemId}: {e.Message}", e);
     }
 
     var width = decoded.Width;
     var height = decoded.Height;
     var pixels = decoded.PixelData;
+    var apertureAlreadyApplied = false;
 
     if (descriptor.CodedWidth > 0 && descriptor.CodedHeight > 0) {
       if (width == descriptor.CodedWidth && height == descriptor.CodedHeight) {
-        if (descriptor.Aperture != null
-            && _TryResolveCleanAperture(
-              descriptor.Aperture.Value, width, height,
-              out var x, out var y, out var cleanWidth, out var cleanHeight)) {
-          pixels = _CropRgb24(pixels, width, x, y, cleanWidth, cleanHeight);
-          width = cleanWidth;
-          height = cleanHeight;
-        }
       } else if (descriptor.Aperture != null
                  && _TryResolveCleanAperture(
                    descriptor.Aperture.Value, descriptor.CodedWidth, descriptor.CodedHeight,
                    out _, out _, out var cleanWidth, out var cleanHeight)
                  && width == cleanWidth && height == cleanHeight) {
+        apertureAlreadyApplied = true;
       } else {
         throw new InvalidDataException(
           $"HEIF: item {itemId}'s ispe states {descriptor.CodedWidth}x{descriptor.CodedHeight}, "
-          + $"but its H.265 sequence parameter set decodes to {width}x{height}.");
+          + $"but its {codec} sequence decodes to {width}x{height}.");
       }
     }
+
+    (pixels, width, height) = _ApplyItemTransforms(
+      descriptor, pixels, width, height, skipAperture: apertureAlreadyApplied);
 
     return new() {
       ItemId = itemId,
@@ -252,12 +275,270 @@ public static class HeifReader {
     };
   }
 
+  private static HeifImage _DecodeIdentityItem(
+    HeifContainer container,
+    byte[] bytes,
+    uint itemId,
+    ItemDescriptor descriptor,
+    HashSet<uint> activeItems,
+    int depth
+  ) {
+    var inputs = _GetReferences(container, itemId, "dimg");
+    if (inputs.Count != 1)
+      throw new InvalidDataException(
+        $"HEIF: identity-derived item {itemId} requires exactly one dimg input but has {inputs.Count}.");
+
+    var input = _DecodeItem(container, bytes, inputs[0], activeItems, depth + 1);
+    var pixels = input.PixelData[..];
+    var width = input.Width;
+    var height = input.Height;
+
+    _ValidateDerivedExtent(itemId, descriptor, width, height);
+    (pixels, width, height) = _ApplyItemTransforms(descriptor, pixels, width, height);
+
+    return new() {
+      ItemId = itemId,
+      ItemType = descriptor.ItemType,
+      IsPrimary = itemId == container.PrimaryItemId,
+      Width = width,
+      Height = height,
+      PixelData = pixels,
+      RawImageData = _ReadItemPayloadOrEmpty(container, bytes, itemId),
+    };
+  }
+
+  private static HeifImage _DecodeGridItem(
+    HeifContainer container,
+    byte[] bytes,
+    uint itemId,
+    ItemDescriptor descriptor,
+    HashSet<uint> activeItems,
+    int depth
+  ) {
+    if (!container.Locations.TryGetValue(itemId, out var location))
+      throw new InvalidDataException($"HEIF: grid item {itemId} has no iloc entry for its descriptor.");
+
+    var raw = _ReadItemData(container, bytes, location);
+    var grid = _ReadGridDescriptor(raw, itemId);
+    var inputs = _GetReferences(container, itemId, "dimg");
+    var expectedInputCount = checked(grid.Rows * grid.Columns);
+    if (inputs.Count != expectedInputCount)
+      throw new InvalidDataException(
+        $"HEIF: grid item {itemId} is {grid.Columns}x{grid.Rows} but has {inputs.Count} dimg inputs instead of {expectedInputCount}.");
+
+    if (inputs.Count == 0)
+      throw new InvalidDataException($"HEIF: grid item {itemId} contains no tile inputs.");
+
+    var tiles = new HeifImage[inputs.Count];
+    for (var i = 0; i < inputs.Count; ++i)
+      tiles[i] = _DecodeItem(container, bytes, inputs[i], activeItems, depth + 1);
+
+    var tileWidth = tiles[0].Width;
+    var tileHeight = tiles[0].Height;
+    if (tileWidth <= 0 || tileHeight <= 0)
+      throw new InvalidDataException($"HEIF: grid item {itemId}'s first tile has an empty extent.");
+
+    for (var i = 1; i < tiles.Length; ++i)
+      if (tiles[i].Width != tileWidth || tiles[i].Height != tileHeight)
+        throw new InvalidDataException(
+          $"HEIF: grid item {itemId}'s tiles do not share one extent; tile 0 is {tileWidth}x{tileHeight}, "
+          + $"tile {i} is {tiles[i].Width}x{tiles[i].Height}.");
+
+    var tiledWidth = checked((long)tileWidth * grid.Columns);
+    var tiledHeight = checked((long)tileHeight * grid.Rows);
+    var minimumWidth = checked((long)tileWidth * (grid.Columns - 1) + 1);
+    var minimumHeight = checked((long)tileHeight * (grid.Rows - 1) + 1);
+    if (grid.OutputWidth < minimumWidth || grid.OutputWidth > tiledWidth
+        || grid.OutputHeight < minimumHeight || grid.OutputHeight > tiledHeight)
+      throw new InvalidDataException(
+        $"HEIF: grid item {itemId} states output {grid.OutputWidth}x{grid.OutputHeight}, "
+        + $"outside the extent of its {grid.Columns}x{grid.Rows} tiles of {tileWidth}x{tileHeight}.");
+
+    var width = grid.OutputWidth;
+    var height = grid.OutputHeight;
+    var pixels = new byte[checked(width * height * 3)];
+    var targetStride = checked(width * 3);
+    var sourceStride = checked(tileWidth * 3);
+
+    for (var tileIndex = 0; tileIndex < tiles.Length; ++tileIndex) {
+      var tileRow = tileIndex / grid.Columns;
+      var tileColumn = tileIndex % grid.Columns;
+      var targetX = checked(tileColumn * tileWidth);
+      var targetY = checked(tileRow * tileHeight);
+      var copyWidth = Math.Min(tileWidth, width - targetX);
+      var copyHeight = Math.Min(tileHeight, height - targetY);
+      var copyBytes = checked(copyWidth * 3);
+
+      for (var row = 0; row < copyHeight; ++row) {
+        var sourceOffset = checked(row * sourceStride);
+        var targetOffset = checked((targetY + row) * targetStride + targetX * 3);
+        tiles[tileIndex].PixelData.AsSpan(sourceOffset, copyBytes).CopyTo(pixels.AsSpan(targetOffset, copyBytes));
+      }
+    }
+
+    _ValidateDerivedExtent(itemId, descriptor, width, height);
+    (pixels, width, height) = _ApplyItemTransforms(descriptor, pixels, width, height);
+
+    return new() {
+      ItemId = itemId,
+      ItemType = descriptor.ItemType,
+      IsPrimary = itemId == container.PrimaryItemId,
+      Width = width,
+      Height = height,
+      PixelData = pixels,
+      RawImageData = raw,
+    };
+  }
+
+  private static void _ValidateDerivedExtent(uint itemId, ItemDescriptor descriptor, int width, int height) {
+    if (descriptor.CodedWidth <= 0 || descriptor.CodedHeight <= 0)
+      return;
+    if (descriptor.CodedWidth == width && descriptor.CodedHeight == height)
+      return;
+
+    throw new InvalidDataException(
+      $"HEIF: derived item {itemId}'s ispe states {descriptor.CodedWidth}x{descriptor.CodedHeight}, "
+      + $"but its derivation reconstructs {width}x{height} before transforms.");
+  }
+
+  private static byte[] _ReadItemPayloadOrEmpty(HeifContainer container, byte[] bytes, uint itemId)
+    => container.Locations.TryGetValue(itemId, out var location) ? _ReadItemData(container, bytes, location) : [];
+
+  private static GridDescriptor _ReadGridDescriptor(ReadOnlySpan<byte> data, uint itemId) {
+    if (data.Length < 8)
+      throw new InvalidDataException($"HEIF: grid item {itemId}'s descriptor is truncated.");
+    if (data[0] != 0)
+      throw new NotSupportedException($"HEIF: grid item {itemId} uses unsupported descriptor version {data[0]}.");
+    if ((data[1] & 0xFE) != 0)
+      throw new InvalidDataException($"HEIF: grid item {itemId} sets reserved descriptor flags 0x{data[1]:X2}.");
+
+    var rows = data[2] + 1;
+    var columns = data[3] + 1;
+    var largeFields = (data[1] & 1) != 0;
+    var required = largeFields ? 12 : 8;
+    if (data.Length < required)
+      throw new InvalidDataException($"HEIF: grid item {itemId}'s descriptor ends inside its output extent.");
+
+    var width = largeFields
+      ? checked((int)BinaryPrimitives.ReadUInt32BigEndian(data[4..]))
+      : BinaryPrimitives.ReadUInt16BigEndian(data[4..]);
+    var height = largeFields
+      ? checked((int)BinaryPrimitives.ReadUInt32BigEndian(data[8..]))
+      : BinaryPrimitives.ReadUInt16BigEndian(data[6..]);
+
+    if (width <= 0 || height <= 0)
+      throw new InvalidDataException($"HEIF: grid item {itemId} states an empty output extent {width}x{height}.");
+
+    return new(rows, columns, width, height);
+  }
+
+  private static (byte[] Pixels, int Width, int Height) _ApplyItemTransforms(
+    ItemDescriptor descriptor,
+    byte[] pixels,
+    int width,
+    int height,
+    bool skipAperture = false
+  ) {
+    // MIAF 7.3.6.7 fixes the application order: clean aperture, then rotation, then mirror.
+    if (!skipAperture
+        && descriptor.Aperture != null
+        && _TryResolveCleanAperture(
+          descriptor.Aperture.Value, width, height,
+          out var x, out var y, out var cleanWidth, out var cleanHeight)) {
+      pixels = _CropRgb24(pixels, width, x, y, cleanWidth, cleanHeight);
+      width = cleanWidth;
+      height = cleanHeight;
+    }
+
+    if (descriptor.Rotation is > 0) {
+      pixels = _RotateRgb24(pixels, width, height, descriptor.Rotation.Value, out var rotatedWidth, out var rotatedHeight);
+      width = rotatedWidth;
+      height = rotatedHeight;
+    }
+
+    if (descriptor.MirrorAxis != null)
+      pixels = _MirrorRgb24(pixels, width, height, descriptor.MirrorAxis.Value);
+
+    return (pixels, width, height);
+  }
+
+  private static byte[] _RotateRgb24(
+    byte[] source,
+    int width,
+    int height,
+    byte quarterTurnsCounterClockwise,
+    out int resultWidth,
+    out int resultHeight
+  ) {
+    var angle = quarterTurnsCounterClockwise & 3;
+    if (angle == 0) {
+      resultWidth = width;
+      resultHeight = height;
+      return source;
+    }
+
+    resultWidth = angle is 1 or 3 ? height : width;
+    resultHeight = angle is 1 or 3 ? width : height;
+    var result = new byte[checked(resultWidth * resultHeight * 3)];
+
+    for (var y = 0; y < height; ++y)
+      for (var x = 0; x < width; ++x) {
+        int targetX;
+        int targetY;
+        switch (angle) {
+          case 1:
+            targetX = y;
+            targetY = width - 1 - x;
+            break;
+          case 2:
+            targetX = width - 1 - x;
+            targetY = height - 1 - y;
+            break;
+          default:
+            targetX = height - 1 - y;
+            targetY = x;
+            break;
+        }
+
+        var sourceOffset = checked((y * width + x) * 3);
+        var targetOffset = checked((targetY * resultWidth + targetX) * 3);
+        source.AsSpan(sourceOffset, 3).CopyTo(result.AsSpan(targetOffset, 3));
+      }
+
+    return result;
+  }
+
+  private static byte[] _MirrorRgb24(byte[] source, int width, int height, byte axis) {
+    if (axis > 1)
+      throw new InvalidDataException($"HEIF: imir axis {axis} is outside the defined range 0..1.");
+
+    var result = new byte[source.Length];
+    var stride = checked(width * 3);
+
+    if (axis == 0) {
+      // Horizontal axis: top-to-bottom mirroring.
+      for (var y = 0; y < height; ++y)
+        source.AsSpan(y * stride, stride).CopyTo(result.AsSpan((height - 1 - y) * stride, stride));
+      return result;
+    }
+
+    // Vertical axis: left-to-right mirroring.
+    for (var y = 0; y < height; ++y)
+      for (var x = 0; x < width; ++x) {
+        var sourceOffset = checked((y * width + x) * 3);
+        var targetOffset = checked((y * width + (width - 1 - x)) * 3);
+        source.AsSpan(sourceOffset, 3).CopyTo(result.AsSpan(targetOffset, 3));
+      }
+
+    return result;
+  }
+
   private static IReadOnlyList<uint> _VisibleImageItems(HeifContainer container) {
     var result = new List<uint>();
 
     bool IsDecodable(uint id) {
       var type = container.ItemInfos.TryGetValue(id, out var itemType) ? itemType : string.Empty;
-      return _HEVC_ITEM_TYPES.Contains(type) || _AVC_ITEM_TYPES.Contains(type)
+      return _HEVC_ITEM_TYPES.Contains(type) || _AVC_ITEM_TYPES.Contains(type) || _DERIVED_ITEM_TYPES.Contains(type)
              || _HasProperty(container, id, IsoBmffBox.HvcC) || _HasProperty(container, id, IsoBmffBox.AvcC);
     }
 
@@ -265,7 +546,10 @@ public static class HeifReader {
       result.Add(container.PrimaryItemId);
 
     foreach (var id in container.ItemInfos.Keys.OrderBy(id => id)) {
-      if (id == container.PrimaryItemId || container.HiddenImageItems.Contains(id) || !IsDecodable(id))
+      if (id == container.PrimaryItemId
+          || container.HiddenImageItems.Contains(id)
+          || container.DerivedImageInputs.Contains(id)
+          || !IsDecodable(id))
         continue;
       result.Add(id);
     }
@@ -295,6 +579,8 @@ public static class HeifReader {
     byte[]? avcc = null;
     CleanAperture? aperture = null;
     RawImageColorInfo? colour = null;
+    byte? rotation = null;
+    byte? mirrorAxis = null;
 
     if (container.Associations.TryGetValue(itemId, out var associations)) {
       foreach (var association in associations) {
@@ -317,6 +603,22 @@ public static class HeifReader {
               aperture = _ReadCleanAperture(property.Data);
             break;
 
+          case IsoBmffBox.Irot:
+            if (property.Data.Length < 1)
+              throw new InvalidDataException($"HEIF: item {itemId}'s irot property is empty.");
+            if ((property.Data[0] & 0xFC) != 0)
+              throw new InvalidDataException($"HEIF: item {itemId}'s irot property sets reserved bits.");
+            rotation = (byte)(property.Data[0] & 3);
+            break;
+
+          case IsoBmffBox.Imir:
+            if (property.Data.Length < 1)
+              throw new InvalidDataException($"HEIF: item {itemId}'s imir property is empty.");
+            if ((property.Data[0] & 0xFE) != 0)
+              throw new InvalidDataException($"HEIF: item {itemId}'s imir property sets reserved bits.");
+            mirrorAxis = (byte)(property.Data[0] & 1);
+            break;
+
           case IsoBmffBox.Colr:
             colour = _ReadNclxColour(property.Data) ?? colour;
             break;
@@ -332,7 +634,110 @@ public static class HeifReader {
       }
     }
 
-    return new(itemType, width, height, aperture, colour, hvcc, avcc);
+    return new(itemType, width, height, aperture, colour, rotation, mirrorAxis, hvcc, avcc);
+  }
+
+  private static ItemGeometry _ReadItemGeometry(
+    HeifContainer container,
+    byte[] bytes,
+    uint itemId,
+    HashSet<uint> activeItems,
+    int depth
+  ) {
+    if (depth >= _MAX_DERIVATION_DEPTH)
+      throw new InvalidDataException($"HEIF: image-item derivation exceeds {_MAX_DERIVATION_DEPTH} levels.");
+    if (!activeItems.Add(itemId))
+      throw new InvalidDataException($"HEIF: image-item derivation contains a cycle at item {itemId}.");
+
+    try {
+      var descriptor = _DescribeItem(container, itemId);
+      int width;
+      int height;
+
+      switch (descriptor.ItemType) {
+        case "grid": {
+          if (!container.Locations.TryGetValue(itemId, out var location))
+            throw new InvalidDataException($"HEIF: grid item {itemId} has no iloc entry for its descriptor.");
+          var grid = _ReadGridDescriptor(_ReadItemData(container, bytes, location), itemId);
+          width = grid.OutputWidth;
+          height = grid.OutputHeight;
+          break;
+        }
+
+        case "iden": {
+          var inputs = _GetReferences(container, itemId, "dimg");
+          if (inputs.Count != 1)
+            throw new InvalidDataException(
+              $"HEIF: identity-derived item {itemId} requires exactly one dimg input but has {inputs.Count}.");
+          var input = _ReadItemGeometry(container, bytes, inputs[0], activeItems, depth + 1);
+          width = input.Width;
+          height = input.Height;
+          break;
+        }
+
+        default:
+          width = descriptor.CodedWidth;
+          height = descriptor.CodedHeight;
+          break;
+      }
+
+      if (width <= 0 || height <= 0)
+        return default;
+
+      if (descriptor.Aperture != null
+          && _TryResolveCleanAperture(
+            descriptor.Aperture.Value, width, height,
+            out _, out _, out var cleanWidth, out var cleanHeight)) {
+        width = cleanWidth;
+        height = cleanHeight;
+      }
+
+      if (descriptor.Rotation is 1 or 3)
+        (width, height) = (height, width);
+
+      return new(width, height);
+    } finally {
+      activeItems.Remove(itemId);
+    }
+  }
+
+  private static string _CompressionForItem(
+    HeifContainer container,
+    uint itemId,
+    HashSet<uint> activeItems,
+    int depth
+  ) {
+    if (depth >= _MAX_DERIVATION_DEPTH || !activeItems.Add(itemId))
+      return "Derived";
+
+    try {
+      var descriptor = _DescribeItem(container, itemId);
+      if (descriptor.HevcConfiguration != null || _HEVC_ITEM_TYPES.Contains(descriptor.ItemType))
+        return "HEVC";
+      if (descriptor.AvcConfiguration != null || _AVC_ITEM_TYPES.Contains(descriptor.ItemType))
+        return "AVC";
+
+      if (_DERIVED_ITEM_TYPES.Contains(descriptor.ItemType)) {
+        var inputs = _GetReferences(container, itemId, "dimg");
+        if (inputs.Count > 0)
+          return _CompressionForItem(container, inputs[0], activeItems, depth + 1);
+      }
+
+      return "None";
+    } finally {
+      activeItems.Remove(itemId);
+    }
+  }
+
+  private static IReadOnlyList<uint> _GetReferences(HeifContainer container, uint itemId, string type) {
+    if (!container.References.TryGetValue(itemId, out var references))
+      return [];
+
+    var result = new List<uint>();
+    foreach (var reference in references)
+      if (reference.Type == type)
+        result.AddRange(reference.ToItemIds);
+    return result;
   }
 
   /// <summary>
@@ -441,12 +846,35 @@ public static class HeifReader {
     if (ftyp.Size == 0)
       throw new InvalidDataException("Missing ftyp box; not a valid ISOBMFF file.");
 
-    if (ftyp.PayloadLength < 4)
-      throw new InvalidDataException("HEIF: ftyp is too short to hold a major brand.");
+    if (ftyp.PayloadLength < 8)
+      throw new InvalidDataException("HEIF: ftyp is too short to hold a major brand and minor version.");
 
-    var brand = Encoding.ASCII.GetString(bytes, ftyp.PayloadStart, 4);
-    if (!_HEIF_BRANDS.Contains(brand))
-      throw new InvalidDataException($"Unsupported major brand '{brand}'; expected a HEIF brand.");
+    var ftypPayload = bytes.AsSpan(ftyp.PayloadStart, ftyp.PayloadLength);
+    var brand = Encoding.ASCII.GetString(ftypPayload[..4]);
+    var hasSpecificHeifBrand = false;
+    var hasGenericHeifBrand = false;
+    var hasAvifBrand = false;
+
+    void InspectBrand(ReadOnlySpan<byte> value) {
+      var valueString = Encoding.ASCII.GetString(value);
+      if (valueString is "avif" or "avis") {
+        hasAvifBrand = true;
+        return;
+      }
+      if (valueString == "mif1") {
+        hasGenericHeifBrand = true;
+        return;
+      }
+      if (_HEIF_BRANDS.Contains(valueString))
+        hasSpecificHeifBrand = true;
+    }
+
+    InspectBrand(ftypPayload[..4]);
+    for (var at = 8; at + 4 <= ftypPayload.Length; at += 4)
+      InspectBrand(ftypPayload.Slice(at, 4));
+
+    if (!hasSpecificHeifBrand && (!hasGenericHeifBrand || hasAvifBrand))
+      throw new InvalidDataException($"Unsupported major brand '{brand}'; expected a HEIF/HEIC/AVCI brand.");
 
     var meta = top.FirstOrDefault(box => box.Type == IsoBmffBox.Meta);
     if (meta.Size == 0)
@@ -461,6 +889,8 @@ public static class HeifReader {
     var properties = new List<PropertyBox> { new(string.Empty, []) };
     var associations = new Dictionary<uint, List<PropertyAssociation>>();
     var hidden = new HashSet<uint>();
+    var derivedInputs = new HashSet<uint>();
+    var references = new Dictionary<uint, List<ItemReference>>();
 
     Box? idat = null;
 
@@ -483,7 +913,7 @@ public static class HeifReader {
           break;
 
         case "iref":
-          _ParseItemReferences(bytes, box, hidden);
+          _ParseItemReferences(bytes, box, hidden, derivedInputs, references);
           break;
 
         case "idat":
@@ -500,6 +930,8 @@ public static class HeifReader {
       properties,
       associations,
       hidden,
+      derivedInputs,
+      references,
       top,
       idat);
   }
@@ -668,24 +1100,39 @@ public static class HeifReader {
     }
   }
 
-  private static void _ParseItemReferences(byte[] bytes, Box iref, HashSet<uint> hidden) {
+  private static void _ParseItemReferences(
+    byte[] bytes,
+    Box iref,
+    HashSet<uint> hidden,
+    HashSet<uint> derivedInputs,
+    Dictionary<uint, List<ItemReference>> references
+  ) {
     var payload = bytes.AsSpan(iref.PayloadStart, iref.PayloadLength);
     if (payload.Length < 4)
       throw new InvalidDataException("HEIF: iref is truncated.");
 
     var version = payload[0];
-    foreach (var reference in _ReadBoxes(bytes, iref.PayloadStart + 4, iref.End)) {
-      if (reference.Type is not ("thmb" or "auxl"))
-        continue;
+    if (version > 1)
+      throw new NotSupportedException($"HEIF: iref version {version} is not defined by the implemented syntax.");
 
+    foreach (var reference in _ReadBoxes(bytes, iref.PayloadStart + 4, iref.End)) {
       var data = bytes.AsSpan(reference.PayloadStart, reference.PayloadLength);
       var at = 0;
       var fromId = version == 0 ? (uint)_ReadU16(data, ref at) : _ReadU32(data, ref at);
-      hidden.Add(fromId);
-
       var count = _ReadU16(data, ref at);
+      var toIds = new uint[count];
       for (var i = 0; i < count; ++i)
-        _ = version == 0 ? (uint)_ReadU16(data, ref at) : _ReadU32(data, ref at);
+        toIds[i] = version == 0 ? (uint)_ReadU16(data, ref at) : _ReadU32(data, ref at);
+
+      if (!references.TryGetValue(fromId, out var list))
+        references[fromId] = list = [];
+      list.Add(new(reference.Type, toIds));
+
+      if (reference.Type is "thmb" or "auxl")
+        hidden.Add(fromId);
+      else if (reference.Type == "dimg")
+        foreach (var toId in toIds)
+          derivedInputs.Add(toId);
     }
   }
 
@@ -864,6 +1311,7 @@ public static class HeifReader {
 
   private readonly record struct PropertyBox(string Type, byte[] Data);
   private readonly record struct PropertyAssociation(int PropertyIndex, bool Essential);
+  private readonly record struct ItemReference(string Type, uint[] ToItemIds);
   private readonly record struct ItemExtent(ulong Offset, ulong Length);
   private readonly record struct ItemLocation(
     uint ItemId,
@@ -890,10 +1338,14 @@ public static class HeifReader {
     int CodedHeight,
     CleanAperture? Aperture,
     RawImageColorInfo? Colour,
+    byte? Rotation,
+    byte? MirrorAxis,
     byte[]? HevcConfiguration,
     byte[]? AvcConfiguration
   );
 
+  private readonly record struct GridDescriptor(int Rows, int Columns, int OutputWidth, int OutputHeight);
+  private readonly record struct ItemGeometry(int Width, int Height);
   private readonly record struct LegacyDescriptor(int Width, int Height, CleanAperture? Aperture);
 
   private sealed record HeifContainer(
@@ -904,6 +1356,8 @@ public static class HeifReader {
     List<PropertyBox> Properties,
     Dictionary<uint, List<PropertyAssociation>> Associations,
     HashSet<uint> HiddenImageItems,
+    HashSet<uint> DerivedImageInputs,
+    Dictionary<uint, List<ItemReference>> References,
     List<Box> TopLevelBoxes,
     Box? IdatBox
   ) {

@@ -44,7 +44,7 @@ public static class CmxReader {
 
     EmbeddedDibFile embedded;
     try {
-      embedded = EmbeddedDibReader.FromSpan(data);
+      embedded = EmbeddedDibReader.FindInSpan(data);
     } catch (InvalidDataException exception) {
       throw new InvalidDataException("The CMX container has no decodable bitmap preview.", exception);
     }
