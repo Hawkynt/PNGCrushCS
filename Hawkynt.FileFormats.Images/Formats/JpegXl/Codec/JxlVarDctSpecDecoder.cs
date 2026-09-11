@@ -20,6 +20,10 @@ internal static class JxlVarDctSpecDecoder {
   /// they are (libjxl <c>kSkipAdaptiveDCSmoothing</c>).</summary>
   private const ulong _kSkipAdaptiveDcSmoothing = 0x80;
 
+  /// <summary>The frame flag that sources low-frequency XYB from a preceding
+  /// hidden DC frame instead of carrying VarDCT DC coefficients here.</summary>
+  private const ulong _kUseDcFrame = 0x20;
+
   /// <summary>Default VarDCT group size.</summary>
   private const int _DefaultGroupSizeLog2 = 8;
 
@@ -47,7 +51,10 @@ internal static class JxlVarDctSpecDecoder {
     int numExtraChannels = 0,
     ulong frameFlags = 0,
     int numPasses = 1,
-    uint[]? passShifts = null
+    uint[]? passShifts = null,
+    uint[]? passDownsample = null,
+    uint[]? passLastPass = null,
+    float[][]? dcFrame = null
   ) {
     ArgumentNullException.ThrowIfNull(reader);
     if (width <= 0)
@@ -70,15 +77,25 @@ internal static class JxlVarDctSpecDecoder {
     if (passShifts[^1] != 0)
       throw new InvalidDataException("The final JPEG XL AC pass must have shift zero.");
 
+    passDownsample ??= [];
+    passLastPass ??= [];
+    if (passDownsample.Length != passLastPass.Length)
+      throw new ArgumentException("Progressive downsample and last-pass arrays must have equal length.");
+
+    var useDcFrame = (frameFlags & _kUseDcFrame) != 0;
+    if (useDcFrame && dcFrame is null)
+      throw new InvalidDataException("This VarDCT frame requires a preceding progressive DC frame, but none was supplied.");
+
     var groupSize = groupSizeOverride > 0 ? groupSizeOverride : 1 << _DefaultGroupSizeLog2;
     var numGroupsW = (width + groupSize - 1) / groupSize;
     var numGroupsH = (height + groupSize - 1) / groupSize;
     var numGroups = checked(numGroupsW * numGroupsH);
 
-    // A frame in more than one section is addressed through its TOC. AC group
-    // sections are pass-major: pass 0 group 0..N-1, then pass 1, and so on.
+    // A frame in more than one section is addressed through its TOC. The TOC
+    // already exposes canonical offsets even if those sections were physically
+    // permuted, so section consumers do not need a permutation-specific path.
     var sections = toc?.SectionSizes.Length ?? 1;
-    var seeks = codestream is not null && toc is { Permuted: false } && sections > 1;
+    var seeks = codestream is not null && toc is not null && sections > 1;
 
     JxlBitReader SectionReader(int index) {
       if (!seeks || index >= sections)
@@ -102,14 +119,24 @@ internal static class JxlVarDctSpecDecoder {
 
     var dcWidth = (width + _BlockDim - 1) / _BlockDim;
     var dcHeight = (height + _BlockDim - 1) / _BlockDim;
+    var frameDcCount = checked(dcWidth * dcHeight);
+    if (useDcFrame) {
+      if (dcFrame!.Length < _NumXybChannels)
+        throw new InvalidDataException("The progressive DC frame does not contain three XYB planes.");
+      for (var c = 0; c < _NumXybChannels; ++c)
+        if (dcFrame[c].Length < frameDcCount)
+          throw new InvalidDataException(
+            $"Progressive DC channel {c} has {dcFrame[c].Length} samples; this frame needs {frameDcCount}.");
+    }
+
     var (modularGlobalTree, modularGlobalEntropy) = JxlModularSpecDecoder.DecodeGlobalInfo(
       reader, distanceMultiplierHint: (uint)Math.Max(dcWidth, _NumXybChannels));
 
-    // VarDCT extra channels use the modular side-stream. A single-pass frame can
-    // carry large planes group-by-group (PR #403). Progressive extra-channel
-    // partitioning additionally depends on the pass shift interval; until the
-    // modular decoder exposes min/max shift filtering, refuse that combination
-    // instead of consuming the wrong stream.
+    // VarDCT extra channels use the modular side-stream. Large planes are split
+    // spatially into AC groups and progressive frames further partition those
+    // channels by min(hshift,vshift). The pass bracket is frame metadata, while
+    // the actual modular stream follows that pass's AC coefficients on the same
+    // section reader.
     var extraChannels = Array.Empty<JxlChannel>();
     var extraChannelTransforms = Array.Empty<JxlModularTransform>();
     var firstGroupedExtraChannel = 0;
@@ -145,34 +172,38 @@ internal static class JxlVarDctSpecDecoder {
              && extraChannels[firstGroupedExtraChannel].Width <= groupSize
              && extraChannels[firstGroupedExtraChannel].Height <= groupSize)
         ++firstGroupedExtraChannel;
-
-      if (numPasses > 1 && firstGroupedExtraChannel < extraChannels.Length)
-        throw new NotSupportedException(
-          "Progressive VarDCT with group-carried extra channels needs pass-shift filtering in the modular side-stream decoder.");
     }
 
-    // ProcessDCGroup for VarDCT.
+    // ProcessDCGroup for VarDCT. kUseDcFrame removes the two-bit extra precision
+    // and the VarDCTDC modular stream entirely; the DC-group section then starts
+    // with the remaining modular/AC-metadata data. This is the same branch
+    // libjxl takes when PassesSharedState::dc points at a previously decoded
+    // dc_frames[] slot.
     var dcGroupReader = SectionReader(1);
-    var extraPrecision = (int)dcGroupReader.ReadBits(2);
-    var extraPrecisionMul = 1f / (1 << extraPrecision);
+    var extraPrecisionMul = 1f;
 
     const int dcGroupIndex = 0;
     var numDcGroupsForStreams = Math.Max(1, numDcGroups);
     var dcStreamId = 1 + dcGroupIndex;
     var acMetadataStreamId = 1 + 2 * numDcGroupsForStreams + dcGroupIndex;
 
-    var dcImage = JxlModularSpecDecoder.DecodeGroup(
-      dcGroupReader,
-      width: dcWidth,
-      height: dcHeight,
-      numChannels: _NumXybChannels,
-      bitDepth: bitDepth,
-      globalTree: modularGlobalTree,
-      globalEntropy: modularGlobalEntropy,
-      streamId: dcStreamId);
+    JxlModularImage? dcImage = null;
+    if (!useDcFrame) {
+      var extraPrecision = (int)dcGroupReader.ReadBits(2);
+      extraPrecisionMul = 1f / (1 << extraPrecision);
+      dcImage = JxlModularSpecDecoder.DecodeGroup(
+        dcGroupReader,
+        width: dcWidth,
+        height: dcHeight,
+        numChannels: _NumXybChannels,
+        bitDepth: bitDepth,
+        globalTree: modularGlobalTree,
+        globalEntropy: modularGlobalEntropy,
+        streamId: dcStreamId);
+    }
 
-    var dcGroupBlocksX = (width + _BlockDim - 1) / _BlockDim;
-    var dcGroupBlocksY = (height + _BlockDim - 1) / _BlockDim;
+    var dcGroupBlocksX = dcWidth;
+    var dcGroupBlocksY = dcHeight;
     var upperBound = dcGroupBlocksX * dcGroupBlocksY;
     var countBits = upperBound <= 1 ? 0 : (int)Math.Ceiling(Math.Log2(upperBound));
     var count = (int)dcGroupReader.ReadBits(countBits) + 1;
@@ -272,20 +303,26 @@ internal static class JxlVarDctSpecDecoder {
       }
     }
 
-    // The low frequencies belong to the frame, not an AC pass.
-    var frameDcCount = dcGroupBlocksX * dcGroupBlocksY;
+    // The low frequencies belong to the frame, not an AC pass. With
+    // kUseDcFrame they already are dequantized canonical XYB from the hidden DC
+    // frame. Otherwise derive them from this frame's VarDCTDC modular image.
     var frameDc = new float[_NumXybChannels * frameDcCount];
-    for (var i = 0; i < frameDcCount; ++i) {
-      var qY = dcImage.Channels[0].Pixels[i];
-      var qX = dcImage.Channels[1].Pixels[i];
-      var qB = dcImage.Channels[2].Pixels[i];
-      var yDc = qY * mulDc[1] * extraPrecisionMul;
-      frameDc[1 * frameDcCount + i] = yDc;
-      frameDc[0 * frameDcCount + i] = qX * mulDc[0] * extraPrecisionMul + yDc * dcCorrelation.YtoX;
-      frameDc[2 * frameDcCount + i] = qB * mulDc[2] * extraPrecisionMul + yDc * dcCorrelation.YtoB;
+    if (useDcFrame) {
+      for (var c = 0; c < _NumXybChannels; ++c)
+        Array.Copy(dcFrame![c], 0, frameDc, c * frameDcCount, frameDcCount);
+    } else {
+      for (var i = 0; i < frameDcCount; ++i) {
+        var qY = dcImage!.Channels[0].Pixels[i];
+        var qX = dcImage.Channels[1].Pixels[i];
+        var qB = dcImage.Channels[2].Pixels[i];
+        var yDc = qY * mulDc[1] * extraPrecisionMul;
+        frameDc[1 * frameDcCount + i] = yDc;
+        frameDc[0 * frameDcCount + i] = qX * mulDc[0] * extraPrecisionMul + yDc * dcCorrelation.YtoX;
+        frameDc[2 * frameDcCount + i] = qB * mulDc[2] * extraPrecisionMul + yDc * dcCorrelation.YtoB;
+      }
     }
 
-    if ((frameFlags & _kSkipAdaptiveDcSmoothing) == 0)
+    if (!useDcFrame && (frameFlags & _kSkipAdaptiveDcSmoothing) == 0)
       JxlAdaptiveDcSmoothing.Apply(frameDc, dcGroupBlocksX, dcGroupBlocksY, mulDc);
 
     var groups = new JxlVarDctGroup[numGroups];
@@ -294,8 +331,9 @@ internal static class JxlVarDctSpecDecoder {
         var groupIdx = gy * numGroupsW + gx;
         var (blocksX, blocksY) = _GroupBlockDims(gx, gy, width, height, groupSize);
         var strategies = groupStrategies[groupIdx];
-        var lfBlocks = _SliceLfBlocksFromDc(
-          dcImage, gx, gy, groupSize / _BlockDim, blocksX, blocksY);
+        var lfBlocks = useDcFrame
+          ? _ZeroLfBlocks(blocksX, blocksY)
+          : _SliceLfBlocksFromDc(dcImage!, gx, gy, groupSize / _BlockDim, blocksX, blocksY);
 
         JxlDctBlock[][]? acBlocks = null;
         for (var pass = 0; pass < numPasses; ++pass) {
@@ -318,21 +356,25 @@ internal static class JxlVarDctSpecDecoder {
             coefficientShift: checked((int)passShifts[pass]),
             destination: acBlocks);
 
-          // Single-pass grouped extra channels continue after that pass's AC
-          // coefficients on the same section reader (PR #403).
-          if (numPasses == 1 && firstGroupedExtraChannel < extraChannels.Length)
+          if (firstGroupedExtraChannel < extraChannels.Length) {
+            var (minShift, maxShift) = JxlProgressivePasses.GetDownsamplingBracket(
+              pass, numPasses, passDownsample, passLastPass);
             _DecodeGroupedExtraChannels(
               acGroupReader, extraChannels, firstGroupedExtraChannel,
               gx, gy, groupIdx, groupSize, bitDepth,
               modularGlobalTree, modularGlobalEntropy,
-              numDcGroupsForStreams, numGroups, pass);
+              numDcGroupsForStreams, numGroups, pass,
+              minShift, maxShift);
+          }
         }
 
         if (acBlocks is null)
           throw new InvalidDataException("A VarDCT frame contained no AC pass data.");
 
         // DC is injected only after all progressive AC contributions have been
-        // accumulated; pass data never overwrites coefficient zero.
+        // accumulated; pass data never overwrites coefficient zero. For an
+        // external DC frame these are placeholders: _RenderGroup replaces the
+        // lowest frequencies from frameDc before the inverse transform.
         for (var c = 0; c < _NumXybChannels; ++c)
           for (var i = 0; i < lfBlocks[c].Coefficients.Length; ++i)
             acBlocks[c][i].Coefficients[0] = lfBlocks[c].Coefficients[i];
@@ -425,13 +467,19 @@ internal static class JxlVarDctSpecDecoder {
     JxlEntropyDecoder? modularGlobalEntropy,
     int numDcGroups,
     int numGroups,
-    int pass
+    int pass,
+    int minShift,
+    int maxShift
   ) {
     var originX = gx * groupSize;
     var originY = gy * groupSize;
     var windows = new System.Collections.Generic.List<(int Channel, JxlChannel Piece, int X, int Y)>();
     for (var c = firstGroupedExtraChannel; c < extraChannels.Length; ++c) {
       var channel = extraChannels[c];
+      var shift = Math.Min(channel.HShift, channel.VShift);
+      if (shift < minShift || shift > maxShift)
+        continue;
+
       var x = originX >> channel.HShift;
       var y = originY >> channel.VShift;
       var pieceWidth = Math.Min(groupSize >> channel.HShift, channel.Width - x);
@@ -474,6 +522,17 @@ internal static class JxlVarDctSpecDecoder {
           target.Pixels, checked((y + row) * target.Width + x),
           piece.Width);
     }
+  }
+
+  private static JxlLfBlock[] _ZeroLfBlocks(int blocksX, int blocksY) {
+    var result = new JxlLfBlock[_NumXybChannels];
+    for (var c = 0; c < result.Length; ++c)
+      result[c] = new JxlLfBlock {
+        Width = blocksX,
+        Height = blocksY,
+        Coefficients = new short[checked(blocksX * blocksY)],
+      };
+    return result;
   }
 
   /// <summary>Extract this group's per-channel DC slice from the frame's DC
