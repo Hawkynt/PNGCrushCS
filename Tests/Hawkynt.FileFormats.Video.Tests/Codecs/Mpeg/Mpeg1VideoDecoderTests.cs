@@ -255,19 +255,48 @@ public sealed class Mpeg1VideoDecoderTests {
     Assert.That(_Red(frame, 7, 0), Is.EqualTo(_Grey(100)));
   }
 
+  [Test]
+  [Category("Unit")]
+  public void ADcPictureDecodesItsSixDcOnlyBlocks() {
+    // D pictures are not part of a GOP. Table B.2d gives them one macroblock type, code 1; every
+    // block then stops immediately after its differential DC value, so there is no EOB between the
+    // six blocks and the macroblock itself ends with the one-bit end_of_macroblock marker.
+    var stream = new MpegTestStream()
+      .SequenceHeader(16, 16).PictureHeader(4).SliceHeader(0, 1)
+      .Code("1")                 // macroblock_address_increment = 1
+      .Code("1")                 // Table B.2d: intra
+      .Code("110").Bits(8, 4)    // Y0: dct_dc_size 4, differential +8 => 136
+      .Code("100")               // Y1: differential 0, predictor remains 136
+      .Code("100")               // Y2
+      .Code("100")               // Y3
+      .Code("00")                // Cb: differential 0 => 128
+      .Code("00")                // Cr: differential 0 => 128
+      .Code("1")                 // end_of_macroblock
+      .End();
+
+    var frame = _Decode(stream).Single();
+
+    Assert.That(_Red(frame, 0, 0), Is.EqualTo(_Grey(136)));
+    Assert.That(_Red(frame, 15, 15), Is.EqualTo(_Grey(136)));
+  }
+
   // ============================================================================================
   // Refusals
   // ============================================================================================
 
   [Test]
   [Category("Unit")]
-  public void ADcPictureIsRefusedByName() {
+  public void ADcPictureWithAZeroEndOfMacroblockMarkerIsRefused() {
     var stream = new MpegTestStream()
-      .SequenceHeader(16, 16).GroupOfPictures().PictureHeader(4).SliceHeader(0, 1).Code("1").End();
+      .SequenceHeader(16, 16).PictureHeader(4).SliceHeader(0, 1)
+      .Code("1").Code("1")
+      .Code("100").Code("100").Code("100").Code("100")
+      .Code("00").Code("00")
+      .Code("0")
+      .End();
 
-    var failure = Assert.Throws<NotSupportedException>(() => _Decode(stream));
-    Assert.That(failure!.Message, Does.Contain("D picture"));
-    Assert.That(failure.Message, Does.Contain("not implemented"));
+    var failure = Assert.Throws<InvalidDataException>(() => _Decode(stream));
+    Assert.That(failure!.Message, Does.Contain("end_of_macroblock 0"));
   }
 
   [Test]
