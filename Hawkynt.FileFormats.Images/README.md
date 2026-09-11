@@ -50,11 +50,8 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | Acorn | `.spr`, `.acorn` | ✅ | ✅ | — | — | — | none |
 | AdexImage | `.adx` | ✅ | ✅ | — | — | — | none |
 | AdTechFax | `.adt` | ✅ | ✅ | — | — | — | none |
-| AdvancedArtStudio | `.ocp`, `.mpi`, `.mpic` | ✅ | ✅ | — | — | — | recoil2png |
-| Afli | `.afl` | ✅ | ✅ | — | — | — | recoil2png, XnView |
-
 | AdvancedArtStudio | `.ocp`, `.mpi`, `.mpic` | ✅ | ✅ | — | — | — | recoil2png, IrfanView |
-| Afli | `.afl` | ✅ | ✅ | — | — | — | none |
+| Afli | `.afl` | ✅ | ✅ | — | — | — | recoil2png, XnView |
 | Ai | `.ai` | ✅ | ✅ | — | — | — | none |
 | AimGreyScale | `.ima` | ✅ | ✅ | — | — | — | XnView |
 | AirNav | `.anv` | ✅ | ✅ | — | — | — | XnView |
@@ -68,44 +65,24 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | Analyze | `.hdr`, `.img` | ✅ | ✅ | — | — | — | none |
 | AndrewToolkit | `.atk` | ✅ | ✅ | — | — | — | none |
 | Ani | `.ani` | ✅ | ✅ | — | ✅ | ✅ | XnView |
-| AnimatorCompressor | `.kpr` | ✅ | ✅ | — | — | — | recoil2png |
-| Anime4Ever | `.a4r` | ✅ | ✅ | — | — | — | recoil2png |
-| AnimPainter | `.anp` | ✅ | ✅ | — | — | — | none |
-| AnsiArt | `.ans`, `.ansi` | ✅ | ✅ | — | — | — | none |
-| Apac3 | `.ap3`, `.apv`, `.dgi`, `.dgp`, `.esc`, `.ilc`, `.pzm`, `.app`, `.ils` | ✅ | ✅ | — | — | — | recoil2png |
-| Apng | `.apng` | ✅ | ✅ | — | ✅ | — | ImageMagick, ffmpeg |
-| ApolloHdru | `.hdru`, `.gn` | ✅ | ✅ | — | — | — | XnView |
-| Apple3201 | `.3201` | ✅ | ✅ | — | — | — | recoil2png |
-| AppleII | `.hgr`, `.dhgr` | ✅ | ✅ | — | — | — | recoil2png |
-| AppleIIDhr | `.dhr`, `.a2d` | ✅ | ✅ | — | — | — | none |
-| AppleIIgs | `.shr`, `.c1`, `.pic` | ✅ | ✅ | — | — | — | recoil2png |
-| AppleIIHgr | `.hgr` | ✅ | ✅ | — | — | — | recoil2png |
-| ApplePreferred | `.32k`, `.gs`, `.iigs`, `.shr` | ✅ | ✅ | — | — | — | recoil2png |
-| AppleSh3 | `.sh3`, `.3200` | ✅ | ✅ | — | — | — | recoil2png |
-| AppleShr | `.shr` | ✅ | ✅ | — | — | — | recoil2png |
-| Apx | `.apx` | ✅ | ✅ | — | — | — | XnView |
-| Arf | `.arf` | ✅ | ✅ | — | — | — | XnView |
-| Arn | `.arn` | ✅ | ✅ | — | — | — | XnView |
-
-| Ani | `.ani` | ✅ | ✅ | — | ✅ | ✅ | none |
 | AnimatorCompressor | `.kpr` | ✅ | ✅ | — | — | — | recoil2png, IrfanView |
 | Anime4Ever | `.a4r` | ✅ | ✅ | — | — | — | recoil2png, IrfanView |
 | AnimPainter | `.anp` | ✅ | ✅ | — | — | — | none |
 | AnsiArt | `.ans`, `.ansi` | ✅ | ✅ | — | — | — | none |
 | Apac3 | `.ap3`, `.apv`, `.dgi`, `.dgp`, `.esc`, `.ilc`, `.pzm`, `.app`, `.ils` | ✅ | ✅ | — | — | — | recoil2png |
 | Apng | `.apng` | ✅ | ✅ | — | ✅ | — | ImageMagick, ffmpeg, IrfanView |
-| ApolloHdru | `.hdru`, `.gn` | ✅ | ✅ | — | — | — | none |
+| ApolloHdru | `.hdru`, `.gn` | ✅ | ✅ | — | — | — | XnView |
 | Apple3201 | `.3201` | ✅ | ✅ | — | — | — | recoil2png, IrfanView |
 | AppleII | `.hgr`, `.dhgr` | ✅ | ✅ | — | — | — | recoil2png, IrfanView |
 | AppleIIDhr | `.dhr`, `.a2d` | ✅ | ✅ | — | — | — | none |
-| AppleIIgs | `.shr`, `.c1`, `.pic` | ✅ | ✅ | — | — | — | none |
+| AppleIIgs | `.shr`, `.c1`, `.pic` | ✅ | ✅ | — | — | — | recoil2png |
 | AppleIIHgr | `.hgr` | ✅ | ✅ | — | — | — | recoil2png, IrfanView |
 | ApplePreferred | `.32k`, `.gs`, `.iigs`, `.shr` | ✅ | ✅ | — | — | — | recoil2png, IrfanView |
 | AppleSh3 | `.sh3`, `.3200` | ✅ | ✅ | — | — | — | recoil2png, IrfanView |
 | AppleShr | `.shr` | ✅ | ✅ | — | — | — | recoil2png, IrfanView |
-| Apx | `.apx` | ✅ | ✅ | — | — | — | none |
-| Arf | `.arf` | ✅ | ✅ | — | — | — | none |
-| Arn | `.arn` | ✅ | ✅ | — | — | — | none |
+| Apx | `.apx` | ✅ | ✅ | — | — | — | XnView |
+| Arf | `.arf` | ✅ | ✅ | — | — | — | XnView |
+| Arn | `.arn` | ✅ | ✅ | — | — | — | XnView |
 | Art | `.art` | ✅ | ✅ | — | — | — | none |
 | ArtDirector | `.art` | ✅ | ✅ | — | — | — | recoil2png, IrfanView |
 | Artist64 | `.a64` | ✅ | ✅ | — | — | — | recoil2png, IrfanView |
@@ -152,16 +129,9 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | AtariIce | `.ice`, `.icn` | ✅ | ✅ | — | — | — | recoil2png |
 | AtariImageManager | `.im`, `.col` | ✅ | ✅ | — | — | — | recoil2png, IrfanView |
 | AtariMaxi | `.max8`, `.amx` | ✅ | ✅ | — | — | — | none |
-| AtariPaintworks | `.cl0`, `.cl1`, `.cl2`, `.pg0`, `.pg1`, `.pg2`, `.pg3`, `.sc0`, `.sc1`, `.sc2` | ✅ | ✅ | — | — | — | recoil2png |
-| AtariPi5 | `.pi5` | ✅ | ✅ | — | — | — | recoil2png |
-| AtariPi8 | `.pi8` | ✅ | ✅ | — | — | — | recoil2png |
-| AtariPi9 | `.pi9` | ✅ | ✅ | — | — | — | recoil2png |
-| AtariPicture | `.apc`, `.apa`, `.plm`, `.aps`, `.mga`, `.pls` | ✅ | ✅ | — | — | — | recoil2png |
-| AtariPicworks | `.cp3` | ✅ | ✅ | — | — | — | recoil2png |
-
 | AtariPaintworks | `.cl0`, `.cl1`, `.cl2`, `.pg0`, `.pg1`, `.pg2`, `.pg3`, `.sc0`, `.sc1`, `.sc2` | ✅ | ✅ | — | — | — | recoil2png, IrfanView |
 | AtariPi5 | `.pi5` | ✅ | ✅ | — | — | — | recoil2png, IrfanView |
-| AtariPi8 | `.pi8` | ✅ | ✅ | — | — | — | none |
+| AtariPi8 | `.pi8` | ✅ | ✅ | — | — | — | recoil2png |
 | AtariPi9 | `.pi9` | ✅ | ✅ | — | — | — | recoil2png, IrfanView |
 | AtariPicture | `.apc`, `.apa`, `.plm`, `.aps`, `.mga`, `.pls` | ✅ | ✅ | — | — | — | recoil2png, IrfanView |
 | AtariPicworks | `.cp3` | ✅ | ✅ | — | — | — | recoil2png, IrfanView |
@@ -181,38 +151,24 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | Avs | `.avs`, `.x`, `.mbfavs`, `.mbfs` | ✅ | ✅ | — | — | — | ImageMagick |
 | AwardBmp | `.epa`, `.awbm` | ✅ | ✅ | — | — | — | recoil2png, IrfanView |
 | Awd | `.awd` | ✅ | ✅ | — | — | — | none |
-| AxialisScreensaver | `.ssp` | ✅ | ✅ | — | ✅ | — | XnView |
-
-| AxialisScreensaver | `.ssp` | ✅ | ✅ | — | ✅ | — | IrfanView |
+| AxialisScreensaver | `.ssp` | ✅ | ✅ | — | ✅ | — | XnView, IrfanView |
 | Bam | `.bam` | ✅ | ✅ | ✅ | — | — | none |
 | BbcMicro | `.bbc` | ✅ | ✅ | — | — | — | none |
 | BbcMicroScreen | `.bb4`, `.bb0`, `.bb1`, `.bb2`, `.bb5` | ✅ | ✅ | — | — | — | recoil2png |
 | BennetYeeFace | `.ybm` | ✅ | ✅ | — | — | — | none |
-| BestPaint | `.bp` | ✅ | ✅ | — | — | — | recoil2png |
+| BestPaint | `.bp` | ✅ | ✅ | — | — | — | recoil2png, IrfanView |
 | Bfli | `.bfl`, `.bfli`, `.flp` | ✅ | ✅ | — | — | — | XnView |
 | BfxBitware | `.bfx` | ✅ | ✅ | — | — | — | none |
-| BigTiff | `.btf`, `.tf8` | ✅ | ✅ | — | ✅ | — | ImageMagick |
-| BioRadPic | `.pic` | ✅ | ✅ | — | — | — | XnView |
-
-| BestPaint | `.bp` | ✅ | ✅ | — | — | — | recoil2png, IrfanView |
-| Bfli | `.bfl`, `.bfli`, `.flp` | ✅ | ✅ | — | — | — | none |
-| BfxBitware | `.bfx` | ✅ | ✅ | — | — | — | none |
 | BigTiff | `.btf`, `.tf8` | ✅ | ✅ | — | ✅ | — | ImageMagick, IrfanView |
-| BioRadPic | `.pic` | ✅ | ✅ | — | — | — | none |
+| BioRadPic | `.pic` | ✅ | ✅ | — | — | — | XnView |
 | BkScreen | `.bks` | ✅ | ✅ | — | — | — | recoil2png |
 | Blazing | `.blz`, `.pi` | ✅ | ✅ | — | — | — | recoil2png |
 | BlazingPaddlesWindow | `.wnd` | ✅ | ✅ | — | — | — | recoil2png, IrfanView |
 | Blazon | `.bpl` | ✅ | ✅ | — | — | — | recoil2png, IrfanView |
 | Blp | `.blp` | ✅ | ✅ | — | — | — | none |
-| Bmp | `.bmp`, `.dib`, `.bga`, `.rl4`, `.rl8`, `.vga`, `.sys`, `.bum`, `.thb`, `.2d`, `.bmc`, `.stm`, `.upi`, `.msk`, `.flt` | ✅ | ✅ | ✅ | — | ✅ | ImageMagick, ffmpeg |
+| Bmp | `.bmp`, `.dib`, `.bga`, `.rl4`, `.rl8`, `.vga`, `.sys`, `.bum`, `.thb`, `.2d`, `.bmc`, `.stm`, `.upi`, `.msk`, `.flt` | ✅ | ✅ | ✅ | — | ✅ | ImageMagick, ffmpeg, IrfanView |
 | Bob | `.bob` | ✅ | ✅ | — | — | — | XnView |
 | BodyPaint3D | `.b3d`, `.b2d` | ✅ | ✅ | — | — | — | XnView |
-| BoogieDownPaint | `.bdp` | ✅ | ✅ | — | — | — | recoil2png |
-| Botticelli | `.p4i` | ✅ | ✅ | — | — | — | recoil2png |
-
-| Bmp | `.bmp`, `.dib`, `.bga`, `.rl4`, `.rl8`, `.vga`, `.sys`, `.bum`, `.thb`, `.2d`, `.bmc`, `.stm`, `.upi`, `.msk`, `.flt` | ✅ | ✅ | ✅ | — | ✅ | ImageMagick, ffmpeg, IrfanView |
-| Bob | `.bob` | ✅ | ✅ | — | — | — | none |
-| BodyPaint3D | `.b3d`, `.b2d` | ✅ | ✅ | — | — | — | none |
 | BoogieDownPaint | `.bdp` | ✅ | ✅ | — | — | — | recoil2png, IrfanView |
 | Botticelli | `.p4i` | ✅ | ✅ | — | — | — | recoil2png, IrfanView |
 | Bpg | `.bpg` | ✅ | ✅ | — | — | — | none |
@@ -252,23 +208,16 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | ChampionsInterlace | `.cin` | ✅ | ✅ | — | — | — | none |
 | CharPad | `.ctm` | ✅ | ✅ | — | — | — | recoil2png, IrfanView |
 | CharSet64 | `.chr64` | ✅ | ✅ | — | — | — | none |
-| Cheese | `.che`, `.chs` | ✅ | ✅ | — | — | — | recoil2png |
-| ChinonEs1000 | `.cmt` | ✅ | ✅ | — | — | — | XnView |
-| ChrDollar | `.ch$` | ✅ | ✅ | — | — | — | recoil2png |
-| CImage | `.dsi` | ✅ | ✅ | — | — | — | XnView |
-
 | Cheese | `.che`, `.chs` | ✅ | ✅ | — | — | — | recoil2png, IrfanView |
-| ChinonEs1000 | `.cmt` | ✅ | ✅ | — | — | — | none |
+| ChinonEs1000 | `.cmt` | ✅ | ✅ | — | — | — | XnView |
 | ChrDollar | `.ch$` | ✅ | ✅ | — | — | — | recoil2png, IrfanView |
-| CImage | `.dsi` | ✅ | ✅ | — | — | — | none |
+| CImage | `.dsi` | ✅ | ✅ | — | — | — | XnView |
 | CinemasterAtari | `.cin8` | ✅ | ✅ | — | — | — | none |
 | Cineon | `.cin` | ✅ | ✅ | — | — | — | ImageMagick |
 | CiscoIp | `.cip` | ✅ | ✅ | — | — | — | XnView |
 | ClipArtCatalog | `.cat` | ✅ | ✅ | — | ✅ | — | none |
 | Cloe | `.clo`, `.cloe` | ✅ | ✅ | — | — | — | none |
-| Clp | `.clp` | ✅ | ✅ | — | — | — | XnView |
-
-| Clp | `.clp` | ✅ | ✅ | — | — | — | IrfanView |
+| Clp | `.clp` | ✅ | ✅ | — | — | — | XnView, IrfanView |
 | Cmu | `.cmu` | ✅ | ✅ | — | — | — | none |
 | CmuWindowManager | `.cmu`, `.cmuwm` | ✅ | ✅ | — | — | — | XnView |
 | Cmx | `.cmx` | ✅ | — | — | — | — | — |
@@ -328,14 +277,9 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | DivGameMap | `.fpg` | ✅ | ✅ | — | — | — | none |
 | DjVu | `.djvu`, `.djv`, `.iw4` | ✅ | ✅ | — | — | — | none |
 | Dng | `.dng` | ✅ | ✅ | — | — | — | ffmpeg |
-| DolphinEd | `.dol`, `.bed` | ✅ | ✅ | — | — | — | recoil2png |
-| Doodle | `.dd`, `.ddp` | ✅ | ✅ | — | — | — | recoil2png |
-| DoodleAtari | `.doo` | ✅ | ✅ | — | — | — | recoil2png |
-| DoodleComp | `.jj` | ✅ | ✅ | — | — | — | recoil2png |
-
 | DolphinEd | `.dol`, `.bed` | ✅ | ✅ | — | — | — | recoil2png, IrfanView |
 | Doodle | `.dd`, `.ddp` | ✅ | ✅ | — | — | — | recoil2png, IrfanView |
-| DoodleAtari | `.doo` | ✅ | ✅ | — | — | — | none |
+| DoodleAtari | `.doo` | ✅ | ✅ | — | — | — | recoil2png |
 | DoodleComp | `.jj` | ✅ | ✅ | — | — | — | recoil2png, IrfanView |
 | DoodlePacked | `.dpk` | ✅ | ✅ | — | — | — | none |
 | DoomFlat | `.flat` | ✅ | ✅ | — | — | — | none |
@@ -345,26 +289,18 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | Drazlace | `.dlp`, `.drl` | ✅ | ✅ | — | — | — | none |
 | DrazPaint | `.drz`, `.drp` | ✅ | ✅ | — | — | — | none |
 | DrHalo | `.cut` | ✅ | ✅ | — | — | — | ImageMagick |
-| DuneGraph | `.dg1`, `.dc1` | ✅ | ✅ | — | — | — | recoil2png |
-| Duo | `.duo`, `.du1` | ✅ | ✅ | — | — | — | recoil2png |
-| DuoMedium | `.du2` | ✅ | ✅ | — | — | — | recoil2png |
-| Dwg | `.dwg` | ✅ | ✅ | — | — | — | XnView |
-
 | DuneGraph | `.dg1`, `.dc1` | ✅ | ✅ | — | — | — | recoil2png, IrfanView |
 | Duo | `.duo`, `.du1` | ✅ | ✅ | — | — | — | recoil2png, IrfanView |
 | DuoMedium | `.du2` | ✅ | ✅ | — | — | — | recoil2png, IrfanView |
-| Dwg | `.dwg` | ✅ | ✅ | — | — | — | none |
+| Dwg | `.dwg` | ✅ | ✅ | — | — | — | XnView |
 | Dxf | `.dxf` | ✅ | ✅ | — | — | — | none |
 | EccHeader | `.ecc` | ✅ | ✅ | — | — | — | IrfanView |
 | EciGraphicEditor | `.eci`, `.ecp` | ✅ | ✅ | — | — | — | recoil2png, IrfanView |
 | EclipseTile | `.tile` | ✅ | ✅ | — | — | — | none |
 | Ecw | `.ecw` | ✅ | ✅ | — | — | — | none |
 | EdmicsC4 | `.c4` | ✅ | ✅ | — | — | — | none |
-| EggPaint | `.trp` | ✅ | ✅ | — | — | — | recoil2png |
-| ElectricImage | `.ei`, `.eidi` | ✅ | ✅ | — | ✅ | — | XnView |
-
 | EggPaint | `.trp` | ✅ | ✅ | — | — | — | recoil2png, IrfanView |
-| ElectricImage | `.ei`, `.eidi` | ✅ | ✅ | — | ✅ | — | none |
+| ElectricImage | `.ei`, `.eidi` | ✅ | ✅ | — | ✅ | — | XnView |
 | Electronika | `.bk`, `.ekr` | ✅ | ✅ | — | — | — | none |
 | EmbeddedDib | `.zmf`, `.skf`, `.cad`, `.btn` | ✅ | — | — | — | — | — |
 | EmcEditor | `.emc` | ✅ | ✅ | — | — | — | recoil2png |
@@ -410,9 +346,6 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | Flimatic | `.flm` | ✅ | ✅ | — | — | — | recoil2png |
 | Flip64 | `.fbi` | ✅ | ✅ | — | — | — | none |
 | FliProfi | `.fpr` | ✅ | ✅ | — | — | — | recoil2png |
-| FloorDesigner | `.fge` | ✅ | ✅ | — | — | — | recoil2png |
-
-| FliProfi | `.fpr` | ✅ | ✅ | — | — | — | none |
 | FloorDesigner | `.fge` | ✅ | ✅ | — | — | — | recoil2png, IrfanView |
 | FmTowns | `.fmt` | ✅ | ✅ | — | — | — | none |
 | FontasyGrafik | `.bsg` | ✅ | ✅ | — | — | — | none |
@@ -420,18 +353,11 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | FreeHand | `.fhs` | ✅ | ✅ | — | — | — | none |
 | FremontFax | `.f96` | ✅ | ✅ | — | — | — | none |
 | Fsh | `.fsh` | ✅ | ✅ | — | — | — | XnView |
-| Fuckpaint | `.fp` | ✅ | ✅ | — | — | — | recoil2png |
-| FullscreenKit | `.kid` | ✅ | ✅ | — | — | — | recoil2png |
-| FunGraphicsMachine | `.fgs` | ✅ | ✅ | — | — | — | recoil2png |
-| FunPainter | `.fp2`, `.fun` | ✅ | ✅ | — | — | — | recoil2png |
-| FunPhotor | `.fpr` | ✅ | ✅ | — | — | — | XnView |
-
-| Fsh | `.fsh` | ✅ | ✅ | — | — | — | none |
 | Fuckpaint | `.fp` | ✅ | ✅ | — | — | — | recoil2png, IrfanView |
 | FullscreenKit | `.kid` | ✅ | ✅ | — | — | — | recoil2png, IrfanView |
 | FunGraphicsMachine | `.fgs` | ✅ | ✅ | — | — | — | recoil2png, IrfanView |
 | FunPainter | `.fp2`, `.fun` | ✅ | ✅ | — | — | — | recoil2png, IrfanView |
-| FunPhotor | `.fpr` | ✅ | ✅ | — | — | — | IrfanView |
+| FunPhotor | `.fpr` | ✅ | ✅ | — | — | — | XnView, IrfanView |
 | FuntasticPaint | `.fun8`, `.ftp` | ✅ | ✅ | — | — | — | none |
 | FunWithArt | `.fwa` | ✅ | ✅ | — | — | — | recoil2png, IrfanView |
 | G9b | `.g9b` | ✅ | ✅ | — | — | — | recoil2png, IrfanView |
@@ -449,15 +375,10 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | GephardHires | `.ghg` | ✅ | ✅ | — | — | — | recoil2png |
 | GfaPaint | `.gfp` | ✅ | ✅ | — | — | — | none |
 | GfaRaytrace | `.sul` | ✅ | ✅ | — | — | — | none |
-| Gif | `.gif`, `.giff`, `.bpr` | ✅ | ✅ | — | ✅ | ✅ | ImageMagick, ffmpeg |
-| Gigacad | `.gcd` | ✅ | ✅ | — | — | — | recoil2png |
-| GigaPaint | `.gih`, `.gig`, `.rpo` | ✅ | ✅ | — | — | — | recoil2png |
-| GoDot4Bit | `.4bt`, `.4bit`, `.clp` | ✅ | ✅ | — | — | — | XnView |
-
 | Gif | `.gif`, `.giff`, `.bpr` | ✅ | ✅ | — | ✅ | ✅ | ImageMagick, ffmpeg, IrfanView |
 | Gigacad | `.gcd` | ✅ | ✅ | — | — | — | recoil2png, IrfanView |
 | GigaPaint | `.gih`, `.gig`, `.rpo` | ✅ | ✅ | — | — | — | recoil2png, IrfanView |
-| GoDot4Bit | `.4bt`, `.4bit`, `.clp` | ✅ | ✅ | — | — | — | none |
+| GoDot4Bit | `.4bt`, `.4bit`, `.clp` | ✅ | ✅ | — | — | — | XnView |
 | GodPaint | `.gpn`, `.gdp`, `.god` | ✅ | ✅ | — | — | — | recoil2png |
 | Grafix | `.grx` | ✅ | ✅ | — | — | — | recoil2png, IrfanView |
 | Graph2Font | `.g2f` | ✅ | ✅ | — | — | — | recoil2png |
@@ -467,13 +388,8 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | Graphics9Plus | `.gr9p` | ✅ | ✅ | — | — | — | recoil2png, IrfanView |
 | GraphicsMaster | `.gms`, `.gm8` | ✅ | ✅ | — | — | — | none |
 | GraphLogo | `.all` | ✅ | ✅ | — | — | — | recoil2png |
-| GraphSaurus | `.sr5`, `.grs`, `.sr8`, `.srs` | ✅ | ✅ | — | — | — | recoil2png |
-| GraphSaurus6 | `.sr6` | ✅ | ✅ | — | — | — | recoil2png |
-| GraphSaurus7 | `.sr7` | ✅ | ✅ | — | — | — | recoil2png |
-| GraphSaurusInterlaced | `.sri` | ✅ | ✅ | — | — | — | recoil2png |
-
 | GraphSaurus | `.sr5`, `.grs`, `.sr8`, `.srs` | ✅ | ✅ | — | — | — | recoil2png, IrfanView |
-| GraphSaurus6 | `.sr6` | ✅ | ✅ | — | — | — | none |
+| GraphSaurus6 | `.sr6` | ✅ | ✅ | — | — | — | recoil2png |
 | GraphSaurus7 | `.sr7` | ✅ | ✅ | — | — | — | recoil2png, IrfanView |
 | GraphSaurusInterlaced | `.sri` | ✅ | ✅ | — | — | — | recoil2png, IrfanView |
 | GraspGl | `.gl` | ✅ | ✅ | — | — | — | none |
@@ -498,45 +414,26 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | HighresMedium | `.hrm` | ✅ | ✅ | — | — | — | recoil2png |
 | HighResST | `.hst`, `.hrs` | ✅ | ✅ | — | — | — | none |
 | HinterGrundBild | `.hgb` | ✅ | ✅ | — | — | — | none |
-| HiPicCreator | `.hpc`, `.aas` | ✅ | ✅ | — | — | — | recoil2png |
-| HiresC64 | `.hir`, `.hbm`, `.hpi` | ✅ | ✅ | — | — | — | recoil2png |
-| HiResEditor | `.het`, `.rph` | ✅ | ✅ | — | — | — | recoil2png |
-| HiresFliCrest | `.hfc`, `.hfd` | ✅ | ✅ | — | — | — | recoil2png |
-| HiresInterlaceFeniks | `.hlf`, `.hie` | ✅ | ✅ | — | — | — | recoil2png |
-| Hireslace | `.hle` | ✅ | ✅ | — | — | — | recoil2png |
-| HiresManager | `.him` | ✅ | ✅ | — | — | — | recoil2png |
-
 | HiPicCreator | `.hpc`, `.aas` | ✅ | ✅ | — | — | — | recoil2png, IrfanView |
 | HiresC64 | `.hir`, `.hbm`, `.hpi` | ✅ | ✅ | — | — | — | recoil2png, IrfanView |
 | HiResEditor | `.het`, `.rph` | ✅ | ✅ | — | — | — | recoil2png, IrfanView |
-| HiresFliCrest | `.hfc`, `.hfd` | ✅ | ✅ | — | — | — | none |
-| HiresInterlaceFeniks | `.hlf`, `.hie` | ✅ | ✅ | — | — | — | none |
+| HiresFliCrest | `.hfc`, `.hfd` | ✅ | ✅ | — | — | — | recoil2png |
+| HiresInterlaceFeniks | `.hlf`, `.hie` | ✅ | ✅ | — | — | — | recoil2png |
 | Hireslace | `.hle` | ✅ | ✅ | — | — | — | recoil2png, IrfanView |
-| HiresManager | `.him` | ✅ | ✅ | — | — | — | none |
+| HiresManager | `.him` | ✅ | ✅ | — | — | — | recoil2png |
 | HomeworldLif | `.lif` | ✅ | ✅ | — | — | — | none |
 | Hp48Grob | `.grb`, `.gro` | ✅ | ✅ | — | — | — | recoil2png, IrfanView |
 | Hpgl | `.hpgl`, `.hgl`, `.hpg`, `.prn`, `.prt`, `.spl` | ✅ | ✅ | — | — | — | none |
 | HpGrob | `.grob`, `.hp`, `.gro2`, `.gro4` | ✅ | ✅ | — | — | — | none |
-| Hpi | `.hpi` | ✅ | ✅ | — | — | — | ffmpeg |
+| Hpi | `.hpi` | ✅ | ✅ | — | — | — | ffmpeg, IrfanView |
 | Hru | `.hru` | ✅ | ✅ | — | — | — | XnView |
 | Hrz | `.hrz` | ✅ | ✅ | ✅ | — | — | ImageMagick |
-| Hta | `.hta` | ✅ | ✅ | — | ✅ | — | XnView |
+| Hta | `.hta` | ✅ | ✅ | — | ✅ | — | XnView, IrfanView |
 | IbmKips | `.kps` | ✅ | ✅ | — | — | — | XnView |
-| IcDraw | `.ibi`, `.ib3` | ✅ | ✅ | — | — | — | recoil2png |
-| Ice | `.irg`, `.ir2`, `.icn`, `.imn`, `.ipc` | ✅ | ✅ | — | — | — | recoil2png |
-| IcePcinPlus | `.ip2` | ✅ | ✅ | — | — | — | recoil2png |
-| Icns | `.icns` | ✅ | ✅ | — | ✅ | — | XnView |
-| Ico | `.ico` | ✅ | ✅ | — | ✅ | ✅ | ImageMagick, ffmpeg |
-
-| Hpi | `.hpi` | ✅ | ✅ | — | — | — | ffmpeg, IrfanView |
-| Hru | `.hru` | ✅ | ✅ | — | — | — | none |
-| Hrz | `.hrz` | ✅ | ✅ | ✅ | — | — | ImageMagick |
-| Hta | `.hta` | ✅ | ✅ | — | ✅ | — | IrfanView |
-| IbmKips | `.kps` | ✅ | ✅ | — | — | — | none |
 | IcDraw | `.ibi`, `.ib3` | ✅ | ✅ | — | — | — | recoil2png, IrfanView |
 | Ice | `.irg`, `.ir2`, `.icn`, `.imn`, `.ipc` | ✅ | ✅ | — | — | — | recoil2png, IrfanView |
 | IcePcinPlus | `.ip2` | ✅ | ✅ | — | — | — | recoil2png, IrfanView |
-| Icns | `.icns` | ✅ | ✅ | — | ✅ | — | IrfanView |
+| Icns | `.icns` | ✅ | ✅ | — | ✅ | — | XnView, IrfanView |
 | Ico | `.ico` | ✅ | ✅ | — | ✅ | ✅ | ImageMagick, ffmpeg, IrfanView |
 | IconLibrary | `.icl` | ✅ | — | — | — | — | — |
 | Ics | `.ics` | ✅ | ✅ | — | — | — | none |
@@ -570,31 +467,18 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | InterlacedLogoEditor | `.ile` | ✅ | ✅ | — | — | — | recoil2png, IrfanView |
 | InterlaceGraphicsEditor | `.ige` | ✅ | ✅ | — | — | — | recoil2png, IrfanView |
 | InterlaceHiresEditor | `.ihe` | ✅ | ✅ | — | — | — | none |
-| InterlaceLogoDesigner | `.ild` | ✅ | ✅ | — | — | — | recoil2png |
+| InterlaceLogoDesigner | `.ild` | ✅ | ✅ | — | — | — | recoil2png, IrfanView |
 | InterlaceStudio | `.ist` | ✅ | ✅ | — | — | — | recoil2png |
 | InterleafImage | `.iimg` | ✅ | ✅ | — | — | — | XnView |
-| InterPainter | `.inp`, `.ing`, `.ins` | ✅ | ✅ | — | — | — | recoil2png |
-| InterPaintHi | `.iph`, `.hre` | ✅ | ✅ | — | — | — | recoil2png |
-| InterPaintMc | `.ipt`, `.lre` | ✅ | ✅ | — | — | — | recoil2png |
-| Ioca | `.ica`, `.ioca`, `.ioc`, `.mod` | ✅ | ✅ | — | — | — | XnView |
-| IPaint | `.ip` | ✅ | ✅ | — | — | — | recoil2png |
-| Ipg | `.ipg` | ✅ | — | — | ✅ | — | — |
-| Ipl | `.ipl` | ✅ | ✅ | — | — | — | ImageMagick |
-| Ipsm | `.pan` | ✅ | ✅ | — | — | — | ffmpeg |
-| Iss | `.iss` | ✅ | ✅ | — | — | — | XnView |
-
-| InterlaceLogoDesigner | `.ild` | ✅ | ✅ | — | — | — | recoil2png, IrfanView |
-| InterlaceStudio | `.ist` | ✅ | ✅ | — | — | — | none |
-| InterleafImage | `.iimg` | ✅ | ✅ | — | — | — | none |
 | InterPainter | `.inp`, `.ing`, `.ins` | ✅ | ✅ | — | — | — | recoil2png, IrfanView |
 | InterPaintHi | `.iph`, `.hre` | ✅ | ✅ | — | — | — | recoil2png, IrfanView |
 | InterPaintMc | `.ipt`, `.lre` | ✅ | ✅ | — | — | — | recoil2png, IrfanView |
-| Ioca | `.ica`, `.ioca`, `.ioc`, `.mod` | ✅ | ✅ | — | — | — | none |
+| Ioca | `.ica`, `.ioca`, `.ioc`, `.mod` | ✅ | ✅ | — | — | — | XnView |
 | IPaint | `.ip` | ✅ | ✅ | — | — | — | recoil2png, IrfanView |
 | Ipg | `.ipg` | ✅ | — | — | ✅ | — | — |
 | Ipl | `.ipl` | ✅ | ✅ | — | — | — | ImageMagick |
 | Ipsm | `.pan` | ✅ | ✅ | — | — | — | ffmpeg, IrfanView |
-| Iss | `.iss` | ✅ | ✅ | — | — | — | none |
+| Iss | `.iss` | ✅ | ✅ | — | — | — | XnView |
 | It01 | `.fit` | ✅ | ✅ | — | — | — | none |
 | Jbig | `.jbg`, `.bie`, `.jbig` | ✅ | ✅ | — | — | — | ImageMagick |
 | Jbig2 | `.jb2`, `.jbig2` | ✅ | ✅ | — | — | — | none |
@@ -604,38 +488,23 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | Jng | `.jng` | ✅ | ✅ | — | — | — | ImageMagick, ffmpeg |
 | Jnx | `.jnx` | ✅ | ✅ | — | ✅ | — | ImageMagick |
 | JovianVi | `.vi` | ✅ | ✅ | — | — | — | XnView |
-| Jpeg | `.jpg`, `.jpeg`, `.jpe`, `.jfif`, `.jps`, `.thm`, `.j`, `.jif`, `.fsy`, `.mph`, `.ncy`, `.frm` | ✅ | ✅ | — | — | ✅ | ImageMagick, ffmpeg |
-| Jpeg2000 | `.jp2`, `.j2k`, `.j2c`, `.jpx`, `.jpc`, `.jpf`, `.jpt`, `.jpm` | ✅ | ✅ | — | — | — | ImageMagick, opj_decompress, ffmpeg |
-| JpegLs | `.jls` | ✅ | ✅ | — | — | — | ffmpeg |
-| JpegXl | `.jxl` | ✅ | ✅ | — | ✅ | — | ImageMagick, djxl, ffmpeg |
-| JpegXr | `.jxr`, `.wdp`, `.hdp` | ✅ | ✅ | — | — | — | XnView |
-| JupiterAce | `.jac`, `.ace` | ✅ | ✅ | — | — | — | none |
-| Kitty | `.kty`, `.kt4` | ✅ | ✅ | — | — | — | recoil2png |
-| Koala | `.koa`, `.koala`, `.kla` | ✅ | ✅ | — | — | — | recoil2png |
-| KoalaCompressed | `.gg` | ✅ | ✅ | — | — | — | recoil2png |
-| KodakDc25 | `.k25` | ✅ | ✅ | — | — | — | XnView |
-
-| JovianVi | `.vi` | ✅ | ✅ | — | — | — | none |
 | Jpeg | `.jpg`, `.jpeg`, `.jpe`, `.jfif`, `.jps`, `.thm`, `.j`, `.jif`, `.fsy`, `.mph`, `.ncy`, `.frm` | ✅ | ✅ | — | — | ✅ | ImageMagick, ffmpeg, IrfanView |
 | Jpeg2000 | `.jp2`, `.j2k`, `.j2c`, `.jpx`, `.jpc`, `.jpf`, `.jpt`, `.jpm` | ✅ | ✅ | — | — | — | ImageMagick, opj_decompress, ffmpeg |
 | JpegLs | `.jls` | ✅ | ✅ | — | — | — | ffmpeg |
 | JpegXl | `.jxl` | ✅ | ✅ | — | ✅ | — | ImageMagick, djxl, ffmpeg, IrfanView |
-| JpegXr | `.jxr`, `.wdp`, `.hdp` | ✅ | ✅ | — | — | — | none |
+| JpegXr | `.jxr`, `.wdp`, `.hdp` | ✅ | ✅ | — | — | — | XnView |
 | JupiterAce | `.jac`, `.ace` | ✅ | ✅ | — | — | — | none |
 | Kitty | `.kty`, `.kt4` | ✅ | ✅ | — | — | — | recoil2png |
 | Koala | `.koa`, `.koala`, `.kla` | ✅ | ✅ | — | — | — | recoil2png, IrfanView |
 | KoalaCompressed | `.gg` | ✅ | ✅ | — | — | — | recoil2png, IrfanView |
-| KodakDc25 | `.k25` | ✅ | ✅ | — | — | — | none |
+| KodakDc25 | `.k25` | ✅ | ✅ | — | — | — | XnView |
 | KofaxKfx | `.kfx` | ✅ | ✅ | — | — | — | none |
 | Kqp | `.kqp` | ✅ | ✅ | — | — | — | XnView |
 | Krita | `.kra` | ✅ | ✅ | — | — | — | none |
 | KssPaint | `.kss` | ✅ | ✅ | — | — | — | recoil2png, IrfanView |
 | Ktx | `.ktx`, `.ktx2` | ✅ | ✅ | — | — | — | none |
-| LarkaObjectEditor | `.leo` | ✅ | ✅ | — | — | — | recoil2png |
-| LaserData | `.lda` | ✅ | ✅ | — | — | — | XnView |
-
 | LarkaObjectEditor | `.leo` | ✅ | ✅ | — | — | — | recoil2png, IrfanView |
-| LaserData | `.lda` | ✅ | ✅ | — | — | — | none |
+| LaserData | `.lda` | ✅ | ✅ | — | — | — | XnView |
 | LastWordFont | `.f80` | ✅ | ✅ | — | — | — | recoil2png |
 | LdPic | `.bbg` | ✅ | ✅ | — | — | — | recoil2png, IrfanView |
 | LightWorkImage | `.lwi` | ✅ | ✅ | — | — | — | none |
@@ -660,10 +529,6 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | MatLab | `.mat` | ✅ | ✅ | — | — | — | ImageMagick |
 | MawWareTexture | `.mtx` | ✅ | ✅ | — | — | — | XnView |
 | MayaIff | `.iff`, `.maya`, `.tdi` | ✅ | ✅ | — | — | — | XnView |
-| McPainter | `.mcp` | ✅ | ✅ | — | — | — | recoil2png |
-
-| MawWareTexture | `.mtx` | ✅ | ✅ | — | — | — | none |
-| MayaIff | `.iff`, `.maya`, `.tdi` | ✅ | ✅ | — | — | — | none |
 | McPainter | `.mcp` | ✅ | ✅ | — | — | — | recoil2png, IrfanView |
 | Mcs | `.mcs` | ✅ | ✅ | — | — | — | none |
 | Mda | `.mda` | ✅ | ✅ | — | — | — | none |
@@ -675,9 +540,6 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | MicroDesignCut | `.cut` | ✅ | ✅ | — | — | — | none |
 | MicroDesignGrf | `.grf` | ✅ | ✅ | — | — | — | none |
 | MicroDynamicsMars | `.pbt` | ✅ | ✅ | — | — | — | XnView |
-| MicroIllustrator | `.mil` | ✅ | ✅ | — | — | — | recoil2png |
-
-| MicroDynamicsMars | `.pbt` | ✅ | ✅ | — | — | — | none |
 | MicroIllustrator | `.mil` | ✅ | ✅ | — | — | — | recoil2png, IrfanView |
 | MicroIllustratorA8 | `.mia` | ✅ | ✅ | — | — | — | none |
 | MicroPainter8 | `.mpt8`, `.mp8` | ✅ | ✅ | — | — | — | none |
@@ -702,21 +564,12 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | MsxGl8 | `.gl8`, `.sh8` | ✅ | ✅ | — | — | — | recoil2png, IrfanView |
 | MsxGlYjk | `.glc`, `.gls`, `.shc`, `.gla`, `.glb`, `.sha`, `.shb` | ✅ | ✅ | — | — | — | recoil2png, IrfanView |
 | MsxMig | `.mig` | ✅ | ✅ | — | — | — | none |
-| MsxScc | `.scc`, `.yjk` | ✅ | ✅ | — | — | — | recoil2png |
-| MsxScreen10 | `.sca`, `.scb` | ✅ | ✅ | — | — | — | recoil2png |
-| MsxScreen2 | `.sc2`, `.grp` | ✅ | ✅ | — | — | — | recoil2png |
-| MsxScreen3 | `.sc3` | ✅ | ✅ | — | — | — | recoil2png |
-| MsxScreen4 | `.sc4` | ✅ | ✅ | — | — | — | recoil2png |
-| MsxScreen5 | `.sc5`, `.ge5` | ✅ | ✅ | — | — | — | recoil2png |
-| MsxScreen6 | `.sc6` | ✅ | ✅ | — | — | — | recoil2png |
-| MsxScreen8 | `.sc8` | ✅ | ✅ | — | — | — | recoil2png |
-
 | MsxScc | `.scc`, `.yjk` | ✅ | ✅ | — | — | — | recoil2png, IrfanView |
 | MsxScreen10 | `.sca`, `.scb` | ✅ | ✅ | — | — | — | recoil2png, IrfanView |
-| MsxScreen2 | `.sc2`, `.grp` | ✅ | ✅ | — | — | — | none |
+| MsxScreen2 | `.sc2`, `.grp` | ✅ | ✅ | — | — | — | recoil2png |
 | MsxScreen3 | `.sc3` | ✅ | ✅ | — | — | — | recoil2png, IrfanView |
 | MsxScreen4 | `.sc4` | ✅ | ✅ | — | — | — | recoil2png, IrfanView |
-| MsxScreen5 | `.sc5`, `.ge5` | ✅ | ✅ | — | — | — | none |
+| MsxScreen5 | `.sc5`, `.ge5` | ✅ | ✅ | — | — | — | recoil2png |
 | MsxScreen6 | `.sc6` | ✅ | ✅ | — | — | — | recoil2png, IrfanView |
 | MsxScreen8 | `.sc8` | ✅ | ✅ | — | — | — | recoil2png, IrfanView |
 | MsxSprite | `.spt` | ✅ | ✅ | — | — | — | none |
@@ -729,17 +582,11 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | MultiPalettePicture | `.mpp` | ✅ | ✅ | — | — | — | none |
 | NcrImage | `.ncr` | ✅ | ✅ | — | — | — | XnView |
 | NdsTexture | `.nbfs`, `.nds` | ✅ | ✅ | — | — | — | none |
-| NeoBookCartoon | `.car` | ✅ | ✅ | — | — | — | XnView |
-| Neochrome | `.neo` | ✅ | ✅ | — | — | — | recoil2png |
-| NeoGeoPocket | `.ngp`, `.ngpc` | ✅ | ✅ | — | — | — | none |
-| NeoGeoSprite | `.spr` | ✅ | ✅ | — | — | — | none |
-| NeroCoverDesigner | `.cde`, `.nct`, `.ncd` | ✅ | ✅ | — | — | — | XnView |
-
-| NeoBookCartoon | `.car` | ✅ | ✅ | — | — | — | IrfanView |
+| NeoBookCartoon | `.car` | ✅ | ✅ | — | — | — | XnView, IrfanView |
 | Neochrome | `.neo` | ✅ | ✅ | — | — | — | recoil2png, IrfanView |
 | NeoGeoPocket | `.ngp`, `.ngpc` | ✅ | ✅ | — | — | — | none |
 | NeoGeoSprite | `.spr` | ✅ | ✅ | — | — | — | none |
-| NeroCoverDesigner | `.cde`, `.nct`, `.ncd` | ✅ | ✅ | — | — | — | IrfanView |
+| NeroCoverDesigner | `.cde`, `.nct`, `.ncd` | ✅ | ✅ | — | — | — | XnView, IrfanView |
 | NesChr | `.chr` | ✅ | ✅ | — | — | — | none |
 | Netpbm | `.pbm`, `.pgm`, `.ppm`, `.pnm`, `.pam`, `.ppma`, `.rpbm`, `.rpgm`, `.rppm`, `.rpnm` | ✅ | ✅ | — | — | — | ImageMagick, ffmpeg |
 | NewsRoom | `.nsr`, `.ph`, `.bn` | ✅ | ✅ | — | — | — | XnView |
@@ -775,23 +622,14 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | Pagefox | `.pfx` | ✅ | ✅ | — | — | — | none |
 | PaintMagic | `.pmg` | ✅ | ✅ | — | — | — | recoil2png, IrfanView |
 | PaintPro | `.ppro` | ✅ | ✅ | — | — | — | none |
-| PaintShop | `.da4` | ✅ | ✅ | — | — | — | recoil2png |
-| PaintShopBrowser | `.jbf` | ✅ | ✅ | — | ✅ | — | XnView |
-| PaintShopCompressed | `.psc` | ✅ | ✅ | — | — | — | recoil2png |
-| Palm | `.palm`, `.pdb` | ✅ | ✅ | — | — | — | none |
-| PalmImageViewer | `.pdb` | ✅ | ✅ | — | — | — | ImageMagick |
-| PalmPdb | `.pdb` | ✅ | ✅ | — | — | — | none |
-| Paradox | `.mcpp` | ✅ | ✅ | — | — | — | recoil2png |
-| Pat | `.pat` | ✅ | ✅ | — | — | — | XnView |
-
 | PaintShop | `.da4` | ✅ | ✅ | — | — | — | recoil2png, IrfanView |
-| PaintShopBrowser | `.jbf` | ✅ | ✅ | — | ✅ | — | none |
+| PaintShopBrowser | `.jbf` | ✅ | ✅ | — | ✅ | — | XnView |
 | PaintShopCompressed | `.psc` | ✅ | ✅ | — | — | — | recoil2png, IrfanView |
 | Palm | `.palm`, `.pdb` | ✅ | ✅ | — | — | — | none |
 | PalmImageViewer | `.pdb` | ✅ | ✅ | — | — | — | ImageMagick |
 | PalmPdb | `.pdb` | ✅ | ✅ | — | — | — | none |
 | Paradox | `.mcpp` | ✅ | ✅ | — | — | — | recoil2png, IrfanView |
-| Pat | `.pat` | ✅ | ✅ | — | — | — | none |
+| Pat | `.pat` | ✅ | ✅ | — | — | — | XnView |
 | Pc88 | `.pc8` | ✅ | ✅ | — | — | — | none |
 | Pc98Ebd | `.ebd` | ✅ | ✅ | — | — | — | recoil2png |
 | Pcd | `.pcd` | ✅ | ✅ | — | — | — | none |
@@ -818,11 +656,8 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | PhotoLine | `.pld` | ✅ | ✅ | — | — | — | IrfanView |
 | PhotoPaint | `.cpt` | ✅ | ✅ | — | — | — | none |
 | PhotoParade | `.php` | ✅ | ✅ | — | ✅ | — | ffmpeg |
-| PhotoStudio | `.psf` | ✅ | ✅ | — | — | — | none |
-| PhotoSuiteProject | `.pzp` | ✅ | ✅ | — | — | — | XnView |
-
 | PhotoStudio | `.psf` | ✅ | ✅ | — | — | — | IrfanView |
-| PhotoSuiteProject | `.pzp` | ✅ | ✅ | — | — | — | none |
+| PhotoSuiteProject | `.pzp` | ✅ | ✅ | — | — | — | XnView |
 | Pi | `.pi` | ✅ | ✅ | — | — | — | none |
 | Pic2 | `.p2` | ✅ | ✅ | — | — | — | none |
 | Picasso | `.pic0` | ✅ | ✅ | — | — | — | recoil2png, IrfanView |
@@ -839,41 +674,22 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | Pixia | `.pxa`, `.pxs` | ✅ | ✅ | — | — | — | XnView |
 | Pixibox | `.pxb` | ✅ | ✅ | — | — | — | XnView |
 | Pkm | `.pkm` | ✅ | ✅ | — | — | — | none |
-| Pl4Picture | `.pl4` | ✅ | ✅ | — | — | — | recoil2png |
+| Pl4Picture | `.pl4` | ✅ | ✅ | — | — | — | recoil2png, IrfanView |
 | PlaybackBitmapSequence | `.bms` | ✅ | ✅ | — | — | — | XnView |
 | PlotMaker | `.plt`, `.plm2` | ✅ | ✅ | — | — | — | none |
 | PmBitmap | `.pm1`, `.pm2`, `.pm3`, `.pm4` | ✅ | ✅ | — | — | — | none |
 | PmgDesigner | `.pmd` | ✅ | ✅ | — | — | — | none |
 | PmView | `.pm` | ✅ | ✅ | — | — | — | XnView |
-| Png | `.png`, `.frm` | ✅ | ✅ | — | — | ✅ | ImageMagick, ffmpeg |
-| PntrFalcon | `.pnf`, `.pfl` | ✅ | ✅ | — | — | — | none |
-| PocketPc2bp | `.2bp` | ✅ | ✅ | — | — | — | none |
-| PocketPcTheme | `.tsk` | ✅ | ✅ | — | — | — | XnView |
-| PortfolioGraphics | `.pgf`, `.pgc` | ✅ | ✅ | — | — | — | recoil2png |
-| Portrait | `.cvp` | ✅ | ✅ | — | — | — | XnView |
-| PostScript | `.ps`, `.ps1`, `.ps2`, `.ps3`, `.eps`, `.epsf`, `.epsi`, `.epi`, `.prn`, `.pdx` | ✅ | ✅ | — | — | — | none |
-| PowerGraphics | `.pgr` | ✅ | ✅ | — | — | — | recoil2png |
-| PowerPoint | `.ppt`, `.pps`, `.pot`, `.pptx`, `.ppsx`, `.potx`, `.pptm`, `.ppsm`, `.potm` | ✅ | ✅ | — | ✅ | — | XnView |
-| PrinterPageSegment | `.pse`, `.psg` | ✅ | ✅ | — | — | — | XnView |
-| Printfox | `.gb` | ✅ | ✅ | — | — | — | recoil2png |
-| PrintfoxPagefox | `.bs`, `.pg` | ✅ | ✅ | — | — | — | recoil2png |
-
-| Pl4Picture | `.pl4` | ✅ | ✅ | — | — | — | recoil2png, IrfanView |
-| PlaybackBitmapSequence | `.bms` | ✅ | ✅ | — | — | — | none |
-| PlotMaker | `.plt`, `.plm2` | ✅ | ✅ | — | — | — | none |
-| PmBitmap | `.pm1`, `.pm2`, `.pm3`, `.pm4` | ✅ | ✅ | — | — | — | none |
-| PmgDesigner | `.pmd` | ✅ | ✅ | — | — | — | none |
-| PmView | `.pm` | ✅ | ✅ | — | — | — | none |
 | Png | `.png`, `.frm` | ✅ | ✅ | — | — | ✅ | ImageMagick, ffmpeg, IrfanView |
 | PntrFalcon | `.pnf`, `.pfl` | ✅ | ✅ | — | — | — | none |
 | PocketPc2bp | `.2bp` | ✅ | ✅ | — | — | — | none |
-| PocketPcTheme | `.tsk` | ✅ | ✅ | — | — | — | IrfanView |
+| PocketPcTheme | `.tsk` | ✅ | ✅ | — | — | — | XnView, IrfanView |
 | PortfolioGraphics | `.pgf`, `.pgc` | ✅ | ✅ | — | — | — | recoil2png, IrfanView |
-| Portrait | `.cvp` | ✅ | ✅ | — | — | — | none |
+| Portrait | `.cvp` | ✅ | ✅ | — | — | — | XnView |
 | PostScript | `.ps`, `.ps1`, `.ps2`, `.ps3`, `.eps`, `.epsf`, `.epsi`, `.epi`, `.prn`, `.pdx` | ✅ | ✅ | — | — | — | none |
 | PowerGraphics | `.pgr` | ✅ | ✅ | — | — | — | recoil2png, IrfanView |
-| PowerPoint | `.ppt`, `.pps`, `.pot`, `.pptx`, `.ppsx`, `.potx`, `.pptm`, `.ppsm`, `.potm` | ✅ | ✅ | — | ✅ | — | IrfanView |
-| PrinterPageSegment | `.pse`, `.psg` | ✅ | ✅ | — | — | — | none |
+| PowerPoint | `.ppt`, `.pps`, `.pot`, `.pptx`, `.ppsx`, `.potx`, `.pptm`, `.ppsm`, `.potm` | ✅ | ✅ | — | ✅ | — | XnView, IrfanView |
+| PrinterPageSegment | `.pse`, `.psg` | ✅ | ✅ | — | — | — | XnView |
 | Printfox | `.gb` | ✅ | ✅ | — | — | — | recoil2png, IrfanView |
 | PrintfoxPagefox | `.bs`, `.pg` | ✅ | ✅ | — | — | — | recoil2png, IrfanView |
 | PrintMaster | `.pm` | ✅ | ✅ | — | — | — | none |
@@ -882,31 +698,17 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | PrintTechnik | `.hir` | ✅ | ✅ | — | — | — | none |
 | PrismPaint | `.pnt`, `.tpi` | ✅ | ✅ | — | — | — | none |
 | Prisms | `.pri`, `.lff` | ✅ | ✅ | — | — | — | XnView |
-| ProfiGrf | `.grf` | ✅ | ✅ | — | — | — | recoil2png |
-| Ps2Txc | `.txc` | ✅ | ✅ | — | — | — | none |
-| Psb | `.psb` | ✅ | ✅ | — | — | — | ImageMagick |
-| Psd | `.psd`, `.pdd` | ✅ | ✅ | — | — | — | ImageMagick, ffmpeg |
-| PsionPic | `.pic`, `.icn`, `.ch3` | ✅ | ✅ | — | — | — | recoil2png |
-| Psp | `.psp`, `.pspimage`, `.tub`, `.psptube`, `.pspbrush`, `.pspframe`, `.pfr`, `.pspmask`, `.msk`, `.pspt`, `.tex` | ✅ | ✅ | — | — | — | XnView |
-| Ptif | `.ptif`, `.ptiff` | ✅ | ✅ | — | — | — | ImageMagick, ffmpeg |
-| PublicPainter | `.cmp` | ✅ | ✅ | — | — | — | recoil2png |
-| Pvr | `.pvr` | ✅ | ✅ | — | — | — | none |
-| Q0 | `.q0` | ✅ | ✅ | — | — | — | none |
-| QdvImage | `.qdv` | ✅ | ✅ | — | — | — | XnView |
-| Qoi | `.qoi` | ✅ | ✅ | — | — | — | ImageMagick, ffmpeg |
-
-| Prisms | `.pri`, `.lff` | ✅ | ✅ | — | — | — | none |
 | ProfiGrf | `.grf` | ✅ | ✅ | — | — | — | recoil2png, IrfanView |
 | Ps2Txc | `.txc` | ✅ | ✅ | — | — | — | none |
 | Psb | `.psb` | ✅ | ✅ | — | — | — | ImageMagick, IrfanView |
 | Psd | `.psd`, `.pdd` | ✅ | ✅ | — | — | — | ImageMagick, ffmpeg, IrfanView |
 | PsionPic | `.pic`, `.icn`, `.ch3` | ✅ | ✅ | — | — | — | recoil2png, IrfanView |
-| Psp | `.psp`, `.pspimage`, `.tub`, `.psptube`, `.pspbrush`, `.pspframe`, `.pfr`, `.pspmask`, `.msk`, `.pspt`, `.tex` | ✅ | ✅ | — | — | — | none |
+| Psp | `.psp`, `.pspimage`, `.tub`, `.psptube`, `.pspbrush`, `.pspframe`, `.pfr`, `.pspmask`, `.msk`, `.pspt`, `.tex` | ✅ | ✅ | — | — | — | XnView |
 | Ptif | `.ptif`, `.ptiff` | ✅ | ✅ | — | — | — | ImageMagick, ffmpeg, IrfanView |
 | PublicPainter | `.cmp` | ✅ | ✅ | — | — | — | recoil2png |
 | Pvr | `.pvr` | ✅ | ✅ | — | — | — | none |
 | Q0 | `.q0` | ✅ | ✅ | — | — | — | none |
-| QdvImage | `.qdv` | ✅ | ✅ | — | — | — | none |
+| QdvImage | `.qdv` | ✅ | ✅ | — | — | — | XnView |
 | Qoi | `.qoi` | ✅ | ✅ | — | — | — | ImageMagick, ffmpeg, IrfanView |
 | Qrt | `.qrt` | ✅ | ✅ | — | — | — | none |
 | Qtif | `.qtif`, `.qti` | ✅ | ✅ | — | — | — | none |
@@ -925,10 +727,6 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | Rgf | `.rgf` | ✅ | ✅ | — | — | — | none |
 | RicohFax | `.ric`, `.001` | ✅ | ✅ | — | — | — | XnView |
 | RicohIs30 | `.pig` | ✅ | ✅ | — | — | — | XnView |
-| RicohJ6i | `.j6i` | ✅ | ✅ | — | — | — | ffmpeg |
-
-| RicohFax | `.ric`, `.001` | ✅ | ✅ | — | — | — | none |
-| RicohIs30 | `.pig` | ✅ | ✅ | — | — | — | none |
 | RicohJ6i | `.j6i` | ✅ | ✅ | — | — | — | ffmpeg, IrfanView |
 | RiscOsSprite | `.spr`, `.ros` | ✅ | ✅ | — | — | — | none |
 | Rla | `.rla`, `.rlb`, `.rpf` | ✅ | ✅ | — | — | — | none |
@@ -999,31 +797,17 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | Stellar | `.stl` | ✅ | ✅ | — | — | — | recoil2png, IrfanView |
 | StTrueColor | `.stc` | ✅ | ✅ | — | — | — | none |
 | SunIcon | `.icon`, `.pr` | ✅ | ✅ | — | — | — | XnView |
-| SunRaster | `.ras`, `.sun`, `.rast`, `.rs`, `.sr` | ✅ | ✅ | — | — | — | ImageMagick, ffmpeg |
-| SuperHires | `.shi` | ✅ | ✅ | — | — | — | none |
-| SuperHiresEditor | `.she` | ✅ | ✅ | — | — | — | recoil2png |
-| SuperHiresEditor1 | `.sh1` | ✅ | ✅ | — | — | — | recoil2png |
-| SuperHiresEditor2 | `.sh2` | ✅ | ✅ | — | — | — | recoil2png |
-| SuperHiresFli | `.shf` | ✅ | ✅ | — | — | — | recoil2png |
-| SuperHiresStudio | `.shs` | ✅ | ✅ | — | — | — | recoil2png |
-| Svg | `.svg` | ✅ | ✅ | — | — | — | ImageMagick, ffmpeg |
-| Svgz | `.svgz` | ✅ | ✅ | — | — | — | ImageMagick, ffmpeg |
-| SyberiaTexture | `.syj` | ✅ | ✅ | — | — | — | XnView |
-| SymbianMbm | `.mbm` | ✅ | ✅ | — | — | — | XnView |
-| SymbOsGraphic | `.sgx` | ✅ | ✅ | — | — | — | recoil2png |
-
-| SunIcon | `.icon`, `.pr` | ✅ | ✅ | — | — | — | none |
 | SunRaster | `.ras`, `.sun`, `.rast`, `.rs`, `.sr` | ✅ | ✅ | — | — | — | ImageMagick, ffmpeg, IrfanView |
 | SuperHires | `.shi` | ✅ | ✅ | — | — | — | none |
-| SuperHiresEditor | `.she` | ✅ | ✅ | — | — | — | none |
+| SuperHiresEditor | `.she` | ✅ | ✅ | — | — | — | recoil2png |
 | SuperHiresEditor1 | `.sh1` | ✅ | ✅ | — | — | — | recoil2png, IrfanView |
 | SuperHiresEditor2 | `.sh2` | ✅ | ✅ | — | — | — | recoil2png, IrfanView |
 | SuperHiresFli | `.shf` | ✅ | ✅ | — | — | — | recoil2png, IrfanView |
 | SuperHiresStudio | `.shs` | ✅ | ✅ | — | — | — | recoil2png |
 | Svg | `.svg` | ✅ | ✅ | — | — | — | ImageMagick, ffmpeg |
 | Svgz | `.svgz` | ✅ | ✅ | — | — | — | ImageMagick, ffmpeg |
-| SyberiaTexture | `.syj` | ✅ | ✅ | — | — | — | none |
-| SymbianMbm | `.mbm` | ✅ | ✅ | — | — | — | none |
+| SyberiaTexture | `.syj` | ✅ | ✅ | — | — | — | XnView |
+| SymbianMbm | `.mbm` | ✅ | ✅ | — | — | — | XnView |
 | SymbOsGraphic | `.sgx` | ✅ | ✅ | — | — | — | recoil2png, IrfanView |
 | SyntheticArts | `.srt` | ✅ | ✅ | — | — | — | none |
 | Synu | `.synu`, `.syn` | ✅ | ✅ | — | — | — | XnView |
@@ -1042,16 +826,10 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | TilezTexture | `.til` | ✅ | ✅ | — | — | — | ffmpeg, IrfanView |
 | Tim | `.tim` | ✅ | ✅ | — | — | — | recoil2png, ImageMagick, IrfanView |
 | Tim2 | `.tm2` | ✅ | ✅ | — | — | — | ImageMagick |
-| TimexGigascreen | `.hrg`, `.scr` | ✅ | ✅ | — | — | — | recoil2png |
-| Tiny | `.tny`, `.tn1`, `.tn2`, `.tn3`, `.tn4`, `.tn5`, `.tn6` | ✅ | ✅ | — | — | — | recoil2png |
-| TiPicture | `.73i`, `.82i`, `.83i`, `.85i`, `.86i` | ✅ | ✅ | — | — | — | XnView |
-| TmSat | `.imi` | ✅ | ✅ | — | — | — | XnView |
-| TobiasRichterSlideshow | `.pci` | ✅ | ✅ | — | — | — | recoil2png |
-
 | TimexGigascreen | `.hrg`, `.scr` | ✅ | ✅ | — | — | — | recoil2png, IrfanView |
 | Tiny | `.tny`, `.tn1`, `.tn2`, `.tn3`, `.tn4`, `.tn5`, `.tn6` | ✅ | ✅ | — | — | — | recoil2png, IrfanView |
-| TiPicture | `.73i`, `.82i`, `.83i`, `.85i`, `.86i` | ✅ | ✅ | — | — | — | none |
-| TmSat | `.imi` | ✅ | ✅ | — | — | — | none |
+| TiPicture | `.73i`, `.82i`, `.83i`, `.85i`, `.86i` | ✅ | ✅ | — | — | — | XnView |
+| TmSat | `.imi` | ✅ | ✅ | — | — | — | XnView |
 | TobiasRichterSlideshow | `.pci` | ✅ | ✅ | — | — | — | recoil2png, IrfanView |
 | TriPaint | `.tpf` | ✅ | ✅ | — | — | — | none |
 | Trs80 | `.hr` | ✅ | ✅ | — | — | — | recoil2png |
@@ -1070,9 +848,6 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | UleadImageLibrary | `.pst` | ✅ | ✅ | — | ✅ | — | ffmpeg |
 | UtahRle | `.rle`, `.urt` | ✅ | ✅ | — | — | — | ImageMagick |
 | UyvyRaw | `.uyvy`, `.qtl` | ✅ | ✅ | — | — | — | XnView |
-| VbxeSlideShow | `.dap` | ✅ | ✅ | — | — | — | recoil2png |
-
-| UyvyRaw | `.uyvy`, `.qtl` | ✅ | ✅ | — | — | — | none |
 | VbxeSlideShow | `.dap` | ✅ | ✅ | — | — | — | recoil2png, IrfanView |
 | VdcBitmap | `.vbm`, `.bm` | ✅ | ✅ | — | — | — | recoil2png |
 | Vector06c | `.v06`, `.scr` | ✅ | ✅ | — | — | — | none |
@@ -1095,20 +870,11 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | Wad2 | `.wad` | ✅ | ✅ | — | — | — | none |
 | Wad3 | `.wad` | ✅ | ✅ | — | — | — | XnView |
 | Wal | `.wal` | ✅ | ✅ | — | — | — | XnView |
-| Wbmp | `.wbmp`, `.wbm`, `.wap` | ✅ | ✅ | — | — | — | ImageMagick, ffmpeg |
-| WebP | `.webp`, `.wep` | ✅ | ✅ | — | ✅ | ✅ | ImageMagick, dwebp, ffmpeg |
-| WebShots | `.wb1`, `.wbc`, `.wbp`, `.wbz` | ✅ | ✅ | — | — | — | none |
-| WigmoreArtist | `.wig` | ✅ | ✅ | — | — | — | recoil2png |
-| WinFax | `.fxs`, `.fxo`, `.fxr`, `.fxd`, `.fxm` | ✅ | ✅ | — | — | — | XnView |
-| WizSolitaireDeck | `.dec` | ✅ | ✅ | — | — | — | none |
-
-| Wad3 | `.wad` | ✅ | ✅ | — | — | — | none |
-| Wal | `.wal` | ✅ | ✅ | — | — | — | none |
 | Wbmp | `.wbmp`, `.wbm`, `.wap` | ✅ | ✅ | — | — | — | ImageMagick, ffmpeg, IrfanView |
 | WebP | `.webp`, `.wep` | ✅ | ✅ | — | ✅ | ✅ | ImageMagick, dwebp, ffmpeg, IrfanView |
 | WebShots | `.wb1`, `.wbc`, `.wbp`, `.wbz` | ✅ | ✅ | — | — | — | none |
 | WigmoreArtist | `.wig` | ✅ | ✅ | — | — | — | recoil2png, IrfanView |
-| WinFax | `.fxs`, `.fxo`, `.fxr`, `.fxd`, `.fxm` | ✅ | ✅ | — | — | — | none |
+| WinFax | `.fxs`, `.fxo`, `.fxr`, `.fxd`, `.fxm` | ✅ | ✅ | — | — | — | XnView |
 | WizSolitaireDeck | `.dec` | ✅ | ✅ | — | — | — | IrfanView |
 | Wmf | `.wmf` | ✅ | ✅ | — | — | — | none |
 | WonderSwanTile | `.wst`, `.ws` | ✅ | ✅ | — | — | — | none |
@@ -1128,17 +894,10 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | XFliEditor | `.xfl` | ✅ | ✅ | — | — | — | none |
 | Ximage | `.xim` | ✅ | ✅ | — | — | — | XnView |
 | XionicsSmp | `.smp` | ✅ | ✅ | — | — | — | XnView |
-| Xld4 | `.q4` | ✅ | ✅ | — | — | — | recoil2png |
-| XlPaint | `.xlp` | ✅ | ✅ | — | — | — | recoil2png |
-| Xpm | `.xpm`, `.picon` | ✅ | ✅ | — | — | — | ImageMagick, ffmpeg |
-| XvThumbnail | `.xv`, `.p7` | ✅ | ✅ | — | — | — | XnView |
-
-| Ximage | `.xim` | ✅ | ✅ | — | — | — | none |
-| XionicsSmp | `.smp` | ✅ | ✅ | — | — | — | none |
 | Xld4 | `.q4` | ✅ | ✅ | — | — | — | recoil2png, IrfanView |
 | XlPaint | `.xlp` | ✅ | ✅ | — | — | — | recoil2png, IrfanView |
 | Xpm | `.xpm`, `.picon` | ✅ | ✅ | — | — | — | ImageMagick, ffmpeg, IrfanView |
-| XvThumbnail | `.xv`, `.p7` | ✅ | ✅ | — | — | — | none |
+| XvThumbnail | `.xv`, `.p7` | ✅ | ✅ | — | — | — | XnView |
 | Xwd | `.xwd`, `.x11` | ✅ | ✅ | — | — | — | ImageMagick, ffmpeg |
 | Xyz | `.xyz` | ✅ | ✅ | — | — | — | XnView |
 | Ybm | `.ybm` | ✅ | ✅ | — | — | — | none |
@@ -1147,9 +906,6 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | ZeissLsm | `.lsm` | ✅ | ✅ | — | — | — | XnView |
 | Zinc | `.zinc` | ✅ | ✅ | — | — | — | none |
 | ZonerBrush | `.zbr` | ✅ | ✅ | — | — | — | XnView |
-| Zoom4 | `.zm4` | ✅ | ✅ | — | — | — | recoil2png |
-
-| ZonerBrush | `.zbr` | ✅ | ✅ | — | — | — | none |
 | Zoom4 | `.zm4` | ✅ | ✅ | — | — | — | recoil2png, IrfanView |
 | Zoomatic | `.zom` | ✅ | ✅ | — | — | — | recoil2png |
 | ZsStaffKid98 | `.zim` | ✅ | ✅ | — | — | — | recoil2png |
@@ -1170,24 +926,17 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | ZxNext | `.nxt` | ✅ | ✅ | — | — | — | none |
 | ZxNextImage | `.nxi` | ✅ | ✅ | — | — | — | recoil2png, IrfanView |
 | ZxPaintbrush | `.zxp` | ✅ | ✅ | — | — | — | none |
-| ZxPaintyOne | `.zp1` | ✅ | ✅ | — | — | — | recoil2png |
-| ZxRgb3 | `.3` | ✅ | ✅ | — | — | — | recoil2png |
-| ZxSnapshot | `.sna` | ✅ | ✅ | — | — | — | XnView |
-| ZxSpectrum | `.scr`, `.$s`, `.$c`, `.!s` | ✅ | ✅ | — | — | — | recoil2png |
-
 | ZxPaintyOne | `.zp1` | ✅ | ✅ | — | — | — | recoil2png, IrfanView |
 | ZxRgb3 | `.3` | ✅ | ✅ | — | — | — | recoil2png, IrfanView |
-| ZxSnapshot | `.sna` | ✅ | ✅ | — | — | — | none |
-| ZxSpectrum | `.scr`, `.$s`, `.$c`, `.!s` | ✅ | ✅ | — | — | — | none |
+| ZxSnapshot | `.sna` | ✅ | ✅ | — | — | — | XnView |
+| ZxSpectrum | `.scr`, `.$s`, `.$c`, `.!s` | ✅ | ✅ | — | — | — | recoil2png |
 | ZxTimex | `.tmx`, `.scr` | ✅ | ✅ | — | — | — | recoil2png, ImageMagick |
 | ZxTrefiBorderScreen | `.bsp` | ✅ | ✅ | — | — | — | none |
 | ZxTricolor | `.3cl` | ✅ | ✅ | — | — | — | none |
 | ZxUlaPlus | `.ulp`, `.scr` | ✅ | ✅ | — | — | — | recoil2png, ImageMagick |
 | ZzRough | `.rgh` | ✅ | ✅ | — | — | — | recoil2png, IrfanView |
 
-**Oracle** — the tool outside this repository that has read what the writer produces. `none` means nothing but this package's own reader ever has, and a reader agreeing with the writer beside it proves only that the two share one reading of the format; `—` means there is no writer, so there is nothing for anything to have read. What a name in this column states exactly: handed a file this writer produced, under one of the format's own extensions and at one of the sizes the format declares, that tool decoded it back to a picture of the same size which is not a blank canvas. That is weaker than the pixel-for-pixel comparisons in `Tests/Conformance.Recoil.Tests` and in the codec evidence below, and it is the one thing that could be asked of every writer here rather than of a chosen few. It does not prove the pixels agree, and where two unrelated formats share an extension and a geometry it can be a tool reading the other one. The tools: [avifdec](https://github.com/AOMediaCodec/libavif) · [djxl](https://github.com/libjxl/libjxl) · [dwebp](https://developers.google.com/speed/webp/docs/dwebp) · [ffmpeg](https://ffmpeg.org/) · [heif-dec](https://github.com/strukturag/libheif) · [ImageMagick](https://imagemagick.org/) · [opj_decompress](https://www.openjpeg.org/) · [recoil2png](https://recoil.sourceforge.net/) · [XnView](https://www.xnview.com/en/nconvert/).
-
-**Oracle** — the tool outside this repository that has read what the writer produces. `none` means nothing but this package's own reader ever has, and a reader agreeing with the writer beside it proves only that the two share one reading of the format; `—` means there is no writer, so there is nothing for anything to have read. What a name in this column states exactly: handed a file this writer produced, under one of the format's own extensions and at one of the sizes the format declares, that tool decoded it back to a picture of the same size which is not a blank canvas. That is weaker than the pixel-for-pixel comparisons in `Tests/Conformance.Recoil.Tests` and in the codec evidence below, and it is the one thing that could be asked of every writer here rather than of a chosen few. It does not prove the pixels agree, and where two unrelated formats share an extension and a geometry it can be a tool reading the other one. The tools: [avifdec](https://github.com/AOMediaCodec/libavif) · [djxl](https://github.com/libjxl/libjxl) · [dwebp](https://developers.google.com/speed/webp/docs/dwebp) · [ffmpeg](https://ffmpeg.org/) · [Ghostscript](https://www.ghostscript.com/) · [heif-dec](https://github.com/strukturag/libheif) · [ImageMagick](https://imagemagick.org/) · [IrfanView](https://www.irfanview.com/) · [opj_decompress](https://www.openjpeg.org/) · [recoil2png](https://recoil.sourceforge.net/).
+**Oracle** — the tool outside this repository that has read what the writer produces. `none` means nothing but this package's own reader ever has, and a reader agreeing with the writer beside it proves only that the two share one reading of the format; `—` means there is no writer, so there is nothing for anything to have read. What a name in this column states exactly: handed a file this writer produced, under one of the format's own extensions and at one of the sizes the format declares, that tool decoded it back to a picture of the same size which is not a blank canvas. That is weaker than the pixel-for-pixel comparisons in `Tests/Conformance.Recoil.Tests` and in the codec evidence below, and it is the one thing that could be asked of every writer here rather than of a chosen few. It does not prove the pixels agree, and where two unrelated formats share an extension and a geometry it can be a tool reading the other one. The tools: [avifdec](https://github.com/AOMediaCodec/libavif) · [djxl](https://github.com/libjxl/libjxl) · [dwebp](https://developers.google.com/speed/webp/docs/dwebp) · [ffmpeg](https://ffmpeg.org/) · [Ghostscript](https://www.ghostscript.com/) · [heif-dec](https://github.com/strukturag/libheif) · [ImageMagick](https://imagemagick.org/) · [IrfanView](https://www.irfanview.com/) · [opj_decompress](https://www.openjpeg.org/) · [recoil2png](https://recoil.sourceforge.net/) · [XnView](https://www.xnview.com/en/nconvert/).
 <!-- IMAGE-FORMATS:END -->
 
 ### Optimizers
@@ -1855,6 +1604,13 @@ The format-specific links in [Extended format-family reference](#-extended-forma
 | [ImageMagick](https://imagemagick.org/formats/) | Oracle + format catalogue | Broad writer-generated corpus, pixel comparisons, acceptance checks and format-gap discovery. |
 | [XnView / NConvert](https://www.xnview.com/en/image-formats/) | Oracle + format catalogue | Broad format coverage comparison and external writer/read acceptance. |
 | [IrfanView](https://www.irfanview.info/main_formats.htm) | Oracle + format catalogue | Broad format coverage comparison and writer/read acceptance. |
+| [libbpg (`bpgdec`)](https://bellard.org/bpg/) | Reference implementation + oracle | BPG container and HEVC-in-BPG syntax, and the decoder that judges what the BPG writer produces. |
+| [Ghostscript](https://www.ghostscript.com/) | Oracle | Rendering the PostScript family — PDF, EPS, PostScript and Illustrator — to check that a written file draws what it claims. |
+| [pyembroidery](https://github.com/EmbroidePy/pyembroidery) | Oracle | Independent PES stitch and thread reading for the embroidery digitiser. |
+| [LibreOffice](https://www.libreoffice.org/) | Oracle | Opening written OOXML packages under the application their content type claims, and rendering them to PDF for comparison. |
+| [libcdr](https://github.com/LibreOffice/libcdr) | Documentation + behavioural oracle | CorelDRAW version and `DISP` preview semantics. |
+| [olefile](https://github.com/decalage2/olefile) | Oracle | Compound-document structure for the legacy `.ppt` writer. |
+| [fontTools](https://github.com/fonttools/fonttools) | Oracle | TrueType table parsing and glyph geometry for the font writer. |
 | [ExifTool](https://exiftool.org/) | Documentation + oracle | CR3/Canon box layout cross-checks and byte-exact preview/thumbnail extraction. |
 | [Tom's Editor supported formats](https://tomseditor.com/blog/supported-formats) | Format catalogue / oracle | Coverage-gap checks and spot conversions for obscure formats. |
 | [Telparia file-format samples](https://telparia.com/fileFormatSamples/image) | External corpus | Additional real-world samples used by parity tooling. |

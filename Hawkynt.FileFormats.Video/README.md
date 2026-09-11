@@ -438,6 +438,27 @@ Every public and protected member of all 471 types, generated from the built ass
 - Encoding is a smaller domain than decoding on purpose: 46 codecs of the 100 read can also be written. Most are lossless; twelve are not, and each says so in its own row. Motion JPEG writes baseline JPEG, whose loss is a matter of degree, and DV's fixed-length frames, Microsoft Video 1's two-colours-to-a-block coding, Cinepak's vector quantisation, Microsoft's MPEG-4 transform, the ASUS codecs' quantised DCT, Apple Video's 15-bit blocks, H.261's and Apple ProRes's quantised transforms, Hap's texture blocks and id RoQ's vector quantisation have no lossless form at all — a picture that codec can hold exactly comes back exactly, and one it cannot does not. What is still not written back is the modern lossy codecs: a stream read as H.264 cannot be written back as H.264.
 - Video correctness depends on real-world packetization as much as codec math. The project therefore validates packet counts, sizes, timestamps, and key-frame flags against external tools where samples are available.
 
+## 📚 References
+
+Each codec row links the specification it was built from. This table records the external material
+used across the package — the code some of it was converted from, and the tools that judge whether
+what it writes is readable by anything but itself. Per-codec provenance and measurement notes are in
+[`codec-notes.md`](https://github.com/Hawkynt/PNGCrushCS/blob/main/Hawkynt.FileFormats.Video/codec-notes.md);
+the formats that were investigated and left unimplemented, with the reasons, are in
+[`codec-investigations.md`](https://github.com/Hawkynt/PNGCrushCS/blob/main/Hawkynt.FileFormats.Video/codec-investigations.md).
+
+| Reference | Kind | Used for |
+| --- | --- | --- |
+| [FFmpeg](https://ffmpeg.org/) | Foreign source code + oracle | Both, and the distinction matters. Seventeen decoders and sixteen encoders are converted from its LGPL-2.1-or-later sources — the notices beside each name the files — and separately it is the decoder almost every codec here is measured against. A codec converted from it is never also *verified* by it alone; where that is the only check available, the row says so. |
+| [`libavcodec/texturedspenc.c`](https://github.com/FFmpeg/FFmpeg/blob/master/libavcodec/texturedspenc.c) | Foreign source code (MIT) | The one file taken from FFmpeg's tree that is not LGPL: it carries its own MIT grant and states it derives from public-domain code. Hap's block compression. |
+| [OxideAV](https://github.com/OxideAV/oxideav-h264) | Foreign source code | H.264 CABAC context tables and arithmetic decoder. |
+| [libde265 (`dec265`)](https://github.com/strukturag/libde265) | Oracle | A second opinion on HEVC, independent of FFmpeg — the two disagreed with each other on two streams where our decoder matched one of them. |
+| [x265](https://bitbucket.org/multicoreware/x265_git/) | Corpus producer | Intra HEVC streams at every chroma format and depth the decoder claims. |
+| [libaom](https://aomedia.googlesource.com/aom/) / [SVT-AV1](https://gitlab.com/AOMediaCodec/SVT-AV1) | Corpus producers | AV1 elementary streams for the low-overhead OBU container. |
+| [samples.ffmpeg.org](https://samples.ffmpeg.org/) | External corpus | Real files for codecs no encoder here can produce — Indeo, RPZA, RoQ, Smacker and others. Where a published checksum exists it is checked before the file is used. |
+| [RAD Game Tools](https://www.radgametools.com/smkmain.htm) | Documentation | Smacker container and codec background. |
+| [MultimediaWiki](https://wiki.multimedia.cx/) | Documentation | Format descriptions for codecs with no published specification. Treated as rung four: a page whose function names and constants match a decoder that predates it is not an independent source, and `codec-investigations.md` records where that mattered. |
+
 ## ❤️ Support
 
 If this project saves you time or money, consider supporting its development:
