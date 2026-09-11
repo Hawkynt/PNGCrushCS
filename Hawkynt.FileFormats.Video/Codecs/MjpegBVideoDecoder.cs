@@ -54,10 +54,15 @@ public sealed class MjpegBVideoDecoder : IVideoCodecDecoder<MjpegBVideoDecoder> 
       return true;
     }
 
-    var field2 = this._DecodeField(data, nextFieldBase, out var thirdFieldBase);
+    // The third field is refused before the second one is decoded, not after. A packet that names a
+    // third field usually names it past its own end as well, and decoding first would report the
+    // overrun -- true, but a consequence of the real problem and not the thing worth telling anyone.
+    var thirdFieldBase = _PeekNextFieldOffset(data, nextFieldBase);
     if (thirdFieldBase != 0)
       throw new InvalidDataException(
         $"Video stream {this._streamIndex} carries an mjpegb packet whose second field names a third field at offset {thirdFieldBase}; this decoder supports one or two fields per sample.");
+
+    var field2 = this._DecodeField(data, nextFieldBase, out _);
 
     if (field1.Width != field2.Width || field1.Height != field2.Height || field1.Format != field2.Format)
       throw new InvalidDataException(
@@ -70,6 +75,22 @@ public sealed class MjpegBVideoDecoder : IVideoCodecDecoder<MjpegBVideoDecoder> 
 
   /// <summary>Nothing is ever held back: every packet is one whole picture, field-woven or not.</summary>
   public System.Collections.Generic.IEnumerable<RawImage> Flush() => [];
+
+  /// <summary>
+  /// The next-field offset a field header states, or zero when there is no header there to read.
+  /// </summary>
+  /// <remarks>
+  /// A packet too short to hold the header is left to <see cref="_DecodeField"/>, which says so in
+  /// those terms; answering zero here only means "no third field was named", which is the question
+  /// being asked.
+  /// </remarks>
+  private static int _PeekNextFieldOffset(ReadOnlySpan<byte> data, int fieldBase) {
+    if ((uint)fieldBase > (uint)data.Length || data.Length - fieldBase < _HeaderSize)
+      return 0;
+
+    var offset = BinaryPrimitives.ReadUInt32BigEndian(data.Slice(fieldBase + 16, 4));
+    return offset > int.MaxValue ? int.MaxValue : (int)offset;
+  }
 
   private RawImage _DecodeField(ReadOnlySpan<byte> data, int fieldBase, out int nextFieldBase) {
     if ((uint)fieldBase > (uint)data.Length || data.Length - fieldBase < _HeaderSize)
