@@ -34,7 +34,8 @@ namespace FileFormat.Codecs;
 /// built.</b> The document says as much in prose ("copying blocks of pixels from the previous frame"),
 /// and it matters because a block's source and destination can overlap within the same frame: reading
 /// from the partially-decoded output instead reproduces most of a frame correctly and drifts on exactly
-/// the pixels an overlapping block touches twice.
+/// the pixels an overlapping block touches twice. A block is validated as a whole before copying it;
+/// malformed vectors are rejected rather than clipping half a block into the picture.
 /// <para/>
 /// <b>Measured.</b> Three files from <c>samples.ffmpeg.org/V-codecs/QPEG/</c> — <c>qpeg-test.avi</c>
 /// (80x60, fifteen frames, exercising every frame type), <c>Clock.avi</c> and <c>Space.avi</c> (320x240,
@@ -57,6 +58,7 @@ public sealed class QpegVideoDecoder : IVideoCodecDecoder<QpegVideoDecoder> {
   private const byte _EXPECTED_MARKER = 0xE0;
   private const int _FRAME_TYPE_INTRA = 0x10;
   private const int _FRAME_TYPE_INTER_NO_MC = 0x00;
+  private const int _MAX_PALETTE_ENTRIES = 256;
 
   private static readonly (int Width, int Height)[] _BlockDimensions = [
     (0, 0), (32, 32), (24, 32), (8, 32), (24, 24), (16, 16), (32, 16), (16, 32),
@@ -120,7 +122,11 @@ public sealed class QpegVideoDecoder : IVideoCodecDecoder<QpegVideoDecoder> {
         $"QPEG video stream {stream.Index} carries no palette behind its {headerSize}-byte stream format header. "
         + "The frames hold palette indices and nothing else, so there are no colours to decode them to.");
 
-    var entries = info.ColorsUsed > 0 ? info.ColorsUsed : 256;
+    var entries = info.ColorsUsed > 0 ? info.ColorsUsed : _MAX_PALETTE_ENTRIES;
+    if (entries > _MAX_PALETTE_ENTRIES)
+      throw new InvalidDataException(
+        $"QPEG video stream {stream.Index} states {entries} palette entries, but an eight-bit index can address at most 256.");
+
     var available = (format.Length - headerSize) / 4;
     if (available < entries)
       throw new InvalidDataException($"QPEG video stream {stream.Index} states {entries} palette entries and carries {available}.");
@@ -301,22 +307,20 @@ public sealed class QpegVideoDecoder : IVideoCodecDecoder<QpegVideoDecoder> {
 
     var previous = this._previousCanvas ?? throw new InvalidDataException(
       "A QPEG interframe uses motion compensation before any previous frame exists to compensate from.");
+    if (blockWidth == 0 || blockHeight == 0)
+      return;
 
-    for (var by = 0; by < blockHeight; ++by) {
-      var destY = y + by;
-      var sourceY = destY + vertical;
-      if (destY < 0 || destY >= height || sourceY < 0 || sourceY >= height)
-        continue;
+    var sourceX = x + horizontal;
+    var sourceY = y + vertical;
+    if (x + blockWidth > width || y + blockHeight > height
+        || sourceX < 0 || sourceY < 0 || sourceX + blockWidth > width || sourceY + blockHeight > height)
+      throw new InvalidDataException(
+        $"A QPEG motion block of {blockWidth}x{blockHeight} at {x},{y} with vector {horizontal},{vertical} "
+        + "does not fit wholly inside the current and previous pictures.");
 
-      for (var bx = 0; bx < blockWidth; ++bx) {
-        var destX = x + bx;
-        var sourceX = destX + horizontal;
-        if (destX < 0 || destX >= width || sourceX < 0 || sourceX >= width)
-          continue;
-
-        this._canvas[destY * width + destX] = previous[sourceY * width + sourceX];
-      }
-    }
+    for (var by = 0; by < blockHeight; ++by)
+      previous.AsSpan((sourceY + by) * width + sourceX, blockWidth)
+        .CopyTo(this._canvas.AsSpan((y + by) * width + x, blockWidth));
   }
 
   private byte[]? _previousCanvas;
