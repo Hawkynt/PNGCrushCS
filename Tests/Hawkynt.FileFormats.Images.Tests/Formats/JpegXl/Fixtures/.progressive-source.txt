@@ -1,1 +1,0 @@
-Generated locally from deterministic 64x48 RGB pixels with libjxl 0.11.1 C API. See README.progressive.txt.
