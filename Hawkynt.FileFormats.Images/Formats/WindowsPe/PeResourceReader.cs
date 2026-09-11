@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.IO;
@@ -21,6 +21,7 @@ public static class PeResourceReader {
   private const int _SECTION_HEADER_SIZE = 40;
   private const uint _HIGH_BIT = 0x80000000;
   private const int _BITMAP_FILE_HEADER_SIZE = 14;
+  private const ushort _IMAGE_FILE_DLL = 0x2000;
 
   public static PeResourceFile FromFile(FileInfo file) {
     ArgumentNullException.ThrowIfNull(file);
@@ -68,11 +69,15 @@ public static class PeResourceReader {
 
     var numberOfSections = BinaryPrimitives.ReadUInt16LittleEndian(data[(coffOffset + 2)..]);
     var sizeOfOptionalHeader = BinaryPrimitives.ReadUInt16LittleEndian(data[(coffOffset + 16)..]);
+    var characteristics = BinaryPrimitives.ReadUInt16LittleEndian(data[(coffOffset + 18)..]);
+    var moduleKind = (characteristics & _IMAGE_FILE_DLL) != 0
+      ? PeResourceModuleKind.Dll
+      : PeResourceModuleKind.Executable;
 
     // Optional header follows COFF header
     var optionalOffset = coffOffset + _COFF_HEADER_SIZE;
     if (sizeOfOptionalHeader == 0)
-      return new PeResourceFile(); // No optional header means no data directories
+      return new PeResourceFile { ModuleKind = moduleKind }; // No optional header means no data directories
 
     if (optionalOffset + sizeOfOptionalHeader > data.Length)
       throw new InvalidDataException("Data too small for optional header.");
@@ -89,24 +94,24 @@ public static class PeResourceReader {
     // Resource directory is data directory entry index 2 (each entry is 8 bytes: RVA + Size)
     var resourceDirIndex = dataDirOffset + 2 * 8;
     if (resourceDirIndex + 8 > optionalOffset + sizeOfOptionalHeader)
-      return new PeResourceFile(); // No resource data directory
+      return new PeResourceFile { ModuleKind = moduleKind }; // No resource data directory
 
     if (resourceDirIndex + 8 > data.Length)
-      return new PeResourceFile();
+      return new PeResourceFile { ModuleKind = moduleKind };
 
     var resourceRva = BinaryPrimitives.ReadUInt32LittleEndian(data[resourceDirIndex..]);
     var resourceSize = BinaryPrimitives.ReadUInt32LittleEndian(data[(resourceDirIndex + 4)..]);
 
     if (resourceRva == 0 || resourceSize == 0)
-      return new PeResourceFile(); // No resources
+      return new PeResourceFile { ModuleKind = moduleKind }; // No resources
 
     // Parse section headers to find the section containing the resource RVA
     var sectionTableOffset = optionalOffset + sizeOfOptionalHeader;
     if (!_FindSectionForRva(bytes, sectionTableOffset, numberOfSections, resourceRva, out var rsrcFileOffset, out _))
-      return new PeResourceFile(); // Resource section not found
+      return new PeResourceFile { ModuleKind = moduleKind }; // Resource section not found
 
-    if (rsrcFileOffset < 0 || rsrcFileOffset + resourceSize > data.Length)
-      return new PeResourceFile(); // Resource data out of bounds
+    if (rsrcFileOffset < 0 || resourceSize > int.MaxValue || rsrcFileOffset > data.Length - (int)resourceSize)
+      return new PeResourceFile { ModuleKind = moduleKind }; // Resource data out of bounds
 
     // Parse the resource directory tree
     var iconResources = new Dictionary<int, (int Offset, int Size)>();
@@ -158,7 +163,7 @@ public static class PeResourceReader {
 
     // RT_BITMAP: prepend BITMAPFILEHEADER to produce a complete BMP file
     foreach (var (resId, (offset, size)) in bitmapResources) {
-      if (size <= 0 || offset + size > data.Length)
+      if (size <= 0 || offset < 0 || offset > data.Length - size)
         continue;
 
       var bmpData = _PrependBitmapFileHeader(bytes, offset, size);
@@ -171,7 +176,7 @@ public static class PeResourceReader {
 
     // Scan other resource types for embedded image signatures (RT_RCDATA, custom types, etc.)
     foreach (var (_, resId, offset, size) in otherResources) {
-      if (size <= 0 || offset + size > data.Length)
+      if (size <= 0 || offset < 0 || offset > data.Length - size)
         continue;
 
       var formatHint = _DetectImageSignature(bytes, offset, size);
@@ -188,8 +193,11 @@ public static class PeResourceReader {
       });
     }
 
-    return new PeResourceFile { IconGroups = groups, ImageResources = imageResources };
-  
+    return new PeResourceFile {
+      IconGroups = groups,
+      ImageResources = imageResources,
+      ModuleKind = moduleKind,
+    };
   }
 
   public static PeResourceFile FromBytes(byte[] data) {
@@ -210,7 +218,7 @@ public static class PeResourceReader {
 
     for (var i = 0; i < numberOfSections; ++i) {
       var offset = sectionTableOffset + i * _SECTION_HEADER_SIZE;
-      if (offset + _SECTION_HEADER_SIZE > data.Length)
+      if (offset < 0 || offset > data.Length - _SECTION_HEADER_SIZE)
         return false;
 
       var virtualSize = BinaryPrimitives.ReadUInt32LittleEndian(data.AsSpan(offset + 8));
@@ -218,13 +226,18 @@ public static class PeResourceReader {
       var sizeOfRawData = BinaryPrimitives.ReadUInt32LittleEndian(data.AsSpan(offset + 16));
       var pointerToRawData = BinaryPrimitives.ReadUInt32LittleEndian(data.AsSpan(offset + 20));
 
-      // Use the larger of VirtualSize and SizeOfRawData for section extent
+      // Use the larger of VirtualSize and SizeOfRawData for section extent without overflowing the RVA.
       var effectiveSize = Math.Max(virtualSize, sizeOfRawData);
-      if (rva >= virtualAddress && rva < virtualAddress + effectiveSize) {
-        fileOffset = (int)(rva - virtualAddress + pointerToRawData);
-        sectionVirtualAddress = virtualAddress;
-        return true;
-      }
+      if (rva < virtualAddress || rva - virtualAddress >= effectiveSize)
+        continue;
+
+      var relativeOffset = (ulong)(rva - virtualAddress) + pointerToRawData;
+      if (relativeOffset > int.MaxValue)
+        return false;
+
+      fileOffset = (int)relativeOffset;
+      sectionVirtualAddress = virtualAddress;
+      return true;
     }
 
     return false;
@@ -258,7 +271,7 @@ public static class PeResourceReader {
 
       // Level 2: resource name/IDs
       var level2Offset = rsrcFileOffset + offset;
-      if (level2Offset < 0 || level2Offset + _RESOURCE_DIRECTORY_SIZE > data.Length)
+      if (level2Offset < 0 || level2Offset > data.Length - _RESOURCE_DIRECTORY_SIZE)
         continue;
 
       var level2Entries = _ReadDirectoryEntries(data, level2Offset);
@@ -280,7 +293,7 @@ public static class PeResourceReader {
 
         // Level 3: language variants (pick the first one)
         var level3Offset = rsrcFileOffset + resOffset;
-        if (level3Offset < 0 || level3Offset + _RESOURCE_DIRECTORY_SIZE > data.Length)
+        if (level3Offset < 0 || level3Offset > data.Length - _RESOURCE_DIRECTORY_SIZE)
           continue;
 
         var level3Entries = _ReadDirectoryEntries(data, level3Offset);
@@ -307,7 +320,7 @@ public static class PeResourceReader {
   private static List<(int Id, int Offset, bool IsDirectory)> _ReadDirectoryEntries(byte[] data, int directoryFileOffset) {
     var result = new List<(int, int, bool)>();
 
-    if (directoryFileOffset + _RESOURCE_DIRECTORY_SIZE > data.Length)
+    if (directoryFileOffset < 0 || directoryFileOffset > data.Length - _RESOURCE_DIRECTORY_SIZE)
       return result;
 
     var namedEntryCount = BinaryPrimitives.ReadUInt16LittleEndian(data.AsSpan(directoryFileOffset + 12));
@@ -317,7 +330,7 @@ public static class PeResourceReader {
     var entryOffset = directoryFileOffset + _RESOURCE_DIRECTORY_SIZE;
     for (var i = 0; i < totalEntries; ++i) {
       var currentOffset = entryOffset + i * _RESOURCE_ENTRY_SIZE;
-      if (currentOffset + _RESOURCE_ENTRY_SIZE > data.Length)
+      if (currentOffset < 0 || currentOffset > data.Length - _RESOURCE_ENTRY_SIZE)
         break;
 
       var nameOrId = BinaryPrimitives.ReadUInt32LittleEndian(data.AsSpan(currentOffset));
@@ -338,17 +351,22 @@ public static class PeResourceReader {
     dataFileOffset = -1;
     dataSize = 0;
 
-    if (entryFileOffset < 0 || entryFileOffset + _RESOURCE_DATA_ENTRY_SIZE > data.Length)
+    if (entryFileOffset < 0 || entryFileOffset > data.Length - _RESOURCE_DATA_ENTRY_SIZE)
       return false;
 
     var dataRva = BinaryPrimitives.ReadUInt32LittleEndian(data.AsSpan(entryFileOffset));
-    dataSize = (int)BinaryPrimitives.ReadUInt32LittleEndian(data.AsSpan(entryFileOffset + 4));
+    var size = BinaryPrimitives.ReadUInt32LittleEndian(data.AsSpan(entryFileOffset + 4));
+    if (dataRva < rsrcRva || size > int.MaxValue)
+      return false;
 
-    // Convert RVA to file offset: data RVA is relative to the section's virtual address
-    // rsrcFileOffset corresponds to rsrcRva in the file
-    dataFileOffset = (int)(dataRva - rsrcRva) + rsrcFileOffset;
+    // Convert RVA to file offset: data RVA is relative to the resource section's virtual address.
+    var offset = (ulong)(dataRva - rsrcRva) + (uint)rsrcFileOffset;
+    if (offset > int.MaxValue)
+      return false;
 
-    if (dataFileOffset < 0 || dataFileOffset + dataSize > data.Length) {
+    dataFileOffset = (int)offset;
+    dataSize = (int)size;
+    if (dataFileOffset < 0 || dataFileOffset > data.Length - dataSize) {
       dataFileOffset = -1;
       dataSize = 0;
       return false;
@@ -476,7 +494,7 @@ public static class PeResourceReader {
     if (grpSize < 6)
       return null;
 
-    if (grpOffset + grpSize > data.Length)
+    if (grpOffset < 0 || grpOffset > data.Length - grpSize)
       return null;
 
     var count = BinaryPrimitives.ReadUInt16LittleEndian(data.AsSpan(grpOffset + 4));
@@ -564,7 +582,7 @@ public static class PeResourceReader {
     //   Planes (2), BitCount (2), BytesInRes (4), Id (2)
     // RT_CURSOR resources have a 4-byte hotspot header (HotspotX:2, HotspotY:2) prepended to the DIB
 
-    if (grpSize < 6 || grpOffset + grpSize > data.Length)
+    if (grpSize < 6 || grpOffset < 0 || grpOffset > data.Length - grpSize)
       return null;
 
     var count = BinaryPrimitives.ReadUInt16LittleEndian(data.AsSpan(grpOffset + 4));
@@ -582,7 +600,8 @@ public static class PeResourceReader {
     for (var i = 0; i < count; ++i) {
       var entryBase = grpOffset + 6 + i * grpEntrySize;
 
-      // Cursor group entry: Width(2), Height(2) are WORDs
+      // CURSORDIR stores the display width/height as WORDs. The doubled height belongs to the DIB
+      // carried by RT_CURSOR (XOR bitmap plus AND mask), not to this resource-directory field.
       var width = BinaryPrimitives.ReadUInt16LittleEndian(data.AsSpan(entryBase));
       var height = BinaryPrimitives.ReadUInt16LittleEndian(data.AsSpan(entryBase + 2));
       var planes = BinaryPrimitives.ReadUInt16LittleEndian(data.AsSpan(entryBase + 4));
@@ -601,11 +620,9 @@ public static class PeResourceReader {
       var dibSize = curEntry.Size - 4;
       var dibOffset = curEntry.Offset + 4;
 
-      // For ICO/CUR directory entry, width/height must fit in a byte (0=256)
+      // For ICO/CUR directory entry, width/height must fit in a byte (0=256).
       var bWidth = width >= 256 ? (byte)0 : (byte)width;
-      // Cursor heights in PE are doubled (includes AND mask), so halve for ICO directory
-      var actualHeight = height / 2;
-      var bHeight = actualHeight >= 256 ? (byte)0 : (byte)actualHeight;
+      var bHeight = height >= 256 ? (byte)0 : (byte)height;
 
       entries.Add((hotspotX, hotspotY, bWidth, bHeight, 0, dibOffset, dibSize, planes, bitCount));
       totalDataSize += dibSize;
