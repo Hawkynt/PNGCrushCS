@@ -9,6 +9,7 @@ namespace FileFormat.Cdr.Tests;
 
 [TestFixture]
 public sealed class CdrReaderWriterTests {
+  private const int _MaxAuthoringDimension = short.MaxValue * 96 / 1000;
 
   [Test]
   [Category("Unit")]
@@ -125,26 +126,51 @@ public sealed class CdrReaderWriterTests {
       Assert.That(bitmap.AsSpan(2).SequenceEqual(expectedBitmap), Is.True);
       Assert.That(bitmap.AsSpan(2, 2).SequenceEqual("BM"u8), Is.True);
 
-      Assert.That(BinaryPrimitives.ReadInt16LittleEndian(pageConfiguration), Is.EqualTo(2000));
-      Assert.That(BinaryPrimitives.ReadInt16LittleEndian(pageConfiguration.AsSpan(2)), Is.EqualTo(2000));
+      Assert.That(BinaryPrimitives.ReadInt16LittleEndian(pageConfiguration), Is.EqualTo(21));
+      Assert.That(BinaryPrimitives.ReadInt16LittleEndian(pageConfiguration.AsSpan(2)), Is.EqualTo(21));
 
       Assert.That(page.AsSpan(0, 4).SequenceEqual("page"u8), Is.True);
       Assert.That(page.AsSpan(16, 4).SequenceEqual("LIST"u8), Is.True);
       Assert.That(page.AsSpan(24, 4).SequenceEqual("obj "u8), Is.True);
       Assert.That(page.AsSpan(28, 4).SequenceEqual("trfd"u8), Is.True);
-      Assert.That(BinaryPrimitives.ReadInt32LittleEndian(page.AsSpan(54)), Is.EqualTo(1000));
-      Assert.That(BinaryPrimitives.ReadInt32LittleEndian(page.AsSpan(66)), Is.EqualTo(1000));
+      Assert.That(BinaryPrimitives.ReadInt32LittleEndian(page.AsSpan(54)), Is.EqualTo(10));
+      Assert.That(BinaryPrimitives.ReadInt32LittleEndian(page.AsSpan(66)), Is.EqualTo(10));
       Assert.That(page.AsSpan(70, 4).SequenceEqual("loda"u8), Is.True);
-      Assert.That(BinaryPrimitives.ReadInt16LittleEndian(page.AsSpan(92)), Is.EqualTo(-2000));
-      Assert.That(BinaryPrimitives.ReadInt16LittleEndian(page.AsSpan(94)), Is.EqualTo(-2000));
+      Assert.That(BinaryPrimitives.ReadInt16LittleEndian(page.AsSpan(92)), Is.EqualTo(-21));
+      Assert.That(BinaryPrimitives.ReadInt16LittleEndian(page.AsSpan(94)), Is.EqualTo(-21));
       Assert.That(BinaryPrimitives.ReadUInt16LittleEndian(page.AsSpan(104)), Is.EqualTo(1));
+    });
+  }
+
+  [TestCase(1, 10)]
+  [TestCase(6, 63)]
+  [TestCase(8, 83)]
+  [TestCase(96, 1000)]
+  [TestCase(200, 2083)]
+  [TestCase(320, 3333)]
+  [TestCase(_MaxAuthoringDimension, 32760)]
+  [Category("Unit")]
+  public void FromRawImage_PageDimensions_MapPixelsToCdr4UnitsAt96Dpi(int pixels, int expectedUnits) {
+    var image = new RawImage {
+      Width = pixels,
+      Height = 1,
+      Format = PixelFormat.Bgr24,
+      PixelData = new byte[pixels * 3],
+    };
+
+    var file = CdrWriter.FromRawImage(image);
+    var pageConfiguration = file.Chunks.Single(static chunk => chunk.Id.ToString() == "mcfg").Data;
+
+    Assert.Multiple(() => {
+      Assert.That(BinaryPrimitives.ReadInt16LittleEndian(pageConfiguration), Is.EqualTo(expectedUnits));
+      Assert.That(BinaryPrimitives.ReadInt16LittleEndian(pageConfiguration.AsSpan(2)), Is.EqualTo(10));
     });
   }
 
   [TestCase(0, 1)]
   [TestCase(1, 0)]
-  [TestCase(CdrFile.MaxDimension + 1, 1)]
-  [TestCase(1, CdrFile.MaxDimension + 1)]
+  [TestCase(_MaxAuthoringDimension + 1, 1)]
+  [TestCase(1, _MaxAuthoringDimension + 1)]
   [Category("Unit")]
   public void FromRawImage_UnsupportedDimensions_Throw(int width, int height) {
     var image = new RawImage { Width = width, Height = height, Format = PixelFormat.Bgr24, PixelData = [] };
