@@ -2,8 +2,10 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using FileFormat.Avi;
 using FileFormat.Core;
 using Hawkynt.FileFormats.Video;
+using Hawkynt.FileFormats.Video.Tests;
 
 namespace FileFormat.Codecs.Mpeg4.Tests;
 
@@ -163,6 +165,34 @@ public sealed class Mpeg4VideoEncoderTests {
       var error = _MeanSquaredError(sources[index].PixelData, decoded[index].PixelData);
       Assert.That(error, Is.LessThan(worstMeanSquaredError),
         $"frame {index} came back {error:F1} squared levels from what went in");
+    }
+  }
+
+  [Test]
+  [Category("Conformance")]
+  public void FFmpegReadsEveryReorderedPicture() {
+    FFmpegOracle.RequireAvailable();
+
+    const int width = 64;
+    const int height = 48;
+    const int frames = 8;
+    var encoder = Mpeg4VideoEncoder.Create(_Stream(width, height));
+    var packets = new List<CodedPacket>();
+
+    for (var index = 0; index < frames; ++index)
+      if (encoder.TryEncode(_Picture(width, height, index), index, out var packet))
+        packets.Add(packet);
+    packets.AddRange(encoder.Flush());
+
+    var avi = VideoIO.Mux<AviWriter>([encoder.DescribeStream()], packets);
+    var path = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName() + ".avi");
+
+    try {
+      File.WriteAllBytes(path, avi);
+      var (decoded, detail) = FFmpegOracle.TryDecodeFrameCount(path, width, height, frames);
+      Assert.That(decoded, Is.True, detail);
+    } finally {
+      try { File.Delete(path); } catch { /* best effort */ }
     }
   }
 
