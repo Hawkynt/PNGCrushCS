@@ -24,8 +24,14 @@ namespace FileFormat.Cdr;
 public sealed class CdrFile :
   IImageFormatReader<CdrFile>, IImageToRawImage<CdrFile>, IImageFromRawImage<CdrFile>, IImageFormatWriter<CdrFile> {
 
-  /// <summary>Upper bound used while validating embedded previews and newly-authored bitmap pages.</summary>
+  /// <summary>Upper bound used while validating embedded previews while reading existing documents.</summary>
   public const int MaxDimension = 20000;
+
+  /// <summary>Largest raster axis that fits CDR4's signed 16-bit, 1/1000-inch coordinates at 96 DPI.</summary>
+  public const int MaxAuthoringDimension = short.MaxValue * AuthoredRasterDpi / Cdr4CoordinateUnitsPerInch;
+
+  internal const int Cdr4CoordinateUnitsPerInch = 1000;
+  internal const int AuthoredRasterDpi = 96;
 
   static string IImageFormatMetadata<CdrFile>.PrimaryExtension => ".cdr";
   static string[] IImageFormatMetadata<CdrFile>.FileExtensions => [".cdr"];
@@ -33,7 +39,7 @@ public sealed class CdrFile :
   static CdrFile IImageFromRawImage<CdrFile>.FromRawImage(RawImage image) => CdrWriter.FromRawImage(image);
   static byte[] IImageFormatWriter<CdrFile>.ToBytes(CdrFile file) => CdrWriter.ToBytes(file);
   static VideoMode[] IImageFormatMetadata<CdrFile>.VideoModes => [
-    new("Bitmap page / embedded preview", [(new IntegerRange(1, MaxDimension), new IntegerRange(1, MaxDimension))])
+    new("Bitmap page / embedded preview", [(new IntegerRange(1, MaxAuthoringDimension), new IntegerRange(1, MaxAuthoringDimension))])
   ];
 
   /// <summary>The four-byte RIFF form, for example <c>CDR9</c>, <c>CDRD</c> or <c>cdr8</c>.</summary>
