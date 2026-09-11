@@ -25,10 +25,12 @@ namespace FileFormat.Codecs.H263;
 internal ref struct H263BitReader {
 
   private readonly ReadOnlySpan<byte> _data;
+  private readonly bool _realVideoExtendedEscapeLevel;
   private int _bitPosition;
 
-  public H263BitReader(ReadOnlySpan<byte> data) {
+  public H263BitReader(ReadOnlySpan<byte> data, bool realVideoExtendedEscapeLevel = false) {
     this._data = data;
+    this._realVideoExtendedEscapeLevel = realVideoExtendedEscapeLevel;
     this._bitPosition = 0;
   }
 
@@ -37,6 +39,11 @@ internal ref struct H263BitReader {
 
   /// <summary>How many bits are left.</summary>
   public readonly int BitsRemaining => (this._data.Length << 3) - this._bitPosition;
+
+  /// <summary>
+  /// Whether the H.263-compatible block syntax uses RealVideo 1's extension of the escape level.
+  /// </summary>
+  internal readonly bool HasRealVideoExtendedEscapeLevel => this._realVideoExtendedEscapeLevel;
 
   /// <summary>Takes one bit.</summary>
   public int ReadBit() {

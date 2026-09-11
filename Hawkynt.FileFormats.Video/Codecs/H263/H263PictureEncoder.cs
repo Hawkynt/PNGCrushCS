@@ -46,25 +46,45 @@ internal sealed class H263PictureEncoder {
   private readonly H263Frame? _reference;
   private readonly int _macroblockWidth;
   private readonly int _macroblockHeight;
-  private readonly H263BitWriter _writer = new();
+  private readonly H263BitWriter _writer;
 
   /// <summary>Every macroblock's vector, kept because 6.1.1's predictor is a median of neighbours.</summary>
   private readonly short[] _vectorX;
   private readonly short[] _vectorY;
 
   internal H263PictureEncoder(
-    int sourceFormat, int temporalReference, int quantiser, H263Frame source, H263Frame? reference = null) {
+    int sourceFormat, int temporalReference, int quantiser, H263Frame source, H263Frame? reference = null)
+    : this(quantiser, source, reference, new()) {
     if (sourceFormat is < 1 or > 5)
       throw new ArgumentOutOfRangeException(nameof(sourceFormat));
 
+    this._sourceFormat = sourceFormat;
+    this._temporalReference = temporalReference & 0xFF;
+  }
+
+  /// <summary>
+  /// An encoder for the macroblock layer alone, writing into a caller's bit writer under a picture
+  /// header the caller has already written.
+  /// </summary>
+  /// <remarks>
+  /// RealVideo 1 is what this exists for: its picture header is its own, its macroblock layer is
+  /// H.263's, and its decoder already hands that layer to <see cref="H263PictureDecoder"/>. Sharing
+  /// the writer the same way is what keeps the median vector predictor, the complemented CBPY of an
+  /// inter macroblock and the COD rule from existing twice and drifting apart. No source format is
+  /// taken because nothing here writes the field one would go in.
+  /// </remarks>
+  internal static H263PictureEncoder ForMacroblockLayer(
+    H263Frame source, int quantiser, H263Frame? reference, H263BitWriter writer)
+    => new(quantiser, source, reference, writer);
+
+  private H263PictureEncoder(int quantiser, H263Frame source, H263Frame? reference, H263BitWriter writer) {
     if (quantiser is < 1 or > 31)
       throw new ArgumentOutOfRangeException(nameof(quantiser));
 
-    this._sourceFormat = sourceFormat;
-    this._temporalReference = temporalReference & 0xFF;
     this._quantiser = quantiser;
     this._source = source ?? throw new ArgumentNullException(nameof(source));
     this._reference = reference;
+    this._writer = writer;
     this._macroblockWidth = source.LumaWidth / 16;
     this._macroblockHeight = source.LumaHeight / 16;
     this._vectorX = new short[this._macroblockWidth * this._macroblockHeight];
@@ -74,7 +94,12 @@ internal sealed class H263PictureEncoder {
   /// <summary>Encodes the complete picture and returns its byte-aligned elementary-stream payload.</summary>
   internal byte[] Encode() {
     this._WritePictureHeader();
+    this.EncodeMacroblocks();
+    return this._writer.ToArray();
+  }
 
+  /// <summary>Writes the macroblock layer, under whatever picture header has already been written.</summary>
+  internal void EncodeMacroblocks() {
     Span<int> samples = stackalloc int[64];
     Span<int> levels = stackalloc int[6 * 64];
     Span<int> direct = stackalloc int[6];
@@ -111,8 +136,6 @@ internal sealed class H263PictureEncoder {
         H263BlockEncoder.WriteIntra(
           this._writer, direct[index], levels.Slice(index * 64, 64), coded[index]);
     }
-
-    return this._writer.ToArray();
   }
 
   /// <summary>Writes one macroblock of a predicted picture, or nothing at all when COD says so.</summary>
