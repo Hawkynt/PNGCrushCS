@@ -166,10 +166,12 @@ public static class JpegXlReader {
 
       var references = new float[_ReferenceSlots][][];
       var referenceSizes = new (int Width, int Height)[_ReferenceSlots];
+      var progressiveDc = new JxlProgressiveDcState();
       var frame = JxlSpecFrameHeader.Decode(reader, imageMetadata, width, height);
-      while (frame.FrameType == JxlFrameType.ReferenceOnly) {
-        var next = _DecodeReferenceFrame(
-          codestream, reader, imageMetadata, frame, references, referenceSizes);
+      while (frame.FrameType is JxlFrameType.ReferenceOnly or JxlFrameType.DcFrame) {
+        var next = frame.FrameType == JxlFrameType.DcFrame
+          ? progressiveDc.DecodeAndStore(codestream, reader, imageMetadata, frame, width, height)
+          : _DecodeReferenceFrame(codestream, reader, imageMetadata, frame, references, referenceSizes);
         reader = new JxlBitReader(codestream, next);
         frame = JxlSpecFrameHeader.Decode(reader, imageMetadata, width, height);
       }
@@ -223,6 +225,9 @@ public static class JpegXlReader {
         return true;
       }
 
+      var referencedDc = (frame.Flags & _FlagUseDcFrame) != 0
+        ? progressiveDc.RequireForConsumerLevel(frame.DcLevel)
+        : null;
       image = JxlVarDctSpecDecoder.Decode(
         reader,
         width,
@@ -241,7 +246,10 @@ public static class JpegXlReader {
         numExtraChannels: (int)imageMetadata.NumExtraChannels,
         frameFlags: frame.Flags,
         numPasses: (int)frame.NumPasses,
-        passShifts: frame.PassShifts);
+        passShifts: frame.PassShifts,
+        passDownsample: frame.PassDownsample,
+        passLastPass: frame.PassLastPass,
+        dcFrame: referencedDc);
 
       if (patches != null && image is JxlVarDctImage patched)
         JxlPatches.Apply(
@@ -278,6 +286,7 @@ public static class JpegXlReader {
   private const ulong _FlagNoise = 1;
   private const ulong _FlagPatches = 2;
   private const ulong _FlagSplines = 16;
+  private const ulong _FlagUseDcFrame = 0x20;
   private const int _ReferenceSlots = 4;
 
   private static object? _DecodeComposed(
@@ -306,6 +315,7 @@ public static class JpegXlReader {
                         && imageMetadata.ExtraChannelInfo[alphaPlane - 3].AlphaAssociated;
 
     var references = new float[_ReferenceSlots][][];
+    var progressiveDc = new JxlProgressiveDcState();
     float[][]? composed = null;
     var shown = new List<float[][]>();
 
@@ -327,6 +337,10 @@ public static class JpegXlReader {
         reader = new JxlBitReader(codestream, at);
 
       frame = JxlSpecFrameHeader.Decode(reader, imageMetadata, width, height);
+      if (frame.FrameType == JxlFrameType.DcFrame) {
+        at = progressiveDc.DecodeAndStore(codestream, reader, imageMetadata, frame, width, height);
+        continue;
+      }
       if (frame.FrameType is not (JxlFrameType.Regular or JxlFrameType.SkipProgressive))
         throw new NotSupportedException(
           $"This JPEG XL file has a {frame.FrameType} frame, which this decoder does not compose.");
@@ -375,6 +389,9 @@ public static class JpegXlReader {
           throw new NotSupportedException(
             "This JPEG XL file has a lossy frame carrying splines, which this decoder does not draw.");
 
+        var referencedDc = (frame.Flags & _FlagUseDcFrame) != 0
+          ? progressiveDc.RequireForConsumerLevel(frame.DcLevel)
+          : null;
         var lossy = JxlVarDctSpecDecoder.Decode(
           reader,
           frameWidth,
@@ -393,7 +410,10 @@ public static class JpegXlReader {
           numExtraChannels: extraChannels,
           frameFlags: frame.Flags,
           numPasses: (int)frame.NumPasses,
-          passShifts: frame.PassShifts);
+          passShifts: frame.PassShifts,
+          passDownsample: frame.PassDownsample,
+          passLastPass: frame.PassLastPass,
+          dcFrame: referencedDc);
 
         foreground = _LossyPlanes(lossy, frameWidth, frameHeight, planeCount, extraScales);
       }
@@ -596,8 +616,7 @@ public static class JpegXlReader {
         throw new InvalidDataException("A lossy frame did not decode to the size it states.");
 
     if (extraScales.Length > 0 && lossy.ExtraChannels.Length < extraScales.Length)
-      throw new NotSupportedException(
-        "This JPEG XL file has a lossy frame whose extra channels are carried group by group, which this decoder does not read.");
+      throw new NotSupportedException("This JPEG XL lossy frame did not decode all of its extra channels.");
 
     var planes = new float[planeCount][];
     for (var p = 0; p < planeCount; ++p)
@@ -838,7 +857,9 @@ public static class JpegXlReader {
       NumExtraChannels: (int)image.NumExtraChannels,
       IsXybEncoded: image.XybEncoded,
       IsModularFrame: frame.Encoding == JxlFrameEncoding.Modular,
-      IsProgressiveFrame: frame.NumPasses > 1);
+      IsProgressiveFrame: frame.NumPasses > 1
+                          || frame.FrameType == JxlFrameType.DcFrame
+                          || (frame.Flags & _FlagUseDcFrame) != 0);
 
   private static void _PopulatePartial(int width, int height, JxlImageMetadata? image, ref JpegXlSpecMetadata metadata) {
     metadata = new JpegXlSpecMetadata(
