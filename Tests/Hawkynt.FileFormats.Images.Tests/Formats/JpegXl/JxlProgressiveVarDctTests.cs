@@ -1,3 +1,4 @@
+using System;
 using FileFormat.JpegXl.Codec;
 
 namespace FileFormat.JpegXl.Tests;
@@ -6,10 +7,10 @@ namespace FileFormat.JpegXl.Tests;
 [TestFixture]
 public sealed class JxlProgressiveVarDctTests {
 
-  [TestCase("libjxl_progressive_ac_64x48.jxl")]
-  [TestCase("libjxl_qprogressive_ac_64x48.jxl")]
+  [TestCase("libjxl_progressive_ac_64x48.jxl.b64")]
+  [TestCase("libjxl_qprogressive_ac_64x48.jxl.b64")]
   public void ProgressiveAcFrameDecodesAllPasses(string fixture) {
-    var bytes = TestHelper.Fixture(fixture);
+    var bytes = _Fixture(fixture);
 
     Assert.That(JpegXlReader.TryReadSpecMetadata(bytes, out var metadata), Is.True);
     Assert.Multiple(() => {
@@ -34,7 +35,7 @@ public sealed class JxlProgressiveVarDctTests {
 
   [Test]
   public void QuantizedProgressiveHeaderRetainsNonZeroPassShifts() {
-    var bytes = TestHelper.Fixture("libjxl_qprogressive_ac_64x48.jxl");
+    var bytes = _Fixture("libjxl_qprogressive_ac_64x48.jxl.b64");
     var reader = new JxlBitReader(bytes, 2);
     var (width, height) = JxlSizeHeader.Decode(reader);
     var image = JxlImageMetadata.Decode(reader);
@@ -49,4 +50,7 @@ public sealed class JxlProgressiveVarDctTests {
       Assert.That(frame.PassShifts, Has.Some.GreaterThan(0u));
     });
   }
+
+  private static byte[] _Fixture(string name)
+    => Convert.FromBase64String(System.Text.Encoding.ASCII.GetString(TestHelper.Fixture(name)));
 }
