@@ -31,8 +31,20 @@ public readonly record struct FpxFile
   /// </remarks>
   static string[] IImageFormatMetadata<FpxFile>.FileExtensions => [".fpx", ".mix"];
 
+  /// <summary>
+  /// Claims a compound file, declines anything else, and answers "undecided" only when there is not
+  /// yet enough header to tell.
+  /// </summary>
+  /// <remarks>
+  /// A FlashPix picture has no magic of its own: it is an OLE compound document, and what makes it
+  /// FlashPix lives in a stream inside it rather than in the first bytes. Within a registry of image
+  /// formats that is enough to name it, because it is the only image format built on a compound
+  /// document — a compound file that is a spreadsheet is not something an image registry classifies
+  /// either way. Answering "undecided" instead left the format unreachable by signature: the registry
+  /// falls through to a magic-byte list, and there is no such list to fall through to.
+  /// </remarks>
   static bool? IImageFormatMetadata<FpxFile>.MatchesSignature(ReadOnlySpan<byte> header)
-    => header.Length < CompoundFile.Signature.Length ? null : CompoundFile.HasSignature(header) ? null : false;
+    => header.Length < CompoundFile.Signature.Length ? null : CompoundFile.HasSignature(header);
 
   static FpxFile IImageFormatReader<FpxFile>.FromSpan(ReadOnlySpan<byte> data) => FpxReader.FromSpan(data);
   static FpxFile IImageFromRawImage<FpxFile>.FromRawImage(RawImage image, string extension) => FromRawImage(image, extension);
