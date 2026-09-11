@@ -24,16 +24,16 @@ namespace FileFormat.Codecs;
 /// data — so a Windows Media Video stream cannot be decoded from its packets alone, and the demuxer's
 /// habit of handing the codec's private data across untouched is what makes it decodable at all.
 /// <para/>
-/// <b>What it does not do refuses by name.</b> Predicted and bidirectionally predicted pictures need
-/// motion compensation against reference sample planes this decoder does not build, so each is
-/// refused as what it is. A skipped picture is different: it carries no motion or residual syntax and
-/// means the previous picture over again, so the last displayed RGB samples are retained solely to
-/// honour that case. The Advanced profile is refused at the stream, under its own codes <c>WVC1</c> and
-/// <c>WMVA</c>, since it carries a sequence header and an entry point structure of its own inside a byte
-/// stream and shares only its block layer with what is here.
+/// <b>What it does not do refuses by name.</b> A predicted picture, a bidirectionally predicted one
+/// and a skipped one are each refused as what they are, because every one of them needs motion
+/// compensation against a reference this decoder never builds. The Advanced profile is refused at the
+/// stream, under its own codes <c>WVC1</c> and <c>WMVA</c>, since it carries a sequence header and an
+/// entry point structure of its own inside a byte stream and shares only its block layer with what is
+/// here.
 /// Multi-resolution coding, range reduction and the in-loop deblocking filter are refused where the
-/// stream signals them. There is no fallback that substitutes a plausible-looking picture for syntax
-/// this decoder does not understand.
+/// stream signals them. There is no <c>catch</c> anywhere that hands back a blank, a copied or a
+/// repeated picture: a repeated frame is what a legitimate still passage looks like, and nobody checks
+/// a picture that looks like a picture.
 /// </remarks>
 public sealed class Vc1VideoDecoder : IVideoCodecDecoder<Vc1VideoDecoder> {
 
@@ -66,7 +66,6 @@ public sealed class Vc1VideoDecoder : IVideoCodecDecoder<Vc1VideoDecoder> {
   private readonly int _width;
   private readonly int _height;
   private readonly Vc1PictureDecoder _pictures;
-  private byte[]? _previousPixels;
 
   private Vc1VideoDecoder(Vc1SequenceHeader sequence, int width, int height) {
     this._sequence = sequence;
@@ -179,38 +178,25 @@ public sealed class Vc1VideoDecoder : IVideoCodecDecoder<Vc1VideoDecoder> {
   }
 
   /// <summary>Decodes one packet and hands back the picture it holds.</summary>
-  /// <returns><c>false</c> when the packet held no picture that can be displayed yet.</returns>
+  /// <returns><c>false</c> when the packet held no picture at all.</returns>
   public bool TryDecode(CodedPacket packet, out RawImage frame) {
     var data = packet.Data.Span;
 
-    // A Simple or Main profile picture of one byte or fewer is a skipped picture: the previous picture
-    // over again (7.1.1.4). A stream that begins with one has nothing to repeat; after the first real
-    // picture the retained RGB samples are enough because a skipped picture changes no sample.
+    // A Simple or Main profile picture of one byte or fewer is a skipped picture, which is the previous
+    // one over again (7.1.1.4). This decoder holds no previous picture, so there is nothing to repeat.
     if (data.Length <= 1) {
-      if (this._previousPixels == null) {
-        frame = null!;
-        return false;
-      }
-
-      frame = new() {
-        Width = this._width,
-        Height = this._height,
-        Format = PixelFormat.Rgb24,
-        PixelData = (byte[])this._previousPixels.Clone(),
-      };
-      return true;
+      frame = null!;
+      return false;
     }
 
     var picture = this._pictures.Decode(data, default, out _);
-    var pixels = Vc1ColorConversion.ToRgb24(picture, this._width, this._height);
 
     frame = new() {
       Width = this._width,
       Height = this._height,
       Format = PixelFormat.Rgb24,
-      PixelData = pixels,
+      PixelData = Vc1ColorConversion.ToRgb24(picture, this._width, this._height),
     };
-    this._previousPixels = (byte[])pixels.Clone();
 
     return true;
   }
