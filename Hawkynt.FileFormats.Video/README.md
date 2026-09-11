@@ -93,7 +93,7 @@ the size that went in.
 Every codec the package registers has a row, and the name in the first column is the codec's own
 `CodecName` — the same string a refusal message names it by. `Decode` is what
 [`VideoFormatRegistry.CreateDecoder`](https://github.com/Hawkynt/PNGCrushCS/blob/main/Hawkynt.FileFormats.Video/VideoFormatRegistry.cs) builds, 100 of them; `Encode` is
-what [`VideoFormatRegistry.CreateEncoder`](https://github.com/Hawkynt/PNGCrushCS/blob/main/Hawkynt.FileFormats.Video/VideoFormatRegistry.cs) builds, 55 of them. The two
+what [`VideoFormatRegistry.CreateEncoder`](https://github.com/Hawkynt/PNGCrushCS/blob/main/Hawkynt.FileFormats.Video/VideoFormatRegistry.cs) builds, 56 of them. The two
 are separate tables in the registry because they are looked up by different things: a decoder by a
 whole stream description, an encoder by the four-character code a caller wants written.
 
@@ -104,7 +104,7 @@ forms no encoder produces, because a plausible wrong picture is worse than a ref
 silently misdecodes what it will not read. An `Encode` tick is a lossless or format-faithful writer.
 Where the codec has a lossless form the encoder writes it and refuses by name any picture it would
 have to reduce to fit; where the format itself is lossy — Motion JPEG, Microsoft Video 1, Cinepak, DV,
-Microsoft's MPEG-4, ASUS V1 and V2, Apple Video, H.261, H.263, MPEG-1 video, MPEG-2 video, MPEG-4 Part 2, Hap, Apple ProRes, id RoQ — the row says so, because there is nothing else such an encoder
+Microsoft's MPEG-4, ASUS V1 and V2, Apple Video, H.261, H.263, MPEG-1 video, MPEG-2 video, MPEG-4 Part 2, On2 VP3, Hap, Apple ProRes, id RoQ — the row says so, because there is nothing else such an encoder
 could write. Codec-by-codec provenance and
 measurement notes are in
 [`codec-notes.md`](https://github.com/Hawkynt/PNGCrushCS/blob/main/Hawkynt.FileFormats.Video/codec-notes.md).
@@ -124,7 +124,7 @@ measurement notes are in
 | [VC-1 / Windows Media Video 9 (SMPTE 421M, Simple and Main profile intra pictures)](https://en.wikipedia.org/wiki/VC-1) | ⚠️ | — | — | `WMV3`, Simple and Main profile **intra pictures only**; sequence header read from container private data. Predicted, bidirectional and skipped pictures, Advanced profile (`WVC1`, `WMVA`), MULTIRES, RANGERED and LOOPFILTER each refused by name | [SMPTE ST 421](https://ieeexplore.ieee.org/document/7290900) |
 | [Microsoft MPEG-4 versions 1 to 3 video (MPG4/MP42/MP43)](https://wiki.multimedia.cx/index.php/Microsoft_MPEG-4) | ⚠️ | ✅ | ffmpeg | All three variants, intra and predicted pictures: version 1 (`MPG4`, `MP41`, `DIV1`), version 2 (`MP42`, `DIV2`) and version 3 (`MP43`, `DIV3`-`DIV6`, `DVX3`, `AP41`, `AP42`, `COL0`, `COL1`, `MPG3`, and Matroska's `V_MPEG4/MS/V3`). Windows Media Video 7 and 8 (`WMV1`, `WMV2`) are accepted by the registry and then refused by name. The encoder writes any of the three, one slice a picture, one motion vector a macroblock and no alternating current prediction; the registry routes `MP43` to it | [DIVX3/MS-MPEG4 v1-v3](https://wiki.multimedia.cx/index.php/Microsoft_MPEG-4) |
 | [RealVideo 1 (RV10/RV13)](https://en.wikipedia.org/wiki/RealVideo) | ⚠️ | — | — | `RV10`, `RV13` at bitstream revision 0; H.263 macroblock layer under RealVideo's own slice header. PB-frames refused. RealVideo 2/3/4 are not claimed at all, so they reach the registry's own "no codec decodes this" refusal | [ITU-T H.263](https://www.itu.int/rec/T-REC-H.263) |
-| [On2 VP3](https://en.wikipedia.org/wiki/VP3) | ⚠️ | — | — | VP3.1 (`VP31`, `VP32`) entire. `VP30` is accepted and then refused: a VP3.0 key frame cannot be read with VP3.1's rules at any bit offset | [Theora specification, Appendix B](https://www.theora.org/doc/Theora.pdf) |
+| [On2 VP3](https://en.wikipedia.org/wiki/VP3) | ✅ | ✅ | ffmpeg | VP3.1 (`VP31`, `VP32`) entire, and `VP30`, whose key frames carry sixteen fewer header bits and are normalised into the VP3.1 shape rather than read by a second decoder. The encoder writes VP3.1 intra and inter frames in groups of twelve, choosing per macro block between a searched whole-sample vector, no displacement, and -- a whole super block at a time -- not coding the blocks at all. Modes and vectors are written in the literal forms the format offers, and the golden frame is never referenced. Lossy by construction: every coded block goes through the transform and a quantiser, and VP3 has no lossless form | [Theora specification, Appendix B](https://www.theora.org/doc/Theora.pdf) |
 | [VP8 (RFC 6386)](https://en.wikipedia.org/wiki/VP8) | ✅ | — | — | RFC 6386 entire. Reserved bitstream versions and the reserved colour-space/clamping fields refused | [RFC 6386](https://www.rfc-editor.org/rfc/rfc6386) |
 | [VP9 (profiles 0-3)](https://en.wikipedia.org/wiki/VP9) | ✅ | ✅ | ffmpeg | Profiles 0-3: 8-, 10- and 12-bit, 4:2:0 and the non-4:2:0 layouts, and the full-range sRGB/GBR representation | [WebM VP9](https://www.webmproject.org/vp9/) |
 | [Theora (Xiph.Org Theora I)](https://en.wikipedia.org/wiki/Theora) | ✅ | — | — | Xiph.Org Theora I, all three pixel formats. Bitstream versions other than 3.2, the reserved pixel format and set reserved bits refused | [Theora specification](https://www.theora.org/doc/Theora.pdf) |
@@ -412,7 +412,7 @@ Those rules exist because “find a familiar marker and split there” works on 
 
 <!-- API:BEGIN generated by Hawkynt/RepositoryTemplate/package-readme — edit the XML docs in source, not here -->
 
-Every public and protected member of all 480 types, generated from the built assembly and its XML documentation, is in [REFERENCE.md](https://github.com/Hawkynt/PNGCrushCS/blob/main/Hawkynt.FileFormats.Video/REFERENCE.md).
+Every public and protected member of all 481 types, generated from the built assembly and its XML documentation, is in [REFERENCE.md](https://github.com/Hawkynt/PNGCrushCS/blob/main/Hawkynt.FileFormats.Video/REFERENCE.md).
 
 <!-- API:END -->
 
@@ -435,7 +435,7 @@ Every public and protected member of all 480 types, generated from the built ass
 - Large RealVideo pictures require preserved slice offsets when they must be split across 16-bit RealMedia packet lengths, and RoQ sound requires its original predictor argument.
 - Several advanced codecs intentionally implement well-defined subsets (for example H.264 progressive 8-bit 4:2:0, HEVC without the range and screen-content extensions, and VC-1 Simple/Main intra pictures). Every row marked ⚠️ in the codec table names its own subset. Unsupported profiles/features are refused by name rather than silently misdecoded.
 - Codec support is more precise than a single green check can express; consult [`codec-notes.md`](https://github.com/Hawkynt/PNGCrushCS/blob/main/Hawkynt.FileFormats.Video/codec-notes.md) before relying on a profile/level/feature not named in this README.
-- Encoding is a smaller domain than decoding on purpose: 55 codecs of the 100 read can also be written. Most are lossless; sixteen are not, and each says so in its own row. Motion JPEG writes baseline JPEG, whose loss is a matter of degree, and DV's fixed-length frames, Microsoft Video 1's two-colours-to-a-block coding, Cinepak's vector quantisation, Microsoft's MPEG-4 transform, the ASUS codecs' quantised DCT, Apple Video's 15-bit blocks, H.261's, H.263's, MPEG-1 video's, MPEG-2 video's, MPEG-4 Part 2's and Apple ProRes's quantised transforms, Hap's texture blocks and id RoQ's vector quantisation have no lossless form at all — a picture that codec can hold exactly comes back exactly, and one it cannot does not. What is still not written back is the modern lossy codecs: a stream read as H.264 cannot be written back as H.264.
+- Encoding is a smaller domain than decoding on purpose: 56 codecs of the 100 read can also be written. Most are lossless; seventeen are not, and each says so in its own row. Motion JPEG writes baseline JPEG, whose loss is a matter of degree, and DV's fixed-length frames, Microsoft Video 1's two-colours-to-a-block coding, Cinepak's vector quantisation, Microsoft's MPEG-4 transform, the ASUS codecs' quantised DCT, Apple Video's 15-bit blocks, H.261's, H.263's, MPEG-1 video's, MPEG-2 video's, MPEG-4 Part 2's, VP3's and Apple ProRes's quantised transforms, Hap's texture blocks and id RoQ's vector quantisation have no lossless form at all — a picture that codec can hold exactly comes back exactly, and one it cannot does not. What is still not written back is the modern lossy codecs: a stream read as H.264 cannot be written back as H.264.
 - Video correctness depends on real-world packetization as much as codec math. The project therefore validates packet counts, sizes, timestamps, and key-frame flags against external tools where samples are available.
 
 ## ❤️ Support
