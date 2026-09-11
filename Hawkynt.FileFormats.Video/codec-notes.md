@@ -441,6 +441,40 @@ same streams ffmpeg's own two inverse transforms differ from each other by tens 
 per frame. The residual is the transform's, which both standards specify as a formula with an accuracy
 bound rather than as an algorithm, and not a disagreement about the bitstream.
 
+**Encoding writes I and P pictures, Main Profile at Main Level.** The arrangement is MPEG-1's and for
+the same reasons — groups of twelve, prediction taken from a decoder this encoder drives with its own
+output rather than from the source, macroblocks that neither moved nor left a residual not written at
+all, and a search whose incumbent is the zero vector so that a background macroblock can reach that
+state. What is not shared is the vector arithmetic. MPEG-2 has no `full_pel_forward_vector`: every
+vector counts half-samples, and f_code 3 is what buys a range of [-32, 31] whole pixels, because
+7.6.3.1 folds the *reconstructed* vector into the range the f_code states and a vector beyond it comes
+back as a different vector rather than as an expensive one.
+
+**The prediction is formed by the routine the decoder predicts with, not by a copy of it**, and
+chrominance is why. The search is whole-pixel, so a luminance vector is always an even number of
+half-samples and its prediction is a plain copy; but 7.6.3.4 halves the vector for a 4:2:0 chrominance
+plane, so an odd luminance displacement lands chrominance *between* two samples and the decoder
+interpolates. An encoder that rounded to the nearer sample there would compute its residual against a
+prediction its decoder never forms, and the error — a colour fringe on moving edges — would accumulate
+along the group while every luminance comparison stayed clean. The same routine also decides which
+vectors the search may consider at all: an interpolated prediction reaches one sample further than a
+copied one, so chrominance can fall off the reference where luminance does not, and neither standard
+permits a vector that reads outside the reference picture.
+
+The quantiser is the one place a predicted picture is not cheap here. A residual is quantised as
+finely as an intra picture is, so a predicted picture buys its saving by not restating the background
+rather than by stating what it does state coarsely, and the measured margin against coding every
+picture whole is accordingly modest. What the tests pin instead is the property that actually proves
+skipping works: a still scene converges — the first predicted picture corrects the intra picture's own
+quantisation error, and once that correction is in the reference, every macroblock but the two a slice
+must always code goes unwritten.
+
+Verification runs outward as well as in a circle. A twenty-four frame clip crossing a group boundary is
+written as an elementary stream and decoded by **ffmpeg**, with every frame compared rather than only
+the first: the registry's own oracle asks for frame one, which in a group is the intra picture, so a
+malformed vector or a miscounted address increment would pass it and fail in a real player on frame
+two.
+
 ### Microsoft RLE
 
 Run-length coded palettised frames at four bits a pixel and at eight, with the end-of-line, delta and

@@ -69,7 +69,7 @@ internal static class Mpeg1BlockEncoder {
       return;
 
     var bits = differential > 0 ? differential : differential + (1 << size) - 1;
-    writer.Write(bits, size);
+    writer.WriteBits(bits, size);
   }
 
   private static void _WriteCoefficient(MpegBitWriter writer, int run, int level) {
@@ -81,21 +81,21 @@ internal static class Mpeg1BlockEncoder {
     }
 
     writer.WriteCode(_CoefficientCodes[MpegVlcTables.CoefficientEscape]);
-    writer.Write(run, 6);
+    writer.WriteBits(run, 6);
 
     if (level is >= -127 and <= 127) {
-      writer.Write(level & 0xFF, 8);
+      writer.WriteBits(level & 0xFF, 8);
       return;
     }
 
     if (level > 0) {
-      writer.Write(0, 8);
-      writer.Write(level, 8);
+      writer.WriteBits(0, 8);
+      writer.WriteBits(level, 8);
       return;
     }
 
-    writer.Write(0x80, 8);
-    writer.Write(level + 256, 8);
+    writer.WriteBits(0x80, 8);
+    writer.WriteBits(level + 256, 8);
   }
 
   private static IReadOnlyDictionary<int, string> _Reverse(MpegVlcTable table)

@@ -235,38 +235,38 @@ public sealed class Mpeg1VideoEncoder : IVideoCodecEncoder<Mpeg1VideoEncoder> {
     };
 
   private void _WriteSequenceHeader(MpegBitWriter writer) {
-    writer.StartCode(MpegStartCode.SequenceHeader);
-    writer.Write(this._width, 12);
-    writer.Write(this._height, 12);
-    writer.Write(1, 4);                    // pel_aspect_ratio: square pels
-    writer.Write(this._frameRateCode, 4);
-    writer.Write(0x3FFFF, 18);             // bit_rate: variable/unspecified
+    writer.WriteStartCode(MpegStartCode.SequenceHeader);
+    writer.WriteBits(this._width, 12);
+    writer.WriteBits(this._height, 12);
+    writer.WriteBits(1, 4);                    // pel_aspect_ratio: square pels
+    writer.WriteBits(this._frameRateCode, 4);
+    writer.WriteBits(0x3FFFF, 18);             // bit_rate: variable/unspecified
     writer.WriteBit(1);                    // marker_bit
-    writer.Write(0x3FF, 10);               // largest VBV buffer size the field can state
+    writer.WriteBits(0x3FF, 10);               // largest VBV buffer size the field can state
     writer.WriteBit(0);                    // constrained_parameters_flag
     writer.WriteBit(0);                    // load_intra_quantizer_matrix: use the default
     writer.WriteBit(0);                    // load_non_intra_quantizer_matrix
   }
 
   private void _WritePicture(MpegBitWriter writer, Yuv420Planes planes, MpegFrame? reference) {
-    writer.StartCode(MpegStartCode.Picture);
-    writer.Write(this._pictureIndex & 0x3FF, 10); // temporal_reference
-    writer.Write(reference == null ? MpegPictureDecoder.IntraCoded : MpegPictureDecoder.PredictiveCoded, 3);
-    writer.Write(0xFFFF, 16);                    // vbv_delay: unspecified
+    writer.WriteStartCode(MpegStartCode.Picture);
+    writer.WriteBits(this._pictureIndex & 0x3FF, 10); // temporal_reference
+    writer.WriteBits(reference == null ? MpegPictureDecoder.IntraCoded : MpegPictureDecoder.PredictiveCoded, 3);
+    writer.WriteBits(0xFFFF, 16);                    // vbv_delay: unspecified
 
     if (reference != null) {
       // full_pel_forward_vector: the vectors below count whole pixels, so no half-pixel
       // interpolation stands between the prediction and the samples the search compared.
       writer.WriteBit(1);
-      writer.Write(_FORWARD_F_CODE, 3);
+      writer.WriteBits(_FORWARD_F_CODE, 3);
     }
 
     writer.WriteBit(0);                          // extra_bit_picture
 
     // One slice beginning in the first macroblock row. A slice may continue across rows; using one
     // for the whole picture also keeps pictures taller than the 175 start-code row values encodable.
-    writer.StartCode(MpegStartCode.FirstSlice);
-    writer.Write(_QUANTISER_SCALE, 5);
+    writer.WriteStartCode(MpegStartCode.FirstSlice);
+    writer.WriteBits(_QUANTISER_SCALE, 5);
     writer.WriteBit(0); // extra_bit_slice
 
     Span<int> block = stackalloc int[64];
@@ -332,7 +332,7 @@ public sealed class Mpeg1VideoEncoder : IVideoCodecEncoder<Mpeg1VideoEncoder> {
       writer.WriteCode(_CodedBlockPatternCodes[pattern]);
       for (var index = 0; index < 6; ++index)
         if ((pattern & (1 << (5 - index))) != 0)
-          Mpeg1InterBlockEncoder.Write(writer, levels.Slice(index * 64, 64));
+          MpegInterBlockEncoder.Write(writer, levels.Slice(index * 64, 64), isMpeg2: false);
     }
   }
 
@@ -465,7 +465,7 @@ public sealed class Mpeg1VideoEncoder : IVideoCodecEncoder<Mpeg1VideoEncoder> {
         planes.Y, planes.YWidth, planes.YHeight,
         reference.Luma, reference.LumaWidth, reference.LumaHeight,
         x, y, vectorX, vectorY, block);
-      if (Mpeg1InterBlockEncoder.TryQuantise(block, _QUANTISER_SCALE, levels.Slice(index * 64, 64)))
+      if (MpegInterBlockEncoder.TryQuantise(block, _QUANTISER_SCALE, isMpeg2: false, levels.Slice(index * 64, 64)))
         pattern |= 1 << (5 - index);
     }
 
@@ -481,14 +481,14 @@ public sealed class Mpeg1VideoEncoder : IVideoCodecEncoder<Mpeg1VideoEncoder> {
       planes.Cb, planes.ChromaWidth, planes.ChromaHeight,
       reference.Cb, reference.ChromaWidth, reference.ChromaHeight,
       chromaX, chromaY, chromaVectorX, chromaVectorY, block);
-    if (Mpeg1InterBlockEncoder.TryQuantise(block, _QUANTISER_SCALE, levels.Slice(4 * 64, 64)))
+    if (MpegInterBlockEncoder.TryQuantise(block, _QUANTISER_SCALE, isMpeg2: false, levels.Slice(4 * 64, 64)))
       pattern |= 1 << 1;
 
     _ReadResidual(
       planes.Cr, planes.ChromaWidth, planes.ChromaHeight,
       reference.Cr, reference.ChromaWidth, reference.ChromaHeight,
       chromaX, chromaY, chromaVectorX, chromaVectorY, block);
-    if (Mpeg1InterBlockEncoder.TryQuantise(block, _QUANTISER_SCALE, levels.Slice(5 * 64, 64)))
+    if (MpegInterBlockEncoder.TryQuantise(block, _QUANTISER_SCALE, isMpeg2: false, levels.Slice(5 * 64, 64)))
       pattern |= 1 << 0;
 
     return pattern;
@@ -520,7 +520,7 @@ public sealed class Mpeg1VideoEncoder : IVideoCodecEncoder<Mpeg1VideoEncoder> {
 
     writer.WriteCode(_MotionCodes[difference < 0 ? -code : code]);
     if (_MOTION_SCALE > 1)
-      writer.Write(residual, _FORWARD_F_CODE - 1);
+      writer.WriteBits(residual, _FORWARD_F_CODE - 1);
   }
 
   /// <summary>One sample of a plane, with the edge repeated past its bounds.</summary>

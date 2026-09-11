@@ -5,15 +5,24 @@ using FileFormat.Codecs.H261;
 
 namespace FileFormat.Codecs.Mpeg;
 
-/// <summary>Codes one MPEG-1 non-intra block: the residual left after motion compensation.</summary>
+/// <summary>Codes one MPEG non-intra block: the residual left after motion compensation.</summary>
 /// <remarks>
+/// One writer serves both standards, for the same reason the decoder reads both with one block
+/// reader: a non-intra block is the same walk in either, and the two places it differs are worth a
+/// flag rather than a second copy that can drift from this one.
+/// <para/>
 /// A non-intra block has no DC predictor and no separate DC code — every coefficient runs through
 /// the same Table B.14 — and it quantises against the non-intra matrix with the dead zone the
 /// standard's inverse implies. ISO/IEC 11172-2 defines that inverse as
-/// <c>rec = ((2 * level + sign(level)) * quantiser_scale * weight) / 16</c>, so the forward step
-/// that lands nearest a reconstruction point is <c>level = 8 * coefficient / (scale * weight)</c>
+/// <c>rec = ((2 * level + sign(level)) * quantiser_scale * weight) / 16</c> and ISO/IEC 13818-2 as
+/// the same thing over thirty-two, so the forward step that lands nearest a reconstruction point is
+/// <c>level = 8 * coefficient / (scale * weight)</c> in MPEG-1 and twice that numerator in MPEG-2,
 /// truncated towards zero: rounding away from zero here would systematically overshoot, because the
 /// reconstruction adds the sign term back.
+/// <para/>
+/// The other difference is the escape. MPEG-1 spells a level outside the table as eight bits, with
+/// two further forms for a level eight bits cannot hold; MPEG-2 withdrew those and states twelve
+/// bits flat.
 /// <para/>
 /// Quantising is separated from writing because <c>coded_block_pattern</c> has to be written before
 /// any block is: the pattern says which of the six blocks carry coefficients at all, so every block
@@ -22,7 +31,7 @@ namespace FileFormat.Codecs.Mpeg;
 /// No table is copied here. The codes are the decoder's Annex B tables reversed into value-to-code
 /// maps, so a corrected transcription changes both directions at once.
 /// </remarks>
-internal static class Mpeg1InterBlockEncoder {
+internal static class MpegInterBlockEncoder {
 
   private const int _MAX_LEVEL = 255;
 
@@ -35,7 +44,7 @@ internal static class Mpeg1InterBlockEncoder {
   /// <returns><see langword="true"/> when any coefficient survived, which is what puts the block in
   /// the coded block pattern.</returns>
   internal static bool TryQuantise(
-    scoped ReadOnlySpan<int> residual, int quantiserScale, scoped Span<int> levels) {
+    scoped ReadOnlySpan<int> residual, int quantiserScale, bool isMpeg2, scoped Span<int> levels) {
     Span<double> coefficients = stackalloc double[64];
     H261ForwardDct.Transform(residual, coefficients);
 
@@ -43,7 +52,7 @@ internal static class Mpeg1InterBlockEncoder {
     for (var scan = 0; scan < 64; ++scan) {
       var raster = MpegQuantisation.ZigZagScan[scan];
       var weight = MpegQuantisation.DefaultNonIntraMatrix[raster];
-      var scaled = 8d * coefficients[raster] / (quantiserScale * weight);
+      var scaled = (isMpeg2 ? 16d : 8d) * coefficients[raster] / (quantiserScale * weight);
 
       // Truncation towards zero is the dead zone: a coefficient worth less than one reconstruction
       // step becomes nothing rather than being rounded up into a step it never reached.
@@ -56,7 +65,7 @@ internal static class Mpeg1InterBlockEncoder {
   }
 
   /// <summary>Writes a block that <see cref="TryQuantise"/> found at least one coefficient in.</summary>
-  internal static void Write(MpegBitWriter writer, scoped ReadOnlySpan<int> levels) {
+  internal static void Write(MpegBitWriter writer, scoped ReadOnlySpan<int> levels, bool isMpeg2) {
     var previousScan = -1;
     var isFirst = true;
 
@@ -79,13 +88,13 @@ internal static class Mpeg1InterBlockEncoder {
       }
 
       isFirst = false;
-      _WriteCoefficient(writer, run, level);
+      _WriteCoefficient(writer, run, level, isMpeg2);
     }
 
     writer.WriteCode(_CoefficientCodes[MpegVlcTables.EndOfBlock]);
   }
 
-  private static void _WriteCoefficient(MpegBitWriter writer, int run, int level) {
+  private static void _WriteCoefficient(MpegBitWriter writer, int run, int level, bool isMpeg2) {
     var packed = (run << 8) | Math.Abs(level);
     if (_CoefficientCodes.TryGetValue(packed, out var code)) {
       writer.WriteCode(code);
@@ -94,20 +103,27 @@ internal static class Mpeg1InterBlockEncoder {
     }
 
     writer.WriteCode(_CoefficientCodes[MpegVlcTables.CoefficientEscape]);
-    writer.Write(run, 6);
+    writer.WriteBits(run, 6);
+
+    // 13818-2 2.4.3.7 replaced MPEG-1's eight-bit escape and its two extensions with one twelve-bit
+    // field, so a level the table cannot hold is stated once and directly.
+    if (isMpeg2) {
+      writer.WriteBits((uint)(level & 0xFFF), 12);
+      return;
+    }
 
     if (level is >= -127 and <= 127) {
-      writer.Write(level & 0xFF, 8);
+      writer.WriteBits(level & 0xFF, 8);
       return;
     }
 
     if (level > 0) {
-      writer.Write(0, 8);
-      writer.Write(level, 8);
+      writer.WriteBits(0, 8);
+      writer.WriteBits(level, 8);
       return;
     }
 
-    writer.Write(0x80, 8);
-    writer.Write(level + 256, 8);
+    writer.WriteBits(0x80, 8);
+    writer.WriteBits(level + 256, 8);
   }
 }
