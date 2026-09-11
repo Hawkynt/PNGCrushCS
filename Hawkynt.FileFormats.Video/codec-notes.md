@@ -967,6 +967,8 @@ cheaper than what is written instead.
 On the same 262 pictures this encoder's packets total 802,858 bytes against ffmpeg's 827,671.
 ### VP8
 
+The encoder is intentionally all-intra. Every input picture is written as a version-0 key frame at quality 75 through the image package's existing VP8 encoder, so packets carry no dependency on earlier reference frames. That spends compression ratio to keep the bitstream implementation in one place. The video adapter is separately exercised through the registry's FFmpeg oracle, which muxes three packets and asks FFmpeg to decode a frame back at the stated geometry.
+
 The codec WebM was built around, and all of it: the boolean entropy decoder, segmentation, both loop
 filters, up to eight token partitions, all fourteen intra prediction modes, prediction from any of
 the three reference frames with the six-tap and bilinear sub-pixel filters, and the probability state
