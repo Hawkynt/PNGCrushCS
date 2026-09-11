@@ -13,7 +13,6 @@ namespace FileFormat.Cdr;
 public static class CdrWriter {
   private const ushort _Cdr4Version = 400;
   private const ushort _BitmapId = 1;
-  private const int _TargetPageDimension = 10_000;
 
   /// <summary>
   /// Authors a CorelDRAW 4 page containing one bitmap object that covers the page and a matching
@@ -21,14 +20,13 @@ public static class CdrWriter {
   /// </summary>
   public static CdrFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
-    if (image.Width is < 1 or > CdrFile.MaxDimension)
-      throw new ArgumentOutOfRangeException(nameof(image), $"CDR width must be between 1 and {CdrFile.MaxDimension} pixels.");
-    if (image.Height is < 1 or > CdrFile.MaxDimension)
-      throw new ArgumentOutOfRangeException(nameof(image), $"CDR height must be between 1 and {CdrFile.MaxDimension} pixels.");
+    if (image.Width is < 1 or > CdrFile.MaxAuthoringDimension)
+      throw new ArgumentOutOfRangeException(nameof(image), $"CDR4 authoring width must be between 1 and {CdrFile.MaxAuthoringDimension} pixels at {CdrFile.AuthoredRasterDpi} DPI.");
+    if (image.Height is < 1 or > CdrFile.MaxAuthoringDimension)
+      throw new ArgumentOutOfRangeException(nameof(image), $"CDR4 authoring height must be between 1 and {CdrFile.MaxAuthoringDimension} pixels at {CdrFile.AuthoredRasterDpi} DPI.");
 
-    var scale = Math.Max(1, Math.Min(1000, _TargetPageDimension / Math.Max(image.Width, image.Height)));
-    var pageWidth = checked((short)(image.Width * scale));
-    var pageHeight = checked((short)(image.Height * scale));
+    var pageWidth = _PixelsToCdr4Units(image.Width);
+    var pageHeight = _PixelsToCdr4Units(image.Height);
     var bitmap = BmpWriter.ToBytes(BmpFile.FromRawImage(image));
 
     return new CdrFile {
@@ -90,6 +88,9 @@ public static class CdrWriter {
     file.TrailingData.CopyTo(result, riff.Length);
     return result;
   }
+
+  private static short _PixelsToCdr4Units(int pixels)
+    => checked((short)(((long)pixels * CdrFile.Cdr4CoordinateUnitsPerInch + CdrFile.AuthoredRasterDpi / 2) / CdrFile.AuthoredRasterDpi));
 
   private static byte[] _BuildDisp(RawImage preview) {
     var dib = EmbeddedDibWriter.ToBytes(preview);
