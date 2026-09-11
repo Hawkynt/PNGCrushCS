@@ -7,7 +7,7 @@ using FileFormat.Core;
 namespace FileFormat.Codecs;
 
 /// <summary>
-/// Encodes Intel Indeo 2 (<c>RT21</c>) as independently decodable intra frames.
+/// Encodes Intel Indeo 2 (<c>RT21</c>) as intra frames and the inter frames between them.
 /// </summary>
 /// <remarks>
 /// Indeo 2 codes YUV 4:1:0: luminance at full size and Cb/Cr at one quarter of the width and one
@@ -38,6 +38,16 @@ public sealed class Indeo2VideoEncoder : IVideoCodecEncoder<Indeo2VideoEncoder> 
   private const int _CHROMA_DIVISOR = 4;
   private const int _WIDTH_MULTIPLE = 8;
   private const int _AVI_BIT_DEPTH = 24;
+
+  /// <summary>Frames per group: one intra frame and eleven inter frames.</summary>
+  /// <remarks>
+  /// Indeo 2 states no group length of its own, so this is a rate decision. Twelve bounds how far a
+  /// decoder that joined mid-stream has to wait, and how far a lost packet can poison later pictures,
+  /// to eleven frames.
+  /// </remarks>
+  private const int _GROUP_SIZE = 12;
+
+  private int _groupPosition;
 
   private readonly MediaStreamInfo _stream;
   private readonly Indeo2FrameEncoder _frameEncoder;
@@ -124,7 +134,11 @@ public sealed class Indeo2VideoEncoder : IVideoCodecEncoder<Indeo2VideoEncoder> 
     var luma = planes.AsSpan(0, this._lumaSamples);
     var cb = planes.AsSpan(this._lumaSamples, this._chromaSamples);
     var cr = planes.AsSpan(this._lumaSamples + this._chromaSamples, this._chromaSamples);
-    var data = this._frameEncoder.EncodeIntra(luma, cb, cr);
+    // An inter frame is refused rather than guessed when there is nothing before it to differ from,
+    // which is what makes the first frame of a stream intra without a special case here.
+    var data = this._groupPosition == 0 ? null : this._frameEncoder.EncodeInter(luma, cb, cr);
+    var isIntra = data == null;
+    data ??= this._frameEncoder.EncodeIntra(luma, cb, cr);
 
     packet = new(
       this._stream.Index,
@@ -132,7 +146,9 @@ public sealed class Indeo2VideoEncoder : IVideoCodecEncoder<Indeo2VideoEncoder> 
       PresentationTimestamp: presentationTimestamp,
       DecodeTimestamp: presentationTimestamp,
       Duration: 1,
-      IsKeyFrame: true);
+      IsKeyFrame: isIntra);
+
+    this._groupPosition = (this._groupPosition + 1) % _GROUP_SIZE;
     return true;
   }
 
