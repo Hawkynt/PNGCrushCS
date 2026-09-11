@@ -13,8 +13,16 @@ namespace FileFormat.Codecs.Vp3;
 internal static class Vp3TokenWriter {
   private const int _GROUP_SIZE = 16;
 
-  internal static void Write(Vp3BitWriter writer, Vp3Geometry geometry, short[] coefficients) {
+  /// <param name="coded">
+  /// Which blocks carry tokens, or <see langword="null"/> when every block does -- which is what an
+  /// intra frame means and is why it states no coded-block flags at all.
+  /// </param>
+  internal static void Write(Vp3BitWriter writer, Vp3Geometry geometry, short[] coefficients, bool[]? coded) {
     var positions = new byte[geometry.BlockCount];
+    if (coded != null)
+      for (var block = 0; block < geometry.BlockCount; ++block)
+        if (!coded[block])
+          positions[block] = 64; // never reached by any position, so never written
 
     for (var position = 0; position < 64; ++position) {
       if (position <= 1) {

@@ -4,7 +4,7 @@ using FileFormat.Core;
 
 namespace FileFormat.Codecs;
 
-/// <summary>Encodes On2 VP3.1 video as independent intra pictures.</summary>
+/// <summary>Encodes On2 VP3.1 video as intra frames and the inter frames between them.</summary>
 /// <remarks>
 /// VP3 is lossy by definition: spatial residuals are transformed and quantised before they are
 /// entropy-coded. This encoder chooses the finest built-in quantiser and writes every picture as an
@@ -17,6 +17,16 @@ public sealed class Vp3VideoEncoder : IVideoCodecEncoder<Vp3VideoEncoder> {
 
   private readonly MediaStreamInfo _stream;
   private readonly Vp3Encoder _encoder;
+
+  /// <summary>Frames per group: one intra frame and eleven inter frames.</summary>
+  /// <remarks>
+  /// VP3 states no group length of its own, so this is a rate decision rather than a syntax one.
+  /// Twelve bounds how far a decoder joining mid-stream has to wait, and how far an error can travel,
+  /// to eleven frames.
+  /// </remarks>
+  private const int _GROUP_SIZE = 12;
+
+  private int _groupPosition;
 
   private Vp3VideoEncoder(MediaStreamInfo stream) {
     this._stream = new() {
@@ -52,14 +62,16 @@ public sealed class Vp3VideoEncoder : IVideoCodecEncoder<Vp3VideoEncoder> {
   }
 
   public bool TryEncode(RawImage frame, long? presentationTimestamp, out CodedPacket packet) {
-    var data = this._encoder.Encode(frame);
+    var keyFrame = this._groupPosition == 0;
+    var data = this._encoder.Encode(frame, keyFrame);
+    this._groupPosition = (this._groupPosition + 1) % _GROUP_SIZE;
     packet = new(
       StreamIndex: this._stream.Index,
       Data: data,
       PresentationTimestamp: presentationTimestamp,
       DecodeTimestamp: presentationTimestamp,
       Duration: 1,
-      IsKeyFrame: true);
+      IsKeyFrame: keyFrame);
     return true;
   }
 

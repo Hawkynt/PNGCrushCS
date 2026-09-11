@@ -1,7 +1,12 @@
 using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Linq;
 using System.IO;
+using FileFormat.Avi;
 using FileFormat.Core;
 using Hawkynt.FileFormats.Video;
+using Hawkynt.FileFormats.Video.Tests;
 
 namespace FileFormat.Codecs.Vp3.Tests;
 
@@ -9,6 +14,185 @@ namespace FileFormat.Codecs.Vp3.Tests;
 [TestFixture]
 public sealed class Vp3VideoEncoderTests {
   private static readonly CodecTag _Vp31 = CodecTag.FromCharacters("VP31");
+
+  [Test]
+  [Category("Unit")]
+  public void AGroupOpensWithAKeyFrameAndContinuesWithInterFrames() {
+    var encoder = Vp3VideoEncoder.Create(_Stream(128, 96));
+    var keyFrames = new List<bool>();
+    var types = new List<int>();
+
+    for (var index = 0; index < 3; ++index) {
+      Assert.That(encoder.TryEncode(_MovingSquare(128, 96, index), index, out var packet), Is.True);
+      keyFrames.Add(packet.IsKeyFrame);
+
+      // The first bit of a VP3 frame is its type: zero for an intra frame, one for an inter frame.
+      types.Add((packet.Data.Span[0] >> 7) & 1);
+    }
+
+    Assert.Multiple(() => {
+      Assert.That(keyFrames, Is.EqualTo(new[] { true, false, false }));
+      Assert.That(types, Is.EqualTo(new[] { 0, 1, 1 }), "the frame-type bit follows the key-frame flag");
+    });
+  }
+
+  [Test]
+  [Category("RoundTrip")]
+  public void AMovingSquareSurvivesPredictionWithoutDrifting() {
+    // A whole group: one intra frame and eleven inter frames, so the last frame is as far from a key
+    // frame as this encoder ever places one. Drift -- an encoder predicting from its source rather
+    // than from what its decoder reconstructs -- grows along a group, which comparing the LAST frame
+    // catches and comparing the first cannot.
+    const int width = 128;
+    const int height = 96;
+    var stream = _Stream(width, height);
+    var encoder = Vp3VideoEncoder.Create(stream);
+    var sources = new List<RawImage>();
+    var packets = new List<CodedPacket>();
+
+    for (var frame = 0; frame < 12; ++frame) {
+      var picture = _MovingSquare(width, height, frame);
+      sources.Add(picture);
+      if (encoder.TryEncode(picture, frame, out var packet))
+        packets.Add(packet);
+    }
+
+    var decoder = Vp3VideoDecoder.Create(stream);
+    var decoded = new List<RawImage>();
+    foreach (var packet in packets)
+      if (decoder.TryDecode(packet, out var frame))
+        decoded.Add(frame);
+
+    Assert.That(decoded.Count, Is.EqualTo(sources.Count));
+
+    var worst = 0d;
+    for (var index = 0; index < decoded.Count; ++index)
+      worst = Math.Max(worst, _MeanAbsoluteError(sources[index], decoded[index]));
+
+    Assert.That(worst, Is.LessThan(16d),
+      "an inter frame drifted away from its source across the group");
+  }
+
+  [Test]
+  [Category("RoundTrip")]
+  public void AStillSceneCollapsesToUncodedSuperBlocks() {
+    // What the coded-block flags are worth. The first inter frame still costs something -- it corrects
+    // the key frame's own quantisation error -- but once that correction is in the reference there is
+    // nothing left to say and no super block is coded at all. An encoder that predicted from the
+    // source instead of from the reconstruction would never converge.
+    const int width = 128;
+    const int height = 96;
+    var encoder = Vp3VideoEncoder.Create(_Stream(width, height));
+    var picture = _MovingSquare(width, height, 0);
+    var sizes = new List<int>();
+
+    for (var frame = 0; frame < 6; ++frame)
+      if (encoder.TryEncode(picture, frame, out var packet))
+        sizes.Add(packet.Data.Length);
+
+    Assert.That(sizes[^1], Is.LessThan(sizes[0] / 8d),
+      $"a settled inter frame is {sizes[^1]} bytes against {sizes[0]} for the key frame; "
+      + $"the run was {string.Join(", ", sizes)}");
+  }
+
+  [Test]
+  [Category("Oracle")]
+  public void FFmpegDecodesEveryInterFrameAndNotOnlyTheKeyFrame() {
+    // The registry's oracle asks FFmpeg for the first frame only, which is the key frame -- the one
+    // that was already right before inter frames existed. A miscounted coded-block run, a mode
+    // written for a macro block that carries none, or a vector in the wrong units would sail past
+    // that and fail in a real player on frame two.
+    FFmpegOracle.RequireAvailable();
+
+    const int width = 128;
+    const int height = 96;
+    const int frames = 24; // Two whole groups, so a group boundary is crossed as well.
+
+    var stream = _Stream(width, height);
+    var encoder = Vp3VideoEncoder.Create(stream);
+    var packets = new List<CodedPacket>();
+    var sources = new List<RawImage>();
+
+    for (var frame = 0; frame < frames; ++frame) {
+      var picture = _MovingSquare(width, height, frame);
+      sources.Add(picture);
+      if (encoder.TryEncode(picture, frame, out var packet))
+        packets.Add(packet);
+    }
+
+    var directory = Directory.CreateTempSubdirectory("vp3-oracle");
+    try {
+      var path = Path.Combine(directory.FullName, "clip.avi");
+      File.WriteAllBytes(path, VideoIO.Mux<AviWriter>([encoder.DescribeStream()], packets));
+
+      var raw = Path.Combine(directory.FullName, "decoded.rgb");
+      var startInfo = new ProcessStartInfo(FFmpegOracle.ExecutablePath!) {
+        RedirectStandardError = true,
+        UseShellExecute = false,
+      };
+      foreach (var argument in new[] {
+        "-hide_banner", "-loglevel", "error", "-i", path, "-f", "rawvideo", "-pix_fmt", "rgb24", raw })
+        startInfo.ArgumentList.Add(argument);
+
+      using var process = Process.Start(startInfo)!;
+      var diagnostics = process.StandardError.ReadToEnd();
+      process.WaitForExit(60_000);
+
+      Assert.That(process.ExitCode, Is.Zero, $"ffmpeg refused the stream: {diagnostics}");
+
+      var decoded = File.ReadAllBytes(raw);
+      var frameBytes = width * height * 3;
+      Assert.That(decoded.Length / frameBytes, Is.EqualTo(frames),
+        "ffmpeg read a different number of frames than were written");
+
+      for (var index = 0; index < frames; ++index) {
+        var total = 0L;
+        for (var offset = 0; offset < frameBytes; ++offset)
+          total += Math.Abs(sources[index].PixelData[offset] - decoded[index * frameBytes + offset]);
+
+        Assert.That(total / (double)frameBytes, Is.LessThan(16d),
+          $"ffmpeg's frame {index} is not the frame that was encoded");
+      }
+    } finally {
+      try { directory.Delete(recursive: true); } catch { /* best effort */ }
+    }
+  }
+
+  private static double _MeanAbsoluteError(RawImage expected, RawImage actual) {
+    var left = expected.PixelData;
+    var right = actual.PixelData;
+    var total = 0L;
+    var count = Math.Min(left.Length, right.Length);
+    for (var index = 0; index < count; ++index)
+      total += Math.Abs(left[index] - right[index]);
+
+    return total / (double)count;
+  }
+
+  /// <summary>A bright square crossing a fixed background, which is motion and nothing else.</summary>
+  private static RawImage _MovingSquare(int width, int height, int phase) {
+    var data = new byte[width * height * 3];
+    for (var y = 0; y < height; ++y)
+    for (var x = 0; x < width; ++x) {
+      var at = (y * width + x) * 3;
+      var background = (byte)(40 + ((x / 8 + y / 8) & 1) * 30);
+      data[at] = background;
+      data[at + 1] = background;
+      data[at + 2] = background;
+    }
+
+    var squareX = 4 + phase * 3;
+    var squareY = 8 + phase;
+    for (var y = squareY; y < Math.Min(squareY + 16, height); ++y)
+    for (var x = squareX; x < Math.Min(squareX + 16, width); ++x) {
+      var at = (y * width + x) * 3;
+      data[at] = 230;
+      data[at + 1] = 200;
+      data[at + 2] = 60;
+    }
+
+    return new() { Width = width, Height = height, Format = PixelFormat.Rgb24, PixelData = data };
+  }
 
   private static MediaStreamInfo _Stream(int width, int height, string code = "VP31", int index = 0) => new() {
     Index = index,

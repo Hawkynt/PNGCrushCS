@@ -752,6 +752,42 @@ would write past the end of a block; and a frame whose tokens do not account for
 every coded block. None of them hands back a picture. That matters more here than in most codecs,
 because a frame in which nothing changed is a normal thing for a VP3 stream to contain — so a decoder
 that repeated the previous frame on failure would be producing exactly what working looks like.
+**Encoding writes intra and inter frames.** A group opens with a key frame and continues with eleven
+inter frames, each predicted from the frame before it — read back out of a decoder this encoder drives
+with its own output rather than taken from the source, so what the residual is measured against is what
+the receiving decoder will hold.
+
+Three of the encoder's choices are worth stating because each is a real property of the bitstream rather
+than an internal detail.
+
+**Codedness is decided a whole super block at a time**, and that is not only simplicity. The
+block-level pass of the coded-block flags is run-coded with runs that alternate and — unlike the super
+block passes — have no escape for a run longer than the table can state. Such a run cannot be split into
+two of the same value, because the reader flips between them. Deciding per super block leaves that pass
+empty and the question does not arise; the writer refuses an over-long short run outright rather than
+emitting a stream that reads back inverted from that point on. The cost is that a super block with one
+moving block in it codes all sixteen, which on a codec whose frames are mostly untouched background buys
+a whole class of unwritable stream cheaply.
+
+**Modes and motion vectors are written in their literal forms** — three bits for a mode, five bits and a
+sign for a vector component. Both are ordinary VP3, selected by flags the decoder reads before either
+field, and both avoid a second transcription of tables that exist here only to be read.
+
+**A macro block whose blocks are all uncoded carries no mode at all.** The reader takes its silence as
+"inter, no motion" and moves on, so writing one would put every macro block after it a codeword out of
+place — and the encoder's own mode array has to agree with that silence, because the DC predictor asks
+every block which reference its macro block used before it will use it as a neighbour.
+
+The golden frame is never referenced: every inter macro block predicts from the previous frame, with or
+without a vector. The modes that reach for the golden frame, the two that reuse an earlier vector and
+the four-vector mode are all read and none is written.
+
+Verification: a twenty-four frame clip crossing a group boundary is muxed and decoded by **ffmpeg** with
+every frame compared, not only the first — the registry's own oracle asks for frame one, which is the key
+frame, so a miscounted coded-block run, a mode written for a macro block that carries none, or a vector
+in the wrong units would pass it and fail in a real player on frame two. A still scene is also required
+to converge, which is what demonstrates the coded-block flags firing at all.
+
 ### Apple Video (RPZA)
 
 A vector quantizer over 4x4 blocks of 15-bit RGB colour, also called Road Pizza, and QuickTime's own

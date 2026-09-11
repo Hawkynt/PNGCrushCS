@@ -71,6 +71,57 @@ internal static class Vp3DcPrediction {
   }
 
   /// <summary>
+  /// Replaces the absolute quantised DC coefficient of every coded block with the residual VP3 stores
+  /// in the packet, which is <see cref="Undo"/> run backwards.
+  /// </summary>
+  /// <remarks>
+  /// The predictor a block sees is built from its neighbours' <em>absolute</em> values, because that
+  /// is what the decoder will have recovered by the time it reaches the block. So the absolutes are
+  /// taken aside first and the residuals written over them in the same order the decoder walks, which
+  /// is per plane, row by row, coded blocks only.
+  /// <para/>
+  /// A neighbour counts only when it is coded <em>and</em> predicted from the same reference: the
+  /// weighted sum is over blocks that mean the same thing, and a block predicted from the previous
+  /// frame says nothing about one predicted from nothing. <see cref="ApplyIntra"/> is the same walk
+  /// with that question answered in advance, every block being coded and intra.
+  /// </remarks>
+  internal static void Apply(Vp3Geometry geometry, bool[] coded, byte[] modes, short[] coefficients) {
+    var absolute = new short[geometry.BlockCount];
+    for (var block = 0; block < geometry.BlockCount; ++block)
+      absolute[block] = coefficients[block * 64];
+
+    var available = new bool[4];
+    var neighbour = new int[4];
+    var last = new short[3];
+
+    for (var plane = 0; plane < 3; ++plane) {
+      last[0] = last[1] = last[2] = 0;
+
+      var width = geometry.PlaneBlockWidth[plane];
+      var height = geometry.PlaneBlockHeight[plane];
+      var index = geometry.CodedIndex[plane];
+
+      for (var row = 0; row < height; ++row)
+      for (var column = 0; column < width; ++column) {
+        var block = index[row * width + column];
+        if (!coded[block])
+          continue;
+
+        var reference = Vp3Tables.ReferenceOfMode[modes[geometry.MacroblockOfBlock[block]]];
+
+        available[0] = _Neighbour(geometry, coded, modes, index, width, column - 1, row, height, reference, out neighbour[0]);
+        available[1] = _Neighbour(geometry, coded, modes, index, width, column - 1, row - 1, height, reference, out neighbour[1]);
+        available[2] = _Neighbour(geometry, coded, modes, index, width, column, row - 1, height, reference, out neighbour[2]);
+        available[3] = _Neighbour(geometry, coded, modes, index, width, column + 1, row - 1, height, reference, out neighbour[3]);
+
+        var predictor = _PredictAbsolute(available, neighbour, absolute, last[reference]);
+        coefficients[block * 64] = (short)(absolute[block] - predictor);
+        last[reference] = absolute[block];
+      }
+    }
+  }
+
+  /// <summary>
   /// Replaces the absolute quantised DC coefficient of every block of an intra frame with the
   /// residual VP3 stores in the packet.
   /// </summary>
