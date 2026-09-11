@@ -2080,6 +2080,30 @@ Also refused by name: tiles, dependent slice segments, coding units coded as raw
 content, multilayer and three-dimensional extensions. There is no `catch` anywhere that returns a
 blank, a copied or a partial frame.
 
+**Encoding writes independent IDR pictures made of PCM coding units, and no inter pictures at all.**
+That is a statement about what exists in this package rather than a coding preference. A PCM coding
+unit stores its samples exactly and needs no transform, no quantiser and no residual syntax; what it
+does need from CABAC is a handful of flags in a fixed pattern, which the still-picture core already
+writes. An inter picture needs the rest: prediction units, motion vector differences, a transform
+tree, quantised residuals — and every one of those goes through CABAC as arithmetic-coded bins. The
+CABAC engine here **decodes only**. There is no `EncodeBin` to write them with, and adding one means
+building the arithmetic coder, the residual syntax and the rate-distortion decisions behind it: an
+HEVC encoder, not a change to this writer. It is left undone and said so rather than approximated.
+
+What the writer does produce is ordinary Main profile, not Main Still Picture — the still profile
+permits one picture and a video track is not one picture — with VPS, SPS and PPS carried in an
+`HEVCDecoderConfigurationRecord` and length-prefixed samples, so a Matroska or ISO-media container
+needs nothing out of band. Because PCM samples are exact, the only difference a correct decode can
+show is the 4:2:0 conversion an RGB source went through; a 4:2:0 source comes back unchanged. Odd
+dimensions are refused rather than quietly rounded, because rounding them changes the display
+geometry the caller asked for.
+
+Verification runs outward as well as in a circle: a six-picture clip is muxed and decoded by
+**ffmpeg** with every frame compared. Every picture being independent means a multi-picture clip
+tests the packaging rather than the coding — the configuration record, the length prefixes, and that
+picture two is where the container says it is — and PCM's exactness makes that comparison tight
+rather than nominal.
+
 ### CamStudio Screen Codec
 
 Lossless, and the MultimediaWiki page names the whole of the coding in five lines: a header byte whose
