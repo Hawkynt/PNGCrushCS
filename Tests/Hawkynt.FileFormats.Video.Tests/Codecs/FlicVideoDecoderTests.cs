@@ -155,9 +155,22 @@ public sealed class FlicVideoDecoderTests {
 
   [Test]
   [Category("Unit")]
+  public void CopyAcceptsDwordPaddedRows() {
+    // FFmpeg's eight-bit FLIC decoder consumes COPY rows on four-byte boundaries. Distinct padding
+    // values prove they are skipped rather than becoming the first pixel of the following row.
+    var pixels = new byte[] { 1, 2, 3, 0xA5, 4, 5, 6, 0x5A };
+    var frame = _DecodeOne(3, 2, [_Chunk(16, pixels)]);
+
+    Assert.That(_Row(frame, 0), Is.EqualTo(new byte[] { 1, 2, 3 }));
+    Assert.That(_Row(frame, 1), Is.EqualTo(new byte[] { 4, 5, 6 }));
+  }
+
+  [Test]
+  [Category("Unit")]
   public void CopyOfTheWrongSizeIsRefused() {
-    var failure = Assert.Throws<InvalidDataException>(() => _DecodeOne(3, 2, [_Chunk(16, new byte[5])]));
-    Assert.That(failure!.Message, Does.Contain("needs exactly 6"));
+    var failure = Assert.Throws<InvalidDataException>(() => _DecodeOne(3, 2, [_Chunk(16, new byte[7])]));
+    Assert.That(failure!.Message, Does.Contain("6 packed byte(s)"));
+    Assert.That(failure.Message, Does.Contain("8 byte(s)"));
   }
 
   [Test]
