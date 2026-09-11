@@ -49,8 +49,8 @@ public sealed class Indeo2VideoEncoderTests {
       Assert.That(described.FrameRate, Is.EqualTo(requested.FrameRate));
       Assert.That(described.DeclaredFrameCount, Is.EqualTo(7));
       Assert.That(described.CodecPrivateData, Has.Length.EqualTo(40));
-      Assert.That(BinaryPrimitives.ReadInt16LittleEndian(described.CodecPrivateData.AsSpan(14)), Is.EqualTo(24));
-      Assert.That(described.CodecPrivateData.AsSpan(16, 4).ToArray(), Is.EqualTo("RT21"u8.ToArray()));
+      Assert.That(BinaryPrimitives.ReadInt16LittleEndian(described.CodecPrivateData.Span[14..]), Is.EqualTo(24));
+      Assert.That(described.CodecPrivateData.Slice(16, 4).ToArray(), Is.EqualTo("RT21"u8.ToArray()));
     });
   }
 
