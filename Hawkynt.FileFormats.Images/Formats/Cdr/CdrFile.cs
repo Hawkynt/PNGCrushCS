@@ -27,11 +27,9 @@ public sealed class CdrFile :
   /// <summary>Upper bound used while validating embedded previews while reading existing documents.</summary>
   public const int MaxDimension = 20000;
 
-  /// <summary>Largest raster axis that fits CDR4's signed 16-bit, 1/1000-inch coordinates at 96 DPI.</summary>
-  public const int MaxAuthoringDimension = short.MaxValue * AuthoredRasterDpi / Cdr4CoordinateUnitsPerInch;
-
   internal const int Cdr4CoordinateUnitsPerInch = 1000;
   internal const int AuthoredRasterDpi = 96;
+  internal const int MaxAuthoringDimension = short.MaxValue * AuthoredRasterDpi / Cdr4CoordinateUnitsPerInch;
 
   static string IImageFormatMetadata<CdrFile>.PrimaryExtension => ".cdr";
   static string[] IImageFormatMetadata<CdrFile>.FileExtensions => [".cdr"];
