@@ -42,12 +42,12 @@ internal sealed class Vc1BitWriter {
 /// in the tree.
 /// </summary>
 /// <remarks>
-/// There is no VC-1 encoder here and ffmpeg has none either — it decodes the format and does not write
-/// it — so a test stream cannot be produced by encoding one. What can be built by hand is a picture
-/// whose every syntax element is chosen for a reconstruction that can be worked out on paper: a
-/// picture where no block carries an AC coefficient and every DC differential is nought reconstructs
-/// to one value repeated over the whole frame, and that value follows from the quantiser and the
-/// two constants the standard attaches to it.
+/// These streams remain hand-built even though this package now has a deliberately small VC-1 encoder:
+/// the fixture needs syntax chosen independently of that encoder, or a shared writer bug would merely
+/// prove that both sides agree with it. FFmpeg has no VC-1 encoder either — it decodes the format and
+/// does not write it — so the picture here is one whose reconstruction can be worked out on paper: no
+/// block carries an AC coefficient and every DC differential is nought, yielding one value repeated
+/// over the whole frame from the quantiser and the two constants the standard attaches to it.
 /// <para/>
 /// That is a narrow picture but it exercises a wide path: the sequence header, the picture header, the
 /// predicted coded block pattern, the DC differential tables, DC prediction against absent neighbours,
