@@ -360,6 +360,51 @@ by more.
 What is not implemented refuses and says so: D pictures, and a picture size that changes while
 pictures predicted from the old one are still held.
 
+**Encoding writes I and P pictures, and predicts against a decoder rather than against the source.**
+The encoder drives an `MpegVideoDecoder` with its own output and reads the anchor back out of it, so a
+P picture is predicted from the samples the receiving decoder will hold, not from the frame that was
+handed in. Those two differ by the quantiser's loss, and an encoder that ignores the difference is
+correct on its first predicted picture and a little further out on each one after it, which is the
+failure a group of twelve is long enough to make visible and a two-frame test is not. Groups are
+twelve pictures, the length the constrained-parameters material uses, so nothing predicted is ever
+more than eleven pictures from an independently decodable one. Every codeword is the Annex B table
+`MpegVlcTables` decodes with, inverted at load rather than typed a second time, for the same reason it
+is in H.261: a table entered twice can disagree with itself, and a round trip through this library
+alone cannot see it, because both halves would be wrong identically.
+
+Forward vectors are whole-pixel — `full_pel_forward_vector` is set, so no half-pixel interpolation
+stands between the prediction and the samples the search compared — and coded with `forward_f_code` 2.
+That is not a spare bit spent for its own sake. The decoder folds **the reconstructed vector**, not the
+difference that was coded, into `[-16f, 16f)`; with an f_code of one, motion beyond sixteen pixels does
+not cost more bits, it silently comes back as a *different vector*, so the f_code is what decides how
+far anything may move, and the search is clamped to what it states rather than to what the table can
+spell. The difference is folded by the same range before it is written, because both vectors lie inside
+the range while their difference need not.
+
+A macroblock that neither moved nor left a residual is not written at all: the next coded macroblock's
+`macroblock_address_increment` steps over it, escaping in thirty-threes when a run outruns Table B.1.
+This is what makes a predicted picture cheap, and the search has to cooperate with it — on flat or
+repeating content many vectors score identically, so the zero vector is the incumbent and is only
+displaced by a strictly better one. Taking the first equal-scoring candidate instead picks whichever
+corner the scan began at, every macroblock then states a type and two vectors to say nothing happened,
+and a predicted picture ends up *larger* than coding the picture whole. The first and last macroblock
+of a slice are always coded regardless: the first fixes where the slice starts, and a slice ending on a
+skip would not say where it ended. Skipping resets the vector and DC predictors, which the encoder
+mirrors.
+
+B pictures are not written, and that is a contract decision rather than a missing table. They reorder
+coding against display, so the encoder would hand its caller packets in an order that is not the order
+frames arrived, changing what `TryEncode` means to every caller — and against this encoder's
+whole-pixel forward search they express nothing a P picture does not. Reading them is complete.
+
+Verification runs in both directions. The round trip through this library alone codes a full group and
+compares the *last* frame, where drift would have accumulated, not the first, where it cannot have.
+The direction that matters more is outward: a twenty-four frame clip, crossing a group boundary, is
+written out as an elementary stream and decoded by **ffmpeg**, every frame compared and not merely the
+first — the registry's own oracle asks only for frame one, which in a group is the intra picture, so a
+malformed vector, a miscounted address increment or a coded block pattern disagreeing with the blocks
+behind it would pass it and fail in a real player on frame two.
+
 ### MPEG-2 video
 
 One decoder reads both standards, because ISO/IEC 13818-2 is written that way — it requires a decoder
