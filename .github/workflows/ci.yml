@@ -24,6 +24,7 @@ jobs:
   ci:
     uses: Hawkynt/RepositoryTemplate/.github/workflows/dotnet-ci.yml@v1
     with:
+      repo-readme: true
       solution: PngCrush.slnx
       dotnet-version: |
         8.x
