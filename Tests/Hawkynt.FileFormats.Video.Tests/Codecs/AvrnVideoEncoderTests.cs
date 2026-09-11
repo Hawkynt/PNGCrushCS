@@ -1,3 +1,4 @@
+using System;
 using System.Buffers.Binary;
 using System.IO;
 using FileFormat.Core;
@@ -27,7 +28,7 @@ public sealed class AvrnVideoEncoderTests {
   public void DescribesProgressiveResolutionOneToOneWithAvidMarker() {
     var encoder = AvrnVideoEncoder.Create(_Stream());
     var stream = encoder.DescribeStream();
-    var format = stream.CodecPrivateData.Span;
+    var format = stream.CodecPrivateData.ToArray();
 
     Assert.Multiple(() => {
       Assert.That(AvrnVideoEncoder.Codec, Is.EqualTo(_Avrn));
@@ -46,8 +47,8 @@ public sealed class AvrnVideoEncoderTests {
       Assert.That(BinaryPrimitives.ReadInt32LittleEndian(format[8..]), Is.EqualTo(2));
       Assert.That(BinaryPrimitives.ReadUInt16LittleEndian(format[14..]), Is.EqualTo(16));
       Assert.That(BinaryPrimitives.ReadUInt32LittleEndian(format[16..]), Is.EqualTo(_Avrn.Value));
-      Assert.That(format.Slice(68, 3).ToArray(), Is.EqualTo("1:1"u8.ToArray()));
-      Assert.That(format.Slice(44, 4).ToArray(), Is.Not.EqualTo("1:1("u8.ToArray()));
+      Assert.That(format.AsSpan(68, 3).ToArray(), Is.EqualTo("1:1"u8.ToArray()));
+      Assert.That(format.AsSpan(44, 4).ToArray(), Is.Not.EqualTo("1:1("u8.ToArray()));
     });
   }
 

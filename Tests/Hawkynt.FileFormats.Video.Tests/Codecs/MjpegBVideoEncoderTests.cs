@@ -37,7 +37,8 @@ public sealed class MjpegBVideoEncoderTests {
 
     var encoder = MjpegBVideoEncoder.Create(stream);
     var described = encoder.DescribeStream();
-    var entry = described.CodecPrivateData.Span;
+    // A span cannot be captured by the Assert.Multiple lambda below.
+    var entry = described.CodecPrivateData.ToArray();
     Assert.Multiple(() => {
       Assert.That(described.Codec, Is.EqualTo(_Mjpb));
       Assert.That(described.Handler, Is.EqualTo(_Mjpb));
@@ -46,17 +47,18 @@ public sealed class MjpegBVideoEncoderTests {
       Assert.That(described.TimeBase, Is.EqualTo(new Rational(1, 25)));
       Assert.That(entry.Length, Is.EqualTo(96));
       Assert.That(BinaryPrimitives.ReadInt32BigEndian(entry), Is.EqualTo(96));
-      Assert.That(entry[4..8].SequenceEqual("mjpb"u8), Is.True);
-      Assert.That(BinaryPrimitives.ReadUInt16BigEndian(entry[(8 + 24)..]), Is.EqualTo(16));
-      Assert.That(BinaryPrimitives.ReadUInt16BigEndian(entry[(8 + 26)..]), Is.EqualTo(16));
-      Assert.That(BinaryPrimitives.ReadInt32BigEndian(entry[(8 + 78)..]), Is.EqualTo(10));
-      Assert.That(entry[(8 + 78 + 4)..(8 + 78 + 8)].SequenceEqual("fiel"u8), Is.True);
+      Assert.That(entry.AsSpan(4, 4).SequenceEqual("mjpb"u8), Is.True);
+      Assert.That(BinaryPrimitives.ReadUInt16BigEndian(entry.AsSpan(8 + 24)), Is.EqualTo(16));
+      Assert.That(BinaryPrimitives.ReadUInt16BigEndian(entry.AsSpan(8 + 26)), Is.EqualTo(16));
+      Assert.That(BinaryPrimitives.ReadInt32BigEndian(entry.AsSpan(8 + 78)), Is.EqualTo(10));
+      Assert.That(entry.AsSpan(8 + 78 + 4, 4).SequenceEqual("fiel"u8), Is.True);
       Assert.That(entry[8 + 78 + 8], Is.EqualTo(1));
       Assert.That(entry[8 + 78 + 9], Is.Zero);
     });
 
     Assert.That(encoder.TryEncode(image, 7, out var packet), Is.True);
-    var data = packet.Data.Span;
+    // A span cannot be captured by the Assert.Multiple lambda below.
+    var data = packet.Data.ToArray();
     var fieldSize = BinaryPrimitives.ReadUInt32BigEndian(data[8..12]);
     var paddedSize = BinaryPrimitives.ReadUInt32BigEndian(data[12..16]);
     var nextField = BinaryPrimitives.ReadUInt32BigEndian(data[16..20]);
@@ -67,7 +69,7 @@ public sealed class MjpegBVideoEncoderTests {
     var entropyOffset = BinaryPrimitives.ReadUInt32BigEndian(data[36..40]);
 
     Assert.Multiple(() => {
-      Assert.That(data[4..8].SequenceEqual("mjpg"u8), Is.True);
+      Assert.That(data.AsSpan(4, 4).SequenceEqual("mjpg"u8), Is.True);
       Assert.That(fieldSize, Is.GreaterThan(48));
       Assert.That(paddedSize, Is.EqualTo((uint)data.Length));
       Assert.That(paddedSize, Is.GreaterThanOrEqualTo(fieldSize));
