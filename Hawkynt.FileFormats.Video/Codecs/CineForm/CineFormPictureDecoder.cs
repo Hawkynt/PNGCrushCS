@@ -7,21 +7,17 @@ namespace FileFormat.Codecs.CineForm;
 /// Decodes one CineForm frame into its component channels.
 /// </summary>
 /// <remarks>
-/// A packet is a sequence of tag-value pairs (Section 8.3) followed by, for each channel in turn
-/// (Section 8.5(4): "codeblocks from different channels shall not be interleaved"), that channel's ten
-/// subbands. This class reads the handful of top-level tags this decoder needs — <c>ChannelCount</c>
-/// (tag 12) and <c>ImageWidth</c>/<c>ImageHeight</c> (tags 20/21) — skipping everything else exactly as
-/// <see cref="CineFormChannelDecoder"/> does within a channel, then hands each channel in turn to that
-/// class.
+/// A packet is a sequence of tag-value pairs followed by, for each channel in turn, that channel's
+/// ten subbands. The older CineForm framing used by GoPro and FFmpeg also places a raw channel-size
+/// index after tag 2; that payload is skipped explicitly rather than accidentally interpreted as more
+/// tags. Optional DisplayHeight (negative tag 85) crops the vertical padding real encoders add.
 /// <para/>
 /// <b>Which prescale table and which colour layout apply is decided from the channels' own
 /// dimensions, not guessed from the container.</b> Every channel is parsed before any of them is
 /// reconstructed, because a 4:2:2 stream's second and third channels code a lowpass band half the
-/// width of the first channel's — genuine horizontal subsampling, unlike anything about the highpass
-/// levels above it — and an RGB stream's three channels all agree. That comparison is what chooses
-/// between <see cref="CineFormPrescale.TenBit"/> with channel order Y, V, U and
-/// <see cref="CineFormPrescale.TwelveBit"/> with channel order G, R, B; see
-/// <see cref="CineFormChannelDecoder"/>'s remarks for how both were measured.
+/// width of the first channel's — genuine horizontal subsampling — and an RGB stream's three channels
+/// all agree. That comparison chooses between <see cref="CineFormPrescale.TenBit"/> with channel order
+/// Y, V, U and <see cref="CineFormPrescale.TwelveBit"/> with channel order G, R, B.
 /// </remarks>
 internal static class CineFormPictureDecoder {
 
@@ -42,33 +38,36 @@ internal static class CineFormPictureDecoder {
   }
 
   internal static Result Decode(ReadOnlyMemory<byte> data) {
-    // ImageWidth, ImageHeight and ChannelCount sit inside the very same run of header tags that opens
-    // channel 0 — there is no separate top-level header to stop at. This is a non-consuming pre-scan
-    // for those three values only, stopping at the first tag that begins a codeblock so it never reads
-    // into coefficient data; the real, position-advancing parse below starts at the top again and
-    // simply skips these same tags as it walks into channel 0.
-    _PeekImageHeader(data.Span, out var imageWidth, out var imageHeight, out var channelCount);
+    _PeekImageHeader(
+      data.Span,
+      out var imageWidth,
+      out var codedHeight,
+      out var displayHeight,
+      out var channelCount,
+      out var channelHeaderPosition);
 
-    if (imageWidth <= 0 || imageHeight <= 0)
+    if (imageWidth <= 0 || codedHeight <= 0)
       throw new InvalidDataException("A CineForm frame's tag-value header does not state a positive ImageWidth and ImageHeight before its first channel.");
+
+    var imageHeight = displayHeight > 0 ? displayHeight : codedHeight;
+    if (imageHeight > codedHeight)
+      throw new InvalidDataException(
+        $"A CineForm frame states DisplayHeight {imageHeight}, larger than its coded ImageHeight {codedHeight}.");
 
     if (channelCount != 3)
       throw new NotSupportedException(
         $"This decoder reads only the three-channel layouts ffmpeg's own cfhd encoder writes — 4:2:2 YUV and RGB without alpha. This frame states ChannelCount {channelCount}, which was never measured against a real file and is refused rather than guessed at.");
 
-    var position = 0;
+    // With a raw index present, begin after its size words. Every tag the channel decoder needs sits
+    // after the index; starting at packet zero would reinterpret those size words as tag/value pairs.
+    // Sparse VC-5-style fixtures have no index and therefore keep the historical start at zero.
+    var position = channelHeaderPosition;
     var channels = new CineFormChannelDecoder.ParsedChannel[channelCount];
     for (var i = 0; i < channelCount; ++i)
       channels[i] = CineFormChannelDecoder.Parse(data, ref position);
 
-    // Genuine horizontal subsampling shows up nowhere else this early: a 4:2:2 stream's chroma
-    // channels code a lowpass band half the width of the luma channel's, before any wavelet level or
-    // prescale shift has touched either. An RGB stream's three channels always agree.
     var isYuv = channels[1].LowpassWidth < channels[0].LowpassWidth;
     var prescale = isYuv ? CineFormPrescale.TenBit : CineFormPrescale.TwelveBit;
-
-    // The maximum a coded sample is entitled to: ten bits for 4:2:2, twelve for RGB — see
-    // CineFormChannelDecoder's remarks on the depth each layout is coded at.
     var maxSample = isYuv ? 1023 : 4095;
 
     var planes = new Plane[channelCount];
@@ -81,21 +80,6 @@ internal static class CineFormPictureDecoder {
     return new() { ImageWidth = imageWidth, ImageHeight = imageHeight, Channels = planes, IsYuv = isYuv };
   }
 
-  /// <summary>
-  /// Clamps every reconstructed sample to the range the coded depth actually holds.
-  /// </summary>
-  /// <remarks>
-  /// The wavelet transform's ordinary overshoot near a hard edge — the same ringing every linear
-  /// transform codec has — puts a reconstructed sample a few levels below zero or above the coded
-  /// maximum now and again; nothing about Annex A's arithmetic forbids it, and nothing states a
-  /// decoder must undo it. ffmpeg's own decode cannot even show the alternative: <c>yuv422p10le</c>
-  /// and <c>gbrp12le</c> are unsigned formats, so whatever it reconstructs internally is clamped
-  /// before it can be written out at all. Comparing this decoder's own unclamped samples against that
-  /// clamped reference is what reported small differences at the very positions this overshoot
-  /// reaches — not a different decode, an unclamped one being read against a clamped one. Clamping
-  /// here, once, on the finished picture rather than in every caller that narrows it further, is what
-  /// makes the comparison the two decoders' agreement rather than an artefact of the difference.
-  /// </remarks>
   private static void _ClampToCodedRange(int[] samples, int maxSample) {
     for (var i = 0; i < samples.Length; ++i) {
       var sample = samples[i];
@@ -103,23 +87,48 @@ internal static class CineFormPictureDecoder {
     }
   }
 
-  private static void _PeekImageHeader(ReadOnlySpan<byte> span, out int imageWidth, out int imageHeight, out int channelCount) {
+  private static void _PeekImageHeader(
+    ReadOnlySpan<byte> span,
+    out int imageWidth,
+    out int imageHeight,
+    out int displayHeight,
+    out int channelCount,
+    out int channelHeaderPosition) {
+
     imageWidth = 0;
     imageHeight = 0;
+    displayHeight = 0;
     channelCount = 0;
-    var n = span.Length;
+    channelHeaderPosition = 0;
 
-    for (var position = 0; position + 4 <= n; position += 4) {
+    var position = 0;
+    while (position + 4 <= span.Length) {
       var tag16 = (span[position] << 8) | span[position + 1];
       var tag = tag16 >= 0x8000 ? tag16 - 0x10000 : tag16;
       var value = (span[position + 2] << 8) | span[position + 3];
+      position += 4;
+
+      if (tag == CineFormTags.Index) {
+        var bytes = (long)value * 4;
+        if (position + bytes > span.Length)
+          throw new InvalidDataException(
+            $"A CineForm channel-size index declares {value} entries but the packet ends inside the index.");
+        position += (int)bytes;
+        channelHeaderPosition = position;
+        continue;
+      }
 
       if (tag == CineFormTags.LowpassPrecision || tag == CineFormTags.HighpassDataFollows)
-        return; // channel 0's own codeblocks begin here; every value needed is already found by now.
+        return;
 
-      if (tag == CineFormTags.ImageWidth) imageWidth = value;
-      else if (tag == CineFormTags.ImageHeight) imageHeight = value;
-      else if (tag == CineFormTags.ChannelCount) channelCount = value;
+      if (tag == CineFormTags.ImageWidth)
+        imageWidth = value;
+      else if (tag == CineFormTags.ImageHeight)
+        imageHeight = value;
+      else if (tag == -CineFormTags.DisplayHeight || tag == CineFormTags.DisplayHeight)
+        displayHeight = value;
+      else if (tag == CineFormTags.ChannelCount)
+        channelCount = value;
     }
   }
 }
