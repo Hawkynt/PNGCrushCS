@@ -7,7 +7,7 @@ using FileFormat.Core;
 
 namespace FileFormat.Codecs;
 
-/// <summary>Encodes ISO/IEC 11172-2 MPEG-1 video as progressive 4:2:0 intra pictures.</summary>
+/// <summary>Encodes ISO/IEC 11172-2 MPEG-1 video as progressive 4:2:0 I and P pictures.</summary>
 /// <remarks>
 /// Writes I and P pictures. A group of pictures opens with an I picture and continues with P
 /// pictures that predict forwards from the anchor before them, which is the arrangement every
@@ -145,7 +145,7 @@ public sealed class Mpeg1VideoEncoder : IVideoCodecEncoder<Mpeg1VideoEncoder> {
     return new(stream, frameRateCode);
   }
 
-  /// <summary>Codes one independently decodable I picture.</summary>
+  /// <summary>Codes one picture: intra at the head of a group, forward-predicted otherwise.</summary>
   /// <remarks>
   /// One picture is held so <see cref="Flush"/> can put the sequence-end code after the final
   /// picture rather than manufacture a packet that is not a picture. There is no coding-order
