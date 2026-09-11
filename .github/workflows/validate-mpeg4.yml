@@ -1,0 +1,66 @@
+name: Validate MPEG-4 Part 2 writer
+
+on:
+  push:
+    branches: [feature/mpeg4-part2-encoder]
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+
+jobs:
+  ffmpeg:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.x
+            10.0.x
+      - name: Install FFmpeg
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+      - name: Decode the complete reordered I/P/B stream with FFmpeg
+        run: >-
+          dotnet test Tests/Hawkynt.FileFormats.Video.Tests/Hawkynt.FileFormats.Video.Tests.csproj
+          --configuration Release
+          -p:EnableWindowsTargeting=true
+          --filter "FullyQualifiedName~Mpeg4VideoEncoderTests.FFmpegReadsEveryReorderedPicture"
+          --logger "console;verbosity=normal"
+
+  api-reference:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.x
+            10.0.x
+      - name: Build video package
+        shell: pwsh
+        run: |
+          dotnet restore Hawkynt.FileFormats.Video/Hawkynt.FileFormats.Video.csproj -p:EnableWindowsTargeting=true
+          dotnet build Hawkynt.FileFormats.Video/Hawkynt.FileFormats.Video.csproj --configuration Release --no-restore -p:EnableWindowsTargeting=true
+      - name: Regenerate canonical package API reference
+        uses: Hawkynt/RepositoryTemplate/package-readme@v1
+        with:
+          mode: write
+          root: .
+          project: Hawkynt.FileFormats.Video/Hawkynt.FileFormats.Video.csproj
+      - name: Assert MPEG-4 encoder is documented
+        shell: pwsh
+        run: |
+          if (-not (Select-String -Path Hawkynt.FileFormats.Video/REFERENCE.md -Pattern 'Mpeg4VideoEncoder' -Quiet)) {
+            throw 'Mpeg4VideoEncoder is absent from the generated API reference.'
+          }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mpeg4-package-readmes
+          path: |
+            Hawkynt.FileFormats.Video/README.md
+            Hawkynt.FileFormats.Video/REFERENCE.md

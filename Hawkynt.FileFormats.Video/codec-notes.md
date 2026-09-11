@@ -1261,6 +1261,45 @@ a file every other tool plays.
 `DVX3` was checked the same way and is **not** one of them: it names Microsoft's MPEG-4 version 3, so
 it is claimed by the version 2 decoder beside this one and refused there by name. Matroska's
 `V_MPEG4/MS/V3` is the same bitstream under that container's name and is refused with it.
+**Encoding writes I, P and B pictures with searched motion in every predicted one.** Twelve displayed
+pictures to a group, two B-VOPs between anchors, and the reference a picture is built on is read back
+out of this encoder's own reconstruction rather than taken from the source.
+
+Three rules here are the ones a writer gets wrong, and each of them is invisible until something
+exercises it.
+
+**low_delay has to be stated, not left out.** `vol_control_parameters` carries it, and a decoder that
+finds no `low_delay` does not treat the question as open — it takes the stream as low-delay, and then
+meets a B-VOP it was told could not exist. FFmpeg says so in as many words ("low_delay flag set
+incorrectly") and refuses the picture. The block is written because this encoder reorders.
+
+**A B-VOP's vector predictor is the last vector of the same direction**, not a median of neighbours
+and not something that restarts each macroblock row. It runs from the start of the video packet, or
+of the picture where there are no resync markers, and only a macroblock that actually carries a vector
+of that direction moves it: a forward-only macroblock advances the forward predictor and leaves the
+backward one alone. The decoder in this package reset both predictors at the head of every macroblock
+row until this encoder gave it a B-VOP with real motion in it — a mistake that costs nothing for as
+long as every B vector is zero, and then makes every macroblock after the first in a row reconstruct a
+vector nobody coded. FFmpeg reading the same stream correctly is what located it.
+
+**A macroblock the following anchor did not code is not in a B-VOP at all.** That is a rule about
+where syntax elements are and not only about what they mean, so an encoder that writes one anyway
+puts every macroblock after it in the wrong place. It follows `not_coded` in the P-VOP, which is what
+makes a predicted picture cheap in the first place — and for that to fire at all the search has to
+return a zero vector for a macroblock that did not move, which is why the zero vector is the incumbent
+and only a strictly better candidate displaces it.
+
+The chrominance vector is derived from the sum of the macroblock's four luminance vectors through
+7.6.2's rounding table — four times the single vector, for a macroblock that carries one — and not by
+halving. The two agree on some vectors and not others, and the disagreement is a colour fringe on
+moving edges that no luminance comparison sees, so the derivation used here is the decoder's own
+routine rather than a restatement of it.
+
+Verification: a twenty-four frame clip of genuinely moving content, crossing a group boundary, is muxed
+and decoded by **ffmpeg** with every frame compared. Counting the pictures back proves the reordering
+and nothing else — a vector coded against the wrong predictor, folded the wrong way, or halved for
+chrominance with the wrong operator still yields the right number of pictures, just not the right ones.
+
 ### Apple ProRes
 
 Written from SMPTE RDD 36:2022, which is the published description of the bitstream and is cited by
