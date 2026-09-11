@@ -1,3 +1,4 @@
+using System.IO;
 using System;
 using System.Buffers.Binary;
 using System.Collections.Generic;
@@ -42,13 +43,14 @@ public sealed class QpegVideoEncoderTests {
       Assert.That(stream.CodecPrivateData.Length, Is.EqualTo(40 + 16 * 4));
     });
 
-    var format = stream.CodecPrivateData.Span;
+    // A span cannot be captured by the Assert.Multiple lambda below.
+    var format = stream.CodecPrivateData.ToArray();
     Assert.Multiple(() => {
       Assert.That(BinaryPrimitives.ReadInt32LittleEndian(format), Is.EqualTo(40), "biSize");
       Assert.That(BinaryPrimitives.ReadInt32LittleEndian(format[4..]), Is.EqualTo(20), "biWidth");
       Assert.That(BinaryPrimitives.ReadInt32LittleEndian(format[8..]), Is.EqualTo(12), "biHeight");
       Assert.That(BinaryPrimitives.ReadInt16LittleEndian(format[14..]), Is.EqualTo(8), "biBitCount");
-      Assert.That(format.Slice(16, 4).ToArray(), Is.EqualTo("QPEG"u8.ToArray()), "biCompression");
+      Assert.That(format.AsSpan(16, 4).ToArray(), Is.EqualTo("QPEG"u8.ToArray()), "biCompression");
       Assert.That(BinaryPrimitives.ReadInt32LittleEndian(format[32..]), Is.EqualTo(16), "biClrUsed");
     });
 
