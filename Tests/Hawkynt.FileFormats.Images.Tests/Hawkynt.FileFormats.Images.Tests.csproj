@@ -44,6 +44,12 @@
       <Link>Fixtures\%(Filename)%(Extension)</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+    <!-- Small generated binary vectors may be stored as base64 text so the GitHub connector can
+         add them without changing their bytes. Tests decode them before handing them to the reader. -->
+    <None Include="Formats\JpegXl\Fixtures\*.b64">
+      <Link>Fixtures\%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
     <!-- djxl's own decode of a fixture beside it, so a decode can be compared against libjxl
          rather than against this package's other half. -->
     <None Include="Formats\JpegXl\Fixtures\*.ppm">

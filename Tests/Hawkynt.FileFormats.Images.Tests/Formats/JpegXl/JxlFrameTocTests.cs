@@ -48,22 +48,15 @@ internal sealed class JxlFrameTocTests {
 
   // ============================================================
   // Decode — single group, no permutation (1-section TOC)
-  //
-  // libjxl ReadGroupOffsets layout for the 1-section case:
-  //   1 bit  permuted = 0
-  //   U32    section size: U32(0+u(10), 1024+u(14), 17408+u(22), Bits(30))
-  //   ZeroPadToByte
   // ============================================================
 
   [Test]
   public void Decode_SingleGroup_NoPermutation_Selector0() {
-    // libjxl ReadToc layout: permuted (1) | byte-align | U32 size | byte-align.
-    // permuted = 0, section size selector 0 = 0 + u(10), payload = 42 → size = 42.
     var bits = new BitsBuilder()
-      .Add(0u, 1)               // permuted = 0
-      .Add(0u, 7)               // byte-align (libjxl JumpToByteBoundary)
-      .Add(0u, 2)               // U32 selector 0
-      .Add(42u, 10)             // payload = 42 → size = 0 + 42 = 42
+      .Add(0u, 1)
+      .Add(0u, 7)
+      .Add(0u, 2)
+      .Add(42u, 10)
       .ToBytes();
 
     var reader = new JxlBitReader(bits, 0);
@@ -80,10 +73,9 @@ internal sealed class JxlFrameTocTests {
 
   [Test]
   public void Decode_SingleGroup_NoPermutation_Selector0_MaxPayload() {
-    // selector 0 max: payload = 1023 → size = 1023.
     var bits = new BitsBuilder()
       .Add(0u, 1)
-      .Add(0u, 7)               // byte-align
+      .Add(0u, 7)
       .Add(0u, 2)
       .Add(1023u, 10)
       .ToBytes();
@@ -96,10 +88,9 @@ internal sealed class JxlFrameTocTests {
 
   [Test]
   public void Decode_SingleGroup_NoPermutation_Selector1_AddsOffset1024() {
-    // selector 1: BitsOffset(14, 1024) → size = 1024 + payload. payload = 100 → 1124.
     var bits = new BitsBuilder()
       .Add(0u, 1)
-      .Add(0u, 7)               // byte-align
+      .Add(0u, 7)
       .Add(1u, 2)
       .Add(100u, 14)
       .ToBytes();
@@ -112,10 +103,9 @@ internal sealed class JxlFrameTocTests {
 
   [Test]
   public void Decode_SingleGroup_NoPermutation_Selector2_AddsOffset17408() {
-    // selector 2: BitsOffset(22, 17408) → size = 17408 + payload. payload = 5 → 17413.
     var bits = new BitsBuilder()
       .Add(0u, 1)
-      .Add(0u, 7)               // byte-align
+      .Add(0u, 7)
       .Add(2u, 2)
       .Add(5u, 22)
       .ToBytes();
@@ -126,18 +116,11 @@ internal sealed class JxlFrameTocTests {
     Assert.That(toc.SectionSizes[0], Is.EqualTo(17413));
   }
 
-  /// <summary>
-  /// The four ranges abut, so the last selector starts where the third one ends
-  /// rather than at nothing. Reading it as nothing puts every section after a
-  /// four-megabyte one four megabytes early, which is where a lossless picture
-  /// of any size lands.
-  /// </summary>
   [Test]
   public void Decode_SingleGroup_NoPermutation_Selector3_AddsOffset4211712() {
-    // selector 3: BitsOffset(30, 4211712) → size = 4211712 + payload.
     var bits = new BitsBuilder()
       .Add(0u, 1)
-      .Add(0u, 7)               // byte-align
+      .Add(0u, 7)
       .Add(3u, 2)
       .Add(1_000_000u, 30)
       .ToBytes();
@@ -150,18 +133,13 @@ internal sealed class JxlFrameTocTests {
 
   [Test]
   public void Decode_SingleGroup_LeavesReaderByteAligned() {
-    // After Decode the reader should be byte-aligned (libjxl calls
-    // JumpToByteBoundary at the end of ReadGroupOffsets, AND between the
-    // permutation flag and the size U32s). Layout:
-    //   permuted (1) + byte-align(7) + selector (2) + payload10 (10)
-    //   + final byte-align (4) = 24 bits, then sentinel byte.
     var bits = new BitsBuilder()
       .Add(0u, 1)
-      .Add(0u, 7)               // byte-align after permuted
+      .Add(0u, 7)
       .Add(0u, 2)
-      .Add(7u, 10)              // size = 7
-      .Add(0u, 4)               // final byte-align (8+2+10 = 20, +4 = 24)
-      .Add(0xCDu, 8)            // sentinel
+      .Add(7u, 10)
+      .Add(0u, 4)
+      .Add(0xCDu, 8)
       .ToBytes();
 
     var reader = new JxlBitReader(bits, 0);
@@ -174,51 +152,54 @@ internal sealed class JxlFrameTocTests {
   }
 
   // ============================================================
-  // Decode — permuted TOC (deferred)
+  // Decode — entropy-coded Lehmer permutation
   // ============================================================
 
   [Test]
-  public void Decode_Permuted_ThrowsNotImplemented() {
-    // permuted = 1 routes us into the Lehmer-code permutation reader, which
-    // is deferred (requires the ANS pipeline + context map). Confirm we
-    // throw NotImplementedException with a clear message.
-    var bits = new BitsBuilder()
-      .Add(1u, 1)               // permuted = 1
-      .ToBytes();
+  public void Decode_Permuted_RemapsPhysicalSectionsToCanonicalOrder() {
+    // Five canonical sections. Lehmer [1,0,0,0,0] is permutation
+    // [1,0,2,3,4]: canonical section 0 is physically second, section 1 first.
+    // DecodePermutation stores only through the last non-zero Lehmer digit, so
+    // the entropy block carries end=1 followed by digit 1.
+    var writer = new JxlBitWriter();
+    writer.WriteBool(true);
+    var permutationTokens = new JxlTokenStream();
+    permutationTokens.Add(1); // end
+    permutationTokens.Add(1); // lehmer[0]
+    permutationTokens.WriteHeader(writer, JxlCoeffOrderDecoder.PermutationContexts);
+    permutationTokens.WriteTokens(writer);
+    writer.ZeroPadToByte();
 
-    var reader = new JxlBitReader(bits, 0);
+    int[] physicalSizes = [10, 20, 30, 40, 50];
+    foreach (var size in physicalSizes)
+      writer.WriteU32((uint)size, 0, 10, 1024, 14, 17408, 22, 4211712, 30);
+    writer.ZeroPadToByte();
 
-    var ex = Assert.Throws<NotImplementedException>(
-      () => JxlFrameToc.Decode(reader, 1, 1));
+    var reader = new JxlBitReader(writer.ToArray(), 0);
+    var toc = JxlFrameToc.Decode(reader, numGroups: 1, numPasses: 2, numDcGroups: 1);
 
-    Assert.That(ex!.Message, Does.Contain("permuted"),
-      "Error message should mention the permuted flag.");
-    Assert.That(ex.Message, Does.Contain("Lehmer").Or.Contains("DecodePermutation"),
-      "Error message should mention the Lehmer-code reader or DecodePermutation.");
+    Assert.Multiple(() => {
+      Assert.That(toc.Permuted, Is.True);
+      Assert.That(toc.Permutation, Is.EqualTo(new[] { 1, 0, 2, 3, 4 }));
+      Assert.That(toc.SectionSizes, Is.EqualTo(new[] { 20, 10, 30, 40, 50 }));
+      Assert.That(toc.SectionOffsets, Is.EqualTo(new[] { 10, 0, 30, 60, 100 }));
+      Assert.That(reader.BitsRead % 8, Is.Zero);
+    });
   }
 
   // ============================================================
   // Decode — multi-section TOC
-  //
-  // libjxl `NumTocEntries(num_groups, num_dc_groups, num_passes)`:
-  //   (numGroups == 1 && numPasses == 1) ? 1
-  //                                      : 2 + numDcGroups + numGroups * numPasses
   // ============================================================
 
   [Test]
   public void Decode_MultiGroup_ReadsAllSectionSizes() {
-    // numGroups=4, numPasses=1, numDcGroups=1 → 2+1+4 = 7 sections.
-    // Each size selector 0 = 12 bits (2 sel + 10 payload), 7 of those fit
-    // in 84 bits + alignment.
     var b = new BitsBuilder()
-      .Add(0u, 1)            // permuted=0
-      .Add(0u, 7);           // byte-align after permuted
-    // Add 7 size U32s, sizes 1..7.
+      .Add(0u, 1)
+      .Add(0u, 7);
     for (var i = 1; i <= 7; ++i) {
-      b.Add(0u, 2);          // selector 0
-      b.Add((uint)i, 10);    // payload
+      b.Add(0u, 2);
+      b.Add((uint)i, 10);
     }
-    // Final byte-align: 8+84=92 bits, need 4 more bits.
     b.Add(0u, 4);
     var bits = b.ToBytes();
 
@@ -232,15 +213,13 @@ internal sealed class JxlFrameTocTests {
 
   [Test]
   public void Decode_MultiPass_ReadsAllSectionSizes() {
-    // numGroups=1, numPasses=2, numDcGroups=1 → 2+1+1*2 = 5 sections.
     var b = new BitsBuilder()
-      .Add(0u, 1)            // permuted=0
-      .Add(0u, 7);           // byte-align
+      .Add(0u, 1)
+      .Add(0u, 7);
     for (var i = 1; i <= 5; ++i) {
       b.Add(0u, 2);
       b.Add((uint)i * 10u, 10);
     }
-    // 8 + 60 = 68 bits → align needs 4.
     b.Add(0u, 4);
     var bits = b.ToBytes();
 
@@ -254,15 +233,14 @@ internal sealed class JxlFrameTocTests {
 
   [Test]
   public void Decode_MultiGroup_OffsetsAreCumulative() {
-    // Verify SectionOffsets[i] = sum(SectionSizes[0..i-1]).
     var b = new BitsBuilder()
       .Add(0u, 1).Add(0u, 7);
-    var sizes = new int[] { 100, 200, 300, 50, 75, 25, 1 };
+    int[] sizes = [100, 200, 300, 50, 75, 25, 1];
     foreach (var s in sizes) {
       b.Add(0u, 2);
       b.Add((uint)s, 10);
     }
-    b.Add(0u, 4); // byte-align
+    b.Add(0u, 4);
     var bits = b.ToBytes();
 
     var reader = new JxlBitReader(bits, 0);
