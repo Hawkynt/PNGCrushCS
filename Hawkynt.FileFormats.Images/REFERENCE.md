@@ -6275,20 +6275,24 @@ Implements `IEquatable<CanvasRasterFile>`, `IImageFormatMetadata<CanvasRasterFil
 
 ### Namespace `FileFormat.CartesMichelin`
 
-[`CartesMichelinFile`](#cartesmichelinfile) · [`CartesMichelinReader`](#cartesmichelinreader)
+[`CartesMichelinFile`](#cartesmichelinfile) · [`CartesMichelinReader`](#cartesmichelinreader) · [`CartesMichelinWriter`](#cartesmichelinwriter)
 
 #### `CartesMichelinFile`
 
-Implements `IEquatable<CartesMichelinFile>`, `IImageFormatMetadata<CartesMichelinFile>`, `IImageFormatReader<CartesMichelinFile>`, `IImageToRawImage<CartesMichelinFile>`.
+Implements `IEquatable<CartesMichelinFile>`, `IImageFormatMetadata<CartesMichelinFile>`, `IImageFormatReader<CartesMichelinFile>`, `IImageFormatWriter<CartesMichelinFile>`, `IImageFromRawImage<CartesMichelinFile>`, `IImageToRawImage<CartesMichelinFile>`.
 
 | Member | Signature | Summary |
 | --- | --- | --- |
 | `DirectoryEntrySize` | `const int DirectoryEntrySize` |  |
 | `HeaderSize` | `const int HeaderSize` |  |
 | `MaxGridCount` | `const int MaxGridCount` |  |
+| `MaxImageSize` | `const int MaxImageSize` |  |
 | `MaxTileSize` | `const int MaxTileSize` |  |
 | `MinGridCount` | `const int MinGridCount` |  |
+| `MinImageSize` | `const int MinImageSize` |  |
 | `MinTileSize` | `const int MinTileSize` |  |
+| `GridColumns` | `int GridColumns { get; init; }` |  |
+| `GridRows` | `int GridRows { get; init; }` |  |
 | `Height` | `int Height { get; init; }` |  |
 | `PixelData` | `byte[] PixelData { get; init; }` |  |
 | `TileCount` | `int TileCount { get; init; }` |  |
@@ -6296,6 +6300,7 @@ Implements `IEquatable<CartesMichelinFile>`, `IImageFormatMetadata<CartesMicheli
 | `TileSignature` | `static ReadOnlySpan<byte> TileSignature { get; }` |  |
 | `TileWidth` | `int TileWidth { get; init; }` |  |
 | `Width` | `int Width { get; init; }` |  |
+| `FromRawImage` | `static CartesMichelinFile FromRawImage(RawImage image)` |  |
 | `ToRawImage` | `static RawImage ToRawImage(CartesMichelinFile file)` |  |
 
 #### `CartesMichelinReader`
@@ -6306,6 +6311,12 @@ Implements `IEquatable<CartesMichelinFile>`, `IImageFormatMetadata<CartesMicheli
 | `FromFile` | `static CartesMichelinFile FromFile(FileInfo file)` |  |
 | `FromSpan` | `static CartesMichelinFile FromSpan(ReadOnlySpan<byte> data)` |  |
 | `FromStream` | `static CartesMichelinFile FromStream(Stream stream)` |  |
+
+#### `CartesMichelinWriter`
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `ToBytes` | `static byte[] ToBytes(CartesMichelinFile file)` |  |
 
 ### Namespace `FileFormat.CasioQv`
 
@@ -7365,19 +7376,21 @@ Implements `IEquatable<CmuWindowManagerFile>`, `IImageFormatMetadata<CmuWindowMa
 
 ### Namespace `FileFormat.Cmx`
 
-[`CmxFile`](#cmxfile) · [`CmxReader`](#cmxreader)
+[`CmxFile`](#cmxfile) · [`CmxReader`](#cmxreader) · [`CmxWriter`](#cmxwriter)
 
 #### `CmxFile`
 
-Implements `IImageFormatMetadata<CmxFile>`, `IImageFormatReader<CmxFile>`, `IImageToRawImage<CmxFile>`.
+Implements `IImageFormatMetadata<CmxFile>`, `IImageFormatReader<CmxFile>`, `IImageFormatWriter<CmxFile>`, `IImageFromRawImage<CmxFile>`, `IImageToRawImage<CmxFile>`.
 
 | Member | Signature | Summary |
 | --- | --- | --- |
 | `CmxFile` | `CmxFile()` |  |
 | `CoordinatePrecisionBits` | `int CoordinatePrecisionBits { get; init; }` |  |
+| `InternalVersion` | `int InternalVersion { get; init; }` |  |
 | `IsBigEndian` | `bool IsBigEndian { get; init; }` |  |
 | `PreviewOffset` | `int PreviewOffset { get; init; }` |  |
 | `Preview` | `RawImage Preview { get; init; }` |  |
+| `FromRawImage` | `static CmxFile FromRawImage(RawImage image)` |  |
 | `ToRawImage` | `static RawImage ToRawImage(CmxFile file)` |  |
 
 #### `CmxReader`
@@ -7386,6 +7399,13 @@ Implements `IImageFormatMetadata<CmxFile>`, `IImageFormatReader<CmxFile>`, `IIma
 | --- | --- | --- |
 | `FromSpan` | `static CmxFile FromSpan(ReadOnlySpan<byte> data)` |  |
 | `MatchesSignature` | `static bool? MatchesSignature(ReadOnlySpan<byte> header)` |  |
+
+#### `CmxWriter`
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `ToBytes` | `static byte[] ToBytes(CmxFile file)` |  |
+| `ToBytes` | `static byte[] ToBytes(RawImage image)` |  |
 
 ### Namespace `FileFormat.CoCo`
 
@@ -15687,17 +15707,19 @@ Implements `IEquatable<FontasyGrafikFile>`, `IImageFormatMetadata<FontasyGrafikF
 
 ### Namespace `FileFormat.Fpx`
 
-[`FpxFile`](#fpxfile) · [`FpxReader`](#fpxreader)
+[`FpxFile`](#fpxfile) · [`FpxReader`](#fpxreader) · [`FpxWriter`](#fpxwriter)
 
 #### `FpxFile`
 
-Implements `IEquatable<FpxFile>`, `IImageFormatMetadata<FpxFile>`, `IImageFormatReader<FpxFile>`, `IImageToRawImage<FpxFile>`.
+Implements `IEquatable<FpxFile>`, `IImageFormatMetadata<FpxFile>`, `IImageFormatReader<FpxFile>`, `IImageFormatWriter<FpxFile>`, `IImageFromRawImage<FpxFile>`, `IImageToRawImage<FpxFile>`.
 
 | Member | Signature | Summary |
 | --- | --- | --- |
 | `Height` | `int Height { get; init; }` |  |
 | `PixelData` | `byte[] PixelData { get; init; }` |  |
 | `Width` | `int Width { get; init; }` |  |
+| `FromRawImage` | `static FpxFile FromRawImage(RawImage image)` |  |
+| `FromRawImage` | `static FpxFile FromRawImage(RawImage image, string extension)` |  |
 | `ToRawImage` | `static RawImage ToRawImage(FpxFile file)` |  |
 
 #### `FpxReader`
@@ -15708,6 +15730,12 @@ Implements `IEquatable<FpxFile>`, `IImageFormatMetadata<FpxFile>`, `IImageFormat
 | `FromFile` | `static FpxFile FromFile(FileInfo file)` |  |
 | `FromSpan` | `static FpxFile FromSpan(ReadOnlySpan<byte> data)` |  |
 | `FromStream` | `static FpxFile FromStream(Stream stream)` |  |
+
+#### `FpxWriter`
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `ToBytes` | `static byte[] ToBytes(FpxFile file)` |  |
 
 ### Namespace `FileFormat.FreeHand`
 
