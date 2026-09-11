@@ -349,7 +349,7 @@ internal static class Vp9Encoder {
           continue;
         }
 
-        this._WriteCoefficient(writer, token, magnitude);
+        _WriteCoefficient(writer, token, magnitude);
         writer.WriteFlag(value < 0 ? 1 : 0);
         checkEndOfBlock = true;
       }
