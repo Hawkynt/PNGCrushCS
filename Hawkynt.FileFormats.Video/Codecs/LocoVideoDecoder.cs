@@ -15,7 +15,8 @@ namespace FileFormat.Codecs;
 /// LOCO stores one independently Rice-coded predictive plane after another. The Rice parameter adapts
 /// from recent residual magnitudes, zeroes have their own run state, and all non-first-row samples use
 /// the LOCO-I/JPEG-LS median-edge predictor. AVI carries a 12-byte trailer after the ordinary
-/// <c>BITMAPINFOHEADER</c>: version, colour mode, and the near-lossless step.
+/// <c>BITMAPINFOHEADER</c>: version, colour mode, and the near-lossless step. Odd-width RGB carries the
+/// historical encoder's diagonal row-rotation fault and is repaired after the three planes are read.
 /// </remarks>
 public sealed class LocoVideoDecoder : IVideoCodecDecoder<LocoVideoDecoder> {
 
@@ -83,9 +84,6 @@ public sealed class LocoVideoDecoder : IVideoCodecDecoder<LocoVideoDecoder> {
     if (mode is _CYV12 or _YV12 && ((stream.Width | stream.Height) & 1) != 0)
       throw new NotSupportedException(
         $"LOCO stream {stream.Index} has an odd-sized {stream.Width}x{stream.Height} 4:2:0 picture.");
-    if (mode is _CRGB or _RGB or _CRGBA or _RGBA && (stream.Width & 1) != 0)
-      throw new NotSupportedException(
-        $"LOCO stream {stream.Index} has odd-width RGB packing. The historical encoder's diagonal row-rotation quirk is not enabled without a native sample oracle.");
 
     return new(stream.Width, stream.Height, mode, version == 1 ? 0 : lossy, stream.Index);
   }
@@ -118,6 +116,14 @@ public sealed class LocoVideoDecoder : IVideoCodecDecoder<LocoVideoDecoder> {
     at += this._DecodePlane(source[at..], red, this._width, this._height);
     if (alpha != null)
       at += this._DecodePlane(source[at..], alpha, this._width, this._height);
+
+    // The old RGB encoder walked an odd-width packed source diagonally while splitting it into
+    // planes. Its decoder repaired that traversal after entropy decoding; RGBA never had this bug.
+    if (!withAlpha && (this._width & 1) != 0) {
+      _RotateFaultyLoco(blue, this._width, this._height);
+      _RotateFaultyLoco(green, this._width, this._height);
+      _RotateFaultyLoco(red, this._width, this._height);
+    }
 
     var stride = this._width * (withAlpha ? 4 : 3);
     var output = new byte[checked(stride * this._height)];
@@ -208,6 +214,18 @@ public sealed class LocoVideoDecoder : IVideoCodecDecoder<LocoVideoDecoder> {
     }
 
     return (bits.Position + 7) >> 3;
+  }
+
+  private static void _RotateFaultyLoco(Span<byte> data, int width, int height) {
+    for (var y = 1; y < height; ++y) {
+      if (width < y)
+        continue;
+
+      var row = y * width;
+      data.Slice(row + y, width - y).CopyTo(data[row..]);
+      if (y + 1 < height)
+        data.Slice((y + 1) * width, y).CopyTo(data[(row + width - y)..]);
+    }
   }
 
   private static int _Median(int a, int b, int c) {
