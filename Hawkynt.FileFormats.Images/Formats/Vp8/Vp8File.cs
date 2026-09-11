@@ -21,7 +21,7 @@ public readonly record struct Vp8File :
 
   public int Width { get; init; }
   public int Height { get; init; }
-  public byte[] Bitstream { get; init; } = [];
+  public byte[] Bitstream { get; init; }
 
   public static RawImage ToRawImage(Vp8File file)
     => new() {

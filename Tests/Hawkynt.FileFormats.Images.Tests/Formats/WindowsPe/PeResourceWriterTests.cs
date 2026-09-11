@@ -8,12 +8,15 @@ namespace FileFormat.WindowsPe.Tests;
 [TestFixture]
 public sealed class PeResourceWriterTests {
 
-  [TestCase(".exe", PeResourceModuleKind.Executable)]
-  [TestCase(".scr", PeResourceModuleKind.Executable)]
-  [TestCase(".dll", PeResourceModuleKind.Dll)]
-  [TestCase(".ocx", PeResourceModuleKind.Dll)]
-  [TestCase(".cpl", PeResourceModuleKind.Dll)]
-  public void FromRawImage_ExtensionSelectsModuleKind(string extension, PeResourceModuleKind expected) {
+  // PeResourceModuleKind is internal, so it cannot appear in a public signature. The flag is
+  // mapped inside the method, where the internal type is reachable.
+  [TestCase(".exe", false)]
+  [TestCase(".scr", false)]
+  [TestCase(".dll", true)]
+  [TestCase(".ocx", true)]
+  [TestCase(".cpl", true)]
+  public void FromRawImage_ExtensionSelectsModuleKind(string extension, bool expectsDll) {
+    var expected = expectsDll ? PeResourceModuleKind.Dll : PeResourceModuleKind.Executable;
     var file = PeResourceFile.FromRawImage(_CreateImage(), extension);
     Assert.Multiple(() => {
       Assert.That(file.ModuleKind, Is.EqualTo(expected));

@@ -25,6 +25,7 @@ internal static class Indeo3FrameEncoder {
 
   private const int _OS_HEADER_LENGTH = 16;
   private const int _BITSTREAM_HEADER_LENGTH = 48;
+  private const int _TRAILING_SLACK = 16;
   private const byte _WHOLE_PLANE_INTRA_CELL = 0b1011_0000;
   private const byte _MODE_ZERO_TABLE_ZERO = 0x00;
   private const byte _NEUTRAL_SAMPLE = 0x40;
@@ -46,7 +47,13 @@ internal static class Indeo3FrameEncoder {
     var yOffset = _BITSTREAM_HEADER_LENGTH;
     var vOffset = checked(yOffset + y.Length);
     var uOffset = checked(vOffset + v.Length);
-    var dataSize = checked(uOffset + u.Length);
+
+    // Sixteen bytes of slack follow the last plane. The decoder's cell reader may run that far past
+    // the final cell it consumes, so a frame whose last plane ends exactly at the data size is
+    // rejected by the header check (last start must be more than sixteen bytes from the end). Real
+    // IV32 frames carry the same slack; without it every picture small enough for a chroma plane
+    // under sixteen bytes -- a 16x16 source gives a 4x4 one -- fails to decode at all.
+    var dataSize = checked(uOffset + u.Length + _TRAILING_SLACK);
     var frame = new byte[checked(_OS_HEADER_LENGTH + dataSize)];
 
     var osHeader = frame.AsSpan(0, _OS_HEADER_LENGTH);

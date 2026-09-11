@@ -166,7 +166,7 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | BlazingPaddlesWindow | `.wnd` | ✅ | ✅ | — | — | — | recoil2png |
 | Blazon | `.bpl` | ✅ | ✅ | — | — | — | recoil2png |
 | Blp | `.blp` | ✅ | ✅ | — | — | — | none |
-| Bmp | `.bmp`, `.dib`, `.bga`, `.rl4`, `.rl8`, `.vga`, `.sys`, `.bum`, `.thb`, `.2d`, `.bmc`, `.stm`, `.upi`, `.msk`, `.flt` | ✅ | ✅ | ✅ | — | ✅ | ImageMagick, ffmpeg |
+| Bmp | `.bmp`, `.bga`, `.rl4`, `.rl8`, `.vga`, `.sys`, `.bum`, `.thb`, `.2d`, `.bmc`, `.stm`, `.upi`, `.msk`, `.flt` | ✅ | ✅ | ✅ | — | ✅ | ImageMagick, ffmpeg |
 | Bob | `.bob` | ✅ | ✅ | — | — | — | none |
 | BodyPaint3D | `.b3d`, `.b2d` | ✅ | ✅ | — | — | — | none |
 | BoogieDownPaint | `.bdp` | ✅ | ✅ | — | — | — | recoil2png |
@@ -302,7 +302,8 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | EggPaint | `.trp` | ✅ | ✅ | — | — | — | recoil2png |
 | ElectricImage | `.ei`, `.eidi` | ✅ | ✅ | — | ✅ | — | none |
 | Electronika | `.bk`, `.ekr` | ✅ | ✅ | — | — | — | none |
-| EmbeddedDib | `.zmf`, `.skf`, `.cad`, `.btn` | ✅ | — | — | — | — | — |
+| EmbeddedDib | `.dib` | ✅ | ✅ | — | — | — | none |
+| EmbeddedDibPreview | `.zmf`, `.skf`, `.cad`, `.btn` | ✅ | — | — | — | — | — |
 | EmcEditor | `.emc` | ✅ | ✅ | — | — | — | none |
 | Emf | `.emf` | ✅ | ✅ | — | — | — | none |
 | Enterprise128 | `.ep`, `.elan` | ✅ | ✅ | — | — | — | none |
@@ -435,7 +436,7 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | IcePcinPlus | `.ip2` | ✅ | ✅ | — | — | — | recoil2png |
 | Icns | `.icns` | ✅ | ✅ | — | ✅ | — | none |
 | Ico | `.ico` | ✅ | ✅ | — | ✅ | ✅ | ImageMagick, ffmpeg |
-| IconLibrary | `.icl` | ✅ | — | — | — | — | — |
+| IconLibrary | `.icl` | ✅ | ✅ | — | ✅ | — | none |
 | Ics | `.ics` | ✅ | ✅ | — | — | — | none |
 | IffAcbm | `.acbm`, `.iff`, `.blk` | ✅ | ✅ | — | — | — | recoil2png, ffmpeg |
 | IffAnim | `.anim` | ✅ | ✅ | — | — | — | ffmpeg |
@@ -643,7 +644,7 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | Pdf | `.pdf` | ✅ | ✅ | — | ✅ | — | ImageMagick |
 | Pdn | `.pdn` | ✅ | ✅ | — | — | — | none |
 | Pds | `.pds`, `.lbl` | ✅ | ✅ | — | — | — | none |
-| PeResource | `.exe`, `.dll`, `.ocx`, `.scr`, `.cpl` | ✅ | — | — | ✅ | — | — |
+| PeResource | `.exe`, `.dll`, `.ocx`, `.scr`, `.cpl` | ✅ | ✅ | — | ✅ | — | none |
 | PerfectPix | `.pph` | ✅ | ✅ | — | — | — | recoil2png |
 | Pes | `.pes` | ✅ | ✅ | — | — | — | none |
 | PetDraw | `.pdr` | ✅ | ✅ | — | — | — | recoil2png |
@@ -864,6 +865,8 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | VirtualBoyTile | `.vbt`, `.vb`, `.vboy` | ✅ | ✅ | — | — | — | none |
 | Vitec | `.vit` | ✅ | ✅ | — | — | — | none |
 | Vivid | `.vivid`, `.dis` | ✅ | ✅ | — | — | — | none |
+| Vp8 | `.vp8` | ✅ | ✅ | — | — | — | none |
+| Vp8L | `.vp8l` | ✅ | ✅ | — | — | — | none |
 | Vrml | `.wrl`, `.vrml` | ✅ | ✅ | — | — | — | none |
 | Vtf | `.vtf` | ✅ | ✅ | — | — | — | none |
 | Vue | `.vob` | ✅ | ✅ | — | — | — | none |
@@ -1054,7 +1057,7 @@ This list used to be far longer, and the entries that left it did so by argument
 
 ### Registered but read-only
 
-These 8 entries read but have no writer; each is a decision, not an oversight. **Not bounded** (an encoder or a model this package does not have): PeResource, Fpx (executable, OLE and compound-document containers). **Holders of other files rather than pictures of their own**: IconLibrary, Ipg, Sdg, Cmx — an icon library, a tileset and a gallery carry whole files of other formats, so writing any of them means deciding what belongs in a collection rather than serialising a picture. **Deliberately not written** because a file built from arbitrary pixels would not be what the name promises: EmbeddedDib, CartesMichelin.
+These 6 entries read but have no writer; each is a decision, not an oversight. **Not bounded** (an encoder or a model this package does not have): Fpx (OLE and compound-document containers). **Holders of other files rather than pictures of their own**: Ipg, Sdg, Cmx — a tileset and a gallery carry whole files of other formats, so writing any of them means deciding what belongs in a collection rather than serialising a picture. **Deliberately not written** because a file built from arbitrary pixels would not be what the name promises: CartesMichelin, EmbeddedDibPreview — the latter is a heuristic search for a DIB preview inside drawing and project containers whose layout is not documented here, so there is no structure to write one back into.
 
 ## 🚀 Quick start
 

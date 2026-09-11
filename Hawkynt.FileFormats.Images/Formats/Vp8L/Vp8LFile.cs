@@ -25,7 +25,7 @@ public readonly record struct Vp8LFile :
   /// <summary>The header's alpha-is-used hint. It is not authoritative for decoding.</summary>
   public bool AlphaHint { get; init; }
 
-  public byte[] Bitstream { get; init; } = [];
+  public byte[] Bitstream { get; init; }
 
   public static RawImage ToRawImage(Vp8LFile file) {
     var argb = global::FileFormat.WebP.Vp8L.Vp8LDecoder.DecodeArgbStream(

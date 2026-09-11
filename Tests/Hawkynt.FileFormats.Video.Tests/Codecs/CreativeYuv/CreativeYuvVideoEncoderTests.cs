@@ -17,8 +17,8 @@ public class CreativeYuvVideoEncoderTests {
   private static readonly CodecTag _Cyuv = CodecTag.FromCharacters("cyuv");
 
   private static MediaStreamInfo _Stream(
-    int width, int height, MediaStreamKind kind = MediaStreamKind.Video) => new() {
-    Index = 2,
+    int width, int height, MediaStreamKind kind = MediaStreamKind.Video, int index = 2) => new() {
+    Index = index,
     Kind = kind,
     Codec = _Cyuv,
     Width = width,
@@ -184,7 +184,8 @@ public class CreativeYuvVideoEncoderTests {
   [Category("Unit")]
   public void PacketsMuxIntoAnAviAndComeBackThroughTheCreativeYuvDecoder() {
     var (frame, topDown) = _Picture(8, 3, 5);
-    var encoder = CreativeYuvVideoEncoder.Create(_Stream(8, 3));
+    // AVI numbers its streams densely from zero, so this one cannot use the fixture's index of 2.
+    var encoder = CreativeYuvVideoEncoder.Create(_Stream(8, 3, index: 0));
     Assert.That(encoder.TryEncode(frame, 0, out var packet), Is.True);
 
     var avi = VideoIO.Mux<AviWriter>([encoder.DescribeStream()], [packet]);

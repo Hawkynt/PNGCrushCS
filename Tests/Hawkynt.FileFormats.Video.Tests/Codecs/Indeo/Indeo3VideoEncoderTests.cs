@@ -64,7 +64,12 @@ public sealed class Indeo3VideoEncoderTests {
     const int yOffset = 48;
     const int vOffset = yOffset + yLength;
     const int uOffset = vOffset + chromaLength;
-    const int dataSize = uOffset + chromaLength;
+
+    // Sixteen bytes of slack close the frame. The decoder's cell reader may run that far past the
+    // last cell, and its header check rejects a frame whose final plane starts within sixteen bytes
+    // of the end -- which a 4x4 chroma plane always would.
+    const int trailingSlack = 16;
+    const int dataSize = uOffset + chromaLength + trailingSlack;
 
     Assert.Multiple(() => {
       Assert.That(packet.IsKeyFrame, Is.True);

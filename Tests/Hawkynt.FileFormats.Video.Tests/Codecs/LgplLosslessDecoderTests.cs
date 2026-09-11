@@ -83,12 +83,14 @@ public sealed class LgplLosslessDecoderTests {
     Assert.That(packet.IsKeyFrame, Is.True);
 
     var described = encoder.DescribeStream();
-    var extra = described.CodecPrivateData.Span[BitmapInfoHeader.StructSize..];
+    // Materialised before the closure: a Span is a ref struct and cannot be captured by the
+    // Assert.Multiple lambda.
+    var extra = described.CodecPrivateData.Span[BitmapInfoHeader.StructSize..].ToArray();
     Assert.Multiple(() => {
       Assert.That(described.BitsPerPixel, Is.EqualTo(24));
       Assert.That(BinaryPrimitives.ReadInt32LittleEndian(extra), Is.EqualTo(1));
-      Assert.That(BinaryPrimitives.ReadInt32LittleEndian(extra[4..]), Is.EqualTo(3));
-      Assert.That(BinaryPrimitives.ReadInt32LittleEndian(extra[8..]), Is.Zero);
+      Assert.That(BinaryPrimitives.ReadInt32LittleEndian(extra.AsSpan(4)), Is.EqualTo(3));
+      Assert.That(BinaryPrimitives.ReadInt32LittleEndian(extra.AsSpan(8)), Is.Zero);
     });
 
     var decoder = LocoVideoDecoder.Create(described);
