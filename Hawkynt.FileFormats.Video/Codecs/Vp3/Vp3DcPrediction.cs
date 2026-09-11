@@ -1,7 +1,8 @@
 namespace FileFormat.Codecs.Vp3;
 
 /// <summary>
-/// Turns the DC residuals the bitstream carries back into DC coefficients (Section 7.8).
+/// Converts between the DC residuals carried by the bitstream and the quantised DC coefficients they
+/// represent (Section 7.8 of the Theora specification).
 /// </summary>
 /// <remarks>
 /// Only the DC coefficient is predicted, and it is predicted in the quantised domain — before
@@ -61,38 +62,102 @@ internal static class Vp3DcPrediction {
         var pattern = (available[0] ? 1 : 0) | (available[1] ? 2 : 0)
           | (available[2] ? 4 : 0) | (available[3] ? 8 : 0);
 
-        int predictor;
-        if (pattern == 0)
-          predictor = last[reference];
-        else {
-          var weights = Vp3Tables.DcPredictorWeights[pattern];
-          var sum = 0;
-          for (var i = 0; i < 4; ++i)
-            if (available[i])
-              sum += weights[i] * coefficients[neighbour[i] * 64];
-
-          var divisor = weights[4];
-          predictor = sum / divisor;
-
-          if (available[0] && available[1] && available[2]) {
-            var below = coefficients[neighbour[2] * 64];
-            var left = coefficients[neighbour[0] * 64];
-            var belowLeft = coefficients[neighbour[1] * 64];
-
-            if (_Distance(predictor, below) > _OUTRANGE)
-              predictor = below;
-            else if (_Distance(predictor, left) > _OUTRANGE)
-              predictor = left;
-            else if (_Distance(predictor, belowLeft) > _OUTRANGE)
-              predictor = belowLeft;
-          }
-        }
-
+        var predictor = _Predict(available, neighbour, coefficients, last[reference]);
         var value = (short)(coefficients[block * 64] + predictor);
         coefficients[block * 64] = value;
         last[reference] = value;
       }
     }
+  }
+
+  /// <summary>
+  /// Replaces the absolute quantised DC coefficient of every block of an intra frame with the
+  /// residual VP3 stores in the packet.
+  /// </summary>
+  internal static void ApplyIntra(Vp3Geometry geometry, short[] coefficients) {
+    var absolute = new short[geometry.BlockCount];
+    for (var block = 0; block < geometry.BlockCount; ++block)
+      absolute[block] = coefficients[block * 64];
+
+    var available = new bool[4];
+    var neighbour = new int[4];
+
+    for (var plane = 0; plane < 3; ++plane) {
+      short last = 0;
+      var width = geometry.PlaneBlockWidth[plane];
+      var height = geometry.PlaneBlockHeight[plane];
+      var index = geometry.CodedIndex[plane];
+
+      for (var row = 0; row < height; ++row)
+      for (var column = 0; column < width; ++column) {
+        var block = index[row * width + column];
+
+        available[0] = _InBounds(width, height, column - 1, row, out var left);
+        available[1] = _InBounds(width, height, column - 1, row - 1, out var belowLeft);
+        available[2] = _InBounds(width, height, column, row - 1, out var below);
+        available[3] = _InBounds(width, height, column + 1, row - 1, out var belowRight);
+        neighbour[0] = available[0] ? index[left] : 0;
+        neighbour[1] = available[1] ? index[belowLeft] : 0;
+        neighbour[2] = available[2] ? index[below] : 0;
+        neighbour[3] = available[3] ? index[belowRight] : 0;
+
+        var predictor = _PredictAbsolute(available, neighbour, absolute, last);
+        coefficients[block * 64] = (short)(absolute[block] - predictor);
+        last = absolute[block];
+      }
+    }
+  }
+
+  private static int _Predict(bool[] available, int[] neighbour, short[] coefficients, short last) {
+    var pattern = (available[0] ? 1 : 0) | (available[1] ? 2 : 0)
+      | (available[2] ? 4 : 0) | (available[3] ? 8 : 0);
+    if (pattern == 0)
+      return last;
+
+    var weights = Vp3Tables.DcPredictorWeights[pattern];
+    var sum = 0;
+    for (var i = 0; i < 4; ++i)
+      if (available[i])
+        sum += weights[i] * coefficients[neighbour[i] * 64];
+
+    var predictor = sum / weights[4];
+    if (!available[0] || !available[1] || !available[2])
+      return predictor;
+
+    var below = coefficients[neighbour[2] * 64];
+    var left = coefficients[neighbour[0] * 64];
+    var belowLeft = coefficients[neighbour[1] * 64];
+    if (_Distance(predictor, below) > _OUTRANGE)
+      return below;
+    if (_Distance(predictor, left) > _OUTRANGE)
+      return left;
+    return _Distance(predictor, belowLeft) > _OUTRANGE ? belowLeft : predictor;
+  }
+
+  private static int _PredictAbsolute(bool[] available, int[] neighbour, short[] absolute, short last) {
+    var pattern = (available[0] ? 1 : 0) | (available[1] ? 2 : 0)
+      | (available[2] ? 4 : 0) | (available[3] ? 8 : 0);
+    if (pattern == 0)
+      return last;
+
+    var weights = Vp3Tables.DcPredictorWeights[pattern];
+    var sum = 0;
+    for (var i = 0; i < 4; ++i)
+      if (available[i])
+        sum += weights[i] * absolute[neighbour[i]];
+
+    var predictor = sum / weights[4];
+    if (!available[0] || !available[1] || !available[2])
+      return predictor;
+
+    var below = absolute[neighbour[2]];
+    var left = absolute[neighbour[0]];
+    var belowLeft = absolute[neighbour[1]];
+    if (_Distance(predictor, below) > _OUTRANGE)
+      return below;
+    if (_Distance(predictor, left) > _OUTRANGE)
+      return left;
+    return _Distance(predictor, belowLeft) > _OUTRANGE ? belowLeft : predictor;
   }
 
   /// <summary>
@@ -112,6 +177,16 @@ internal static class Vp3DcPrediction {
 
     block = index[row * width + column];
     return coded[block] && Vp3Tables.ReferenceOfMode[modes[geometry.MacroblockOfBlock[block]]] == reference;
+  }
+
+  private static bool _InBounds(int width, int height, int column, int row, out int rasterIndex) {
+    if (column < 0 || column >= width || row < 0 || row >= height) {
+      rasterIndex = 0;
+      return false;
+    }
+
+    rasterIndex = row * width + column;
+    return true;
   }
 
   private static int _Distance(int predictor, int value) {
