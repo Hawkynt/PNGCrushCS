@@ -41,20 +41,10 @@ public static class JpegXlReader {
     if (!_TryExtractCodestream(bytes, out var codestream, out var brand))
       throw new InvalidDataException("Input is neither a JPEG XL bare codestream nor a valid JPEG XL container.");
 
-    // A modular frame comes back sample for sample. A VarDCT frame comes back
-    // within one eight-bit level of libjxl, which is where the difference
-    // between two float pipelines lands once the coefficients agree: measured
-    // before rounding it is a ten-thousandth of a level, and what shows at eight
-    // bits is a sample sitting nearer the boundary than that. Holding it back on
-    // that ground would mean refusing every lossy file forever, since no decoder
-    // that is not libjxl's own arithmetic gets closer.
     if (_TryDecodeSpec(codestream, out var metadata, out var imageMetadata, out var decoded)
         && _TryPackDecoded(metadata, imageMetadata!, decoded, brand, out var file))
       return file;
 
-    // Compatibility with files produced by early versions of this project. The fallback is deliberately
-    // narrow: the private layout must have a 1/3 component marker and either an exact raw raster length
-    // or the historical 'M' modular marker. Arbitrary real JXL bitstreams are never returned as pixels.
     if (_TryParseLegacySynthetic(codestream, brand, out file))
       return file;
 
@@ -170,16 +160,10 @@ public static class JpegXlReader {
       var reader = new JxlBitReader(codestream, 2);
       var (width, height) = JxlSizeHeader.Decode(reader);
       imageMetadata = JxlImageMetadata.Decode(reader);
-      // The bundle between the metadata and the first frame is one bit when the
-      // file leaves it alone, and skipping it only shows up when the metadata
-      // ended on a byte boundary and the alignment below has nothing to swallow.
       JxlCustomTransformData.Decode(reader, imageMetadata.XybEncoded);
       _SkipIccProfile(reader, imageMetadata);
       reader.ZeroPadToByte();
 
-      // Frames kept aside for a later one to draw from are read first and never
-      // shown. A file that patches itself opens with one: the thing that
-      // repeats, coded once.
       var references = new float[_ReferenceSlots][][];
       var referenceSizes = new (int Width, int Height)[_ReferenceSlots];
       var frame = JxlSpecFrameHeader.Decode(reader, imageMetadata, width, height);
@@ -192,9 +176,6 @@ public static class JpegXlReader {
 
       metadata = _Metadata(width, height, imageMetadata, frame);
 
-      // A frame that is not the last one is a layer, not the picture: what a
-      // caller should see is every frame composed in order, with the blending
-      // each states.
       if (!frame.IsLast) {
         image = imageMetadata.HaveAnimation
           ? _DecodeAnimation(codestream, imageMetadata, width, height)
@@ -202,8 +183,6 @@ public static class JpegXlReader {
         return image != null;
       }
 
-      // A group is 128 pixels shifted by what the frame header states, and a
-      // low-frequency group is eight of those across.
       var groupDim = 128 << (int)frame.GroupSizeShift;
       var numGroupsX = (width + groupDim - 1) / groupDim;
       var numGroupsY = (height + groupDim - 1) / groupDim;
@@ -211,14 +190,8 @@ public static class JpegXlReader {
       var lfGroupDim = groupDim * 8;
       var numDcGroups = checked(((width + lfGroupDim - 1) / lfGroupDim) * ((height + lfGroupDim - 1) / lfGroupDim));
       var toc = JxlFrameToc.Decode(reader, numGroups, (int)frame.NumPasses, numDcGroups);
-
-      // The table of contents ends byte-aligned on the frame's first section.
       var frameBody = checked((int)(reader.BitsRead / 8));
 
-      // The frame's global section opens with whatever it states in its header
-      // flags — patches, then splines, then noise — and only then the
-      // quantization tables. Reading them in any other order, or not at all,
-      // puts every field behind them at the wrong offset.
       var patches = (frame.Flags & _FlagPatches) != 0
         ? JxlPatches.Decode(reader, width, height, (int)imageMetadata.NumExtraChannels, referenceSizes)
         : null;
@@ -227,11 +200,7 @@ public static class JpegXlReader {
         ? JxlSplines.Decode(reader, checked((long)width * height))
         : null;
 
-      // The noise field is generated per group from a seed that includes the
-      // group's corner, and shaped afterwards across the whole picture.
       float[]? noiseLut = (frame.Flags & _FlagNoise) != 0 ? JxlNoise.Decode(reader) : null;
-
-      // Every frame carries the DC quantization defaults, including modular frames.
       var dcQuant = JxlFrameQuantizer.ReadDcQuantization(reader);
 
       if (frame.Encoding == JxlFrameEncoding.Modular) {
@@ -249,8 +218,6 @@ public static class JpegXlReader {
         if (!_ValidateDecodedImage(image, width, height, totalChannels))
           return false;
 
-        // A modular frame states no colour correlation of its own, so a spline's
-        // colour is taken as it stands.
         if (splines != null)
           _DrawSplines((JxlModularImage)image!, splines, width, height, bits, isGray);
         return true;
@@ -272,18 +239,15 @@ public static class JpegXlReader {
         groupSizeOverride: groupDim,
         numDcGroups: numDcGroups,
         numExtraChannels: (int)imageMetadata.NumExtraChannels,
-        frameFlags: frame.Flags);
+        frameFlags: frame.Flags,
+        numPasses: (int)frame.NumPasses,
+        passShifts: frame.PassShifts);
 
-      // Patches are stamped on after the filters and before the noise, which is
-      // the order libjxl's pipeline puts them in.
       if (patches != null && image is JxlVarDctImage patched)
         JxlPatches.Apply(
           patched.Channels, patched.Width, patched.Height, patches, references, referenceSizes,
           _PremultipliedAlphas(imageMetadata));
 
-      // Noise goes on after the smoothing and edge-preserving filters and
-      // before the colour transform, which is exactly where the VarDCT decoder
-      // leaves off.
       if (noiseLut != null && image is JxlVarDctImage noised)
         JxlNoise.Apply(
           noised.Channels, noised.Width, noised.Height, noiseLut,
@@ -311,36 +275,11 @@ public static class JpegXlReader {
     }
   }
 
-  /// <summary>libjxl <c>FrameHeader::Flags</c>.</summary>
   private const ulong _FlagNoise = 1;
   private const ulong _FlagPatches = 2;
   private const ulong _FlagSplines = 16;
-
-  /// <summary>How many frames a file may keep aside to draw over later.</summary>
   private const int _ReferenceSlots = 4;
 
-  /// <summary>
-  /// Read every frame in the file and compose them into the picture.
-  /// </summary>
-  /// <remarks>
-  /// Each frame states where it sits, how it combines with what is under it,
-  /// and which of up to four kept-aside frames that is. The result of each is
-  /// what the next one draws over, and the last frame's result is the picture.
-  ///
-  /// <para>Composition is in float over the colour planes followed by the extra
-  /// ones, because the alpha a frame blends by is one of the extra channels.
-  /// The space it happens in is the picture's own, after the colour transform
-  /// and not before it: libjxl builds its pipeline as XYB, then out of linear,
-  /// and only then blending — a reference frame kept in XYB is refused as a
-  /// background there by name. So a lossy frame is taken all the way to the
-  /// colour the picture is stated in and blended there, which is the same space
-  /// a modular frame's samples are already in.</para>
-  /// </remarks>
-  /// <param name="stopAtFirstShownFrame">
-  /// Whether to stop at the first frame an animation would show, which is the
-  /// still picture such a file stands for. Passing false reads the animation to
-  /// its end and returns every moment of it.
-  /// </param>
   private static object? _DecodeComposed(
     byte[] codestream,
     JxlImageMetadata imageMetadata,
@@ -355,16 +294,12 @@ public static class JpegXlReader {
     var bits = (int)imageMetadata.BitDepth.BitsPerSample;
     var scale = 1.0f / ((1 << Math.Clamp(bits, 1, 30)) - 1);
 
-    // An extra channel states its own depth, which need not be the colour's: a
-    // sixteen-bit picture may carry an eight-bit alpha and does so by default.
     var extraScales = new float[extraChannels];
     for (var i = 0; i < extraScales.Length; ++i) {
       var stated = (int)imageMetadata.ExtraChannelInfo[i].BitDepth.BitsPerSample;
       extraScales[i] = 1.0f / ((1 << Math.Clamp(stated > 0 ? stated : bits, 1, 30)) - 1);
     }
 
-    // Three colour planes even for a grey picture, so that a spline's colour
-    // and a blend have somewhere to go.
     var planeCount = 3 + extraChannels;
     var alphaPlane = _AlphaPlane(imageMetadata);
     var premultiplied = alphaPlane >= 3
@@ -392,7 +327,7 @@ public static class JpegXlReader {
         reader = new JxlBitReader(codestream, at);
 
       frame = JxlSpecFrameHeader.Decode(reader, imageMetadata, width, height);
-      if (frame.FrameType != JxlFrameType.Regular)
+      if (frame.FrameType is not (JxlFrameType.Regular or JxlFrameType.SkipProgressive))
         throw new NotSupportedException(
           $"This JPEG XL file has a {frame.FrameType} frame, which this decoder does not compose.");
 
@@ -436,9 +371,6 @@ public static class JpegXlReader {
 
         foreground = _ToPlanes(decoded, frameWidth, frameHeight, planeCount, baseChannels, scale);
       } else {
-        // A lossy frame is drawn on nothing but its own samples: this decoder
-        // reads the splines a frame states and has nowhere to draw them on a
-        // frame kept in XYB, so saying so beats drawing the frame without them.
         if (splines != null)
           throw new NotSupportedException(
             "This JPEG XL file has a lossy frame carrying splines, which this decoder does not draw.");
@@ -459,7 +391,9 @@ public static class JpegXlReader {
           groupSizeOverride: groupDim,
           numDcGroups: numDcGroups,
           numExtraChannels: extraChannels,
-          frameFlags: frame.Flags);
+          frameFlags: frame.Flags,
+          numPasses: (int)frame.NumPasses,
+          passShifts: frame.PassShifts);
 
         foreground = _LossyPlanes(lossy, frameWidth, frameHeight, planeCount, extraScales);
       }
@@ -472,19 +406,12 @@ public static class JpegXlReader {
       if (frame.SaveAsReference != 0)
         references[frame.SaveAsReference % _ReferenceSlots] = composed;
 
-      // An animation is not a stack of layers: its frames follow one another in
-      // time, and each frame with a duration is the whole picture at the moment
-      // it is shown. A frame of no duration is a layer of the next one, so
-      // composition carries on through those and a moment is taken at every
-      // frame that is actually shown.
       if (imageMetadata.HaveAnimation && frame.Duration > 0)
         shown.Add(composed);
 
       if (frame.IsLast)
         break;
 
-      // What a still picture means for an animation is the first frame a viewer
-      // would show, so that is where reading stops unless every moment is wanted.
       if (stopAtFirstShownFrame && shown.Count > 0)
         break;
 
@@ -501,27 +428,12 @@ public static class JpegXlReader {
       : new JxlComposedImage {
         Width = width,
         Height = height,
-        // The still picture stays what it was: the first frame a viewer would
-        // show, which is where the loop stops when only that was asked for and
-        // the first moment gathered when it was not.
         Planes = shown.Count > 0 ? shown[0] : composed,
         AlphaPlane = alphaPlane,
         Frames = stopAtFirstShownFrame ? [] : shown.ToArray(),
       };
   }
 
-  /// <summary>
-  /// Read an animation to its end and hand back the still picture with every
-  /// moment of it beside it.
-  /// </summary>
-  /// <remarks>
-  /// A file whose later frames use syntax this decoder refuses still opens as
-  /// the picture it stands for, because the first frame a viewer would show is
-  /// reachable without any of them — and it opens with no moments rather than a
-  /// count that is short, since a caller stepping through a truncated animation
-  /// has no way to tell that is what it is. That second attempt is only made
-  /// when the first fails, so a file that reads whole is read once.
-  /// </remarks>
   private static object? _DecodeAnimation(byte[] codestream, JxlImageMetadata imageMetadata, int width, int height) {
     try {
       if (_DecodeComposed(codestream, imageMetadata, width, height, stopAtFirstShownFrame: false) is JxlComposedImage whole)
@@ -533,29 +445,16 @@ public static class JpegXlReader {
                                        or NotSupportedException
                                        or ArgumentOutOfRangeException
                                        or OverflowException) {
-      // Whatever stopped a later frame, the first one is still reachable.
     }
 
     return _DecodeComposed(codestream, imageMetadata, width, height);
   }
 
-  /// <summary>
-  /// Read past the embedded colour profile, if the picture has one.
-  /// </summary>
-  /// <remarks>
-  /// The profile is entropy-coded, and every byte of it is coded in a context
-  /// built from the two before it, so there is no length to skip by: the only
-  /// way past it is to decode it. What comes back is not used — the pictures
-  /// this hands back are in the colour space the samples are already in — but
-  /// the frames start where the profile ends, so not reading it puts every
-  /// field after it at the wrong offset.
-  /// </remarks>
   private static void _SkipIccProfile(JxlBitReader reader, JxlImageMetadata imageMetadata) {
     if (imageMetadata.ColorEncoding.WantIcc)
       JxlIccProfileDecoder.Read(reader);
   }
 
-  /// <summary>Whether each extra channel's alpha is already carried in the colour.</summary>
   private static bool[] _PremultipliedAlphas(JxlImageMetadata imageMetadata) {
     var flags = new bool[imageMetadata.ExtraChannelInfo.Length];
     for (var i = 0; i < flags.Length; ++i)
@@ -563,19 +462,6 @@ public static class JpegXlReader {
     return flags;
   }
 
-  /// <summary>
-  /// Read a frame that is kept aside rather than shown, and put it in the slot
-  /// it names.
-  /// </summary>
-  /// <remarks>
-  /// A kept-aside frame is stored the way the frame that draws from it will
-  /// want it, which for a picture coded in XYB means XYB and not colour. A
-  /// modular frame carrying XYB states it as Y, X and B minus Y, each in units
-  /// of that channel's own DC quantisation step — so the planes have to be put
-  /// back in order and the Y added into the B before anything can be stamped
-  /// from them.
-  /// </remarks>
-  /// <returns>The offset of the frame that follows.</returns>
   private static int _DecodeReferenceFrame(
     byte[] codestream,
     JxlBitReader reader,
@@ -629,7 +515,6 @@ public static class JpegXlReader {
 
     var channels = decoded.Channels;
     if (frame.ColorTransform == JxlColorTransform.Xyb) {
-      // Stored as Y, X, B-Y; wanted as X, Y, B.
       for (var i = 0; i < count; ++i) {
         var y = channels[0].Pixels[i];
         planes[0][i] = channels[1].Pixels[i] * dcQuant[0];
@@ -665,7 +550,6 @@ public static class JpegXlReader {
     return next;
   }
 
-  /// <summary>Which plane carries the alpha, or -1 when the picture has none.</summary>
   private static int _AlphaPlane(JxlImageMetadata imageMetadata) {
     for (var i = 0; i < imageMetadata.ExtraChannelInfo.Length; ++i)
       if (imageMetadata.ExtraChannelInfo[i].Type == 0)
@@ -673,10 +557,6 @@ public static class JpegXlReader {
     return -1;
   }
 
-  /// <summary>
-  /// A decoded frame as float planes: three colour ones followed by its extra
-  /// channels, all as fractions of full scale.
-  /// </summary>
   private static float[][] _ToPlanes(
     object? decoded, int frameWidth, int frameHeight, int planeCount, int baseChannels, float scale
   ) {
@@ -686,15 +566,12 @@ public static class JpegXlReader {
 
     for (var p = 0; p < planeCount; ++p) {
       planes[p] = new float[count];
-      // A grey frame's one channel stands for all three colour planes.
       var source = p < 3
         ? Math.Min(p, baseChannels - 1)
         : baseChannels + (p - 3);
       if (source >= modular.Channels.Length)
         continue;
 
-      // Splines are drawn in float and leave the samples underneath alone, so
-      // where they ran the planes they produced are the picture.
       if (p < 3 && modular.ColorPlanes is { } drawn) {
         Array.Copy(drawn[p], planes[p], Math.Min(drawn[p].Length, count));
         continue;
@@ -708,20 +585,6 @@ public static class JpegXlReader {
     return planes;
   }
 
-  /// <summary>
-  /// A decoded lossy frame as the same float planes a modular one gives: three
-  /// colour ones in the picture's own colour, followed by its extra channels.
-  /// </summary>
-  /// <remarks>
-  /// A lossy frame comes out of the coefficients in XYB, and XYB is not a space
-  /// two frames can be combined in — libjxl's blending stage refuses a
-  /// background that is still in it, and the pipeline that feeds that stage has
-  /// already run the inverse opsin transform and the transfer curve
-  /// (<c>dec_cache.cc</c>: XYB, then out of linear, then blending). So the
-  /// frame is taken the whole way here, to the fractions of full scale a
-  /// modular frame's samples already are, and the two kinds of frame meet in
-  /// one space.
-  /// </remarks>
   private static float[][] _LossyPlanes(
     JxlVarDctImage lossy, int frameWidth, int frameHeight, int planeCount, float[] extraScales
   ) {
@@ -732,9 +595,6 @@ public static class JpegXlReader {
       if (lossy.Channels[c].Length < count)
         throw new InvalidDataException("A lossy frame did not decode to the size it states.");
 
-    // A frame that states extra channels and did not hand them back has them in
-    // its groups rather than in its global stream, which this decoder does not
-    // follow — and an alpha of zeros would blend a frame away entirely.
     if (extraScales.Length > 0 && lossy.ExtraChannels.Length < extraScales.Length)
       throw new NotSupportedException(
         "This JPEG XL file has a lossy frame whose extra channels are carried group by group, which this decoder does not read.");
@@ -763,19 +623,9 @@ public static class JpegXlReader {
     return planes;
   }
 
-  /// <summary>
-  /// Finish a modular frame by drawing its splines on top, in the fractions of
-  /// full scale libjxl works in rather than in whole samples.
-  /// </summary>
   private static void _DrawSplines(
     JxlModularImage modular, SplineList splines, int width, int height, int bits, bool isGray
   ) {
-    // A spline's colour is stated against the luma channel the same way a
-    // block's is, and it uses the frame's base correlation rather than any
-    // per-tile one. A modular frame states no correlation map, so the base is
-    // what it started as — and the B half of that is one, not zero, which is
-    // the whole difference between a blue channel that agrees with libjxl and
-    // one that is out by half its range.
     var segments = JxlSplines.BuildSegments(
       splines, width, height,
       yToX: JxlColorCorrelationMap.DefaultYtoXRatio,
@@ -788,8 +638,6 @@ public static class JpegXlReader {
     var planes = new float[3][];
     for (var c = 0; c < 3; ++c) {
       planes[c] = new float[count];
-      // A grey frame carries one channel and all three planes are drawn on it,
-      // which is what makes a coloured spline show up on a grey picture.
       var source = modular.Channels[isGray ? 0 : Math.Min(c, modular.Channels.Length - 1)].Pixels;
       for (var i = 0; i < count; ++i)
         planes[c][i] = source[i] * scale;
@@ -799,10 +647,6 @@ public static class JpegXlReader {
     modular.ColorPlanes = planes;
   }
 
-  /// <summary>
-  /// Round one composed picture out of float and into the raster a caller gets:
-  /// the three colour planes, and the alpha beside them where there is one.
-  /// </summary>
   private static byte[] _PackPlanes(float[][] planes, int alphaPlane, int pixelCount, int parts, bool deep) {
     var bytesPerSample = deep ? 2 : 1;
     var maximum = deep ? 65535.0f : 255.0f;
@@ -840,12 +684,9 @@ public static class JpegXlReader {
     out JpegXlFile file
   ) {
     file = default;
-    // Floating-point samples have no home in either raster this hands back.
     if (metadata.BitsPerSample is < 1 or > 16 || metadata.IsFloatSample)
       return false;
 
-    // Anything deeper than eight bits is carried at sixteen rather than
-    // narrowed, because narrowing is a decision the caller should get to make.
     var deep = metadata.BitsPerSample > 8;
     var bytesPerSample = deep ? 2 : 1;
 
@@ -871,16 +712,10 @@ public static class JpegXlReader {
       return true;
     }
 
-    // A composed picture is already blended and already in float; all that is
-    // left is to round it once and drop the extra channels that are not alpha.
     if (decoded is JxlComposedImage composed) {
       var keepsAlpha = composed.AlphaPlane >= 3;
       var parts = keepsAlpha ? 4 : 3;
 
-      // An animation's moments are rounded the same way its still picture is,
-      // so a caller stepping through them gets the same rasters it would get by
-      // opening each frame on its own — and the still picture is the first of
-      // them rather than a second rounding of the same planes.
       var frames = new byte[composed.Frames.Length][];
       for (var i = 0; i < frames.Length; ++i)
         frames[i] = _PackPlanes(composed.Frames[i], composed.AlphaPlane, pixelCount, parts, deep);
@@ -906,9 +741,6 @@ public static class JpegXlReader {
     if (modular.Channels.Length < baseChannels)
       return false;
 
-    // Once something has been drawn on top, the picture is the float planes and
-    // the samples underneath are only what it was drawn over. A grey frame that
-    // was drawn on comes back in colour, because a spline has a colour.
     if (modular.ColorPlanes is { } drawn) {
       var maximum = deep ? 65535.0f : 255.0f;
       var painted = new byte[checked(pixelCount * 3 * bytesPerSample)];
@@ -935,10 +767,6 @@ public static class JpegXlReader {
       return true;
     }
 
-    // An extra channel states its own sample depth. A sixteen-bit picture states
-    // a sixteen-bit alpha beside it, and that used to be passed over here — so a
-    // file this package had just written came back without the alpha plane it
-    // put in.
     var alphaIndex = -1;
     for (var i = 0; i < imageMetadata.ExtraChannelInfo.Length; ++i) {
       var extra = imageMetadata.ExtraChannelInfo[i];
@@ -988,9 +816,6 @@ public static class JpegXlReader {
     pixels[at + 1] = (byte)sample;
   }
 
-  /// <summary>A sample at the file's own depth, spread over the full 16-bit
-  /// range so that the deepest value the file can state is the deepest
-  /// value here.</summary>
   private static ushort _ToUInt16(int value, int bitsPerSample) {
     var max = (1 << Math.Clamp(bitsPerSample, 1, 16)) - 1;
     var clamped = Math.Clamp(value, 0, max);
