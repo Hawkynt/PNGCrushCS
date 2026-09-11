@@ -5,7 +5,7 @@ using System.IO;
 namespace FileFormat.Codecs.Mpeg;
 
 /// <summary>
-/// One of ISO/IEC 11172-2's variable-length code tables, held as written and read by lookup.
+/// One of ISO/IEC 11172-2's variable-length code tables, held as written and used by lookup.
 /// </summary>
 /// <remarks>
 /// The codes are given as the strings the standard prints them as — <c>"0000 0101 11"</c> — rather
@@ -62,7 +62,7 @@ internal sealed class MpegVlcTable {
     }
   }
 
-  /// <summary>The table's codes and values, for the completeness checks that live in the tests.</summary>
+  /// <summary>The table's codes and values, for completeness checks and the encoder's reverse lookup.</summary>
   internal IReadOnlyList<(string Code, int Value)> Entries => this._entries;
 
   /// <summary>The longest code in the table, in bits.</summary>
@@ -83,6 +83,28 @@ internal sealed class MpegVlcTable {
 
     reader.Skip(length);
     return this._values[bits];
+  }
+
+  /// <summary>Writes the code attached to <paramref name="value"/>.</summary>
+  /// <exception cref="ArgumentOutOfRangeException">The table has no code for the value.</exception>
+  internal void Write(MpegBitWriter writer, int value) {
+    if (this.TryWrite(writer, value))
+      return;
+
+    throw new ArgumentOutOfRangeException(nameof(value), value, $"{this._name} has no code for that value.");
+  }
+
+  /// <summary>Writes the code attached to <paramref name="value"/>, or answers false when the table has none.</summary>
+  internal bool TryWrite(MpegBitWriter writer, int value) {
+    ArgumentNullException.ThrowIfNull(writer);
+
+    foreach (var (code, candidate) in this._entries)
+      if (candidate == value) {
+        writer.WriteCode(code);
+        return true;
+      }
+
+    return false;
   }
 
   private static string _Bits(string code) => code.Replace(" ", string.Empty);
