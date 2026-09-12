@@ -71,43 +71,37 @@ internal static class GifLzwCodec {
     };
   }
 
-  /// <summary>Emits each pixel as its own literal code, never referencing dictionary-extended codes.
-  /// The decoder still grows its dictionary per spec, so the encoder must track code-size growth
-  /// in lockstep and emit a Clear before the table would overflow.</summary>
+  /// <summary>Emits each pixel as its own literal code, never referencing dictionary-extended codes.</summary>
+  /// <remarks>
+  /// The decoder grows its dictionary whether or not the encoder uses it, and widens its code size
+  /// when that dictionary fills, so a literal-only stream has a choice: follow the decoder up to
+  /// twelve bits per pixel, or clear the dictionary often enough that the decoder never widens at
+  /// all. The second is much cheaper — every pixel costs <c>lzwMinCodeSize + 1</c> bits forever
+  /// instead of drifting towards twelve — and it is what this does. The run length is the number of
+  /// entries between the first assignable code and the width boundary: a decoder starting at
+  /// <c>clear + 2</c> widens at <c>2^(min+1)</c>, so <c>2^(min+1) - eoi - 1</c> literals fit
+  /// between clears at every minimum code size.
+  /// </remarks>
   private static byte[] _EncodeNoCompression(ReadOnlySpan<byte> indexedPixels, int lzwMinCodeSize) {
     var clearCode = 1 << lzwMinCodeSize;
     var eoiCode = clearCode + 1;
-    var startCodeSize = lzwMinCodeSize + 1;
+    var codeSize = lzwMinCodeSize + 1;
+    var runLength = (1 << codeSize) - eoiCode - 1;
 
     using var ms = new MemoryStream();
     ms.WriteByte((byte)lzwMinCodeSize);
     using var bitOut = new _BitWriterSubBlocks(ms);
 
-    var codeSize = startCodeSize;
-    var nextCode = eoiCode + 1;
-    var inRunSinceClear = false;
-
-    bitOut.Write(clearCode, codeSize);
-
     for (var i = 0; i < indexedPixels.Length; ++i) {
-      bitOut.Write(indexedPixels[i], codeSize);
-
-      // Decoder side-effect: when prev >= 0 (i.e. not the first code after a clear) it allocates
-      // a new dictionary entry, then bumps codeSize when nextCode hits (1 << codeSize).
-      if (inRunSinceClear && nextCode < _MaxCodes) {
-        ++nextCode;
-        if (nextCode == (1 << codeSize) && codeSize < _MaxCodeBits) ++codeSize;
-      }
-      inRunSinceClear = true;
-
-      // If the next literal would push the decoder over the dictionary cap, reset.
-      if (nextCode >= _MaxCodes - 1 && i + 1 < indexedPixels.Length) {
+      if (i % runLength == 0)
         bitOut.Write(clearCode, codeSize);
-        codeSize = startCodeSize;
-        nextCode = eoiCode + 1;
-        inRunSinceClear = false;
-      }
+      bitOut.Write(indexedPixels[i], codeSize);
     }
+
+    // An empty input still needs the leading clear the spec asks every LZW stream to open with.
+    if (indexedPixels.Length == 0)
+      bitOut.Write(clearCode, codeSize);
+
     bitOut.Write(eoiCode, codeSize);
     bitOut.Flush();
     return ms.ToArray();

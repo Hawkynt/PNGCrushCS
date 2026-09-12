@@ -13,4 +13,9 @@ public readonly record struct Dimensions(ushort Width, ushort Height) {
   }
 
   public static Dimensions Empty { get; } = new((ushort)0, (ushort)0);
+
+  /// <summary>The smallest box that holds both this and <paramref name="other"/> — used to grow a
+  /// logical screen to cover every frame handed to a writer.</summary>
+  public Dimensions With(Dimensions other)
+    => new(Math.Max(this.Width, other.Width), Math.Max(this.Height, other.Height));
 }

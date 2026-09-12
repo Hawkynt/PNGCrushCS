@@ -29,4 +29,23 @@ public readonly record struct LoopCount(ushort Count, bool IsPresent) {
 
   /// <summary>Alias for <see cref="Count"/> matching the external <c>Hawkynt.GifFileFormat.LoopCount</c>'s API.</summary>
   public ushort Value => this.Count;
+
+  /// <summary>True when the NETSCAPE2.0 extension is absent.</summary>
+  public bool IsNotSet => !this.IsPresent;
+
+  /// <summary>Alias for <see cref="LoopForever"/> matching the external API.</summary>
+  public static LoopCount Infinite => LoopForever;
+
+  /// <summary>NETSCAPE2.0 with count 1 — one repeat after the first play. Named as the external API
+  /// names it.</summary>
+  public static LoopCount Once => LoopTimes(1);
+
+  /// <summary>NETSCAPE2.0 with count 2 — two repeats after the first play.</summary>
+  public static LoopCount Twice => LoopTimes(2);
+
+  /// <summary>A bare count is a present NETSCAPE2.0 extension carrying it.</summary>
+  public static implicit operator LoopCount(ushort count) => LoopTimes(count);
+
+  /// <summary>A null count is an absent NETSCAPE2.0 extension; anything else is a present one.</summary>
+  public static implicit operator LoopCount(ushort? count) => count is { } c ? LoopTimes(c) : PlayOnce;
 }

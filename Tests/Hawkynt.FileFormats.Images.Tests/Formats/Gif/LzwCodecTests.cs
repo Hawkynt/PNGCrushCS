@@ -179,4 +179,69 @@ public sealed class LzwCodecTests {
     Assert.That(GifLzwCodec.EncodeOptions.BestEffort().Level, Is.EqualTo(GifLzwCodec.CompressionLevel.Best));
     Assert.That(GifLzwCodec.EncodeOptions.Default.Level, Is.EqualTo(GifLzwCodec.CompressionLevel.Standard));
   }
+
+  // ============================================================
+  // Store mode pins the code width
+  // ============================================================
+
+  [Test]
+  public void CompressionLevel_None_RoundTripsAtEveryMinimumCodeSize() {
+    var rng = new Random(4242);
+    for (var minCodeSize = 2; minCodeSize <= 8; ++minCodeSize) {
+      var alphabet = 1 << minCodeSize;
+      var input = new byte[4096];
+      for (var i = 0; i < input.Length; ++i) input[i] = (byte)rng.Next(alphabet);
+
+      var encoded = GifLzwCodec.Encode(input, minCodeSize, GifLzwCodec.EncodeOptions.NoCompression());
+      using var ms = new MemoryStream(encoded);
+      Assert.That(GifLzwCodec.Decode(ms, input.Length), Is.EqualTo(input), $"minCodeSize {minCodeSize}");
+    }
+  }
+
+  [Test]
+  public void CompressionLevel_None_StaysAtTheStartingCodeWidth() {
+    // The point of clearing periodically instead of following the decoder's dictionary growth is
+    // that every pixel keeps costing minCodeSize+1 bits instead of drifting towards twelve. For
+    // 65536 pixels at 9 bits that is ~74 KB rather than ~93 KB.
+    const int Pixels = 65536;
+    var input = new byte[Pixels];
+    for (var i = 0; i < input.Length; ++i) input[i] = (byte)(i % 256);
+
+    var encoded = GifLzwCodec.Encode(input, 8, GifLzwCodec.EncodeOptions.NoCompression());
+
+    // Pixel payload alone is Pixels * 9 bits; allow 3% for clear codes and sub-block length bytes.
+    var floor = Pixels * 9 / 8;
+    Assert.That(encoded.Length, Is.GreaterThan(floor));
+    Assert.That(encoded.Length, Is.LessThan((int)(floor * 1.03)),
+      "store mode must not let the code width grow past minCodeSize + 1");
+  }
+
+  [Test]
+  public void CompressionLevel_None_EmptyInput_StillOpensWithAClear() {
+    var encoded = GifLzwCodec.Encode([], 8, GifLzwCodec.EncodeOptions.NoCompression());
+    Assert.That(encoded[0], Is.EqualTo((byte)8));
+    using var ms = new MemoryStream(encoded);
+    Assert.That(GifLzwCodec.Decode(ms, 0), Is.Empty);
+  }
+
+  [Test]
+  public void EveryEncoder_OpensWithAClearCode() {
+    // The spec has an LZW stream begin with a Clear Code, and decoders that check will reject one
+    // that does not. Read the first minCodeSize+1 bits of the framed output and compare.
+    var input = new byte[2048];
+    for (var i = 0; i < input.Length; ++i) input[i] = (byte)(i % 17);
+
+    foreach (var options in new[] {
+      GifLzwCodec.EncodeOptions.Default,
+      GifLzwCodec.EncodeOptions.StandardCompression(deferClear: true),
+      GifLzwCodec.EncodeOptions.NoCompression(),
+      GifLzwCodec.EncodeOptions.BestEffort(),
+    }) {
+      var encoded = GifLzwCodec.Encode(input, 8, options);
+      Assert.That(encoded[0], Is.EqualTo((byte)8));
+      // First sub-block starts at [2]; the first 9 bits little-endian must be 256.
+      var first = encoded[2] | (encoded[3] << 8);
+      Assert.That(first & 0x1FF, Is.EqualTo(256), $"{options.Level}/defer={options.DeferClear}");
+    }
+  }
 }
