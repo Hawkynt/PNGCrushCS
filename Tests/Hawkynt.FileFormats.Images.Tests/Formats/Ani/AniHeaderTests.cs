@@ -90,15 +90,40 @@ public sealed class AniHeaderTests {
 
   [Test]
   [Category("Unit")]
-  public void HasSequence_ReturnsTrue_WhenFlagBit0Set() {
-    var header = new AniHeader(36, 1, 1, 0, 0, 0, 1, 10, 1);
+  public void HasSequence_ReturnsTrue_WhenAfSequenceBitSet() {
+    // AF_SEQUENCE is 0x0002, per Microsoft's ANICUR.H and Wine's cursoricon.c.
+    var header = new AniHeader(36, 1, 1, 0, 0, 0, 1, 10, 2);
     Assert.That(header.HasSequence, Is.True);
   }
 
   [Test]
   [Category("Unit")]
-  public void HasSequence_ReturnsFalse_WhenFlagBit0NotSet() {
-    var header = new AniHeader(36, 1, 1, 0, 0, 0, 1, 10, 2);
+  public void HasSequence_ReturnsFalse_WhenOnlyAfIconBitSet() {
+    // 0x0001 is AF_ICON, which says the frames are whole icon files. It says nothing about a
+    // sequence, and every real animated cursor sets it.
+    var header = new AniHeader(36, 1, 1, 0, 0, 0, 1, 10, 1);
     Assert.That(header.HasSequence, Is.False);
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void HasIconFrames_ReturnsTrue_WhenAfIconBitSet() {
+    var header = new AniHeader(36, 1, 1, 0, 0, 0, 1, 10, 1);
+    Assert.That(header.HasIconFrames, Is.True);
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void HasIconFrames_ReturnsFalse_WhenOnlyAfSequenceBitSet() {
+    var header = new AniHeader(36, 1, 1, 0, 0, 0, 1, 10, 2);
+    Assert.That(header.HasIconFrames, Is.False);
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void BothFlags_ReadIndependently() {
+    var header = new AniHeader(36, 1, 1, 0, 0, 0, 1, 10, 3);
+    Assert.That(header.HasIconFrames, Is.True);
+    Assert.That(header.HasSequence, Is.True);
   }
 }
