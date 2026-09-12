@@ -32341,16 +32341,17 @@ Implements `IEquatable<ScreenMakerFile>`, `IImageFormatMetadata<ScreenMakerFile>
 
 ### Namespace `FileFormat.Sdg`
 
-[`SdgFile`](#sdgfile) · [`SdgReader`](#sdgreader)
+[`SdgFile`](#sdgfile) · [`SdgReader`](#sdgreader) · [`SdgWriter`](#sdgwriter)
 
 #### `SdgFile`
 
-Implements `IImageFormatMetadata<SdgFile>`, `IImageFormatReader<SdgFile>`, `IImageToRawImage<SdgFile>`, `IMultiImageFileFormat<SdgFile>`.
+Implements `IImageFormatMetadata<SdgFile>`, `IImageFormatReader<SdgFile>`, `IImageFormatWriter<SdgFile>`, `IImageFromRawImage<SdgFile>`, `IImageToRawImage<SdgFile>`, `IMultiImageFileFormat<SdgFile>`.
 
 | Member | Signature | Summary |
 | --- | --- | --- |
 | `SdgFile` | `SdgFile()` |  |
 | `Images` | `List<RawImage> Images { get; init; }` |  |
+| `FromRawImage` | `static SdgFile FromRawImage(RawImage image)` |  |
 | `ImageCount` | `static int ImageCount(SdgFile file)` |  |
 | `ToRawImage` | `static RawImage ToRawImage(SdgFile file)` |  |
 | `ToRawImage` | `static RawImage ToRawImage(SdgFile file, int index)` |  |
@@ -32361,6 +32362,12 @@ Implements `IImageFormatMetadata<SdgFile>`, `IImageFormatReader<SdgFile>`, `IIma
 | Member | Signature | Summary |
 | --- | --- | --- |
 | `FromSpan` | `static SdgFile FromSpan(ReadOnlySpan<byte> data)` |  |
+
+#### `SdgWriter`
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `ToBytes` | `static byte[] ToBytes(SdgFile file)` |  |
 
 ### Namespace `FileFormat.Sdt`
 
