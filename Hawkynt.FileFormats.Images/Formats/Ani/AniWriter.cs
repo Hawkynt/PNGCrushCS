@@ -69,7 +69,7 @@ public static class AniWriter {
   /// answer; reassembly is for a file that was built rather than read.
   /// </remarks>
   private static IEnumerable<byte[]> _FrameBytes(AniFile file) {
-    if (file.FrameData.Count == file.Frames.Count && file.FrameData.Count > 0)
+    if (file.FrameData.Count > 0)
       return file.FrameData;
 
     var assembled = new List<byte[]>(file.Frames.Count);
