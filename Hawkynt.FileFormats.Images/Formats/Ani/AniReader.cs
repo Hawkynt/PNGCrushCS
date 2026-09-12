@@ -72,20 +72,7 @@ public static class AniReader {
       foreach (var iconChunk in framList.Chunks.Where(c => c.Id.ToString() == _ICON_ID)) {
         frameData.Add(iconChunk.Data);
 
-        // A frame is a cursor far more often than an icon — that is what an animated cursor is
-        // made of, and it is what the header's AF_ICON bit is describing. Parsing each frame as an
-        // icon rejected the type field of every real-world file, so nothing but this library's own
-        // output could be opened at all. The bundle reader takes either.
-        var bundle = IcoReader.ReadBundle(iconChunk.Data);
-        frames.Add(new IcoFile {
-          Images = bundle.Entries.Select(e => new IcoImage {
-            Width = e.Width,
-            Height = e.Height,
-            BitsPerPixel = e.BitsPerPixel,
-            Format = e.Format,
-            Data = e.Data
-          }).ToArray()
-        });
+        frames.Add(_ParseFrame(iconChunk.Data));
       }
 
     var infoList = riff.Lists.FirstOrDefault(l => l.ListType.ToString() == _INFO_LIST);
@@ -104,6 +91,37 @@ public static class AniReader {
   public static AniFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     return FromSpan(data);
+  }
+
+  /// <summary>
+  /// Parses one frame, which is a whole icon or cursor file.
+  /// </summary>
+  /// <remarks>
+  /// A frame is a cursor far more often than an icon — that is what an animated cursor is made of,
+  /// and it is what the header's AF_ICON bit is describing. Parsing each frame as an icon rejected
+  /// the type field of every real-world file, so nothing but this library's own output could be
+  /// opened at all. The bundle reader takes either.
+  /// <para/>
+  /// A frame that will not parse yields no pictures rather than failing the whole file. One bad
+  /// frame out of twenty is not a reason to refuse the other nineteen, and the frame's own bytes
+  /// are kept in <see cref="AniFile.FrameData"/> either way, so whatever is wrong with it stays
+  /// recoverable by whoever wants to look.
+  /// </remarks>
+  private static IcoFile _ParseFrame(byte[] frame) {
+    try {
+      var bundle = IcoReader.ReadBundle(frame);
+      return new IcoFile {
+        Images = bundle.Entries.Select(e => new IcoImage {
+          Width = e.Width,
+          Height = e.Height,
+          BitsPerPixel = e.BitsPerPixel,
+          Format = e.Format,
+          Data = e.Data
+        }).ToArray()
+      };
+    } catch (InvalidDataException) {
+      return new IcoFile();
+    }
   }
 
   /// <summary>Reads one of the INFO list's text chunks, which are NUL-padded ASCII.</summary>

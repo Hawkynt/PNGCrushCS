@@ -350,6 +350,37 @@ public sealed class AniContainerTests {
     Assert.That(_Contains(bytes, "INFO"u8), Is.False);
   }
 
+  // ── A frame that will not parse ──────────────────────────────────────────
+
+  [Test]
+  [Category("Boundary")]
+  public void FromBytes_AFrameThatWillNotParse_DoesNotTakeTheWholeFileDown() {
+    // One corrupt frame out of several is not a reason to refuse the others. Throwing here also
+    // puts the frame's bytes out of reach of anything that wanted to recover them.
+    var good = _Cursor(16, 16, 1, 2);
+    var rubbish = new byte[] { 0x00, 0x00, 0x63, 0x00, 0x01, 0x00, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+    var ani = _BuildAni([good, rubbish, good]);
+
+    var file = AniReader.FromBytes(ani);
+
+    Assert.That(file.FrameData, Has.Count.EqualTo(3), "every frame's bytes are kept");
+    Assert.That(file.Frames, Has.Count.EqualTo(3), "and the frames stay index-aligned with them");
+    Assert.That(file.Frames[0].Images, Has.Count.EqualTo(1));
+    Assert.That(file.Frames[1].Images, Is.Empty, "the one that would not parse yields no pictures");
+    Assert.That(file.Frames[2].Images, Has.Count.EqualTo(1));
+  }
+
+  [Test]
+  [Category("Boundary")]
+  public void FromBytes_AFrameThatWillNotParse_KeepsItsBytesVerbatim() {
+    var rubbish = new byte[] { 0x00, 0x00, 0x63, 0x00, 0x01, 0x00, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+    var ani = _BuildAni([rubbish]);
+
+    var file = AniReader.FromBytes(ani);
+
+    Assert.That(file.FrameData[0], Is.EqualTo(rubbish).AsCollection);
+  }
+
   // ── Chunk walking ────────────────────────────────────────────────────────
 
   [Test]
