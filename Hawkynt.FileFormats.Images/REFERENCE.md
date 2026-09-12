@@ -462,6 +462,7 @@ Implements `IEquatable<AfliFile>`, `IImageFormatMetadata<AfliFile>`, `IImageForm
 
 | Member | Signature | Summary |
 | --- | --- | --- |
+| `FileSize` | `const int FileSize` |  |
 | `FixedHeight` | `const int FixedHeight` |  |
 | `FixedWidth` | `const int FixedWidth` |  |
 | `MinimumFileSize` | `const int MinimumFileSize` |  |
@@ -8025,7 +8026,7 @@ Implements `IEquatable<ComputerEyesStFile>`, `IImageFormatMetadata<ComputerEyesS
 
 ### Namespace `FileFormat.Core`
 
-[`AdditionalImageFormatAttribute`](#additionalimageformatattribute) · [`AllowedZones`](#allowedzones) · [`AmigaColourMap`](#amigacolourmap) · [`AmigaRgbRuns`](#amigargbruns) · [`AmstradGraphics`](#amstradgraphics) · [`AnticMode`](#anticmode) · [`AppleIIGSGraphics`](#appleiigsgraphics) · [`Atari8BitGraphics`](#atari8bitgraphics) · [`AtariKoalaRle`](#atarikoalarle) · [`AtariStCaRle`](#ataristcarle) · [`AtariStGraphics`](#ataristgraphics) · [`BilevelRows`](#bilevelrows) · [`CaseAttribute`](#caseattribute) · [`ChannelScaling`](#channelscaling) · [`CharacterRoms`](#characterroms) · [`ChunkKind`](#chunkkind) · [`ChunkMobility`](#chunkmobility) · [`ChunkOptimizer`](#chunkoptimizer) · [`ChunkPlacement`](#chunkplacement) · [`ChunkPlacementDirective`](#chunkplacementdirective) · [`ChunkReference`](#chunkreference) · [`ChunkRewriteFailure`](#chunkrewritefailure) · [`ChunkRewritePlan`](#chunkrewriteplan) · [`ChunkRewriteResult`](#chunkrewriteresult) · [`ChunkRewriteRule`](#chunkrewriterule) · [`ChunkSpan`](#chunkspan) · [`ChunkZone`](#chunkzone) · [`CodecTag`](#codectag) · [`CodedPacket`](#codedpacket) · [`ColorQuantizer`](#colorquantizer) · [`ColorQuantizer.Result`](#colorquantizerresult) · [`Commodore16Graphics`](#commodore16graphics) · [`Commodore64Graphics`](#commodore64graphics) · [`ConformanceOracle`](#conformanceoracle) · [`ConformanceOracles`](#conformanceoracles) · [`CoverArt`](#coverart) · [`DecodedFrame`](#decodedframe) · [`DisplayFilter`](#displayfilter) · [`EndianAttribute`](#endianattribute) · [`Endianness`](#endianness) · [`ExifCodec`](#exifcodec) · [`ExifData`](#exifdata) · [`ExifIfd`](#exififd) · [`ExifRational`](#exifrational) · [`ExifSRational`](#exifsrational) · [`ExifTagEntry`](#exiftagentry) · [`ExifTagType`](#exiftagtype) · [`FastRawImageConverter`](#fastrawimageconverter) · [`FieldAttribute`](#fieldattribute) · [`FieldOffsetAttribute`](#fieldoffsetattribute) · [`FillerAttribute`](#fillerattribute) · [`FixedPalette`](#fixedpalette) · [`FixedValue`](#fixedvalue) · [`FormatCapability`](#formatcapability) · [`FormatDetectionPriorityAttribute`](#formatdetectionpriorityattribute) · [`FormatIO`](#formatio) · [`FormatMagicBytesAttribute`](#formatmagicbytesattribute) · [`FormatMimeTypeAttribute`](#formatmimetypeattribute) · [`FrameBlend`](#frameblend) · [`GenerateSerializerAttribute`](#generateserializerattribute) · [`GlyphSheet`](#glyphsheet) · [`GtiaRenderer`](#gtiarenderer) · [`HeaderFieldDescriptor`](#headerfielddescriptor) · [`HeaderFieldMapper`](#headerfieldmapper) · [`HeaderSerializer`](#headerserializer) · [`IBinarySerializable<TSelf>`](#ibinaryserializabletself) · [`IFormatChunkLayout<TSelf>`](#iformatchunklayouttself) · [`IFormatChunkPlanRewriter<TSelf>`](#iformatchunkplanrewritertself) · [`IFormatChunkRewriter<TSelf>`](#iformatchunkrewritertself) · [`IImageFormatMetadata<TSelf>`](#iimageformatmetadatatself) · [`IImageFormatReader<TSelf>`](#iimageformatreadertself) · [`IImageFormatWriter<TSelf>`](#iimageformatwritertself) · [`IImageFromRawImage<TSelf, TPixel>`](#iimagefromrawimagetself-tpixel) · [`IImageFromRawImage<TSelf>`](#iimagefromrawimagetself) · [`IImageInfoReader<TSelf>`](#iimageinforeadertself) · [`IImageToRawImage<TSelf>`](#iimagetorawimagetself) · [`IMultiImageFileFormat<TSelf>`](#imultiimagefileformattself) · [`IRawPixelFormat<TSelf>`](#irawpixelformattself) · [`IVideoCodecDecoder<TSelf>`](#ivideocodecdecodertself) · [`IVideoCodecEncoder<TSelf>`](#ivideocodecencodertself) · [`IVideoContainerReader<TSelf>`](#ivideocontainerreadertself) · [`IVideoContainerWriter<TSelf>`](#ivideocontainerwritertself) · [`IVideoFormatMetadata<TSelf>`](#ivideoformatmetadatatself) · [`IVideoFrameDecoder`](#ivideoframedecoder) · [`IVideoPacketEncoder`](#ivideopacketencoder) · [`IfAttribute`](#ifattribute) · [`ImageInfo`](#imageinfo) · [`ImageMetadata`](#imagemetadata) · [`ImageResampler`](#imageresampler) · [`IndexedPalette`](#indexedpalette) · [`IntegerRange`](#integerrange) · [`IptcCodec`](#iptccodec) · [`IptcData`](#iptcdata) · [`IptcDataSet`](#iptcdataset) · [`LayoutMode`](#layoutmode) · [`Lz4Frame`](#lz4frame) · [`MediaStreamInfo`](#mediastreaminfo) · [`MediaStreamKind`](#mediastreamkind) · [`MediaStreamMetadata`](#mediastreammetadata) · [`MonochromePage`](#monochromepage) · [`MsxGraphics`](#msxgraphics) · [`Op`](#op) · [`PackBits`](#packbits) · [`PackBytesStream`](#packbytesstream) · [`PackedRows`](#packedrows) · [`PaletteQuantizer`](#palettequantizer) · [`PaletteSidecar`](#palettesidecar) · [`PixelAspectRatio`](#pixelaspectratio) · [`PixelConverter`](#pixelconverter) · [`PixelFormat`](#pixelformat) · [`PixelRect`](#pixelrect) · [`PlanarConverter`](#planarconverter) · [`Rational`](#rational) · [`RawBytesAttribute`](#rawbytesattribute) · [`RawChromaLocation`](#rawchromalocation) · [`RawColorPrimaries`](#rawcolorprimaries) · [`RawColorRange`](#rawcolorrange) · [`RawImage`](#rawimage) · [`RawImage<TPixel>`](#rawimagetpixel) · [`RawImageColorInfo`](#rawimagecolorinfo) · [`RawImageConverter`](#rawimageconverter) · [`RawImageExactConverter`](#rawimageexactconverter) · [`RawImageExtensions`](#rawimageextensions) · [`RawImageFactory`](#rawimagefactory) · [`RawMatrixCoefficients`](#rawmatrixcoefficients) · [`RawPalette`](#rawpalette) · [`RawPaletteEntry`](#rawpaletteentry) · [`RawPixelAlphaKind`](#rawpixelalphakind) · [`RawPixelFormatKind`](#rawpixelformatkind) · [`RawPixelFormatTraits`](#rawpixelformattraits) · [`RawPixelFormats`](#rawpixelformats) · [`RawTransferCharacteristic`](#rawtransfercharacteristic) · [`RepeatAttribute`](#repeatattribute) · [`RepeatEosAttribute`](#repeateosattribute) · [`RepeatUntilAttribute`](#repeatuntilattribute) · [`Resampling`](#resampling) · [`Rgba32`](#rgba32) · [`SeqFieldAttribute`](#seqfieldattribute) · [`SfdnDecompressor`](#sfdndecompressor) · [`SizedByAttribute`](#sizedbyattribute) · [`StringAttribute`](#stringattribute) · [`StringEncoding`](#stringencoding) · [`StringZAttribute`](#stringzattribute) · [`StructSizeAttribute`](#structsizeattribute) · [`SwitchOnAttribute`](#switchonattribute) · [`TextMetadataEntry`](#textmetadataentry) · [`TypeOverrideAttribute`](#typeoverrideattribute) · [`ValidAnyOfAttribute`](#validanyofattribute) · [`ValidAttribute`](#validattribute) · [`ValidRangeAttribute`](#validrangeattribute) · [`VerifiedByAttribute`](#verifiedbyattribute) · [`VgaPalette`](#vgapalette) · [`Vic20Graphics`](#vic20graphics) · [`VideoIO`](#videoio) · [`VideoMetadata`](#videometadata) · [`VideoMode`](#videomode) · [`WireType`](#wiretype) · [`Zx81Graphics`](#zx81graphics) · [`ZxSpectrumGraphics`](#zxspectrumgraphics)
+[`AdditionalImageFormatAttribute`](#additionalimageformatattribute) · [`AllowedZones`](#allowedzones) · [`AmigaColourMap`](#amigacolourmap) · [`AmigaRgbRuns`](#amigargbruns) · [`AmstradGraphics`](#amstradgraphics) · [`AnticMode`](#anticmode) · [`AppleIIGSGraphics`](#appleiigsgraphics) · [`Atari8BitGraphics`](#atari8bitgraphics) · [`AtariKoalaRle`](#atarikoalarle) · [`AtariStCaRle`](#ataristcarle) · [`AtariStGraphics`](#ataristgraphics) · [`BilevelRows`](#bilevelrows) · [`CaseAttribute`](#caseattribute) · [`ChannelScaling`](#channelscaling) · [`CharacterRoms`](#characterroms) · [`ChunkKind`](#chunkkind) · [`ChunkMobility`](#chunkmobility) · [`ChunkOptimizer`](#chunkoptimizer) · [`ChunkPlacement`](#chunkplacement) · [`ChunkPlacementDirective`](#chunkplacementdirective) · [`ChunkReference`](#chunkreference) · [`ChunkRewriteFailure`](#chunkrewritefailure) · [`ChunkRewritePlan`](#chunkrewriteplan) · [`ChunkRewriteResult`](#chunkrewriteresult) · [`ChunkRewriteRule`](#chunkrewriterule) · [`ChunkSpan`](#chunkspan) · [`ChunkZone`](#chunkzone) · [`CodecTag`](#codectag) · [`CodedPacket`](#codedpacket) · [`ColorQuantizer`](#colorquantizer) · [`ColorQuantizer.Result`](#colorquantizerresult) · [`Commodore16Graphics`](#commodore16graphics) · [`Commodore64Fli`](#commodore64fli) · [`Commodore64Graphics`](#commodore64graphics) · [`ConformanceOracle`](#conformanceoracle) · [`ConformanceOracles`](#conformanceoracles) · [`CoverArt`](#coverart) · [`DecodedFrame`](#decodedframe) · [`DisplayFilter`](#displayfilter) · [`EndianAttribute`](#endianattribute) · [`Endianness`](#endianness) · [`ExifCodec`](#exifcodec) · [`ExifData`](#exifdata) · [`ExifIfd`](#exififd) · [`ExifRational`](#exifrational) · [`ExifSRational`](#exifsrational) · [`ExifTagEntry`](#exiftagentry) · [`ExifTagType`](#exiftagtype) · [`FastRawImageConverter`](#fastrawimageconverter) · [`FieldAttribute`](#fieldattribute) · [`FieldOffsetAttribute`](#fieldoffsetattribute) · [`FillerAttribute`](#fillerattribute) · [`FixedPalette`](#fixedpalette) · [`FixedValue`](#fixedvalue) · [`FormatCapability`](#formatcapability) · [`FormatDetectionPriorityAttribute`](#formatdetectionpriorityattribute) · [`FormatIO`](#formatio) · [`FormatMagicBytesAttribute`](#formatmagicbytesattribute) · [`FormatMimeTypeAttribute`](#formatmimetypeattribute) · [`FrameBlend`](#frameblend) · [`GenerateSerializerAttribute`](#generateserializerattribute) · [`GlyphSheet`](#glyphsheet) · [`GtiaRenderer`](#gtiarenderer) · [`HeaderFieldDescriptor`](#headerfielddescriptor) · [`HeaderFieldMapper`](#headerfieldmapper) · [`HeaderSerializer`](#headerserializer) · [`IBinarySerializable<TSelf>`](#ibinaryserializabletself) · [`IFormatChunkLayout<TSelf>`](#iformatchunklayouttself) · [`IFormatChunkPlanRewriter<TSelf>`](#iformatchunkplanrewritertself) · [`IFormatChunkRewriter<TSelf>`](#iformatchunkrewritertself) · [`IImageFormatMetadata<TSelf>`](#iimageformatmetadatatself) · [`IImageFormatReader<TSelf>`](#iimageformatreadertself) · [`IImageFormatWriter<TSelf>`](#iimageformatwritertself) · [`IImageFromRawImage<TSelf, TPixel>`](#iimagefromrawimagetself-tpixel) · [`IImageFromRawImage<TSelf>`](#iimagefromrawimagetself) · [`IImageInfoReader<TSelf>`](#iimageinforeadertself) · [`IImageToRawImage<TSelf>`](#iimagetorawimagetself) · [`IMultiImageFileFormat<TSelf>`](#imultiimagefileformattself) · [`IRawPixelFormat<TSelf>`](#irawpixelformattself) · [`IVideoCodecDecoder<TSelf>`](#ivideocodecdecodertself) · [`IVideoCodecEncoder<TSelf>`](#ivideocodecencodertself) · [`IVideoContainerReader<TSelf>`](#ivideocontainerreadertself) · [`IVideoContainerWriter<TSelf>`](#ivideocontainerwritertself) · [`IVideoFormatMetadata<TSelf>`](#ivideoformatmetadatatself) · [`IVideoFrameDecoder`](#ivideoframedecoder) · [`IVideoPacketEncoder`](#ivideopacketencoder) · [`IfAttribute`](#ifattribute) · [`ImageInfo`](#imageinfo) · [`ImageMetadata`](#imagemetadata) · [`ImageResampler`](#imageresampler) · [`IndexedPalette`](#indexedpalette) · [`IntegerRange`](#integerrange) · [`IptcCodec`](#iptccodec) · [`IptcData`](#iptcdata) · [`IptcDataSet`](#iptcdataset) · [`LayoutMode`](#layoutmode) · [`Lz4Frame`](#lz4frame) · [`MediaStreamInfo`](#mediastreaminfo) · [`MediaStreamKind`](#mediastreamkind) · [`MediaStreamMetadata`](#mediastreammetadata) · [`MonochromePage`](#monochromepage) · [`MsxGraphics`](#msxgraphics) · [`Op`](#op) · [`PackBits`](#packbits) · [`PackBytesStream`](#packbytesstream) · [`PackedRows`](#packedrows) · [`PaletteQuantizer`](#palettequantizer) · [`PaletteSidecar`](#palettesidecar) · [`PixelAspectRatio`](#pixelaspectratio) · [`PixelConverter`](#pixelconverter) · [`PixelFormat`](#pixelformat) · [`PixelRect`](#pixelrect) · [`PlanarConverter`](#planarconverter) · [`Rational`](#rational) · [`RawBytesAttribute`](#rawbytesattribute) · [`RawChromaLocation`](#rawchromalocation) · [`RawColorPrimaries`](#rawcolorprimaries) · [`RawColorRange`](#rawcolorrange) · [`RawImage`](#rawimage) · [`RawImage<TPixel>`](#rawimagetpixel) · [`RawImageColorInfo`](#rawimagecolorinfo) · [`RawImageConverter`](#rawimageconverter) · [`RawImageExactConverter`](#rawimageexactconverter) · [`RawImageExtensions`](#rawimageextensions) · [`RawImageFactory`](#rawimagefactory) · [`RawMatrixCoefficients`](#rawmatrixcoefficients) · [`RawPalette`](#rawpalette) · [`RawPaletteEntry`](#rawpaletteentry) · [`RawPixelAlphaKind`](#rawpixelalphakind) · [`RawPixelFormatKind`](#rawpixelformatkind) · [`RawPixelFormatTraits`](#rawpixelformattraits) · [`RawPixelFormats`](#rawpixelformats) · [`RawTransferCharacteristic`](#rawtransfercharacteristic) · [`RepeatAttribute`](#repeatattribute) · [`RepeatEosAttribute`](#repeateosattribute) · [`RepeatUntilAttribute`](#repeatuntilattribute) · [`Resampling`](#resampling) · [`Rgba32`](#rgba32) · [`SeqFieldAttribute`](#seqfieldattribute) · [`SfdnDecompressor`](#sfdndecompressor) · [`SizedByAttribute`](#sizedbyattribute) · [`StringAttribute`](#stringattribute) · [`StringEncoding`](#stringencoding) · [`StringZAttribute`](#stringzattribute) · [`StructSizeAttribute`](#structsizeattribute) · [`SwitchOnAttribute`](#switchonattribute) · [`TextMetadataEntry`](#textmetadataentry) · [`TypeOverrideAttribute`](#typeoverrideattribute) · [`ValidAnyOfAttribute`](#validanyofattribute) · [`ValidAttribute`](#validattribute) · [`ValidRangeAttribute`](#validrangeattribute) · [`VerifiedByAttribute`](#verifiedbyattribute) · [`VgaPalette`](#vgapalette) · [`Vic20Graphics`](#vic20graphics) · [`VideoIO`](#videoio) · [`VideoMetadata`](#videometadata) · [`VideoMode`](#videomode) · [`WireType`](#wiretype) · [`Zx81Graphics`](#zx81graphics) · [`ZxSpectrumGraphics`](#zxspectrumgraphics)
 
 #### `AdditionalImageFormatAttribute`
 
@@ -8482,6 +8483,30 @@ Primitives shared by the Commodore 16 and Plus/4 picture formats.
 | `ColorIndex` | `static int ColorIndex(int luminance, int hue)` | The colour a luminance and hue combine to, as an index into `HexColors`. |
 | `CreatePalette` | `static byte[] CreatePalette()` | The whole table as RGB triplets, ready for `Palette`. |
 
+#### `Commodore64Fli`
+
+The geometry and the memory layout the Commodore 64 FLI pictures share.
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `BitmapSize` | `const int BitmapSize` | Bytes a whole-screen bitmap takes. |
+| `ColorRamSize` | `const int ColorRamSize` | Bytes colour memory takes. |
+| `HiddenColumns` | `const int HiddenColumns` | Pixels at the left of a row the raster switch cannot reach. |
+| `MatrixAreaSize` | `const int MatrixAreaSize` | Bytes all eight matrices take together. |
+| `MatrixCount` | `const int MatrixCount` | Video matrices a FLI picture carries, one for each raster line of a cell. |
+| `MatrixEntries` | `const int MatrixEntries` | Entries one video matrix holds. |
+| `MatrixStride` | `const int MatrixStride` | Bytes from one video matrix to the next: a whole page for the thousand it uses. |
+| `MemoryWidth` | `const int MemoryWidth` | Pixels a row of screen memory holds. |
+| `MulticolorHiddenColumns` | `const int MulticolorHiddenColumns` | Multicolour pixels at the left of a row the raster switch cannot reach. |
+| `MulticolorMemoryWidth` | `const int MulticolorMemoryWidth` | Multicolour pixels a row of screen memory holds; each is drawn two wide. |
+| `MulticolorVisibleWidth` | `const int MulticolorVisibleWidth` | Multicolour pixels across the picture. |
+| `ScreenHeight` | `const int ScreenHeight` | Raster lines a whole screen holds. |
+| `VisibleWidth` | `const int VisibleWidth` | Pixels across a FLI picture: the row less the cells drawn before the switch. |
+| `DecodeHires` | `static RawImage DecodeHires(ReadOnlySpan<byte> bitmap, ReadOnlySpan<byte> matrices, int matrixStride, int height, int firstRow = 0)` | Decodes a high-resolution FLI picture into the 296 pixels across that are the picture. |
+| `DecodeMulticolor` | `static RawImage DecodeMulticolor(ReadOnlySpan<byte> bitmap, ReadOnlySpan<byte> matrices, int matrixStride, ReadOnlySpan<byte> colorRam, ReadOnlySpan<byte> backgrounds, int height, int firstRow = 0)` | Decodes a multicolour FLI picture into the 296 pixels across that are the picture. |
+| `EncodeHires` | `static int EncodeHires(RawImage image, int height, int firstRow, Span<byte> bitmap, Span<byte> matrices, int matrixStride)` | Encodes a picture as a high-resolution FLI screen, placed where the raster can reach it. |
+| `EncodeMulticolor` | `static int EncodeMulticolor(RawImage image, int height, int firstRow, byte background, Span<byte> bitmap, Span<byte> matrices, int matrixStride, Span<byte> colorRam)` | Encodes a picture as a multicolour FLI screen, placed where the raster can reach it. |
+
 #### `Commodore64Graphics`
 
 Primitives shared by the Commodore 64 picture formats.
@@ -8527,6 +8552,7 @@ A tool from outside this repository that has read what one of our writers produc
 | `PyEmbroidery` | `14` | pyembroidery. |
 | `LibreOffice` | `15` | LibreOffice, driven headless as `soffice`. |
 | `Olefile` | `16` | The `olefile` Python package. |
+| `Ghostscript` | `17` | Ghostscript, the PostScript and PDF interpreter, as `gs`. |
 
 #### `ConformanceOracles`
 
@@ -12773,6 +12799,8 @@ Implements `IEquatable<DoodleAtariFile>`, `IImageFormatMetadata<DoodleAtariFile>
 | Member | Signature | Summary |
 | --- | --- | --- |
 | `ExpectedFileSize` | `const int ExpectedFileSize` |  |
+| `ScreenHeight` | `const int ScreenHeight` |  |
+| `ScreenWidth` | `const int ScreenWidth` |  |
 | `Height` | `int Height { get; }` |  |
 | `PixelData` | `byte[] PixelData { get; init; }` |  |
 | `Width` | `int Width { get; }` |  |
@@ -13773,11 +13801,15 @@ Implements `IEquatable<EmcEditorFile>`, `IImageFormatMetadata<EmcEditorFile>`, `
 
 | Member | Signature | Summary |
 | --- | --- | --- |
+| `FileSize` | `const int FileSize` |  |
 | `FixedHeight` | `const int FixedHeight` |  |
 | `FixedWidth` | `const int FixedWidth` |  |
+| `Background` | `byte Background { get; init; }` |  |
+| `BitmapData` | `byte[] BitmapData { get; init; }` |  |
+| `ColorRam` | `byte[] ColorRam { get; init; }` |  |
 | `Height` | `int Height { get; }` |  |
 | `LoadAddress` | `ushort LoadAddress { get; init; }` |  |
-| `RawData` | `byte[] RawData { get; init; }` |  |
+| `Matrices` | `byte[] Matrices { get; init; }` |  |
 | `Width` | `int Width { get; }` |  |
 | `FromRawImage` | `static EmcEditorFile FromRawImage(RawImage image)` |  |
 | `ToRawImage` | `static RawImage ToRawImage(EmcEditorFile file)` |  |
@@ -14911,11 +14943,17 @@ Implements `IEquatable<FfliFile>`, `IImageFormatMetadata<FfliFile>`, `IImageForm
 
 | Member | Signature | Summary |
 | --- | --- | --- |
+| `FileSize` | `const int FileSize` |  |
 | `FixedHeight` | `const int FixedHeight` |  |
 | `FixedWidth` | `const int FixedWidth` |  |
+| `BitmapData` | `byte[] BitmapData { get; init; }` |  |
+| `ColorRam` | `byte[] ColorRam { get; init; }` |  |
+| `FirstBackgrounds` | `byte[] FirstBackgrounds { get; init; }` |  |
+| `FirstMatrices` | `byte[] FirstMatrices { get; init; }` |  |
 | `Height` | `int Height { get; }` |  |
 | `LoadAddress` | `ushort LoadAddress { get; init; }` |  |
-| `RawData` | `byte[] RawData { get; init; }` |  |
+| `SecondBackgrounds` | `byte[] SecondBackgrounds { get; init; }` |  |
+| `SecondMatrices` | `byte[] SecondMatrices { get; init; }` |  |
 | `Width` | `int Width { get; }` |  |
 | `FromRawImage` | `static FfliFile FromRawImage(RawImage image)` |  |
 | `ToRawImage` | `static RawImage ToRawImage(FfliFile file)` |  |
@@ -15309,11 +15347,16 @@ Implements `IEquatable<FliDesignerFile>`, `IImageFormatMetadata<FliDesignerFile>
 
 | Member | Signature | Summary |
 | --- | --- | --- |
+| `FileSize` | `const int FileSize` |  |
 | `FixedHeight` | `const int FixedHeight` |  |
 | `FixedWidth` | `const int FixedWidth` |  |
+| `PaddedFileSize` | `const int PaddedFileSize` |  |
+| `BitmapData` | `byte[] BitmapData { get; init; }` |  |
+| `ColorRam` | `byte[] ColorRam { get; init; }` |  |
 | `Height` | `int Height { get; }` |  |
 | `LoadAddress` | `ushort LoadAddress { get; init; }` |  |
-| `RawData` | `byte[] RawData { get; init; }` |  |
+| `Matrices` | `byte[] Matrices { get; init; }` |  |
+| `Padded` | `bool Padded { get; init; }` |  |
 | `Width` | `int Width { get; }` |  |
 | `FromRawImage` | `static FliDesignerFile FromRawImage(RawImage image)` |  |
 | `ToRawImage` | `static RawImage ToRawImage(FliDesignerFile file)` |  |
@@ -15343,15 +15386,15 @@ Implements `IEquatable<FliDesigner2File>`, `IImageFormatMetadata<FliDesigner2Fil
 
 | Member | Signature | Summary |
 | --- | --- | --- |
+| `FileSize` | `const int FileSize` |  |
 | `FixedHeight` | `const int FixedHeight` |  |
 | `FixedWidth` | `const int FixedWidth` |  |
-| `MinFileSize` | `const int MinFileSize` |  |
 | `BitmapData` | `byte[] BitmapData { get; init; }` |  |
 | `ColorRam` | `byte[] ColorRam { get; init; }` |  |
-| `ExtraData` | `byte[] ExtraData { get; init; }` |  |
 | `Height` | `int Height { get; }` |  |
 | `LoadAddress` | `ushort LoadAddress { get; init; }` |  |
-| `ScreenData` | `byte[] ScreenData { get; init; }` |  |
+| `Matrices` | `byte[] Matrices { get; init; }` |  |
+| `Trailer` | `byte[] Trailer { get; init; }` |  |
 | `Width` | `int Width { get; }` |  |
 | `FromRawImage` | `static FliDesigner2File FromRawImage(RawImage image)` |  |
 | `ToRawImage` | `static RawImage ToRawImage(FliDesigner2File file)` |  |
@@ -15381,11 +15424,15 @@ Implements `IEquatable<FliEditorFile>`, `IImageFormatMetadata<FliEditorFile>`, `
 
 | Member | Signature | Summary |
 | --- | --- | --- |
+| `FileSize` | `const int FileSize` |  |
 | `FixedHeight` | `const int FixedHeight` |  |
 | `FixedWidth` | `const int FixedWidth` |  |
+| `Backgrounds` | `byte[] Backgrounds { get; init; }` |  |
+| `BitmapData` | `byte[] BitmapData { get; init; }` |  |
+| `ColorRam` | `byte[] ColorRam { get; init; }` |  |
 | `Height` | `int Height { get; }` |  |
 | `LoadAddress` | `ushort LoadAddress { get; init; }` |  |
-| `RawData` | `byte[] RawData { get; init; }` |  |
+| `Matrices` | `byte[] Matrices { get; init; }` |  |
 | `Width` | `int Width { get; }` |  |
 | `FromRawImage` | `static FliEditorFile FromRawImage(RawImage image)` |  |
 | `ToRawImage` | `static RawImage ToRawImage(FliEditorFile file)` |  |
@@ -15453,11 +15500,19 @@ Implements `IEquatable<FliProfiFile>`, `IImageFormatMetadata<FliProfiFile>`, `II
 
 | Member | Signature | Summary |
 | --- | --- | --- |
+| `FileSize` | `const int FileSize` |  |
 | `FixedHeight` | `const int FixedHeight` |  |
 | `FixedWidth` | `const int FixedWidth` |  |
+| `BitmapData` | `byte[] BitmapData { get; init; }` |  |
+| `BorderColors` | `byte[] BorderColors { get; init; }` |  |
+| `ColorRam` | `byte[] ColorRam { get; init; }` |  |
+| `FirstSpriteMulticolor` | `byte FirstSpriteMulticolor { get; init; }` |  |
 | `Height` | `int Height { get; }` |  |
 | `LoadAddress` | `ushort LoadAddress { get; init; }` |  |
-| `RawData` | `byte[] RawData { get; init; }` |  |
+| `Matrices` | `byte[] Matrices { get; init; }` |  |
+| `SecondSpriteMulticolor` | `byte SecondSpriteMulticolor { get; init; }` |  |
+| `SpriteColors` | `byte[] SpriteColors { get; init; }` |  |
+| `Sprites` | `byte[] Sprites { get; init; }` |  |
 | `Width` | `int Width { get; }` |  |
 | `FromRawImage` | `static FliProfiFile FromRawImage(RawImage image)` |  |
 | `ToRawImage` | `static RawImage ToRawImage(FliProfiFile file)` |  |
@@ -15530,11 +15585,16 @@ Implements `IEquatable<FlimaticFile>`, `IImageFormatMetadata<FlimaticFile>`, `II
 
 | Member | Signature | Summary |
 | --- | --- | --- |
+| `FileSize` | `const int FileSize` |  |
 | `FixedHeight` | `const int FixedHeight` |  |
 | `FixedWidth` | `const int FixedWidth` |  |
+| `Background` | `byte Background { get; init; }` |  |
+| `BitmapData` | `byte[] BitmapData { get; init; }` |  |
+| `ColorRam` | `byte[] ColorRam { get; init; }` |  |
 | `Height` | `int Height { get; }` |  |
 | `LoadAddress` | `ushort LoadAddress { get; init; }` |  |
-| `RawData` | `byte[] RawData { get; init; }` |  |
+| `Matrices` | `byte[] Matrices { get; init; }` |  |
+| `Trailer` | `byte[] Trailer { get; init; }` |  |
 | `Width` | `int Width { get; }` |  |
 | `FromRawImage` | `static FlimaticFile FromRawImage(RawImage image)` |  |
 | `ToRawImage` | `static RawImage ToRawImage(FlimaticFile file)` |  |
@@ -18442,10 +18502,10 @@ Implements `IEquatable<HighresMediumFile>`, `IImageFormatMetadata<HighresMediumF
 | `ImageHeight` | `const int ImageHeight` |  |
 | `ImageWidth` | `const int ImageWidth` |  |
 | `NumPlanes` | `const int NumPlanes` |  |
-| `Palette1` | `short[] Palette1 { get; init; }` |  |
-| `Palette2` | `short[] Palette2 { get; init; }` |  |
-| `PixelData1` | `byte[] PixelData1 { get; init; }` |  |
-| `PixelData2` | `byte[] PixelData2 { get; init; }` |  |
+| `BitmapData` | `byte[] BitmapData { get; init; }` |  |
+| `Height` | `int Height { get; }` |  |
+| `Palettes` | `byte[] Palettes { get; init; }` |  |
+| `Width` | `int Width { get; }` |  |
 | `FromRawImage` | `static HighresMediumFile FromRawImage(RawImage image)` |  |
 | `ToRawImage` | `static RawImage ToRawImage(HighresMediumFile file)` |  |
 
@@ -18548,11 +18608,13 @@ Implements `IEquatable<HiresFliCrestFile>`, `IImageFormatMetadata<HiresFliCrestF
 
 | Member | Signature | Summary |
 | --- | --- | --- |
+| `FileSize` | `const int FileSize` |  |
 | `FixedHeight` | `const int FixedHeight` |  |
 | `FixedWidth` | `const int FixedWidth` |  |
+| `BitmapData` | `byte[] BitmapData { get; init; }` |  |
 | `Height` | `int Height { get; }` |  |
 | `LoadAddress` | `ushort LoadAddress { get; init; }` |  |
-| `RawData` | `byte[] RawData { get; init; }` |  |
+| `Matrices` | `byte[] Matrices { get; init; }` |  |
 | `Width` | `int Width { get; }` |  |
 | `FromRawImage` | `static HiresFliCrestFile FromRawImage(RawImage image)` |  |
 | `ToRawImage` | `static RawImage ToRawImage(HiresFliCrestFile file)` |  |
@@ -18582,11 +18644,15 @@ Implements `IEquatable<HiresInterlaceFeniksFile>`, `IImageFormatMetadata<HiresIn
 
 | Member | Signature | Summary |
 | --- | --- | --- |
+| `FileSize` | `const int FileSize` |  |
 | `FixedHeight` | `const int FixedHeight` |  |
 | `FixedWidth` | `const int FixedWidth` |  |
+| `FirstBitmap` | `byte[] FirstBitmap { get; init; }` |  |
+| `FirstScreen` | `byte[] FirstScreen { get; init; }` |  |
 | `Height` | `int Height { get; }` |  |
 | `LoadAddress` | `ushort LoadAddress { get; init; }` |  |
-| `RawData` | `byte[] RawData { get; init; }` |  |
+| `SecondBitmap` | `byte[] SecondBitmap { get; init; }` |  |
+| `SecondScreen` | `byte[] SecondScreen { get; init; }` |  |
 | `Width` | `int Width { get; }` |  |
 | `FromRawImage` | `static HiresInterlaceFeniksFile FromRawImage(RawImage image)` |  |
 | `ToRawImage` | `static RawImage ToRawImage(HiresInterlaceFeniksFile file)` |  |
@@ -18616,11 +18682,13 @@ Implements `IEquatable<HiresManagerFile>`, `IImageFormatMetadata<HiresManagerFil
 
 | Member | Signature | Summary |
 | --- | --- | --- |
+| `FileSize` | `const int FileSize` |  |
 | `FixedHeight` | `const int FixedHeight` |  |
 | `FixedWidth` | `const int FixedWidth` |  |
+| `BitmapData` | `byte[] BitmapData { get; init; }` |  |
 | `Height` | `int Height { get; }` |  |
 | `LoadAddress` | `ushort LoadAddress { get; init; }` |  |
-| `RawData` | `byte[] RawData { get; init; }` |  |
+| `Matrices` | `byte[] Matrices { get; init; }` |  |
 | `Width` | `int Width { get; }` |  |
 | `FromRawImage` | `static HiresManagerFile FromRawImage(RawImage image)` |  |
 | `ToRawImage` | `static RawImage ToRawImage(HiresManagerFile file)` |  |
@@ -20791,12 +20859,13 @@ Implements `IEquatable<InterlaceStudioFile>`, `IImageFormatMetadata<InterlaceStu
 
 | Member | Signature | Summary |
 | --- | --- | --- |
+| `FileSize` | `const int FileSize` |  |
 | `ImageHeight` | `const int ImageHeight` |  |
 | `ImageWidth` | `const int ImageWidth` |  |
-| `MinimumFileSize` | `const int MinimumFileSize` |  |
 | `FirstFrame` | `byte[] FirstFrame { get; init; }` |  |
 | `Header` | `byte[] Header { get; init; }` |  |
 | `Height` | `int Height { get; }` |  |
+| `Registers` | `byte[] Registers { get; init; }` |  |
 | `SecondFrame` | `byte[] SecondFrame { get; init; }` |  |
 | `Width` | `int Width { get; }` |  |
 | `FromRawImage` | `static InterlaceStudioFile FromRawImage(RawImage image)` |  |
@@ -25130,11 +25199,14 @@ Implements `IEquatable<MultiLaceEditorFile>`, `IImageFormatMetadata<MultiLaceEdi
 
 | Member | Signature | Summary |
 | --- | --- | --- |
+| `ColorCount` | `const int ColorCount` |  |
+| `FileSize` | `const int FileSize` |  |
 | `FixedHeight` | `const int FixedHeight` |  |
 | `FixedWidth` | `const int FixedWidth` |  |
+| `FirstField` | `byte[] FirstField { get; init; }` |  |
 | `Height` | `int Height { get; }` |  |
 | `LoadAddress` | `ushort LoadAddress { get; init; }` |  |
-| `RawData` | `byte[] RawData { get; init; }` |  |
+| `SecondField` | `byte[] SecondField { get; init; }` |  |
 | `Width` | `int Width { get; }` |  |
 | `FromRawImage` | `static MultiLaceEditorFile FromRawImage(RawImage image)` |  |
 | `ToRawImage` | `static RawImage ToRawImage(MultiLaceEditorFile file)` |  |
@@ -34498,14 +34570,18 @@ Implements `IEquatable<SuperHiresEditorFile>`, `IImageFormatMetadata<SuperHiresE
 
 | Member | Signature | Summary |
 | --- | --- | --- |
+| `FileSize` | `const int FileSize` |  |
 | `ImageHeight` | `const int ImageHeight` |  |
 | `ImageWidth` | `const int ImageWidth` |  |
-| `Bitmap1` | `byte[] Bitmap1 { get; init; }` |  |
-| `Bitmap2` | `byte[] Bitmap2 { get; init; }` |  |
+| `BackSpriteColor` | `byte BackSpriteColor { get; init; }` |  |
+| `BitmapData` | `byte[] BitmapData { get; init; }` |  |
+| `FrontSpriteColor` | `byte FrontSpriteColor { get; init; }` |  |
+| `Height` | `int Height { get; }` |  |
 | `LoadAddress` | `ushort LoadAddress { get; init; }` |  |
-| `Screen1` | `byte[] Screen1 { get; init; }` |  |
-| `Screen2` | `byte[] Screen2 { get; init; }` |  |
-| `TrailingData` | `byte[] TrailingData { get; init; }` |  |
+| `ScreenData` | `byte[] ScreenData { get; init; }` |  |
+| `Sprites` | `byte[] Sprites { get; init; }` |  |
+| `Trailer` | `byte[] Trailer { get; init; }` |  |
+| `Width` | `int Width { get; }` |  |
 | `FromRawImage` | `static SuperHiresEditorFile FromRawImage(RawImage image)` |  |
 | `ToRawImage` | `static RawImage ToRawImage(SuperHiresEditorFile file)` |  |
 
@@ -40582,6 +40658,8 @@ Implements `IEquatable<ZxSpectrumFile>`, `IImageFormatMetadata<ZxSpectrumFile>`,
 
 | Member | Signature | Summary |
 | --- | --- | --- |
+| `ScreenHeight` | `const int ScreenHeight` |  |
+| `ScreenWidth` | `const int ScreenWidth` |  |
 | `AttributeData` | `byte[] AttributeData { get; init; }` |  |
 | `BitmapData` | `byte[] BitmapData { get; init; }` |  |
 | `BorderColor` | `byte BorderColor { get; init; }` |  |
