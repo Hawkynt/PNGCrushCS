@@ -187,4 +187,65 @@ public sealed class H265ResidualWriterTests {
 
     return differences.Count == 0 ? "the coefficients match" : string.Join("; ", differences);
   }
+
+  /// <summary>
+  /// Four thousand random blocks across every size, component and initialisation column.
+  /// </summary>
+  /// <remarks>
+  /// The written cases above reach the corners of the syntax that were thought of. This reaches the
+  /// ones that were not: densities from one coefficient to every coefficient, magnitudes from one to
+  /// the widest the coder carries, and the context states a slice of any kind starts from. It is
+  /// cheap because a mismatch is decided by comparing numbers rather than by decoding a picture.
+  /// </remarks>
+  [Test]
+  [Category("RoundTrip")]
+  [Category("Boundary")]
+  public void RandomBlocksOfEveryShapeRoundTrip() {
+    var failures = 0;
+    for (var seed = 0; seed < 4000 && failures < 6; ++seed) {
+      var random = new Random(seed);
+      var log2Size = 2 + random.Next(4);
+      var cIdx = random.Next(3);
+      var size = 1 << log2Size;
+      var block = new int[size * size];
+      var density = random.Next(1, 101);
+      for (var i = 0; i < block.Length; ++i) {
+        if (random.Next(100) >= density) continue;
+        var magnitude = random.Next(100) < 70 ? random.Next(1, 4) : random.Next(1, 30000);
+        block[i] = random.Next(2) == 0 ? magnitude : -magnitude;
+      }
+
+      if (Array.TrueForAll(block, v => v == 0)) block[random.Next(block.Length)] = 1;
+
+      var initType = random.Next(3);
+      var states = new byte[H265CabacContexts.COUNT];
+      H265CabacContexts.Initialize(states, initType, 26);
+      var encoder = new H265CabacEncoder(states);
+      H265ResidualWriter.Encode(encoder, block, log2Size, cIdx, -1, 1);
+      encoder.EncodeTerminate(1);
+      var payload = encoder.Finish();
+
+      var readStates = new byte[H265CabacContexts.COUNT];
+      H265CabacContexts.Initialize(readStates, initType, 26);
+      var decoded = new int[block.Length];
+      try {
+        var d = new H265CabacEngine(payload, readStates);
+        d.Start(0);
+        H265Residual.Decode(ref d, decoded, log2Size, cIdx, -1, 1, _Pps, false);
+      } catch (Exception e) {
+        TestContext.Out.WriteLine($"seed {seed} log2 {log2Size} cIdx {cIdx} threw {e.GetType().Name}");
+        ++failures;
+        continue;
+      }
+
+      for (var i = 0; i < block.Length; ++i)
+        if (block[i] != decoded[i]) {
+          TestContext.Out.WriteLine($"seed {seed} log2 {log2Size} cIdx {cIdx} density {density}: at {i} wrote {block[i]} read {decoded[i]}");
+          ++failures;
+          break;
+        }
+    }
+
+    Assert.That(failures, Is.Zero, "fuzz failures");
+  }
 }

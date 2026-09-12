@@ -2126,11 +2126,14 @@ Verification runs outward as well as in a circle. The arithmetic encoder and the
 held against the reader they have to agree with — over blocks that reach the corners of the syntax,
 and asserting that both directions end with the same context states, not merely the same values,
 because a coder that agreed on the bins but diverged on the states would pass a shorter test and fail
-on the first slice long enough to matter. Then a twenty-four-picture clip crossing two group
-boundaries is muxed and decoded by **ffmpeg**, every frame compared. That length is the point: a
-decoder handed a broken predicted picture still produces a picture, and the damage shows as drift
-accumulating across the group rather than as a failure to decode. Displacing one written vector by a
-single sample fails it.
+on the first slice long enough to matter. A predicted and a bidirectional picture are then
+coded and handed to **this package's own decoder**, whose reconstruction has to match the encoder's
+sample for sample -- not closely, exactly, because the encoder predicts the next picture from its
+reconstruction and the decoder from theirs, and a difference of one sample is drift. Finally a
+twenty-four-picture clip crossing two group boundaries goes to **ffmpeg** as a raw byte stream and
+every frame is compared in display order. The two checks answer different questions: ours says the
+two halves of this package agree, ffmpeg's says they are both right -- which is what caught the
+Table 9-30 transcription above. Displacing one written vector by a single sample fails either.
 
 ### CamStudio Screen Codec
 

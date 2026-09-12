@@ -139,13 +139,20 @@ internal sealed class H265CabacEncoder {
   }
 
   /// <summary>
-  /// Closes the interval and returns the bytes, ending on a byte boundary.
+  /// Closes the interval, writes the stop bit, and returns the bytes of the slice segment.
   /// </summary>
   /// <remarks>
   /// The accumulator's top bit is the last carry, and it has to be resolved before anything is
   /// written: if it is set, the byte held back goes out incremented and every held-back run of ones
   /// has wrapped to zero. What remains of the low end then names a point inside the final interval,
   /// and writing it is what commits every bin the interval was narrowed by.
+  /// <para/>
+  /// <b>The stop bit belongs here</b>, immediately after those bits and before the alignment zeroes,
+  /// not in a byte the caller appends afterwards. The decoder holds nine bits of lookahead, so
+  /// deciding the last terminating bin draws bits past the ones the encoder committed — and what it
+  /// finds there decides the answer. A one there is what clause 9.3.4.3.5 leaves for it; zeroes let a
+  /// short slice decode its own end-of-slice flag as nought, which reads as the entropy coder having
+  /// gone out of step when nothing has.
   /// </remarks>
   internal byte[] Finish() {
     if ((this._low >> (32 - this._bitsLeft)) != 0) {
@@ -160,6 +167,8 @@ internal sealed class H265CabacEncoder {
     for (var i = bits - 1; i >= 0; --i)
       this._WriteBit((int)((value >> i) & 1));
 
+    // rbsp_slice_segment_trailing_bits(): the stop bit, then zeroes to the byte boundary.
+    this._WriteBit(1);
     this._AlignToByte();
     return [.. this._bytes];
   }

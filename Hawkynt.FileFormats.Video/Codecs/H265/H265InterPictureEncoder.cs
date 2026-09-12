@@ -47,6 +47,7 @@ internal sealed class H265InterPictureEncoder : IH265MotionContext {
   private readonly H265PictureParameterSet _pps;
   private readonly H265SliceHeader _header;
   private readonly H265Picture _reference;
+  private readonly H265Picture? _future;
   private readonly H265Picture _source;
   private readonly H265Picture _picture;
   private readonly int _qp;
@@ -64,7 +65,13 @@ internal sealed class H265InterPictureEncoder : IH265MotionContext {
   private int _cuLog2Size;
 
   /// <param name="source">The picture to code, already converted to the coded sample format.</param>
-  /// <param name="reference">The reconstruction the decoder will predict from.</param>
+  /// <param name="reference">The reconstruction before this picture, which list 0 names.</param>
+  /// <param name="future">
+  /// The reconstruction after this picture in display order, which list 1 names, or <c>null</c> for
+  /// a predicted picture. A picture with both can take each block from whichever side shows it
+  /// better, or from the average of the two — which is what a bidirectional picture is for: content
+  /// entering the scene has no past to be predicted from and a perfectly good future.
+  /// </param>
   /// <param name="qp">The luma quantiser this slice codes at.</param>
   /// <param name="log2CuSize">
   /// The coding unit size this writer uses, as a base-two logarithm. Smaller units follow motion
@@ -76,6 +83,7 @@ internal sealed class H265InterPictureEncoder : IH265MotionContext {
     H265SliceHeader header,
     H265Picture source,
     H265Picture reference,
+    H265Picture? future,
     int qp,
     int log2CuSize = 4) {
     this._sps = sps;
@@ -83,6 +91,7 @@ internal sealed class H265InterPictureEncoder : IH265MotionContext {
     this._header = header;
     this._source = source;
     this._reference = reference;
+    this._future = future;
     this._qp = qp;
     this._log2CtbSize = sps.CtbLog2SizeY;
     this._log2CuSize = Math.Clamp(log2CuSize, sps.MinCbLog2SizeY, sps.CtbLog2SizeY);
@@ -103,6 +112,14 @@ internal sealed class H265InterPictureEncoder : IH265MotionContext {
   /// <summary>The reconstruction, which is what the next picture predicts from.</summary>
   internal H265Picture Reconstruction => this._picture;
 
+  internal static int DiagUnits;
+  internal static int DiagSkipped;
+  internal static int DiagResidual;
+  internal static long DiagPredictionError;
+  internal static long DiagReconstructionError;
+  internal static long DiagChromaError;
+  internal static readonly System.Text.StringBuilder DiagLog = new();
+
   // ── the motion context the shared derivation reads ──────────────────────────
 
   public H265SliceHeader Header => this._header;
@@ -113,7 +130,11 @@ internal sealed class H265InterPictureEncoder : IH265MotionContext {
 
   public H265Picture Picture => this._picture;
 
-  public IReadOnlyList<H265Picture> ReferenceList(int list) => list == 0 ? [this._reference] : [];
+  public IReadOnlyList<H265Picture> ReferenceList(int list) => list switch {
+    0 => [this._reference],
+    1 when this._future != null => [this._future],
+    _ => [],
+  };
 
   public H265Picture? CollocatedPicture => null;
 
@@ -162,7 +183,10 @@ internal sealed class H265InterPictureEncoder : IH265MotionContext {
   /// <summary>Codes the whole picture and returns the arithmetic-coded slice data.</summary>
   internal byte[] Encode() {
     var contexts = new byte[H265CabacContexts.COUNT];
-    H265CabacContexts.Initialize(contexts, this._header.SliceType == H265SliceType.P ? 1 : 0, this._header.SliceQpY);
+    H265CabacContexts.Initialize(
+      contexts,
+      H265CabacContexts.InitializationType(this._header.SliceType, this._header.CabacInitFlag),
+      this._header.SliceQpY);
 
     var cabac = new H265CabacEncoder(contexts);
 
@@ -236,19 +260,16 @@ internal sealed class H265InterPictureEncoder : IH265MotionContext {
     this._cuLog2Size = log2CbSize;
     this._Fill(this._codingTreeDepth, x0, y0, size, (byte)depth);
 
-    var chosen = this._Search(x0, y0, size);
+    var motion = this._ChooseMotion(x0, y0, size);
 
     // The merge candidate costs one bin where an explicit vector costs several, so it is taken
     // whenever it names the same motion the search settled on.
     var merged = H265MotionPrediction.DeriveMerge(this, x0, y0, size, size, 0, 0);
-    var mergeMatches = merged.PredictL0 && !merged.PredictL1
-                       && merged.RefIdxL0 == 0 && merged.MvL0X == chosen.X && merged.MvL0Y == chosen.Y;
-
-    var motion = H265MotionInfo.None;
-    motion.Set(0, true, 0, chosen.X, chosen.Y);
+    var mergeMatches = _SameMotion(merged, motion);
 
     this._Predict(x0, y0, size, motion);
     var levels = this._Quantise(x0, y0, log2CbSize, out var anyLuma, out var anyCb, out var anyCr);
+
     var anyResidual = anyLuma || anyCb || anyCr;
 
     // Skipping is exactly this: the merge candidate, and nothing else at all.
@@ -270,7 +291,7 @@ internal sealed class H265InterPictureEncoder : IH265MotionContext {
       this._WriteMergeIndex(cabac, 0);
     } else {
       cabac.EncodeBin(H265CabacContexts.MERGE_FLAG, 0);
-      this._WriteExplicitMotion(cabac, x0, y0, size, chosen);
+      this._WriteExplicitMotion(cabac, x0, y0, size, depth, motion);
     }
 
     this._Store(x0, y0, size, motion);
@@ -305,30 +326,129 @@ internal sealed class H265InterPictureEncoder : IH265MotionContext {
       cabac.EncodeBypass(0);
   }
 
-  /// <summary>Writes a vector as the difference from whichever of the two predictors is closer.</summary>
-  private void _WriteExplicitMotion(H265CabacEncoder cabac, int x0, int y0, int size, (int X, int Y) chosen) {
-    var best = 0;
-    var bestCost = int.MaxValue;
-    var bestDeltaX = 0;
-    var bestDeltaY = 0;
+  /// <summary>
+  /// Writes which lists a prediction unit uses and the vector into each -- clause 7.3.8.6.
+  /// </summary>
+  /// <remarks>
+  /// A bidirectional slice states the direction first; a predicted slice has only one and states
+  /// nothing. Each vector then goes out as a difference from whichever of that list's two predictors
+  /// is closer, and the flag saying which.
+  /// </remarks>
+  private void _WriteExplicitMotion(
+    H265CabacEncoder cabac, int x0, int y0, int size, int depth, in H265MotionInfo motion) {
+    var direction = motion.PredictL0 && motion.PredictL1 ? 2 : motion.PredictL0 ? 0 : 1;
 
-    for (var flag = 0; flag < 2; ++flag) {
-      var predictor = H265MotionPrediction.DerivePredictor(this, x0, y0, size, size, 0, 0, 0, flag);
-      var deltaX = chosen.X - predictor.X;
-      var deltaY = chosen.Y - predictor.Y;
-      var cost = Math.Abs(deltaX) + Math.Abs(deltaY);
+    if (this._header.SliceType == H265SliceType.B) {
+      // An 8x4 or 4x8 prediction unit may not be bidirectional, so for those the first bin is not
+      // written at all and the direction is one of the two single lists.
+      if (size + size != 12)
+        cabac.EncodeBin(H265CabacContexts.INTER_PRED_IDC + Math.Min(depth, 4), direction == 2 ? 1 : 0);
+
+      if (direction != 2)
+        cabac.EncodeBin(H265CabacContexts.INTER_PRED_IDC + 4, direction);
+    }
+
+    for (var list = 0; list < 2; ++list) {
+      if (direction == 1 - list)
+        continue;
+
+      var chosenX = list == 0 ? motion.MvL0X : motion.MvL1X;
+      var chosenY = list == 0 ? motion.MvL0Y : motion.MvL1Y;
+
+      var best = 0;
+      var bestCost = int.MaxValue;
+      var bestDeltaX = 0;
+      var bestDeltaY = 0;
+
+      for (var flag = 0; flag < 2; ++flag) {
+        var predictor = H265MotionPrediction.DerivePredictor(this, x0, y0, size, size, 0, list, 0, flag);
+        var deltaX = chosenX - predictor.X;
+        var deltaY = chosenY - predictor.Y;
+        var cost = Math.Abs(deltaX) + Math.Abs(deltaY);
+        if (cost >= bestCost)
+          continue;
+
+        best = flag;
+        bestCost = cost;
+        bestDeltaX = deltaX;
+        bestDeltaY = deltaY;
+      }
+
+      // Where the slice header says list one's difference is always zero it is not written and the
+      // decoder reads none. This writer never says that; the condition is here to stay honest about
+      // the syntax rather than to take a branch.
+      if (!(list == 1 && this._header.MvdL1Zero && direction == 2))
+        _WriteMotionVectorDifference(cabac, bestDeltaX, bestDeltaY);
+
+      cabac.EncodeBin(H265CabacContexts.MVP_FLAG, best);
+    }
+  }
+
+  /// <summary>
+  /// Chooses where this block comes from: the past, the future, or the average of the two.
+  /// </summary>
+  /// <remarks>
+  /// Measured rather than estimated. Each candidate is predicted into the picture with the decoder's
+  /// own motion compensation and the residual measured from the result, so the comparison is between
+  /// the three reconstructions a decoder would actually build -- including the rounding of the
+  /// bidirectional average, which an estimate made from two separate sums does not have.
+  /// <para/>
+  /// The past is the incumbent. Content that is equally well predicted from either side should be
+  /// predicted from the one whose vector is more likely to be what the neighbours already say, and
+  /// a bidirectional block costs two vectors where a single-list one costs one.
+  /// </remarks>
+  private H265MotionInfo _ChooseMotion(int x0, int y0, int size) {
+    var fromPast = this._Search(x0, y0, size, this._reference);
+    var best = H265MotionInfo.None;
+    best.Set(0, true, 0, fromPast.X, fromPast.Y);
+
+    if (this._future == null)
+      return best;
+
+    var bestCost = this._ResidualCost(x0, y0, size, best);
+
+    var fromFuture = this._Search(x0, y0, size, this._future);
+    var backward = H265MotionInfo.None;
+    backward.Set(1, true, 0, fromFuture.X, fromFuture.Y);
+
+    var both = H265MotionInfo.None;
+    both.Set(0, true, 0, fromPast.X, fromPast.Y);
+    both.Set(1, true, 0, fromFuture.X, fromFuture.Y);
+
+    foreach (var candidate in new[] { backward, both }) {
+      var cost = this._ResidualCost(x0, y0, size, candidate);
       if (cost >= bestCost)
         continue;
 
-      best = flag;
       bestCost = cost;
-      bestDeltaX = deltaX;
-      bestDeltaY = deltaY;
+      best = candidate;
     }
 
-    _WriteMotionVectorDifference(cabac, bestDeltaX, bestDeltaY);
-    cabac.EncodeBin(H265CabacContexts.MVP_FLAG, best);
+    return best;
   }
+
+  /// <summary>What the prediction leaves behind, measured on the luminance plane.</summary>
+  private long _ResidualCost(int x0, int y0, int size, in H265MotionInfo motion) {
+    this._Predict(x0, y0, size, motion);
+
+    var width = Math.Min(size, this._sps.Width - x0);
+    var height = Math.Min(size, this._sps.Height - y0);
+
+    var cost = 0L;
+    for (var y = 0; y < height; ++y) {
+      var row = (y0 + y) * this._sps.Width;
+      for (var x = 0; x < width; ++x)
+        cost += Math.Abs(this._source.Luma[row + x0 + x] - this._picture.Luma[row + x0 + x]);
+    }
+
+    return cost;
+  }
+
+  private static bool _SameMotion(in H265MotionInfo left, in H265MotionInfo right)
+    => left.PredictL0 == right.PredictL0
+       && left.PredictL1 == right.PredictL1
+       && (!left.PredictL0 || (left.RefIdxL0 == right.RefIdxL0 && left.MvL0X == right.MvL0X && left.MvL0Y == right.MvL0Y))
+       && (!left.PredictL1 || (left.RefIdxL1 == right.RefIdxL1 && left.MvL1X == right.MvL1X && left.MvL1Y == right.MvL1Y));
 
   /// <summary>
   /// The motion vector difference — clause 7.3.8.9.
@@ -415,19 +535,19 @@ internal sealed class H265InterPictureEncoder : IH265MotionContext {
   /// displacement the scan happened to reach first — the zero vector is nearly always what the
   /// predictor already says, so it is the one that costs nothing to state.
   /// </remarks>
-  private (int X, int Y) _Search(int x0, int y0, int size) {
+  private (int X, int Y) _Search(int x0, int y0, int size, H265Picture reference) {
     var width = Math.Min(size, this._sps.Width - x0);
     var height = Math.Min(size, this._sps.Height - y0);
 
     var best = (X: 0, Y: 0);
-    var bestCost = this._MatchCost(x0, y0, width, height, 0, 0, int.MaxValue);
+    var bestCost = this._MatchCost(reference, x0, y0, width, height, 0, 0, int.MaxValue);
 
     for (var dy = -_SEARCH_RANGE; dy <= _SEARCH_RANGE; ++dy)
       for (var dx = -_SEARCH_RANGE; dx <= _SEARCH_RANGE; ++dx) {
         if (dx == 0 && dy == 0)
           continue;
 
-        var cost = this._MatchCost(x0, y0, width, height, dx, dy, bestCost);
+        var cost = this._MatchCost(reference, x0, y0, width, height, dx, dy, bestCost);
         if (cost >= bestCost)
           continue;
 
@@ -438,7 +558,8 @@ internal sealed class H265InterPictureEncoder : IH265MotionContext {
     return best;
   }
 
-  private int _MatchCost(int x0, int y0, int width, int height, int dx, int dy, int ceiling) {
+  private int _MatchCost(
+    H265Picture reference, int x0, int y0, int width, int height, int dx, int dy, int ceiling) {
     var cost = 0;
     for (var y = 0; y < height; ++y) {
       var sourceRow = (y0 + y) * this._sps.Width;
@@ -446,7 +567,7 @@ internal sealed class H265InterPictureEncoder : IH265MotionContext {
 
       for (var x = 0; x < width; ++x) {
         var referenceX = Math.Clamp(x0 + x + dx, 0, this._sps.Width - 1);
-        cost += Math.Abs(this._source.Luma[sourceRow + x0 + x] - this._reference.Luma[referenceRow + referenceX]);
+        cost += Math.Abs(this._source.Luma[sourceRow + x0 + x] - reference.Luma[referenceRow + referenceX]);
       }
 
       if (cost >= ceiling)

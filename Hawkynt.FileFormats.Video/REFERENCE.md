@@ -1076,6 +1076,7 @@ Implements `IVideoCodecEncoder<H265VideoEncoder>`, `IVideoPacketEncoder`.
 | `Codec` | `static CodecTag Codec { get; }` |  |
 | `Create` | `static H265VideoEncoder Create(MediaStreamInfo stream)` |  |
 | `DescribeStream` | `MediaStreamInfo DescribeStream()` |  |
+| `Flush` | `IEnumerable<CodedPacket> Flush()` | Takes the packets the encoder is still holding once the pictures have run out. |
 | `TryEncode` | `bool TryEncode(RawImage frame, long? presentationTimestamp, out CodedPacket packet)` |  |
 
 #### `HapDecoder`

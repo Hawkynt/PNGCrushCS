@@ -1,5 +1,6 @@
 using System;
 using System.Buffers.Binary;
+using System.Collections.Generic;
 using System.IO;
 using FileFormat.Codecs.H265;
 using FileFormat.Core;
@@ -67,22 +68,46 @@ public sealed class H265VideoEncoder : IVideoCodecEncoder<H265VideoEncoder> {
         $"A {frame.Width}x{frame.Height} {frame.Format} picture needs {frame.MinimumPixelDataLength} bytes and carries {frame.PixelData.Length}.");
 
     this._sequence ??= new(frame.Width, frame.Height);
-    var (sample, keyFrame) = this._sequence.Encode(frame);
+    this._RecordConfiguration();
 
-    var configuration = _AsMainProfile(this._sequence.Configuration);
-    if (this._configuration == null)
+    if (!this._sequence.TryEncode(frame, presentationTimestamp, out var coded)) {
+      // A picture the bidirectional ones may predict from has to be coded before them, so a picture
+      // handed in is not always a packet handed back. Flush returns what is still held.
+      packet = default;
+      return false;
+    }
+
+    packet = _ToPacket(this._requested.Index, coded);
+    return true;
+  }
+
+  /// <summary>Takes the packets the encoder is still holding once the pictures have run out.</summary>
+  public IEnumerable<CodedPacket> Flush() {
+    if (this._sequence == null)
+      yield break;
+
+    foreach (var coded in this._sequence.Flush())
+      yield return _ToPacket(this._requested.Index, coded);
+  }
+
+  private static CodedPacket _ToPacket(int streamIndex, H265VideoSequenceEncoder.Coded coded)
+    => new(
+      StreamIndex: streamIndex,
+      Data: coded.Sample,
+      PresentationTimestamp: coded.PresentationTimestamp,
+      DecodeTimestamp: coded.DecodeTimestamp,
+      IsKeyFrame: coded.IsKeyFrame);
+
+  private void _RecordConfiguration() {
+    var configuration = _AsMainProfile(this._sequence!.Configuration);
+    if (this._configuration == null) {
       this._configuration = configuration;
-    else if (!configuration.AsSpan().SequenceEqual(this._configuration))
+      return;
+    }
+
+    if (!configuration.AsSpan().SequenceEqual(this._configuration))
       throw new InvalidDataException(
         "The HEVC parameter sets changed while encoding a fixed-geometry stream. A video stream description can carry only one decoder configuration here.");
-
-    packet = new(
-      StreamIndex: this._requested.Index,
-      Data: sample,
-      PresentationTimestamp: presentationTimestamp,
-      DecodeTimestamp: presentationTimestamp,
-      IsKeyFrame: keyFrame);
-    return true;
   }
 
   public MediaStreamInfo DescribeStream() {

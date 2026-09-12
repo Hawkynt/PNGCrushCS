@@ -552,7 +552,7 @@ internal static class H265PcmStillCodec {
 
   internal static byte[] _BuildSps(
     int width, int height, int displayWidth, int displayHeight, byte level,
-    int maxDecPicBufferingMinus1 = 0, int log2MaxPocLsbMinus4 = 0) {
+    int maxDecPicBufferingMinus1 = 0, int log2MaxPocLsbMinus4 = 0, int maxNumReorderPics = 0) {
     var w = new Bits();
     w.WriteBits(0, 4); // sps_video_parameter_set_id
     w.WriteBits(0, 3); // sps_max_sub_layers_minus1
@@ -578,7 +578,7 @@ internal static class H265PcmStillCodec {
     w.WriteUe((uint)log2MaxPocLsbMinus4);
     w.WriteBit(0); // sub_layer_ordering_info_present_flag
     w.WriteUe((uint)maxDecPicBufferingMinus1);
-    w.WriteUe(0); // max_num_reorder_pics
+    w.WriteUe((uint)maxNumReorderPics);
     w.WriteUe(0); // max_latency_increase_plus1
     w.WriteUe(0); // log2_min_luma_coding_block_size_minus3 => 8
     w.WriteUe((uint)(_CTB_LOG2 - 3)); // log2_diff_max_min_luma_coding_block_size
@@ -605,7 +605,7 @@ internal static class H265PcmStillCodec {
     return w.ToArray();
   }
 
-  internal static byte[] _BuildPps() {
+  internal static byte[] _BuildPps(bool cabacInitPresent = false) {
     var w = new Bits();
     w.WriteUe(0); // pps_pic_parameter_set_id
     w.WriteUe(0); // pps_seq_parameter_set_id
@@ -613,7 +613,7 @@ internal static class H265PcmStillCodec {
     w.WriteBit(0); // output_flag_present_flag
     w.WriteBits(0, 3); // num_extra_slice_header_bits
     w.WriteBit(0); // sign_data_hiding_enabled_flag
-    w.WriteBit(0); // cabac_init_present_flag
+    w.WriteBit(cabacInitPresent ? 1 : 0); // cabac_init_present_flag
     w.WriteUe(0); // num_ref_idx_l0_default_active_minus1
     w.WriteUe(0); // num_ref_idx_l1_default_active_minus1
     w.WriteSe(0); // init_qp_minus26

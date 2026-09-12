@@ -157,11 +157,7 @@ internal sealed class H265FrameDecoder : IH265MotionContext {
     this._segmentStartTs = startTs;
     var substream = 0;
 
-    var initType = header.SliceType switch {
-      H265SliceType.I => 0,
-      H265SliceType.P => header.CabacInitFlag ? 2 : 1,
-      _ => header.CabacInitFlag ? 1 : 2,
-    };
+    var initType = H265CabacContexts.InitializationType(header.SliceType, header.CabacInitFlag);
 
     for (var ts = startTs; ts < total; ++ts) {
       var ctb = this._tiles.ToRasterScan(ts);
