@@ -10,6 +10,7 @@ namespace FileFormat.PhotoLine;
 /// JPEG or PNG. Every sample in the corpus was refused before, and every one of them now matches
 /// XnView exactly once the wrapper is stepped over.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.IrfanView)]
 public readonly record struct PhotoLineFile
   : IImageFormatReader<PhotoLineFile>, IImageToRawImage<PhotoLineFile>,
     IImageFromRawImage<PhotoLineFile>, IImageFormatWriter<PhotoLineFile> {

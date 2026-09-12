@@ -13,7 +13,7 @@ namespace FileFormat.Fuckpaint;
 /// The two screens share one colour RAM and one background, so what differs between the fields is
 /// only the bitmap and the video matrix.
 /// </remarks>
-[VerifiedBy(ConformanceOracle.Recoil2Png)]
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.IrfanView)]
 public readonly record struct FuckpaintFile
   : IImageFormatReader<FuckpaintFile>, IImageToRawImage<FuckpaintFile>,
     IImageFromRawImage<FuckpaintFile>, IImageFormatWriter<FuckpaintFile> {

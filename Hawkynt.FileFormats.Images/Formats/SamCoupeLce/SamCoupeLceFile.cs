@@ -14,7 +14,7 @@ namespace FileFormat.SamCoupeLce;
 /// The second screen begins wherever the first one's interrupt list ends, which is the only thing
 /// in the file that says how long either of them is.
 /// </remarks>
-[VerifiedBy(ConformanceOracle.Recoil2Png)]
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.IrfanView)]
 public readonly record struct SamCoupeLceFile
   : IImageFormatReader<SamCoupeLceFile>, IImageToRawImage<SamCoupeLceFile>,
     IImageFromRawImage<SamCoupeLceFile>, IImageFormatWriter<SamCoupeLceFile> {

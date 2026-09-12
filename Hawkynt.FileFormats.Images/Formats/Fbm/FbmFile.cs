@@ -5,6 +5,7 @@ namespace FileFormat.Fbm;
 
 /// <summary>In-memory representation of a CMU Fuzzy Bitmap (FBM) image.</summary>
 [FormatMagicBytes([0x25, 0x62, 0x69, 0x74, 0x6D, 0x61, 0x70, 0x00])]
+[VerifiedBy(ConformanceOracle.XnView)]
 public readonly record struct FbmFile : IImageFormatReader<FbmFile>, IImageToRawImage<FbmFile>, IImageFromRawImage<FbmFile>, IImageFormatWriter<FbmFile> {
 
   static string IImageFormatMetadata<FbmFile>.PrimaryExtension => ".fbm";

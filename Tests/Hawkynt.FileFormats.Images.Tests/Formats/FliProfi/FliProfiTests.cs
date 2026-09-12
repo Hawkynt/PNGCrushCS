@@ -1,183 +1,161 @@
 using System;
 using System.IO;
-using FileFormat.FliProfi;
 using FileFormat.Core;
 
 namespace FileFormat.FliProfi.Tests;
 
+/// <summary>
+/// The layout a FLI Profi file actually has, as opposed to the one it used to be written in.
+/// </summary>
+/// <remarks>
+/// What was written was 17002 bytes of bitmap, eight video matrices packed a thousand apart and
+/// colour memory, with nothing for the sprite border. The format is 18370: sprites at 2, their
+/// colours at 642, the border's pattern-11 colours at 898, the two shared registers at 1098, colour
+/// memory at 1154, the matrices a page apart from 2178 and the bitmap at 10370.
+/// </remarks>
 [TestFixture]
-public sealed class FliProfiReaderTests {
+public sealed class FliProfiLayoutTests {
 
-  [Test]
-  [Category("Unit")]
-  public void FromFile_Null_ThrowsArgumentNullException() {
-    Assert.Throws<ArgumentNullException>(() => FliProfiReader.FromFile(null!));
+  private static byte[] _Build() {
+    var data = new byte[FliProfiFile.FileSize];
+    data[0] = 0x80;
+    data[1] = 0x37;
+
+    for (var cell = 0; cell < Commodore64Fli.ColorRamSize; ++cell)
+      data[FliProfiFile.ColorRamOffset + cell] = 0x0B;
+
+    for (var line = 0; line < Commodore64Fli.MatrixCount; ++line)
+    for (var cell = 0; cell < Commodore64Fli.MatrixEntries; ++cell)
+      data[FliProfiFile.MatricesOffset + line * Commodore64Fli.MatrixStride + cell] = (byte)(line << 4 | 1);
+
+    for (var i = 0; i < Commodore64Fli.BitmapSize; ++i)
+      data[FliProfiFile.BitmapOffset + i] = 0b01010101;
+
+    return data;
   }
 
   [Test]
   [Category("Unit")]
-  public void FromFile_Missing_ThrowsFileNotFoundException() {
-    var missing = new FileInfo(Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".fpr"));
-    Assert.Throws<FileNotFoundException>(() => FliProfiReader.FromFile(missing));
+  public void FromFile_Null_Throws()
+    => Assert.Throws<ArgumentNullException>(() => FliProfiReader.FromFile(null!));
+
+  [Test]
+  [Category("Unit")]
+  public void FromFile_Missing_Throws()
+    => Assert.Throws<FileNotFoundException>(
+      () => FliProfiReader.FromFile(new FileInfo(Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".fpr"))));
+
+  [Test]
+  [Category("Unit")]
+  public void FromBytes_Null_Throws()
+    => Assert.Throws<ArgumentNullException>(() => FliProfiReader.FromBytes(null!));
+
+  [Test]
+  [Category("Unit")]
+  public void TheOldFabricatedLength_IsNoLongerWhatItWants()
+    => Assert.Throws<InvalidDataException>(() => FliProfiReader.FromBytes(new byte[17002]));
+
+  [Test]
+  [Category("Unit")]
+  public void ThePartsAreWhereTheMachineAddressesThem() {
+    Assert.Multiple(() => {
+      Assert.That(FliProfiFile.FileSize, Is.EqualTo(18370));
+      Assert.That(FliProfiFile.SpritesOffset, Is.EqualTo(2));
+      Assert.That(FliProfiFile.SpriteColorsOffset, Is.EqualTo(642));
+      Assert.That(FliProfiFile.BorderColorsOffset, Is.EqualTo(898));
+      Assert.That(FliProfiFile.ColorRamOffset, Is.EqualTo(1154));
+      Assert.That(FliProfiFile.MatricesOffset, Is.EqualTo(2178));
+      Assert.That(FliProfiFile.BitmapOffset, Is.EqualTo(10370));
+    });
   }
 
   [Test]
   [Category("Unit")]
-  public void FromBytes_Null_ThrowsArgumentNullException() {
-    Assert.Throws<ArgumentNullException>(() => FliProfiReader.FromBytes(null!));
+  public void ThePictureIsTheWholeRowBecauseSpritesCoverTheLeftOfIt() {
+    var picture = FliProfiFile.ToRawImage(FliProfiReader.FromBytes(_Build()));
+
+    Assert.Multiple(() => {
+      Assert.That(picture.Width, Is.EqualTo(320));
+      Assert.That(picture.Height, Is.EqualTo(200));
+    });
   }
 
   [Test]
   [Category("Unit")]
-  public void FromBytes_TooSmall_ThrowsInvalidDataException() {
-    Assert.Throws<InvalidDataException>(() => FliProfiReader.FromBytes(new byte[100]));
+  public void EachRowOfACellTakesItsColoursFromItsOwnMatrix() {
+    // Read past the three cells the sprites cover, which have no matrix of their own.
+    var picture = FliProfiFile.ToRawImage(FliProfiReader.FromBytes(_Build()));
+
+    Assert.Multiple(() => {
+      for (var row = 0; row < Commodore64Fli.MatrixCount; ++row)
+        Assert.That(picture.PixelData[row * 320 + 24], Is.EqualTo(row), $"row {row} takes matrix {row}");
+    });
   }
 
   [Test]
   [Category("Unit")]
-  public void FromStream_Null_ThrowsArgumentNullException() {
-    Assert.Throws<ArgumentNullException>(() => FliProfiReader.FromStream(null!));
+  public void ASpriteOverThePixelWinsOverTheBitmap() {
+    var data = _Build();
+    data[FliProfiFile.SpriteColorsOffset] = 0x07;
+
+    // Pattern 01 in the sprite covering the top-left pixel.
+    data[FliProfiFile.SpritesOffset] = 0b01000000;
+
+    var picture = FliProfiFile.ToRawImage(FliProfiReader.FromBytes(data));
+
+    Assert.That(picture.PixelData[0], Is.EqualTo(0x07));
   }
-
-  [Test]
-  [Category("Unit")]
-  public void FromBytes_ValidData_ParsesDimensions() {
-    var data = TestHelpers._BuildValidFliProfiData(0x3C00);
-    var result = FliProfiReader.FromBytes(data);
-
-    Assert.That(result.Width, Is.EqualTo(160));
-    Assert.That(result.Height, Is.EqualTo(200));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void FromBytes_ValidData_ParsesLoadAddress() {
-    var data = TestHelpers._BuildValidFliProfiData(0x4000);
-    var result = FliProfiReader.FromBytes(data);
-
-    Assert.That(result.LoadAddress, Is.EqualTo(0x4000));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void FromBytes_ValidData_RawDataLength() {
-    var data = TestHelpers._BuildValidFliProfiData(0x3C00);
-    var result = FliProfiReader.FromBytes(data);
-
-    Assert.That(result.RawData.Length, Is.EqualTo(data.Length - FliProfiFile.LoadAddressSize));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void FromBytes_ValidData_RawDataPreserved() {
-    var data = TestHelpers._BuildValidFliProfiData(0x3C00);
-    var result = FliProfiReader.FromBytes(data);
-
-    for (var i = 0; i < result.RawData.Length; ++i)
-      Assert.That(result.RawData[i], Is.EqualTo(data[i + FliProfiFile.LoadAddressSize]), $"RawData mismatch at index {i}");
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void FromBytes_MinimumSize_Accepted() {
-    var minSize = FliProfiFile.LoadAddressSize + FliProfiFile.MinPayloadSize;
-    var data = new byte[minSize];
-    data[0] = 0x00;
-    data[1] = 0x3C;
-
-    var result = FliProfiReader.FromBytes(data);
-    Assert.That(result.RawData.Length, Is.EqualTo(FliProfiFile.MinPayloadSize));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void FromBytes_JustBelowMinimumSize_ThrowsInvalidDataException() {
-    var tooSmall = FliProfiFile.LoadAddressSize + FliProfiFile.MinPayloadSize - 1;
-    Assert.Throws<InvalidDataException>(() => FliProfiReader.FromBytes(new byte[tooSmall]));
-  }
-}
-
-[TestFixture]
-public sealed class FliProfiRoundTripTests {
 
   [Test]
   [Category("Integration")]
-  public void RoundTrip_AllFieldsPreserved() {
-    var rawData = new byte[FliProfiFile.MinPayloadSize + 500];
-    for (var i = 0; i < rawData.Length; ++i)
-      rawData[i] = (byte)(i * 13 % 256);
-
-    var original = new FliProfiFile { LoadAddress = 0x3C00, RawData = rawData };
-
+  public void WhatIsReadIsWhatIsWritten() {
+    var original = FliProfiReader.FromBytes(_Build());
     var bytes = FliProfiWriter.ToBytes(original);
     var restored = FliProfiReader.FromBytes(bytes);
 
-    Assert.That(restored.LoadAddress, Is.EqualTo(original.LoadAddress));
-    Assert.That(restored.RawData, Is.EqualTo(original.RawData));
+    Assert.Multiple(() => {
+      Assert.That(bytes, Has.Length.EqualTo(FliProfiFile.FileSize));
+      Assert.That(restored.LoadAddress, Is.EqualTo(original.LoadAddress));
+      Assert.That(restored.Sprites, Is.EqualTo(original.Sprites));
+      Assert.That(restored.ColorRam, Is.EqualTo(original.ColorRam));
+      Assert.That(restored.Matrices, Is.EqualTo(original.Matrices));
+      Assert.That(restored.BitmapData, Is.EqualTo(original.BitmapData));
+    });
   }
 
   [Test]
   [Category("Integration")]
-  public void RoundTrip_ViaFile_PreservesData() {
-    var rawData = new byte[FliProfiFile.MinPayloadSize];
-    for (var i = 0; i < rawData.Length; ++i)
-      rawData[i] = (byte)(i % 256);
+  public void RoundTrip_ViaFile() {
+    var original = FliProfiReader.FromBytes(_Build());
+    var path = Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".fpr");
 
-    var original = new FliProfiFile { LoadAddress = 0x4000, RawData = rawData };
-
-    var tmp = Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".fpr");
     try {
-      File.WriteAllBytes(tmp, FliProfiWriter.ToBytes(original));
-      var restored = FliProfiReader.FromFile(new FileInfo(tmp));
+      File.WriteAllBytes(path, FliProfiWriter.ToBytes(original));
+      var restored = FliProfiReader.FromFile(new FileInfo(path));
 
-      Assert.That(restored.LoadAddress, Is.EqualTo(original.LoadAddress));
-      Assert.That(restored.RawData, Is.EqualTo(original.RawData));
+      Assert.That(restored.BitmapData, Is.EqualTo(original.BitmapData));
     } finally {
-      try { File.Delete(tmp); } catch { /* best effort */ }
+      if (File.Exists(path))
+        File.Delete(path);
     }
   }
 
   [Test]
-  [Category("Integration")]
-  public void RoundTrip_ViaStream_PreservesData() {
-    var rawData = new byte[FliProfiFile.MinPayloadSize];
-    for (var i = 0; i < rawData.Length; ++i)
-      rawData[i] = (byte)(i % 256);
-
-    var original = new FliProfiFile { LoadAddress = 0x3C00, RawData = rawData };
-    var bytes = FliProfiWriter.ToBytes(original);
-
-    using var ms = new MemoryStream(bytes);
-    var restored = FliProfiReader.FromStream(ms);
-
-    Assert.That(restored.LoadAddress, Is.EqualTo(original.LoadAddress));
-    Assert.That(restored.RawData, Is.EqualTo(original.RawData));
-  }
+  [Category("Unit")]
+  public void FromStream_Null_Throws()
+    => Assert.Throws<ArgumentNullException>(() => FliProfiReader.FromStream(null!));
 
   [Test]
-  [Category("Integration")]
-  public void RoundTrip_AllZeros() {
-    var rawData = new byte[FliProfiFile.MinPayloadSize];
-    var original = new FliProfiFile { LoadAddress = 0x0000, RawData = rawData };
+  [Category("Unit")]
+  public void FromStream_ReadsWhatFromBytesReads() {
+    using var stream = new MemoryStream(_Build());
+    var fromStream = FliProfiFile.ToRawImage(FliProfiReader.FromStream(stream));
+    var fromBytes = FliProfiFile.ToRawImage(FliProfiReader.FromBytes(_Build()));
 
-    var bytes = FliProfiWriter.ToBytes(original);
-    var restored = FliProfiReader.FromBytes(bytes);
-
-    Assert.That(restored.LoadAddress, Is.EqualTo(0));
-    Assert.That(restored.RawData, Is.EqualTo(rawData));
-  }
-}
-
-file static class TestHelpers {
-  internal static byte[] _BuildValidFliProfiData(ushort loadAddress) {
-    var rawData = new byte[FliProfiFile.MinPayloadSize];
-    for (var i = 0; i < rawData.Length; ++i)
-      rawData[i] = (byte)(i % 256);
-
-    var data = new byte[FliProfiFile.LoadAddressSize + rawData.Length];
-    data[0] = (byte)(loadAddress & 0xFF);
-    data[1] = (byte)(loadAddress >> 8);
-    Array.Copy(rawData, 0, data, FliProfiFile.LoadAddressSize, rawData.Length);
-    return data;
+    Assert.Multiple(() => {
+      Assert.That(fromStream.Width, Is.EqualTo(fromBytes.Width));
+      Assert.That(fromStream.Height, Is.EqualTo(fromBytes.Height));
+      Assert.That(fromStream.PixelData, Is.EqualTo(fromBytes.PixelData));
+    });
   }
 }

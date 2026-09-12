@@ -3,7 +3,22 @@ using FileFormat.Core;
 
 namespace FileFormat.EmcEditor;
 
-/// <summary>In-memory representation of a Commodore 64 EMC Editor extended multicolor image.</summary>
+/// <summary>In-memory representation of an EMC-editor multicolour picture for the Commodore 64.</summary>
+/// <remarks>
+/// A FLI screen with the eight video matrices first, a page apart because that is the granularity of
+/// the VIC-II's matrix pointer, then the bitmap, then colour memory a whole sixteen kilobytes in, and
+/// a background register as the last byte of the file.
+/// <para/>
+/// What is shown is 192 rows and not 200, and they start at the fifth raster line of the screen
+/// rather than the first — so the picture's row 0 is screen row 4, and which of the eight matrices
+/// speaks for it follows from that rather than from the row's own number. Getting that wrong shifts
+/// every colour half a cell up the screen while leaving the shape of the picture intact, which is
+/// exactly the kind of error a round trip through one's own reader cannot see.
+/// <para/>
+/// It used to be written as 10000 bytes of bitmap, one video matrix and colour memory at 160 by 200,
+/// which is an ordinary multicolour screen and not FLI at all.
+/// </remarks>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct EmcEditorFile
   : IImageFormatReader<EmcEditorFile>, IImageToRawImage<EmcEditorFile>,
     IImageFromRawImage<EmcEditorFile>, IImageFormatWriter<EmcEditorFile> {
@@ -12,115 +27,83 @@ public readonly record struct EmcEditorFile
   static string[] IImageFormatMetadata<EmcEditorFile>.FileExtensions => [".emc"];
   static EmcEditorFile IImageFormatReader<EmcEditorFile>.FromSpan(ReadOnlySpan<byte> data) => EmcEditorReader.FromSpan(data);
   static byte[] IImageFormatWriter<EmcEditorFile>.ToBytes(EmcEditorFile file) => EmcEditorWriter.ToBytes(file);
+  static VideoMode[] IImageFormatMetadata<EmcEditorFile>.VideoModes => [
+    new("EMC-editor", [(FixedWidth, FixedHeight)], [Commodore64Graphics.ColorCount])
+  ];
 
-  /// <summary>The fixed width of the image in pixels.</summary>
-  public const int FixedWidth = 160;
+  /// <summary>Pixels across the picture, the hardware being unable to colour the first 24 of a row.</summary>
+  public const int FixedWidth = Commodore64Fli.VisibleWidth;
 
-  /// <summary>The fixed height of the image in pixels.</summary>
-  public const int FixedHeight = 200;
+  /// <summary>Rows: the screen less the half-cell at the top and the one at the bottom.</summary>
+  public const int FixedHeight = 192;
+
+  /// <summary>The raster line of the screen the picture's first row is.</summary>
+  internal const int FirstRow = 4;
 
   /// <summary>Size of the load address in bytes.</summary>
   internal const int LoadAddressSize = 2;
 
-  /// <summary>Size of the bitmap data section in bytes.</summary>
-  internal const int BitmapSize = 8000;
+  /// <summary>Where the video matrices start: straight after the load address.</summary>
+  internal const int MatricesOffset = LoadAddressSize;
 
-  /// <summary>Size of the screen RAM section in bytes.</summary>
-  internal const int ScreenRamSize = 1000;
+  /// <summary>Where the bitmap starts: after all eight matrices.</summary>
+  internal const int BitmapOffset = MatricesOffset + Commodore64Fli.MatrixAreaSize;
 
-  /// <summary>Size of the color RAM section in bytes.</summary>
-  internal const int ColorRamSize = 1000;
+  /// <summary>Where colour memory starts, a whole sixteen kilobytes past the load address.</summary>
+  internal const int ColorRamOffset = LoadAddressSize + 16384;
 
-  /// <summary>Minimum payload size (bitmap + screen RAM + color RAM).</summary>
-  internal const int MinPayloadSize = BitmapSize + ScreenRamSize + ColorRamSize;
+  /// <summary>The background register: the last byte of the file.</summary>
+  internal const int BackgroundOffset = FileSize - 1;
 
-  /// <summary>Default load address, the one the program itself writes.</summary>
-  internal const ushort DefaultLoadAddress = 0x2000;
+  /// <summary>The length of a whole EMC-editor picture, which is also what identifies it.</summary>
+  public const int FileSize = 17412;
 
-  /// <summary>Image width, always 160.</summary>
+  /// <summary>Default load address, which puts the matrices at the foot of the bank at $4000.</summary>
+  internal const ushort DefaultLoadAddress = 0x4000;
+
+  /// <summary>Image width, always 296.</summary>
   public int Width => FixedWidth;
 
-  /// <summary>Image height, always 200.</summary>
+  /// <summary>Image height, always 192.</summary>
   public int Height => FixedHeight;
 
   /// <summary>C64 memory load address (2 bytes, little-endian).</summary>
   public ushort LoadAddress { get; init; }
 
-  /// <summary>Raw payload data (entire file content after load address).</summary>
-  public byte[] RawData { get; init; }
+  /// <summary>The eight video matrices, one after another, a whole page apiece.</summary>
+  public byte[] Matrices { get; init; }
 
-  /// <summary>Converts this EMC Editor image to a platform-independent <see cref="RawImage"/> in Rgb24 format using multicolor decode.</summary>
-  public static RawImage ToRawImage(EmcEditorFile file) {
+  /// <summary>The bitmap, eight thousand bytes, a cell at a time.</summary>
+  public byte[] BitmapData { get; init; }
 
-    const int width = FixedWidth;
-    const int height = FixedHeight;
-    var rgb = new byte[width * height * 3];
+  /// <summary>Colour memory, one entry a cell, which pattern 11 takes.</summary>
+  public byte[] ColorRam { get; init; }
 
-    var hasFullData = file.RawData.Length >= MinPayloadSize;
+  /// <summary>The colour pattern 00 shows across the whole picture.</summary>
+  public byte Background { get; init; }
 
-    for (var y = 0; y < height; ++y)
-      for (var x = 0; x < width; ++x) {
-        var cellX = x / 4;
-        var cellY = y / 8;
-        var cellIndex = cellY * 40 + cellX;
-        var byteInCell = y % 8;
-        var bitmapOffset = cellIndex * 8 + byteInCell;
-        var bitmapByte = bitmapOffset < file.RawData.Length ? file.RawData[bitmapOffset] : (byte)0;
-        var pixelInByte = x % 4;
-        var bitValue = (bitmapByte >> ((3 - pixelInByte) * 2)) & 0x03;
+  /// <summary>Converts this picture to a platform-independent <see cref="RawImage"/>.</summary>
+  public static RawImage ToRawImage(EmcEditorFile file)
+    => Commodore64Fli.DecodeMulticolor(
+      file.BitmapData ?? [], file.Matrices ?? [], Commodore64Fli.MatrixStride,
+      file.ColorRam ?? [], [file.Background], FixedHeight, FirstRow);
 
-        int colorIndex;
-        if (hasFullData) {
-          var screenOffset = BitmapSize + cellIndex;
-          var screenByte = screenOffset < file.RawData.Length ? file.RawData[screenOffset] : (byte)0;
-          var colorOffset = BitmapSize + ScreenRamSize + cellIndex;
-          var colorByte = colorOffset < file.RawData.Length ? file.RawData[colorOffset] : (byte)0;
-
-          colorIndex = bitValue switch {
-            0 => 0,
-            1 => (screenByte >> 4) & 0x0F,
-            2 => screenByte & 0x0F,
-            3 => colorByte & 0x0F,
-            _ => 0
-          };
-        } else
-          colorIndex = bitValue != 0 ? 1 : 0;
-
-        var color = Commodore64Graphics.HexColors[colorIndex];
-        var offset = (y * width + x) * 3;
-        rgb[offset] = (byte)((color >> 16) & 0xFF);
-        rgb[offset + 1] = (byte)((color >> 8) & 0xFF);
-        rgb[offset + 2] = (byte)(color & 0xFF);
-      }
-
-    return new() {
-      Width = width,
-      Height = height,
-      Format = PixelFormat.Rgb24,
-      PixelData = rgb,
-    };
-  }
-
-
-  /// <summary>Encodes a picture as an EMC Editor screen, scaling it to 160x200 first.</summary>
-  /// <remarks>
-  /// The file has nowhere to keep a background colour and <see cref="ToRawImage"/> accordingly shows
-  /// black behind pattern 00, so encoding has to assume the same. That leaves a cell three colours
-  /// of its own on top of that black rather than four.
-  /// </remarks>
+  /// <summary>Encodes a picture as an EMC-editor screen, scaling it to 296x192 first.</summary>
   public static EmcEditorFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
 
-    var rgb = image.SampleTo(FixedWidth, FixedHeight).PixelData;
-    var raw = new byte[MinPayloadSize];
-    Commodore64Graphics.EncodeMulticolor(
-      rgb, FixedWidth, FixedHeight,
-      raw.AsSpan(0, BitmapSize),
-      raw.AsSpan(BitmapSize, ScreenRamSize),
-      raw.AsSpan(BitmapSize + ScreenRamSize, ColorRamSize),
-      0);
+    var bitmap = new byte[Commodore64Fli.BitmapSize];
+    var matrices = new byte[Commodore64Fli.MatrixAreaSize];
+    var colorRam = new byte[Commodore64Fli.ColorRamSize];
+    Commodore64Fli.EncodeMulticolor(
+      image, FixedHeight, FirstRow, 0, bitmap, matrices, Commodore64Fli.MatrixStride, colorRam);
 
-    return new() { LoadAddress = DefaultLoadAddress, RawData = raw };
+    return new() {
+      LoadAddress = DefaultLoadAddress,
+      Matrices = matrices,
+      BitmapData = bitmap,
+      ColorRam = colorRam,
+      Background = 0,
+    };
   }
-
 }

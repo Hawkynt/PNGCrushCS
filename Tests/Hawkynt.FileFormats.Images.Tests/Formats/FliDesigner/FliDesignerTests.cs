@@ -1,158 +1,158 @@
 using System;
 using System.IO;
-using FileFormat.FliDesigner;
 using FileFormat.Core;
 
 namespace FileFormat.FliDesigner.Tests;
 
+/// <summary>
+/// The layout a FLI Designer file actually has, as opposed to the one it used to be written in.
+/// </summary>
+/// <remarks>
+/// What was written was the parts in the order they are named — bitmap, then eight video matrices a
+/// thousand bytes apart, then colour memory — which comes to 17002 bytes and is not the format. The
+/// file is addressed the way the VIC-II addresses it: colour memory first, the matrices a page apart
+/// because that is the granularity the chip's matrix pointer has, and the bitmap last. That is 17218
+/// bytes, or 17409 where the picture was saved to the end of its bank.
+/// </remarks>
 [TestFixture]
-public sealed class FliDesignerReaderTests {
+public sealed class FliDesignerLayoutTests {
 
-  [Test]
-  [Category("Unit")]
-  public void FromFile_Null_ThrowsArgumentNullException() {
-    Assert.Throws<ArgumentNullException>(() => FliDesignerReader.FromFile(null!));
+  /// <summary>Builds a picture whose eight matrices each name a different pair of colours.</summary>
+  private static byte[] _Build(bool padded) {
+    var data = new byte[padded ? FliDesignerFile.PaddedFileSize : FliDesignerFile.FileSize];
+    data[0] = 0x00;
+    data[1] = 0x3C;
+
+    for (var cell = 0; cell < Commodore64Fli.ColorRamSize; ++cell)
+      data[FliDesignerFile.ColorRamOffset + cell] = 0x0B;
+
+    for (var line = 0; line < Commodore64Fli.MatrixCount; ++line)
+    for (var cell = 0; cell < Commodore64Fli.MatrixEntries; ++cell)
+      data[FliDesignerFile.MatricesOffset + line * Commodore64Fli.MatrixStride + cell] = (byte)(line << 4 | 1);
+
+    // Pattern 01 everywhere, so the high nibble of every matrix entry is what shows.
+    for (var i = 0; i < Commodore64Fli.BitmapSize; ++i)
+      data[FliDesignerFile.BitmapOffset + i] = 0b01010101;
+
+    return data;
   }
 
   [Test]
   [Category("Unit")]
-  public void FromFile_Missing_ThrowsFileNotFoundException() {
-    var missing = new FileInfo(Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".fd2"));
-    Assert.Throws<FileNotFoundException>(() => FliDesignerReader.FromFile(missing));
+  public void FromFile_Null_Throws()
+    => Assert.Throws<ArgumentNullException>(() => FliDesignerReader.FromFile(null!));
+
+  [Test]
+  [Category("Unit")]
+  public void FromFile_Missing_Throws()
+    => Assert.Throws<FileNotFoundException>(
+      () => FliDesignerReader.FromFile(new FileInfo(Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".fd2"))));
+
+  [Test]
+  [Category("Unit")]
+  public void FromBytes_Null_Throws()
+    => Assert.Throws<ArgumentNullException>(() => FliDesignerReader.FromBytes(null!));
+
+  [Test]
+  [Category("Unit")]
+  public void TheOldFabricatedLength_IsNoLongerWhatItWants()
+    => Assert.Throws<InvalidDataException>(() => FliDesignerReader.FromBytes(new byte[17002]));
+
+  [Test]
+  [Category("Unit")]
+  public void APictureIsSeventeenThousandTwoHundredAndEighteenBytes() {
+    Assert.That(FliDesignerFile.FileSize, Is.EqualTo(17218));
+    Assert.Multiple(() => {
+      Assert.That(FliDesignerFile.ColorRamOffset, Is.EqualTo(2));
+      Assert.That(FliDesignerFile.MatricesOffset, Is.EqualTo(0x402));
+      Assert.That(FliDesignerFile.BitmapOffset, Is.EqualTo(0x2402));
+    });
   }
 
   [Test]
   [Category("Unit")]
-  public void FromBytes_Null_ThrowsArgumentNullException() {
-    Assert.Throws<ArgumentNullException>(() => FliDesignerReader.FromBytes(null!));
+  public void AFileRunningOnToTheEndOfItsBankIsStillRead() {
+    var file = FliDesignerReader.FromBytes(_Build(padded: true));
+
+    Assert.Multiple(() => {
+      Assert.That(file.LoadAddress, Is.EqualTo(0x3C00));
+      Assert.That(file.Padded, Is.True);
+      Assert.That(file.Matrices, Has.Length.EqualTo(Commodore64Fli.MatrixAreaSize));
+      Assert.That(file.BitmapData, Has.Length.EqualTo(Commodore64Fli.BitmapSize));
+    });
   }
 
   [Test]
   [Category("Unit")]
-  public void FromBytes_TooSmall_ThrowsInvalidDataException() {
-    Assert.Throws<InvalidDataException>(() => FliDesignerReader.FromBytes(new byte[100]));
+  public void ThePictureIsTwoHundredAndNinetySixAcross() {
+    var picture = FliDesignerFile.ToRawImage(FliDesignerReader.FromBytes(_Build(padded: false)));
+
+    Assert.Multiple(() => {
+      Assert.That(picture.Width, Is.EqualTo(296));
+      Assert.That(picture.Height, Is.EqualTo(200));
+    });
   }
 
   [Test]
   [Category("Unit")]
-  public void FromBytes_ValidData_ParsesDimensions() {
-    var data = TestHelpers._BuildValidFliDesignerData(0x3C00);
-    var result = FliDesignerReader.FromBytes(data);
+  public void EachRowOfACellTakesItsColoursFromItsOwnMatrix() {
+    var picture = FliDesignerFile.ToRawImage(FliDesignerReader.FromBytes(_Build(padded: false)));
 
-    Assert.That(result.Width, Is.EqualTo(160));
-    Assert.That(result.Height, Is.EqualTo(200));
-    Assert.That(result.LoadAddress, Is.EqualTo(0x3C00));
-    Assert.That(result.RawData.Length, Is.GreaterThanOrEqualTo(17000));
+    Assert.Multiple(() => {
+      for (var row = 0; row < Commodore64Fli.MatrixCount; ++row)
+        Assert.That(picture.PixelData[row * 296], Is.EqualTo(row), $"row {row} takes matrix {row}");
+    });
   }
-
-  [Test]
-  [Category("Unit")]
-  public void FromStream_Null_ThrowsArgumentNullException() {
-    Assert.Throws<ArgumentNullException>(() => FliDesignerReader.FromStream(null!));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void FromStream_ValidData_ParsesCorrectly() {
-    var data = TestHelpers._BuildValidFliDesignerData(0x3C00);
-    using var ms = new MemoryStream(data);
-    var result = FliDesignerReader.FromStream(ms);
-
-    Assert.That(result.LoadAddress, Is.EqualTo(0x3C00));
-    Assert.That(result.RawData.Length, Is.EqualTo(17000));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void FromBytes_LoadAddress_LittleEndian() {
-    var data = TestHelpers._BuildValidFliDesignerData(0xABCD);
-    var result = FliDesignerReader.FromBytes(data);
-
-    Assert.That(result.LoadAddress, Is.EqualTo(0xABCD));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void FromBytes_ExactMinSize_Succeeds() {
-    var data = TestHelpers._BuildValidFliDesignerData(0x3C00);
-    Assert.That(data.Length, Is.EqualTo(2 + 17000));
-    Assert.DoesNotThrow(() => FliDesignerReader.FromBytes(data));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void FromBytes_OneBelowMinSize_ThrowsInvalidDataException() {
-    var data = new byte[2 + 17000 - 1];
-    Assert.Throws<InvalidDataException>(() => FliDesignerReader.FromBytes(data));
-  }
-}
-
-[TestFixture]
-public sealed class FliDesignerRoundTripTests {
 
   [Test]
   [Category("Integration")]
-  public void RoundTrip_AllFieldsPreserved() {
-    var rawData = new byte[17000];
-    for (var i = 0; i < rawData.Length; ++i)
-      rawData[i] = (byte)(i * 11 % 256);
-
-    var original = new FliDesignerFile { LoadAddress = 0x3C00, RawData = rawData };
-
+  public void WhatIsReadIsWhatIsWritten() {
+    var original = FliDesignerReader.FromBytes(_Build(padded: true));
     var bytes = FliDesignerWriter.ToBytes(original);
     var restored = FliDesignerReader.FromBytes(bytes);
 
-    Assert.That(restored.LoadAddress, Is.EqualTo(original.LoadAddress));
-    Assert.That(restored.RawData, Is.EqualTo(original.RawData));
+    Assert.Multiple(() => {
+      Assert.That(bytes, Has.Length.EqualTo(FliDesignerFile.PaddedFileSize));
+      Assert.That(restored.LoadAddress, Is.EqualTo(original.LoadAddress));
+      Assert.That(restored.ColorRam, Is.EqualTo(original.ColorRam));
+      Assert.That(restored.Matrices, Is.EqualTo(original.Matrices));
+      Assert.That(restored.BitmapData, Is.EqualTo(original.BitmapData));
+    });
   }
 
   [Test]
   [Category("Integration")]
   public void RoundTrip_ViaFile() {
-    var rawData = new byte[17000];
-    for (var i = 0; i < rawData.Length; ++i)
-      rawData[i] = (byte)(i * 13 % 256);
+    var original = FliDesignerReader.FromBytes(_Build(padded: false));
+    var path = Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".fd2");
 
-    var original = new FliDesignerFile { LoadAddress = 0x3C00, RawData = rawData };
-    var tmpPath = Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".fd2");
     try {
-      File.WriteAllBytes(tmpPath, FliDesignerWriter.ToBytes(original));
-      var restored = FliDesignerReader.FromFile(new FileInfo(tmpPath));
+      File.WriteAllBytes(path, FliDesignerWriter.ToBytes(original));
+      var restored = FliDesignerReader.FromFile(new FileInfo(path));
 
-      Assert.That(restored.LoadAddress, Is.EqualTo(original.LoadAddress));
-      Assert.That(restored.RawData, Is.EqualTo(original.RawData));
+      Assert.That(restored.BitmapData, Is.EqualTo(original.BitmapData));
     } finally {
-      if (File.Exists(tmpPath))
-        File.Delete(tmpPath);
+      if (File.Exists(path))
+        File.Delete(path);
     }
   }
 
   [Test]
-  [Category("Integration")]
-  public void RoundTrip_LargerPayload_Preserved() {
-    var rawData = new byte[20000];
-    for (var i = 0; i < rawData.Length; ++i)
-      rawData[i] = (byte)(i * 3 % 256);
+  [Category("Unit")]
+  public void FromStream_Null_Throws()
+    => Assert.Throws<ArgumentNullException>(() => FliDesignerReader.FromStream(null!));
 
-    var original = new FliDesignerFile { LoadAddress = 0x3C00, RawData = rawData };
+  [Test]
+  [Category("Unit")]
+  public void FromStream_ReadsWhatFromBytesReads() {
+    using var stream = new MemoryStream(_Build(padded: true));
+    var fromStream = FliDesignerFile.ToRawImage(FliDesignerReader.FromStream(stream));
+    var fromBytes = FliDesignerFile.ToRawImage(FliDesignerReader.FromBytes(_Build(padded: true)));
 
-    var bytes = FliDesignerWriter.ToBytes(original);
-    var restored = FliDesignerReader.FromBytes(bytes);
-
-    Assert.That(restored.RawData, Is.EqualTo(original.RawData));
-  }
-}
-
-file static class TestHelpers {
-  internal static byte[] _BuildValidFliDesignerData(ushort loadAddress) {
-    var rawData = new byte[17000];
-    for (var i = 0; i < rawData.Length; ++i)
-      rawData[i] = (byte)(i % 256);
-
-    var data = new byte[2 + rawData.Length];
-    data[0] = (byte)(loadAddress & 0xFF);
-    data[1] = (byte)(loadAddress >> 8);
-    Array.Copy(rawData, 0, data, 2, rawData.Length);
-    return data;
+    Assert.Multiple(() => {
+      Assert.That(fromStream.Width, Is.EqualTo(fromBytes.Width));
+      Assert.That(fromStream.Height, Is.EqualTo(fromBytes.Height));
+      Assert.That(fromStream.PixelData, Is.EqualTo(fromBytes.PixelData));
+    });
   }
 }

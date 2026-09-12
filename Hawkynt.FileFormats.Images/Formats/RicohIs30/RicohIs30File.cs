@@ -20,6 +20,7 @@ namespace FileFormat.RicohIs30;
 /// how the converter derives it. At two bits a pixel the four values are a grey ramp with zero white
 /// and three black.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.XnView)]
 public readonly record struct RicohIs30File : IImageFormatReader<RicohIs30File>, IImageToRawImage<RicohIs30File>, IImageFromRawImage<RicohIs30File>, IImageFormatWriter<RicohIs30File> {
 
   /// <summary>The two bytes the file opens with.</summary>

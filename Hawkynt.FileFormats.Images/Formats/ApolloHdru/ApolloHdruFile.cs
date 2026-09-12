@@ -35,6 +35,7 @@ namespace FileFormat.ApolloHdru;
 /// they say they are. The reader still requires them; only content sniffing is left out of it, and
 /// a page under its own name is read as it should be.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.XnView)]
 public readonly record struct ApolloHdruFile
   : IImageFormatReader<ApolloHdruFile>, IImageToRawImage<ApolloHdruFile>,
     IImageFromRawImage<ApolloHdruFile>, IImageFormatWriter<ApolloHdruFile> {

@@ -4,6 +4,13 @@ using FileFormat.Core;
 namespace FileFormat.ScreenMaker;
 
 /// <summary>In-memory representation of a Screen Maker image.</summary>
+/// <remarks>
+/// No oracle, and not for want of asking. XnView converts what this writes to a picture of the right
+/// size, but its own <c>-info</c> names the file <c>bob</c> — the Bob Raytracer loader, which claims
+/// only <c>.bob</c> and has nothing to do with Screen Maker. It has no reader for this format; it has
+/// a reader whose header happens to fall where ours does. That is a coincidence of layout, not a
+/// third party understanding the file, so it is not recorded as one.
+/// </remarks>
 public readonly record struct ScreenMakerFile : IImageFormatReader<ScreenMakerFile>, IImageToRawImage<ScreenMakerFile>, IImageFromRawImage<ScreenMakerFile>, IImageFormatWriter<ScreenMakerFile> {
 
   static string IImageFormatMetadata<ScreenMakerFile>.PrimaryExtension => ".smk";

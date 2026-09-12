@@ -16,7 +16,7 @@ namespace FileFormat.CanvasRaster;
 /// touch then follows in scan order. Which is to say the format compresses only what repeats and
 /// pays full price for the rest, rather than choosing between the two.
 /// </remarks>
-[VerifiedBy(ConformanceOracle.Recoil2Png)]
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.IrfanView)]
 public readonly record struct CanvasRasterFile
   : IImageFormatReader<CanvasRasterFile>, IImageToRawImage<CanvasRasterFile>,
     IImageFromRawImage<CanvasRasterFile>, IImageFormatWriter<CanvasRasterFile> {

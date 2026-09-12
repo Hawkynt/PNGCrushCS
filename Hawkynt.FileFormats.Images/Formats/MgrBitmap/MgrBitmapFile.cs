@@ -4,6 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.MgrBitmap;
 
 /// <summary>In-memory representation of an MGR (MGR Window Manager) bitmap image.</summary>
+[VerifiedBy(ConformanceOracle.XnView)]
 public readonly record struct MgrBitmapFile : IImageFormatReader<MgrBitmapFile>, IImageToRawImage<MgrBitmapFile>, IImageFromRawImage<MgrBitmapFile>, IImageFormatWriter<MgrBitmapFile> {
 
   static string IImageFormatMetadata<MgrBitmapFile>.PrimaryExtension => ".mgr";

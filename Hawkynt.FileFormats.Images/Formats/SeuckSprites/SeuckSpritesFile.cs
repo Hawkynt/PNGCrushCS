@@ -14,7 +14,7 @@ namespace FileFormat.SeuckSprites;
 /// pair of multicolour registers, so a sprite chooses just one of its three. That is why the sheet
 /// shows the same black and white throughout and varies only in the third.
 /// </remarks>
-[VerifiedBy(ConformanceOracle.Recoil2Png)]
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.IrfanView)]
 public readonly record struct SeuckSpritesFile
   : IImageFormatReader<SeuckSpritesFile>, IImageToRawImage<SeuckSpritesFile>,
     IImageFromRawImage<SeuckSpritesFile>, IImageFormatWriter<SeuckSpritesFile> {

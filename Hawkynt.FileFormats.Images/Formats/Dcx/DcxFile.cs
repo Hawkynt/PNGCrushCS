@@ -8,7 +8,7 @@ namespace FileFormat.Dcx;
 
 /// <summary>In-memory representation of a DCX (multi-page PCX) file.</summary>
 [FormatMagicBytes([0xB1, 0x68, 0xDE, 0x3A])]
-[VerifiedBy(ConformanceOracle.ImageMagick)]
+[VerifiedBy(ConformanceOracle.ImageMagick, ConformanceOracle.IrfanView)]
 public sealed class DcxFile : IImageFormatReader<DcxFile>, IImageToRawImage<DcxFile>, IImageFromRawImage<DcxFile>, IImageFormatWriter<DcxFile>, IMultiImageFileFormat<DcxFile> {
 
   static string IImageFormatMetadata<DcxFile>.PrimaryExtension => ".dcx";

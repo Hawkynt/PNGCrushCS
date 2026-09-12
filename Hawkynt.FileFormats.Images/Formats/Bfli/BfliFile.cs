@@ -38,6 +38,7 @@ namespace FileFormat.Bfli;
 /// every sample then comes out speckled.
 /// </remarks>
 [FormatMagicBytes([0xFF, 0x3B, 0x62])]
+[VerifiedBy(ConformanceOracle.XnView)]
 public readonly record struct BfliFile
   : IImageFormatReader<BfliFile>, IImageToRawImage<BfliFile>,
     IImageFromRawImage<BfliFile>, IImageFormatWriter<BfliFile> {

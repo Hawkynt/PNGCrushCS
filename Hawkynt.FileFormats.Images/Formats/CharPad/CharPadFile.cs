@@ -14,7 +14,7 @@ namespace FileFormat.CharPad;
 /// that matters: per project, per character, or per tile. The last is only possible when there are
 /// tiles at all, which is why that combination is rejected rather than defaulted.
 /// </remarks>
-[VerifiedBy(ConformanceOracle.Recoil2Png)]
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.IrfanView)]
 public readonly record struct CharPadFile
   : IImageFormatReader<CharPadFile>, IImageToRawImage<CharPadFile>,
     IImageFromRawImage<CharPadFile>, IImageFormatWriter<CharPadFile> {

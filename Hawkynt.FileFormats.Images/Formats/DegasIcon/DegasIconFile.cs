@@ -13,7 +13,7 @@ namespace FileFormat.DegasIcon;
 /// The extension is shared with the ICE character editor's output, which is binary, so the two are
 /// told apart by whether the file parses as C.
 /// </remarks>
-[VerifiedBy(ConformanceOracle.Recoil2Png)]
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.IrfanView)]
 public readonly record struct DegasIconFile
   : IImageFormatReader<DegasIconFile>, IImageToRawImage<DegasIconFile>,
     IImageFromRawImage<DegasIconFile>, IImageFormatWriter<DegasIconFile> {

@@ -1,43 +1,34 @@
-﻿using System;
+using System;
+using System.Buffers.Binary;
+using FileFormat.Core;
 
 namespace FileFormat.FliDesigner2;
 
-/// <summary>Assembles FLI Designer 2 (enhanced FLI multicolor) image file bytes from a FliDesigner2File.</summary>
+/// <summary>Assembles FLI Designer 2 (.fd2) file bytes from a <see cref="FliDesigner2File"/>.</summary>
+/// <remarks>
+/// Always the full 17409: the length is what tells the reference decoder which of the two things a
+/// .fd2 can be it is holding, so a file stopping at the last byte of the bitmap would be the other
+/// one.
+/// </remarks>
 public static class FliDesigner2Writer {
 
   public static byte[] ToBytes(FliDesigner2File file) {
-    ArgumentNullException.ThrowIfNull(file);
+    ArgumentNullException.ThrowIfNull(file.ColorRam);
+    ArgumentNullException.ThrowIfNull(file.Matrices);
+    ArgumentNullException.ThrowIfNull(file.BitmapData);
 
-    var baseSize = FliDesigner2File.LoadAddressSize
-      + FliDesigner2File.BitmapDataSize
-      + FliDesigner2File.ScreenDataSize
-      + FliDesigner2File.ColorRamSize;
+    var result = new byte[FliDesigner2File.FileSize];
+    BinaryPrimitives.WriteUInt16LittleEndian(result, file.LoadAddress);
 
-    var totalSize = baseSize + file.ExtraData.Length;
-    var result = new byte[totalSize];
-    var offset = 0;
-
-    // Load address (2 bytes, little-endian)
-    result[offset] = (byte)(file.LoadAddress & 0xFF);
-    result[offset + 1] = (byte)(file.LoadAddress >> 8);
-    offset += FliDesigner2File.LoadAddressSize;
-
-    // Bitmap data (8000 bytes)
-    file.BitmapData.AsSpan(0, FliDesigner2File.BitmapDataSize).CopyTo(result.AsSpan(offset));
-    offset += FliDesigner2File.BitmapDataSize;
-
-    // Per-scanline screen RAM (8000 bytes)
-    file.ScreenData.AsSpan(0, FliDesigner2File.ScreenDataSize).CopyTo(result.AsSpan(offset));
-    offset += FliDesigner2File.ScreenDataSize;
-
-    // Color RAM (1000 bytes)
-    file.ColorRam.AsSpan(0, FliDesigner2File.ColorRamSize).CopyTo(result.AsSpan(offset));
-    offset += FliDesigner2File.ColorRamSize;
-
-    // Extra data (variable length)
-    if (file.ExtraData.Length > 0)
-      file.ExtraData.AsSpan(0, file.ExtraData.Length).CopyTo(result.AsSpan(offset));
+    _Copy(file.ColorRam, result, FliDesigner2File.ColorRamOffset, Commodore64Fli.ColorRamSize);
+    _Copy(file.Matrices, result, FliDesigner2File.MatricesOffset, Commodore64Fli.MatrixAreaSize);
+    _Copy(file.BitmapData, result, FliDesigner2File.BitmapOffset, Commodore64Fli.BitmapSize);
+    if (file.Trailer != null)
+      _Copy(file.Trailer, result, FliDesigner2File.PictureSize, FliDesigner2File.FileSize - FliDesigner2File.PictureSize);
 
     return result;
   }
+
+  private static void _Copy(byte[] source, byte[] destination, int at, int length)
+    => source.AsSpan(0, Math.Min(source.Length, length)).CopyTo(destination.AsSpan(at));
 }

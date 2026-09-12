@@ -6,6 +6,7 @@ namespace FileFormat.Gbr;
 
 /// <summary>In-memory representation of a GIMP Brush (GBR) version 2 image.</summary>
 [FormatMagicBytes([0x47, 0x49, 0x4D, 0x50], offset: 20)]
+[VerifiedBy(ConformanceOracle.XnView)]
 public readonly record struct GbrFile : IImageFormatReader<GbrFile>, IImageToRawImage<GbrFile>, IImageFromRawImage<GbrFile>, IImageFormatWriter<GbrFile> {
 
   static string IImageFormatMetadata<GbrFile>.PrimaryExtension => ".gbr";

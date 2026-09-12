@@ -17,6 +17,7 @@ namespace FileFormat.ImnetImage;
 /// <para/>
 /// As with the other fax-derived formats here, <see cref="PixelData"/> uses a set bit for black.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.XnView)]
 public readonly record struct ImnetImageFile : IImageFormatReader<ImnetImageFile>, IImageToRawImage<ImnetImageFile>, IImageFromRawImage<ImnetImageFile>, IImageFormatWriter<ImnetImageFile> {
 
   static string IImageFormatMetadata<ImnetImageFile>.PrimaryExtension => ".imt";

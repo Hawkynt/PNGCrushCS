@@ -4,6 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.Ioca;
 
 /// <summary>In-memory representation of an IBM IOCA (Image Object Content Architecture) image.</summary>
+[VerifiedBy(ConformanceOracle.XnView)]
 public readonly record struct IocaFile : IImageFormatReader<IocaFile>, IImageToRawImage<IocaFile>, IImageFromRawImage<IocaFile>, IImageFormatWriter<IocaFile> {
 
   /// <summary>The shortest thing that can be one structured field: its header and nothing else.</summary>

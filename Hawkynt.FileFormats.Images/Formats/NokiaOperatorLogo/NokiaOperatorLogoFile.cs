@@ -4,6 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.NokiaOperatorLogo;
 
 /// <summary>In-memory representation of a Nokia Operator Logo (NOL) image.</summary>
+[VerifiedBy(ConformanceOracle.XnView)]
 public readonly record struct NokiaOperatorLogoFile : IImageFormatReader<NokiaOperatorLogoFile>, IImageToRawImage<NokiaOperatorLogoFile>, IImageFromRawImage<NokiaOperatorLogoFile>, IImageFormatWriter<NokiaOperatorLogoFile> {
 
   /// <summary>Magic bytes: "NOL" (0x4E 0x4F 0x4C).</summary>

@@ -4,6 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.Prisms;
 
 /// <summary>In-memory representation of a Prisms picture (.pri, .lff).</summary>
+[VerifiedBy(ConformanceOracle.XnView)]
 public readonly record struct PrismsFile : IImageFormatReader<PrismsFile>, IImageToRawImage<PrismsFile>, IImageFromRawImage<PrismsFile>, IImageFormatWriter<PrismsFile> {
 
   public static ReadOnlySpan<byte> Signature => [0xEB, 0xE8, 0x00, 0x00];

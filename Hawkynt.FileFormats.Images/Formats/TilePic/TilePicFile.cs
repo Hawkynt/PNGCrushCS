@@ -28,7 +28,7 @@ namespace FileFormat.TilePic;
 /// specifies nor cares" — so what settles it is the name: <c>.tjp</c> is the JPEG one, and a tile
 /// that is not a JPEG is refused rather than guessed at.
 /// </remarks>
-[VerifiedBy(ConformanceOracle.FFmpeg)]
+[VerifiedBy(ConformanceOracle.FFmpeg, ConformanceOracle.IrfanView)]
 public readonly record struct TilePicFile : IImageFormatReader<TilePicFile>, IImageToRawImage<TilePicFile>, IImageFromRawImage<TilePicFile>, IImageFormatWriter<TilePicFile> {
 
   /// <summary>The four bytes a file opens with.</summary>

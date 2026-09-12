@@ -12,7 +12,7 @@ namespace FileFormat.SaracenPaint;
 /// <para/>
 /// A multicolour screen rather than a high-resolution one: the matrix first, the bitmap after its page, the colour RAM after the bitmap, and the background register tucked into the gap behind the matrix.
 /// </remarks>
-[VerifiedBy(ConformanceOracle.Recoil2Png)]
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.IrfanView)]
 public readonly record struct SaracenPaintFile
   : IImageFormatReader<SaracenPaintFile>, IImageToRawImage<SaracenPaintFile>,
     IImageFromRawImage<SaracenPaintFile>, IImageFormatWriter<SaracenPaintFile> {

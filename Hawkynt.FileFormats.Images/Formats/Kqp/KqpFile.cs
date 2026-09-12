@@ -24,6 +24,7 @@ namespace FileFormat.Kqp;
 /// with the software decodes with lettering that is sharp to the pixel, which the wrong tables
 /// cannot produce.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.XnView)]
 public readonly record struct KqpFile
   : IImageFormatReader<KqpFile>, IImageToRawImage<KqpFile>,
     IImageFromRawImage<KqpFile>, IImageFormatWriter<KqpFile> {

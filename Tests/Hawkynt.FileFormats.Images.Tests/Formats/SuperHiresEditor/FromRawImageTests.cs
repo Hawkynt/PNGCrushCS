@@ -32,7 +32,7 @@ public sealed class FromRawImageTests {
     var bytes = SuperHiresEditorWriter.ToBytes(_Encode<SuperHiresEditorFile>(source));
     var decoded = SuperHiresEditorFile.ToRawImage(SuperHiresEditorReader.FromBytes(bytes));
 
-    Assert.That(decoded.PixelData, Is.EqualTo(source.PixelData));
+    Assert.That(PixelConverter.Convert(decoded, PixelFormat.Rgb24).PixelData, Is.EqualTo(source.PixelData));
   }
 
   [Test]

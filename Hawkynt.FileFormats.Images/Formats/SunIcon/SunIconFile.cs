@@ -13,6 +13,7 @@ namespace FileFormat.SunIcon;
 /// </remarks>
 [FormatMagicBytes([0x2F, 0x2A, 0x20, 0x46, 0x6F, 0x72, 0x6D, 0x61, 0x74, 0x5F, 0x76, 0x65, 0x72, 0x73, 0x69, 0x6F, 0x6E, 0x3D])]
 [FormatMimeType("image/x-sun-icon")]
+[VerifiedBy(ConformanceOracle.XnView)]
 public readonly record struct SunIconFile : IImageFormatReader<SunIconFile>, IImageToRawImage<SunIconFile>, IImageFromRawImage<SunIconFile>, IImageFormatWriter<SunIconFile> {
 
   static string IImageFormatMetadata<SunIconFile>.PrimaryExtension => ".icon";

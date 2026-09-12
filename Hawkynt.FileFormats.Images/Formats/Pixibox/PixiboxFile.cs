@@ -22,6 +22,7 @@ namespace FileFormat.Pixibox;
 /// the pixels that were put in, byte for byte, on every one of them — including the zero-count case,
 /// which was checked on its own.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.XnView)]
 public readonly record struct PixiboxFile : IImageFormatReader<PixiboxFile>, IImageToRawImage<PixiboxFile>, IImageFromRawImage<PixiboxFile>, IImageFormatWriter<PixiboxFile> {
 
   /// <summary>The twelve bytes every file opens with.</summary>

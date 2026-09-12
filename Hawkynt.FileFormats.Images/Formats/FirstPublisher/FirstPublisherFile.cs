@@ -10,6 +10,7 @@ namespace FileFormat.FirstPublisher;
 /// bilevel format gets: two sizes and the rows, with a zero word before each size that the format
 /// never used for anything.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.XnView)]
 public readonly record struct FirstPublisherFile : IImageFormatReader<FirstPublisherFile>, IImageToRawImage<FirstPublisherFile>, IImageFromRawImage<FirstPublisherFile>, IImageFormatWriter<FirstPublisherFile> {
 
   static string IImageFormatMetadata<FirstPublisherFile>.PrimaryExtension => ".art";

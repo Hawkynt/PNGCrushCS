@@ -1,15 +1,17 @@
 using System;
+using System.Buffers.Binary;
 using System.IO;
+using FileFormat.Core;
 
 namespace FileFormat.Ffli;
 
-/// <summary>Reads Full FLI (.ffli) files from bytes, streams, or file paths.</summary>
+/// <summary>Reads Flash FLI (.ffl, .ffli) files from bytes, streams, or file paths.</summary>
 public static class FfliReader {
 
   public static FfliFile FromFile(FileInfo file) {
     ArgumentNullException.ThrowIfNull(file);
     if (!file.Exists)
-      throw new FileNotFoundException("FFLI file not found.", file.FullName);
+      throw new FileNotFoundException("Flash FLI file not found.", file.FullName);
 
     return FromBytes(File.ReadAllBytes(file.FullName));
   }
@@ -21,26 +23,30 @@ public static class FfliReader {
       stream.ReadExactly(data);
       return FromBytes(data);
     }
+
     using var ms = new MemoryStream();
     stream.CopyTo(ms);
     return FromBytes(ms.ToArray());
   }
 
   public static FfliFile FromSpan(ReadOnlySpan<byte> data) {
+    if (data.Length < FfliFile.FileSize)
+      throw new InvalidDataException(
+        $"A Flash FLI picture takes {FfliFile.FileSize} bytes; this file is {data.Length}.");
 
-    if (data.Length < FfliFile.LoadAddressSize + FfliFile.MinPayloadSize)
-      throw new InvalidDataException($"Data too small for a valid FFLI file (expected at least {FfliFile.LoadAddressSize + FfliFile.MinPayloadSize} bytes, got {data.Length}).");
-
-    var loadAddress = (ushort)(data[0] | (data[1] << 8));
-
-    var rawData = new byte[data.Length - FfliFile.LoadAddressSize];
-    data.Slice(FfliFile.LoadAddressSize, rawData.Length).CopyTo(rawData.AsSpan(0));
+    if (data[FfliFile.SignatureOffset] != FfliFile.Signature)
+      throw new InvalidDataException("A Flash FLI names itself with a lower-case f in its third byte; this file does not.");
 
     return new() {
-      LoadAddress = loadAddress,
-      RawData = rawData,
+      LoadAddress = BinaryPrimitives.ReadUInt16LittleEndian(data),
+      FirstBackgrounds = data.Slice(FfliFile.FirstBackgroundsOffset, FfliFile.FixedHeight).ToArray(),
+      ColorRam = data.Slice(FfliFile.ColorRamOffset, Commodore64Fli.ColorRamSize).ToArray(),
+      FirstMatrices = data.Slice(FfliFile.FirstMatricesOffset, Commodore64Fli.MatrixAreaSize).ToArray(),
+      BitmapData = data.Slice(FfliFile.BitmapOffset, Commodore64Fli.BitmapSize).ToArray(),
+      SecondMatrices = data.Slice(FfliFile.SecondMatricesOffset, Commodore64Fli.MatrixAreaSize).ToArray(),
+      SecondBackgrounds = data.Slice(FfliFile.SecondBackgroundsOffset, FfliFile.FixedHeight).ToArray(),
     };
-    }
+  }
 
   public static FfliFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

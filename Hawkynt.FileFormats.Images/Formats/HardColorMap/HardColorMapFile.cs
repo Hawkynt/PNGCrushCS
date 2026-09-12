@@ -14,7 +14,7 @@ namespace FileFormat.HardColorMap;
 /// happen to cover it and on the priority register's ranking of them, so the only way to know is to
 /// run the chip.
 /// </remarks>
-[VerifiedBy(ConformanceOracle.Recoil2Png)]
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.IrfanView)]
 public readonly record struct HardColorMapFile
   : IImageFormatReader<HardColorMapFile>, IImageToRawImage<HardColorMapFile>,
     IImageFromRawImage<HardColorMapFile>, IImageFormatWriter<HardColorMapFile> {

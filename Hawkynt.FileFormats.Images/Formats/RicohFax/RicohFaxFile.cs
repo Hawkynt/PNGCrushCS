@@ -21,6 +21,7 @@ namespace FileFormat.RicohFax;
 /// reports one fewer for a page that ends without one. Everything this writes ends with the separator,
 /// so the two agree on anything written here and on any page that ends the way a fax page ends.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.XnView)]
 public readonly record struct RicohFaxFile
   : IImageFormatReader<RicohFaxFile>, IImageToRawImage<RicohFaxFile>,
     IImageFromRawImage<RicohFaxFile>, IImageFormatWriter<RicohFaxFile> {

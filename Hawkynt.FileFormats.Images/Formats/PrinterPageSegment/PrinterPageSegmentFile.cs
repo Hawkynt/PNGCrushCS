@@ -23,6 +23,7 @@ namespace FileFormat.PrinterPageSegment;
 /// reach stays white rather than black — and the fill rectangle a cell position may carry writes
 /// paper too, clearing what an earlier cell put there.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.XnView)]
 public readonly record struct PrinterPageSegmentFile : IImageFormatReader<PrinterPageSegmentFile>, IImageToRawImage<PrinterPageSegmentFile>, IImageFromRawImage<PrinterPageSegmentFile>, IImageFormatWriter<PrinterPageSegmentFile> {
 
   static string IImageFormatMetadata<PrinterPageSegmentFile>.PrimaryExtension => ".pse";

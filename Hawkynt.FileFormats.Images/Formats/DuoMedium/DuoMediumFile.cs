@@ -12,7 +12,7 @@ namespace FileFormat.DuoMedium;
 /// Medium resolution halves the vertical resolution as well, so every stored row is drawn on two
 /// scanlines and a 273-row picture is 546 scanlines tall.
 /// </remarks>
-[VerifiedBy(ConformanceOracle.Recoil2Png)]
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.IrfanView)]
 public readonly record struct DuoMediumFile
   : IImageFormatReader<DuoMediumFile>, IImageToRawImage<DuoMediumFile>,
     IImageFromRawImage<DuoMediumFile>, IImageFormatWriter<DuoMediumFile> {

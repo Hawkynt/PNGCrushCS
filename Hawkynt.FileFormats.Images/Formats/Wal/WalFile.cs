@@ -4,6 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.Wal;
 
 /// <summary>In-memory representation of a WAL (Quake 2 Texture) file.</summary>
+[VerifiedBy(ConformanceOracle.XnView)]
 public readonly record struct WalFile : IImageFormatReader<WalFile>, IImageToRawImage<WalFile>, IImageFromRawImage<WalFile>, IImageFormatWriter<WalFile> {
 
   static string IImageFormatMetadata<WalFile>.PrimaryExtension => ".wal";

@@ -14,7 +14,7 @@ namespace FileFormat.AtariHr2;
 /// the hue of the playfield register and only the luminance of the other, so the two colours are
 /// always shades of one.
 /// </remarks>
-[VerifiedBy(ConformanceOracle.Recoil2Png)]
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.IrfanView)]
 public readonly record struct AtariHr2File
   : IImageFormatReader<AtariHr2File>, IImageToRawImage<AtariHr2File>,
     IImageFromRawImage<AtariHr2File>, IImageFormatWriter<AtariHr2File> {

@@ -11,6 +11,7 @@ namespace FileFormat.Xar;
 /// <see cref="TagNodeBitmap"/> are actual editable objects in the document. The writer uses that
 /// standards-defined bitmap-object subset rather than fabricating a thumbnail-only file.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.IrfanView)]
 public readonly record struct XarFile :
   IImageFormatReader<XarFile>, IImageToRawImage<XarFile>, IImageFromRawImage<XarFile>, IImageFormatWriter<XarFile> {
 

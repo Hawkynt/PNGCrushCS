@@ -30,6 +30,7 @@ namespace FileFormat.UyvyRaw;
 /// Both names claim this extension, so the progressive reading is the one taken, that being what the
 /// four letters mean everywhere they name a capture buffer.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.XnView)]
 public readonly record struct UyvyRawFile
   : IImageFormatReader<UyvyRawFile>, IImageToRawImage<UyvyRawFile>,
     IImageFromRawImage<UyvyRawFile>, IImageFormatWriter<UyvyRawFile> {

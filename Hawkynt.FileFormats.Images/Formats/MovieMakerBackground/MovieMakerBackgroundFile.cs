@@ -9,7 +9,7 @@ namespace FileFormat.MovieMakerBackground;
 /// bytes in the order the pixel values use them — background first, then PF0, PF1 and PF2 — and
 /// finally twelve unused bytes. The 160x96 logical pixels are displayed at 320x192.
 /// </remarks>
-[VerifiedBy(ConformanceOracle.Recoil2Png)]
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.IrfanView)]
 public readonly record struct MovieMakerBackgroundFile
   : IImageFormatReader<MovieMakerBackgroundFile>, IImageToRawImage<MovieMakerBackgroundFile>,
     IImageFromRawImage<MovieMakerBackgroundFile>, IImageFormatWriter<MovieMakerBackgroundFile> {

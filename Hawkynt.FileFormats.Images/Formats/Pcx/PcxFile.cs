@@ -6,7 +6,7 @@ namespace FileFormat.Pcx;
 /// <summary>In-memory representation of a PCX image.</summary>
 [FormatDetectionPriority(999)]
 [FormatMimeType("image/x-pcx", "image/vnd.zbrush.pcx", "image/pcx")]
-[VerifiedBy(ConformanceOracle.ImageMagick, ConformanceOracle.FFmpeg)]
+[VerifiedBy(ConformanceOracle.ImageMagick, ConformanceOracle.FFmpeg, ConformanceOracle.IrfanView)]
 public readonly record struct PcxFile : IImageFormatReader<PcxFile>, IImageToRawImage<PcxFile>, IImageFromRawImage<PcxFile>, IImageFormatWriter<PcxFile> {
 
   static string IImageFormatMetadata<PcxFile>.PrimaryExtension => ".pcx";

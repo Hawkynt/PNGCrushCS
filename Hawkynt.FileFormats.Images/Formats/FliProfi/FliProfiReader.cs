@@ -1,5 +1,7 @@
 using System;
+using System.Buffers.Binary;
 using System.IO;
+using FileFormat.Core;
 
 namespace FileFormat.FliProfi;
 
@@ -21,26 +23,29 @@ public static class FliProfiReader {
       stream.ReadExactly(data);
       return FromBytes(data);
     }
+
     using var ms = new MemoryStream();
     stream.CopyTo(ms);
     return FromBytes(ms.ToArray());
   }
 
   public static FliProfiFile FromSpan(ReadOnlySpan<byte> data) {
-
-    if (data.Length < FliProfiFile.LoadAddressSize + FliProfiFile.MinPayloadSize)
-      throw new InvalidDataException($"Data too small for a valid FLI Profi file (expected at least {FliProfiFile.LoadAddressSize + FliProfiFile.MinPayloadSize} bytes, got {data.Length}).");
-
-    var loadAddress = (ushort)(data[0] | (data[1] << 8));
-
-    var rawData = new byte[data.Length - FliProfiFile.LoadAddressSize];
-    data.Slice(FliProfiFile.LoadAddressSize, rawData.Length).CopyTo(rawData.AsSpan(0));
+    if (data.Length < FliProfiFile.FileSize)
+      throw new InvalidDataException(
+        $"A FLI Profi picture takes {FliProfiFile.FileSize} bytes; this file is {data.Length}.");
 
     return new() {
-      LoadAddress = loadAddress,
-      RawData = rawData,
+      LoadAddress = BinaryPrimitives.ReadUInt16LittleEndian(data),
+      Sprites = data.Slice(FliProfiFile.SpritesOffset, FliProfiFile.SpriteBlockCount * FliProfiFile.SpriteBlockSize).ToArray(),
+      SpriteColors = data.Slice(FliProfiFile.SpriteColorsOffset, FliProfiFile.FixedHeight).ToArray(),
+      BorderColors = data.Slice(FliProfiFile.BorderColorsOffset, FliProfiFile.FixedHeight).ToArray(),
+      FirstSpriteMulticolor = data[FliProfiFile.FirstSpriteMulticolorOffset],
+      SecondSpriteMulticolor = data[FliProfiFile.SecondSpriteMulticolorOffset],
+      ColorRam = data.Slice(FliProfiFile.ColorRamOffset, Commodore64Fli.ColorRamSize).ToArray(),
+      Matrices = data.Slice(FliProfiFile.MatricesOffset, Commodore64Fli.MatrixAreaSize).ToArray(),
+      BitmapData = data.Slice(FliProfiFile.BitmapOffset, Commodore64Fli.BitmapSize).ToArray(),
     };
-    }
+  }
 
   public static FliProfiFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

@@ -13,6 +13,7 @@ namespace FileFormat.IbmKips;
 /// The size being height-then-width rather than the other way about is the only thing here worth
 /// being careful of; a 320 by 200 picture states 200 first.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.XnView)]
 public readonly record struct IbmKipsFile
   : IImageFormatReader<IbmKipsFile>, IImageToRawImage<IbmKipsFile>,
     IImageFromRawImage<IbmKipsFile>, IImageFormatWriter<IbmKipsFile> {

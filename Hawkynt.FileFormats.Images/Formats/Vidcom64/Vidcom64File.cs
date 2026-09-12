@@ -4,7 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.Vidcom64;
 
 /// <summary>In-memory representation of a Commodore 64 Vidcom 64 multicolor image.</summary>
-[VerifiedBy(ConformanceOracle.Recoil2Png)]
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.IrfanView)]
 public readonly record struct Vidcom64File : IImageFormatReader<Vidcom64File>, IImageToRawImage<Vidcom64File>, IImageFromRawImage<Vidcom64File>, IImageFormatWriter<Vidcom64File> {
 
   static string IImageFormatMetadata<Vidcom64File>.PrimaryExtension => ".vid";

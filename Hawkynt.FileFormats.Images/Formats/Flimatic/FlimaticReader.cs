@@ -1,9 +1,11 @@
 using System;
+using System.Buffers.Binary;
 using System.IO;
+using FileFormat.Core;
 
 namespace FileFormat.Flimatic;
 
-/// <summary>Reads Commodore 64 Flimatic (.flm) files from bytes, streams, or file paths.</summary>
+/// <summary>Reads Flimatic (.flm) files from bytes, streams, or file paths.</summary>
 public static class FlimaticReader {
 
   public static FlimaticFile FromFile(FileInfo file) {
@@ -21,26 +23,26 @@ public static class FlimaticReader {
       stream.ReadExactly(data);
       return FromBytes(data);
     }
+
     using var ms = new MemoryStream();
     stream.CopyTo(ms);
     return FromBytes(ms.ToArray());
   }
 
   public static FlimaticFile FromSpan(ReadOnlySpan<byte> data) {
-
-    if (data.Length < FlimaticFile.LoadAddressSize + FlimaticFile.MinPayloadSize)
-      throw new InvalidDataException($"Data too small for a valid Flimatic file (expected at least {FlimaticFile.LoadAddressSize + FlimaticFile.MinPayloadSize} bytes, got {data.Length}).");
-
-    var loadAddress = (ushort)(data[0] | (data[1] << 8));
-
-    var rawData = new byte[data.Length - FlimaticFile.LoadAddressSize];
-    data.Slice(FlimaticFile.LoadAddressSize, rawData.Length).CopyTo(rawData.AsSpan(0));
+    if (data.Length < FlimaticFile.FileSize)
+      throw new InvalidDataException(
+        $"A Flimatic picture takes {FlimaticFile.FileSize} bytes; this file is {data.Length}.");
 
     return new() {
-      LoadAddress = loadAddress,
-      RawData = rawData,
+      LoadAddress = BinaryPrimitives.ReadUInt16LittleEndian(data),
+      ColorRam = data.Slice(FlimaticFile.ColorRamOffset, Commodore64Fli.ColorRamSize).ToArray(),
+      Matrices = data.Slice(FlimaticFile.MatricesOffset, Commodore64Fli.MatrixAreaSize).ToArray(),
+      BitmapData = data.Slice(FlimaticFile.BitmapOffset, Commodore64Fli.BitmapSize).ToArray(),
+      Background = data[FlimaticFile.BackgroundOffset],
+      Trailer = data.Slice(FlimaticFile.PictureSize, FlimaticFile.FileSize - FlimaticFile.PictureSize).ToArray(),
     };
-    }
+  }
 
   public static FlimaticFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

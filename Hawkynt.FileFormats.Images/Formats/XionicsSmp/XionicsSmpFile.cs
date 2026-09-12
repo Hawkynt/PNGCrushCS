@@ -24,6 +24,7 @@ namespace FileFormat.XionicsSmp;
 /// vendor's own; neither is decoded here, and both are refused by name rather than drawn as something
 /// else, because there is no file of either to check a reading against.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.XnView)]
 public readonly record struct XionicsSmpFile : IImageFormatReader<XionicsSmpFile>, IImageToRawImage<XionicsSmpFile>, IImageFromRawImage<XionicsSmpFile>, IImageFormatWriter<XionicsSmpFile> {
 
   /// <summary>The fourteen bytes the file opens with.</summary>

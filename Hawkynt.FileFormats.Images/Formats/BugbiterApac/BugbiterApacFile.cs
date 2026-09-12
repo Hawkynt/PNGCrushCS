@@ -16,7 +16,7 @@ namespace FileFormat.BugbiterApac;
 /// rows sit eighty bytes apart. The file also carries a text comment of its own length, which is
 /// why everything after the header moves.
 /// </remarks>
-[VerifiedBy(ConformanceOracle.Recoil2Png)]
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.IrfanView)]
 public readonly record struct BugbiterApacFile
   : IImageFormatReader<BugbiterApacFile>, IImageToRawImage<BugbiterApacFile>,
     IImageFromRawImage<BugbiterApacFile>, IImageFormatWriter<BugbiterApacFile> {
