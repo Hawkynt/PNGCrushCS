@@ -95,6 +95,24 @@ internal static class H265CabacContexts {
   /// </param>
   /// <param name="initType">0 for an intra slice, 1 and 2 for the two predicted flavours.</param>
   /// <param name="sliceQpY">The slice's quantiser, which is what the tabulated line is evaluated at.</param>
+  /// <summary>
+  /// Which of the three initialisation columns a slice starts from — clause 9.3.2.2.
+  /// </summary>
+  /// <remarks>
+  /// An intra slice has its own; a predicted and a bidirectional slice share the other two and may
+  /// swap them, which is what <c>cabac_init_flag</c> says. A bidirectional slice at the top of a
+  /// prediction pyramid behaves like a predicted one, and that is the swap it is for.
+  /// <para/>
+  /// Both directions of the coder derive it here. Picking the wrong column does not fail: every bin
+  /// still decodes, from probabilities tuned for a different kind of slice, and the picture is wrong
+  /// in a way nothing reports.
+  /// </remarks>
+  internal static int InitializationType(H265SliceType sliceType, bool cabacInitFlag) => sliceType switch {
+    H265SliceType.I => 0,
+    H265SliceType.P => cabacInitFlag ? 2 : 1,
+    _ => cabacInitFlag ? 1 : 2,
+  };
+
   internal static void Initialize(byte[] states, int initType, int sliceQpY) {
     var values = _InitialValues[initType];
     var qp = Math.Clamp(sliceQpY, 0, 51);
@@ -235,8 +253,8 @@ internal static class H265CabacContexts {
         169, 194, 166, 167, 154, 167, 137, 182,
       ],
       [
-        154, 196, 167, 167, 154, 152, 167, 182, 182, 134, 149, 136, 153, 121, 136, 137,
-        169, 208, 166, 167, 154, 167, 137, 182,
+        154, 196, 167, 167, 154, 152, 167, 182, 182, 134, 149, 136, 153, 121, 136, 122,
+        169, 208, 166, 167, 154, 152, 167, 182,
       ]);
 
     // Table 9-31: four luma contexts and two chroma ones.

@@ -2082,15 +2082,37 @@ Also refused by name: tiles, dependent slice segments, coding units coded as raw
 content, multilayer and three-dimensional extensions. There is no `catch` anywhere that returns a
 blank, a copied or a partial frame.
 
-**Encoding writes independent IDR pictures made of PCM coding units, and no inter pictures at all.**
-That is a statement about what exists in this package rather than a coding preference. A PCM coding
-unit stores its samples exactly and needs no transform, no quantiser and no residual syntax; what it
-does need from CABAC is a handful of flags in a fixed pattern, which the still-picture core already
-writes. An inter picture needs the rest: prediction units, motion vector differences, a transform
-tree, quantised residuals — and every one of those goes through CABAC as arithmetic-coded bins. The
-CABAC engine here **decodes only**. There is no `EncodeBin` to write them with, and adding one means
-building the arithmetic coder, the residual syntax and the rate-distortion decisions behind it: an
-HEVC encoder, not a change to this writer. It is left undone and said so rather than approximated.
+**Encoding writes a group of twelve: one IDR picture, then eleven predicted ones.** The IDR is made
+of PCM coding units, which store their samples exactly and need no transform, quantiser or residual
+syntax. The eleven after it are ordinary inter coding units, and getting there meant building the
+half of the coder that was missing.
+
+The CABAC engine used to **decode only**. Writing a prediction unit, a motion vector difference or a
+quantised coefficient means producing arbitrary bins, so the arithmetic *encoder* came first, sharing
+its probability tables with the decoder so the two cannot hold different numbers. Carry propagation
+is the part the decode direction has no counterpart for: adding to the low end of the interval can
+reach bits decided thousands of bins ago, so a byte of all ones is held back until a byte that can
+absorb a carry settles it. On top of that sit the residual writer — a mirror of the reader, pass for
+pass and context for context, because the contexts are derived from what has already been coded — and
+the forward transform and quantiser, which are the inverses of the normative ones.
+
+**A motion vector is never sent whole**, and that decided the shape of the encoder. What the
+bitstream carries is a merge index, or a difference against a predictor, and both are derived from
+the neighbouring blocks. An encoder cannot say what to write until it knows what the decoder will
+predict, and the only safe way to know is to run the decoder's own derivation — a second copy of
+clause 8.5.3.2 would produce a stream that decodes cleanly to the wrong samples whenever the two
+disagreed, with nothing in the stream to say so. So `H265MotionPrediction` and
+`H265MotionCompensation` now run against an interface the frame decoder and the picture encoder both
+implement, and the encoder predicts with the decoder's own code.
+
+The reconstruction is built as the picture is coded, because the next picture predicts from what a
+decoder will have rather than from the source. Deblocking and sample-adaptive offset are switched off
+in the parameter sets, which costs a little quality at block edges and means the encoder does not
+have to run the filters to stay in step.
+
+What the writer does not do: bidirectional pictures, fractional-sample motion, more than one
+reference picture, more than one prediction unit per coding unit, and any rate-distortion search over
+coding unit sizes. Each of those costs compression; none of them costs conformance.
 
 What the writer does produce is ordinary Main profile, not Main Still Picture — the still profile
 permits one picture and a video track is not one picture — with VPS, SPS and PPS carried in an
@@ -2100,11 +2122,18 @@ show is the 4:2:0 conversion an RGB source went through; a 4:2:0 source comes ba
 dimensions are refused rather than quietly rounded, because rounding them changes the display
 geometry the caller asked for.
 
-Verification runs outward as well as in a circle: a six-picture clip is muxed and decoded by
-**ffmpeg** with every frame compared. Every picture being independent means a multi-picture clip
-tests the packaging rather than the coding — the configuration record, the length prefixes, and that
-picture two is where the container says it is — and PCM's exactness makes that comparison tight
-rather than nominal.
+Verification runs outward as well as in a circle. The arithmetic encoder and the residual writer are
+held against the reader they have to agree with — over blocks that reach the corners of the syntax,
+and asserting that both directions end with the same context states, not merely the same values,
+because a coder that agreed on the bins but diverged on the states would pass a shorter test and fail
+on the first slice long enough to matter. A predicted and a bidirectional picture are then
+coded and handed to **this package's own decoder**, whose reconstruction has to match the encoder's
+sample for sample -- not closely, exactly, because the encoder predicts the next picture from its
+reconstruction and the decoder from theirs, and a difference of one sample is drift. Finally a
+twenty-four-picture clip crossing two group boundaries goes to **ffmpeg** as a raw byte stream and
+every frame is compared in display order. The two checks answer different questions: ours says the
+two halves of this package agree, ffmpeg's says they are both right -- which is what caught the
+Table 9-30 transcription above. Displacing one written vector by a single sample fails either.
 
 ### CamStudio Screen Codec
 
