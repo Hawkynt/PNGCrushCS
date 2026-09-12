@@ -17,9 +17,9 @@ public sealed class SdgReaderTests {
     var second = _Image(0x50);
     var plain = _Object(BmpWriter.ToBytes(BmpFile.FromRawImage(first)));
     var compressed = _Object(_ZCompressedBmp(BmpWriter.ToBytes(BmpFile.FromRawImage(second))));
-    var data = new byte[plain.Length + 7 + compressed.Length];
+    var data = new byte[plain.Length + compressed.Length];
     plain.CopyTo(data, 0);
-    compressed.CopyTo(data, plain.Length + 7);
+    compressed.CopyTo(data, plain.Length);
 
     var file = SdgReader.FromSpan(data);
 
@@ -32,6 +32,26 @@ public sealed class SdgReaderTests {
 
   [Test]
   [Category("Unit")]
+  public void FromSpan_GarbageBetweenObjects_IsRefusedInsteadOfByteScanned() {
+    var first = _Object(BmpWriter.ToBytes(BmpFile.FromRawImage(_Image(0x10))));
+    var second = _Object(BmpWriter.ToBytes(BmpFile.FromRawImage(_Image(0x50))));
+    var data = new byte[first.Length + 7 + second.Length];
+    first.CopyTo(data, 0);
+    second.CopyTo(data, first.Length + 7);
+
+    Assert.That(() => SdgReader.FromSpan(data), Throws.TypeOf<InvalidDataException>());
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void FromSpan_TruncatedBitmapTrailer_IsRefused() {
+    var data = _Object(BmpWriter.ToBytes(BmpFile.FromRawImage(_Image(0x20))));
+
+    Assert.That(() => SdgReader.FromSpan(data[..^1]), Throws.TypeOf<InvalidDataException>());
+  }
+
+  [Test]
+  [Category("Unit")]
   public void FromSpan_Sga3WithoutBitmapFlag_IsRefused() {
     var data = _Object(BmpWriter.ToBytes(BmpFile.FromRawImage(_Image(0x20))));
     data[10] = 0;
@@ -40,7 +60,9 @@ public sealed class SdgReaderTests {
   }
 
   private static byte[] _Object(byte[] bmp) {
-    var result = new byte[11 + bmp.Length];
+    // SgaObjectBmp v5: common 11-byte header, BitmapEx, empty URL, ten legacy fields,
+    // an empty compatibility string and an empty UTF-8 title.
+    var result = new byte[11 + bmp.Length + 16];
     result[0] = (byte)'S'; result[1] = (byte)'G'; result[2] = (byte)'A'; result[3] = (byte)'3';
     BinaryPrimitives.WriteUInt16LittleEndian(result.AsSpan(4), 4);
     BinaryPrimitives.WriteUInt16LittleEndian(result.AsSpan(6), 5);
@@ -63,6 +85,7 @@ public sealed class SdgReaderTests {
 
     var result = new byte[bodyAt + 12 + coded.Length];
     bmp.AsSpan(0, bodyAt).CopyTo(result);
+    BinaryPrimitives.WriteUInt32LittleEndian(result.AsSpan(2), checked((uint)result.Length));
     BinaryPrimitives.WriteUInt32LittleEndian(result.AsSpan(30), zCompress);
     BinaryPrimitives.WriteUInt32LittleEndian(result.AsSpan(bodyAt), checked((uint)coded.Length));
     BinaryPrimitives.WriteUInt32LittleEndian(result.AsSpan(bodyAt + 4), checked((uint)uncoded.Length));

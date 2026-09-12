@@ -4,42 +4,47 @@ using FileFormat.Core;
 
 namespace FileFormat.Codecs.Tests;
 
-/// <summary>
-/// The avui decoder, on rows built here byte by byte.
-/// </summary>
-/// <remarks>
-/// The decoder as a whole was measured against ffmpeg's own encoder over both geometries it ever
-/// writes — 720x486 and 720x576 — and fifty frames of pseudo-random content each, comparing
-/// <see cref="AvuiVideoDecoder.DecodePlanes"/> against ffmpeg's own raw <c>uyvy422</c> output of the
-/// same content: every sample of every plane of every frame identical, and the header bytes ahead of
-/// the picture all zero in every one of the hundred frames measured. What these tests pin down is the
-/// packing and the header skip themselves, since that comparison alone does not say which byte of a
-/// group is which sample or how large the header is at each geometry.
-/// </remarks>
+/// <summary>AVUI packets built independently at the byte offsets the reference decoder consumes.</summary>
 [TestFixture]
 public class AvuiVideoDecoderTests {
 
   private static readonly CodecTag _Avui = CodecTag.FromCharacters("AVUI");
+  private const int _Width = 720;
 
-  private static MediaStreamInfo _Stream(int width, int height, CodecTag? codec = null) => new() {
-    Index = 0,
-    Kind = MediaStreamKind.Video,
-    Codec = codec ?? _Avui,
-    Width = width,
-    Height = height,
-  };
+  private static MediaStreamInfo _Stream(
+    int width,
+    int height,
+    CodecTag? codec = null,
+    int depth = AvuiVideoFormat.OpaqueDepth,
+    ReadOnlyMemory<byte> privateData = default) => new() {
+      Index = 0,
+      Kind = MediaStreamKind.Video,
+      Codec = codec ?? _Avui,
+      Width = width,
+      Height = height,
+      BitsPerPixel = depth,
+      CodecPrivateData = privateData,
+    };
+
+  private static byte[] _Aprg(bool interlaced) {
+    var result = new byte[24];
+    result[3] = 24;
+    "APRGAPRG0001"u8.CopyTo(result.AsSpan(4));
+    result[19] = interlaced ? (byte)2 : (byte)1;
+    return result;
+  }
 
   [Test]
   [Category("Unit")]
   public void AcceptsTheAvuiTagIgnoringCase() {
-    Assert.That(AvuiVideoDecoder.Accepts(_Stream(720, 486)), Is.True);
-    Assert.That(AvuiVideoDecoder.Accepts(_Stream(720, 486, CodecTag.FromCharacters("avui"))), Is.True);
+    Assert.That(AvuiVideoDecoder.Accepts(_Stream(_Width, 486)), Is.True);
+    Assert.That(AvuiVideoDecoder.Accepts(_Stream(_Width, 486, CodecTag.FromCharacters("avui"))), Is.True);
   }
 
   [Test]
   [Category("Unit")]
   public void RefusesAnythingElse() {
-    Assert.That(AvuiVideoDecoder.Accepts(_Stream(720, 486, CodecTag.FromCharacters("avrp"))), Is.False);
+    Assert.That(AvuiVideoDecoder.Accepts(_Stream(_Width, 486, CodecTag.FromCharacters("avrp"))), Is.False);
   }
 
   [Test]
@@ -49,87 +54,167 @@ public class AvuiVideoDecoderTests {
     Assert.That(failure!.Message, Does.Contain("0x486"));
   }
 
-  [Test]
+  [TestCase(_Width, 486)]
+  [TestCase(_Width, 576)]
   [Category("Unit")]
-  public void AcceptsTheNtscGeometry() {
-    Assert.That(() => AvuiVideoDecoder.Create(_Stream(720, 486)), Throws.Nothing);
+  public void AcceptsTheTwoD1Geometries(int width, int height) {
+    Assert.That(() => AvuiVideoDecoder.Create(_Stream(width, height)), Throws.Nothing);
   }
 
   [Test]
   [Category("Unit")]
-  public void AcceptsThePalGeometry() {
-    Assert.That(() => AvuiVideoDecoder.Create(_Stream(720, 576)), Throws.Nothing);
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void RefusesAGeometryNeitherStandardWrites() {
-    // avui's own encoder refuses every width and height but the two SD standards, and there is no
-    // real stream to say what a header of any other size would mean.
-    var failure = Assert.Throws<NotSupportedException>(() => AvuiVideoDecoder.Create(_Stream(720, 480)));
+  public void RefusesAGeometryOutsideTheTwoD1Standards() {
+    var failure = Assert.Throws<NotSupportedException>(() => AvuiVideoDecoder.Create(_Stream(_Width, 480)));
     Assert.That(failure!.Message, Does.Contain("720x480"));
   }
 
-  // ============================================================================================
-  // The packing: one row is Cb(0), Y(0), Cr(0), Y(1), repeating — ordinary uyvy422
-  // ============================================================================================
-
   [Test]
   [Category("Unit")]
-  public void DecodesTheFirstFourColumnsOfARowAfterTheHeader() {
-    // Y = 101..104, Cb = 201, 203, Cr = 151, 153, packed as ffmpeg's own encoder writes uyvy422:
-    // Cb(0), Y(0), Cr(0), Y(1), Cb(1), Y(2), Cr(1), Y(3). NTSC's geometry is fixed at 720 columns, so
-    // the first row's leading eight bytes are what this test pins down and the rest of the picture is
-    // filled with an arbitrary but complete payload behind them.
-    var packet = new byte[14_400 + 720 * 2 * 486];
-    var row = new byte[] { 201, 101, 151, 102, 203, 103, 153, 104 };
-    row.CopyTo(packet, 14_400);
-    var decoder = AvuiVideoDecoder.Create(_Stream(720, 486));
+  public void ProgressiveNtscStartsAfterTwoHalfBlankingRuns() {
+    const int skip = 10;
+    var packet = new byte[2 * _Width * (486 + skip)];
+    var firstRow = 2 * _Width * skip;
+    new byte[] { 201, 101, 151, 102, 203, 103, 153, 104 }.CopyTo(packet, firstRow);
 
+    var decoder = AvuiVideoDecoder.Create(_Stream(_Width, 486, privateData: _Aprg(interlaced: false)));
     var (luma, cb, cr) = decoder.DecodePlanes(packet);
 
-    Assert.That(luma[..4], Is.EqualTo(new byte[] { 101, 102, 103, 104 }));
-    Assert.That(cb[..2], Is.EqualTo(new byte[] { 201, 203 }));
-    Assert.That(cr[..2], Is.EqualTo(new byte[] { 151, 153 }));
+    Assert.Multiple(() => {
+      Assert.That(luma[..4], Is.EqualTo(new byte[] { 101, 102, 103, 104 }));
+      Assert.That(cb[..2], Is.EqualTo(new byte[] { 201, 203 }));
+      Assert.That(cr[..2], Is.EqualTo(new byte[] { 151, 153 }));
+    });
   }
 
   [Test]
   [Category("Unit")]
-  public void TheHeaderIsTenLinesAtNtscAndSixteenAtPal() {
-    // A packet exactly the header plus the whole picture is complete; one byte short of it is not.
-    var ntscHeader = 720 * 2 * 10;
-    var palHeader = 720 * 2 * 16;
+  public void InterlacedNtscStoresTheOddFieldBeforeTheEvenField() {
+    const int height = 486;
+    const int halfBlank = _Width * 10;
+    const int fieldPayload = _Width * height;
+    var opaqueLength = 2 * _Width * (height + 10) + 4;
+    var packet = new byte[opaqueLength];
 
-    var ntsc = AvuiVideoDecoder.Create(_Stream(720, 486));
-    Assert.That(() => ntsc.DecodePlanes(new byte[ntscHeader + 720 * 2 * 486]), Throws.Nothing);
-    Assert.That(() => ntsc.DecodePlanes(new byte[ntscHeader + 720 * 2 * 486 - 1]), Throws.TypeOf<InvalidDataException>());
+    // Field zero is displayed on row 1 for 486-line NTSC.
+    new byte[] { 21, 11, 31, 12 }.CopyTo(packet, halfBlank);
+    // Field one follows field zero's whole payload, a four-byte separator, and its own blanking.
+    new byte[] { 61, 51, 71, 52 }.CopyTo(packet, halfBlank + fieldPayload + 4 + halfBlank);
 
-    var pal = AvuiVideoDecoder.Create(_Stream(720, 576));
-    Assert.That(() => pal.DecodePlanes(new byte[palHeader + 720 * 2 * 576]), Throws.Nothing);
-    Assert.That(() => pal.DecodePlanes(new byte[palHeader + 720 * 2 * 576 - 1]), Throws.TypeOf<InvalidDataException>());
+    var decoder = AvuiVideoDecoder.Create(_Stream(_Width, height, privateData: _Aprg(interlaced: true)));
+    var (luma, cb, cr) = decoder.DecodePlanes(packet);
+
+    Assert.Multiple(() => {
+      Assert.That(luma[0..2], Is.EqualTo(new byte[] { 51, 52 }), "even row comes from the second coded field");
+      Assert.That(luma[_Width..(_Width + 2)], Is.EqualTo(new byte[] { 11, 12 }), "odd row comes from the first coded field");
+      Assert.That(cb[0], Is.EqualTo(61));
+      Assert.That(cb[_Width / 2], Is.EqualTo(21));
+      Assert.That(cr[0], Is.EqualTo(71));
+      Assert.That(cr[_Width / 2], Is.EqualTo(31));
+    });
   }
 
   [Test]
   [Category("Unit")]
-  public void RefusesAPacketShorterThanItsHeaderPlusItsStride() {
-    var decoder = AvuiVideoDecoder.Create(_Stream(720, 486));
-    var failure = Assert.Throws<InvalidDataException>(() => decoder.DecodePlanes(new byte[100]));
-    Assert.That(failure!.Message, Does.Contain("100 byte(s)"));
-    Assert.That(failure.Message, Does.Contain("14400"));
+  public void InterlacedPalStoresTheEvenFieldBeforeTheOddField() {
+    const int height = 576;
+    const int halfBlank = _Width * 16;
+    const int fieldPayload = _Width * height;
+    var packet = new byte[2 * _Width * (height + 16) + 4];
+    new byte[] { 21, 11, 31, 12 }.CopyTo(packet, halfBlank);
+    new byte[] { 61, 51, 71, 52 }.CopyTo(packet, halfBlank + fieldPayload + 4 + halfBlank);
+
+    var decoder = AvuiVideoDecoder.Create(_Stream(_Width, height, privateData: _Aprg(interlaced: true)));
+    var (luma, _, _) = decoder.DecodePlanes(packet);
+
+    Assert.Multiple(() => {
+      Assert.That(luma[0..2], Is.EqualTo(new byte[] { 11, 12 }));
+      Assert.That(luma[_Width..(_Width + 2)], Is.EqualTo(new byte[] { 51, 52 }));
+    });
   }
 
   [Test]
   [Category("Unit")]
-  public void TryDecodeAlwaysReturnsAPicture() {
-    var packet = new byte[14_400 + 720 * 2 * 486];
-    var decoder = AvuiVideoDecoder.Create(_Stream(720, 486));
+  public void MissingAprgUsesTheReferenceDecodersInterlacedDefault() {
+    const int height = 486;
+    const int halfBlank = _Width * 10;
+    var packet = new byte[2 * _Width * (height + 10) + 4];
+    new byte[] { 21, 11, 31, 12 }.CopyTo(packet, halfBlank);
+
+    var decoder = AvuiVideoDecoder.Create(_Stream(_Width, height));
+    var (luma, _, _) = decoder.DecodePlanes(packet);
+
+    Assert.That(luma[_Width..(_Width + 2)], Is.EqualTo(new byte[] { 11, 12 }));
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void Depth32ReadsTheInvertedAlphaCompanion() {
+    const int height = 486;
+    const int skip = 10;
+    var opaqueLength = 2 * _Width * (height + skip);
+    var packet = new byte[2 * opaqueLength + 4];
+    var colour = 2 * _Width * skip;
+    new byte[] { 128, 16, 128, 16 }.CopyTo(packet, colour);
+
+    var alpha = opaqueLength + 5 + 2 * _Width * skip;
+    packet[alpha] = 255;     // stored inverted: decoded alpha 0
+    packet[alpha + 2] = 127; // decoded alpha 128
+
+    var decoder = AvuiVideoDecoder.Create(_Stream(
+      _Width, height, depth: AvuiVideoFormat.AlphaDepth, privateData: _Aprg(interlaced: false)));
+    var (_, _, _, decodedAlpha) = decoder.DecodePlanesWithAlpha(packet);
+
+    Assert.That(decodedAlpha, Is.Not.Null);
+    Assert.That(decodedAlpha![..2], Is.EqualTo(new byte[] { 0, 128 }));
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void Depth32ReturnsRgbaRatherThanDroppingAlpha() {
+    const int height = 486;
+    const int skip = 10;
+    var opaqueLength = 2 * _Width * (height + skip);
+    var packet = new byte[2 * opaqueLength + 4];
+    packet[opaqueLength + 5 + 2 * _Width * skip] = 255;
+
+    var decoder = AvuiVideoDecoder.Create(_Stream(
+      _Width, height, depth: AvuiVideoFormat.AlphaDepth, privateData: _Aprg(interlaced: false)));
+    var decoded = decoder.TryDecode(new(0, packet), out var frame);
+
+    Assert.Multiple(() => {
+      Assert.That(decoded, Is.True);
+      Assert.That(frame.Format, Is.EqualTo(PixelFormat.Rgba32));
+      Assert.That(frame.PixelData[3], Is.Zero);
+    });
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void Depth32RefusesATruncatedAlphaCompanion() {
+    const int height = 486;
+    var opaqueLength = 2 * _Width * (height + 10);
+    var decoder = AvuiVideoDecoder.Create(_Stream(
+      _Width, height, depth: AvuiVideoFormat.AlphaDepth, privateData: _Aprg(interlaced: false)));
+
+    var failure = Assert.Throws<InvalidDataException>(() => decoder.DecodePlanes(new byte[2 * opaqueLength + 3]));
+    Assert.That(failure!.Message, Does.Contain("colour and alpha"));
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void OpaqueTryDecodeKeepsTheExistingRgb24Contract() {
+    const int height = 486;
+    var packet = new byte[2 * _Width * (height + 10)];
+    var decoder = AvuiVideoDecoder.Create(_Stream(_Width, height, privateData: _Aprg(interlaced: false)));
 
     var decoded = decoder.TryDecode(new(0, packet), out var frame);
 
-    Assert.That(decoded, Is.True);
-    Assert.That(frame.Width, Is.EqualTo(720));
-    Assert.That(frame.Height, Is.EqualTo(486));
-    Assert.That(frame.Format, Is.EqualTo(PixelFormat.Rgb24));
-    Assert.That(frame.PixelData.Length, Is.EqualTo(720 * 486 * 3));
+    Assert.Multiple(() => {
+      Assert.That(decoded, Is.True);
+      Assert.That(frame.Width, Is.EqualTo(_Width));
+      Assert.That(frame.Height, Is.EqualTo(height));
+      Assert.That(frame.Format, Is.EqualTo(PixelFormat.Rgb24));
+      Assert.That(frame.PixelData.Length, Is.EqualTo(_Width * height * 3));
+    });
   }
 }
