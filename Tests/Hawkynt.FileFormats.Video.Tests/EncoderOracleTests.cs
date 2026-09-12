@@ -9,6 +9,7 @@ using FileFormat.FlicVideo;
 using FileFormat.Flv;
 using FileFormat.Matroska;
 using FileFormat.Mjpeg;
+using FileFormat.Ogg;
 using FileFormat.RealMedia;
 using FileFormat.Mp4;
 using FileFormat.RoqVideo;
@@ -239,7 +240,8 @@ public sealed class EncoderOracleTests {
   /// <remarks>
   /// A codec has to be named by something a demuxer can carry before any decoder is reached, and no
   /// one container names them all: the VFW-style codes belong in an AVI, the QuickTime ones in an
-  /// MP4, and Matroska carries whatever the other two will not.
+  /// MP4, Matroska carries whatever the other two will not, and Xiph's codecs are named by the
+  /// header packet an Ogg stream opens with rather than by any code a container holds.
   /// <para/>
   /// YUV4MPEG2 is deliberately not among them. It states the planes and no codec, so anything
   /// written into one comes back out of FFmpeg as a picture of the right size whether the encoder
@@ -259,6 +261,7 @@ public sealed class EncoderOracleTests {
     ("Fli", ".flc", static (streams, packets) => VideoIO.Mux<FliWriter>(streams, packets)),
     ("Roq", ".roq", static (streams, packets) => VideoIO.Mux<RoqWriter>(streams, packets)),
     ("Mjpeg", ".mjpg", static (streams, packets) => VideoIO.Mux<MjpegWriter>(streams, packets)),
+    ("Ogg", ".ogv", static (streams, packets) => VideoIO.Mux<OggWriter>(streams, packets)),
   ];
 
   /// <summary>
