@@ -16849,7 +16849,20 @@ Implements `IEquatable<GfaRaytraceFile>`, `IImageFormatMetadata<GfaRaytraceFile>
 
 ### Namespace `FileFormat.Gif`
 
-[`Dimensions`](#dimensions) · [`Frame`](#frame) · [`FrameDisposalMethod`](#framedisposalmethod) · [`GifApplicationExtension`](#gifapplicationextension) · [`GifCommentExtension`](#gifcommentextension) · [`GifFile`](#giffile) · [`GifLogicalScreenDescriptor`](#giflogicalscreendescriptor) · [`GifPlainTextExtension`](#gifplaintextextension) · [`GifReader`](#gifreader) · [`GifVersion`](#gifversion) · [`GifWriter`](#gifwriter) · [`LoopCount`](#loopcount) · [`Offset`](#offset) · [`Reader`](#reader) · [`Writer`](#writer)
+[`ColorResolution`](#colorresolution) · [`Dimensions`](#dimensions) · [`Frame`](#frame) · [`FrameDisposalMethod`](#framedisposalmethod) · [`GifApplicationExtension`](#gifapplicationextension) · [`GifCommentExtension`](#gifcommentextension) · [`GifCompressionLevel`](#gifcompressionlevel) · [`GifFile`](#giffile) · [`GifFrameWindow`](#gifframewindow) · [`GifLogicalScreenDescriptor`](#giflogicalscreendescriptor) · [`GifPlainTextExtension`](#gifplaintextextension) · [`GifReader`](#gifreader) · [`GifStreamWriter`](#gifstreamwriter) · [`GifVersion`](#gifversion) · [`GifWriteOptions`](#gifwriteoptions) · [`GifWriter`](#gifwriter) · [`LoopCount`](#loopcount) · [`Offset`](#offset) · [`Reader`](#reader) · [`Writer`](#writer)
+
+#### `ColorResolution`
+
+| Value | Numeric | Summary |
+| --- | --- | --- |
+| `Monochrome` | `0` |  |
+| `Colored4` | `1` |  |
+| `Colored8` | `2` |  |
+| `Colored16` | `3` |  |
+| `Colored32` | `4` |  |
+| `Colored64` | `5` |  |
+| `Colored128` | `6` |  |
+| `Colored256` | `7` |  |
 
 #### `Dimensions`
 
@@ -16862,6 +16875,7 @@ Implements `IEquatable<Dimensions>`.
 | `Empty` | `static Dimensions Empty { get; }` |  |
 | `Height` | `ushort Height { get; init; }` |  |
 | `Width` | `ushort Width { get; init; }` |  |
+| `With` | `Dimensions With(Dimensions other)` |  |
 
 #### `Frame`
 
@@ -16920,6 +16934,14 @@ Implements `IEquatable<GifCommentExtension>`.
 | `GifCommentExtension` | `GifCommentExtension(byte[] Data)` |  |
 | `Data` | `byte[] Data { get; init; }` |  |
 
+#### `GifCompressionLevel`
+
+| Value | Numeric | Summary |
+| --- | --- | --- |
+| `None` | `0` |  |
+| `Standard` | `1` |  |
+| `Best` | `2` |  |
+
 #### `GifFile`
 
 Implements `IFormatChunkLayout<GifFile>`, `IFormatChunkPlanRewriter<GifFile>`, `IFormatChunkRewriter<GifFile>`, `IImageFormatMetadata<GifFile>`, `IImageFormatReader<GifFile>`, `IImageFormatWriter<GifFile>`, `IImageFromRawImage<GifFile>`, `IImageToRawImage<GifFile>`, `IMultiImageFileFormat<GifFile>`.
@@ -16944,6 +16966,12 @@ Implements `IFormatChunkLayout<GifFile>`, `IFormatChunkPlanRewriter<GifFile>`, `
 | `ToRawImage` | `static RawImage ToRawImage(GifFile file, int index)` |  |
 | `ToRawImages` | `static IReadOnlyList<RawImage> ToRawImages(GifFile file)` |  |
 
+#### `GifFrameWindow`
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `Trim` | `static ValueTuple<byte[], Dimensions, Offset> Trim(byte[] pixels, Dimensions size, Offset position, byte skipIndex)` |  |
+
 #### `GifLogicalScreenDescriptor`
 
 Implements `IEquatable<GifLogicalScreenDescriptor>`.
@@ -16952,6 +16980,7 @@ Implements `IEquatable<GifLogicalScreenDescriptor>`.
 | --- | --- | --- |
 | `GifLogicalScreenDescriptor` | `GifLogicalScreenDescriptor(ushort Width, ushort Height, bool HasGlobalColorTable, byte ColorResolution, bool GlobalColorTableSorted, byte GlobalColorTableSize, byte BackgroundColorIndex, byte PixelAspectRatio)` |  |
 | `BackgroundColorIndex` | `byte BackgroundColorIndex { get; init; }` |  |
+| `ColorResolutionValue` | `ColorResolution ColorResolutionValue { get; }` |  |
 | `ColorResolution` | `byte ColorResolution { get; init; }` |  |
 | `GlobalColorTableEntryCount` | `int GlobalColorTableEntryCount { get; }` |  |
 | `GlobalColorTableSize` | `byte GlobalColorTableSize { get; init; }` |  |
@@ -16960,6 +16989,7 @@ Implements `IEquatable<GifLogicalScreenDescriptor>`.
 | `Height` | `ushort Height { get; init; }` |  |
 | `PixelAspectRatio` | `byte PixelAspectRatio { get; init; }` |  |
 | `Width` | `ushort Width { get; init; }` |  |
+| `WithColorResolution` | `GifLogicalScreenDescriptor WithColorResolution(ColorResolution resolution)` |  |
 
 #### `GifPlainTextExtension`
 
@@ -16987,6 +17017,20 @@ Implements `IEquatable<GifPlainTextExtension>`.
 | `FromSpan` | `static GifFile FromSpan(ReadOnlySpan<byte> data)` |  |
 | `FromStream` | `static GifFile FromStream(Stream stream)` |  |
 
+#### `GifStreamWriter`
+
+Implements `IDisposable`.
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `GifStreamWriter` | `GifStreamWriter(Stream output, GifLogicalScreenDescriptor logicalScreenDescriptor, byte[] globalColorTable, LoopCount loopCount, GifVersion version = 1, GifWriteOptions options = null)` |  |
+| `Complete` | `void Complete()` |  |
+| `Dispose` | `void Dispose()` |  |
+| `WriteApplicationExtension` | `void WriteApplicationExtension(GifApplicationExtension extension)` |  |
+| `WriteComment` | `void WriteComment(byte[] data)` |  |
+| `WriteFrame` | `void WriteFrame(Frame frame)` |  |
+| `WritePlainText` | `void WritePlainText(GifPlainTextExtension extension)` |  |
+
 #### `GifVersion`
 
 | Value | Numeric | Summary |
@@ -16994,12 +17038,27 @@ Implements `IEquatable<GifPlainTextExtension>`.
 | `Gif87a` | `0` |  |
 | `Gif89a` | `1` |  |
 
+#### `GifWriteOptions`
+
+Implements `IEquatable<GifWriteOptions>`.
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `GifWriteOptions` | `GifWriteOptions()` |  |
+| `Compression` | `GifCompressionLevel Compression { get; init; }` |  |
+| `Default` | `static GifWriteOptions Default { get; }` |  |
+| `DeferClear` | `bool DeferClear { get; init; }` |  |
+| `NoCompression` | `static GifWriteOptions NoCompression { get; }` |  |
+| `SmallestOutput` | `static GifWriteOptions SmallestOutput { get; }` |  |
+
 #### `GifWriter`
 
 | Member | Signature | Summary |
 | --- | --- | --- |
 | `ToBytes` | `static byte[] ToBytes(GifFile file)` |  |
+| `ToBytes` | `static byte[] ToBytes(GifFile file, GifWriteOptions options)` |  |
 | `WriteTo` | `static void WriteTo(GifFile file, Stream output)` |  |
+| `WriteTo` | `static void WriteTo(GifFile file, Stream output, GifWriteOptions options)` |  |
 
 #### `LoopCount`
 
@@ -17009,14 +17068,20 @@ Implements `IEquatable<LoopCount>`.
 | --- | --- | --- |
 | `LoopCount` | `LoopCount(ushort Count, bool IsPresent)` |  |
 | `Count` | `ushort Count { get; init; }` |  |
+| `Infinite` | `static LoopCount Infinite { get; }` |  |
 | `IsInfinite` | `bool IsInfinite { get; }` |  |
+| `IsNotSet` | `bool IsNotSet { get; }` |  |
 | `IsPresent` | `bool IsPresent { get; init; }` |  |
 | `IsSet` | `bool IsSet { get; }` |  |
 | `LoopForever` | `static LoopCount LoopForever { get; }` |  |
 | `NotSet` | `static LoopCount NotSet { get; }` |  |
+| `Once` | `static LoopCount Once { get; }` |  |
 | `PlayOnce` | `static LoopCount PlayOnce { get; }` |  |
+| `Twice` | `static LoopCount Twice { get; }` |  |
 | `Value` | `ushort Value { get; }` |  |
 | `LoopTimes` | `static LoopCount LoopTimes(ushort count)` |  |
+| `implicit operator LoopCount` | `static implicit operator LoopCount(ushort count)` |  |
+| `implicit operator LoopCount` | `static implicit operator LoopCount(ushort? count)` |  |
 
 #### `Offset`
 
@@ -17044,7 +17109,11 @@ Implements `IEquatable<Offset>`.
 | Member | Signature | Summary |
 | --- | --- | --- |
 | `ToBytes` | `static byte[] ToBytes(GifFile file)` |  |
+| `ToBytes` | `static byte[] ToBytes(GifFile file, GifWriteOptions options)` |  |
+| `ToFile` | `static void ToFile(FileInfo file, Dimensions size, IEnumerable<Frame> frames, LoopCount loopCount, byte backgroundColorIndex = 0, ColorResolution colorResolution = 7, byte[] globalColorTable = null, GifWriteOptions options = null)` |  |
 | `WriteTo` | `static void WriteTo(GifFile file, Stream output)` |  |
+| `WriteTo` | `static void WriteTo(GifFile file, Stream output, GifWriteOptions options)` |  |
+| `WriteTo` | `static void WriteTo(Stream output, Dimensions size, IEnumerable<Frame> frames, LoopCount loopCount, byte backgroundColorIndex = 0, ColorResolution colorResolution = 7, byte[] globalColorTable = null, GifWriteOptions options = null)` |  |
 
 ### Namespace `FileFormat.GigaPaint`
 
