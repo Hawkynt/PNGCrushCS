@@ -8,7 +8,7 @@ namespace FileFormat.Codecs.H265;
 /// Decodes one HEVC picture in coding-tree-block tile-scan order, reconstructing coding units,
 /// transform units and prediction units as their syntax is consumed.
 /// </summary>
-internal sealed class H265FrameDecoder {
+internal sealed class H265FrameDecoder : IH265MotionContext {
 
   private const int _LOG2_MIN_BLOCK = 2;
   private const int _MIN_BLOCK = 1 << _LOG2_MIN_BLOCK;
@@ -125,9 +125,9 @@ internal sealed class H265FrameDecoder {
     this._saoBandOrClass = new byte[sps.PicSizeInCtbsY * 3];
   }
 
-  internal H265Picture Picture => this._picture;
-  internal H265SequenceParameterSet Sps => this._sps;
-  internal H265PictureParameterSet Pps => this._pps;
+  public H265Picture Picture => this._picture;
+  public H265SequenceParameterSet Sps => this._sps;
+  public H265PictureParameterSet Pps => this._pps;
 
   private int _decodedCtbs;
 
@@ -1344,15 +1344,15 @@ internal sealed class H265FrameDecoder {
 
   internal int BlocksAcross => this._blocksAcross;
   internal int BlocksDown => this._blocksDown;
-  internal H265SliceHeader Header => this._header;
-  internal IReadOnlyList<H265Picture> ReferenceList(int list) => this._referenceLists[list];
-  internal int BlockIndexAt(int x, int y) => this._BlockIndex(x, y);
-  internal int CodingBlockX => this._cuX;
-  internal int CodingBlockY => this._cuY;
-  internal int CodingBlockSize => 1 << this._cuLog2Size;
-  internal H265PartitionMode CodingBlockPartitionMode => this._cuPartitionMode;
+  public H265SliceHeader Header => this._header;
+  public IReadOnlyList<H265Picture> ReferenceList(int list) => this._referenceLists[list];
+  public int BlockIndexAt(int x, int y) => this._BlockIndex(x, y);
+  public int CodingBlockX => this._cuX;
+  public int CodingBlockY => this._cuY;
+  public int CodingBlockSize => 1 << this._cuLog2Size;
+  public H265PartitionMode CodingBlockPartitionMode => this._cuPartitionMode;
 
-  internal H265MotionInfo MotionAt(int index) {
+  public H265MotionInfo MotionAt(int index) {
     var motion = this._picture.Motion;
     return new() {
       PredictL0 = motion.PredictionFlagL0[index],
@@ -1366,7 +1366,7 @@ internal sealed class H265FrameDecoder {
     };
   }
 
-  internal H265Picture? CollocatedPicture {
+  public H265Picture? CollocatedPicture {
     get {
       if (!this._header.TemporalMvpEnabled)
         return null;
@@ -1375,10 +1375,10 @@ internal sealed class H265FrameDecoder {
     }
   }
 
-  internal bool IsAvailableAt(int x0, int y0, int x, int y) => this._IsAvailable(x0, y0, x, y);
+  public bool IsAvailableAt(int x0, int y0, int x, int y) => this._IsAvailable(x0, y0, x, y);
   internal bool SameTileAt(int x0, int y0, int x, int y)
     => this._tiles.SameTile(this._CtbRasterAddress(x0, y0), this._CtbRasterAddress(x, y));
-  internal bool IsIntraAt(int index) => this._predictionMode[index] == (byte)H265PredictionMode.Intra;
+  public bool IsIntraAt(int index) => this._predictionMode[index] == (byte)H265PredictionMode.Intra;
   internal bool IsPulseCodeModulatedAt(int index) => this._pulseCodeModulated[index];
   internal bool IsTransquantBypassAt(int index) => this._transquantBypass[index];
   internal bool HasCodedResidualAt(int index) => this._hasCodedResidual[index];

@@ -33,6 +33,7 @@ public sealed class H265VideoEncoder : IVideoCodecEncoder<H265VideoEncoder> {
   private readonly MediaStreamInfo _requested;
   private MediaStreamInfo? _stream;
   private byte[]? _configuration;
+  private H265VideoSequenceEncoder? _sequence;
 
   private H265VideoEncoder(MediaStreamInfo stream) => this._requested = stream;
 
@@ -65,8 +66,10 @@ public sealed class H265VideoEncoder : IVideoCodecEncoder<H265VideoEncoder> {
       throw new InvalidDataException(
         $"A {frame.Width}x{frame.Height} {frame.Format} picture needs {frame.MinimumPixelDataLength} bytes and carries {frame.PixelData.Length}.");
 
-    var encoded = H265PcmStillCodec.Encode(frame);
-    var configuration = _AsMainProfile(encoded.DecoderConfiguration);
+    this._sequence ??= new(frame.Width, frame.Height);
+    var (sample, keyFrame) = this._sequence.Encode(frame);
+
+    var configuration = _AsMainProfile(this._sequence.Configuration);
     if (this._configuration == null)
       this._configuration = configuration;
     else if (!configuration.AsSpan().SequenceEqual(this._configuration))
@@ -75,10 +78,10 @@ public sealed class H265VideoEncoder : IVideoCodecEncoder<H265VideoEncoder> {
 
     packet = new(
       StreamIndex: this._requested.Index,
-      Data: encoded.Sample,
+      Data: sample,
       PresentationTimestamp: presentationTimestamp,
       DecodeTimestamp: presentationTimestamp,
-      IsKeyFrame: true);
+      IsKeyFrame: keyFrame);
     return true;
   }
 

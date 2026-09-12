@@ -16,16 +16,18 @@ public sealed class H265VideoEncoderTests {
   [Test]
   [Category("Oracle")]
   public void FFmpegReadsEveryPictureBackAsTheFrameThatWentIn() {
-    // Every picture here is an independent IDR made of PCM coding units, so what a multi-picture
-    // clip tests that a single picture does not is the packaging: the decoder configuration record,
-    // the length-prefixed samples, and that picture two is found where the container says it is.
-    // PCM stores samples exactly, so the only difference a correct decode can show is the 4:2:0
-    // conversion the source went through -- which makes the comparison tight rather than nominal.
+    // Long enough to cross a group boundary, so the clip carries a key picture, eleven predicted
+    // pictures, a second key picture and more predicted ones after it. Every frame is compared, not
+    // only the first: a decoder given a broken predicted picture still produces a picture, and the
+    // damage shows up as drift that accumulates over the group rather than as a failure to decode.
+    // This is the assertion that would have caught a motion vector written against the wrong
+    // predictor, a residual coded in the wrong scan, or a reconstruction that differs from the
+    // decoder's by a rounding step.
     FFmpegOracle.RequireAvailable();
 
     const int width = 64;
     const int height = 48;
-    const int frames = 6;
+    const int frames = 24;
 
     var encoder = H265VideoEncoder.Create(_Stream(width, height));
     var packets = new List<CodedPacket>();
@@ -38,8 +40,10 @@ public sealed class H265VideoEncoderTests {
         packets.Add(packet);
     }
 
-    // Nothing is held back: every picture is independent, so there is no Flush to drain.
+    // Nothing is held back: no picture is coded out of order, so there is no Flush to drain.
     Assert.That(packets, Has.Count.EqualTo(frames));
+    Assert.That(packets.FindAll(static packet => !packet.IsKeyFrame), Is.Not.Empty,
+      "a clip of only key pictures would pass everything below without testing prediction at all");
 
     var directory = Directory.CreateTempSubdirectory("h265-oracle");
     try {
@@ -202,29 +206,40 @@ public sealed class H265VideoEncoderTests {
 
   [Test]
   [Category("Unit")]
-  public void EveryPacketIsAnIndependentIdrPicture() {
+  public void AGroupOpensWithAKeyPictureAndTheRestArePredicted() {
     var encoder = H265VideoEncoder.Create(_Stream());
-    var first = _Picture(phase: 1);
-    var second = _Picture(phase: 2);
+    var packets = new List<CodedPacket>();
 
-    Assert.That(encoder.TryEncode(first, 0, out var a), Is.True);
-    var stream = encoder.DescribeStream();
-    Assert.That(encoder.TryEncode(second, 1, out var b), Is.True);
-    Assert.That(encoder.DescribeStream().CodecPrivateData.ToArray(), Is.EqualTo(stream.CodecPrivateData.ToArray()));
-    Assert.That(a.IsKeyFrame && b.IsKeyFrame, Is.True);
+    for (var index = 0; index < 14; ++index)
+      if (encoder.TryEncode(_Picture(phase: index), index, out var packet))
+        packets.Add(packet);
 
-    var decoder = H265VideoDecoder.Create(stream);
-    Assert.That(decoder.TryDecode(a, out var decodedA), Is.True);
-    Assert.That(decoder.TryDecode(b, out var decodedB), Is.True);
-
-    var expectedA = FastRawImageConverter.Convert(
-      FastRawImageConverter.Convert(first, PixelFormat.Yuv420P8), PixelFormat.Rgb24);
-    var expectedB = FastRawImageConverter.Convert(
-      FastRawImageConverter.Convert(second, PixelFormat.Yuv420P8), PixelFormat.Rgb24);
     Assert.Multiple(() => {
-      Assert.That(decodedA.PixelData, Is.EqualTo(expectedA.PixelData));
-      Assert.That(decodedB.PixelData, Is.EqualTo(expectedB.PixelData));
+      Assert.That(packets[0].IsKeyFrame, Is.True, "a stream has to open with a picture a decoder can start at");
+      for (var index = 1; index < 12; ++index)
+        Assert.That(packets[index].IsKeyFrame, Is.False, $"picture {index} is predicted");
+
+      Assert.That(packets[12].IsKeyFrame, Is.True, "the next group opens with a key picture of its own");
+
+      // The point of predicting: a picture that states a difference is a fraction of the size of one
+      // that states every sample. A predicted picture that grew to the size of the key picture would
+      // mean the prediction was not being used, and would pass every other assertion here.
+      var predicted = packets[1].Data.Length;
+      Assert.That(predicted, Is.LessThan(packets[0].Data.Length / 4),
+        $"a predicted picture is {predicted} bytes against the key picture's {packets[0].Data.Length}");
     });
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void TheParameterSetsDoNotChangeWithinAStream() {
+    var encoder = H265VideoEncoder.Create(_Stream());
+
+    Assert.That(encoder.TryEncode(_Picture(phase: 1), 0, out _), Is.True);
+    var first = encoder.DescribeStream().CodecPrivateData.ToArray();
+    Assert.That(encoder.TryEncode(_Picture(phase: 2), 1, out _), Is.True);
+
+    Assert.That(encoder.DescribeStream().CodecPrivateData.ToArray(), Is.EqualTo(first));
   }
 
   [Test]

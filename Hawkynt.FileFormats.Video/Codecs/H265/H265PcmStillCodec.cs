@@ -34,8 +34,8 @@ internal static class H265PcmStillCodec {
   // 32 by 32, not 64 by 64: H.265 7.4.3.2 caps Log2MaxIpcmCbSizeY at Min(CtbLog2SizeY, 5), so a
   // coding block carrying PCM samples can never be larger than 32 by 32. Making the coding tree
   // block the same size keeps every tree block exactly one unsplit PCM coding unit.
-  private const int _CTB_LOG2 = 5;
-  private const int _CTB_SIZE = 1 << _CTB_LOG2;
+  internal const int _CTB_LOG2 = 5;
+  internal const int _CTB_SIZE = 1 << _CTB_LOG2;
   private const int _PCM_BYTES_PER_CTB = _CTB_SIZE * _CTB_SIZE + 2 * (_CTB_SIZE / 2) * (_CTB_SIZE / 2);
 
   internal static EncodedImage Encode(RawImage source) {
@@ -461,7 +461,7 @@ internal static class H265PcmStillCodec {
       return engine.DecodeTerminate() != 0; // pcm_flag
     });
 
-  private static RawImage _PadRgbToEven(RawImage source, int width, int height) {
+  internal static RawImage _PadRgbToEven(RawImage source, int width, int height) {
     var rgb = source.ToRgb24();
     if (source.Width == width && source.Height == height)
       return new RawImage { Width = width, Height = height, Format = PixelFormat.Rgb24, PixelData = rgb };
@@ -482,7 +482,7 @@ internal static class H265PcmStillCodec {
     return new RawImage { Width = width, Height = height, Format = PixelFormat.Rgb24, PixelData = result };
   }
 
-  private static (byte[] Y, byte[] Cb, byte[] Cr) _PadYuvToCodedSize(RawImage yuv, int width, int height) {
+  internal static (byte[] Y, byte[] Cb, byte[] Cr) _PadYuvToCodedSize(RawImage yuv, int width, int height) {
     var sourceY = yuv.GetPlaneData(0);
     var sourceCb = yuv.GetPlaneData(1);
     var sourceCr = yuv.GetPlaneData(2);
@@ -510,7 +510,7 @@ internal static class H265PcmStillCodec {
   /// picture does not fit into makes the stream non-conformant, and a decoder that allocates from
   /// the level is entitled to refuse it, so the number cannot be a constant.
   /// </summary>
-  private static byte _SmallestLevelFor(int width, int height) {
+  internal static byte _SmallestLevelFor(int width, int height) {
     // H.265 Table A.8, MaxLumaPs per level, plus A.4.1's dimension bound of Sqrt(MaxLumaPs * 8).
     (byte Level, long MaxLumaPs)[] levels = [
       (30, 36864), (60, 122880), (63, 245760), (90, 552960), (93, 983040),
@@ -528,7 +528,7 @@ internal static class H265PcmStillCodec {
       $"HEVC: a {width} by {height} picture exceeds the largest defined level's picture size.");
   }
 
-  private static byte[] _BuildVps(byte level) {
+  internal static byte[] _BuildVps(byte level) {
     var w = new Bits();
     w.WriteBits(0, 4); // vps_video_parameter_set_id
     w.WriteBit(1); // vps_base_layer_internal_flag
@@ -550,7 +550,9 @@ internal static class H265PcmStillCodec {
     return w.ToArray();
   }
 
-  private static byte[] _BuildSps(int width, int height, int displayWidth, int displayHeight, byte level) {
+  internal static byte[] _BuildSps(
+    int width, int height, int displayWidth, int displayHeight, byte level,
+    int maxDecPicBufferingMinus1 = 0, int log2MaxPocLsbMinus4 = 0) {
     var w = new Bits();
     w.WriteBits(0, 4); // sps_video_parameter_set_id
     w.WriteBits(0, 3); // sps_max_sub_layers_minus1
@@ -573,9 +575,9 @@ internal static class H265PcmStillCodec {
 
     w.WriteUe(0); // bit_depth_luma_minus8
     w.WriteUe(0); // bit_depth_chroma_minus8
-    w.WriteUe(0); // log2_max_pic_order_cnt_lsb_minus4
+    w.WriteUe((uint)log2MaxPocLsbMinus4);
     w.WriteBit(0); // sub_layer_ordering_info_present_flag
-    w.WriteUe(0); // max_dec_pic_buffering_minus1
+    w.WriteUe((uint)maxDecPicBufferingMinus1);
     w.WriteUe(0); // max_num_reorder_pics
     w.WriteUe(0); // max_latency_increase_plus1
     w.WriteUe(0); // log2_min_luma_coding_block_size_minus3 => 8
@@ -603,7 +605,7 @@ internal static class H265PcmStillCodec {
     return w.ToArray();
   }
 
-  private static byte[] _BuildPps() {
+  internal static byte[] _BuildPps() {
     var w = new Bits();
     w.WriteUe(0); // pps_pic_parameter_set_id
     w.WriteUe(0); // pps_seq_parameter_set_id
@@ -639,7 +641,7 @@ internal static class H265PcmStillCodec {
     return w.ToArray();
   }
 
-  private static byte[] _BuildSlice(byte[] y, byte[] cb, byte[] cr, int width, int height) {
+  internal static byte[] _BuildSlice(byte[] y, byte[] cb, byte[] cr, int width, int height) {
     var header = new Bits();
     header.WriteBit(1); // first_slice_segment_in_pic_flag
     header.WriteBit(0); // no_output_of_prior_pics_flag
@@ -812,7 +814,7 @@ internal static class H265PcmStillCodec {
     return FastRawImageConverter.Convert(yuv, PixelFormat.Rgb24);
   }
 
-  private static byte[] _BuildDecoderConfiguration(byte[] vps, byte[] sps, byte[] pps, byte level) {
+  internal static byte[] _BuildDecoderConfiguration(byte[] vps, byte[] sps, byte[] pps, byte level) {
     var size = 23 + (3 + 2 + vps.Length) + (3 + 2 + sps.Length) + (3 + 2 + pps.Length);
     var result = new byte[size];
     result[0] = 1;
@@ -847,7 +849,7 @@ internal static class H265PcmStillCodec {
     return at + nal.Length;
   }
 
-  private static byte[] _MakeNal(H265NalUnitType type, byte[] rbsp) {
+  internal static byte[] _MakeNal(H265NalUnitType type, byte[] rbsp) {
     var escaped = _EscapeRbsp(rbsp);
     var result = new byte[2 + escaped.Length];
     result[0] = (byte)((int)type << 1);
@@ -892,10 +894,10 @@ internal static class H265PcmStillCodec {
   /// </summary>
   private const byte _CONSTRAINT_FLAGS_FIRST_BYTE = 0b1011_0000;
 
-  private static int _RoundUp(int value, int multiple)
+  internal static int _RoundUp(int value, int multiple)
     => checked((value + multiple - 1) / multiple * multiple);
 
-  private sealed class Bits {
+  internal sealed class Bits {
     private readonly List<byte> _bytes = [];
     private int _current;
     private int _used;
