@@ -142,6 +142,28 @@ public sealed class SuperHiresEditorReaderTests {
 
   [Test]
   [Category("Integration")]
+  public void RoundTrip_EveryByteSaturated() {
+    // Every field at its widest, which is what the old two-screen model was checked with and is
+    // still worth asking of a fixed-length file: nothing in it may refuse a saturated value.
+    var data = new byte[SuperHiresEditorFile.FileSize];
+    Array.Fill(data, (byte)0xFF);
+
+    var original = SuperHiresEditorReader.FromBytes(data);
+    var restored = SuperHiresEditorReader.FromBytes(SuperHiresEditorWriter.ToBytes(original));
+
+    Assert.Multiple(() => {
+      Assert.That(restored.LoadAddress, Is.EqualTo((ushort)0xFFFF));
+      Assert.That(restored.BitmapData, Is.EqualTo(original.BitmapData));
+      Assert.That(restored.ScreenData, Is.EqualTo(original.ScreenData));
+      Assert.That(restored.Sprites, Is.EqualTo(original.Sprites));
+      Assert.That(restored.BackSpriteColor, Is.EqualTo(original.BackSpriteColor));
+      Assert.That(restored.FrontSpriteColor, Is.EqualTo(original.FrontSpriteColor));
+      Assert.That(restored.Trailer, Is.EqualTo(original.Trailer));
+    });
+  }
+
+  [Test]
+  [Category("Integration")]
   public void RoundTrip_ViaFile_PreservesData() {
     var original = SuperHiresEditorReader.FromBytes(_BuildValidFile(0x2000));
     var path = Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".she");

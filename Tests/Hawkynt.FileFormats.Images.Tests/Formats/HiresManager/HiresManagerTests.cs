@@ -126,4 +126,23 @@ public sealed class HiresManagerLayoutTests {
         File.Delete(path);
     }
   }
+
+  [Test]
+  [Category("Unit")]
+  public void FromStream_Null_Throws()
+    => Assert.Throws<ArgumentNullException>(() => HiresManagerReader.FromStream(null!));
+
+  [Test]
+  [Category("Unit")]
+  public void FromStream_ReadsWhatFromBytesReads() {
+    using var stream = new MemoryStream(_Build());
+    var fromStream = HiresManagerFile.ToRawImage(HiresManagerReader.FromStream(stream));
+    var fromBytes = HiresManagerFile.ToRawImage(HiresManagerReader.FromBytes(_Build()));
+
+    Assert.Multiple(() => {
+      Assert.That(fromStream.Width, Is.EqualTo(fromBytes.Width));
+      Assert.That(fromStream.Height, Is.EqualTo(fromBytes.Height));
+      Assert.That(fromStream.PixelData, Is.EqualTo(fromBytes.PixelData));
+    });
+  }
 }

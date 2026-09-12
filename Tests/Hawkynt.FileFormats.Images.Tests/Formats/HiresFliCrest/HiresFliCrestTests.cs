@@ -115,4 +115,23 @@ public sealed class HiresFliCrestLayoutTests {
         File.Delete(path);
     }
   }
+
+  [Test]
+  [Category("Unit")]
+  public void FromStream_Null_Throws()
+    => Assert.Throws<ArgumentNullException>(() => HiresFliCrestReader.FromStream(null!));
+
+  [Test]
+  [Category("Unit")]
+  public void FromStream_ReadsWhatFromBytesReads() {
+    using var stream = new MemoryStream(_Build());
+    var fromStream = HiresFliCrestFile.ToRawImage(HiresFliCrestReader.FromStream(stream));
+    var fromBytes = HiresFliCrestFile.ToRawImage(HiresFliCrestReader.FromBytes(_Build()));
+
+    Assert.Multiple(() => {
+      Assert.That(fromStream.Width, Is.EqualTo(fromBytes.Width));
+      Assert.That(fromStream.Height, Is.EqualTo(fromBytes.Height));
+      Assert.That(fromStream.PixelData, Is.EqualTo(fromBytes.PixelData));
+    });
+  }
 }

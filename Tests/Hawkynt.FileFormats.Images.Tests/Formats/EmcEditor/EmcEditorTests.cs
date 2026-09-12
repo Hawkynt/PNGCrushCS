@@ -125,4 +125,23 @@ public sealed class EmcEditorLayoutTests {
         File.Delete(path);
     }
   }
+
+  [Test]
+  [Category("Unit")]
+  public void FromStream_Null_Throws()
+    => Assert.Throws<ArgumentNullException>(() => EmcEditorReader.FromStream(null!));
+
+  [Test]
+  [Category("Unit")]
+  public void FromStream_ReadsWhatFromBytesReads() {
+    using var stream = new MemoryStream(_Build(0));
+    var fromStream = EmcEditorFile.ToRawImage(EmcEditorReader.FromStream(stream));
+    var fromBytes = EmcEditorFile.ToRawImage(EmcEditorReader.FromBytes(_Build(0)));
+
+    Assert.Multiple(() => {
+      Assert.That(fromStream.Width, Is.EqualTo(fromBytes.Width));
+      Assert.That(fromStream.Height, Is.EqualTo(fromBytes.Height));
+      Assert.That(fromStream.PixelData, Is.EqualTo(fromBytes.PixelData));
+    });
+  }
 }

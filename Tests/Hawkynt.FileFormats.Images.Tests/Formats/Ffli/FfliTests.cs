@@ -146,4 +146,23 @@ public sealed class FfliLayoutTests {
         File.Delete(path);
     }
   }
+
+  [Test]
+  [Category("Unit")]
+  public void FromStream_Null_Throws()
+    => Assert.Throws<ArgumentNullException>(() => FfliReader.FromStream(null!));
+
+  [Test]
+  [Category("Unit")]
+  public void FromStream_ReadsWhatFromBytesReads() {
+    using var stream = new MemoryStream(_Build());
+    var fromStream = FfliFile.ToRawImage(FfliReader.FromStream(stream));
+    var fromBytes = FfliFile.ToRawImage(FfliReader.FromBytes(_Build()));
+
+    Assert.Multiple(() => {
+      Assert.That(fromStream.Width, Is.EqualTo(fromBytes.Width));
+      Assert.That(fromStream.Height, Is.EqualTo(fromBytes.Height));
+      Assert.That(fromStream.PixelData, Is.EqualTo(fromBytes.PixelData));
+    });
+  }
 }
