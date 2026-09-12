@@ -166,7 +166,7 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | BlazingPaddlesWindow | `.wnd` | ✅ | ✅ | — | — | — | recoil2png, IrfanView |
 | Blazon | `.bpl` | ✅ | ✅ | — | — | — | recoil2png, IrfanView |
 | Blp | `.blp` | ✅ | ✅ | — | — | — | none |
-| Bmp | `.bmp`, `.dib`, `.bga`, `.rl4`, `.rl8`, `.vga`, `.sys`, `.bum`, `.thb`, `.2d`, `.bmc`, `.stm`, `.upi`, `.msk`, `.flt` | ✅ | ✅ | ✅ | — | ✅ | ImageMagick, ffmpeg, IrfanView |
+| Bmp | `.bmp`, `.bga`, `.rl4`, `.rl8`, `.vga`, `.sys`, `.bum`, `.thb`, `.2d`, `.bmc`, `.stm`, `.upi`, `.msk`, `.flt` | ✅ | ✅ | ✅ | — | ✅ | ImageMagick, ffmpeg, IrfanView |
 | Bob | `.bob` | ✅ | ✅ | — | — | — | XnView |
 | BodyPaint3D | `.b3d`, `.b2d` | ✅ | ✅ | — | — | — | XnView |
 | BoogieDownPaint | `.bdp` | ✅ | ✅ | — | — | — | recoil2png, IrfanView |
@@ -193,10 +193,10 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | CanonNavFax | `.can` | ✅ | ✅ | — | — | — | none |
 | Canvas | `.cvs` | ✅ | ✅ | — | — | — | none |
 | CanvasRaster | `.ful` | ✅ | ✅ | — | — | — | recoil2png, IrfanView |
-| CartesMichelin | `.big` | ✅ | — | — | — | — | — |
+| CartesMichelin | `.big` | ✅ | ✅ | — | — | — | none |
 | CasioQv | `.cam` | ✅ | ✅ | — | — | — | ffmpeg, IrfanView |
 | Ccitt | `.g3`, `.g4`, `.ccitt`, `.fax` | ✅ | ✅ | — | — | — | none |
-| Cdr | `.cdr` | ✅ | — | — | — | — | — |
+| Cdr | `.cdr` | ✅ | ✅ | — | — | — | LibreOffice |
 | CDUPaint | `.cdu` | ✅ | ✅ | — | — | — | recoil2png, IrfanView |
 | Cdxl | `.cdxl` | ✅ | ✅ | — | — | — | none |
 | Cel | `.cel` | ✅ | ✅ | — | — | — | none |
@@ -220,7 +220,7 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | Clp | `.clp` | ✅ | ✅ | — | — | — | XnView, IrfanView |
 | Cmu | `.cmu` | ✅ | ✅ | — | — | — | none |
 | CmuWindowManager | `.cmu`, `.cmuwm` | ✅ | ✅ | — | — | — | XnView |
-| Cmx | `.cmx` | ✅ | — | — | — | — | — |
+| Cmx | `.cmx` | ✅ | ✅ | — | — | — | none |
 | CoCo | `.coc` | ✅ | ✅ | — | — | — | none |
 | CoCo3 | `.cc3` | ✅ | ✅ | — | — | — | none |
 | CoCoMax | `.max`, `.p41` | ✅ | ✅ | — | — | — | recoil2png, IrfanView |
@@ -302,7 +302,8 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | EggPaint | `.trp` | ✅ | ✅ | — | — | — | recoil2png, IrfanView |
 | ElectricImage | `.ei`, `.eidi` | ✅ | ✅ | — | ✅ | — | XnView |
 | Electronika | `.bk`, `.ekr` | ✅ | ✅ | — | — | — | none |
-| EmbeddedDib | `.zmf`, `.skf`, `.cad`, `.btn` | ✅ | — | — | — | — | — |
+| EmbeddedDib | `.dib` | ✅ | ✅ | — | — | — | none |
+| EmbeddedDibPreview | `.zmf`, `.skf`, `.cad`, `.btn` | ✅ | — | — | — | — | — |
 | EmcEditor | `.emc` | ✅ | ✅ | — | — | — | recoil2png |
 | Emf | `.emf` | ✅ | ✅ | — | — | — | none |
 | Enterprise128 | `.ep`, `.elan` | ✅ | ✅ | — | — | — | none |
@@ -349,7 +350,7 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | FloorDesigner | `.fge` | ✅ | ✅ | — | — | — | recoil2png, IrfanView |
 | FmTowns | `.fmt` | ✅ | ✅ | — | — | — | none |
 | FontasyGrafik | `.bsg` | ✅ | ✅ | — | — | — | none |
-| Fpx | `.fpx`, `.mix` | ✅ | — | — | — | — | — |
+| Fpx | `.fpx`, `.mix` | ✅ | ✅ | — | — | — | none |
 | FreeHand | `.fhs` | ✅ | ✅ | — | — | — | none |
 | FremontFax | `.f96` | ✅ | ✅ | — | — | — | none |
 | Fsh | `.fsh` | ✅ | ✅ | — | — | — | XnView |
@@ -435,7 +436,7 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | IcePcinPlus | `.ip2` | ✅ | ✅ | — | — | — | recoil2png, IrfanView |
 | Icns | `.icns` | ✅ | ✅ | — | ✅ | — | XnView, IrfanView |
 | Ico | `.ico` | ✅ | ✅ | — | ✅ | ✅ | ImageMagick, ffmpeg, IrfanView |
-| IconLibrary | `.icl` | ✅ | — | — | — | — | — |
+| IconLibrary | `.icl` | ✅ | ✅ | — | ✅ | — | none |
 | Ics | `.ics` | ✅ | ✅ | — | — | — | none |
 | IffAcbm | `.acbm`, `.iff`, `.blk` | ✅ | ✅ | — | — | — | recoil2png, ffmpeg, IrfanView |
 | IffAnim | `.anim` | ✅ | ✅ | — | — | — | ffmpeg |
@@ -643,7 +644,7 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | Pdf | `.pdf` | ✅ | ✅ | — | ✅ | — | ImageMagick, Ghostscript |
 | Pdn | `.pdn` | ✅ | ✅ | — | — | — | none |
 | Pds | `.pds`, `.lbl` | ✅ | ✅ | — | — | — | XnView |
-| PeResource | `.exe`, `.dll`, `.ocx`, `.scr`, `.cpl` | ✅ | — | — | ✅ | — | — |
+| PeResource | `.exe`, `.dll`, `.ocx`, `.scr`, `.cpl` | ✅ | ✅ | — | ✅ | — | none |
 | PerfectPix | `.pph` | ✅ | ✅ | — | — | — | recoil2png, IrfanView |
 | Pes | `.pes` | ✅ | ✅ | — | — | — | none |
 | PetDraw | `.pdr` | ✅ | ✅ | — | — | — | recoil2png, IrfanView |
@@ -745,7 +746,7 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | ScitexCt | `.sct`, `.ct`, `.ch` | ✅ | ✅ | — | — | — | ImageMagick |
 | ScreenBlaster | `.sbl` | ✅ | ✅ | — | — | — | none |
 | ScreenMaker | `.smk` | ✅ | ✅ | — | — | — | none |
-| Sdg | `.sdg` | ✅ | — | — | ✅ | — | — |
+| Sdg | `.sdg` | ✅ | ✅ | — | ✅ | — | none |
 | Sdt | `.sdt` | ✅ | ✅ | — | — | — | none |
 | SeattleFilmWorks | `.sfw`, `.pwp` | ✅ | ✅ | — | — | — | none |
 | SecondNatureSlideShow | `.cat` | ✅ | ✅ | — | ✅ | — | ffmpeg |
@@ -864,6 +865,8 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | VirtualBoyTile | `.vbt`, `.vb`, `.vboy` | ✅ | ✅ | — | — | — | none |
 | Vitec | `.vit` | ✅ | ✅ | — | — | — | none |
 | Vivid | `.vivid`, `.dis` | ✅ | ✅ | — | — | — | XnView |
+| Vp8 | `.vp8` | ✅ | ✅ | — | — | — | none |
+| Vp8L | `.vp8l` | ✅ | ✅ | — | — | — | none |
 | Vrml | `.wrl`, `.vrml` | ✅ | ✅ | — | — | — | none |
 | Vtf | `.vtf` | ✅ | ✅ | — | — | — | none |
 | Vue | `.vob` | ✅ | ✅ | — | — | — | XnView |
@@ -936,7 +939,7 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | ZxUlaPlus | `.ulp`, `.scr` | ✅ | ✅ | — | — | — | recoil2png, ImageMagick |
 | ZzRough | `.rgh` | ✅ | ✅ | — | — | — | recoil2png, IrfanView |
 
-**Oracle** — the tool outside this repository that has read what the writer produces. `none` means nothing but this package's own reader ever has, and a reader agreeing with the writer beside it proves only that the two share one reading of the format; `—` means there is no writer, so there is nothing for anything to have read. What a name in this column states exactly: handed a file this writer produced, under one of the format's own extensions and at one of the sizes the format declares, that tool decoded it back to a picture of the same size which is not a blank canvas. That is weaker than the pixel-for-pixel comparisons in `Tests/Conformance.Recoil.Tests` and in the codec evidence below, and it is the one thing that could be asked of every writer here rather than of a chosen few. It does not prove the pixels agree, and where two unrelated formats share an extension and a geometry it can be a tool reading the other one. The tools: [avifdec](https://github.com/AOMediaCodec/libavif) · [djxl](https://github.com/libjxl/libjxl) · [dwebp](https://developers.google.com/speed/webp/docs/dwebp) · [ffmpeg](https://ffmpeg.org/) · [Ghostscript](https://www.ghostscript.com/) · [heif-dec](https://github.com/strukturag/libheif) · [ImageMagick](https://imagemagick.org/) · [IrfanView](https://www.irfanview.com/) · [opj_decompress](https://www.openjpeg.org/) · [recoil2png](https://recoil.sourceforge.net/) · [XnView](https://www.xnview.com/en/nconvert/).
+**Oracle** — the tool outside this repository that has read what the writer produces. `none` means nothing but this package's own reader ever has, and a reader agreeing with the writer beside it proves only that the two share one reading of the format; `—` means there is no writer, so there is nothing for anything to have read. What a name in this column states exactly: handed a file this writer produced, under one of the format's own extensions and at one of the sizes the format declares, that tool decoded it back to a picture of the same size which is not a blank canvas. That is weaker than the pixel-for-pixel comparisons in `Tests/Conformance.Recoil.Tests` and in the codec evidence below, and it is the one thing that could be asked of every writer here rather than of a chosen few. It does not prove the pixels agree, and where two unrelated formats share an extension and a geometry it can be a tool reading the other one. The tools: [avifdec](https://github.com/AOMediaCodec/libavif) · [djxl](https://github.com/libjxl/libjxl) · [dwebp](https://developers.google.com/speed/webp/docs/dwebp) · [ffmpeg](https://ffmpeg.org/) · [Ghostscript](https://www.ghostscript.com/) · [heif-dec](https://github.com/strukturag/libheif) · [ImageMagick](https://imagemagick.org/) · [IrfanView](https://www.irfanview.com/) · [LibreOffice](https://www.libreoffice.org/) · [opj_decompress](https://www.openjpeg.org/) · [recoil2png](https://recoil.sourceforge.net/) · [XnView](https://www.xnview.com/en/nconvert/).
 <!-- IMAGE-FORMATS:END -->
 
 ### Optimizers
@@ -1054,7 +1057,7 @@ This list used to be far longer, and the entries that left it did so by argument
 
 ### Registered but read-only
 
-These 9 entries read but have no writer; each is a decision, not an oversight. **Not bounded** (an encoder or a model this package does not have): PeResource, Fpx (executable, OLE and compound-document containers). **Holders of other files rather than pictures of their own**: IconLibrary, Ipg, Sdg, Cdr, Cmx — an icon library, a tileset and a gallery carry whole files of other formats, and CorelDRAW's streams are vector scenes whose raster part is only an embedded preview, so writing any of them means deciding what belongs in a collection or composing a drawing, neither of which is serialising a picture. **Deliberately not written** because a file built from arbitrary pixels would not be what the name promises: EmbeddedDib, CartesMichelin.
+These 2 entries read but have no writer; each is a decision, not an oversight. **Holders of other files rather than pictures of their own**: Ipg — a tileset carries whole files of other formats, so writing one means deciding what belongs in a collection rather than serialising a picture. **Deliberately not written** because there is no structure to write one back into: EmbeddedDibPreview, a heuristic search for a DIB preview inside drawing and project containers whose layout is not documented here.
 
 ## 🚀 Quick start
 
@@ -1444,7 +1447,7 @@ The long tail also includes TGA/Targa, PCX, SGI/Iris, Sun Raster, X PixMap (XPM)
 
 <!-- API:BEGIN generated by Hawkynt/RepositoryTemplate/package-readme — edit the XML docs in source, not here -->
 
-Every public and protected member of all 3365 types, generated from the built assembly and its XML documentation, is in [REFERENCE.md](https://github.com/Hawkynt/PNGCrushCS/blob/main/Hawkynt.FileFormats.Images/REFERENCE.md).
+Every public and protected member of all 3374 types, generated from the built assembly and its XML documentation, is in [REFERENCE.md](https://github.com/Hawkynt/PNGCrushCS/blob/main/Hawkynt.FileFormats.Images/REFERENCE.md).
 
 <!-- API:END -->
 

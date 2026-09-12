@@ -23,6 +23,16 @@ public interface IVideoCodecEncoder<TSelf> : IVideoPacketEncoder where TSelf : I
   static abstract CodecTag Codec { get; }
 
   /// <summary>
+  /// Whether this encoder can produce the code a stream description asks for.
+  /// </summary>
+  /// <remarks>
+  /// Most encoders have one canonical code, so the default keeps the original exact-tag lookup.
+  /// Codecs whose identical bitstream is carried under several codes override this rather than
+  /// forcing the registry to know their aliases.
+  /// </remarks>
+  static virtual bool Accepts(MediaStreamInfo stream) => stream.Codec.EqualsIgnoringCase(TSelf.Codec);
+
+  /// <summary>
   /// Builds an encoder producing the stream described.
   /// </summary>
   /// <remarks>

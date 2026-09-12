@@ -5,13 +5,76 @@
 [![CI](https://github.com/Hawkynt/PNGCrushCS/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Hawkynt/PNGCrushCS/actions/workflows/ci.yml)
 ![Last Commit](https://img.shields.io/github/last-commit/Hawkynt/PNGCrushCS?branch=main)
 ![Activity](https://img.shields.io/github/commit-activity/m/Hawkynt/PNGCrushCS)
+[![Stars](https://img.shields.io/github/stars/Hawkynt/PNGCrushCS?color=FFD700)](https://github.com/Hawkynt/PNGCrushCS/stargazers)
+[![Forks](https://img.shields.io/github/forks/Hawkynt/PNGCrushCS?color=008080)](https://github.com/Hawkynt/PNGCrushCS/network/members)
+[![Issues](https://img.shields.io/github/issues/Hawkynt/PNGCrushCS)](https://github.com/Hawkynt/PNGCrushCS/issues)
+![Code Size](https://img.shields.io/github/languages/code-size/Hawkynt/PNGCrushCS?color=4CAF50)
+![Repo Size](https://img.shields.io/github/repo-size/Hawkynt/PNGCrushCS?color=FF9800)
+
 [![Release](https://img.shields.io/github/v/release/Hawkynt/PNGCrushCS)](https://github.com/Hawkynt/PNGCrushCS/releases/latest)
 [![Nightly](https://img.shields.io/github/v/release/Hawkynt/PNGCrushCS?include_prereleases&sort=date&filter=nightly-*&label=nightly&color=FF9800)](https://github.com/Hawkynt/PNGCrushCS/releases)
+[![Downloads](https://img.shields.io/github/downloads/Hawkynt/PNGCrushCS/total)](https://github.com/Hawkynt/PNGCrushCS/releases)
+
 [![NuGet Images](https://img.shields.io/nuget/v/Hawkynt.FileFormats.Images?label=Images)](https://www.nuget.org/packages/Hawkynt.FileFormats.Images/)
 
 > A pure-managed C# image and video format suite plus an exhaustive image optimizer: broad format detection/read/write APIs, container/codec support, and lossless size optimization behind one repository.
 
-## 🧩 Components
+![Crush Viewer showing the deterministic screenshot fixture](docs/screenshots/crush-viewer.png)
+
+## 🧭 Vision
+
+One repository that can read, write and shrink image and video formats without leaving managed code —
+no native encoder shelled out to, no p/invoke to a library that must be shipped alongside. The format
+registry is source-generated and reflection-free, so what is supported is decidable at build time
+rather than discovered at runtime.
+
+"Exhaustive" is the standing claim, and it is meant literally: the goal is every format, with the
+gaps tracked in the support tables rather than left for a consumer to discover.
+
+## ✨ Features
+
+- Detection, decoding and encoding for a broad set of image formats, plus video containers and codecs
+- Lossless optimization per format, searching the encoder's own parameter space rather than guessing
+- Cross-format conversion that keeps whichever result is smallest
+- A pure-C# compression core — DEFLATE, LZW, PackBits, Zopfli-class parsing
+- A WinForms viewer over the same registry the libraries use
+- Published as NuGet packages, with the complete support tables in each package README
+
+## 🧩 Support matrix
+
+| Format | Optimize | Typical search dimensions | Reference |
+| --- | :---: | --- | --- |
+| [PNG](https://en.wikipedia.org/wiki/PNG) | ✅ | color type × bit depth × filters × DEFLATE × interlace × palette/quantization | [W3C PNG](https://www.w3.org/TR/png-3/) |
+| [JPEG](https://en.wikipedia.org/wiki/JPEG) | ✅ | lossless coefficient transcode; optional lossy mode × quality × subsampling × Huffman × metadata | [ITU-T T.81](https://www.itu.int/rec/T-REC-T.81) |
+| [GIF](https://en.wikipedia.org/wiki/GIF) | ✅ | palette strategy × global/local tables × disposal × trimming × frame differencing × LZW policy | [GIF89a](https://www.w3.org/Graphics/GIF/spec-gif89a.txt) |
+| [TIFF](https://en.wikipedia.org/wiki/TIFF) | ✅ | color mode × compression × predictor × strip/tile layout | [TIFF 6.0](https://www.adobe.io/open/standards/TIFF.html) |
+| [BMP](https://en.wikipedia.org/wiki/BMP_file_format) | ✅ | color mode × RLE4/RLE8 × row order × palette ordering | [Microsoft bitmap storage](https://learn.microsoft.com/windows/win32/gdi/bitmap-storage) |
+| [TGA](https://en.wikipedia.org/wiki/Truevision_TGA) | ✅ | color mode × pixel width × RLE × origin | [TGA 2.0 overview](https://www.loc.gov/preservation/digital/formats/fdd/fdd000180.shtml) |
+| [PCX](https://en.wikipedia.org/wiki/PCX) | ✅ | color mode × plane layout × palette ordering | [PCX format notes](http://fileformats.archiveteam.org/wiki/PCX) |
+| [ICO](https://en.wikipedia.org/wiki/ICO_(file_format)) / [CUR](https://en.wikipedia.org/wiki/ICO_(file_format)) | ✅ | per-entry DIB vs PNG choice; CUR hotspot preservation | [Microsoft icons](https://learn.microsoft.com/windows/win32/menurc/about-icons) |
+| [ANI](https://en.wikipedia.org/wiki/ANI_(file_format)) | ✅ | embedded cursor choices while preserving RIFF ACON structure | [Microsoft RIFF](https://learn.microsoft.com/windows/win32/xaudio2/resource-interchange-file-format--riff-) |
+| [WebP](https://en.wikipedia.org/wiki/WebP) | ✅ | container-level pass-through and metadata stripping; codecs provided by the format library | [WebP RIFF container](https://developers.google.com/speed/webp/docs/riff_container) |
+
+The PNG/GIF/TIFF engines are also published as packages; their READMEs contain package-level capability matrices and API examples.
+
+## 📦 Installation
+
+```bash
+dotnet add package Hawkynt.FileFormats.Images
+```
+
+The `crush` CLI and the viewer come from the [latest release](../../releases/latest).
+
+## 🚀 Quick start
+
+```bash
+# Auto-detect, try same-format optimization plus cross-format conversion, keep the smallest result
+crush auto -i input.png -o output.png
+```
+
+The [CLI reference](#-cli-usage) below covers the format-specific verbs.
+
+## 📚 Components
 
 | Component | Kind | Description |
 | --- | --- | --- |
@@ -26,7 +89,7 @@
 
 The complete image support table (read, write, metadata-only, multi-image, optimizer, per format) lives in the [image package README](Hawkynt.FileFormats.Images/README.md#-format-support). Video container and codec support lives in the [video package README](Hawkynt.FileFormats.Video/README.md#-format--codec-support).
 
-## 🖼️ Viewer
+## 🖥️ Viewer
 
 `Crush.Viewer` is the Windows desktop front end for the same format registry used by the libraries. It supports drag-and-drop/open, zoom and pan, multi-image navigation, crop/resize/rotate/flip, palette reduction, text-mode rendering, and conversion through **Save As**.
 
@@ -34,7 +97,7 @@ The complete image support table (read, write, metadata-only, multi-image, optim
 
 The screenshot is not maintained by hand. Every push to a branch other than `main` builds the viewer on Windows, opens a deterministic PNG fixture through the real decoder, captures the rendered WinForms client area, and commits a changed screenshot back to that branch. Screenshot-only commits do not recursively trigger another capture.
 
-## 🚀 CLI usage
+## ⌨️ CLI usage
 
 ```bash
 # Auto-detect, try same-format optimization plus cross-format conversion, keep the smallest result
@@ -60,22 +123,34 @@ Every optimizer follows the same basic pipeline:
 4. Optionally screen candidates with a cheaper compressor before expensive Ultra/Hyper passes.
 5. Return the smallest valid result.
 
-## 🧩 Optimizer format support
+## 🤖 CI
 
-| Format | Optimize | Typical search dimensions | Reference |
-| --- | :---: | --- | --- |
-| [PNG](https://en.wikipedia.org/wiki/PNG) | ✅ | color type × bit depth × filters × DEFLATE × interlace × palette/quantization | [W3C PNG](https://www.w3.org/TR/png-3/) |
-| [JPEG](https://en.wikipedia.org/wiki/JPEG) | ✅ | lossless coefficient transcode; optional lossy mode × quality × subsampling × Huffman × metadata | [ITU-T T.81](https://www.itu.int/rec/T-REC-T.81) |
-| [GIF](https://en.wikipedia.org/wiki/GIF) | ✅ | palette strategy × global/local tables × disposal × trimming × frame differencing × LZW policy | [GIF89a](https://www.w3.org/Graphics/GIF/spec-gif89a.txt) |
-| [TIFF](https://en.wikipedia.org/wiki/TIFF) | ✅ | color mode × compression × predictor × strip/tile layout | [TIFF 6.0](https://www.adobe.io/open/standards/TIFF.html) |
-| [BMP](https://en.wikipedia.org/wiki/BMP_file_format) | ✅ | color mode × RLE4/RLE8 × row order × palette ordering | [Microsoft bitmap storage](https://learn.microsoft.com/windows/win32/gdi/bitmap-storage) |
-| [TGA](https://en.wikipedia.org/wiki/Truevision_TGA) | ✅ | color mode × pixel width × RLE × origin | [TGA 2.0 overview](https://www.loc.gov/preservation/digital/formats/fdd/fdd000180.shtml) |
-| [PCX](https://en.wikipedia.org/wiki/PCX) | ✅ | color mode × plane layout × palette ordering | [PCX format notes](http://fileformats.archiveteam.org/wiki/PCX) |
-| [ICO](https://en.wikipedia.org/wiki/ICO_(file_format)) / [CUR](https://en.wikipedia.org/wiki/ICO_(file_format)) | ✅ | per-entry DIB vs PNG choice; CUR hotspot preservation | [Microsoft icons](https://learn.microsoft.com/windows/win32/menurc/about-icons) |
-| [ANI](https://en.wikipedia.org/wiki/ANI_(file_format)) | ✅ | embedded cursor choices while preserving RIFF ACON structure | [Microsoft RIFF](https://learn.microsoft.com/windows/win32/xaudio2/resource-interchange-file-format--riff-) |
-| [WebP](https://en.wikipedia.org/wiki/WebP) | ✅ | container-level pass-through and metadata stripping; codecs provided by the format library | [WebP RIFF container](https://developers.google.com/speed/webp/docs/riff_container) |
+`ci.yml` is the merge gate and runs on pull requests only — nothing runs on a push to `main`, because a pull request has to be green to merge and re-running the same matrix on the merge commit proves nothing. `smoke.yml` gives a working branch the fast tier on one runner, `viewer-platforms.yml` builds the viewer on all three operating systems, and `viewer-screenshot.yml` refreshes the README screenshot, all on pushes to non-`main` branches. `coverage.yml` reports coverage on a daily schedule, gating nobody. `release.yml` handles coordinated releases and NuGet publishing. Version stamping is performed by `.github/workflows/scripts/version.pl --stamp` during CI.
 
-The PNG/GIF/TIFF engines are also published as packages; their READMEs contain package-level capability matrices and API examples.
+Stable releases are manual. Nightlies are built from `main`, which only ever receives merges of green pull requests. The pipeline is documented in full in [`.github/workflows/README.md`](.github/workflows/README.md).
+
+## 💡 Inspiration
+
+The breadth of format coverage is informed by tools that have spent decades dealing with the less fashionable corners of image-format history:
+
+| Project | Focus | Link |
+| --- | --- | --- |
+| Tom's Editor | Very broad conversion coverage | [Supported formats](https://tomseditor.com/convert/supported-formats) |
+| ImageMagick | General-purpose image processing | [Format list](https://imagemagick.org/script/formats.php) |
+| XnView | Broad viewer/converter support | [Formats](https://www.xnview.com/en/xnview/#formats) |
+| IrfanView | Viewer with plugin ecosystem | [Formats](https://www.irfanview.com/main_formats.htm) |
+
+These are comparison/inspiration sources, not implementation specifications. Format implementations should cite the normative specification, original paper, or authoritative project where possible.
+
+## ✅ Conformance and scope
+
+Capability claims are kept next to the implementation evidence instead of duplicated as a hand-maintained backlog in this README:
+
+- [`Hawkynt.FileFormats.Images/README.md`](Hawkynt.FileFormats.Images/README.md) is the image support table — read, write, metadata-only, multi-image and optimizer per format — together with the interoperability evidence for the modern codecs (WebP, AVIF, HEIF, JPEG XL, JPEG 2000, JPEG XR) and the oracle-corpus results.
+- [`Hawkynt.FileFormats.Video/README.md`](Hawkynt.FileFormats.Video/README.md) is the video support table — demux, mux, decode, encode per container and codec, and what is not decoded with the reason; [`codec-notes.md`](Hawkynt.FileFormats.Video/codec-notes.md) records how each was measured and [`codec-investigations.md`](Hawkynt.FileFormats.Video/codec-investigations.md) what stopped the rest.
+- [`Tools/parity/README.md`](Tools/parity/README.md) is how those numbers are measured against RECOIL, ImageMagick, ffmpeg, XnView and IrfanView.
+
+A capability is promoted only when its syntax and behavior have evidence beyond the project's own writer reading its own output. Unsupported profiles stay unadvertised rather than being represented as successful decode/write support.
 
 ## 🏗️ Architecture
 
@@ -109,7 +184,7 @@ Key design rules:
 
 [`FileFormat.md`](FileFormat.md) is the long form of that: the intermediate representation, the interface stack, and the attribute language the header serializer generator reads — which is the one part of this codebase a new format's author has to know and cannot read off the formats themselves.
 
-## 🛠️ Build / test / run
+## 🛠️ Building
 
 PNGCrushCS can optionally consume the sibling `CompressionWorkbench` checkout for linked-source primitives:
 
@@ -140,35 +215,6 @@ dotnet run --project Crush.Viewer -- input.png
 ```
 
 The cross-repo links are conditional; consumers of the published packages do not need the sibling checkout.
-
-## 🤖 CI
-
-`ci.yml` is the merge gate and runs on pull requests only — nothing runs on a push to `main`, because a pull request has to be green to merge and re-running the same matrix on the merge commit proves nothing. `smoke.yml` gives a working branch the fast tier on one runner, `viewer-platforms.yml` builds the viewer on all three operating systems, and `viewer-screenshot.yml` refreshes the README screenshot, all on pushes to non-`main` branches. `coverage.yml` reports coverage on a daily schedule, gating nobody. `release.yml` handles coordinated releases and NuGet publishing. Version stamping is performed by `.github/workflows/scripts/version.pl --stamp` during CI.
-
-Stable releases are manual. Nightlies are built from `main`, which only ever receives merges of green pull requests. The pipeline is documented in full in [`.github/workflows/README.md`](.github/workflows/README.md).
-
-## 💡 Inspiration
-
-The breadth of format coverage is informed by tools that have spent decades dealing with the less fashionable corners of image-format history:
-
-| Project | Focus | Link |
-| --- | --- | --- |
-| Tom's Editor | Very broad conversion coverage | [Supported formats](https://tomseditor.com/convert/supported-formats) |
-| ImageMagick | General-purpose image processing | [Format list](https://imagemagick.org/script/formats.php) |
-| XnView | Broad viewer/converter support | [Formats](https://www.xnview.com/en/xnview/#formats) |
-| IrfanView | Viewer with plugin ecosystem | [Formats](https://www.irfanview.com/main_formats.htm) |
-
-These are comparison/inspiration sources, not implementation specifications. Format implementations should cite the normative specification, original paper, or authoritative project where possible.
-
-## ✅ Conformance and scope
-
-Capability claims are kept next to the implementation evidence instead of duplicated as a hand-maintained backlog in this README:
-
-- [`Hawkynt.FileFormats.Images/README.md`](Hawkynt.FileFormats.Images/README.md) is the image support table — read, write, metadata-only, multi-image and optimizer per format — together with the interoperability evidence for the modern codecs (WebP, AVIF, HEIF, JPEG XL, JPEG 2000, JPEG XR) and the oracle-corpus results.
-- [`Hawkynt.FileFormats.Video/README.md`](Hawkynt.FileFormats.Video/README.md) is the video support table — demux, mux, decode, encode per container and codec, and what is not decoded with the reason; [`codec-notes.md`](Hawkynt.FileFormats.Video/codec-notes.md) records how each was measured and [`codec-investigations.md`](Hawkynt.FileFormats.Video/codec-investigations.md) what stopped the rest.
-- [`Tools/parity/README.md`](Tools/parity/README.md) is how those numbers are measured against RECOIL, ImageMagick, ffmpeg, XnView and IrfanView.
-
-A capability is promoted only when its syntax and behavior have evidence beyond the project's own writer reading its own output. Unsupported profiles stay unadvertised rather than being represented as successful decode/write support.
 
 ## ❤️ Support
 

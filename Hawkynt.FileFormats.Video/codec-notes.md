@@ -360,6 +360,51 @@ by more.
 What is not implemented refuses and says so: D pictures, and a picture size that changes while
 pictures predicted from the old one are still held.
 
+**Encoding writes I and P pictures, and predicts against a decoder rather than against the source.**
+The encoder drives an `MpegVideoDecoder` with its own output and reads the anchor back out of it, so a
+P picture is predicted from the samples the receiving decoder will hold, not from the frame that was
+handed in. Those two differ by the quantiser's loss, and an encoder that ignores the difference is
+correct on its first predicted picture and a little further out on each one after it, which is the
+failure a group of twelve is long enough to make visible and a two-frame test is not. Groups are
+twelve pictures, the length the constrained-parameters material uses, so nothing predicted is ever
+more than eleven pictures from an independently decodable one. Every codeword is the Annex B table
+`MpegVlcTables` decodes with, inverted at load rather than typed a second time, for the same reason it
+is in H.261: a table entered twice can disagree with itself, and a round trip through this library
+alone cannot see it, because both halves would be wrong identically.
+
+Forward vectors are whole-pixel — `full_pel_forward_vector` is set, so no half-pixel interpolation
+stands between the prediction and the samples the search compared — and coded with `forward_f_code` 2.
+That is not a spare bit spent for its own sake. The decoder folds **the reconstructed vector**, not the
+difference that was coded, into `[-16f, 16f)`; with an f_code of one, motion beyond sixteen pixels does
+not cost more bits, it silently comes back as a *different vector*, so the f_code is what decides how
+far anything may move, and the search is clamped to what it states rather than to what the table can
+spell. The difference is folded by the same range before it is written, because both vectors lie inside
+the range while their difference need not.
+
+A macroblock that neither moved nor left a residual is not written at all: the next coded macroblock's
+`macroblock_address_increment` steps over it, escaping in thirty-threes when a run outruns Table B.1.
+This is what makes a predicted picture cheap, and the search has to cooperate with it — on flat or
+repeating content many vectors score identically, so the zero vector is the incumbent and is only
+displaced by a strictly better one. Taking the first equal-scoring candidate instead picks whichever
+corner the scan began at, every macroblock then states a type and two vectors to say nothing happened,
+and a predicted picture ends up *larger* than coding the picture whole. The first and last macroblock
+of a slice are always coded regardless: the first fixes where the slice starts, and a slice ending on a
+skip would not say where it ended. Skipping resets the vector and DC predictors, which the encoder
+mirrors.
+
+B pictures are not written, and that is a contract decision rather than a missing table. They reorder
+coding against display, so the encoder would hand its caller packets in an order that is not the order
+frames arrived, changing what `TryEncode` means to every caller — and against this encoder's
+whole-pixel forward search they express nothing a P picture does not. Reading them is complete.
+
+Verification runs in both directions. The round trip through this library alone codes a full group and
+compares the *last* frame, where drift would have accumulated, not the first, where it cannot have.
+The direction that matters more is outward: a twenty-four frame clip, crossing a group boundary, is
+written out as an elementary stream and decoded by **ffmpeg**, every frame compared and not merely the
+first — the registry's own oracle asks only for frame one, which in a group is the intra picture, so a
+malformed vector, a miscounted address increment or a coded block pattern disagreeing with the blocks
+behind it would pass it and fail in a real player on frame two.
+
 ### MPEG-2 video
 
 One decoder reads both standards, because ISO/IEC 13818-2 is written that way — it requires a decoder
@@ -395,6 +440,40 @@ what separates a rounding difference from a fault in prediction or dequantisatio
 same streams ffmpeg's own two inverse transforms differ from each other by tens of thousands of samples
 per frame. The residual is the transform's, which both standards specify as a formula with an accuracy
 bound rather than as an algorithm, and not a disagreement about the bitstream.
+
+**Encoding writes I and P pictures, Main Profile at Main Level.** The arrangement is MPEG-1's and for
+the same reasons — groups of twelve, prediction taken from a decoder this encoder drives with its own
+output rather than from the source, macroblocks that neither moved nor left a residual not written at
+all, and a search whose incumbent is the zero vector so that a background macroblock can reach that
+state. What is not shared is the vector arithmetic. MPEG-2 has no `full_pel_forward_vector`: every
+vector counts half-samples, and f_code 3 is what buys a range of [-32, 31] whole pixels, because
+7.6.3.1 folds the *reconstructed* vector into the range the f_code states and a vector beyond it comes
+back as a different vector rather than as an expensive one.
+
+**The prediction is formed by the routine the decoder predicts with, not by a copy of it**, and
+chrominance is why. The search is whole-pixel, so a luminance vector is always an even number of
+half-samples and its prediction is a plain copy; but 7.6.3.4 halves the vector for a 4:2:0 chrominance
+plane, so an odd luminance displacement lands chrominance *between* two samples and the decoder
+interpolates. An encoder that rounded to the nearer sample there would compute its residual against a
+prediction its decoder never forms, and the error — a colour fringe on moving edges — would accumulate
+along the group while every luminance comparison stayed clean. The same routine also decides which
+vectors the search may consider at all: an interpolated prediction reaches one sample further than a
+copied one, so chrominance can fall off the reference where luminance does not, and neither standard
+permits a vector that reads outside the reference picture.
+
+The quantiser is the one place a predicted picture is not cheap here. A residual is quantised as
+finely as an intra picture is, so a predicted picture buys its saving by not restating the background
+rather than by stating what it does state coarsely, and the measured margin against coding every
+picture whole is accordingly modest. What the tests pin instead is the property that actually proves
+skipping works: a still scene converges — the first predicted picture corrects the intra picture's own
+quantisation error, and once that correction is in the reference, every macroblock but the two a slice
+must always code goes unwritten.
+
+Verification runs outward as well as in a circle. A twenty-four frame clip crossing a group boundary is
+written as an elementary stream and decoded by **ffmpeg**, with every frame compared rather than only
+the first: the registry's own oracle asks for frame one, which in a group is the intra picture, so a
+malformed vector or a miscounted address increment would pass it and fail in a real player on frame
+two.
 
 ### Microsoft RLE
 
@@ -673,6 +752,42 @@ would write past the end of a block; and a frame whose tokens do not account for
 every coded block. None of them hands back a picture. That matters more here than in most codecs,
 because a frame in which nothing changed is a normal thing for a VP3 stream to contain — so a decoder
 that repeated the previous frame on failure would be producing exactly what working looks like.
+**Encoding writes intra and inter frames.** A group opens with a key frame and continues with eleven
+inter frames, each predicted from the frame before it — read back out of a decoder this encoder drives
+with its own output rather than taken from the source, so what the residual is measured against is what
+the receiving decoder will hold.
+
+Three of the encoder's choices are worth stating because each is a real property of the bitstream rather
+than an internal detail.
+
+**Codedness is decided a whole super block at a time**, and that is not only simplicity. The
+block-level pass of the coded-block flags is run-coded with runs that alternate and — unlike the super
+block passes — have no escape for a run longer than the table can state. Such a run cannot be split into
+two of the same value, because the reader flips between them. Deciding per super block leaves that pass
+empty and the question does not arise; the writer refuses an over-long short run outright rather than
+emitting a stream that reads back inverted from that point on. The cost is that a super block with one
+moving block in it codes all sixteen, which on a codec whose frames are mostly untouched background buys
+a whole class of unwritable stream cheaply.
+
+**Modes and motion vectors are written in their literal forms** — three bits for a mode, five bits and a
+sign for a vector component. Both are ordinary VP3, selected by flags the decoder reads before either
+field, and both avoid a second transcription of tables that exist here only to be read.
+
+**A macro block whose blocks are all uncoded carries no mode at all.** The reader takes its silence as
+"inter, no motion" and moves on, so writing one would put every macro block after it a codeword out of
+place — and the encoder's own mode array has to agree with that silence, because the DC predictor asks
+every block which reference its macro block used before it will use it as a neighbour.
+
+The golden frame is never referenced: every inter macro block predicts from the previous frame, with or
+without a vector. The modes that reach for the golden frame, the two that reuse an earlier vector and
+the four-vector mode are all read and none is written.
+
+Verification: a twenty-four frame clip crossing a group boundary is muxed and decoded by **ffmpeg** with
+every frame compared, not only the first — the registry's own oracle asks for frame one, which is the key
+frame, so a miscounted coded-block run, a mode written for a macro block that carries none, or a vector
+in the wrong units would pass it and fail in a real player on frame two. A still scene is also required
+to converge, which is what demonstrates the coded-block flags firing at all.
+
 ### Apple Video (RPZA)
 
 A vector quantizer over 4x4 blocks of 15-bit RGB colour, also called Road Pizza, and QuickTime's own
@@ -852,6 +967,8 @@ cheaper than what is written instead.
 On the same 262 pictures this encoder's packets total 802,858 bytes against ffmpeg's 827,671.
 ### VP8
 
+The encoder is intentionally all-intra. Every input picture is written as a version-0 key frame at quality 75 through the image package's existing VP8 encoder, so packets carry no dependency on earlier reference frames. That spends compression ratio to keep the bitstream implementation in one place. The video adapter is separately exercised through the registry's FFmpeg oracle, which muxes three packets and asks FFmpeg to decode a frame back at the stated geometry.
+
 The codec WebM was built around, and all of it: the boolean entropy decoder, segmentation, both loop
 filters, up to eight token partitions, all fourteen intra prediction modes, prediction from any of
 the three reference frames with the six-tap and bilinear sub-pixel filters, and the probability state
@@ -999,6 +1116,38 @@ shifted, since no offset into one of their pictures decodes even three macrobloc
 tables. A first run that leaves its macroblock position out is refused for the same reason: no
 measured stream does it, so the shape of such a header is unverified, and reading it wrongly would
 produce noise shaped like a picture instead of an error. A PB-frame is refused where it is signalled.
+
+**Encoding writes intra and predicted pictures.** The shape is the one MPEG-1 and H.261 use here —
+groups of twelve, prediction taken from a decoder this encoder drives with its own output rather than
+from the source, a whole-pixel search whose incumbent is the zero vector so a background macroblock
+can reach the state that lets it go untransmitted — but two things in the macroblock layer are H.263's
+alone and are where a writer built from the MPEG one would go wrong.
+
+The first is the vector predictor. Clause 6.1.1 predicts from the **median of three neighbours** —
+left, above, above-right, with substitutions at the edges applied in the Recommendation's own order —
+and not from the previous macroblock's vector. The predictor a decoder forms therefore depends on
+macroblocks a whole row apart, so an encoder keeping a running vector of its own would agree with the
+decoder about the first macroblock of a picture and about nothing after it. The rule is read here in
+the same order it is read there, which is what makes the first macroblock predict from zero instead of
+from whatever the arrays happen to hold.
+
+The second is CBPY, which **states the complement of an inter macroblock's luminance pattern** and the
+plain value of an intra one's. Writing it uncomplemented names exactly the blocks that were coded as
+pure prediction: a picture, and the wrong one. Alongside it, COD (5.3.1) is the bit that makes a
+predicted picture cheap at all — set, and the macroblock is not transmitted, is the co-located
+macroblock of the reference, and counts as a zero vector for every later predictor.
+
+Vectors are whole-pixel in luminance and so land between chrominance samples half the time, where the
+prediction is formed by the decoder's own interpolation rather than rounded to the nearer sample; the
+search is kept inside the -16 to 15.5 whole pixels the baseline allows, because each Table 14 code
+stands for two differences sixty-four half-pixels apart and a vector beyond the range comes back as
+the other member of the pair.
+
+Verification runs outward: a twenty-four frame clip crossing a group boundary is written out and
+decoded by **ffmpeg**, every frame compared rather than only the first — the registry's own oracle asks
+for frame one, which in a group is the intra picture, so a vector coded against the wrong predictor, a
+CBPY written uncomplemented or a misplaced COD bit would pass it and fail in a real player on frame
+two. A still scene is also required to converge, which is what actually demonstrates COD firing.
 
 ### H.264 / AVC
 
@@ -1150,6 +1299,45 @@ a file every other tool plays.
 `DVX3` was checked the same way and is **not** one of them: it names Microsoft's MPEG-4 version 3, so
 it is claimed by the version 2 decoder beside this one and refused there by name. Matroska's
 `V_MPEG4/MS/V3` is the same bitstream under that container's name and is refused with it.
+**Encoding writes I, P and B pictures with searched motion in every predicted one.** Twelve displayed
+pictures to a group, two B-VOPs between anchors, and the reference a picture is built on is read back
+out of this encoder's own reconstruction rather than taken from the source.
+
+Three rules here are the ones a writer gets wrong, and each of them is invisible until something
+exercises it.
+
+**low_delay has to be stated, not left out.** `vol_control_parameters` carries it, and a decoder that
+finds no `low_delay` does not treat the question as open — it takes the stream as low-delay, and then
+meets a B-VOP it was told could not exist. FFmpeg says so in as many words ("low_delay flag set
+incorrectly") and refuses the picture. The block is written because this encoder reorders.
+
+**A B-VOP's vector predictor is the last vector of the same direction**, not a median of neighbours
+and not something that restarts each macroblock row. It runs from the start of the video packet, or
+of the picture where there are no resync markers, and only a macroblock that actually carries a vector
+of that direction moves it: a forward-only macroblock advances the forward predictor and leaves the
+backward one alone. The decoder in this package reset both predictors at the head of every macroblock
+row until this encoder gave it a B-VOP with real motion in it — a mistake that costs nothing for as
+long as every B vector is zero, and then makes every macroblock after the first in a row reconstruct a
+vector nobody coded. FFmpeg reading the same stream correctly is what located it.
+
+**A macroblock the following anchor did not code is not in a B-VOP at all.** That is a rule about
+where syntax elements are and not only about what they mean, so an encoder that writes one anyway
+puts every macroblock after it in the wrong place. It follows `not_coded` in the P-VOP, which is what
+makes a predicted picture cheap in the first place — and for that to fire at all the search has to
+return a zero vector for a macroblock that did not move, which is why the zero vector is the incumbent
+and only a strictly better candidate displaces it.
+
+The chrominance vector is derived from the sum of the macroblock's four luminance vectors through
+7.6.2's rounding table — four times the single vector, for a macroblock that carries one — and not by
+halving. The two agree on some vectors and not others, and the disagreement is a colour fringe on
+moving edges that no luminance comparison sees, so the derivation used here is the decoder's own
+routine rather than a restatement of it.
+
+Verification: a twenty-four frame clip of genuinely moving content, crossing a group boundary, is muxed
+and decoded by **ffmpeg** with every frame compared. Counting the pictures back proves the reordering
+and nothing else — a vector coded against the wrong predictor, folded the wrong way, or halved for
+chrominance with the wrong operator still yields the right number of pictures, just not the right ones.
+
 ### Apple ProRes
 
 Written from SMPTE RDD 36:2022, which is the published description of the bitstream and is cited by
@@ -1893,6 +2081,30 @@ Also refused by name: tiles, dependent slice segments, coding units coded as raw
 4:4:4, monochrome, more than eight bits a sample, separate colour planes, and the range, screen
 content, multilayer and three-dimensional extensions. There is no `catch` anywhere that returns a
 blank, a copied or a partial frame.
+
+**Encoding writes independent IDR pictures made of PCM coding units, and no inter pictures at all.**
+That is a statement about what exists in this package rather than a coding preference. A PCM coding
+unit stores its samples exactly and needs no transform, no quantiser and no residual syntax; what it
+does need from CABAC is a handful of flags in a fixed pattern, which the still-picture core already
+writes. An inter picture needs the rest: prediction units, motion vector differences, a transform
+tree, quantised residuals — and every one of those goes through CABAC as arithmetic-coded bins. The
+CABAC engine here **decodes only**. There is no `EncodeBin` to write them with, and adding one means
+building the arithmetic coder, the residual syntax and the rate-distortion decisions behind it: an
+HEVC encoder, not a change to this writer. It is left undone and said so rather than approximated.
+
+What the writer does produce is ordinary Main profile, not Main Still Picture — the still profile
+permits one picture and a video track is not one picture — with VPS, SPS and PPS carried in an
+`HEVCDecoderConfigurationRecord` and length-prefixed samples, so a Matroska or ISO-media container
+needs nothing out of band. Because PCM samples are exact, the only difference a correct decode can
+show is the 4:2:0 conversion an RGB source went through; a 4:2:0 source comes back unchanged. Odd
+dimensions are refused rather than quietly rounded, because rounding them changes the display
+geometry the caller asked for.
+
+Verification runs outward as well as in a circle: a six-picture clip is muxed and decoded by
+**ffmpeg** with every frame compared. Every picture being independent means a multi-picture clip
+tests the packaging rather than the coding — the configuration record, the length prefixes, and that
+picture two is where the container says it is — and PCM's exactness makes that comparison tight
+rather than nominal.
 
 ### CamStudio Screen Codec
 

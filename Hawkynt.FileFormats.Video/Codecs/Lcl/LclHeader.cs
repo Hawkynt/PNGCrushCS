@@ -22,8 +22,9 @@ internal readonly record struct LclHeader(byte ImageType, sbyte Compression, byt
 
   /// <summary>
   /// Bit 0 of <see cref="Flags"/>: the coded picture is split into two independently decodable
-  /// sections. The document says so and states nothing else about it — not the length or offset
-  /// fields that would say where one section ends and the other begins — so nothing here reads one.
+  /// sections. The published document states the split but leaves its length/offset fields unstated;
+  /// MSZH's compatible reference decoder establishes those packet fields and this package follows
+  /// them there, while the ZLIB decoder still refuses this flag rather than guessing its wrapper.
   /// </summary>
   public bool Multithreaded => (this.Flags & 0x01) != 0;
 

@@ -1,0 +1,121 @@
+name: Temporary AVRn documentation regeneration
+
+on:
+  push:
+    branches: [fix/avid-avrn-read-write]
+
+permissions:
+  contents: write
+
+jobs:
+  regenerate:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out PNGCrushCS
+        uses: actions/checkout@v4
+        with:
+          path: PNGCrushCS
+          fetch-depth: 0
+
+      - name: Check out CompressionWorkbench sibling
+        uses: actions/checkout@v4
+        with:
+          repository: Hawkynt/CompressionWorkbench
+          path: CompressionWorkbench
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.x
+            10.0.x
+
+      - name: Update AVRn support ledger and codec notes
+        working-directory: PNGCrushCS
+        shell: pwsh
+        run: |
+          $utf8 = [System.Text.UTF8Encoding]::new($false)
+          $readmePath = 'Hawkynt.FileFormats.Video/README.md'
+          $readme = Get-Content -Raw $readmePath
+          $oldRow = '| [Avid AVRn](https://wiki.multimedia.cx/index.php/Motion_JPEG) | ✅ | — | — | `AVRn`; baseline JPEG, but the container''s picture size is trusted over the JPEG frame header''s | [ITU-T T.81](https://www.itu.int/rec/T-REC-T.81) |'
+          $newRow = '| [Avid AVRn](https://ffmpeg.org/) | ✅ | ✅ | ffmpeg | `AVRn`; non-1:1 streams are Motion JPEG with Avid''s top-padding crop. Resolution 1:1 is lossless UYVY 4:2:2; progressive and interlaced 1:1 decode, while the encoder writes progressive 1:1 with the VFW `1:1` discriminator | [FFmpeg AVRn decoder](https://github.com/FFmpeg/FFmpeg/blob/master/libavcodec/avrndec.c) |'
+          if (-not $readme.Contains($oldRow)) { throw 'The AVRn support row changed upstream.' }
+          $readme = $readme.Replace($oldRow, $newRow)
+          $readme = $readme.Replace('builds, 46 of them', 'builds, 47 of them')
+          $readme = $readme.Replace('46 codecs of the 100 read can also be written', '47 codecs of the 100 read can also be written')
+          [System.IO.File]::WriteAllText($readmePath, $readme, $utf8)
+
+          $notesPath = 'Hawkynt.FileFormats.Video/codec-notes.md'
+          $notes = Get-Content -Raw $notesPath
+          $replacement = @'
+          ### Avid AVRn
+
+          `AVRn` is not one payload. The four-character code was used both for Avid Motion JPEG and for
+          Avid Resolution 1:1, and the AVI codec data is what separates them. Current ffmpeg makes that
+          split in `libavformat/avidec.c`: after the forty-byte BITMAPINFOHEADER, codec extra data shorter
+          than 31 bytes or without `1:1` at byte 28 is reclassified as MJPEG; only the `1:1` form reaches
+          `libavcodec/avrndec.c`. This decoder keeps the same distinction locally because this package's AVI
+          reader deliberately hands the complete `strf` to the codec instead of changing codec identity in
+          the container layer.
+
+          The MJPEG subtype is delegated to the package's existing Motion JPEG decoder, but Avid still owns
+          the displayed geometry. If the container states a smaller picture, the bottom rows and left columns
+          of the coded JPEG are kept. That is not an obsolete wrapper quirk: ffmpeg's old AVRn decoder did the
+          crop itself, and the 2021 change that moved non-1:1 streams to the general MJPEG decoder recreated the
+          same rule there as a top crop for `AVRn` and `AVDJ`. The old decoder in this package therefore had
+          this crop right; its defect was assuming that every `AVRn` packet was JPEG and never recognizing the
+          Resolution 1:1 raw subtype.
+
+          Resolution 1:1 is lossless packed UYVY 4:2:2. A progressive packet is two bytes a pixel, with any
+          surplus whole coded rows before the displayed picture; `packet_size / (2 * width)` gives the coded
+          height and the last container-height rows are unpacked. Interlaced codec data carries a `1:1(`
+          descriptor and a field-order byte. Those packets hold one field, four separator bytes, then the
+          other; the two are woven back onto alternating output rows before the shared UYVY packer turns them
+          into `Yuv422P8` planes. Truncated packets and odd-height interlaced streams are refused rather than
+          leaving an uninitialised row as a plausible picture.
+
+          The writer emits the progressive Resolution 1:1 form. Its stream format is a 40-byte
+          BITMAPINFOHEADER followed by 31 bytes of codec data with `1:1` at byte 28, the discriminator ffmpeg's
+          AVI demuxer requires. The packet itself is exactly the shared UYVY packing, so a `Yuv422P8` source is
+          byte-for-byte lossless and every frame is independent. ffmpeg has no AVRn encoder to compare bytes
+          against; interoperability is checked in the other direction by muxing the output into AVI and asking
+          ffmpeg's decoder to read it.
+
+          Provenance is clean-room behavior, not a translation. The consulted ffmpeg decoder, demuxer and
+          AVRn/MJPEG compatibility change are LGPL-2.1-or-later and therefore licence-compatible with this
+          LGPL-3.0-or-later project anyway, but no implementation structure or expressive code is reproduced;
+          the repository's existing `PackedYuv422Packing` supplies the actual sample packing.
+          '@
+          $pattern = '(?s)### Avid AVRn\r?\n.*?(?=\r?\n### )'
+          if (-not [regex]::IsMatch($notes, $pattern)) { throw 'The AVRn codec-notes section could not be found.' }
+          $notes = [regex]::Replace($notes, $pattern, $replacement.TrimEnd(), 1)
+          [System.IO.File]::WriteAllText($notesPath, $notes, $utf8)
+
+      - name: Restore
+        working-directory: PNGCrushCS
+        run: dotnet restore PngCrush.slnx -p:EnableWindowsTargeting=true
+
+      - name: Build
+        working-directory: PNGCrushCS
+        run: dotnet build PngCrush.slnx --configuration Release --no-restore -p:EnableWindowsTargeting=true
+
+      - name: Regenerate package documentation
+        uses: Hawkynt/RepositoryTemplate/package-readme@v1
+        with:
+          mode: write
+          root: PNGCrushCS
+          configuration: Release
+
+      - name: Commit generated documentation
+        working-directory: PNGCrushCS
+        shell: bash
+        run: |
+          if git diff --quiet -- Hawkynt.FileFormats.Video/README.md Hawkynt.FileFormats.Video/REFERENCE.md Hawkynt.FileFormats.Video/codec-notes.md; then
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Hawkynt.FileFormats.Video/README.md Hawkynt.FileFormats.Video/REFERENCE.md Hawkynt.FileFormats.Video/codec-notes.md
+          git commit -m "* regenerate AVRn video documentation"
+          git push origin HEAD:fix/avid-avrn-read-write

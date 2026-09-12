@@ -30,6 +30,8 @@ internal readonly struct IsoBmffBox {
   internal const string Ipma = "ipma";
   internal const string Ispe = "ispe";
   internal const string Clap = "clap";
+  internal const string Irot = "irot";
+  internal const string Imir = "imir";
 
   /// <summary>The colour information property: which primaries, transfer, matrix and range.</summary>
   internal const string Colr = "colr";

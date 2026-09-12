@@ -53,7 +53,7 @@ public readonly record struct BmpFile :
   /// <c>.msk</c> was claimed and this was not.
   /// </remarks>
   static string[] IImageFormatMetadata<BmpFile>.FileExtensions =>
-    [".bmp", ".dib", ".bga", ".rl4", ".rl8", ".vga", ".sys", ".bum", ".thb", ".2d", ".bmc", ".stm", ".upi", ".msk", ".flt"];
+    [".bmp", ".bga", ".rl4", ".rl8", ".vga", ".sys", ".bum", ".thb", ".2d", ".bmc", ".stm", ".upi", ".msk", ".flt"];
   static BmpFile IImageFormatReader<BmpFile>.FromSpan(ReadOnlySpan<byte> data) => BmpReader.FromSpan(data);
   static FormatCapability IImageFormatMetadata<BmpFile>.Capabilities => FormatCapability.HasDedicatedOptimizer;
   static VideoMode[] IImageFormatMetadata<BmpFile>.VideoModes => [

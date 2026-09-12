@@ -54,6 +54,7 @@ internal static class WriterOracleTool {
     ConformanceOracle.HeifDec,
     ConformanceOracle.AvifDec,
     ConformanceOracle.FFmpeg,
+    ConformanceOracle.LibreOffice,
     ConformanceOracle.IrfanView,
     ConformanceOracle.Ghostscript,
   ];
@@ -121,7 +122,7 @@ internal static class WriterOracleTool {
     if (extensions != null && !extensions.Contains(Path.GetExtension(path), StringComparer.OrdinalIgnoreCase))
       return (Verdict.NoOpinion, "reads no format that goes by this name");
 
-    var output = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName() + ".png");
+    var output = _OutputPath(oracle, path);
     try {
       var (exitCode, diagnostics) = _Run(executable, _Arguments(oracle, path, output), oracle);
       if (exitCode == null)
@@ -137,7 +138,7 @@ internal static class WriterOracleTool {
 
       return (Verdict.Rejected, diagnostics.Length == 0 ? "it produced no picture of that size" : _FirstLine(diagnostics));
     } finally {
-      try { File.Delete(output); } catch { /* best effort */ }
+      _DeleteOutput(oracle, output);
     }
   }
 
@@ -155,7 +156,7 @@ internal static class WriterOracleTool {
     if (executable == null)
       return null;
 
-    var output = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName() + ".png");
+    var output = _OutputPath(oracle, path);
     try {
       var (exitCode, _) = _Run(executable, _Arguments(oracle, path, output), oracle);
       if (exitCode is not 0 || !File.Exists(output))
@@ -165,8 +166,26 @@ internal static class WriterOracleTool {
     } catch (IOException) {
       return null;
     } finally {
-      try { File.Delete(output); } catch { /* best effort */ }
+      _DeleteOutput(oracle, output);
     }
+  }
+
+  private static string _OutputPath(ConformanceOracle oracle, string input) {
+    if (oracle != ConformanceOracle.LibreOffice)
+      return Path.Combine(Path.GetTempPath(), Path.GetRandomFileName() + ".png");
+
+    // soffice chooses the output file name from the input stem; isolate each invocation so parallel
+    // tests cannot collide and so an already-running desktop instance cannot steal the conversion.
+    var directory = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+    Directory.CreateDirectory(directory);
+    return Path.Combine(directory, Path.GetFileNameWithoutExtension(input) + ".png");
+  }
+
+  private static void _DeleteOutput(ConformanceOracle oracle, string output) {
+    try { File.Delete(output); } catch { /* best effort */ }
+
+    if (oracle == ConformanceOracle.LibreOffice)
+      try { Directory.Delete(Path.GetDirectoryName(output)!, recursive: true); } catch { /* best effort */ }
   }
 
   private static string _FirstLine(string text) {
@@ -238,6 +257,7 @@ internal static class WriterOracleTool {
     ConformanceOracle.HeifDec => [input, output],
     ConformanceOracle.AvifDec => [input, output],
     ConformanceOracle.FFmpeg => ["-hide_banner", "-loglevel", "error", "-y", "-i", input, "-frames:v", "1", output],
+    ConformanceOracle.LibreOffice => _LibreOfficeArguments(input, output),
 
     // Everywhere but Windows the executable is Wine and the program is its first argument. /silent
     // is what makes it usable with nobody present: without it a file it cannot read raises a dialog
@@ -271,6 +291,12 @@ internal static class WriterOracleTool {
     _ => throw new NotSupportedException($"{oracle} has no runner here."),
   };
 
+  private static string[] _LibreOfficeArguments(string input, string output) {
+    var directory = Path.GetDirectoryName(output)!;
+    var profile = new Uri(Path.GetFullPath(Path.Combine(directory, "profile"))).AbsoluteUri;
+    return [$"-env:UserInstallation={profile}", "--headless", "--convert-to", "png", "--outdir", directory, input];
+  }
+
   /// <summary>Where the tool is, or null when the machine has not got it.</summary>
   /// <remarks>
   /// The environment variable comes first for every one of them, so a build that keeps its oracles
@@ -295,6 +321,7 @@ internal static class WriterOracleTool {
       ConformanceOracle.HeifDec => ("HEIF_DEC", "heif-dec"),
       ConformanceOracle.AvifDec => ("AVIFDEC", "avifdec"),
       ConformanceOracle.FFmpeg => ("FFMPEG", "ffmpeg"),
+      ConformanceOracle.LibreOffice => ("LIBREOFFICE", "soffice"),
       ConformanceOracle.Ghostscript => ("GHOSTSCRIPT", OperatingSystem.IsWindows() ? "gswin64c" : "gs"),
       _ => (null, null),
     };

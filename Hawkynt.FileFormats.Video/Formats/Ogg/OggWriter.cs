@@ -25,6 +25,7 @@ public sealed class OggWriter : IVideoContainerWriter<OggWriter> {
     internal uint Serial { get; } = serial;
     internal ReadOnlyMemory<byte>[] Headers { get; } = headers;
     internal uint Sequence { get; set; }
+    internal bool IsTheora { get; set; }
     internal int TheoraShift { get; set; }
     internal long TheoraFrame { get; set; }
     internal long TheoraLastKey { get; set; } = -1;
@@ -61,10 +62,14 @@ public sealed class OggWriter : IVideoContainerWriter<OggWriter> {
         headers[1] = comment;
 
       var state = new StreamState(info, 0x504E4700u + checked((uint)i + 1), headers);
-      if (info.CodecId?.Equals("theora", StringComparison.OrdinalIgnoreCase) == true) {
-        var first = headers[0].Span;
-        if (first.Length < 42 || first[0] != 0x80 || !first.Slice(1, 6).SequenceEqual("theora"u8))
+      var first = headers[0].Span;
+      var startsAsTheora = first.Length >= 7 && first[0] == 0x80 && first.Slice(1, 6).SequenceEqual("theora"u8);
+      var namedAsTheora = info.CodecId?.Equals("theora", StringComparison.OrdinalIgnoreCase) == true
+                          || info.CodecId?.Equals("V_THEORA", StringComparison.OrdinalIgnoreCase) == true;
+      if (startsAsTheora || namedAsTheora) {
+        if (first.Length < 42 || !startsAsTheora)
           throw new InvalidDataException("Theora CodecPrivateData does not begin with a valid identification header.");
+        state.IsTheora = true;
         state.TheoraShift = (BinaryPrimitives.ReadUInt16BigEndian(first.Slice(40, 2)) >> 5) & 0x1F;
       }
       this._states[i] = state;
@@ -141,7 +146,7 @@ public sealed class OggWriter : IVideoContainerWriter<OggWriter> {
   }
 
   private static long _Granule(StreamState state, CodedPacket packet, long? nextPosition) {
-    if (state.Info.CodecId?.Equals("theora", StringComparison.OrdinalIgnoreCase) == true) {
+    if (state.IsTheora) {
       var frame = state.TheoraFrame++;
       if (packet.IsKeyFrame)
         state.TheoraLastKey = frame;

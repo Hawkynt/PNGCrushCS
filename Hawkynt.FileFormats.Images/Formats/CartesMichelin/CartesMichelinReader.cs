@@ -35,6 +35,51 @@ public static class CartesMichelinReader {
     return FromSpan(data);
   }
 
+  /// <summary>
+  /// Identifies a sheet by the structure around its embedded GIF tiles rather than by the four
+  /// range-limited integers at its front. <c>null</c> means the supplied prefix ends before a
+  /// present tile's signature can be inspected.
+  /// </summary>
+  internal static bool? MatchesSignature(ReadOnlySpan<byte> data) {
+    if (data.Length < CartesMichelinFile.HeaderSize)
+      return null;
+
+    var tileWidth = BinaryPrimitives.ReadInt32LittleEndian(data);
+    var tileHeight = BinaryPrimitives.ReadInt32LittleEndian(data[4..]);
+    var across = BinaryPrimitives.ReadInt32LittleEndian(data[8..]);
+    var down = BinaryPrimitives.ReadInt32LittleEndian(data[12..]);
+    if (!_HeaderIsPlausible(tileWidth, tileHeight, across, down))
+      return false;
+
+    var directoryEnd = CartesMichelinFile.HeaderSize
+                       + (long)across * down * CartesMichelinFile.DirectoryEntrySize;
+    if (directoryEnd > data.Length)
+      return null;
+
+    var needsMoreData = false;
+    for (var index = 0; index < across * down; ++index) {
+      var at = CartesMichelinFile.HeaderSize + index * CartesMichelinFile.DirectoryEntrySize;
+      var offset = BinaryPrimitives.ReadInt32LittleEndian(data[at..]);
+      var length = BinaryPrimitives.ReadInt32LittleEndian(data[(at + 4)..]);
+      if (length == 0)
+        continue;
+      if (length < CartesMichelinFile.TileSignature.Length || offset <= 0)
+        continue;
+
+      var signatureEnd = (long)offset + CartesMichelinFile.TileSignature.Length;
+      if (signatureEnd > data.Length) {
+        needsMoreData = true;
+        continue;
+      }
+
+      if (data.Slice(offset, CartesMichelinFile.TileSignature.Length)
+          .SequenceEqual(CartesMichelinFile.TileSignature))
+        return true;
+    }
+
+    return needsMoreData ? null : false;
+  }
+
   public static CartesMichelinFile FromSpan(ReadOnlySpan<byte> data) {
     if (data.Length < CartesMichelinFile.HeaderSize)
       throw new InvalidDataException(
@@ -75,9 +120,13 @@ public static class CartesMichelinReader {
 
     var columns = maxColumn - minColumn + 1;
     var rows = maxRow - minRow + 1;
-    var width = tileWidth * columns;
-    var height = tileHeight * rows;
-    var pixels = new byte[width * height * 3];
+    var width = checked(tileWidth * columns);
+    var height = checked(tileHeight * rows);
+    var pixelBytes = (long)width * height * 3;
+    if (pixelBytes > Array.MaxLength)
+      throw new InvalidDataException($"The assembled Cartes Michelin sheet is too large ({width}x{height}).");
+
+    var pixels = new byte[(int)pixelBytes];
     var placed = 0;
 
     for (var row = minRow; row <= maxRow; ++row)
@@ -87,7 +136,10 @@ public static class CartesMichelinReader {
         continue;
 
       var picture = GifFile.ToRawImage(GifReader.FromSpan(tile)).EnsureFormat(PixelFormat.Rgb24);
-      _Blit(picture, pixels, width, height, (column - minColumn) * tileWidth, (row - minRow) * tileHeight);
+      _Blit(
+        picture, pixels, width,
+        (column - minColumn) * tileWidth, (row - minRow) * tileHeight,
+        tileWidth, tileHeight);
       ++placed;
     }
 
@@ -96,39 +148,46 @@ public static class CartesMichelinReader {
       Height = height,
       TileWidth = tileWidth,
       TileHeight = tileHeight,
+      GridColumns = across,
+      GridRows = down,
       TileCount = placed,
       PixelData = pixels,
     };
   }
 
-  /// <summary>The bytes of one grid position's tile, or empty where there is none.</summary>
+  private static bool _HeaderIsPlausible(int tileWidth, int tileHeight, int across, int down)
+    => tileWidth is >= CartesMichelinFile.MinTileSize and <= CartesMichelinFile.MaxTileSize
+       && tileHeight is >= CartesMichelinFile.MinTileSize and <= CartesMichelinFile.MaxTileSize
+       && across is >= CartesMichelinFile.MinGridCount and <= CartesMichelinFile.MaxGridCount
+       && down is >= CartesMichelinFile.MinGridCount and <= CartesMichelinFile.MaxGridCount;
+
+  /// <summary>The bytes of one grid position's tile, or empty where the directory marks it absent.</summary>
   private static ReadOnlySpan<byte> _Tile(ReadOnlySpan<byte> data, int across, int row, int column) {
     var at = CartesMichelinFile.HeaderSize + (row * across + column) * CartesMichelinFile.DirectoryEntrySize;
     var offset = BinaryPrimitives.ReadInt32LittleEndian(data[at..]);
     var length = BinaryPrimitives.ReadInt32LittleEndian(data[(at + 4)..]);
-    if (length <= 0 || offset <= 0 || (long)offset + length > data.Length)
+    if (length == 0)
       return default;
+    if (length < 0 || offset <= 0 || (long)offset + length > data.Length)
+      throw new InvalidDataException($"Cartes Michelin tile {column},{row} has an invalid offset/length entry ({offset}, {length}).");
 
     var tile = data.Slice(offset, length);
-    return tile.Length >= CartesMichelinFile.TileSignature.Length
-           && tile[..CartesMichelinFile.TileSignature.Length].SequenceEqual(CartesMichelinFile.TileSignature)
-      ? tile
-      : default;
+    if (tile.Length < CartesMichelinFile.TileSignature.Length
+        || !tile[..CartesMichelinFile.TileSignature.Length].SequenceEqual(CartesMichelinFile.TileSignature))
+      throw new InvalidDataException($"Cartes Michelin tile {column},{row} is present but does not contain a GIF image.");
+
+    return tile;
   }
 
-  private static void _Blit(RawImage tile, byte[] pixels, int width, int height, int left, int top) {
-    for (var y = 0; y < tile.Height; ++y) {
-      var targetRow = top + y;
-      if (targetRow >= height)
-        break;
-
-      for (var x = 0; x < tile.Width; ++x) {
-        var targetColumn = left + x;
-        if (targetColumn >= width)
-          break;
-
+  private static void _Blit(
+    RawImage tile, byte[] pixels, int width,
+    int left, int top, int slotWidth, int slotHeight) {
+    var copyHeight = Math.Min(tile.Height, slotHeight);
+    var copyWidth = Math.Min(tile.Width, slotWidth);
+    for (var y = 0; y < copyHeight; ++y) {
+      for (var x = 0; x < copyWidth; ++x) {
         var from = (y * tile.Width + x) * 3;
-        var to = (targetRow * width + targetColumn) * 3;
+        var to = ((top + y) * width + left + x) * 3;
         pixels[to] = tile.PixelData[from];
         pixels[to + 1] = tile.PixelData[from + 1];
         pixels[to + 2] = tile.PixelData[from + 2];

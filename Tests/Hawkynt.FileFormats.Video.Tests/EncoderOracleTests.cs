@@ -5,9 +5,12 @@ using System.Linq;
 using System.Text;
 using FileFormat.Avi;
 using FileFormat.Core;
+using FileFormat.FlicVideo;
 using FileFormat.Flv;
 using FileFormat.Matroska;
 using FileFormat.Mjpeg;
+using FileFormat.Ogg;
+using FileFormat.RealMedia;
 using FileFormat.Mp4;
 using FileFormat.RoqVideo;
 using FileFormat.Yuv4Mpeg;
@@ -237,7 +240,8 @@ public sealed class EncoderOracleTests {
   /// <remarks>
   /// A codec has to be named by something a demuxer can carry before any decoder is reached, and no
   /// one container names them all: the VFW-style codes belong in an AVI, the QuickTime ones in an
-  /// MP4, and Matroska carries whatever the other two will not.
+  /// MP4, Matroska carries whatever the other two will not, and Xiph's codecs are named by the
+  /// header packet an Ogg stream opens with rather than by any code a container holds.
   /// <para/>
   /// YUV4MPEG2 is deliberately not among them. It states the planes and no codec, so anything
   /// written into one comes back out of FFmpeg as a picture of the right size whether the encoder
@@ -249,9 +253,15 @@ public sealed class EncoderOracleTests {
     ("Avi", ".avi", static (streams, packets) => VideoIO.Mux<AviWriter>(streams, packets)),
     ("Mp4", ".mp4", static (streams, packets) => VideoIO.Mux<Mp4Writer>(streams, packets)),
     ("Matroska", ".mkv", static (streams, packets) => VideoIO.Mux<MatroskaWriter>(streams, packets)),
+    // RealVideo carries its bitstream version in the container, and only this one carries it in
+    // the shape a RealVideo decoder expects; without it the codec has no container to be asked
+    // about in.
+    ("RealMedia", ".rm", static (streams, packets) => VideoIO.Mux<RealMediaWriter>(streams, packets)),
     ("Flv", ".flv", static (streams, packets) => VideoIO.Mux<FlvWriter>(streams, packets)),
+    ("Fli", ".flc", static (streams, packets) => VideoIO.Mux<FliWriter>(streams, packets)),
     ("Roq", ".roq", static (streams, packets) => VideoIO.Mux<RoqWriter>(streams, packets)),
     ("Mjpeg", ".mjpg", static (streams, packets) => VideoIO.Mux<MjpegWriter>(streams, packets)),
+    ("Ogg", ".ogv", static (streams, packets) => VideoIO.Mux<OggWriter>(streams, packets)),
   ];
 
   /// <summary>
@@ -259,8 +269,8 @@ public sealed class EncoderOracleTests {
   /// </summary>
   /// <remarks>
   /// YUV4MPEG2 states the planes and names no codec, so whatever is written into one comes back out
-  /// of FFmpeg as a picture whether the encoder that produced those bytes was understood or not —
-  /// MagicYUV passed through it on a build of FFmpeg with no MagicYUV decoder in it. That makes it
+  /// of FFmpeg as a picture whether or not the encoder that produced those bytes was understood —
+  /// MagicYUV passed through it on a build with no MagicYUV decoder in it. That makes it
   /// useless for a codec claim and perfectly good for a container claim: FFmpeg still had to follow
   /// the header this muxer wrote to find the planes at all.
   /// </remarks>
@@ -377,15 +387,15 @@ public sealed class EncoderOracleTests {
 
   /// <summary>The pictures offered, in the order they are offered.</summary>
   /// <remarks>
-  /// Three representations rather than one, because the encoders here disagree about what a picture
-  /// is: the palettised coders refuse anything that is not indexed rather than quantising it, and
-  /// the direct-colour ones refuse an indexed picture rather than expanding it. Offering all three
+  /// Four representations rather than one, because the encoders here disagree about what a picture
+  /// is: some take packed RGB, some indexed pixels, and some native planar YUV. Offering all four
   /// measures whether the bytes are readable instead of whether the fixture guessed right.
   /// </remarks>
   private static IEnumerable<RawImage> _Pictures(int width, int height) {
     yield return _Rgb24(width, height);
     yield return _Rgba32(width, height);
     yield return _Indexed(width, height);
+    yield return _Yuv420P8(width, height);
   }
 
   private static RawImage _Rgb24(int width, int height) {
@@ -435,6 +445,34 @@ public sealed class EncoderOracleTests {
       PixelData = data,
       Palette = palette,
       PaletteCount = 256,
+    };
+  }
+
+  private static RawImage _Yuv420P8(int width, int height) {
+    var chromaWidth = (width + 1) >> 1;
+    var chromaHeight = (height + 1) >> 1;
+    var lumaLength = checked(width * height);
+    var chromaLength = checked(chromaWidth * chromaHeight);
+    var data = new byte[checked(lumaLength + 2 * chromaLength)];
+    var uAt = lumaLength;
+    var vAt = lumaLength + chromaLength;
+
+    for (var y = 0; y < height; ++y)
+    for (var x = 0; x < width; ++x)
+      data[y * width + x] = (byte)(16 + (x * 131 + y * 47) % 220);
+
+    for (var y = 0; y < chromaHeight; ++y)
+    for (var x = 0; x < chromaWidth; ++x) {
+      data[uAt + y * chromaWidth + x] = (byte)(16 + (x * 67 + y * 29) % 225);
+      data[vAt + y * chromaWidth + x] = (byte)(16 + (x * 31 + y * 89) % 225);
+    }
+
+    return new() {
+      Width = width,
+      Height = height,
+      Format = PixelFormat.Yuv420P8,
+      PixelData = data,
+      ColorInfo = RawImageColorInfo.Bt601Limited,
     };
   }
 }

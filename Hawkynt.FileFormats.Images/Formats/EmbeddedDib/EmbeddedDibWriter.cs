@@ -4,23 +4,19 @@ using FileFormat.Wrappers;
 
 namespace FileFormat.EmbeddedDib;
 
-/// <summary>Writes the packed Windows DIB payload embedded in drawing and project containers.</summary>
+/// <summary>Writes a packed Windows DIB: information header, optional masks/palette and pixel rows.</summary>
 /// <remarks>
-/// This writes only the <c>BITMAPINFOHEADER</c>, optional palette and pixel rows. It deliberately
-/// omits the 14-byte <c>BITMAPFILEHEADER</c> used by standalone BMP files because the surrounding
-/// container supplies its own framing.
-/// <para/>
-/// It is intentionally not the registry writer for <see cref="EmbeddedDibFile"/>: the extensions
-/// registered there name drawing and project formats, and a packed DIB by itself is not a valid
-/// file in any of those formats. Their writers can use this payload when constructing the container.
+/// A packed DIB deliberately omits the 14-byte <c>BITMAPFILEHEADER</c> used by standalone <c>.bmp</c>
+/// files. That makes this both the writer for the standalone <c>.dib</c> format and the low-level
+/// payload writer used by containers that embed a Windows bitmap.
 /// </remarks>
 public static class EmbeddedDibWriter {
 
-  /// <summary>Serializes the preview carried by <paramref name="file"/> as a packed DIB payload.</summary>
+  /// <summary>Serializes the bitmap carried by <paramref name="file"/> as a packed DIB.</summary>
   public static byte[] ToBytes(EmbeddedDibFile file)
-    => ToBytes(file.Preview ?? throw new ArgumentException("No preview is available to write.", nameof(file)));
+    => ToBytes(file.Preview ?? throw new ArgumentException("No bitmap is available to write.", nameof(file)));
 
-  /// <summary>Serializes <paramref name="image"/> as a packed DIB payload.</summary>
+  /// <summary>Serializes <paramref name="image"/> as a packed DIB.</summary>
   public static byte[] ToBytes(RawImage image)
     => WrappedDib.Encode(image);
 }
