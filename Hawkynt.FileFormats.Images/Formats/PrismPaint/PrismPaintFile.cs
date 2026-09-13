@@ -70,29 +70,6 @@ public readonly record struct PrismPaintFile : IImageFormatReader<PrismPaintFile
   /// <summary>Pixel data (1 byte per pixel, width x height bytes).</summary>
   public byte[] PixelData { get; init; }
 
-  /// <summary>Converts the Falcon 4-byte palette entry to an RGB triplet.</summary>
-  internal static void ConvertFalconPaletteToRgb(ReadOnlySpan<byte> falcon, Span<byte> rgb) {
-    for (var i = 0; i < PaletteEntryCount; ++i) {
-      var srcOff = i * BytesPerPaletteEntry;
-      var dstOff = i * 3;
-      rgb[dstOff] = falcon[srcOff];       // R
-      rgb[dstOff + 1] = falcon[srcOff + 1]; // G
-      rgb[dstOff + 2] = falcon[srcOff + 3]; // B
-    }
-  }
-
-  /// <summary>Converts an RGB palette to the Falcon 4-byte palette format.</summary>
-  internal static void ConvertRgbPaletteToFalcon(ReadOnlySpan<byte> rgb, Span<byte> falcon) {
-    for (var i = 0; i < PaletteEntryCount; ++i) {
-      var srcOff = i * 3;
-      var dstOff = i * BytesPerPaletteEntry;
-      falcon[dstOff] = rgb[srcOff];       // R
-      falcon[dstOff + 1] = rgb[srcOff + 1]; // G
-      falcon[dstOff + 2] = 0x00;            // padding
-      falcon[dstOff + 3] = rgb[srcOff + 2]; // B
-    }
-  }
-
   public static RawImage ToRawImage(PrismPaintFile file) {
 
     return new() {
