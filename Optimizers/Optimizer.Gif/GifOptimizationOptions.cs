@@ -11,6 +11,7 @@ public sealed record GifOptimizationOptions(
   bool OptimizeDisposal = true,
   bool TrimMargins = true,
   bool TryDeferredClear = true,
+  bool TryFrozenDictionary = true,
   bool DeduplicateFrames = true,
   bool TryFrameDifferencing = true,
   bool TryCompressionAwareDisposal = true,
