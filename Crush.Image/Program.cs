@@ -96,7 +96,8 @@ public static class Program {
       strategies,
       OptimizeDisposal: opts.OptimizeDisposal,
       TrimMargins: opts.TrimMargins,
-      TryDeferredClear: opts.DeferredClear,
+      TryDeferredClear: opts.DeferredClear ?? true,
+      TryFrozenDictionary: opts.FrozenDictionary ?? true,
       DeduplicateFrames: opts.Deduplicate,
       TryFrameDifferencing: opts.FrameDiff,
       MaxParallelTasks: opts.ParallelTasks

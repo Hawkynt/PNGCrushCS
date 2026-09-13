@@ -22,8 +22,19 @@ public sealed class GifVerb : ICrushOptions {
   [Option("trim-margins", Default = true, HelpText = "Trim transparent margins from frames")]
   public bool TrimMargins { get; set; } = true;
 
-  [Option("deferred-clear", Default = true, HelpText = "Try deferred LZW clear codes")]
-  public bool DeferredClear { get; set; } = true;
+  // These two are bool? rather than bool on purpose. CommandLineParser treats a plain bool option as
+  // a switch: it is set when the flag is present and left at Default otherwise, so an option declared
+  // `bool` with `Default = true` can never be turned off — `--flag false` parses, silently discards
+  // the `false`, and leaves the option on. Declaring the property nullable makes the parser accept an
+  // explicit value, so `--deferred-clear false` does what the help text implies. Absence and a bare
+  // flag both still mean true, so nothing that worked before changes.
+  [Option("deferred-clear", Default = true,
+    HelpText = "Try deferred LZW clear codes; pass 'false' to skip (--deferred-clear false)")]
+  public bool? DeferredClear { get; set; }
+
+  [Option("frozen-dictionary", Default = true,
+    HelpText = "Try a frozen LZW dictionary; pass 'false' to skip (--frozen-dictionary false)")]
+  public bool? FrozenDictionary { get; set; }
 
   [Option("frame-diff", Default = true, HelpText = "Try frame differencing")]
   public bool FrameDiff { get; set; } = true;
