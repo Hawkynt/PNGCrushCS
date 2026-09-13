@@ -8,8 +8,6 @@ namespace FileFormat.Ico;
 /// <summary>Reads ICO files from bytes, streams, or file paths.</summary>
 public static class IcoReader {
 
-  private static readonly byte[] _PngSignature = [0x89, 0x50, 0x4E, 0x47];
-
   public static IcoFile FromFile(FileInfo file) {
     ArgumentNullException.ThrowIfNull(file);
     if (!file.Exists)
@@ -37,7 +35,27 @@ public static class IcoReader {
 
   public static IcoFile FromSpan(ReadOnlySpan<byte> data) => _Parse(data, IcoFileType.Icon);
 
-  internal static IcoFile _Parse(ReadOnlySpan<byte> data, IcoFileType expectedType) {
+  /// <summary>
+  /// Reads an icon or a cursor without being told which, reporting what it turned out to be.
+  /// </summary>
+  /// <remarks>
+  /// This is the one directory walk; <see cref="FromSpan"/> and
+  /// <see cref="FileFormat.Cur.CurReader.FromSpan"/> are both this with the type checked
+  /// afterwards. Reading the hotspot is not conditional on having been told to expect a cursor:
+  /// the file says which it is, and the two bytes are read according to what it said.
+  /// </remarks>
+  /// <exception cref="ArgumentNullException"><paramref name="data"/> is null.</exception>
+  /// <exception cref="InvalidDataException">
+  /// The file is too short, its reserved field is not nought, it claims to be neither an icon nor a
+  /// cursor, or an entry points outside it.
+  /// </exception>
+  public static IconBundle ReadBundle(byte[] data) {
+    ArgumentNullException.ThrowIfNull(data);
+    return ReadBundle(data.AsSpan());
+  }
+
+  /// <inheritdoc cref="ReadBundle(byte[])"/>
+  public static IconBundle ReadBundle(ReadOnlySpan<byte> data) {
     if (data.Length < IcoHeader.StructSize)
       throw new InvalidDataException("Data too small for a valid ICO file.");
 
@@ -46,20 +64,20 @@ public static class IcoReader {
     if (header.Reserved != 0)
       throw new InvalidDataException($"Invalid ICO reserved field: expected 0, got {header.Reserved}.");
 
-    if (header.Type != (ushort)expectedType)
-      throw new InvalidDataException($"Invalid ICO type field: expected {(ushort)expectedType}, got {header.Type}.");
+    if (header.Type is not ((ushort)IcoFileType.Icon or (ushort)IcoFileType.Cursor))
+      throw new InvalidDataException($"Invalid ICO type field: expected 1 (icon) or 2 (cursor), got {header.Type}.");
+
+    var kind = (IcoFileType)header.Type;
+    var isCursor = kind == IcoFileType.Cursor;
 
     var count = header.Count;
     var directoryEnd = IcoHeader.StructSize + count * IcoDirectoryEntry.StructSize;
     if (data.Length < directoryEnd)
       throw new InvalidDataException("Data too small to contain all directory entries.");
 
-    var images = new List<IcoImage>(count);
+    var entries = new List<IconBundleEntry>(count);
     for (var i = 0; i < count; ++i) {
       var entry = IcoDirectoryEntry.ReadFrom(data[(IcoHeader.StructSize + i * IcoDirectoryEntry.StructSize)..]);
-      var width = entry.Width == 0 ? 256 : entry.Width;
-      var height = entry.Height == 0 ? 256 : entry.Height;
-      var bitCount = entry.Field5;
       var dataSize = entry.DataSize;
       var dataOffset = entry.DataOffset;
 
@@ -69,78 +87,60 @@ public static class IcoReader {
       if (dataOffset + dataSize > data.Length)
         throw new InvalidDataException($"Directory entry {i} references data beyond end of file.");
 
-      var embeddedData = new byte[dataSize];
-      data.Slice(dataOffset, dataSize).CopyTo(embeddedData.AsSpan(0));
+      var payload = data.Slice(dataOffset, dataSize).ToArray();
 
-      var isPng = _IsPngSignature(embeddedData);
-      if (isPng) {
-        _ParsePngDimensions(embeddedData, out var pngWidth, out var pngHeight, out var pngBpp);
-        images.Add(new IcoImage {
-          Width = pngWidth,
-          Height = pngHeight,
-          BitsPerPixel = pngBpp,
-          Format = IcoImageFormat.Png,
-          Data = embeddedData
-        });
+      // In a cursor these two bytes are the hotspot, and the depth is then only knowable from the
+      // payload. Reading them as a depth is the mistake that makes a cursor whose hotspot happens
+      // to be at (1, 24) look like a 24-bit picture.
+      var hotspotX = isCursor ? entry.Field4 : (ushort)0;
+      var hotspotY = isCursor ? entry.Field5 : (ushort)0;
+      var statedBitCount = isCursor ? 0 : entry.Field5;
+
+      // A directory entry states each side in one byte with nought standing for 256, which is not
+      // what older files mean by it: one cursor in the corpus states 0 by 0 and is a 32 by 32
+      // arrow, and XnView, ImageMagick and IrfanView all draw it at 32. The payload carries the
+      // real size, so it is asked first and the directory byte is the fallback.
+      var directoryWidth = entry.Width == 0 ? 256 : entry.Width;
+      var directoryHeight = entry.Height == 0 ? 256 : entry.Height;
+
+      if (IcoPayload.IsPng(payload)) {
+        var (pngWidth, pngHeight, pngBitsPerPixel) = IcoPayload.ReadPngHeader(payload);
+        entries.Add(new IconBundleEntry(
+          i, pngWidth, pngHeight, pngBitsPerPixel, hotspotX, hotspotY, IcoImageFormat.Png, payload));
       } else {
-        var dibBpp = _ReadDibBitsPerPixel(embeddedData, bitCount);
-        var (dibWidth, dibHeight) = _ReadDibDimensions(embeddedData, width, height);
-        images.Add(new IcoImage {
-          Width = dibWidth,
-          Height = dibHeight,
-          BitsPerPixel = dibBpp,
-          Format = IcoImageFormat.Bmp,
-          Data = embeddedData
-        });
+        var bitsPerPixel = _ReadDibBitsPerPixel(payload, statedBitCount);
+        var (dibWidth, dibHeight) = _ReadDibDimensions(payload, directoryWidth, directoryHeight);
+        entries.Add(new IconBundleEntry(
+          i, dibWidth, dibHeight, bitsPerPixel, hotspotX, hotspotY, IcoImageFormat.Bmp, payload));
       }
     }
 
+    return new IconBundle(kind, entries);
+  }
+
+  internal static IcoFile _Parse(ReadOnlySpan<byte> data, IcoFileType expectedType) {
+    var bundle = ReadBundle(data);
+
+    if (bundle.Kind != expectedType)
+      throw new InvalidDataException($"Invalid ICO type field: expected {(ushort)expectedType}, got {(ushort)bundle.Kind}.");
+
+    var images = new List<IcoImage>(bundle.Entries.Count);
+    foreach (var entry in bundle.Entries)
+      images.Add(new IcoImage {
+        Width = entry.Width,
+        Height = entry.Height,
+        BitsPerPixel = entry.BitsPerPixel,
+        Format = entry.Format,
+        Data = entry.Data
+      });
+
     return new IcoFile { Images = images };
-  }
-
-  private static bool _IsPngSignature(byte[] data) {
-    if (data.Length < 4)
-      return false;
-
-    for (var i = 0; i < 4; ++i)
-      if (data[i] != _PngSignature[i])
-        return false;
-
-    return true;
-  }
-
-  private static void _ParsePngDimensions(byte[] pngData, out int width, out int height, out int bitsPerPixel) {
-    // PNG: 8-byte signature, then IHDR chunk: 4-byte length, 4-byte type, 13-byte data
-    // IHDR data: width(4) height(4) bitDepth(1) colorType(1) ...
-    if (pngData.Length < 8 + 4 + 4 + 13)
-      throw new InvalidDataException("Embedded PNG too small to contain IHDR.");
-
-    width = BinaryPrimitives.ReadInt32BigEndian(pngData.AsSpan(16));
-    height = BinaryPrimitives.ReadInt32BigEndian(pngData.AsSpan(20));
-    var bitDepth = pngData[24];
-    var colorType = pngData[25];
-
-    var samplesPerPixel = colorType switch {
-      0 => 1, // Grayscale
-      2 => 3, // RGB
-      3 => 1, // Palette (indexed)
-      4 => 2, // Grayscale+Alpha
-      6 => 4, // RGBA
-      _ => 1
-    };
-
-    bitsPerPixel = bitDepth * samplesPerPixel;
   }
 
   /// <summary>
   /// Takes the size from the bitmap header rather than from the directory entry.
   /// </summary>
   /// <remarks>
-  /// A directory entry states each dimension in one byte, and a nought there means 256 — which is
-  /// what this used to read it as without looking further. Older cursors write nought for sizes that
-  /// are nothing of the kind: one in the corpus states 0 by 0 and is a 32 by 32 arrow, and XnView,
-  /// ImageMagick and IrfanView all draw it at 32, so the byte was never meant to be trusted alone.
-  /// <para/>
   /// The bitmap header carries the real width, and a height of twice the picture — the second half
   /// being the mask that says which pixels show through. The PNG-bodied entries already had their
   /// size read from the body this way; the bitmap-bodied ones now do too.

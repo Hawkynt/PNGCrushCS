@@ -977,12 +977,15 @@ Implements `IImageFormatMetadata<AniFile>`, `IImageFormatReader<AniFile>`, `IIma
 | Member | Signature | Summary |
 | --- | --- | --- |
 | `AniFile` | `AniFile()` |  |
+| `Artist` | `string Artist { get; init; }` |  |
 | `FileExtensions` | `static string[] FileExtensions { get; }` |  |
+| `FrameData` | `IReadOnlyList<byte[]> FrameData { get; init; }` |  |
 | `Frames` | `IReadOnlyList<IcoFile> Frames { get; init; }` |  |
 | `Header` | `AniHeader Header { get; init; }` |  |
 | `PrimaryExtension` | `static string PrimaryExtension { get; }` |  |
 | `Rates` | `int[] Rates { get; init; }` |  |
 | `Sequence` | `int[] Sequence { get; init; }` |  |
+| `Title` | `string Title { get; init; }` |  |
 | `FromBytes` | `static AniFile FromBytes(byte[] data)` |  |
 | `FromFile` | `static AniFile FromFile(FileInfo file)` |  |
 | `FromRawImage` | `static AniFile FromRawImage(RawImage image)` |  |
@@ -1005,6 +1008,7 @@ Implements `IBinarySerializable<AniHeader>`, `IEquatable<AniHeader>`.
 | `CbSize` | `int CbSize { get; init; }` |  |
 | `DisplayRate` | `int DisplayRate { get; init; }` |  |
 | `Flags` | `int Flags { get; init; }` |  |
+| `HasIconFrames` | `bool HasIconFrames { get; }` |  |
 | `HasSequence` | `bool HasSequence { get; }` |  |
 | `Height` | `int Height { get; init; }` |  |
 | `NumFrames` | `int NumFrames { get; init; }` |  |
@@ -19314,7 +19318,7 @@ Implements `IImageFormatMetadata<IcnsFile>`, `IImageFormatReader<IcnsFile>`, `II
 
 ### Namespace `FileFormat.Ico`
 
-[`IcoFile`](#icofile) · [`IcoImage`](#icoimage) · [`IcoImageFormat`](#icoimageformat) · [`IcoReader`](#icoreader) · [`IcoWriter`](#icowriter)
+[`IcoFile`](#icofile) · [`IcoFileType`](#icofiletype) · [`IcoImage`](#icoimage) · [`IcoImageFormat`](#icoimageformat) · [`IcoPayload`](#icopayload) · [`IcoReader`](#icoreader) · [`IcoWriter`](#icowriter) · [`IconBundle`](#iconbundle) · [`IconBundleEntry`](#iconbundleentry)
 
 #### `IcoFile`
 
@@ -19328,6 +19332,13 @@ Implements `IImageFormatMetadata<IcoFile>`, `IImageFormatReader<IcoFile>`, `IIma
 | `ImageCount` | `static int ImageCount(IcoFile file)` |  |
 | `ToRawImage` | `static RawImage ToRawImage(IcoFile file)` |  |
 | `ToRawImage` | `static RawImage ToRawImage(IcoFile file, int index)` |  |
+
+#### `IcoFileType`
+
+| Value | Numeric | Summary |
+| --- | --- | --- |
+| `Icon` | `1` |  |
+| `Cursor` | `2` |  |
 
 #### `IcoImage`
 
@@ -19347,6 +19358,17 @@ Implements `IImageFormatMetadata<IcoFile>`, `IImageFormatReader<IcoFile>`, `IIma
 | `Bmp` | `0` |  |
 | `Png` | `1` |  |
 
+#### `IcoPayload`
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `BmpFileToIconDib` | `static byte[] BmpFileToIconDib(ReadOnlySpan<byte> bmpFile, out int width, out int height, out int bitsPerPixel)` |  |
+| `Encode` | `static ValueTuple<byte[], int, int, int, IcoImageFormat> Encode(ReadOnlySpan<byte> imageFile)` |  |
+| `IconDibToBmpFile` | `static byte[] IconDibToBmpFile(ReadOnlySpan<byte> iconDib, int width, int height, int bitsPerPixel)` |  |
+| `IsBmpFile` | `static bool IsBmpFile(ReadOnlySpan<byte> data)` |  |
+| `IsPng` | `static bool IsPng(ReadOnlySpan<byte> data)` |  |
+| `ReadPngHeader` | `static ValueTuple<int, int, int> ReadPngHeader(ReadOnlySpan<byte> png)` |  |
+
 #### `IcoReader`
 
 | Member | Signature | Summary |
@@ -19355,12 +19377,41 @@ Implements `IImageFormatMetadata<IcoFile>`, `IImageFormatReader<IcoFile>`, `IIma
 | `FromFile` | `static IcoFile FromFile(FileInfo file)` |  |
 | `FromSpan` | `static IcoFile FromSpan(ReadOnlySpan<byte> data)` |  |
 | `FromStream` | `static IcoFile FromStream(Stream stream)` |  |
+| `ReadBundle` | `static IconBundle ReadBundle(ReadOnlySpan<byte> data)` |  |
+| `ReadBundle` | `static IconBundle ReadBundle(byte[] data)` |  |
 
 #### `IcoWriter`
 
 | Member | Signature | Summary |
 | --- | --- | --- |
+| `Assemble` | `static byte[] Assemble(IcoFileType kind, IReadOnlyList<IconBundleEntry> entries)` |  |
 | `ToBytes` | `static byte[] ToBytes(IcoFile file)` |  |
+
+#### `IconBundle`
+
+Implements `IEquatable<IconBundle>`.
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `IconBundle` | `IconBundle(IcoFileType Kind, IReadOnlyList<IconBundleEntry> Entries)` |  |
+| `Entries` | `IReadOnlyList<IconBundleEntry> Entries { get; init; }` |  |
+| `Kind` | `IcoFileType Kind { get; init; }` |  |
+
+#### `IconBundleEntry`
+
+Implements `IEquatable<IconBundleEntry>`.
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `IconBundleEntry` | `IconBundleEntry(int Index, int Width, int Height, int BitsPerPixel, ushort HotspotX, ushort HotspotY, IcoImageFormat Format, byte[] Data)` |  |
+| `BitsPerPixel` | `int BitsPerPixel { get; init; }` |  |
+| `Data` | `byte[] Data { get; init; }` |  |
+| `Format` | `IcoImageFormat Format { get; init; }` |  |
+| `Height` | `int Height { get; init; }` |  |
+| `HotspotX` | `ushort HotspotX { get; init; }` |  |
+| `HotspotY` | `ushort HotspotY { get; init; }` |  |
+| `Index` | `int Index { get; init; }` |  |
+| `Width` | `int Width { get; init; }` |  |
 
 ### Namespace `FileFormat.IconLibrary`
 
