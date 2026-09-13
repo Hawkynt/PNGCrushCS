@@ -15,12 +15,7 @@ public static class FaceSaverReader {
     return FromBytes(File.ReadAllBytes(file.FullName));
   }
 
-  public static FaceSaverFile FromStream(Stream stream) {
-    ArgumentNullException.ThrowIfNull(stream);
-    using var ms = new MemoryStream();
-    stream.CopyTo(ms);
-    return FromBytes(ms.ToArray());
-  }
+  public static FaceSaverFile FromStream(Stream stream) => FromBytes(StreamBytes.ReadAll(stream));
 
   public static FaceSaverFile FromSpan(ReadOnlySpan<byte> data) {
 

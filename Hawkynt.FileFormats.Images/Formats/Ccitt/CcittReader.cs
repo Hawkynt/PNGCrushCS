@@ -14,17 +14,7 @@ public static class CcittReader {
     return FromBytes(File.ReadAllBytes(file.FullName), width, height, format);
   }
 
-  public static CcittFile FromStream(Stream stream, int width, int height, CcittFormat format) {
-    ArgumentNullException.ThrowIfNull(stream);
-    if (stream.CanSeek) {
-      var data = new byte[stream.Length - stream.Position];
-      stream.ReadExactly(data);
-      return FromBytes(data, width, height, format);
-    }
-    using var ms = new MemoryStream();
-    stream.CopyTo(ms);
-    return FromBytes(ms.ToArray(), width, height, format);
-  }
+  public static CcittFile FromStream(Stream stream, int width, int height, CcittFormat format) => FromBytes(StreamBytes.ReadAll(stream), width, height, format);
 
   public static CcittFile FromSpan(ReadOnlySpan<byte> data, int width, int height, CcittFormat format) {
     if (data.Length < 1)

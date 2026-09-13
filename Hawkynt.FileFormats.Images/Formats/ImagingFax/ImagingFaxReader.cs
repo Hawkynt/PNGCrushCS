@@ -14,17 +14,7 @@ public static class ImagingFaxReader {
     return FromSpan(File.ReadAllBytes(file.FullName));
   }
 
-  public static ImagingFaxFile FromStream(Stream stream) {
-    ArgumentNullException.ThrowIfNull(stream);
-    if (stream.CanSeek) {
-      var data = new byte[stream.Length - stream.Position];
-      stream.ReadExactly(data);
-      return FromSpan(data);
-    }
-    using var ms = new MemoryStream();
-    stream.CopyTo(ms);
-    return FromSpan(ms.ToArray());
-  }
+  public static ImagingFaxFile FromStream(Stream stream) => FromSpan(StreamBytes.ReadAll(stream));
 
   public static ImagingFaxFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

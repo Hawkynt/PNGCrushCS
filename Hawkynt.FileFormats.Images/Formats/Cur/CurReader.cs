@@ -16,17 +16,7 @@ public static class CurReader {
     return FromBytes(File.ReadAllBytes(file.FullName));
   }
 
-  public static CurFile FromStream(Stream stream) {
-    ArgumentNullException.ThrowIfNull(stream);
-    if (stream.CanSeek) {
-      var data = new byte[stream.Length - stream.Position];
-      stream.ReadExactly(data);
-      return FromBytes(data);
-    }
-    using var ms = new MemoryStream();
-    stream.CopyTo(ms);
-    return FromBytes(ms.ToArray());
-  }
+  public static CurFile FromStream(Stream stream) => FromBytes(StreamBytes.ReadAll(stream));
 
   public static CurFile FromSpan(ReadOnlySpan<byte> data) {
     // One directory walk, which already reads the hotspot because the file said it was a cursor.

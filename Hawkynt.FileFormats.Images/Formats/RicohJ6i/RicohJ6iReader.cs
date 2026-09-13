@@ -16,18 +16,7 @@ public static class RicohJ6iReader {
     return FromBytes(File.ReadAllBytes(file.FullName));
   }
 
-  public static RicohJ6iFile FromStream(Stream stream) {
-    ArgumentNullException.ThrowIfNull(stream);
-    if (stream.CanSeek) {
-      var data = new byte[stream.Length - stream.Position];
-      stream.ReadExactly(data);
-      return FromSpan(data);
-    }
-
-    using var ms = new MemoryStream();
-    stream.CopyTo(ms);
-    return FromSpan(ms.ToArray());
-  }
+  public static RicohJ6iFile FromStream(Stream stream) => FromSpan(StreamBytes.ReadAll(stream));
 
   public static RicohJ6iFile FromSpan(ReadOnlySpan<byte> data) {
     if (data.Length <= RicohJ6iFile.HeaderSize

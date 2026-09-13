@@ -15,18 +15,7 @@ public static class HiresInterlaceFeniksReader {
     return FromBytes(File.ReadAllBytes(file.FullName));
   }
 
-  public static HiresInterlaceFeniksFile FromStream(Stream stream) {
-    ArgumentNullException.ThrowIfNull(stream);
-    if (stream.CanSeek) {
-      var data = new byte[stream.Length - stream.Position];
-      stream.ReadExactly(data);
-      return FromBytes(data);
-    }
-
-    using var ms = new MemoryStream();
-    stream.CopyTo(ms);
-    return FromBytes(ms.ToArray());
-  }
+  public static HiresInterlaceFeniksFile FromStream(Stream stream) => FromBytes(StreamBytes.ReadAll(stream));
 
   public static HiresInterlaceFeniksFile FromSpan(ReadOnlySpan<byte> data) {
     if (data.Length < HiresInterlaceFeniksFile.SecondBitmapOffset + HiresInterlaceFeniksFile.BitmapDataSize)

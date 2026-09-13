@@ -30,18 +30,7 @@ public static class RawGreyscaleReader {
   private static RawGreyscaleFile _At((int Width, int Height) size, byte[] data)
     => new() { Width = size.Width, Height = size.Height, PixelData = data };
 
-  public static RawGreyscaleFile FromStream(Stream stream) {
-    ArgumentNullException.ThrowIfNull(stream);
-    if (stream.CanSeek) {
-      var data = new byte[stream.Length - stream.Position];
-      stream.ReadExactly(data);
-      return FromSpan(data);
-    }
-
-    using var ms = new MemoryStream();
-    stream.CopyTo(ms);
-    return FromSpan(ms.ToArray());
-  }
+  public static RawGreyscaleFile FromStream(Stream stream) => FromSpan(StreamBytes.ReadAll(stream));
 
   public static RawGreyscaleFile FromSpan(ReadOnlySpan<byte> data)
     => _At(RawGreyscaleFile.SizeOf(data.Length), data.ToArray());

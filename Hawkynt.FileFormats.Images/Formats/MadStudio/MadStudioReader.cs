@@ -14,18 +14,7 @@ public static class MadStudioReader {
     return FromSpan(File.ReadAllBytes(file.FullName), MadStudioLayout.ModeFromExtension(file.Extension));
   }
 
-  public static MadStudioFile FromStream(Stream stream) {
-    ArgumentNullException.ThrowIfNull(stream);
-    if (stream.CanSeek) {
-      var data = new byte[stream.Length - stream.Position];
-      stream.ReadExactly(data);
-      return FromBytes(data);
-    }
-
-    using var ms = new MemoryStream();
-    stream.CopyTo(ms);
-    return FromBytes(ms.ToArray());
-  }
+  public static MadStudioFile FromStream(Stream stream) => FromBytes(StreamBytes.ReadAll(stream));
 
   public static MadStudioFile FromSpan(ReadOnlySpan<byte> data) {
     // Each mode has a distinct file size, so the bytes alone say which one this is.

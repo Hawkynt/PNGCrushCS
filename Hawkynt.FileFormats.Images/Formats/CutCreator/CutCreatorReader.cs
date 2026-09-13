@@ -14,18 +14,7 @@ public static class CutCreatorReader {
     return FromBytes(File.ReadAllBytes(file.FullName));
   }
 
-  public static CutCreatorFile FromStream(Stream stream) {
-    ArgumentNullException.ThrowIfNull(stream);
-    if (stream.CanSeek) {
-      var data = new byte[stream.Length - stream.Position];
-      stream.ReadExactly(data);
-      return FromBytes(data);
-    }
-
-    using var ms = new MemoryStream();
-    stream.CopyTo(ms);
-    return FromBytes(ms.ToArray());
-  }
+  public static CutCreatorFile FromStream(Stream stream) => FromBytes(StreamBytes.ReadAll(stream));
 
   public static CutCreatorFile FromSpan(ReadOnlySpan<byte> data) {
     // Nothing in the file says what it is, so its length has to. Accepting anything longer would

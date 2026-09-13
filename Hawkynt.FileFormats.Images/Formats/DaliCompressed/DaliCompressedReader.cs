@@ -14,18 +14,7 @@ public static class DaliCompressedReader {
     return FromSpan(File.ReadAllBytes(file.FullName), DaliCompressedFile.ResolutionFromExtension(file.Extension));
   }
 
-  public static DaliCompressedFile FromStream(Stream stream) {
-    ArgumentNullException.ThrowIfNull(stream);
-    if (stream.CanSeek) {
-      var data = new byte[stream.Length - stream.Position];
-      stream.ReadExactly(data);
-      return FromSpan(data);
-    }
-
-    using var ms = new MemoryStream();
-    stream.CopyTo(ms);
-    return FromSpan(ms.ToArray());
-  }
+  public static DaliCompressedFile FromStream(Stream stream) => FromSpan(StreamBytes.ReadAll(stream));
 
   /// <summary>Reads bytes as the primary .LPK variant because resolution is not stored in the stream.</summary>
   public static DaliCompressedFile FromSpan(ReadOnlySpan<byte> data) => FromSpan(data, DaliResolution.Low);

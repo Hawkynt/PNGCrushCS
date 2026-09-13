@@ -14,18 +14,7 @@ public static class BkScreenReader {
     return FromBytes(File.ReadAllBytes(file.FullName));
   }
 
-  public static BkScreenFile FromStream(Stream stream) {
-    ArgumentNullException.ThrowIfNull(stream);
-    if (stream.CanSeek) {
-      var data = new byte[stream.Length - stream.Position];
-      stream.ReadExactly(data);
-      return FromBytes(data);
-    }
-
-    using var ms = new MemoryStream();
-    stream.CopyTo(ms);
-    return FromBytes(ms.ToArray());
-  }
+  public static BkScreenFile FromStream(Stream stream) => FromBytes(StreamBytes.ReadAll(stream));
 
   public static BkScreenFile FromSpan(ReadOnlySpan<byte> data) {
     // Nothing in a dump identifies it, so the length is the whole of what there is to go on.

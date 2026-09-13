@@ -14,18 +14,7 @@ public static class McPainterReader {
     return FromBytes(File.ReadAllBytes(file.FullName));
   }
 
-  public static McPainterFile FromStream(Stream stream) {
-    ArgumentNullException.ThrowIfNull(stream);
-    if (stream.CanSeek) {
-      var data = new byte[stream.Length - stream.Position];
-      stream.ReadExactly(data);
-      return FromBytes(data);
-    }
-
-    using var ms = new MemoryStream();
-    stream.CopyTo(ms);
-    return FromBytes(ms.ToArray());
-  }
+  public static McPainterFile FromStream(Stream stream) => FromBytes(StreamBytes.ReadAll(stream));
 
   public static McPainterFile FromSpan(ReadOnlySpan<byte> data) {
     // There is no header at all: the length is the only thing identifying the format.

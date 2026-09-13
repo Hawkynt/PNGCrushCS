@@ -16,18 +16,7 @@ public static class GrafixReader {
     return FromBytes(File.ReadAllBytes(file.FullName));
   }
 
-  public static GrafixFile FromStream(Stream stream) {
-    ArgumentNullException.ThrowIfNull(stream);
-    if (stream.CanSeek) {
-      var data = new byte[stream.Length - stream.Position];
-      stream.ReadExactly(data);
-      return FromBytes(data);
-    }
-
-    using var ms = new MemoryStream();
-    stream.CopyTo(ms);
-    return FromBytes(ms.ToArray());
-  }
+  public static GrafixFile FromStream(Stream stream) => FromBytes(StreamBytes.ReadAll(stream));
 
   public static GrafixFile FromSpan(ReadOnlySpan<byte> data) {
     if (data.Length < 1588 || Encoding.ASCII.GetString(data[..GrafixFile.Signature.Length]) != GrafixFile.Signature

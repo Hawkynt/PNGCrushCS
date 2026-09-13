@@ -18,18 +18,7 @@ public static class ShapeTableReader {
     return FromBytes(File.ReadAllBytes(file.FullName));
   }
 
-  public static ShapeTableFileType FromStream(Stream stream) {
-    ArgumentNullException.ThrowIfNull(stream);
-    if (stream.CanSeek) {
-      var data = new byte[stream.Length - stream.Position];
-      stream.ReadExactly(data);
-      return FromBytes(data);
-    }
-
-    using var ms = new MemoryStream();
-    stream.CopyTo(ms);
-    return FromBytes(ms.ToArray());
-  }
+  public static ShapeTableFileType FromStream(Stream stream) => FromBytes(StreamBytes.ReadAll(stream));
 
   public static ShapeTableFileType FromSpan(ReadOnlySpan<byte> data) {
     // The packed C64 forms identify themselves by a byte of their load header, so they are tried

@@ -16,12 +16,7 @@ public static partial class XbmColorReader {
     return FromBytes(File.ReadAllBytes(file.FullName));
   }
 
-  public static XbmColorFile FromStream(Stream stream) {
-    ArgumentNullException.ThrowIfNull(stream);
-    using var ms = new MemoryStream();
-    stream.CopyTo(ms);
-    return FromBytes(ms.ToArray());
-  }
+  public static XbmColorFile FromStream(Stream stream) => FromBytes(StreamBytes.ReadAll(stream));
 
   public static XbmColorFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

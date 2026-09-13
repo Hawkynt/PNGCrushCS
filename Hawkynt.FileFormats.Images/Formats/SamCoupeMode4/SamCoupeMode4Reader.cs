@@ -14,18 +14,7 @@ public static class SamCoupeMode4Reader {
     return FromBytes(File.ReadAllBytes(file.FullName));
   }
 
-  public static SamCoupeMode4File FromStream(Stream stream) {
-    ArgumentNullException.ThrowIfNull(stream);
-    if (stream.CanSeek) {
-      var data = new byte[stream.Length - stream.Position];
-      stream.ReadExactly(data);
-      return FromBytes(data);
-    }
-
-    using var ms = new MemoryStream();
-    stream.CopyTo(ms);
-    return FromBytes(ms.ToArray());
-  }
+  public static SamCoupeMode4File FromStream(Stream stream) => FromBytes(StreamBytes.ReadAll(stream));
 
   public static SamCoupeMode4File FromSpan(ReadOnlySpan<byte> data) {
     // Interrupt records make the length variable, so only the minimum is fixed.

@@ -62,18 +62,7 @@ public static class OcpArtStudioWindowReader {
     return null;
   }
 
-  public static OcpArtStudioWindowFile FromStream(Stream stream) {
-    ArgumentNullException.ThrowIfNull(stream);
-    if (stream.CanSeek) {
-      var data = new byte[stream.Length - stream.Position];
-      stream.ReadExactly(data);
-      return FromBytes(data);
-    }
-
-    using var ms = new MemoryStream();
-    stream.CopyTo(ms);
-    return FromBytes(ms.ToArray());
-  }
+  public static OcpArtStudioWindowFile FromStream(Stream stream) => FromBytes(StreamBytes.ReadAll(stream));
 
   /// <summary>Reads a window without its palette, which leaves it a shape and no colours.</summary>
   public static OcpArtStudioWindowFile FromSpan(ReadOnlySpan<byte> data) => _Read(data, new byte[48]);

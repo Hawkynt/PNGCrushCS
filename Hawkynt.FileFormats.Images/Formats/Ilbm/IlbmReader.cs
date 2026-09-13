@@ -19,17 +19,7 @@ public static class IlbmReader {
     return FromBytes(File.ReadAllBytes(file.FullName));
   }
 
-  public static IlbmFile FromStream(Stream stream) {
-    ArgumentNullException.ThrowIfNull(stream);
-    if (stream.CanSeek) {
-      var data = new byte[stream.Length - stream.Position];
-      stream.ReadExactly(data);
-      return FromBytes(data);
-    }
-    using var ms = new MemoryStream();
-    stream.CopyTo(ms);
-    return FromBytes(ms.ToArray());
-  }
+  public static IlbmFile FromStream(Stream stream) => FromBytes(StreamBytes.ReadAll(stream));
 
   /// <summary>
   /// Expands a PCHG chunk into one palette a scanline, or null when there is none to expand.

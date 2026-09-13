@@ -23,17 +23,7 @@ public static class ZxMultiArtistReader {
     return FromBytes(File.ReadAllBytes(file.FullName));
   }
 
-  public static ZxMultiArtistFile FromStream(Stream stream) {
-    ArgumentNullException.ThrowIfNull(stream);
-    if (stream.CanSeek) {
-      var data = new byte[stream.Length - stream.Position];
-      stream.ReadExactly(data);
-      return FromBytes(data);
-    }
-    using var ms = new MemoryStream();
-    stream.CopyTo(ms);
-    return FromBytes(ms.ToArray());
-  }
+  public static ZxMultiArtistFile FromStream(Stream stream) => FromBytes(StreamBytes.ReadAll(stream));
 
   /// <summary>Turns the Spectrum's screen layout into rows one after another.</summary>
   private static byte[] _Deinterleave(ReadOnlySpan<byte> data) {

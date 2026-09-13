@@ -14,18 +14,7 @@ public static class Atari8MissileReader {
     return FromBytes(File.ReadAllBytes(file.FullName));
   }
 
-  public static Atari8MissileFile FromStream(Stream stream) {
-    ArgumentNullException.ThrowIfNull(stream);
-    if (stream.CanSeek) {
-      var data = new byte[stream.Length - stream.Position];
-      stream.ReadExactly(data);
-      return FromBytes(data);
-    }
-
-    using var ms = new MemoryStream();
-    stream.CopyTo(ms);
-    return FromBytes(ms.ToArray());
-  }
+  public static Atari8MissileFile FromStream(Stream stream) => FromBytes(StreamBytes.ReadAll(stream));
 
   public static Atari8MissileFile FromSpan(ReadOnlySpan<byte> data) {
     if (data.Length != Atari8MissileFile.FileSize && data.Length != Atari8MissileFile.PaddedFileSize)

@@ -16,18 +16,7 @@ public static class MsxGlYjkReader {
     return FromSpan(File.ReadAllBytes(file.FullName), MsxGlYjkFile.ModeFromExtension(file.Extension));
   }
 
-  public static MsxGlYjkFile FromStream(Stream stream) {
-    ArgumentNullException.ThrowIfNull(stream);
-    if (stream.CanSeek) {
-      var data = new byte[stream.Length - stream.Position];
-      stream.ReadExactly(data);
-      return FromBytes(data);
-    }
-
-    using var ms = new MemoryStream();
-    stream.CopyTo(ms);
-    return FromBytes(ms.ToArray());
-  }
+  public static MsxGlYjkFile FromStream(Stream stream) => FromBytes(StreamBytes.ReadAll(stream));
 
   /// <summary>Reads a picture, assuming the Screen 12 reading.</summary>
   /// <remarks>

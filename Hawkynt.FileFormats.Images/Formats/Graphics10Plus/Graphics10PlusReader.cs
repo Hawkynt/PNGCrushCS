@@ -14,18 +14,7 @@ public static class Graphics10PlusReader {
     return FromBytes(File.ReadAllBytes(file.FullName));
   }
 
-  public static Graphics10PlusFile FromStream(Stream stream) {
-    ArgumentNullException.ThrowIfNull(stream);
-    if (stream.CanSeek) {
-      var data = new byte[stream.Length - stream.Position];
-      stream.ReadExactly(data);
-      return FromBytes(data);
-    }
-
-    using var memory = new MemoryStream();
-    stream.CopyTo(memory);
-    return FromBytes(memory.ToArray());
-  }
+  public static Graphics10PlusFile FromStream(Stream stream) => FromBytes(StreamBytes.ReadAll(stream));
 
   public static Graphics10PlusFile FromSpan(ReadOnlySpan<byte> data) {
     // Nothing in the file says what it is: no signature, no header, no stated size. The one length

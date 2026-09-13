@@ -37,13 +37,7 @@ public static class VrmlReader {
     return FromBytes(File.ReadAllBytes(file.FullName));
   }
 
-  public static VrmlFile FromStream(Stream stream) {
-    ArgumentNullException.ThrowIfNull(stream);
-
-    using var ms = new MemoryStream();
-    stream.CopyTo(ms);
-    return FromSpan(ms.ToArray());
-  }
+  public static VrmlFile FromStream(Stream stream) => FromSpan(StreamBytes.ReadAll(stream));
 
   public static VrmlFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

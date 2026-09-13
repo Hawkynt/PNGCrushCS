@@ -46,17 +46,7 @@ public static class CameraRawReader {
     return FromBytes(File.ReadAllBytes(file.FullName));
   }
 
-  public static CameraRawFile FromStream(Stream stream) {
-    ArgumentNullException.ThrowIfNull(stream);
-    if (stream.CanSeek) {
-      var data = new byte[stream.Length - stream.Position];
-      stream.ReadExactly(data);
-      return FromBytes(data);
-    }
-    using var ms = new MemoryStream();
-    stream.CopyTo(ms);
-    return FromBytes(ms.ToArray());
-  }
+  public static CameraRawFile FromStream(Stream stream) => FromBytes(StreamBytes.ReadAll(stream));
 
   public static CameraRawFile FromSpan(ReadOnlySpan<byte> data) {
     if (data.Length < _MIN_TIFF_SIZE)

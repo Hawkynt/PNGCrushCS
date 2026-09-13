@@ -14,18 +14,7 @@ public static class TmSatReader {
     return FromBytes(File.ReadAllBytes(file.FullName));
   }
 
-  public static TmSatFile FromStream(Stream stream) {
-    ArgumentNullException.ThrowIfNull(stream);
-    if (stream.CanSeek) {
-      var buffer = new byte[stream.Length - stream.Position];
-      stream.ReadExactly(buffer);
-      return FromBytes(buffer);
-    }
-
-    using var memory = new MemoryStream();
-    stream.CopyTo(memory);
-    return FromBytes(memory.ToArray());
-  }
+  public static TmSatFile FromStream(Stream stream) => FromBytes(StreamBytes.ReadAll(stream));
 
   public static TmSatFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

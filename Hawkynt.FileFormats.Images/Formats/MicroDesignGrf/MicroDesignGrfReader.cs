@@ -15,19 +15,7 @@ public static class MicroDesignGrfReader {
     return FromBytes(File.ReadAllBytes(file.FullName));
   }
 
-  public static MicroDesignGrfFile FromStream(Stream stream) {
-    ArgumentNullException.ThrowIfNull(stream);
-    if (stream.CanSeek) {
-      var remaining = checked((int)(stream.Length - stream.Position));
-      var data = new byte[remaining];
-      stream.ReadExactly(data);
-      return FromBytes(data);
-    }
-
-    using var buffer = new MemoryStream();
-    stream.CopyTo(buffer);
-    return FromBytes(buffer.ToArray());
-  }
+  public static MicroDesignGrfFile FromStream(Stream stream) => FromBytes(StreamBytes.ReadAll(stream));
 
   public static MicroDesignGrfFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

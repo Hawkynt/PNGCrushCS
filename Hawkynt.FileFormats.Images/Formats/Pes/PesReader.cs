@@ -29,12 +29,7 @@ public static class PesReader {
     return FromSpan(File.ReadAllBytes(file.FullName));
   }
 
-  public static PesFile FromStream(Stream stream) {
-    ArgumentNullException.ThrowIfNull(stream);
-    using var buffer = new MemoryStream();
-    stream.CopyTo(buffer);
-    return FromSpan(buffer.ToArray());
-  }
+  public static PesFile FromStream(Stream stream) => FromSpan(StreamBytes.ReadAll(stream));
 
   public static PesFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

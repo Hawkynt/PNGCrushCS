@@ -16,18 +16,7 @@ public static class CImageReader {
     return FromBytes(File.ReadAllBytes(file.FullName));
   }
 
-  public static CImageFile FromStream(Stream stream) {
-    ArgumentNullException.ThrowIfNull(stream);
-    if (stream.CanSeek) {
-      var data = new byte[stream.Length - stream.Position];
-      stream.ReadExactly(data);
-      return FromBytes(data);
-    }
-
-    using var buffer = new MemoryStream();
-    stream.CopyTo(buffer);
-    return FromBytes(buffer.ToArray());
-  }
+  public static CImageFile FromStream(Stream stream) => FromBytes(StreamBytes.ReadAll(stream));
 
   public static CImageFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

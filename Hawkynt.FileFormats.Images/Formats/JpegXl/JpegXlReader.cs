@@ -21,12 +21,7 @@ public static class JpegXlReader {
     return FromBytes(File.ReadAllBytes(file.FullName));
   }
 
-  public static JpegXlFile FromStream(Stream stream) {
-    ArgumentNullException.ThrowIfNull(stream);
-    using var ms = new MemoryStream();
-    stream.CopyTo(ms);
-    return FromBytes(ms.ToArray());
-  }
+  public static JpegXlFile FromStream(Stream stream) => FromBytes(StreamBytes.ReadAll(stream));
 
   public static JpegXlFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

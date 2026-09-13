@@ -27,18 +27,7 @@ public static class HtaReader {
     return FromBytes(File.ReadAllBytes(file.FullName));
   }
 
-  public static HtaFile FromStream(Stream stream) {
-    ArgumentNullException.ThrowIfNull(stream);
-    if (stream.CanSeek) {
-      var buffer = new byte[stream.Length - stream.Position];
-      stream.ReadExactly(buffer);
-      return FromBytes(buffer);
-    }
-
-    using var memory = new MemoryStream();
-    stream.CopyTo(memory);
-    return FromBytes(memory.ToArray());
-  }
+  public static HtaFile FromStream(Stream stream) => FromBytes(StreamBytes.ReadAll(stream));
 
   public static HtaFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

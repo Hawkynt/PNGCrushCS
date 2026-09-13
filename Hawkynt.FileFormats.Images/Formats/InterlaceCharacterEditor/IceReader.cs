@@ -14,18 +14,7 @@ public static class IceReader {
     return FromSpan(File.ReadAllBytes(file.FullName), ModeFromExtension(file.Extension));
   }
 
-  public static IceFile FromStream(Stream stream) {
-    ArgumentNullException.ThrowIfNull(stream);
-    if (stream.CanSeek) {
-      var data = new byte[stream.Length - stream.Position];
-      stream.ReadExactly(data);
-      return FromBytes(data);
-    }
-
-    using var ms = new MemoryStream();
-    stream.CopyTo(ms);
-    return FromBytes(ms.ToArray());
-  }
+  public static IceFile FromStream(Stream stream) => FromBytes(StreamBytes.ReadAll(stream));
 
   public static IceFile FromSpan(ReadOnlySpan<byte> data) => FromSpan(data, _ModeFromLength(data.Length));
 

@@ -13,17 +13,7 @@ public static class SharpX68kReader {
     return FromBytes(File.ReadAllBytes(file.FullName));
   }
 
-  public static SharpX68kFile FromStream(Stream stream) {
-    ArgumentNullException.ThrowIfNull(stream);
-    if (stream.CanSeek) {
-      var data = new byte[stream.Length - stream.Position];
-      stream.ReadExactly(data);
-      return FromBytes(data);
-    }
-    using var ms = new MemoryStream();
-    stream.CopyTo(ms);
-    return FromBytes(ms.ToArray());
-  }
+  public static SharpX68kFile FromStream(Stream stream) => FromBytes(StreamBytes.ReadAll(stream));
 
   public static SharpX68kFile FromSpan(ReadOnlySpan<byte> data) {
 

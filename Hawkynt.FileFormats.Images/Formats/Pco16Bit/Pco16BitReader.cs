@@ -14,17 +14,7 @@ public static class Pco16BitReader {
     return FromBytes(File.ReadAllBytes(file.FullName));
   }
 
-  public static Pco16BitFile FromStream(Stream stream) {
-    ArgumentNullException.ThrowIfNull(stream);
-    if (stream.CanSeek) {
-      var data = new byte[stream.Length - stream.Position];
-      stream.ReadExactly(data);
-      return FromBytes(data);
-    }
-    using var ms = new MemoryStream();
-    stream.CopyTo(ms);
-    return FromBytes(ms.ToArray());
-  }
+  public static Pco16BitFile FromStream(Stream stream) => FromBytes(StreamBytes.ReadAll(stream));
 
   public static Pco16BitFile FromSpan(ReadOnlySpan<byte> data) {
 

@@ -14,18 +14,7 @@ public static class SamCoupeSsxReader {
     return FromBytes(File.ReadAllBytes(file.FullName));
   }
 
-  public static SamCoupeSsxFile FromStream(Stream stream) {
-    ArgumentNullException.ThrowIfNull(stream);
-    if (stream.CanSeek) {
-      var data = new byte[stream.Length - stream.Position];
-      stream.ReadExactly(data);
-      return FromBytes(data);
-    }
-
-    using var ms = new MemoryStream();
-    stream.CopyTo(ms);
-    return FromBytes(ms.ToArray());
-  }
+  public static SamCoupeSsxFile FromStream(Stream stream) => FromBytes(StreamBytes.ReadAll(stream));
 
   public static SamCoupeSsxFile FromSpan(ReadOnlySpan<byte> data) {
     // Nothing marks the mode, and no two of them are the same size, so the length is the whole of

@@ -14,18 +14,7 @@ public static class ImageSystemReader {
     return FromBytes(File.ReadAllBytes(file.FullName));
   }
 
-  public static ImageSystemFile FromStream(Stream stream) {
-    ArgumentNullException.ThrowIfNull(stream);
-    if (stream.CanSeek) {
-      var data = new byte[stream.Length - stream.Position];
-      stream.ReadExactly(data);
-      return FromSpan(data);
-    }
-
-    using var ms = new MemoryStream();
-    stream.CopyTo(ms);
-    return FromSpan(ms.ToArray());
-  }
+  public static ImageSystemFile FromStream(Stream stream) => FromSpan(StreamBytes.ReadAll(stream));
 
   /// <summary>The length is the whole of the identification: the two forms have no signature.</summary>
   public static ImageSystemFile FromSpan(ReadOnlySpan<byte> data) {
