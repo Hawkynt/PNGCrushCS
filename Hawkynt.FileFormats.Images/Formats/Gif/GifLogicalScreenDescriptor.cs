@@ -24,4 +24,13 @@ public readonly record struct GifLogicalScreenDescriptor(
 
   /// <summary>The number of entries the GCT carries: <c>2^(GlobalColorTableSize + 1)</c>.</summary>
   public int GlobalColorTableEntryCount => this.HasGlobalColorTable ? 1 << (this.GlobalColorTableSize + 1) : 0;
+
+  /// <summary><see cref="ColorResolution"/> as the raw 3-bit on-disk value rather than the bit count
+  /// <see cref="ColorResolution"/> stores.</summary>
+  public global::FileFormat.Gif.ColorResolution ColorResolutionValue
+    => (global::FileFormat.Gif.ColorResolution)((this.ColorResolution - 1) & 0x07);
+
+  /// <summary>This descriptor with its colour resolution set from the raw 3-bit enumeration.</summary>
+  public GifLogicalScreenDescriptor WithColorResolution(global::FileFormat.Gif.ColorResolution resolution)
+    => this with { ColorResolution = (byte)((byte)resolution + 1) };
 }
