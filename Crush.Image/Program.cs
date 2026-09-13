@@ -29,7 +29,7 @@ public static class Program {
   public static async Task<int> Main(string[] args) =>
     await Parser.Default
       .ParseArguments<AutoVerb, PngVerb, GifVerb, TiffVerb, BmpVerb, TgaVerb, PcxVerb,
-        JpegVerb, IcoVerb, CurVerb, AniVerb, WebPVerb>(args)
+        JpegVerb, IcoVerb, CurVerb, AniVerb, WebPVerb>(VerbArguments.SupplyImplicitTrue(args))
       .MapResult(
         (AutoVerb v) => _RunAuto(v),
         (PngVerb v) => _RunPng(v),
