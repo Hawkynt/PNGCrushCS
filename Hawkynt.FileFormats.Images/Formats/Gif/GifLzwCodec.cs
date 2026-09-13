@@ -7,10 +7,10 @@ namespace FileFormat.Gif;
 /// <summary>GIF LZW encoder + decoder, including the 1..255-byte sub-block framing the spec wraps the
 /// bitstream in.</summary>
 /// <remarks>
-/// <para><b>Encoder.</b> Variable-width LZW with codes growing 3..12 bits, clear-code emitted on
-/// dictionary overflow. The "deferred clear code" optimisation (don't clear immediately when full —
-/// keep using the existing dictionary as a static codebook for a few iterations) is supported via the
-/// <see cref="EncodeOptions.DeferClear"/> flag; readers don't notice the difference.</para>
+/// <para><b>Encoder.</b> Variable-width LZW with codes growing 3..12 bits. What happens once the
+/// dictionary is full is chosen by <see cref="EncodeOptions.Clear"/>: clear straight away, freeze the
+/// dictionary and never clear again, or watch the compression ratio and clear only once it degrades.
+/// All three produce streams any conforming decoder reads back identically.</para>
 /// <para><b>Decoder.</b> Standard back-reference walk with a 4096-entry table. Tolerates the legacy
 /// "code = next-allocated-index" first-character special case (the so-called KwKwK pattern).</para>
 /// </remarks>
@@ -18,6 +18,12 @@ internal static class GifLzwCodec {
 
   private const int _MaxCodeBits = 12;
   private const int _MaxCodes = 1 << _MaxCodeBits;
+
+  // ClearStrategy.Adaptive tuning: how many input pixels one ratio window spans at minimum and at
+  // maximum, and how much worse a window may come out before the frozen dictionary is abandoned.
+  private const int _AdaptiveMinInterval = 64;
+  private const int _AdaptiveMaxInterval = 1024;
+  private const double _AdaptiveDegradationFactor = 1.1;
 
   /// <summary>Compression strategy. <see cref="CompressionLevel.None"/> emits each pixel as a literal code
   /// (largest output, useful as a baseline for testing or for downstream re-compression).
@@ -30,20 +36,43 @@ internal static class GifLzwCodec {
     Best,
   }
 
-  /// <summary>Encoder configuration. <see cref="DeferClear"/> only affects <see cref="CompressionLevel.Standard"/>;
-  /// <see cref="CompressionLevel.Best"/> overrides it by trying both values internally.</summary>
-  public sealed record EncodeOptions(CompressionLevel Level = CompressionLevel.Standard, bool DeferClear = false) {
+  /// <summary>What the encoder does when the 4096-entry dictionary fills up. Every strategy emits a
+  /// stream a conforming decoder reads back identically; they differ only in size, and which one wins
+  /// depends on the content.</summary>
+  public enum ClearStrategy {
+
+    /// <summary>Emit a clear code and start a fresh dictionary the moment the old one fills. Safe on
+    /// everything, and the only choice that adapts when the content changes character part-way through.</summary>
+    Immediate,
+
+    /// <summary>Never clear: keep the full dictionary as a static codebook for the rest of the frame.
+    /// Wins on content that stays statistically uniform — a smooth horizontal gradient encodes about a
+    /// third smaller — and loses badly when it does not, because a codebook built from the first part of
+    /// the image goes on being used for a part it does not describe.</summary>
+    Freeze,
+
+    /// <summary>Keep the full dictionary, but measure output bits per input pixel over a growing window
+    /// and clear as soon as that ratio degrades by more than 10%. Gets most of <see cref="Freeze"/>'s win
+    /// on uniform content without its worst case, because a frame that changes character clears instead of
+    /// limping on with a stale codebook.</summary>
+    Adaptive,
+  }
+
+  /// <summary>Encoder configuration. <see cref="Clear"/> only affects <see cref="CompressionLevel.Standard"/>;
+  /// <see cref="CompressionLevel.Best"/> overrides it by trying every strategy internally.</summary>
+  public sealed record EncodeOptions(CompressionLevel Level = CompressionLevel.Standard, ClearStrategy Clear = ClearStrategy.Immediate) {
     public static readonly EncodeOptions Default = new();
 
     /// <summary>Each pixel encoded as a literal code with no dictionary growth — produces the largest output.</summary>
     public static EncodeOptions NoCompression() => new(CompressionLevel.None);
 
-    /// <summary>Standard LZW with optional deferred-clear-code optimisation.</summary>
-    public static EncodeOptions StandardCompression(bool deferClear = false)
-      => new(CompressionLevel.Standard, deferClear);
+    /// <summary>Standard LZW with the given dictionary-full strategy.</summary>
+    public static EncodeOptions StandardCompression(ClearStrategy clear = ClearStrategy.Immediate)
+      => new(CompressionLevel.Standard, clear);
 
-    /// <summary>Try every Standard variant (clear-now, deferred-clear) and keep the smallest output. ~2x the
-    /// encode cost; saves a few % on real-world frames where deferred-clear wins or loses unpredictably.</summary>
+    /// <summary>Try every Standard variant (immediate, frozen and adaptive clear) plus the DP-optimal
+    /// encoder, and keep the smallest output. ~4x the encode cost; saves a few % on real-world frames
+    /// where the strategies win or lose unpredictably.</summary>
     public static EncodeOptions BestEffort() => new(CompressionLevel.Best);
   }
 
@@ -67,7 +96,7 @@ internal static class GifLzwCodec {
     return options.Level switch {
       CompressionLevel.None => _EncodeNoCompression(indexedPixels, lzwMinCodeSize),
       CompressionLevel.Best => _EncodeBest(indexedPixels, lzwMinCodeSize),
-      _ => _EncodeStandard(indexedPixels, lzwMinCodeSize, options.DeferClear),
+      _ => _EncodeStandard(indexedPixels, lzwMinCodeSize, options.Clear),
     };
   }
 
@@ -107,8 +136,16 @@ internal static class GifLzwCodec {
     return ms.ToArray();
   }
 
-  /// <summary>Standard LZW with optional deferred-clear-code optimisation.</summary>
-  private static byte[] _EncodeStandard(ReadOnlySpan<byte> indexedPixels, int lzwMinCodeSize, bool deferClear) {
+  /// <summary>Standard LZW; <paramref name="clear"/> decides what happens once the dictionary is full.</summary>
+  /// <remarks>
+  /// <see cref="ClearStrategy.Adaptive"/> keeps a running measure of how many output bits each input
+  /// pixel is costing. The window starts at 64 pixels and doubles up to 1024 each time the ratio holds,
+  /// so a frame that stays uniform is checked ever more cheaply; when a window comes out more than 10%
+  /// worse than the one before it, the frozen dictionary is no longer paying for itself and gets cleared.
+  /// The counters run from the first pixel, not from the moment the dictionary fills, so the first
+  /// comparison is against the ratio the encoder actually achieved while it was still learning.
+  /// </remarks>
+  private static byte[] _EncodeStandard(ReadOnlySpan<byte> indexedPixels, int lzwMinCodeSize, ClearStrategy clear) {
     var clearCode = 1 << lzwMinCodeSize;
     var eoiCode = clearCode + 1;
     var startCodeSize = lzwMinCodeSize + 1;
@@ -129,24 +166,55 @@ internal static class GifLzwCodec {
       return ms.ToArray();
     }
 
+    // Adaptive-clear bookkeeping; inert for the other two strategies.
+    var pixelsSinceCheck = 0;
+    var bitsSinceCheck = 0;
+    var previousRatio = 0.0;
+    var checkInterval = _AdaptiveMinInterval;
+
     var w = (int)indexedPixels[0];
     for (var i = 1; i < indexedPixels.Length; ++i) {
       var k = indexedPixels[i];
       var combined = (w << 9) | k;
       if (dict.TryGetValue(combined, out var existing)) {
         w = existing;
+        ++pixelsSinceCheck;
         continue;
       }
 
       bitOut.Write(w, codeSize);
+      bitsSinceCheck += codeSize;
+      ++pixelsSinceCheck;
+
       if (nextCode < _MaxCodes) {
         dict[combined] = nextCode++;
         if (nextCode == (1 << codeSize) + 1 && codeSize < _MaxCodeBits) ++codeSize;
-      } else if (!deferClear) {
-        bitOut.Write(clearCode, codeSize);
-        dict.Clear();
-        codeSize = startCodeSize;
-        nextCode = eoiCode + 1;
+      } else {
+        switch (clear) {
+          case ClearStrategy.Immediate:
+            bitOut.Write(clearCode, codeSize);
+            dict.Clear();
+            codeSize = startCodeSize;
+            nextCode = eoiCode + 1;
+            break;
+          case ClearStrategy.Adaptive when pixelsSinceCheck >= checkInterval: {
+            var currentRatio = (double)bitsSinceCheck / (pixelsSinceCheck * 8);
+            if (previousRatio > 0 && currentRatio > previousRatio * _AdaptiveDegradationFactor) {
+              bitOut.Write(clearCode, codeSize);
+              dict.Clear();
+              codeSize = startCodeSize;
+              nextCode = eoiCode + 1;
+              checkInterval = _AdaptiveMinInterval;
+            } else
+              checkInterval = Math.Min(checkInterval * 2, _AdaptiveMaxInterval);
+
+            previousRatio = currentRatio;
+            pixelsSinceCheck = 0;
+            bitsSinceCheck = 0;
+            break;
+          }
+          // Freeze, and Adaptive inside a window: keep using the full dictionary as-is.
+        }
       }
 
       w = k;
@@ -163,12 +231,17 @@ internal static class GifLzwCodec {
   /// code sequence by treating LZW as a shortest-path problem in a DAG of byte positions — it can
   /// pick shorter matches that pay off downstream where the greedy encoder always grabs the longest.</summary>
   private static byte[] _EncodeBest(ReadOnlySpan<byte> pixels, int lzwMinCodeSize) {
-    var clearNow = _EncodeStandard(pixels, lzwMinCodeSize, deferClear: false);
-    var deferred = _EncodeStandard(pixels, lzwMinCodeSize, deferClear: true);
+    var best = _EncodeStandard(pixels, lzwMinCodeSize, ClearStrategy.Immediate);
+
+    var frozen = _EncodeStandard(pixels, lzwMinCodeSize, ClearStrategy.Freeze);
+    if (frozen.Length < best.Length) best = frozen;
+
+    var adaptive = _EncodeStandard(pixels, lzwMinCodeSize, ClearStrategy.Adaptive);
+    if (adaptive.Length < best.Length) best = adaptive;
+
     var optimal = _EncodeOptimalDp(pixels, lzwMinCodeSize);
-    var best = clearNow;
-    if (deferred.Length < best.Length) best = deferred;
     if (optimal != null && optimal.Length < best.Length) best = optimal;
+
     return best;
   }
 

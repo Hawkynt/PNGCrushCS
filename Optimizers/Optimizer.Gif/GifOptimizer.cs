@@ -236,8 +236,10 @@ public sealed class GifOptimizer {
           localColorTable = palette;
         }
 
-        // LZW compress
-        var compressed = LzwCompressor.Compress(pixels, 8, combo.LzwMode == LzwMode.DeferredClear);
+        // LZW compress. The codec frames the bitstream into GIF sub-blocks and prefixes the LZW
+        // minimum code size, so what comes back is the complete image-data block.
+        var compressed = GifLzwCodec.Encode(pixels, 8, GifLzwCodec.EncodeOptions.StandardCompression(
+          combo.LzwMode == LzwMode.DeferredClear ? GifLzwCodec.ClearStrategy.Adaptive : GifLzwCodec.ClearStrategy.Immediate));
 
         assembledFrames[i] = new AssembledFrame {
           CompressedData = compressed,
@@ -246,8 +248,7 @@ public sealed class GifOptimizer {
           LocalColorTable = localColorTable,
           Delay = frame.Delay,
           DisposalMethod = disposal,
-          TransparentColorIndex = transparentIndex,
-          BitsPerPixel = 8
+          TransparentColorIndex = transparentIndex
         };
       }
 

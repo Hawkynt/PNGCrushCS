@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using FileFormat.Gif;
 using NUnit.Framework;
 using FileFormat.Core;
 
@@ -90,12 +91,12 @@ public sealed class PaletteReordererTests {
     var (freqPalette, freqRemap) =
       PaletteReorderer.Reorder(_TestPalette, pixels, PaletteReorderStrategy.FrequencySorted);
     var freqRemapped = PaletteReorderer.ApplyRemap(pixels, freqRemap);
-    var freqCompressed = LzwCompressor.Compress(freqRemapped, 8);
+    var freqCompressed = GifLzwCodec.Encode(freqRemapped, 8);
 
     var (optPalette, optRemap) =
       PaletteReorderer.Reorder(_TestPalette, pixels, PaletteReorderStrategy.CompressionOptimized);
     var optRemapped = PaletteReorderer.ApplyRemap(pixels, optRemap);
-    var optCompressed = LzwCompressor.Compress(optRemapped, 8);
+    var optCompressed = GifLzwCodec.Encode(optRemapped, 8);
 
     Assert.That(optCompressed.Length, Is.LessThanOrEqualTo(freqCompressed.Length),
       $"CompressionOptimized={optCompressed.Length} vs FrequencySorted={freqCompressed.Length}");

@@ -11,7 +11,7 @@ public sealed class LzwRoundTripTests {
   [Category("Unit")]
   public void Compress_SmallData_RoundTrips() {
     var original = new byte[] { 0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3 };
-    var compressed = LzwCompressor.Compress(original, 8);
+    var compressed = GifLzwCodec.Encode(original, 8);
 
     Assert.That(compressed.Length, Is.GreaterThan(0));
   }
@@ -19,7 +19,7 @@ public sealed class LzwRoundTripTests {
   [Test]
   [Category("Unit")]
   public void Compress_EmptyData_ProducesOutput() {
-    var compressed = LzwCompressor.Compress(ReadOnlySpan<byte>.Empty, 8);
+    var compressed = GifLzwCodec.Encode(ReadOnlySpan<byte>.Empty, 8);
     Assert.That(compressed.Length, Is.GreaterThan(0));
   }
 
@@ -29,7 +29,7 @@ public sealed class LzwRoundTripTests {
     var original = new byte[1024];
     Array.Fill(original, (byte)42);
 
-    var compressed = LzwCompressor.Compress(original, 8);
+    var compressed = GifLzwCodec.Encode(original, 8);
     Assert.That(compressed.Length, Is.LessThan(original.Length));
   }
 
@@ -46,8 +46,8 @@ public sealed class LzwRoundTripTests {
     // Create GIF manually with our LZW compressor, then read back
     var tempFile = new FileInfo(Path.Combine(Path.GetTempPath(), $"lzw_rt_{Guid.NewGuid():N}.gif"));
     try {
-      var compressed = LzwCompressor.Compress(expectedPixels, 2);
-      var gifBytes = _BuildGifWithCompressedData(width, height, compressed, 2);
+      var compressed = GifLzwCodec.Encode(expectedPixels, 2);
+      var gifBytes = _BuildGifWithCompressedData(width, height, compressed);
       File.WriteAllBytes(tempFile.FullName, gifBytes);
 
       var gif = Reader.FromFile(tempFile);
@@ -72,8 +72,8 @@ public sealed class LzwRoundTripTests {
 
     var tempFile = new FileInfo(Path.Combine(Path.GetTempPath(), $"lzw_lg_{Guid.NewGuid():N}.gif"));
     try {
-      var compressed = LzwCompressor.Compress(pixels, 2);
-      var gifBytes = _BuildGifWithCompressedData(width, height, compressed, 2);
+      var compressed = GifLzwCodec.Encode(pixels, 2);
+      var gifBytes = _BuildGifWithCompressedData(width, height, compressed);
       File.WriteAllBytes(tempFile.FullName, gifBytes);
 
       var gif = Reader.FromFile(tempFile);
@@ -87,7 +87,7 @@ public sealed class LzwRoundTripTests {
     }
   }
 
-  private static byte[] _BuildGifWithCompressedData(int width, int height, byte[] compressedData, byte minCodeSize) {
+  private static byte[] _BuildGifWithCompressedData(int width, int height, byte[] compressedData) {
     using var ms = new MemoryStream();
     using var writer = new BinaryWriter(ms);
 
@@ -118,17 +118,8 @@ public sealed class LzwRoundTripTests {
     writer.Write((ushort)height);
     writer.Write((byte)0x00);
 
-    // Image data
-    writer.Write(minCodeSize);
-    var offset = 0;
-    while (offset < compressedData.Length) {
-      var blockSize = Math.Min(255, compressedData.Length - offset);
-      writer.Write((byte)blockSize);
-      writer.Write(compressedData, offset, blockSize);
-      offset += blockSize;
-    }
-
-    writer.Write((byte)0x00);
+    // Image data: the codec already emits the minimum code size, the sub-blocks and the terminator.
+    writer.Write(compressedData);
     writer.Write((byte)0x3B);
 
     return ms.ToArray();
