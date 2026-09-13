@@ -302,6 +302,8 @@ internal static class GifFrameOptimizer {
 
   /// <summary>
   ///   Trims transparent margins from a frame, returning the cropped pixel data and updated position/size.
+  ///   A frame with no transparent index has no margin that carries no information, so it is returned
+  ///   untouched; everything else is the shared window-shrinking pass.
   /// </summary>
   public static (byte[] pixels, Offset position, Dimensions size) TrimTransparentMargins(
     byte[] pixels,
@@ -309,47 +311,11 @@ internal static class GifFrameOptimizer {
     Offset position,
     byte? transparentIndex
   ) {
-    if (transparentIndex == null || size.Width == 0 || size.Height == 0)
+    if (transparentIndex == null)
       return (pixels, position, size);
 
-    var ti = transparentIndex.Value;
-    int w = size.Width;
-    int h = size.Height;
-
-    // Find bounding box of non-transparent pixels
-    int top = h;
-    int bottom = 0;
-    int left = w;
-    int right = 0;
-
-    for (var y = 0; y < h; ++y)
-    for (var x = 0; x < w; ++x)
-      if (pixels[y * w + x] != ti) {
-        if (y < top) top = y;
-        if (y > bottom) bottom = y;
-        if (x < left) left = x;
-        if (x > right) right = x;
-      }
-
-    if (bottom < top)
-      // Entire frame is transparent; keep 1x1 pixel
-      return ([ti], new Offset(position.X, position.Y), new Dimensions(1, 1));
-
-    var newW = right - left + 1;
-    var newH = bottom - top + 1;
-
-    if (newW == w && newH == h)
-      return (pixels, position, size);
-
-    var trimmed = new byte[newW * newH];
-    for (var y = 0; y < newH; ++y)
-      Array.Copy(pixels, (top + y) * w + left, trimmed, y * newW, newW);
-
-    return (
-      trimmed,
-      new Offset((ushort)(position.X + left), (ushort)(position.Y + top)),
-      new Dimensions(newW, newH)
-    );
+    var (trimmed, newSize, newPosition) = GifFrameWindow.Trim(pixels, size, position, transparentIndex.Value);
+    return (trimmed, newPosition, newSize);
   }
 
   /// <summary>

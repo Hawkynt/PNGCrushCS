@@ -37,7 +37,7 @@ internal static class GifAssembler {
       if (frame.LocalColorTable != null)
         _WriteColorTable(writer, frame.LocalColorTable);
 
-      _WriteImageData(writer, frame.CompressedData, frame.BitsPerPixel);
+      writer.Write(frame.CompressedData);
     }
 
     _WriteTrailer(writer);
@@ -115,20 +115,7 @@ internal static class GifAssembler {
     }
   }
 
-  private static void _WriteImageData(BinaryWriter writer, byte[] compressedLzwData, byte bitsPerPixel) {
-    writer.Write((byte)(bitsPerPixel == 1 ? 2 : bitsPerPixel));
 
-    // Write sub-blocks
-    var offset = 0;
-    while (offset < compressedLzwData.Length) {
-      var blockSize = Math.Min(255, compressedLzwData.Length - offset);
-      writer.Write((byte)blockSize);
-      writer.Write(compressedLzwData, offset, blockSize);
-      offset += blockSize;
-    }
-
-    writer.Write(BLOCK_TERMINATOR);
-  }
 
   private static void _WriteTrailer(BinaryWriter writer) => writer.Write(FILE_TERMINATOR);
 

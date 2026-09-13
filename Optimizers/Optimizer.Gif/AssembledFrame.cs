@@ -5,6 +5,9 @@ using FileFormat.Core;
 namespace Optimizer.Gif;
 
 internal sealed class AssembledFrame {
+
+  /// <summary>The complete GIF image-data block as <see cref="FileFormat.Gif.GifLzwCodec"/> emits it:
+  /// the LZW minimum code size byte, the sub-blocks, and the zero-length terminator.</summary>
   public byte[] CompressedData { get; init; } = [];
   public Dimensions Size { get; init; }
   public Offset Position { get; init; }
@@ -12,5 +15,4 @@ internal sealed class AssembledFrame {
   public TimeSpan Delay { get; init; }
   public FrameDisposalMethod DisposalMethod { get; init; }
   public byte? TransparentColorIndex { get; init; }
-  public byte BitsPerPixel { get; init; } = 8;
 }

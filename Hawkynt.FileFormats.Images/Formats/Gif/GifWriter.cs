@@ -200,7 +200,9 @@ public static class GifWriter {
       GifCompressionLevel.Best => GifLzwCodec.CompressionLevel.Best,
       _ => GifLzwCodec.CompressionLevel.Standard,
     },
-    options.DeferClear);
+    // The public bool keeps meaning "freeze the dictionary"; the adaptive strategy is reachable
+    // through GifCompressionLevel.Best, which now tries it alongside the other two.
+    options.DeferClear ? GifLzwCodec.ClearStrategy.Freeze : GifLzwCodec.ClearStrategy.Immediate);
 
   private static void _WriteGraphicControlExtension(Stream s, Frame frame) {
     s.WriteByte(0x21);

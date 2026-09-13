@@ -226,18 +226,8 @@ public sealed class EndToEndTests {
       for (var x = 0; x < width; ++x)
         pixels[y * width + x] = (byte)((x + y + f) % 4);
 
-      byte minCodeSize = 2;
-      var compressed = LzwCompressor.Compress(pixels, minCodeSize);
-      writer.Write(minCodeSize);
-      var offset = 0;
-      while (offset < compressed.Length) {
-        var blockSize = Math.Min(255, compressed.Length - offset);
-        writer.Write((byte)blockSize);
-        writer.Write(compressed, offset, blockSize);
-        offset += blockSize;
-      }
-
-      writer.Write((byte)0x00);
+      // The codec emits the minimum code size, the sub-blocks and the terminator as one block.
+      writer.Write(GifLzwCodec.Encode(pixels, 2));
     }
 
     writer.Write((byte)0x3B);
