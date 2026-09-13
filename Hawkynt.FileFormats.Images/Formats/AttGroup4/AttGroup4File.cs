@@ -1,4 +1,5 @@
 using System;
+using FileFormat.BilevelFax;
 using FileFormat.Core;
 
 namespace FileFormat.AttGroup4;
@@ -30,30 +31,7 @@ public readonly record struct AttGroup4File : IImageFormatReader<AttGroup4File>,
   public byte[] PixelData { get; init; }
 
   /// <summary>Converts this ATT image to a platform-independent <see cref="RawImage"/> in Rgb24 format.</summary>
-  public static RawImage ToRawImage(AttGroup4File file) {
-
-    var bytesPerRow = (file.Width + 7) / 8;
-    var rgb = new byte[file.Width * file.Height * 3];
-
-    for (var y = 0; y < file.Height; ++y)
-      for (var x = 0; x < file.Width; ++x) {
-        var byteIndex = y * bytesPerRow + x / 8;
-        var bitIndex = 7 - (x % 8);
-        var bit = (file.PixelData[byteIndex] >> bitIndex) & 1;
-        var offset = (y * file.Width + x) * 3;
-        var color = bit == 1 ? (byte)0 : (byte)255;
-        rgb[offset] = color;
-        rgb[offset + 1] = color;
-        rgb[offset + 2] = color;
-      }
-
-    return new() {
-      Width = file.Width,
-      Height = file.Height,
-      Format = PixelFormat.Rgb24,
-      PixelData = rgb,
-    };
-  }
+  public static RawImage ToRawImage(AttGroup4File file) => FaxPage.ToRawImage(file.Width, file.Height, file.PixelData);
 
   /// <summary>Thresholds any <see cref="RawImage"/> down to the two tones this format holds.
   /// Every size fits, because the header states its own.</summary>
