@@ -49,12 +49,12 @@ public static class Program {
   private static Task<int> _RunAuto(AutoVerb opts) {
     var options = new ImageOptimizationOptions(
       AllowLossy: opts.AllowLossy,
-      AllowFormatConversion: opts.AllowConversion,
+      AllowFormatConversion: opts.AllowConversion ?? true,
       StripMetadata: opts.StripMetadata,
       MaxParallelTasks: opts.ParallelTasks
     );
 
-    return _RunOptimizer(opts, options, opts.AutoExtension);
+    return _RunOptimizer(opts, options, opts.AutoExtension ?? true);
   }
 
   private static Task<int> _RunPng(PngVerb opts) {
@@ -62,9 +62,9 @@ public static class Program {
     var deflateMethods = _ParseEnumList<DeflateMethod>(opts.DeflateMethods);
 
     var pngOptions = new PngOptimizationOptions {
-      AutoSelectColorMode = opts.AutoColorMode,
-      TryInterlacing = opts.TryInterlacing,
-      TryPartitioning = opts.TryPartitioning,
+      AutoSelectColorMode = opts.AutoColorMode ?? true,
+      TryInterlacing = opts.TryInterlacing ?? true,
+      TryPartitioning = opts.TryPartitioning ?? true,
       AllowLossyPalette = opts.LossyPalette,
       UseDithering = opts.UseDithering,
       IsHighQualityQuantization = opts.HighQualityQuantize,
@@ -94,12 +94,12 @@ public static class Program {
 
     var gifOptions = new GifOptimizationOptions(
       strategies,
-      OptimizeDisposal: opts.OptimizeDisposal,
-      TrimMargins: opts.TrimMargins,
+      OptimizeDisposal: opts.OptimizeDisposal ?? true,
+      TrimMargins: opts.TrimMargins ?? true,
       TryDeferredClear: opts.DeferredClear ?? true,
       TryFrozenDictionary: opts.FrozenDictionary ?? true,
-      DeduplicateFrames: opts.Deduplicate,
-      TryFrameDifferencing: opts.FrameDiff,
+      DeduplicateFrames: opts.Deduplicate ?? true,
+      TryFrameDifferencing: opts.FrameDiff ?? true,
       MaxParallelTasks: opts.ParallelTasks
     );
 
@@ -122,8 +122,8 @@ public static class Program {
     var tiffOptions = new TiffOptimizationOptions(
       compressions,
       predictors,
-      AutoSelectColorMode: opts.AutoColorMode,
-      DynamicStripSizing: opts.DynamicStripSizing,
+      AutoSelectColorMode: opts.AutoColorMode ?? true,
+      DynamicStripSizing: opts.DynamicStripSizing ?? true,
       TryTiles: opts.TryTiles,
       TileSizes: tileSizes.Count > 0 ? tileSizes : null,
       MaxParallelTasks: opts.ParallelTasks
@@ -145,7 +145,7 @@ public static class Program {
 
     var bmpOptions = new BmpOptimizationOptions(
       Compressions: compressions,
-      AutoSelectColorMode: opts.AutoColorMode,
+      AutoSelectColorMode: opts.AutoColorMode ?? true,
       MaxParallelTasks: opts.ParallelTasks
     );
 
@@ -165,7 +165,7 @@ public static class Program {
 
     var tgaOptions = new TgaOptimizationOptions(
       Compressions: compressions,
-      AutoSelectColorMode: opts.AutoColorMode,
+      AutoSelectColorMode: opts.AutoColorMode ?? true,
       MaxParallelTasks: opts.ParallelTasks
     );
 
@@ -182,7 +182,7 @@ public static class Program {
 
   private static Task<int> _RunPcx(PcxVerb opts) {
     var pcxOptions = new PcxOptimizationOptions(
-      AutoSelectColorMode: opts.AutoColorMode,
+      AutoSelectColorMode: opts.AutoColorMode ?? true,
       MaxParallelTasks: opts.ParallelTasks
     );
 
@@ -204,7 +204,7 @@ public static class Program {
       AllowLossy: opts.AllowLossy,
       MinQuality: opts.MinQuality,
       Qualities: qualities.Count > 0 ? qualities : null,
-      StripMetadata: opts.StripMetadata,
+      StripMetadata: opts.StripMetadata ?? true,
       MaxParallelTasks: opts.ParallelTasks
     );
 
@@ -261,7 +261,7 @@ public static class Program {
   private static Task<int> _RunWebP(WebPVerb opts) {
     var webpOptions = new WebPOptimizationOptions(
       MaxParallelTasks: opts.ParallelTasks,
-      StripMetadata: opts.StripMetadata
+      StripMetadata: opts.StripMetadata ?? true
     );
 
     var options = new ImageOptimizationOptions(
@@ -269,7 +269,7 @@ public static class Program {
       AllowFormatConversion: opts.AllowConversion,
       ForceFormat: opts.AllowConversion ? null : Optimizer.Image.ImageFormat.WebP,
       MaxParallelTasks: opts.ParallelTasks,
-      StripMetadata: opts.StripMetadata,
+      StripMetadata: opts.StripMetadata ?? true,
       WebPOptions: webpOptions
     );
 

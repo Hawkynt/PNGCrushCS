@@ -20,11 +20,13 @@ public sealed class TiffVerb : ICrushOptions {
     HelpText = "Predictor modes (comma-separated)")]
   public string Predictors { get; set; } = "None,HorizontalDifferencing";
 
+  // bool? and not bool: a plain bool option is a switch, so `Default = true` could never be
+  // declined — see the note in GifVerb.cs for the mechanism.
   [Option('a', "auto-color-mode", Default = true, HelpText = "Automatically select best color mode")]
-  public bool AutoColorMode { get; set; } = true;
+  public bool? AutoColorMode { get; set; }
 
   [Option("dynamic-strips", Default = true, HelpText = "Dynamically generate strip sizes")]
-  public bool DynamicStripSizing { get; set; } = true;
+  public bool? DynamicStripSizing { get; set; }
 
   [Option("tiles", Default = false, HelpText = "Try tiled TIFF encoding")]
   public bool TryTiles { get; set; } = false;

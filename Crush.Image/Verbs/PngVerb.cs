@@ -12,14 +12,16 @@ public sealed class PngVerb : ICrushOptions {
   [Option('o', "output", Required = true, HelpText = "Output PNG file path")]
   public string OutputFile { get; set; } = "";
 
+  // bool? and not bool: a plain bool option is a switch, so `Default = true` could never be
+  // declined — see the note in GifVerb.cs for the mechanism.
   [Option('a', "auto-color-mode", Default = true, HelpText = "Automatically select best color mode")]
-  public bool AutoColorMode { get; set; } = true;
+  public bool? AutoColorMode { get; set; }
 
   [Option("interlace", Default = true, HelpText = "Try interlaced PNG encoding")]
-  public bool TryInterlacing { get; set; } = true;
+  public bool? TryInterlacing { get; set; }
 
   [Option('p', "partition", Default = true, HelpText = "Try smart partitioning for better compression")]
-  public bool TryPartitioning { get; set; } = true;
+  public bool? TryPartitioning { get; set; }
 
   [Option('f', "filters", Default = "SingleFilter,ScanlineAdaptive,PartitionOptimized",
     HelpText = "Filter strategies to try (comma-separated)")]
