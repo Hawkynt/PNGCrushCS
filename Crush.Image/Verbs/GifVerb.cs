@@ -16,18 +16,19 @@ public sealed class GifVerb : ICrushOptions {
     HelpText = "Palette reorder strategies (comma-separated)")]
   public string PaletteStrategies { get; set; } = "Original,FrequencySorted,LuminanceSorted,LzwRunAware";
 
+  // Every on-by-default flag on this verb is bool? rather than bool, on purpose. CommandLineParser
+  // treats a plain bool option as a switch: it is set when the flag is present and left at Default
+  // otherwise, so an option declared `bool` with `Default = true` can never be turned off —
+  // `--flag false` parses, silently discards the `false`, and leaves the option on. Declaring the
+  // property nullable makes the parser accept an explicit value, so `--trim-margins false` does what
+  // the help text implies. Absence and a bare flag both still mean true, so nothing that worked
+  // before changes; Program.cs supplies the `?? true` at the point of use.
   [Option("optimize-disposal", Default = true, HelpText = "Optimize frame disposal methods")]
-  public bool OptimizeDisposal { get; set; } = true;
+  public bool? OptimizeDisposal { get; set; }
 
   [Option("trim-margins", Default = true, HelpText = "Trim transparent margins from frames")]
-  public bool TrimMargins { get; set; } = true;
+  public bool? TrimMargins { get; set; }
 
-  // These two are bool? rather than bool on purpose. CommandLineParser treats a plain bool option as
-  // a switch: it is set when the flag is present and left at Default otherwise, so an option declared
-  // `bool` with `Default = true` can never be turned off — `--flag false` parses, silently discards
-  // the `false`, and leaves the option on. Declaring the property nullable makes the parser accept an
-  // explicit value, so `--deferred-clear false` does what the help text implies. Absence and a bare
-  // flag both still mean true, so nothing that worked before changes.
   [Option("deferred-clear", Default = true,
     HelpText = "Try deferred LZW clear codes; pass 'false' to skip (--deferred-clear false)")]
   public bool? DeferredClear { get; set; }
@@ -37,10 +38,10 @@ public sealed class GifVerb : ICrushOptions {
   public bool? FrozenDictionary { get; set; }
 
   [Option("frame-diff", Default = true, HelpText = "Try frame differencing")]
-  public bool FrameDiff { get; set; } = true;
+  public bool? FrameDiff { get; set; }
 
   [Option("deduplicate", Default = true, HelpText = "Merge identical consecutive frames")]
-  public bool Deduplicate { get; set; } = true;
+  public bool? Deduplicate { get; set; }
 
   [Option("compression-palette", Default = false, HelpText = "Try compression-aware palette reordering")]
   public bool CompressionPalette { get; set; } = false;

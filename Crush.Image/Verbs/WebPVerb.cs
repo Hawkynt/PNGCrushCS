@@ -12,8 +12,10 @@ public sealed class WebPVerb : ICrushOptions {
   [Option('o', "output", Required = true, HelpText = "Output WebP file path")]
   public string OutputFile { get; set; } = "";
 
+  // bool? and not bool: a plain bool option is a switch, so `Default = true` could never be
+  // declined — see the note in GifVerb.cs for the mechanism.
   [Option('s', "strip-metadata", Default = true, HelpText = "Strip metadata (EXIF, ICCP, XMP)")]
-  public bool StripMetadata { get; set; } = true;
+  public bool? StripMetadata { get; set; }
 
   [Option("convert", Default = false, HelpText = "Also try other formats")]
   public bool AllowConversion { get; set; } = false;

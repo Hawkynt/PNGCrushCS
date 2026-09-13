@@ -15,8 +15,10 @@ public sealed class TgaVerb : ICrushOptions {
   [Option('c', "compression", Default = "None,Rle", HelpText = "Compression methods (comma-separated)")]
   public string Compressions { get; set; } = "None,Rle";
 
+  // bool? and not bool: a plain bool option is a switch, so `Default = true` could never be
+  // declined — see the note in GifVerb.cs for the mechanism.
   [Option('a', "auto-color-mode", Default = true, HelpText = "Automatically select best color mode")]
-  public bool AutoColorMode { get; set; } = true;
+  public bool? AutoColorMode { get; set; }
 
   [Option("convert", Default = false, HelpText = "Also try other formats")]
   public bool AllowConversion { get; set; } = false;
