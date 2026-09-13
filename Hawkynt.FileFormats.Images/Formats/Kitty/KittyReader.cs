@@ -25,18 +25,7 @@ public static class KittyReader {
     return FromBytes(File.ReadAllBytes(file.FullName));
   }
 
-  public static KittyFile FromStream(Stream stream) {
-    ArgumentNullException.ThrowIfNull(stream);
-    if (stream.CanSeek) {
-      var data = new byte[stream.Length - stream.Position];
-      stream.ReadExactly(data);
-      return FromBytes(data);
-    }
-
-    using var ms = new MemoryStream();
-    stream.CopyTo(ms);
-    return FromBytes(ms.ToArray());
-  }
+  public static KittyFile FromStream(Stream stream) => FromBytes(StreamBytes.ReadAll(stream));
 
   public static KittyFile FromSpan(ReadOnlySpan<byte> data) {
     var pixels = new int[KittyFile.Width * KittyFile.Height];

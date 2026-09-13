@@ -40,17 +40,7 @@ public static class BmpReader {
     return FromBytes(File.ReadAllBytes(file.FullName));
   }
 
-  public static BmpFile FromStream(Stream stream) {
-    ArgumentNullException.ThrowIfNull(stream);
-    if (stream.CanSeek) {
-      var data = new byte[stream.Length - stream.Position];
-      stream.ReadExactly(data);
-      return FromBytes(data);
-    }
-    using var ms = new MemoryStream();
-    stream.CopyTo(ms);
-    return FromBytes(ms.ToArray());
-  }
+  public static BmpFile FromStream(Stream stream) => FromBytes(StreamBytes.ReadAll(stream));
 
   /// <summary>The length of the OS/2 BITMAPCOREHEADER, which is what marks a file as that older kind.</summary>
   private const int CORE_HEADER_SIZE = 12;

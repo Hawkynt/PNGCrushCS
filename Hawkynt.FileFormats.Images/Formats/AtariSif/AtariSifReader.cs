@@ -16,12 +16,7 @@ public static class AtariSifReader {
     return FromBytes(File.ReadAllBytes(file.FullName));
   }
 
-  public static AtariSifFile FromStream(Stream stream) {
-    ArgumentNullException.ThrowIfNull(stream);
-    using var ms = new MemoryStream();
-    stream.CopyTo(ms);
-    return FromBytes(ms.ToArray());
-  }
+  public static AtariSifFile FromStream(Stream stream) => FromBytes(StreamBytes.ReadAll(stream));
 
   public static AtariSifFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

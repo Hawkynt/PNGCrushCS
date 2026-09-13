@@ -16,18 +16,7 @@ public static class MtvReader {
     return FromBytes(File.ReadAllBytes(file.FullName));
   }
 
-  public static MtvFile FromStream(Stream stream) {
-    ArgumentNullException.ThrowIfNull(stream);
-    if (stream.CanSeek) {
-      var data = new byte[stream.Length - stream.Position];
-      stream.ReadExactly(data);
-      return FromBytes(data);
-    }
-
-    using var buffer = new MemoryStream();
-    stream.CopyTo(buffer);
-    return FromBytes(buffer.ToArray());
-  }
+  public static MtvFile FromStream(Stream stream) => FromBytes(StreamBytes.ReadAll(stream));
 
   public static MtvFile FromSpan(ReadOnlySpan<byte> data) {
     if (!TryReadHeader(data, out var width, out var height, out var pixelOffset))

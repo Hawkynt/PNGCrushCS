@@ -15,18 +15,7 @@ public static class PcdsReader {
     return FromBytes(File.ReadAllBytes(file.FullName));
   }
 
-  public static PcdsFile FromStream(Stream stream) {
-    ArgumentNullException.ThrowIfNull(stream);
-    if (stream.CanSeek) {
-      var data = new byte[stream.Length - stream.Position];
-      stream.ReadExactly(data);
-      return FromBytes(data);
-    }
-
-    using var memory = new MemoryStream();
-    stream.CopyTo(memory);
-    return FromBytes(memory.ToArray());
-  }
+  public static PcdsFile FromStream(Stream stream) => FromBytes(StreamBytes.ReadAll(stream));
 
   /// <summary>
   /// The same container the <c>.pcd</c> reader walks, stopped one step short of the colour

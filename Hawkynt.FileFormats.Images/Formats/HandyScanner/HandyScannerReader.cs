@@ -14,18 +14,7 @@ public static class HandyScannerReader {
     return FromBytes(File.ReadAllBytes(file.FullName));
   }
 
-  public static HandyScannerFile FromStream(Stream stream) {
-    ArgumentNullException.ThrowIfNull(stream);
-    if (stream.CanSeek) {
-      var data = new byte[stream.Length - stream.Position];
-      stream.ReadExactly(data);
-      return FromBytes(data);
-    }
-
-    using var ms = new MemoryStream();
-    stream.CopyTo(ms);
-    return FromBytes(ms.ToArray());
-  }
+  public static HandyScannerFile FromStream(Stream stream) => FromBytes(StreamBytes.ReadAll(stream));
 
   public static HandyScannerFile FromSpan(ReadOnlySpan<byte> data) {
     // A whole number of rows and nothing else is the only structure there is to check.

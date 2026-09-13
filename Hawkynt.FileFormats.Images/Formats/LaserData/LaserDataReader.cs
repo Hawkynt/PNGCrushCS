@@ -16,18 +16,7 @@ public static class LaserDataReader {
     return FromBytes(File.ReadAllBytes(file.FullName));
   }
 
-  public static LaserDataFile FromStream(Stream stream) {
-    ArgumentNullException.ThrowIfNull(stream);
-    if (stream.CanSeek) {
-      var data = new byte[stream.Length - stream.Position];
-      stream.ReadExactly(data);
-      return FromBytes(data);
-    }
-
-    using var buffer = new MemoryStream();
-    stream.CopyTo(buffer);
-    return FromBytes(buffer.ToArray());
-  }
+  public static LaserDataFile FromStream(Stream stream) => FromBytes(StreamBytes.ReadAll(stream));
 
   public static LaserDataFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

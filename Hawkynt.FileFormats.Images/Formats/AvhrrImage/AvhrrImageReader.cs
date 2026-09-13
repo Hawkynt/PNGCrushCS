@@ -14,17 +14,7 @@ public static class AvhrrImageReader {
     return FromBytes(File.ReadAllBytes(file.FullName));
   }
 
-  public static AvhrrImageFile FromStream(Stream stream) {
-    ArgumentNullException.ThrowIfNull(stream);
-    if (stream.CanSeek) {
-      var data = new byte[stream.Length - stream.Position];
-      stream.ReadExactly(data);
-      return FromSpan(data);
-    }
-    using var ms = new MemoryStream();
-    stream.CopyTo(ms);
-    return FromSpan(ms.ToArray());
-  }
+  public static AvhrrImageFile FromStream(Stream stream) => FromSpan(StreamBytes.ReadAll(stream));
 
   public static AvhrrImageFile FromSpan(ReadOnlySpan<byte> data) {
     if (data.Length < AvhrrImageFile.MinFileSize)

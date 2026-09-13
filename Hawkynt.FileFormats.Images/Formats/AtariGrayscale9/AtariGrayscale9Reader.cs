@@ -14,18 +14,7 @@ public static class AtariGrayscale9Reader {
     return FromBytes(File.ReadAllBytes(file.FullName));
   }
 
-  public static AtariGrayscale9File FromStream(Stream stream) {
-    ArgumentNullException.ThrowIfNull(stream);
-    if (stream.CanSeek) {
-      var data = new byte[stream.Length - stream.Position];
-      stream.ReadExactly(data);
-      return FromBytes(data);
-    }
-
-    using var ms = new MemoryStream();
-    stream.CopyTo(ms);
-    return FromBytes(ms.ToArray());
-  }
+  public static AtariGrayscale9File FromStream(Stream stream) => FromBytes(StreamBytes.ReadAll(stream));
 
   public static AtariGrayscale9File FromSpan(ReadOnlySpan<byte> data) {
     // The format carries no signature; its fixed size is the only thing identifying it. There are

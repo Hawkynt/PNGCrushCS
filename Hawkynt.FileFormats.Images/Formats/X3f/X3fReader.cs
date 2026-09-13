@@ -32,18 +32,7 @@ public static class X3fReader {
     return FromBytes(File.ReadAllBytes(file.FullName));
   }
 
-  public static X3fFile FromStream(Stream stream) {
-    ArgumentNullException.ThrowIfNull(stream);
-    if (stream.CanSeek) {
-      var data = new byte[stream.Length - stream.Position];
-      stream.ReadExactly(data);
-      return FromBytes(data);
-    }
-
-    using var ms = new MemoryStream();
-    stream.CopyTo(ms);
-    return FromBytes(ms.ToArray());
-  }
+  public static X3fFile FromStream(Stream stream) => FromBytes(StreamBytes.ReadAll(stream));
 
   public static X3fFile FromSpan(ReadOnlySpan<byte> data) {
     if (data.Length < X3fFile.HeaderSize + 4 || !data[..4].SequenceEqual(X3fFile.Magic))

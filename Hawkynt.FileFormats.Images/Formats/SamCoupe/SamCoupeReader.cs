@@ -29,17 +29,7 @@ public static class SamCoupeReader {
     return FromBytes(File.ReadAllBytes(file.FullName), mode);
   }
 
-  public static SamCoupeFile FromStream(Stream stream, SamCoupeMode mode = SamCoupeMode.Mode4) {
-    ArgumentNullException.ThrowIfNull(stream);
-    if (stream.CanSeek) {
-      var data = new byte[stream.Length - stream.Position];
-      stream.ReadExactly(data);
-      return FromBytes(data, mode);
-    }
-    using var ms = new MemoryStream();
-    stream.CopyTo(ms);
-    return FromBytes(ms.ToArray(), mode);
-  }
+  public static SamCoupeFile FromStream(Stream stream, SamCoupeMode mode = SamCoupeMode.Mode4) => FromBytes(StreamBytes.ReadAll(stream), mode);
 
   public static SamCoupeFile FromSpan(ReadOnlySpan<byte> data, SamCoupeMode mode = SamCoupeMode.Mode4) {
     if (data.Length != FileSize)

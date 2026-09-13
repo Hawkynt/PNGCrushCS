@@ -14,17 +14,7 @@ public static class BbcMicroReader {
     return FromBytes(File.ReadAllBytes(file.FullName), mode);
   }
 
-  public static BbcMicroFile FromStream(Stream stream, BbcMicroMode mode = BbcMicroMode.Mode1) {
-    ArgumentNullException.ThrowIfNull(stream);
-    if (stream.CanSeek) {
-      var data = new byte[stream.Length - stream.Position];
-      stream.ReadExactly(data);
-      return FromSpan(data, mode);
-    }
-    using var ms = new MemoryStream();
-    stream.CopyTo(ms);
-    return FromSpan(ms.ToArray(), mode);
-  }
+  public static BbcMicroFile FromStream(Stream stream, BbcMicroMode mode = BbcMicroMode.Mode1) => FromSpan(StreamBytes.ReadAll(stream), mode);
 
   public static BbcMicroFile FromSpan(ReadOnlySpan<byte> data, BbcMicroMode mode = BbcMicroMode.Mode1) {
     var expectedSize = BbcMicroFile.GetExpectedScreenSize(mode);

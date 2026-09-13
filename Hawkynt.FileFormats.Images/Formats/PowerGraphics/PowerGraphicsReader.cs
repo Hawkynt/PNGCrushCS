@@ -15,18 +15,7 @@ public static class PowerGraphicsReader {
     return FromBytes(File.ReadAllBytes(file.FullName));
   }
 
-  public static PowerGraphicsFile FromStream(Stream stream) {
-    ArgumentNullException.ThrowIfNull(stream);
-    if (stream.CanSeek) {
-      var data = new byte[stream.Length - stream.Position];
-      stream.ReadExactly(data);
-      return FromBytes(data);
-    }
-
-    using var ms = new MemoryStream();
-    stream.CopyTo(ms);
-    return FromBytes(ms.ToArray());
-  }
+  public static PowerGraphicsFile FromStream(Stream stream) => FromBytes(StreamBytes.ReadAll(stream));
 
   public static PowerGraphicsFile FromSpan(ReadOnlySpan<byte> data) {
     if (data.Length < 1776 || data[0] != 255 || data[1] != 255 || data[2] != 6 || data[3] != 130

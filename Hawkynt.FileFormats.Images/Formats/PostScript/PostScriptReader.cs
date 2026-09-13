@@ -17,12 +17,7 @@ public static class PostScriptReader {
   }
 
   /// <summary>Reads a file from a stream.</summary>
-  public static PostScriptFile FromStream(Stream stream) {
-    ArgumentNullException.ThrowIfNull(stream);
-    using var memory = new MemoryStream();
-    stream.CopyTo(memory);
-    return FromBytes(memory.ToArray());
-  }
+  public static PostScriptFile FromStream(Stream stream) => FromBytes(StreamBytes.ReadAll(stream));
 
   /// <summary>Reads a file from bytes.</summary>
   public static PostScriptFile FromBytes(byte[] data) {

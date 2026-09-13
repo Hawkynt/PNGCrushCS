@@ -18,18 +18,7 @@ public static class FlashImageReader {
     return FromBytes(File.ReadAllBytes(file.FullName));
   }
 
-  public static FlashImageFile FromStream(Stream stream) {
-    ArgumentNullException.ThrowIfNull(stream);
-    if (stream.CanSeek) {
-      var buffer = new byte[stream.Length - stream.Position];
-      stream.ReadExactly(buffer);
-      return FromBytes(buffer);
-    }
-
-    using var memory = new MemoryStream();
-    stream.CopyTo(memory);
-    return FromBytes(memory.ToArray());
-  }
+  public static FlashImageFile FromStream(Stream stream) => FromBytes(StreamBytes.ReadAll(stream));
 
   public static FlashImageFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

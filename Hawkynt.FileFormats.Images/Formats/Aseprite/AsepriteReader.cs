@@ -46,12 +46,7 @@ public static class AsepriteReader {
     return FromSpan(File.ReadAllBytes(file.FullName));
   }
 
-  public static AsepriteFile FromStream(Stream stream) {
-    ArgumentNullException.ThrowIfNull(stream);
-    using var buffer = new MemoryStream();
-    stream.CopyTo(buffer);
-    return FromSpan(buffer.ToArray());
-  }
+  public static AsepriteFile FromStream(Stream stream) => FromSpan(StreamBytes.ReadAll(stream));
 
   public static AsepriteFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

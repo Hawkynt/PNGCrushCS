@@ -15,18 +15,7 @@ public static class Pl4PictureReader {
     return FromBytes(File.ReadAllBytes(file.FullName));
   }
 
-  public static Pl4PictureFile FromStream(Stream stream) {
-    ArgumentNullException.ThrowIfNull(stream);
-    if (stream.CanSeek) {
-      var data = new byte[stream.Length - stream.Position];
-      stream.ReadExactly(data);
-      return FromBytes(data);
-    }
-
-    using var ms = new MemoryStream();
-    stream.CopyTo(ms);
-    return FromBytes(ms.ToArray());
-  }
+  public static Pl4PictureFile FromStream(Stream stream) => FromBytes(StreamBytes.ReadAll(stream));
 
   public static Pl4PictureFile FromSpan(ReadOnlySpan<byte> data) {
     var unpacked = Lz4Frame.Unpack(data, Pl4PictureFile.UnpackedSize);

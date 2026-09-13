@@ -14,18 +14,7 @@ public static class VdcBitmapReader {
     return FromBytes(File.ReadAllBytes(file.FullName));
   }
 
-  public static VdcBitmapFile FromStream(Stream stream) {
-    ArgumentNullException.ThrowIfNull(stream);
-    if (stream.CanSeek) {
-      var data = new byte[stream.Length - stream.Position];
-      stream.ReadExactly(data);
-      return FromBytes(data);
-    }
-
-    using var ms = new MemoryStream();
-    stream.CopyTo(ms);
-    return FromBytes(ms.ToArray());
-  }
+  public static VdcBitmapFile FromStream(Stream stream) => FromBytes(StreamBytes.ReadAll(stream));
 
   public static VdcBitmapFile FromSpan(ReadOnlySpan<byte> data) {
     if (data.Length < 9 || !data[..VdcBitmapFile.Signature.Length].SequenceEqual(VdcBitmapFile.Signature))

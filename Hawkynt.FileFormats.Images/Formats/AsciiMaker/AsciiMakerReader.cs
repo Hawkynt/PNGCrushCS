@@ -14,18 +14,7 @@ public static class AsciiMakerReader {
     return FromBytes(File.ReadAllBytes(file.FullName));
   }
 
-  public static AsciiMakerFile FromStream(Stream stream) {
-    ArgumentNullException.ThrowIfNull(stream);
-    if (stream.CanSeek) {
-      var data = new byte[stream.Length - stream.Position];
-      stream.ReadExactly(data);
-      return FromBytes(data);
-    }
-
-    using var ms = new MemoryStream();
-    stream.CopyTo(ms);
-    return FromBytes(ms.ToArray());
-  }
+  public static AsciiMakerFile FromStream(Stream stream) => FromBytes(StreamBytes.ReadAll(stream));
 
   public static AsciiMakerFile FromSpan(ReadOnlySpan<byte> data) {
     // Either the grid exactly, or the grid padded out to a whole page; there is no header to check.

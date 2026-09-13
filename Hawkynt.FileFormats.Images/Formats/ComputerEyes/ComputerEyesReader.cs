@@ -14,17 +14,7 @@ public static class ComputerEyesReader {
     return FromBytes(File.ReadAllBytes(file.FullName));
   }
 
-  public static ComputerEyesFile FromStream(Stream stream) {
-    ArgumentNullException.ThrowIfNull(stream);
-    if (stream.CanSeek) {
-      var data = new byte[stream.Length - stream.Position];
-      stream.ReadExactly(data);
-      return FromBytes(data);
-    }
-    using var ms = new MemoryStream();
-    stream.CopyTo(ms);
-    return FromBytes(ms.ToArray());
-  }
+  public static ComputerEyesFile FromStream(Stream stream) => FromBytes(StreamBytes.ReadAll(stream));
 
   /// <summary>
   /// Says that a file bearing the EYES signature is not decoded here, and what is known about it.

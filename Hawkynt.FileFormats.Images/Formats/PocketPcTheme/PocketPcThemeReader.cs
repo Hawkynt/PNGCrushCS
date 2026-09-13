@@ -21,18 +21,7 @@ public static class PocketPcThemeReader {
     return FromBytes(File.ReadAllBytes(file.FullName));
   }
 
-  public static PocketPcThemeFile FromStream(Stream stream) {
-    ArgumentNullException.ThrowIfNull(stream);
-    if (stream.CanSeek) {
-      var data = new byte[stream.Length - stream.Position];
-      stream.ReadExactly(data);
-      return FromSpan(data);
-    }
-
-    using var memory = new MemoryStream();
-    stream.CopyTo(memory);
-    return FromSpan(memory.ToArray());
-  }
+  public static PocketPcThemeFile FromStream(Stream stream) => FromSpan(StreamBytes.ReadAll(stream));
 
   public static PocketPcThemeFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

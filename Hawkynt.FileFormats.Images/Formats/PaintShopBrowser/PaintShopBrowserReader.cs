@@ -37,18 +37,7 @@ public static class PaintShopBrowserReader {
     return FromBytes(File.ReadAllBytes(file.FullName));
   }
 
-  public static PaintShopBrowserFile FromStream(Stream stream) {
-    ArgumentNullException.ThrowIfNull(stream);
-    if (stream.CanSeek) {
-      var data = new byte[stream.Length - stream.Position];
-      stream.ReadExactly(data);
-      return FromBytes(data);
-    }
-
-    using var memory = new MemoryStream();
-    stream.CopyTo(memory);
-    return FromBytes(memory.ToArray());
-  }
+  public static PaintShopBrowserFile FromStream(Stream stream) => FromBytes(StreamBytes.ReadAll(stream));
 
   public static PaintShopBrowserFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

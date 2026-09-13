@@ -16,18 +16,7 @@ public static class EmbeddedDibReader {
     return FromBytes(File.ReadAllBytes(file.FullName));
   }
 
-  public static EmbeddedDibFile FromStream(Stream stream) {
-    ArgumentNullException.ThrowIfNull(stream);
-    if (stream.CanSeek) {
-      var data = new byte[stream.Length - stream.Position];
-      stream.ReadExactly(data);
-      return FromBytes(data);
-    }
-
-    using var ms = new MemoryStream();
-    stream.CopyTo(ms);
-    return FromBytes(ms.ToArray());
-  }
+  public static EmbeddedDibFile FromStream(Stream stream) => FromBytes(StreamBytes.ReadAll(stream));
 
   /// <summary>Decodes a packed DIB that begins at the first byte.</summary>
   public static EmbeddedDibFile FromSpan(ReadOnlySpan<byte> data)

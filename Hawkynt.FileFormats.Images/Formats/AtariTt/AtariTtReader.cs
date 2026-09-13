@@ -15,18 +15,7 @@ public static class AtariTtReader {
     return FromBytes(File.ReadAllBytes(file.FullName));
   }
 
-  public static AtariTtFile FromStream(Stream stream) {
-    ArgumentNullException.ThrowIfNull(stream);
-    if (stream.CanSeek) {
-      var data = new byte[stream.Length - stream.Position];
-      stream.ReadExactly(data);
-      return FromBytes(data);
-    }
-
-    using var ms = new MemoryStream();
-    stream.CopyTo(ms);
-    return FromBytes(ms.ToArray());
-  }
+  public static AtariTtFile FromStream(Stream stream) => FromBytes(StreamBytes.ReadAll(stream));
 
   public static AtariTtFile FromSpan(ReadOnlySpan<byte> data) {
     if (data.Length < AtariTtFile.PaletteOffset || data[0] != 0)

@@ -18,12 +18,7 @@ public static class SpiffReader {
     return FromBytes(File.ReadAllBytes(file.FullName));
   }
 
-  public static SpiffFile FromStream(Stream stream) {
-    ArgumentNullException.ThrowIfNull(stream);
-    using var ms = new MemoryStream();
-    stream.CopyTo(ms);
-    return FromBytes(ms.ToArray());
-  }
+  public static SpiffFile FromStream(Stream stream) => FromBytes(StreamBytes.ReadAll(stream));
 
   public static SpiffFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

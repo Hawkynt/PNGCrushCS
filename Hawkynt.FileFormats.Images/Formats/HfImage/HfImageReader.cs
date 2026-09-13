@@ -14,17 +14,7 @@ public static class HfImageReader {
     return FromSpan(File.ReadAllBytes(file.FullName));
   }
 
-  public static HfImageFile FromStream(Stream stream) {
-    ArgumentNullException.ThrowIfNull(stream);
-    if (stream.CanSeek) {
-      var data = new byte[stream.Length - stream.Position];
-      stream.ReadExactly(data);
-      return FromSpan(data);
-    }
-    using var ms = new MemoryStream();
-    stream.CopyTo(ms);
-    return FromSpan(ms.ToArray());
-  }
+  public static HfImageFile FromStream(Stream stream) => FromSpan(StreamBytes.ReadAll(stream));
 
   public static HfImageFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

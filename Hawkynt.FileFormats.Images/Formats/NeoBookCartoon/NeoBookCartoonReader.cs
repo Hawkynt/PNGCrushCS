@@ -17,18 +17,7 @@ public static class NeoBookCartoonReader {
     return FromBytes(File.ReadAllBytes(file.FullName));
   }
 
-  public static NeoBookCartoonFile FromStream(Stream stream) {
-    ArgumentNullException.ThrowIfNull(stream);
-    if (stream.CanSeek) {
-      var buffer = new byte[stream.Length - stream.Position];
-      stream.ReadExactly(buffer);
-      return FromBytes(buffer);
-    }
-
-    using var memory = new MemoryStream();
-    stream.CopyTo(memory);
-    return FromBytes(memory.ToArray());
-  }
+  public static NeoBookCartoonFile FromStream(Stream stream) => FromBytes(StreamBytes.ReadAll(stream));
 
   public static NeoBookCartoonFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
