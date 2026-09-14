@@ -75,6 +75,11 @@ internal static class ProResPictureEncoder {
       throw new ArgumentOutOfRangeException(nameof(pictureHeight));
 
     var sliceSizes = ProResSliceLayout.Build(widthInMacroblocks, log2DesiredSliceSize);
+    var sliceCount = (long)heightInMacroblocks * sliceSizes.Length;
+    if (sliceCount > ushort.MaxValue)
+      throw new InvalidDataException(
+        $"A ProRes picture would contain {sliceCount} slices, but its picture header can state at most {ushort.MaxValue}.");
+
     var slices = _Transform(planes, sliceSizes, heightInMacroblocks, pictureHeight);
     var scan = interlaced ? ProResScan.Interlaced : ProResScan.Progressive;
 

@@ -1400,14 +1400,32 @@ folding the two together, moves up to three levels of RGB on a fifth to a third 
 What refuses: a bitstream version later than the two RDD 36 describes; a reserved `chroma_format`,
 `interlace_mode` or `alpha_channel_type`; a `quantization_index` outside the permitted 1 to 224; a
 version 0 frame stating syntax its own version does not have; a packet that is not a compressed
-frame; and any structure whose stated size does not fit inside the one containing it.
+frame; any structure whose stated size does not fit inside the one containing it; and non-zero frame
+stuffing where RDD 36 permits only zero bytes.
 
-**Writing it: the four 4:2:2 profiles, and nothing else.** The encoder writes `apco`, `apcs`, `apcn`
-and `apch` — progressive, ten-bit 4:2:2, no alpha, one whole picture a packet at bitstream version 0,
-which is the version 6.4 defines for exactly that combination. `ap4h` and `ap4x` are refused by name:
-they are 4:4:4 at twelve bits with an alpha channel, and none of the three is written here. So is any
-other four-character code, and so is a picture whose size is not the stream's, since every ProRes
-frame restates its own size and a stream cannot carry two.
+**Writing covers all six profiles and both picture structures the format has.** `apco`, `apcs`,
+`apcn` and `apch` are ten-bit 4:2:2; `ap4h` and `ap4x` are twelve-bit 4:4:4. The 4:2:2/no-alpha
+combination stays at bitstream version 0, while 4:4:4 or alpha uses version 1 as 6.4 requires. A
+32-bit 4444 sample description writes the frame's alpha losslessly, choosing the eight- or sixteen-bit
+alpha syntax from the source representation; a 24-bit description writes colour only. Every packet
+is still a key frame because ProRes has no P or B pictures and no forward or backward references.
+
+Interlace is two independently coded field pictures, not prediction. An existing QuickTime `fiel`
+child selects top-first (`0x0201`) or bottom-first (`0x0206`), which become RDD 36 interlace modes 1
+and 2 and select the interlaced coefficient scan. QuickTime's two orders whose coded and displayed
+orders disagree (`0x0209` and `0x020E`) are refused: the ProRes frame header has no second field-order
+flag with which to preserve that distinction. The writer also refuses an unknown profile tag, a
+picture whose size is not the stream's, and a sample entry whose own size cuts off the child atoms it
+would otherwise be tempting to parse past.
+
+The outward check is executable rather than a round trip through the same implementation. Seven
+generated frames are muxed and decoded by **ffmpeg**: progressive `apcn`, `ap4h` and `ap4x`, both
+interlaced field orders with partial final field macroblock rows, `ap4h` with eight-bit alpha and
+`ap4x` with sixteen-bit alpha. The comparison is on `yuv422p10le`, `yuv444p12le` and
+`yuva444p12le` component planes. Every colour sample is within one coded level of this package's
+decode — the same inverse-transform residue measured in the read direction — and both alpha planes
+are exact after ffmpeg's specified 8/16-to-12-bit normalization. ffmpeg reports no decoding error on
+any of the seven.
 
 Each half of the encoder sits in the file its decoding half sits in, and the tests assert the pairs
 are inverses rather than merely plausible: the Golomb-Rice/exponential-Golomb writer beside the
@@ -1420,12 +1438,14 @@ every frame carries its own weight matrices and every slice its own quantisation
 selects two things and both of them on this side. The first is the pair of weight matrices in the
 frame header, and those are copied rather than derived — the specification prints none of them,
 because a decoder is told them by every frame, so the only written statement of a profile's matrices
-is in an encoder. The four pairs here are FFmpeg's `prores_quant_matrices` and were additionally read
-back byte for byte out of the frame headers of files written by both of its ProRes encoders;
-provenance is in `Codecs/ProRes/THIRD-PARTY-NOTICE.FFmpeg.txt`. The second is the data rate, taken
-from the *Apple ProRes White Paper* and divided by the 8160 macroblocks of 1920x1080 and by 29.97
-frames a second, which turns each profile's headline figure into bits a macroblock: 184 for Proxy,
-417 for LT, 601 for 422 and 900 for 422 HQ.
+is in an encoder. The four 4:2:2 pairs are FFmpeg's `prores_quant_matrices`; the 4444 and 4444 XQ pairs match its
+`QMAT_LUMA`/`QMAT_CHROMA` tables, and all six are interoperability constants carried in each frame
+rather than executable encoder logic. Provenance is in `Codecs/ProRes/THIRD-PARTY-NOTICE.FFmpeg.txt`.
+The second choice is the data rate, taken from the *Apple ProRes White Paper* and divided by the 8160
+macroblocks of 1920x1080 and by 29.97 frames a second. That gives bits per macroblock of 184 for Proxy,
+417 for LT, 601 for 422, 900 for 422 HQ, 1349 for 4444 and 2024 for 4444 XQ. The last two use the
+white paper's 330 and 495 Mbit/s colour-only figures; current Apple support rounds XQ to approximately
+500 Mbit/s. Lossless alpha is outside the colour budget because its size is determined by the matte.
 
 **One quantisation index a picture, bisected against that budget.** The index is the smallest of the
 1 to 224 that 6.3.1 permits whose coded slices together fit, and 1 wherever the picture already does,
