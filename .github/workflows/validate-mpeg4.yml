@@ -22,14 +22,19 @@ jobs:
             8.x
             10.0.x
       - name: Install FFmpeg
-        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
       - name: Decode the complete reordered I/P/B stream with FFmpeg
-        run: >-
-          dotnet test Tests/Hawkynt.FileFormats.Video.Tests/Hawkynt.FileFormats.Video.Tests.csproj
-          --configuration Release
-          -p:EnableWindowsTargeting=true
-          --filter "FullyQualifiedName~Mpeg4VideoEncoderTests.FFmpegReadsEveryReorderedPicture"
-          --logger "console;verbosity=normal"
+        shell: bash
+        run: |
+          set +e
+          dotnet test Tests/Hawkynt.FileFormats.Video.Tests/Hawkynt.FileFormats.Video.Tests.csproj \
+            --configuration Release \
+            -p:EnableWindowsTargeting=true \
+            --filter "FullyQualifiedName~Mpeg4VideoEncoderTests.FFmpegReadsEveryReorderedPicture" \
+            --logger "console;verbosity=minimal" > mpeg4-ffmpeg-test.log 2>&1
+          status=$?
+          tail -n 100 mpeg4-ffmpeg-test.log
+          exit $status
 
   api-reference:
     needs: ffmpeg
