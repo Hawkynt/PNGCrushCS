@@ -28,7 +28,7 @@ internal enum Vp56MacroblockType : byte {
 internal readonly record struct Vp56MotionVector(short X, short Y) {
   internal static readonly Vp56MotionVector Zero = new(0, 0);
 
-  internal static Vp56MotionVector operator +(Vp56MotionVector left, Vp56MotionVector right)
+  public static Vp56MotionVector operator +(Vp56MotionVector left, Vp56MotionVector right)
     => new((short)(left.X + right.X), (short)(left.Y + right.Y));
 }
 
