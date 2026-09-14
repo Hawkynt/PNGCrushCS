@@ -20,6 +20,7 @@ internal sealed class H263BidirectionalPictureDecoder {
   private const int _INTRA = 11;
   private const int _INTRA_Q = 12;
   private const int _STUFFING = 13;
+  private const int _MAX_EXTRAPOLATION_HALF_PIXELS = 30;
 
   private readonly H263PictureHeader _header;
   private readonly H263Frame _target;
@@ -320,6 +321,17 @@ internal sealed class H263BidirectionalPictureDecoder {
     int index,
     int vectorX,
     int vectorY) {
+    var (left, top) = this._BlockOrigin(address, index);
+
+    // Annex O invokes the Annex D.1 edge extrapolation rule for B-picture motion compensation, but
+    // PLUSPTYPE still limits the selected luminance region to fifteen pixels beyond the coded picture.
+    // Check the half-pixel sample positions before chrominance scaling, so a vector at the extreme
+    // baseline limit cannot silently select a sixteenth pixel outside an edge.
+    if (index < 4 && !_WithinExtrapolationLimit(left, top, vectorX, vectorY, reference.LumaWidth, reference.LumaHeight))
+      throw new InvalidDataException(
+        $"Block {index} of macroblock {address} selects samples more than 15 pixels outside its H.263 reference picture, "
+        + $"using motion vector ({vectorX}, {vectorY}) half-pixels.");
+
     var isChroma = index >= 4;
     if (isChroma) {
       vectorX = H263MotionCompensation.ToChroma(vectorX);
@@ -327,10 +339,25 @@ internal sealed class H263BidirectionalPictureDecoder {
     }
 
     var (plane, width, _) = reference.PlaneOf(index);
-    var (left, top) = this._BlockOrigin(address, index);
-    // O.5 permits B-picture vectors to extend outside their references and uses Annex D.1 edge samples.
     H263MotionCompensation.TryPredict(
       prediction, plane, width, left, top, vectorX, vectorY, clampToEdge: true, roundingControl: 0);
+  }
+
+  private static bool _WithinExtrapolationLimit(
+    int left,
+    int top,
+    int vectorX,
+    int vectorY,
+    int width,
+    int height) {
+    var firstX = 2 * left + vectorX;
+    var firstY = 2 * top + vectorY;
+    var lastX = 2 * (left + 7) + vectorX;
+    var lastY = 2 * (top + 7) + vectorY;
+    return firstX >= -_MAX_EXTRAPOLATION_HALF_PIXELS
+           && firstY >= -_MAX_EXTRAPOLATION_HALF_PIXELS
+           && lastX <= 2 * (width - 1) + _MAX_EXTRAPOLATION_HALF_PIXELS
+           && lastY <= 2 * (height - 1) + _MAX_EXTRAPOLATION_HALF_PIXELS;
   }
 
   private void _Store(int address, int index, ReadOnlySpan<int> samples) {
