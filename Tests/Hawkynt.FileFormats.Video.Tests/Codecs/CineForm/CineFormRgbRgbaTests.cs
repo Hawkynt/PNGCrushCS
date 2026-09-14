@@ -2,7 +2,10 @@ using System;
 using System.Buffers.Binary;
 using System.IO;
 using System.Linq;
+using FileFormat.Avi;
 using FileFormat.Core;
+using Hawkynt.FileFormats.Video;
+using Hawkynt.FileFormats.Video.Tests;
 using NUnit.Framework;
 
 namespace FileFormat.Codecs.CineForm.Tests;
@@ -112,6 +115,32 @@ public sealed class CineFormRgbRgbaTests {
 
     var decoder = CineFormVideoDecoder.Create(encoder.DescribeStream());
     Assert.Throws<InvalidDataException>(() => decoder.DecodeChannels(packet));
+  }
+
+  [TestCase(CineFormEncodingFormat.Rgb444)]
+  [TestCase(CineFormEncodingFormat.Rgba4444)]
+  [Category("Conformance")]
+  public void FfmpegReadsTheNewTwelveBitLayoutsWhenItIsAvailable(CineFormEncodingFormat encodingFormat) {
+    FFmpegOracle.RequireAvailable();
+
+    const int width = 64;
+    const int height = 48;
+    var encoder = CineFormVideoEncoder.Create(_Stream(width, height), encodingFormat);
+    var frame = encodingFormat == CineFormEncodingFormat.Rgba4444
+      ? _Rgba64(width, height, 3072, 1536, 768, 2048)
+      : _Rgb48(width, height, 3072, 1536, 768);
+
+    Assert.That(encoder.TryEncode(frame, 0, out var packet), Is.True);
+    var avi = VideoIO.Mux<AviWriter>([encoder.DescribeStream()], [packet]);
+    var path = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName() + ".avi");
+
+    try {
+      File.WriteAllBytes(path, avi);
+      var (decoded, output) = FFmpegOracle.TryDecodeFirstFrame(path, width, height);
+      Assert.That(decoded, Is.True, output);
+    } finally {
+      try { File.Delete(path); } catch { /* best effort */ }
+    }
   }
 
   private static MediaStreamInfo _Stream(int width, int height) => new() {
