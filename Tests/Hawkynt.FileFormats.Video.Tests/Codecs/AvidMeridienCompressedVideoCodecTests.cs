@@ -10,8 +10,6 @@ namespace FileFormat.Codecs.Tests;
 [TestFixture]
 public sealed class AvidMeridienCompressedVideoDecoderTests {
 
-  private static readonly CodecTag _Avdj = CodecTag.FromCharacters("AVDJ");
-
   [TestCase("AVDJ", true)]
   [TestCase("avdj", true)]
   [TestCase("MJPG", false)]
@@ -67,15 +65,20 @@ public sealed class AvidMeridienCompressedVideoDecoderTests {
     Assert.That(top < next, Is.EqualTo(firstExpectedOnTopRow));
   }
 
-  [Test]
+  [TestCase(1, true, TestName = "QuickTime TT codes the top field first")]
+  [TestCase(6, false, TestName = "QuickTime BB codes the bottom field first")]
+  [TestCase(9, true, TestName = "QuickTime TB codes the top field first")]
+  [TestCase(14, false, TestName = "QuickTime BT codes the bottom field first")]
   [Category("Unit")]
-  public void QuickTimeFielAtomControlsTwoFieldPolarity() {
+  public void QuickTimeFielAtomControlsCodedFieldPlacement(byte detail, bool firstExpectedOnTopRow) {
     var first = _Jpeg(_Solid(4, 2, 30));
     var second = _Jpeg(_Solid(4, 2, 220));
-    var decoder = AvidMeridienCompressedVideoDecoder.Create(_Stream(4, 4, privateData: _QuickTimeDescription(detail: 14)));
+    var decoder = AvidMeridienCompressedVideoDecoder.Create(_Stream(4, 4, privateData: _QuickTimeDescription(detail)));
 
     Assert.That(decoder.TryDecode(new(0, first.Concat(second).ToArray()), out var frame), Is.True);
-    Assert.That(frame.PixelData[0], Is.GreaterThan(frame.PixelData[4 * 3]), "detail 14 means the odd/lower field is temporally first");
+    var top = frame.PixelData[0];
+    var next = frame.PixelData[4 * 3];
+    Assert.That(top < next, Is.EqualTo(firstExpectedOnTopRow));
   }
 
   [Test]
@@ -109,7 +112,7 @@ public sealed class AvidMeridienCompressedVideoDecoderTests {
 
     var failure = Assert.Throws<NotSupportedException>(
       () => decoder.TryDecode(new(0, first.Concat(second).ToArray()), out _));
-    Assert.That(failure!.Message, Does.Contain("which field is temporally first"));
+    Assert.That(failure!.Message, Does.Contain("spatial placement of the first coded field"));
   }
 
   private static MediaStreamInfo _Stream(
@@ -185,8 +188,8 @@ public sealed class AvidMeridienCompressedVideoEncoderTests {
     Assert.That((decoded.Width, decoded.Height), Is.EqualTo((16, 12)));
   }
 
-  [TestCase(486, true, 14)]
-  [TestCase(576, false, 9)]
+  [TestCase(486, true, 6)]
+  [TestCase(576, false, 1)]
   [Category("Unit")]
   public void StandardDefinitionEncodeWritesTwoFieldsInDocumentedTemporalOrder(
     int height,
