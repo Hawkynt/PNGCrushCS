@@ -1,8 +1,11 @@
 using System;
+using System.IO;
 using System.Linq;
+using FileFormat.Avi;
 using FileFormat.Codecs.Mpeg4;
 using FileFormat.Core;
 using Hawkynt.FileFormats.Video;
+using Hawkynt.FileFormats.Video.Tests;
 
 namespace FileFormat.Codecs.MsMpeg4.Tests;
 
@@ -14,20 +17,13 @@ public sealed class MsMpeg4PredictedIntraMacroblockTests {
   [TestCase("MP43", 3)]
   [Category("Unit")]
   public void SceneChangeUsesTheIntraMacroblockFormInsideAPredictedPicture(string tag, int versionValue) {
+    const int width = 32;
+    const int height = 16;
     var version = (MsMpeg4Version)versionValue;
-    var stream = new MediaStreamInfo {
-      Index = 0,
-      Kind = MediaStreamKind.Video,
-      Codec = CodecTag.FromCharacters(tag),
-      Width = 16,
-      Height = 16,
-      FrameRate = new(25, 1),
-      TimeBase = new(1, 25),
-    };
+    var encoder = MsMpeg4VideoEncoder.Create(_Stream(tag, width, height));
 
-    var encoder = MsMpeg4VideoEncoder.Create(stream);
-    Assert.That(encoder.TryEncode(_Solid(16, 16, 24), 0, out var first), Is.True);
-    Assert.That(encoder.TryEncode(_Solid(16, 16, 224), 1, out var second), Is.True);
+    Assert.That(encoder.TryEncode(_Solid(width, height, 24), 0, out var first), Is.True);
+    Assert.That(encoder.TryEncode(_Solid(width, height, 224), 1, out var second), Is.True);
 
     Assert.Multiple(() => {
       Assert.That(first.IsKeyFrame, Is.True);
@@ -59,8 +55,45 @@ public sealed class MsMpeg4PredictedIntraMacroblockTests {
     var decoder = MsMpeg4VideoDecoder.Create(encoder.DescribeStream());
     Assert.That(decoder.TryDecode(first, out _), Is.True);
     Assert.That(decoder.TryDecode(second, out var decoded), Is.True);
-    Assert.That(decoded.PixelData.Average(value => (double)value), Is.GreaterThan(180d));
+    Assert.That(decoded.PixelData.Average(value => (double)value), Is.GreaterThan(180d),
+      "the second P-intra macroblock must retain the first one's DC predictor state");
   }
+
+  [TestCase("MPG4")]
+  [TestCase("MP42")]
+  [TestCase("MP43")]
+  [Category("Oracle")]
+  public void FFmpegDecodesPredictedPicturesContainingIntraMacroblocks(string tag) {
+    FFmpegOracle.RequireAvailable();
+
+    const int width = 32;
+    const int height = 16;
+    var encoder = MsMpeg4VideoEncoder.Create(_Stream(tag, width, height));
+
+    Assert.That(encoder.TryEncode(_Solid(width, height, 24), 0, out var first), Is.True);
+    Assert.That(encoder.TryEncode(_Solid(width, height, 224), 1, out var second), Is.True);
+
+    var directory = Directory.CreateTempSubdirectory("msmpeg4-p-intra-oracle");
+    try {
+      var path = Path.Combine(directory.FullName, "clip.avi");
+      File.WriteAllBytes(path, VideoIO.Mux<AviWriter>([encoder.DescribeStream()], [first, second]));
+
+      var (decoded, output) = FFmpegOracle.TryDecodeFrameCount(path, width, height, expectedFrames: 2);
+      Assert.That(decoded, Is.True, $"ffmpeg refused {tag} P-intra syntax or predictor state: {output}");
+    } finally {
+      try { directory.Delete(recursive: true); } catch { /* best effort */ }
+    }
+  }
+
+  private static MediaStreamInfo _Stream(string tag, int width, int height) => new() {
+    Index = 0,
+    Kind = MediaStreamKind.Video,
+    Codec = CodecTag.FromCharacters(tag),
+    Width = width,
+    Height = height,
+    FrameRate = new(25, 1),
+    TimeBase = new(1, 25),
+  };
 
   private static RawImage _Solid(int width, int height, byte value) {
     var pixels = new byte[width * height * 3];
