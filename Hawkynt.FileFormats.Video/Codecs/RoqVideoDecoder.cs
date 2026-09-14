@@ -3,182 +3,172 @@ using System.Buffers.Binary;
 using System.IO;
 using FileFormat.Codecs.Roq;
 using FileFormat.Core;
+using FileFormat.Jpeg;
 using FileFormat.RoqVideo;
 
 namespace FileFormat.Codecs;
 
-/// <summary>
-/// Decodes id RoQ (<c>RoQV</c>) — the FMV format Quake III and its contemporaries use — vector
-/// quantisation with motion compensation over a quadtree of 8x8, 4x4 and 2x2 blocks.
-/// </summary>
+/// <summary>Decodes standard id RoQ and the older Trilobyte RoQ video extensions.</summary>
 /// <remarks>
-/// A picture is not one packet in the way a Cinepak frame is; RoQ's own chunk boundaries carry more
-/// structure than that. This decoder is handed the raw <c>INFO</c>, <c>QUAD_CODEBOOK</c> and
-/// <c>QUAD_VQ</c> chunks <see cref="RoqReader"/> hands out, header included, and figures out from each
-/// packet's own two-byte chunk id which of them it is — the same seam Cinepak and Microsoft Video 1
-/// use, where a codec reads its own framing out of the bytes it is given rather than being told by the
-/// container. Only <c>QUAD_VQ</c> ever produces a picture; an <c>INFO</c> restatement or a codebook
-/// update is consumed for its own effect and answers "not yet."
-/// <para/>
-/// <b>Two picture buffers, not one.</b> See <see cref="RoqPictureDecoder"/> for the measured argument:
-/// a <c>MOT</c> block leaves in place whichever content the buffer it is being painted into last held —
-/// which is two pictures back, not one, because RoQ's encoder alternates between exactly two buffers
-/// and a block a picture skips is a block that buffer's *other* recent occupant never touched either.
-/// The first picture has no second buffer to inherit from, so its result is copied into both slots once
-/// it is painted.
-/// <para/>
-/// <b>Full-resolution chroma.</b> A codebook cell states one Cb and one Cr for a 2x2 area, which reads
-/// as 4:2:0 — but motion compensation moves whatever a block already holds at full pixel precision,
-/// chroma included, so a picture a few frames past its last codebook repaint routinely has chroma that
-/// lines up with no 2x2 grid at all. <see cref="RoqFrame"/> keeps Cb and Cr at the picture's own full
-/// size for exactly that reason, matching what ffmpeg's own decoder does — its native output for RoQ
-/// is <c>yuvj444p</c>, not <c>yuvj420p</c>.
-/// <para/>
-/// <b>Measured, and measured on the right thing.</b> A picture is reconstructed as full-resolution
-/// YCbCr with no subsampling left in it — see the note above — so unlike a genuinely 4:2:0 codec there
-/// is no chroma-siting convention for an RGB comparison to disagree about, and a comparison there would
-/// be a direct one in principle. In practice ffmpeg's own <c>rgb24</c> output is not perfectly faithful
-/// to its own decoded planes — on two of three files measured, a few dozen pixels across the whole file
-/// differ from this decoder's RGB by one level, and reproducing this decoder's own conversion formula
-/// against ffmpeg's <c>yuvj444p</c> planes directly, with no decoder of ours involved, reproduces the
-/// identical handful of pixels at the identical positions, which is what settles that as ffmpeg's
-/// <c>swscale</c> and not a decoding difference. So the decode itself is measured on <c>yuvj444p</c>,
-/// where the answer is unambiguous either way. Three files — 512x256 to 512x512, 210 to 802 pictures,
-/// 1 338 in all, one of them the sample whose own accompanying note names motion compensation with a
-/// nonzero mean vector as "the last problem in the native roq decoder" for chrominance addressing —
-/// were decoded here and by ffmpeg and compared sample for sample against ffmpeg's own <c>yuvj444p</c>
-/// output: every plane of every picture in all three files is identical, ffmpeg's decode included on
-/// the file the sample's own author flags as exercising the bug.
-/// <para/>
-/// <b>What is not implemented refuses and says so.</b> A <c>RoQ_JPEG</c> chunk — the 11th Hour and
-/// Clandestiny superset of the format, where a keyframe may be a plain JFIF file instead of a
-/// quadtree-coded picture — is refused by name rather than guessed at; no sample this was measured
-/// against carries one. A picture size that is not a whole number of 16-pixel macroblocks, a size that
-/// changes part way through a stream, a codebook entry named before any codebook chunk has stated one,
-/// and a motion vector reaching outside the picture all refuse and name the field that failed, rather
-/// than being clamped or wrapped against nothing that was ever verified.
+/// RoQ has no B-picture or future-reference syntax. QUAD_VQ pictures use two reconstruction buffers:
+/// FCC reads the immediately preceding displayed picture, while MOT writes nothing and therefore keeps
+/// the target buffer's older contents. The Trilobyte form additionally permits alpha-bearing codebooks,
+/// JPEG intraframes, HANG repeat pictures and a signature variant that doubles motion-vector offsets.
 /// </remarks>
 public sealed class RoqVideoDecoder : IVideoCodecDecoder<RoqVideoDecoder> {
-
   private static readonly CodecTag _Tag = CodecTag.FromCharacters("RoQV");
-
-  private const int _CHUNK_HEADER_LENGTH = 8;
-  private const int _INFO_PAYLOAD_LENGTH = 8;
-  private const int _MACROBLOCK = 16;
+  private const int _HeaderLength = 8;
+  private const int _InfoLength = 8;
+  private const int _Macroblock = 16;
 
   private readonly RoqCodebook _codebook = new();
-
+  private readonly int _motionScale;
   private int _width;
   private int _height;
+  private bool _hasAlpha;
   private RoqFrame? _bufferA;
   private RoqFrame? _bufferB;
+  private RoqFrame? _lastDisplayed;
   private bool _nextTargetIsA = true;
   private bool _hasDecodedFirstPicture;
+
+  private RoqVideoDecoder(int motionScale) => this._motionScale = motionScale;
 
   public static string CodecName => "id RoQ";
 
   public static bool Accepts(MediaStreamInfo stream) {
     ArgumentNullException.ThrowIfNull(stream);
-
     return stream.Kind == MediaStreamKind.Video && stream.Codec.EqualsIgnoringCase(_Tag);
   }
 
   public static RoqVideoDecoder Create(MediaStreamInfo stream) {
     ArgumentNullException.ThrowIfNull(stream);
-
-    return new();
+    var privateData = stream.CodecPrivateData.Span;
+    var motionScale = privateData.Length > 0 && privateData[0] == 2 ? 2 : 1;
+    return new(motionScale);
   }
 
   public bool TryDecode(CodedPacket packet, out RawImage frame) {
     var data = packet.Data.Span;
-    if (data.Length < _CHUNK_HEADER_LENGTH)
-      throw new InvalidDataException($"A RoQ packet is {data.Length} bytes, short of a chunk header's own eight.");
+    var at = 0;
+    RawImage? picture = null;
 
-    var id = BinaryPrimitives.ReadUInt16LittleEndian(data);
-    var size = BinaryPrimitives.ReadUInt32LittleEndian(data[2..]);
-    var argument = BinaryPrimitives.ReadUInt16LittleEndian(data[6..]);
-    var payload = data.Slice(_CHUNK_HEADER_LENGTH, (int)size);
+    while (at < data.Length) {
+      if (data.Length - at < _HeaderLength)
+        throw new InvalidDataException($"A RoQ packet ends with {data.Length - at} bytes, short of an eight-byte chunk header.");
 
-    switch (id) {
-      case RoqChunkType.INFO:
-        this._ReadInfo(payload);
-        frame = null!;
-        return false;
+      var header = data[at..];
+      var id = BinaryPrimitives.ReadUInt16LittleEndian(header);
+      var size = BinaryPrimitives.ReadUInt32LittleEndian(header[2..]);
+      var argument = BinaryPrimitives.ReadUInt16LittleEndian(header[6..]);
+      if (size > int.MaxValue || size > data.Length - at - _HeaderLength)
+        throw new InvalidDataException($"RoQ chunk 0x{id:X4} states {size} payload bytes but only {data.Length - at - _HeaderLength} remain.");
 
-      case RoqChunkType.QUAD_CODEBOOK:
-        this._codebook.Replace(payload, argument);
-        frame = null!;
-        return false;
+      var payload = data.Slice(at + _HeaderLength, (int)size);
+      RawImage? decoded = id switch {
+        RoqChunkType.INFO => this._ReadInfo(payload, argument),
+        RoqChunkType.QUAD_CODEBOOK => this._ReadCodebook(payload, argument),
+        RoqChunkType.QUAD_VQ => this._DecodeVq(payload, argument),
+        RoqChunkType.JPEG => this._DecodeJpeg(payload),
+        RoqChunkType.HANG => this._DecodeHang(payload, argument),
+        _ => throw new NotSupportedException($"A RoQ video packet contains chunk type 0x{id:X4}, which is not a video chunk this decoder reads."),
+      };
 
-      case RoqChunkType.QUAD_VQ:
-        frame = this._DecodePicture(payload, argument);
-        return true;
+      if (decoded is not null) {
+        if (picture is not null)
+          throw new InvalidDataException("One RoQ coded packet contains more than one picture; the codec API can return only one picture per packet.");
+        picture = decoded;
+      }
 
-      case RoqChunkType.JPEG:
-        throw new NotSupportedException(
-          "A RoQ_JPEG chunk carries a JFIF picture in place of a quadtree-coded one — the 11th Hour and "
-          + "Clandestiny superset of the format. Not implemented.");
-
-      default:
-        throw new NotSupportedException($"A RoQ video packet is chunk type 0x{id:X4}, which is not one this decoder reads.");
+      at += _HeaderLength + (int)size;
     }
+
+    frame = picture!;
+    return picture is not null;
   }
 
-  private void _ReadInfo(ReadOnlySpan<byte> payload) {
-    if (payload.Length < _INFO_PAYLOAD_LENGTH)
-      throw new InvalidDataException($"A RoQ_INFO chunk is {payload.Length} bytes, short of the eight bytes the chunk holds.");
+  private RawImage? _ReadInfo(ReadOnlySpan<byte> payload, ushort argument) {
+    if (payload.Length < _InfoLength)
+      throw new InvalidDataException($"A RoQ_INFO chunk is {payload.Length} bytes, short of its eight-byte payload.");
+    if (argument > 1)
+      throw new NotSupportedException($"RoQ_INFO argument {argument} is neither the standard 0 nor the alpha-codebook value 1.");
 
     var width = BinaryPrimitives.ReadUInt16LittleEndian(payload);
     var height = BinaryPrimitives.ReadUInt16LittleEndian(payload[2..]);
-
-    if (this._width != 0 && (width != this._width || height != this._height))
-      throw new NotSupportedException(
-        $"This RoQ stream states a picture of {this._width}x{this._height} and then, part way through, "
-        + $"{width}x{height}. Decoding a stream whose picture size changes is not implemented.");
-
-    if (this._width != 0)
-      return;
-
+    var block = BinaryPrimitives.ReadUInt16LittleEndian(payload[4..]);
+    var subBlock = BinaryPrimitives.ReadUInt16LittleEndian(payload[6..]);
     if (width == 0 || height == 0)
       throw new InvalidDataException($"RoQ_INFO states a picture of {width}x{height}, which has no pixels.");
+    if (block != 8 || subBlock != 4)
+      throw new NotSupportedException($"RoQ_INFO states block fields {block}/{subBlock}; only the established 8/4 quadtree is defined.");
+    if (width % _Macroblock != 0 || height % _Macroblock != 0)
+      throw new NotSupportedException($"RoQ_INFO states {width}x{height}, not a whole number of {_Macroblock}-pixel macroblocks.");
 
-    if (width % _MACROBLOCK != 0 || height % _MACROBLOCK != 0)
-      throw new NotSupportedException(
-        $"RoQ_INFO states a picture of {width}x{height}, which is not a whole number of {_MACROBLOCK}-pixel "
-        + "macroblocks. RoQ codes nothing but whole macroblocks and states nowhere what a partial one covers.");
+    var hasAlpha = argument == 1;
+    if (width == this._width && height == this._height && hasAlpha == this._hasAlpha)
+      return null;
 
+    this._codebook.Configure(hasAlpha);
     this._width = width;
     this._height = height;
-    this._bufferA = new(width, height);
-    this._bufferB = new(width, height);
+    this._hasAlpha = hasAlpha;
+    this._bufferA = new(width, height, hasAlpha);
+    this._bufferB = new(width, height, hasAlpha);
+    this._lastDisplayed = null;
+    this._nextTargetIsA = true;
+    this._hasDecodedFirstPicture = false;
+    return null;
   }
 
-  private RawImage _DecodePicture(ReadOnlySpan<byte> payload, ushort argument) {
-    if (this._bufferA == null)
-      throw new InvalidDataException("A RoQ_QUAD_VQ chunk arrived before any RoQ_INFO chunk stated a picture size.");
+  private RawImage? _ReadCodebook(ReadOnlySpan<byte> payload, ushort argument) {
+    this._RequireInfo(RoqChunkType.QUAD_CODEBOOK);
+    this._codebook.Replace(payload, argument);
+    return null;
+  }
 
-    var meanX = (sbyte)(argument >> 8);
-    var meanY = (sbyte)argument;
+  private RawImage _DecodeVq(ReadOnlySpan<byte> payload, ushort argument) {
+    this._RequireInfo(RoqChunkType.QUAD_VQ);
+    var target = this._nextTargetIsA ? this._bufferA! : this._bufferB!;
+    var reference = this._nextTargetIsA ? this._bufferB! : this._bufferA!;
+    RoqPictureDecoder.Decode(payload, this._codebook, (sbyte)(argument >> 8), (sbyte)argument, reference, target, this._motionScale);
+    this._FinishPicture(target, reference);
+    return RoqColorConversion.ToRawImage(target);
+  }
 
-    var target = this._nextTargetIsA ? this._bufferA : this._bufferB!;
-    var reference = this._nextTargetIsA ? this._bufferB! : this._bufferA;
+  private RawImage _DecodeJpeg(ReadOnlySpan<byte> payload) {
+    this._RequireInfo(RoqChunkType.JPEG);
+    var image = JpegFile.ToRawImage(JpegReader.FromSpan(payload));
+    if (image.Width != this._width || image.Height != this._height)
+      throw new InvalidDataException($"RoQ_JPEG is {image.Width}x{image.Height}, while RoQ_INFO states {this._width}x{this._height}.");
 
-    RoqPictureDecoder.Decode(payload, this._codebook, meanX, meanY, reference, target);
+    var rgb = image.EnsureFormat(PixelFormat.Rgb24);
+    var target = this._nextTargetIsA ? this._bufferA! : this._bufferB!;
+    var reference = this._nextTargetIsA ? this._bufferB! : this._bufferA!;
+    RoqColorConversion.FromRgb24(rgb.PixelData, target);
+    target.MakeOpaque();
+    this._FinishPicture(target, reference);
+    return this._hasAlpha ? RoqColorConversion.ToRawImage(target) : rgb;
+  }
 
+  private RawImage _DecodeHang(ReadOnlySpan<byte> payload, ushort argument) {
+    if (!payload.IsEmpty || argument != 0)
+      throw new InvalidDataException($"RoQ_HANG must be empty with argument zero; got {payload.Length} bytes and 0x{argument:X4}.");
+    if (this._lastDisplayed is null)
+      throw new InvalidDataException("RoQ_HANG appears before any picture exists to repeat.");
+    return RoqColorConversion.ToRawImage(this._lastDisplayed);
+  }
+
+  private void _FinishPicture(RoqFrame target, RoqFrame reference) {
     if (!this._hasDecodedFirstPicture) {
-      // The very first picture has no second buffer to have been building into two pictures ago, so
-      // its result becomes both buffers' content — see RoqPictureDecoder's remarks on MOT.
       reference.CopyFrom(target);
       this._hasDecodedFirstPicture = true;
     }
-
+    this._lastDisplayed = target;
     this._nextTargetIsA = !this._nextTargetIsA;
+  }
 
-    return new() {
-      Width = this._width,
-      Height = this._height,
-      Format = PixelFormat.Rgb24,
-      PixelData = RoqColorConversion.ToRgb24(target),
-    };
+  private void _RequireInfo(ushort chunkType) {
+    if (this._bufferA is null)
+      throw new InvalidDataException($"RoQ chunk 0x{chunkType:X4} arrived before RoQ_INFO stated the picture format.");
   }
 }
