@@ -1,0 +1,56 @@
+name: Temporary final MS-MPEG-4 validation
+
+on:
+  push:
+    branches: [complete/msmpeg4-p-intra]
+
+permissions:
+  contents: write
+
+jobs:
+  validate-and-clean:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.x
+            10.0.x
+
+      - name: Ensure FFmpeg oracle is available
+        shell: bash
+        run: |
+          if ! command -v ffmpeg >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y ffmpeg
+          fi
+          ffmpeg -version | head -n 1
+
+      - name: Check whitespace
+        run: git diff --check main...HEAD
+
+      - name: Restore video tests
+        run: dotnet restore Tests/Hawkynt.FileFormats.Video.Tests/Hawkynt.FileFormats.Video.Tests.csproj -p:EnableWindowsTargeting=true
+
+      - name: Run MS-MPEG-4 tests including FFmpeg oracle
+        run: dotnet test Tests/Hawkynt.FileFormats.Video.Tests/Hawkynt.FileFormats.Video.Tests.csproj --configuration Release --no-restore -p:EnableWindowsTargeting=true --filter FullyQualifiedName~MsMpeg4
+
+      - name: Run complete video test project
+        run: dotnet test Tests/Hawkynt.FileFormats.Video.Tests/Hawkynt.FileFormats.Video.Tests.csproj --configuration Release --no-restore -p:EnableWindowsTargeting=true
+
+      - name: Remove temporary validation workflow
+        shell: bash
+        run: |
+          rm .github/workflows/tmp-msmpeg4-final-validation.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "chore: remove temporary MS-MPEG-4 validation workflow"
+          git push origin HEAD:complete/msmpeg4-p-intra
