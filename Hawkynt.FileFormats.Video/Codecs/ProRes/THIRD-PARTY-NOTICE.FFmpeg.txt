@@ -21,8 +21,8 @@ Relevant FFmpeg sources:
   libavcodec/proresenc_kostya.c    prores_quant_matrices for the 4:2:2 profiles
   libavcodec/proresenc_anatoliy.c  QMAT_LUMA/QMAT_CHROMA, including 4444/XQ tables
 
+Copyright (c) 2011 Anatoliy Wasserman
 Copyright (c) 2012 Konstantin Shishkov
-Copyright (c) 2012 Anatoliy Wasserman
 
 FFmpeg is free software; you can redistribute it and/or modify it under the terms of
 the GNU Lesser General Public License as published by the Free Software Foundation;
