@@ -13,6 +13,7 @@ namespace FileFormat.Codecs.CineForm;
 /// </remarks>
 internal static class CineFormTags {
   internal const int Index = 2;
+  internal const int TransformType = 10;
   internal const int ChannelCount = 12;
   internal const int SubbandCount = 14;
   internal const int ImageWidth = 20;
@@ -21,6 +22,8 @@ internal static class CineFormTags {
   internal const int SubbandNumber = 48;
   internal const int Quantization = 53;
   internal const int ChannelNumber = 62;
+  internal const int InterlacedFlags = 63;
+  internal const int SampleFlags = 68;
   internal const int Precision = 70;
   internal const int PrescaleTable = 83;
   internal const int EncodedFormat = 84;
