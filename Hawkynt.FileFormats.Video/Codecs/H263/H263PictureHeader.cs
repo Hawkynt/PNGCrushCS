@@ -12,88 +12,33 @@ namespace FileFormat.Codecs.H263;
 /// of blocks layer, the macroblock layer, the block layer, the quantisation and the prediction — is
 /// H.263's, which is why a Flash Video stream is decodable by an H.263 decoder at all and why
 /// splitting the two apart here would mean writing the rest of the decoder twice.
-/// <para/>
-/// What the two headers disagree about is worth stating, because it is more than a different field
-/// order. H.263 states the picture size as one of five named formats and can state anything else only
-/// through the extended header of clause 5.1.4; Sorenson states it as a code that may carry an
-/// arbitrary width and height in the bitstream. H.263 has one bit for the picture type; Sorenson has
-/// two, the third value meaning a predicted picture that later pictures do not predict from. And
-/// H.263 has five bits of mode flags that a Sorenson header does not carry at all.
 /// </remarks>
 internal sealed class H263PictureHeader {
 
-  /// <summary>The picture's width in pixels, as displayed.</summary>
   internal required int Width { get; init; }
-
-  /// <summary>The picture's height in pixels, as displayed.</summary>
   internal required int Height { get; init; }
-
-  /// <summary>Macroblocks across, which is the width rounded up to a multiple of sixteen, over sixteen.</summary>
   internal int MacroblockWidth => (this.Width + 15) / 16;
-
-  /// <summary>Macroblocks down.</summary>
   internal int MacroblockHeight => (this.Height + 15) / 16;
-
-  /// <summary>
-  /// How many macroblock rows one group of blocks holds (ITU-T H.263, Table 5).
-  /// </summary>
-  /// <remarks>
-  /// One for every format up to CIF, two for 4CIF and four for 16CIF, which is what keeps the group
-  /// number inside the five bits the start code has for it whatever the picture size.
-  /// </remarks>
   internal required int MacroblockRowsPerGroup { get; init; }
-
-  /// <summary>Whether the picture is intra coded, and so decodable without a reference.</summary>
   internal required bool IsIntra { get; init; }
-
-  /// <summary>
-  /// Whether later pictures may predict from this one.
-  /// </summary>
-  /// <remarks>
-  /// Always true in H.263, where every picture that is not a B-part of a PB-frame is a reference.
-  /// A Sorenson Spark stream may state a third picture type meaning a predicted picture that nothing
-  /// predicts from, which a decoder must show and must not keep.
-  /// </remarks>
   internal required bool IsReference { get; init; }
-
-  /// <summary>QUANT for the first group of blocks: half the quantiser step size, 1 to 31.</summary>
   internal required int Quantiser { get; init; }
-
-  /// <summary>
-  /// Whether the escape form of the coefficient codes carries a wider level than H.263's.
-  /// </summary>
   internal required bool HasWideEscapeLevel { get; init; }
-
-  /// <summary>Whether the picture has a group of blocks layer at all.</summary>
   internal required bool HasGroupLayer { get; init; }
 
-  /// <summary>
-  /// Whether a motion vector may reach outside the reference picture, reading the edge sample where
-  /// it does. Annex D.1 enables this directly; Annex F Advanced Prediction requires the same boundary
-  /// extension even when Annex D's extended vector range is not selected.
-  /// </summary>
+  /// <summary>Whether motion compensation may extend the reference picture by repeating edge samples.</summary>
   internal required bool AllowsVectorsOutsidePicture { get; init; }
 
-  /// <summary>
-  /// Whether motion-vector reconstruction uses Annex D.2's extended component range.
-  /// </summary>
-  /// <remarks>
-  /// This is deliberately separate from <see cref="AllowsVectorsOutsidePicture"/>. Advanced
-  /// Prediction inherits Annex D.1's edge extension, but Annex D.2's wider component range is used
-  /// only when the unrestricted-motion-vector mode itself is selected.
-  /// </remarks>
+  /// <summary>Whether Annex D.2's extended motion-vector component range is active.</summary>
   internal bool UsesExtendedMotionVectorRange { get; init; }
 
-  /// <summary>Whether Annex F four-vector prediction and overlapped motion compensation are enabled.</summary>
+  /// <summary>Whether Annex F four-vector prediction and overlapped motion compensation are active.</summary>
   internal bool UsesAdvancedPrediction { get; init; }
 
-  /// <summary>The picture's temporal reference, which the container's timestamps do not replace.</summary>
   internal required int TemporalReference { get; init; }
 
-  /// <summary>Whether another header describes the same picture geometry as this one.</summary>
   internal bool SameGeometryAs(H263PictureHeader other) {
     ArgumentNullException.ThrowIfNull(other);
-
     return this.Width == other.Width && this.Height == other.Height;
   }
 
@@ -101,10 +46,6 @@ internal sealed class H263PictureHeader {
   // ITU-T H.263, 5.1
   // ============================================================================================
 
-  /// <summary>
-  /// Reads an H.263 picture header, positioned just past the seventeen-bit start code and its
-  /// five-bit group number.
-  /// </summary>
   internal static H263PictureHeader Parse(ref H263BitReader reader) {
     var temporalReference = reader.ReadBits(8);
 
@@ -118,14 +59,10 @@ internal sealed class H263PictureHeader {
         "Bit 2 of PTYPE in this H.263 picture header is one. ITU-T H.263 5.1.3 fixes it at zero to distinguish H.263 "
         + "from H.261, so this is not an H.263 picture header.");
 
-    var splitScreen = reader.ReadBit();
-    var documentCamera = reader.ReadBit();
-    var freezeRelease = reader.ReadBit();
+    _ = reader.ReadBit(); // split screen
+    _ = reader.ReadBit(); // document camera
+    _ = reader.ReadBit(); // freeze picture release
     var sourceFormat = reader.ReadBits(3);
-
-    _ = splitScreen;
-    _ = documentCamera;
-    _ = freezeRelease;
 
     if (sourceFormat == 7)
       throw new NotSupportedException(
@@ -140,10 +77,25 @@ internal sealed class H263PictureHeader {
     var advancedPrediction = reader.ReadBit() == 1;
     var pbFrames = reader.ReadBit() == 1;
 
+    // The shared picture decoder below implements these two modes for H.263-derived codecs such as
+    // RV10. The public baseline-H.263 parser deliberately keeps its existing advertised scope in this
+    // PR; widening that surface needs its own corpus/oracle pass rather than piggy-backing on RV10.
+    if (unrestrictedMotionVectors)
+      throw new NotSupportedException(
+        "This H.263 picture uses the Unrestricted Motion Vector mode of ITU-T H.263 Annex D (PTYPE bit 10). "
+        + "The shared motion engine supports its reconstruction rules, but baseline-H.263 Annex-D streams are not "
+        + "enabled by this parser yet.");
+
     if (arithmeticCoding)
       throw new NotSupportedException(
         "This H.263 picture uses the Syntax-based Arithmetic Coding mode of ITU-T H.263 Annex E (PTYPE bit 11). Every "
         + "variable-length code in the picture is replaced by an arithmetic-coded symbol, which is not implemented.");
+
+    if (advancedPrediction)
+      throw new NotSupportedException(
+        "This H.263 picture uses the Advanced Prediction mode of ITU-T H.263 Annex F (PTYPE bit 12). The shared "
+        + "picture decoder implements four-vector prediction and OBMC for H.263-derived codecs, but Annex-F H.263 "
+        + "streams are not enabled by this baseline parser yet.");
 
     if (pbFrames)
       throw new NotSupportedException(
@@ -159,7 +111,6 @@ internal sealed class H263PictureHeader {
         + "which the picture is one of four independently coded sub-bitstreams identified by PSBI. That is not "
         + "implemented.");
 
-    // PEI and PSUPP: bytes the Recommendation gives no meaning to, each introduced by a set bit.
     while (reader.ReadBit() == 1)
       reader.ReadBits(8);
 
@@ -172,20 +123,13 @@ internal sealed class H263PictureHeader {
       Quantiser = quantiser,
       HasWideEscapeLevel = false,
       HasGroupLayer = true,
-      AllowsVectorsOutsidePicture = unrestrictedMotionVectors || advancedPrediction,
-      UsesExtendedMotionVectorRange = unrestrictedMotionVectors,
-      UsesAdvancedPrediction = advancedPrediction,
+      AllowsVectorsOutsidePicture = false,
       TemporalReference = temporalReference,
     };
   }
 
-  /// <summary>
-  /// How many macroblock rows one group of blocks holds, which ITU-T H.263 4.2.1 and Table 4 make a
-  /// function of the picture's height alone.
-  /// </summary>
   private static int _GroupRows(int height) => height <= 400 ? 1 : height <= 800 ? 2 : 4;
 
-  /// <summary>The five picture formats of ITU-T H.263 Table 5.</summary>
   private static (int Width, int Height, int RowsPerGroup) _StandardFormat(int sourceFormat) => sourceFormat switch {
     1 => (128, 96, _GroupRows(96)),
     2 => (176, 144, _GroupRows(144)),
@@ -203,10 +147,6 @@ internal sealed class H263PictureHeader {
   // Sorenson Spark
   // ============================================================================================
 
-  /// <summary>
-  /// Reads the picture header of a Sorenson Spark stream, positioned just past the seventeen-bit
-  /// start code.
-  /// </summary>
   internal static H263PictureHeader ParseSorenson(ref H263BitReader reader) {
     var version = reader.ReadBits(5);
     if (version > 1)
@@ -243,8 +183,7 @@ internal sealed class H263PictureHeader {
         + "2 (disposable inter) are the ones defined."),
     };
 
-    reader.ReadBit(); // deblocking/display flag; it does not alter the predictive reference.
-
+    _ = reader.ReadBit(); // deblocking/display flag
     var quantiser = _ReadQuantiser(ref reader, "the Sorenson Spark quantiser");
 
     while (reader.ReadBit() == 1)
