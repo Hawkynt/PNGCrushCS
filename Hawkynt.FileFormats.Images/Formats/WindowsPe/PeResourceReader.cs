@@ -132,6 +132,7 @@ public static class PeResourceReader {
         groups.Add(new PeIconGroup { GroupId = groupId, IsCursor = false, IcoData = icoData });
         imageResources.Add(new PeImageResource {
           ResourceType = PeImageResourceType.Icon,
+          ResourceTypeId = _RT_GROUP_ICON,
           ResourceId = groupId,
           Data = icoData,
         });
@@ -144,6 +145,7 @@ public static class PeResourceReader {
         groups.Add(new PeIconGroup { GroupId = groupId, IsCursor = true, IcoData = curData });
         imageResources.Add(new PeImageResource {
           ResourceType = PeImageResourceType.Cursor,
+          ResourceTypeId = _RT_GROUP_CURSOR,
           ResourceId = groupId,
           Data = curData,
         });
@@ -158,29 +160,15 @@ public static class PeResourceReader {
       var bmpData = _PrependBitmapFileHeader(bytes, offset, size);
       imageResources.Add(new PeImageResource {
         ResourceType = PeImageResourceType.Bitmap,
+        ResourceTypeId = _RT_BITMAP,
         ResourceId = resId,
         Data = bmpData,
       });
     }
 
-    // Scan other resource types for embedded image signatures (RT_RCDATA, custom types, etc.)
-    foreach (var (_, resId, offset, size) in otherResources) {
-      if (size <= 0 || offset < 0 || offset > data.Length - size)
-        continue;
-
-      var formatHint = _DetectImageSignature(bytes, offset, size);
-      if (formatHint == null)
-        continue;
-
-      var rawData = new byte[size];
-      data.Slice(offset, size).CopyTo(rawData);
-      imageResources.Add(new PeImageResource {
-        ResourceType = PeImageResourceType.EmbeddedImage,
-        ResourceId = resId,
-        Data = rawData,
-        FormatHint = formatHint,
-      });
-    }
+    // The editor parser retains the exact Type -> Name -> Language path, including named selectors
+    // and all language variants, so use it for embedded images instead of the legacy flattened scan.
+    imageResources.AddRange(PeResourceEditor.GetEmbeddedImages(bytes));
 
     return new PeResourceFile {
       IconGroups = groups,
@@ -280,7 +268,7 @@ public static class PeResourceReader {
           continue;
         }
 
-        // Level 3: language variants (pick the first one)
+        // Level 3: language variants (pick the first one for legacy icon/cursor/bitmap assembly)
         var level3Offset = rsrcFileOffset + resOffset;
         if (level3Offset < 0 || level3Offset > data.Length - _RESOURCE_DIRECTORY_SIZE)
           continue;
@@ -405,11 +393,7 @@ public static class PeResourceReader {
 
   /// <summary>Detects known image file signatures in resource data.</summary>
   internal static string? _DetectImageSignature(byte[] data, int offset, int size) {
-    if (size < 4)
-      return null;
-
-    var end = Math.Min(offset + size, data.Length);
-    if (end - offset < 4)
+    if (offset < 0 || size < 4 || size > data.Length || offset > data.Length - size)
       return null;
 
     // PNG: 89 50 4E 47 0D 0A 1A 0A
@@ -480,29 +464,25 @@ public static class PeResourceReader {
     //     Width (1), Height (1), ColorCount (1), Reserved (1),
     //     Planes (2), BitCount (2), BytesInRes (4), Id (2)   <-- Id instead of ImageOffset
 
-    if (grpSize < 6)
-      return null;
-
-    if (grpOffset < 0 || grpOffset > data.Length - grpSize)
+    if (grpSize < 6 || grpOffset < 0 || grpSize > data.Length || grpOffset > data.Length - grpSize)
       return null;
 
     var count = BinaryPrimitives.ReadUInt16LittleEndian(data.AsSpan(grpOffset + 4));
-
     if (count == 0)
       return null;
 
-    var grpEntrySize = 14; // GRPICONDIRENTRY is 14 bytes (last field is ushort Id)
-    if (grpSize < 6 + count * grpEntrySize)
+    const int grpEntrySize = 14; // GRPICONDIRENTRY is 14 bytes (last field is ushort Id)
+    if (count > (grpSize - 6) / grpEntrySize)
       return null;
 
     // Calculate total ICO file size
     // ICO header: 6 bytes
     // ICO directory: count * 16 bytes (ICONDIRENTRY has uint ImageOffset instead of ushort Id)
-    var icoHeaderSize = 6;
+    const int icoHeaderSize = 6;
 
     // First pass: compute total data size and collect entries
     var entries = new List<(byte Width, byte Height, byte ColorCount, byte Reserved, ushort Planes, ushort BitCount, int BytesInRes, int ResourceId, int ActualDataOffset, int ActualDataSize)>();
-    var totalDataSize = 0;
+    long totalDataSize = 0;
 
     for (var i = 0; i < count; ++i) {
       var entryBase = grpOffset + 6 + i * grpEntrySize;
@@ -518,17 +498,23 @@ public static class PeResourceReader {
       // Find the corresponding RT_ICON resource
       if (!iconResources.TryGetValue(resourceId, out var iconEntry))
         continue; // Skip entries with missing resources
+      if (iconEntry.Offset < 0 || iconEntry.Size < 0 || iconEntry.Size > data.Length || iconEntry.Offset > data.Length - iconEntry.Size)
+        continue;
 
       entries.Add((width, height, colorCount, reserved, planes, bitCount, bytesInRes, resourceId, iconEntry.Offset, iconEntry.Size));
       totalDataSize += iconEntry.Size;
+      if (totalDataSize > int.MaxValue)
+        return null;
     }
 
     if (entries.Count == 0)
       return null;
 
-    // Build the ICO file
-    var icoSize = icoHeaderSize + entries.Count * 16 + totalDataSize;
-    var ico = new byte[icoSize];
+    // Build the ICO file only after proving all size arithmetic fits the managed array/index range.
+    var icoSize = (long)icoHeaderSize + entries.Count * 16L + totalDataSize;
+    if (icoSize > int.MaxValue)
+      return null;
+    var ico = new byte[(int)icoSize];
 
     // Write ICO header
     BinaryPrimitives.WriteUInt16LittleEndian(ico.AsSpan(0), 0);                         // Reserved
@@ -571,20 +557,20 @@ public static class PeResourceReader {
     //   Planes (2), BitCount (2), BytesInRes (4), Id (2)
     // RT_CURSOR resources have a 4-byte hotspot header (HotspotX:2, HotspotY:2) prepended to the DIB
 
-    if (grpSize < 6 || grpOffset < 0 || grpOffset > data.Length - grpSize)
+    if (grpSize < 6 || grpOffset < 0 || grpSize > data.Length || grpOffset > data.Length - grpSize)
       return null;
 
     var count = BinaryPrimitives.ReadUInt16LittleEndian(data.AsSpan(grpOffset + 4));
     if (count == 0)
       return null;
 
-    var grpEntrySize = 14;
-    if (grpSize < 6 + count * grpEntrySize)
+    const int grpEntrySize = 14;
+    if (count > (grpSize - 6) / grpEntrySize)
       return null;
 
-    var icoHeaderSize = 6;
+    const int icoHeaderSize = 6;
     var entries = new List<(ushort HotspotX, ushort HotspotY, byte Width, byte Height, byte ColorCount, int ActualDataOffset, int ActualDataSize, ushort Planes, ushort BitCount)>();
-    var totalDataSize = 0;
+    long totalDataSize = 0;
 
     for (var i = 0; i < count; ++i) {
       var entryBase = grpOffset + 6 + i * grpEntrySize;
@@ -600,8 +586,8 @@ public static class PeResourceReader {
       if (!cursorResources.TryGetValue(resourceId, out var curEntry))
         continue;
 
-      // RT_CURSOR data has a 4-byte hotspot header
-      if (curEntry.Size < 4)
+      // RT_CURSOR data has a 4-byte hotspot header.
+      if (curEntry.Offset < 0 || curEntry.Size < 4 || curEntry.Size > data.Length || curEntry.Offset > data.Length - curEntry.Size)
         continue;
 
       var hotspotX = BinaryPrimitives.ReadUInt16LittleEndian(data.AsSpan(curEntry.Offset));
@@ -615,14 +601,18 @@ public static class PeResourceReader {
 
       entries.Add((hotspotX, hotspotY, bWidth, bHeight, 0, dibOffset, dibSize, planes, bitCount));
       totalDataSize += dibSize;
+      if (totalDataSize > int.MaxValue)
+        return null;
     }
 
     if (entries.Count == 0)
       return null;
 
-    // Build CUR file (Type=2)
-    var curSize = icoHeaderSize + entries.Count * 16 + totalDataSize;
-    var cur = new byte[curSize];
+    // Build CUR file (Type=2) only after proving all size arithmetic fits managed indexing.
+    var curSize = (long)icoHeaderSize + entries.Count * 16L + totalDataSize;
+    if (curSize > int.MaxValue)
+      return null;
+    var cur = new byte[(int)curSize];
 
     BinaryPrimitives.WriteUInt16LittleEndian(cur.AsSpan(0), 0);                          // Reserved
     BinaryPrimitives.WriteUInt16LittleEndian(cur.AsSpan(2), 2);                           // Type = Cursor
