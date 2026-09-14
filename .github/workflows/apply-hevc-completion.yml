@@ -1,0 +1,33 @@
+name: Apply HEVC completion patch
+
+on:
+  push:
+    branches: [feat/h265-fractional-motion]
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/h265-fractional-motion
+          fetch-depth: 0
+      - name: Apply patch
+        shell: bash
+        run: |
+          git apply --check .github/hevc-completion.patch
+          git apply .github/hevc-completion.patch
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Hawkynt.FileFormats.Video/Codecs/H265/H265PcmStillCodec.cs
+          git add Hawkynt.FileFormats.Video/Codecs/H265/H265FrameDecoder.cs
+          git add Hawkynt.FileFormats.Video/Codecs/H265/H265InterPictureEncoder.cs
+          git add Hawkynt.FileFormats.Video/Codecs/H265/H265VideoSequenceEncoder.cs
+          git add Tests/Hawkynt.FileFormats.Video.Tests/Codecs/H265/H265AdvancedInterEncoderTests.cs
+          git add Tests/Hawkynt.FileFormats.Video.Tests/Codecs/H265/H265PcmFrameDecoderTests.cs
+          git commit -m "Complete HEVC reference, partition, RD and PCM paths"
+          git push origin HEAD:feat/h265-fractional-motion
