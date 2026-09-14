@@ -73,14 +73,14 @@ internal static class CineFormPictureDecoder {
       channels[i] = CineFormChannelDecoder.Parse(data, ref position);
 
     var format = _ResolveFormat(encodedFormat, channels);
+    if (format == CineFormEncodedFormat.Bayer)
+      throw new NotSupportedException(
+        "CineForm Bayer/CFA frames need the format's four-channel CFA reconstruction stage; treating those channels as RGBA would produce a plausible but wrong picture.");
+
     var expectedChannels = format == CineFormEncodedFormat.Rgba4444 ? 4 : 3;
     if (channelCount != expectedChannels)
       throw new InvalidDataException(
         $"CineForm EncodedFormat {(int)format} ({format}) needs {expectedChannels} channels, but the frame states {channelCount}.");
-
-    if (format == CineFormEncodedFormat.Bayer)
-      throw new NotSupportedException(
-        "CineForm Bayer/CFA frames need the format's four-channel CFA reconstruction stage; treating those channels as RGBA would produce a plausible but wrong picture.");
 
     var codedPrecision = format == CineFormEncodedFormat.Yuv422 ? 10 : 12;
     if (precision != 0 && precision != codedPrecision)
