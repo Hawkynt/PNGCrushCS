@@ -141,6 +141,10 @@ public sealed class MagicYuvEncoder : IVideoCodecEncoder<MagicYuvEncoder> {
 
     var tag = CodecTag.FromCharacters(selected);
     var format = MagicYuvFormat.Of(tag, stream.Index);
+    if (format.IsHighBitDepth && stream.BitsPerPixel > 0 && stream.BitsPerPixel != format.StreamBitsPerPixel)
+      throw new NotSupportedException(
+        $"Video stream {stream.Index} names {stream.Codec}, one of MagicYUV's formats deeper than eight bits, but states {stream.BitsPerPixel} bits per pixel where that FourCC uses {format.StreamBitsPerPixel}. The contradictory description is refused rather than encoded under one of the two meanings.");
+
     var pixelFormat = format.NativePixelFormat;
     return new(stream, tag, format, pixelFormat, predictor, slices, interlaced);
   }
