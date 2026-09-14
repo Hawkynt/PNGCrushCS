@@ -316,11 +316,9 @@ public sealed class FlicVideoEncoder : IVideoCodecEncoder<FlicVideoEncoder> {
       if (oldRow.SequenceEqual(newRow)) continue;
 
       _WriteLineSkips(output, y - yCursor, 0x4000);
-      var lastOpcode = false;
       var scanWidth = this._width;
       if ((this._width & 1) != 0 && oldRow[^1] != newRow[^1]) {
         _WriteU16(output, (ushort)(0x8000 | newRow[^1]));
-        lastOpcode = true;
         --scanWidth;
       }
 
@@ -342,13 +340,11 @@ public sealed class FlicVideoEncoder : IVideoCodecEncoder<FlicVideoEncoder> {
 
       using var packets = new MemoryStream();
       var packetCount = 0;
-      var cursor = 0;
       var skip = first;
       while (skip > byte.MaxValue) {
         packets.WriteByte(byte.MaxValue);
         packets.WriteByte(0);
         skip -= byte.MaxValue;
-        cursor += byte.MaxValue;
         ++packetCount;
       }
 
@@ -360,7 +356,6 @@ public sealed class FlicVideoEncoder : IVideoCodecEncoder<FlicVideoEncoder> {
         packets.WriteByte(checked((byte)words));
         packets.Write(newRow.Slice(xPos, words * 2));
         xPos += words * 2;
-        cursor = xPos;
         firstPacket = false;
         ++packetCount;
       }
@@ -371,8 +366,6 @@ public sealed class FlicVideoEncoder : IVideoCodecEncoder<FlicVideoEncoder> {
       packets.Position = 0;
       packets.CopyTo(output);
       yCursor = y + 1;
-      _ = lastOpcode;
-      _ = cursor;
     }
     return output.ToArray();
   }
