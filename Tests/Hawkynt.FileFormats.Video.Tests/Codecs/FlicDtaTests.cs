@@ -55,6 +55,71 @@ public sealed class FlicDtaTests {
 
   [Test]
   [Category("Unit")]
+  public void DtaLcTreatsTheWholeNegativeWordAsALineSkip() {
+    const int height = 32768;
+    var decoder = FlicVideoDecoder.Create(_Stream(1, height, 24));
+    // 0x8001 is signed -32767. DTA_LC therefore skips to the final row. In standard SS2 its
+    // high bits are opcode class 10 instead; the two grammars must not be conflated.
+    var delta = _Chunk(FliChunkType.DTA_LC, [
+      1, 0,
+      0x01, 0x80,
+      1, 0,
+      0, 1, 9, 8, 7,
+    ]);
+
+    Assert.That(decoder.TryDecode(new CodedPacket(0, delta), out var frame), Is.True);
+    Assert.That(frame.PixelData.AsSpan((height - 1) * 3, 3).ToArray(), Is.EqualTo(new byte[] { 9, 8, 7 }));
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void HighColourSs2UsesWordPacketsAndPixelSkips() {
+    var decoder = FlicVideoDecoder.Create(_Stream(3, 1, 15));
+    var first = _Chunk(FliChunkType.COPY, new byte[6]);
+    var delta = _Chunk(FliChunkType.SS2, [
+      1, 0,       // one changed line
+      1, 0,       // one packet
+      1, 1,       // skip one pixel, copy one word
+      0x00, 0x7C, // RGB555 red
+    ]);
+
+    Assert.That(decoder.TryDecode(new CodedPacket(0, first), out _), Is.True);
+    Assert.That(decoder.TryDecode(new CodedPacket(0, delta), out var frame), Is.True);
+    Assert.That(frame.PixelData, Is.EqualTo(new byte[] {
+      0, 0, 0,
+      255, 0, 0,
+      0, 0, 0,
+    }));
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void HighColourSs2DoesNotInterpretDtaNegativeWordsAsLineSkips() {
+    var decoder = FlicVideoDecoder.Create(_Stream(1, 1, 15));
+    var delta = _Chunk(FliChunkType.SS2, [
+      1, 0,
+      0x01, 0x80, // SS2 opcode class 10; DTA_LC would call this signed -32767
+    ]);
+
+    var failure = Assert.Throws<InvalidDataException>(() => decoder.TryDecode(new CodedPacket(0, delta), out _));
+    Assert.That(failure!.Message, Does.Contain("last-byte opcode"));
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void HighColourSs2RejectsItsUndefinedOpcodeClass() {
+    var decoder = FlicVideoDecoder.Create(_Stream(1, 1, 15));
+    var delta = _Chunk(FliChunkType.SS2, [
+      1, 0,
+      0x01, 0x40, // SS2 opcode class 01 is undefined
+    ]);
+
+    var failure = Assert.Throws<InvalidDataException>(() => decoder.TryDecode(new CodedPacket(0, delta), out _));
+    Assert.That(failure!.Message, Does.Contain("undefined opcode class"));
+  }
+
+  [Test]
+  [Category("Unit")]
   public void Rgb555IsWidenedWithoutChangingItsCodedReferenceCanvas() {
     var decoder = FlicVideoDecoder.Create(_Stream(2, 1, 15));
     // red max, then blue max
