@@ -12,12 +12,12 @@ namespace FileFormat.Codecs.CineForm;
 /// index after tag 2; that payload is skipped explicitly rather than accidentally interpreted as more
 /// tags. Optional DisplayHeight (negative tag 85) crops the vertical padding real encoders add.
 /// <para/>
-/// <b>Which prescale table and which colour layout apply is decided from the channels' own
-/// dimensions, not guessed from the container.</b> Every channel is parsed before any of them is
-/// reconstructed, because a 4:2:2 stream's second and third channels code a lowpass band half the
-/// width of the first channel's — genuine horizontal subsampling — and an RGB stream's three channels
-/// all agree. That comparison chooses between <see cref="CineFormPrescale.TenBit"/> with channel order
-/// Y, V, U and <see cref="CineFormPrescale.TwelveBit"/> with channel order G, R, B.
+/// Real CFHD frames name their colour layout with tag 84: 1 is ten-bit YUV 4:2:2, 3 is twelve-bit RGB
+/// 4:4:4 and 4 is twelve-bit RGBA 4:4:4:4. Older sparse fixtures which omit that vendor tag retain the
+/// measured channel-width fallback: half-width chroma means YUV, equal-width three-channel data means
+/// RGB, and four equal-width channels mean RGBA. Bayer (value 2) is refused explicitly because its four
+/// channels are decorrelated CFA components, not RGBA planes, and need the separate CFA reconstruction
+/// stage the core pixel model does not currently expose.
 /// </remarks>
 internal static class CineFormPictureDecoder {
 
@@ -31,10 +31,14 @@ internal static class CineFormPictureDecoder {
     internal required int ImageWidth { get; init; }
     internal required int ImageHeight { get; init; }
     internal required Plane[] Channels { get; init; }
+    internal required CineFormEncodedFormat EncodedFormat { get; init; }
+    internal required int Precision { get; init; }
 
-    /// <summary><see langword="true"/> for a horizontally-subsampled three-channel YUV frame (channel
-    /// order Y, V, U); <see langword="false"/> for a three-channel RGB frame (channel order G, R, B).</summary>
-    internal required bool IsYuv { get; init; }
+    /// <summary><see langword="true"/> for horizontally-subsampled YUV (channel order Y, V, U).</summary>
+    internal bool IsYuv => this.EncodedFormat == CineFormEncodedFormat.Yuv422;
+
+    /// <summary><see langword="true"/> when channel 3 carries the decoded alpha component.</summary>
+    internal bool HasAlpha => this.EncodedFormat == CineFormEncodedFormat.Rgba4444;
   }
 
   internal static Result Decode(ReadOnlyMemory<byte> data) {
@@ -44,6 +48,8 @@ internal static class CineFormPictureDecoder {
       out var codedHeight,
       out var displayHeight,
       out var channelCount,
+      out var encodedFormat,
+      out var precision,
       out var channelHeaderPosition);
 
     if (imageWidth <= 0 || codedHeight <= 0)
@@ -54,9 +60,9 @@ internal static class CineFormPictureDecoder {
       throw new InvalidDataException(
         $"A CineForm frame states DisplayHeight {imageHeight}, larger than its coded ImageHeight {codedHeight}.");
 
-    if (channelCount != 3)
+    if (channelCount is < 3 or > 4)
       throw new NotSupportedException(
-        $"This decoder reads only the three-channel layouts ffmpeg's own cfhd encoder writes — 4:2:2 YUV and RGB without alpha. This frame states ChannelCount {channelCount}, which was never measured against a real file and is refused rather than guessed at.");
+        $"This decoder reads CineForm's three-channel YUV/RGB and four-channel RGBA layouts; this frame states ChannelCount {channelCount}.");
 
     // With a raw index present, begin after its size words. Every tag the channel decoder needs sits
     // after the index; starting at packet zero would reinterpret those size words as tag/value pairs.
@@ -66,18 +72,58 @@ internal static class CineFormPictureDecoder {
     for (var i = 0; i < channelCount; ++i)
       channels[i] = CineFormChannelDecoder.Parse(data, ref position);
 
-    var isYuv = channels[1].LowpassWidth < channels[0].LowpassWidth;
-    var prescale = isYuv ? CineFormPrescale.TenBit : CineFormPrescale.TwelveBit;
-    var maxSample = isYuv ? 1023 : 4095;
+    var format = _ResolveFormat(encodedFormat, channels);
+    var expectedChannels = format == CineFormEncodedFormat.Rgba4444 ? 4 : 3;
+    if (channelCount != expectedChannels)
+      throw new InvalidDataException(
+        $"CineForm EncodedFormat {(int)format} ({format}) needs {expectedChannels} channels, but the frame states {channelCount}.");
+
+    if (format == CineFormEncodedFormat.Bayer)
+      throw new NotSupportedException(
+        "CineForm Bayer/CFA frames need the format's four-channel CFA reconstruction stage; treating those channels as RGBA would produce a plausible but wrong picture.");
+
+    var codedPrecision = format == CineFormEncodedFormat.Yuv422 ? 10 : 12;
+    if (precision != 0 && precision != codedPrecision)
+      throw new InvalidDataException(
+        $"CineForm EncodedFormat {(int)format} ({format}) is coded at {codedPrecision} bits, but this frame states Precision {precision}.");
+
+    var prescale = format == CineFormEncodedFormat.Yuv422 ? CineFormPrescale.TenBit : CineFormPrescale.TwelveBit;
+    var maxSample = format == CineFormEncodedFormat.Yuv422 ? 1023 : 4095;
 
     var planes = new Plane[channelCount];
     for (var i = 0; i < channelCount; ++i) {
       var samples = CineFormChannelDecoder.Reconstruct(channels[i], prescale, out var width, out var height);
       _ClampToCodedRange(samples, maxSample);
+      if (format == CineFormEncodedFormat.Rgba4444 && i == 3)
+        _ExpandAlpha(samples);
       planes[i] = new(samples, width, height);
     }
 
-    return new() { ImageWidth = imageWidth, ImageHeight = imageHeight, Channels = planes, IsYuv = isYuv };
+    return new() {
+      ImageWidth = imageWidth,
+      ImageHeight = imageHeight,
+      Channels = planes,
+      EncodedFormat = format,
+      Precision = codedPrecision,
+    };
+  }
+
+  private static CineFormEncodedFormat _ResolveFormat(
+    CineFormEncodedFormat encodedFormat,
+    CineFormChannelDecoder.ParsedChannel[] channels) {
+
+    if (encodedFormat != CineFormEncodedFormat.Unspecified)
+      return encodedFormat switch {
+        CineFormEncodedFormat.Yuv422 or CineFormEncodedFormat.Bayer or CineFormEncodedFormat.Rgb444 or CineFormEncodedFormat.Rgba4444 => encodedFormat,
+        _ => throw new NotSupportedException($"CineForm EncodedFormat {(int)encodedFormat} is not known to this decoder."),
+      };
+
+    if (channels.Length == 4)
+      return CineFormEncodedFormat.Rgba4444;
+
+    return channels[1].LowpassWidth < channels[0].LowpassWidth
+      ? CineFormEncodedFormat.Yuv422
+      : CineFormEncodedFormat.Rgb444;
   }
 
   private static void _ClampToCodedRange(int[] samples, int maxSample) {
@@ -87,18 +133,37 @@ internal static class CineFormPictureDecoder {
     }
   }
 
+  /// <summary>Undo the alpha companding used by CineForm RGBA before the spatial transform.</summary>
+  /// <remarks>
+  /// The constants are format interoperability values also used by the public GoPro implementation
+  /// and FFmpeg: coded alpha is offset by 256, expanded by eight and scaled by 9400/65536. Applying
+  /// this after reconstruction is what makes the fourth twelve-bit channel an alpha plane rather than
+  /// merely another colour component.
+  /// </remarks>
+  private static void _ExpandAlpha(int[] samples) {
+    for (var i = 0; i < samples.Length; ++i) {
+      var channel = (samples[i] - 256) << 3;
+      channel = channel * 9400 >> 16;
+      samples[i] = channel < 0 ? 0 : channel > 4095 ? 4095 : channel;
+    }
+  }
+
   private static void _PeekImageHeader(
     ReadOnlySpan<byte> span,
     out int imageWidth,
     out int imageHeight,
     out int displayHeight,
     out int channelCount,
+    out CineFormEncodedFormat encodedFormat,
+    out int precision,
     out int channelHeaderPosition) {
 
     imageWidth = 0;
     imageHeight = 0;
     displayHeight = 0;
     channelCount = 0;
+    encodedFormat = CineFormEncodedFormat.Unspecified;
+    precision = 0;
     channelHeaderPosition = 0;
 
     var position = 0;
@@ -129,6 +194,10 @@ internal static class CineFormPictureDecoder {
         displayHeight = value;
       else if (tag == CineFormTags.ChannelCount)
         channelCount = value;
+      else if (tag == CineFormTags.EncodedFormat)
+        encodedFormat = (CineFormEncodedFormat)value;
+      else if (tag == CineFormTags.Precision)
+        precision = value;
     }
   }
 }
