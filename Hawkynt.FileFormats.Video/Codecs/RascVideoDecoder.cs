@@ -167,9 +167,9 @@ public sealed class RascVideoDecoder : IVideoCodecDecoder<RascVideoDecoder> {
         throw new InvalidDataException("An 8-bit RASC format record ends inside its 256-entry palette.");
       for (var i = 0; i < 256; ++i) {
         var value = BinaryPrimitives.ReadUInt32LittleEndian(payload[(consumed + i * 4)..]);
-        this._palette![i * 3] = (byte)value;
+        this._palette![i * 3] = (byte)(value >> 16);
         this._palette[i * 3 + 1] = (byte)(value >> 8);
-        this._palette[i * 3 + 2] = (byte)(value >> 16);
+        this._palette[i * 3 + 2] = (byte)value;
       }
       consumed += 256 * 4;
     }
@@ -441,7 +441,7 @@ public sealed class RascVideoDecoder : IVideoCodecDecoder<RascVideoDecoder> {
             display[pixelAt] = this._NearestPaletteIndex(red, green, blue);
             break;
           case NativeFormat.Rgb555: {
-            var value = (ushort)((red >> 3) | ((green >> 3) << 5) | ((blue >> 3) << 10));
+            var value = (ushort)((blue >> 3) | ((green >> 3) << 5) | ((red >> 3) << 10));
             BinaryPrimitives.WriteUInt16LittleEndian(display[pixelAt..], value);
             break;
           }
@@ -485,9 +485,9 @@ public sealed class RascVideoDecoder : IVideoCodecDecoder<RascVideoDecoder> {
           }
           case NativeFormat.Rgb555: {
             var value = BinaryPrimitives.ReadUInt16LittleEndian(native[at..]);
-            var red = value & 31;
+            var blue = value & 31;
             var green = (value >> 5) & 31;
-            var blue = (value >> 10) & 31;
+            var red = (value >> 10) & 31;
             output[outAt++] = (byte)((red << 3) | (red >> 2));
             output[outAt++] = (byte)((green << 3) | (green >> 2));
             output[outAt++] = (byte)((blue << 3) | (blue >> 2));
@@ -541,8 +541,6 @@ public sealed class RascVideoDecoder : IVideoCodecDecoder<RascVideoDecoder> {
     if (expectedBytes < 0)
       throw new InvalidDataException("A RASC record declares a negative decompressed size.");
     var output = new byte[expectedBytes];
-    if (expectedBytes == 0)
-      return output;
 
     using var input = new MemoryStream(compressed.ToArray(), writable: false);
     using var zlib = new ZLibStream(input, CompressionMode.Decompress);
@@ -553,6 +551,11 @@ public sealed class RascVideoDecoder : IVideoCodecDecoder<RascVideoDecoder> {
         break;
       at += read;
     }
+    if (at != output.Length)
+      throw new InvalidDataException(
+        $"A RASC zlib stream produced {at} byte(s), but {expectedBytes} byte(s) were declared.");
+    if (zlib.ReadByte() != -1)
+      throw new InvalidDataException("A RASC zlib stream expands beyond its declared byte count.");
     return output;
   }
 
