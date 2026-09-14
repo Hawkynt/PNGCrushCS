@@ -1,0 +1,119 @@
+name: Temporary legacy Office oracle
+
+on:
+  push:
+    branches: [office-legacy-binary-writers]
+    paths: [.github/workflows/tmp-office-legacy-oracle.yml]
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install LibreOffice UNO bridge
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libreoffice python3-uno
+      - name: Generate Word and Excel 97-2003 oracle files
+        run: |
+          cat > /tmp/generate.py <<'PY'
+          import binascii, os, struct, subprocess, time, zlib
+          import uno
+          from com.sun.star.beans import PropertyValue
+          from com.sun.star.awt import Size, Point
+
+          out = '/tmp/oracle'
+          os.makedirs(out, exist_ok=True)
+
+          def png(path):
+              w, h = 3, 2
+              rows = [
+                  bytes([0, 255,0,0, 0,255,0, 0,0,255]),
+                  bytes([0, 255,255,255, 0,0,0, 255,255,0]),
+              ]
+              raw = b''.join(rows)
+              def chunk(kind, data):
+                  return struct.pack('>I', len(data)) + kind + data + struct.pack('>I', binascii.crc32(kind + data) & 0xffffffff)
+              data = b'\x89PNG\r\n\x1a\n' + chunk(b'IHDR', struct.pack('>IIBBBBB', w,h,8,2,0,0,0)) + chunk(b'IDAT', zlib.compress(raw)) + chunk(b'IEND', b'')
+              open(path, 'wb').write(data)
+
+          img = out + '/image.png'
+          png(img)
+
+          soffice = subprocess.Popen(['soffice','--headless','--accept=socket,host=127.0.0.1,port=2002;urp;StarOffice.ServiceManager','--norestore','--nodefault','--nofirststartwizard'])
+          try:
+              for _ in range(60):
+                  try:
+                      local_ctx = uno.getComponentContext()
+                      resolver = local_ctx.ServiceManager.createInstanceWithContext('com.sun.star.bridge.UnoUrlResolver', local_ctx)
+                      ctx = resolver.resolve('uno:socket,host=127.0.0.1,port=2002;urp;StarOffice.ComponentContext')
+                      break
+                  except Exception:
+                      time.sleep(0.5)
+              else:
+                  raise RuntimeError('LibreOffice UNO did not start')
+
+              smgr = ctx.ServiceManager
+              desktop = smgr.createInstanceWithContext('com.sun.star.frame.Desktop', ctx)
+              file_url = uno.systemPathToFileUrl(img)
+
+              def prop(name, value):
+                  p = PropertyValue(); p.Name = name; p.Value = value; return p
+
+              def writer(path, filter_name):
+                  doc = desktop.loadComponentFromURL('private:factory/swriter', '_blank', 0, ())
+                  graphic = doc.createInstance('com.sun.star.text.TextGraphicObject')
+                  graphic.GraphicURL = file_url
+                  graphic.Width = 1800
+                  graphic.Height = 1200
+                  cursor = doc.Text.createTextCursor()
+                  doc.Text.insertTextContent(cursor, graphic, False)
+                  doc.Text.insertString(cursor, '\n', False)
+                  doc.storeAsURL(uno.systemPathToFileUrl(path), (prop('FilterName', filter_name), prop('Overwrite', True)))
+                  doc.close(True)
+
+              def calc(path, filter_name):
+                  doc = desktop.loadComponentFromURL('private:factory/scalc', '_blank', 0, ())
+                  sheet = doc.Sheets.getByIndex(0)
+                  shape = doc.createInstance('com.sun.star.drawing.GraphicObjectShape')
+                  shape.GraphicURL = file_url
+                  shape.Position = Point(0, 0)
+                  shape.Size = Size(1800, 1200)
+                  sheet.DrawPage.add(shape)
+                  sheet.getCellByPosition(0, 0).String = 'oracle'
+                  doc.storeAsURL(uno.systemPathToFileUrl(path), (prop('FilterName', filter_name), prop('Overwrite', True)))
+                  doc.close(True)
+
+              writer(out + '/oracle.doc', 'MS Word 97')
+              writer(out + '/oracle.dot', 'MS Word 97 Vorlage')
+              calc(out + '/oracle.xls', 'MS Excel 97')
+              calc(out + '/oracle.xlt', 'MS Excel 97 Vorlage/Template')
+          finally:
+              soffice.terminate()
+              try: soffice.wait(timeout=10)
+              except Exception: soffice.kill()
+          PY
+          /usr/bin/python3 /tmp/generate.py
+          file /tmp/oracle/*
+      - name: Inspect compound streams
+        run: |
+          python3 -m pip install --break-system-packages olefile
+          python3 - <<'PY'
+          import json, olefile, os
+          root='/tmp/oracle'
+          result={}
+          for name in ['oracle.doc','oracle.dot','oracle.xls','oracle.xlt']:
+              path=os.path.join(root,name)
+              ole=olefile.OleFileIO(path)
+              item={'size':os.path.getsize(path),'streams':{}}
+              for parts in ole.listdir(streams=True, storages=False):
+                  key='/'.join(parts)
+                  data=ole.openstream(parts).read()
+                  item['streams'][key]={'size':len(data),'head':data[:256].hex()}
+              result[name]=item
+          open(os.path.join(root,'streams.json'),'w').write(json.dumps(result,indent=2,sort_keys=True))
+          print(open(os.path.join(root,'streams.json')).read())
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: legacy-office-oracles
+          path: /tmp/oracle
