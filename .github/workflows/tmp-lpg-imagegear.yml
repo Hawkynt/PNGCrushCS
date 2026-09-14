@@ -9,92 +9,67 @@ jobs:
   probe:
     runs-on: ubuntu-latest
     steps:
-      - name: Probe archived ImageGear and Paris resources
+      - name: Narrow ImageGear oracle probe
         shell: bash
         run: |
           set -u
           ROOT=/tmp/lpg-imagegear
           mkdir -p "$ROOT"
 
-          echo '=== Internet Archive search ==='
+          echo '=== Internet Archive focused search ==='
           python3 - <<'PY'
-          import json, urllib.parse, urllib.request, time
-
+          import json, urllib.parse, urllib.request
           queries = [
-              'ImageGear AccuSoft',
-              'ImageGear98 AccuSoft',
-              'OfficeGear AccuSoft',
+              'title:(ImageGear) AND (creator:(AccuSoft) OR description:(AccuSoft))',
+              'title:(OfficeGear) AND (creator:(AccuSoft) OR description:(AccuSoft))',
               'gear32sd.dll',
-              'Canvas 7 Deneba',
-              'Paris XLPrint',
-              'Laser Image Technologies Paris',
+              '"Canvas 7" AND Deneba',
+              '"Paris" AND XLPrint',
           ]
-          seen=set()
           for q in queries:
-              print('\n--- QUERY', q, '---')
+              print('\n---', q, '---')
               u='https://archive.org/advancedsearch.php?'+urllib.parse.urlencode({
-                  'q':q,
-                  'fl[]':['identifier','title','description','creator','year'],
-                  'rows':100,
-                  'page':1,
-                  'output':'json'
+                  'q':q,'fl[]':['identifier','title','creator','year'],'rows':50,'page':1,'output':'json'
               }, doseq=True)
               try:
-                  with urllib.request.urlopen(u, timeout=45) as r:
-                      docs=json.load(r)['response']['docs']
+                  with urllib.request.urlopen(u, timeout=20) as r:
+                      data=json.load(r)
+                  print('numFound', data['response'].get('numFound'))
+                  for d in data['response']['docs']:
+                      print(d.get('identifier',''), '|', d.get('title',''), '|', d.get('creator',''), '|', d.get('year',''))
               except Exception as e:
-                  print('SEARCH ERROR', type(e).__name__, e)
-                  continue
-              for d in docs:
-                  ident=d.get('identifier','')
-                  print('HIT', ident, '|', d.get('title',''), '|', d.get('creator',''), '|', d.get('year',''))
-                  if not ident or ident in seen:
-                      continue
-                  seen.add(ident)
-                  if len(seen)>250:
-                      continue
-                  try:
-                      with urllib.request.urlopen('https://archive.org/metadata/'+urllib.parse.quote(ident), timeout=30) as r:
-                          md=json.load(r)
-                  except Exception as e:
-                      print('  META ERROR', type(e).__name__, e)
-                      continue
-                  interesting=[]
-                  for f in md.get('files',[]):
-                      name=f.get('name','')
-                      low=name.lower()
-                      if any(x in low for x in ('gear32sd','imagegear','officegear','.igf','.lpg','paris','xlprint')):
-                          interesting.append((name,f.get('size',''),f.get('md5','')))
-                  for item in interesting[:100]:
-                      print('  FILE', *item, sep=' | ')
-          print('\nUNIQUE IDENTIFIERS', len(seen))
+                  print(type(e).__name__, e)
           PY
 
-          echo '=== Wayback candidate legacy AccuSoft downloads ==='
+          echo '=== Direct DLL download-page inspection ==='
+          for url in \
+            'https://www.opendll.com/index.php?arch=32bit&file-download=gear32sd.dll&version=7.0.15.15' \
+            'https://www.dll-files.com/gear32sd.dll.html'; do
+            echo "--- $url ---"
+            html="$ROOT/page.html"
+            curl --max-time 20 -A 'Mozilla/5.0' -fsSL "$url" -o "$html" || { echo FETCH_FAILED; continue; }
+            grep -inE -B3 -A5 'gear32sd|download|\.zip|\.dll' "$html" | head -250 || true
+            echo '--- href/action candidates ---'
+            grep -oiE '(href|action)=["'"'][^"'"']+["'"']' "$html" | grep -iE 'download|gear32|\.zip|\.dll' | head -100 || true
+          done
+
+          echo '=== Wayback exact legacy file candidates ==='
           for target in \
-            'accusoft.com/*imagegear*' \
-            'www.accusoft.com/*imagegear*' \
-            'accusoft.com/*officegear*' \
-            'www.accusoft.com/*officegear*' \
-            'ftp.accusoft.com/*' \
-            'ftp.xlprintau.dynip.com/*' \
-            'www.xlprint.com/*'; do
+            'www.accusoft.com/*ImageGear*.zip' \
+            'www.accusoft.com/*ImageGear*.exe' \
+            'www.accusoft.com/*OfficeGear*.zip' \
+            'www.accusoft.com/*OfficeGear*.exe' \
+            'ftp.accusoft.com/*.zip' \
+            'ftp.accusoft.com/*.exe' \
+            'ftp.xlprintau.dynip.com/*.zip' \
+            'ftp.xlprintau.dynip.com/*.exe'; do
             echo "--- $target ---"
-            curl -fsSLG 'https://web.archive.org/cdx/search/cdx' \
+            curl --max-time 25 -fsSLG 'https://web.archive.org/cdx/search/cdx' \
               --data-urlencode "url=$target" \
               --data-urlencode 'output=json' \
               --data-urlencode 'fl=timestamp,original,statuscode,mimetype,digest,length' \
               --data-urlencode 'filter=statuscode:200' \
               --data-urlencode 'collapse=urlkey' \
-              --data-urlencode 'limit=50000' \
-              | python3 -c 'import json,sys; d=json.load(sys.stdin); [print("\t".join(map(str,r))) for r in d[1:] if any(x in r[1].lower() for x in (".zip",".exe",".cab",".dll",".igf",".lpg","imagegear","officegear","paris","setup","install","demo","eval"))]' \
-              | head -500 || true
-          done
-
-          echo '=== Inspect public gear32sd.dll download pages ==='
-          for url in \
-            'https://www.opendll.com/index.php?arch=32bit&file-download=gear32sd.dll&version=7.0.15.15' \
-            'https://www.dll-files.com/gear32sd.dll.html'; do
-            echo "--- $url ---"
-            curl -A 'Mozilla/5.0' -fsSL "$url" | grep -oiE 'https?://[^"<> ]+|href="[^"]+"' | grep -iE 'gear32|download|\.zip|\.dll' | head -100 || true
+              --data-urlencode 'limit=1000' || true
+            echo
           done
