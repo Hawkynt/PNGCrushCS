@@ -197,11 +197,6 @@ internal sealed class Mpeg4VideoObjectLayer {
     }
 
     var quarterSample = verid != 1 && reader.ReadBit() == 1;
-    if (quarterSample)
-      throw new NotSupportedException(
-        "This MPEG-4 video object layer states quarter_sample (ISO/IEC 14496-2 7.6.2.2): its luminance motion "
-        + "vectors are to a quarter of a sample, interpolated with an eight-tap filter over a block extended by "
-        + "mirroring rather than with the bilinear filter of 7.6.2.1. That is not implemented.");
 
     if (reader.ReadBit() != 1)
       throw new NotSupportedException(
