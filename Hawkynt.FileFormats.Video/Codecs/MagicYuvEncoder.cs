@@ -29,7 +29,6 @@ public sealed class MagicYuvEncoder : IVideoCodecEncoder<MagicYuvEncoder> {
 
   private const byte _CODED = 0;
   private const byte _UNCOMPRESSED = 1;
-  private const byte _CODER_TYPE = 0x20;
   private const uint _INTERLACED = 0x0000_0002;
   private const uint _DEFAULT_FLAGS = 0x0020_0000;
 
@@ -93,7 +92,9 @@ public sealed class MagicYuvEncoder : IVideoCodecEncoder<MagicYuvEncoder> {
       DeclaredFrameCount = stream.DeclaredFrameCount,
       Width = stream.Width,
       Height = stream.Height,
-      BitsPerPixel = RawImage.BitsPerPixel(pixelFormat),
+      BitsPerPixel = format.IsHighBitDepth
+        ? format.StreamBitsPerPixel
+        : RawImage.BitsPerPixel(pixelFormat),
       Language = stream.Language,
       Name = stream.Name,
     };
@@ -379,7 +380,7 @@ public sealed class MagicYuvEncoder : IVideoCodecEncoder<MagicYuvEncoder> {
       var bits = new _BitWriter(frame, start + 2);
       if (raw[piece]) {
         foreach (var value in residual)
-          bits.Write(value, format.BitDepth);
+          bits.Write((uint)value, format.BitDepth);
       } else {
         var planeCodes = codes[piece % planeCount];
         var planeLengths = lengths[piece % planeCount];
@@ -495,8 +496,6 @@ public sealed class MagicYuvEncoder : IVideoCodecEncoder<MagicYuvEncoder> {
         target[at++] = (byte)(this._held >> this._heldBits);
       }
     }
-
-    internal void Write(ushort value, int length) => this.Write(value, length);
 
     internal void Flush() {
       if (this._heldBits == 0)
