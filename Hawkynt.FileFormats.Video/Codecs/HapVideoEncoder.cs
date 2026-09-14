@@ -18,24 +18,20 @@ namespace FileFormat.Codecs;
 /// <b>Texture coding.</b> <c>Hap1</c>, <c>Hap5</c> and <c>HapY</c> use the existing DXT writer,
 /// originally ported from FFmpeg's separately MIT-licensed <c>texturedspenc.c</c> and already measured
 /// against FFmpeg in both directions. <c>HapA</c> and the alpha image of <c>HapM</c> use the RGTC1/BC4
-/// endpoint ramp defined by the RGTC specification. <c>Hap7</c> uses a specification-derived BC7 mode
-/// 6 encoder, and <c>HapH</c> uses a specification-derived one-subset BC6H encoder, selecting BC6S for
-/// a frame containing any negative finite sample and BC6U otherwise. BC7 and BC6H deliberately start
-/// with one conforming mode rather than pretending that a full mode/partition rate-distortion search
-/// is required for interoperability; such a search would improve quality, not add syntax support.
+/// endpoint ramp defined by the RGTC specification. <c>Hap7</c> uses specification-derived BC7 block
+/// encoders, and <c>HapH</c> uses specification-derived BC6H block encoders, selecting BC6S for a
+/// frame containing any negative finite sample and BC6U otherwise.
 /// <para/>
 /// <b>Odd dimensions are valid.</b> BC1/3/4/6/7 are 4x4 block formats whose image dimensions need not
 /// be multiples of four. The last block is completed here by replicating its right/bottom edge and the
-/// container dimensions crop those padding samples again on decode. The previous writer rejected such
-/// pictures even though the decoder already rounded the block grid up and the Hap project publishes
-/// odd-dimension conformance material.
+/// container dimensions crop those padding samples again on decode.
 /// <para/>
-/// <b>Framing.</b> A single texture is offered to Snappy as one block and kept compressed only when it
-/// is smaller. <c>HapM</c> writes the format's sole permitted two-image combination: a Scaled YCoCg
-/// DXT5 section followed by an RGTC1/BC4 alpha section, both independently second-stage compressed,
-/// inside a 0x0D multiple-image section. Decode-instruction/chunk tables remain a decoder feature:
-/// they exist to permit parallel second-stage decompression, not to represent pictures unavailable in
-/// the simple form.
+/// <b>Framing and chunks.</b> The default is one chunk, preserving the simple whole-texture form and
+/// deterministic output of older callers. <see cref="Create(MediaStreamInfo,int)"/> requests more
+/// chunks for parallel second-stage decode. Hap requires equal block-aligned chunks, so if the block
+/// count is not divisible by the request the request is reduced to the largest divisor below it,
+/// matching the reference encoder. Each resulting chunk independently chooses Snappy or raw storage.
+/// <c>HapM</c> applies the same chunk count independently to its colour and alpha textures.
 /// </remarks>
 public sealed class HapVideoEncoder : IVideoCodecEncoder<HapVideoEncoder> {
 
@@ -58,9 +54,6 @@ public sealed class HapVideoEncoder : IVideoCodecEncoder<HapVideoEncoder> {
   private const byte _FORMAT_BC6_SIGNED = 0x03;
   private const byte _MULTI_IMAGE = 0x0D;
 
-  private const byte _COMPRESSOR_NONE = 0xA0;
-  private const byte _COMPRESSOR_SNAPPY = 0xB0;
-
   private readonly MediaStreamInfo _stream;
   private readonly Variant _variant;
   private readonly int _width;
@@ -68,14 +61,16 @@ public sealed class HapVideoEncoder : IVideoCodecEncoder<HapVideoEncoder> {
   private readonly int _blocksAcross;
   private readonly int _blockRows;
   private readonly int _blockCount;
+  private readonly int _chunkCount;
 
-  private HapVideoEncoder(MediaStreamInfo stream, CodecTag tag, Variant variant) {
+  private HapVideoEncoder(MediaStreamInfo stream, CodecTag tag, Variant variant, int requestedChunkCount) {
     this._variant = variant;
     this._width = stream.Width;
     this._height = stream.Height;
     this._blocksAcross = (stream.Width - 1) / _BLOCK + 1;
     this._blockRows = (stream.Height - 1) / _BLOCK + 1;
     this._blockCount = checked(this._blocksAcross * this._blockRows);
+    this._chunkCount = _LimitedChunkCount(this._blockCount, requestedChunkCount);
     this._stream = new() {
       Index = stream.Index,
       Kind = MediaStreamKind.Video,
@@ -102,6 +97,14 @@ public sealed class HapVideoEncoder : IVideoCodecEncoder<HapVideoEncoder> {
   /// <summary>The registry's canonical code; the encoder's static acceptance hook handles the aliases.</summary>
   public static CodecTag Codec => _Hap1;
 
+  /// <summary>The actual number of equal texture chunks each image section will carry.</summary>
+  /// <remarks>
+  /// This can be lower than the count passed to <see cref="Create(MediaStreamInfo,int)"/> because Hap
+  /// chunks end on compressed-texture block boundaries and the reference encoder reduces a request
+  /// until it divides the frame's block count exactly.
+  /// </remarks>
+  public int ChunkCount => this._chunkCount;
+
   static bool IVideoCodecEncoder<HapVideoEncoder>.Accepts(MediaStreamInfo stream) {
     ArgumentNullException.ThrowIfNull(stream);
     if (stream.Kind != MediaStreamKind.Video)
@@ -113,8 +116,11 @@ public sealed class HapVideoEncoder : IVideoCodecEncoder<HapVideoEncoder> {
       || codec.EqualsIgnoringCase(_HapH);
   }
 
-  /// <summary>Builds an encoder for the requested Hap FourCC; an unspecified code defaults to Hap1.</summary>
-  public static HapVideoEncoder Create(MediaStreamInfo stream) {
+  /// <summary>Builds an encoder using Hap's traditional one-chunk frame layout.</summary>
+  public static HapVideoEncoder Create(MediaStreamInfo stream) => Create(stream, 1);
+
+  /// <summary>Builds an encoder requesting a deterministic number of independently decodable chunks.</summary>
+  public static HapVideoEncoder Create(MediaStreamInfo stream, int chunkCount) {
     ArgumentNullException.ThrowIfNull(stream);
 
     if (stream.Kind != MediaStreamKind.Video)
@@ -124,8 +130,11 @@ public sealed class HapVideoEncoder : IVideoCodecEncoder<HapVideoEncoder> {
       throw new InvalidDataException(
         $"Video stream {stream.Index} states a picture size of {stream.Width}x{stream.Height}, which no frame can be coded from.");
 
+    if (chunkCount <= 0)
+      throw new ArgumentOutOfRangeException(nameof(chunkCount), "A Hap stream needs at least one chunk per texture.");
+
     var (tag, variant) = _VariantOf(stream.Codec, stream.Index);
-    return new(stream, tag, variant);
+    return new(stream, tag, variant, chunkCount);
   }
 
   private static (CodecTag Tag, Variant Variant) _VariantOf(CodecTag codec, int index) {
@@ -340,7 +349,7 @@ public sealed class HapVideoEncoder : IVideoCodecEncoder<HapVideoEncoder> {
     var payload = new byte[checked(colour.Length + alpha.Length)];
     colour.CopyTo(payload, 0);
     alpha.CopyTo(payload, colour.Length);
-    return _WriteLongSection(_MULTI_IMAGE, payload);
+    return HapFrameEncoding.WriteLongSection(_MULTI_IMAGE, payload);
   }
 
   private byte[] _WriteHapH(RawImage frame) {
@@ -348,23 +357,14 @@ public sealed class HapVideoEncoder : IVideoCodecEncoder<HapVideoEncoder> {
     return this._WriteImageSection(texture, formatCode);
   }
 
-  private byte[] _WriteImageSection(byte[] texture, byte formatCode) {
-    var compressed = HapSnappyEncoder.Compress(texture);
-    var useSnappy = compressed.Length < texture.Length;
-    var payload = useSnappy ? compressed : texture;
-    var compressor = useSnappy ? _COMPRESSOR_SNAPPY : _COMPRESSOR_NONE;
-    return _WriteLongSection((byte)(compressor | formatCode), payload);
-  }
+  private byte[] _WriteImageSection(byte[] texture, byte formatCode)
+    => HapFrameEncoding.WriteImageSection(texture, formatCode, this._chunkCount);
 
-  private static byte[] _WriteLongSection(byte type, ReadOnlySpan<byte> payload) {
-    var frame = new byte[checked(8 + payload.Length)];
-    frame[3] = type;
-    frame[4] = (byte)payload.Length;
-    frame[5] = (byte)(payload.Length >> 8);
-    frame[6] = (byte)(payload.Length >> 16);
-    frame[7] = (byte)(payload.Length >> 24);
-    payload.CopyTo(frame.AsSpan(8));
-    return frame;
+  private static int _LimitedChunkCount(int blockCount, int requested) {
+    var result = Math.Min(blockCount, requested);
+    while (blockCount % result != 0)
+      --result;
+    return result;
   }
 
   private static byte _PixelFormatCode(Variant variant) => variant switch {
