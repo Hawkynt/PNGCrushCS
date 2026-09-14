@@ -65,7 +65,7 @@ public sealed class Indeo5VideoEncoderTests {
       Assert.That(packet.PresentationTimestamp, Is.EqualTo(17));
       Assert.That(packet.DecodeTimestamp, Is.EqualTo(17));
       Assert.That(packet.IsKeyFrame, Is.True);
-      Assert.That((packet.Data.Span[0] >> 5) & 7, Is.EqualTo(Indeo5Decoder.FrameTypeIntra));
+      Assert.That(_FrameType(packet), Is.EqualTo(Indeo5Decoder.FrameTypeIntra));
       Assert.That(_MaximumDifference(decoded.Luma, _ExpectedLuma(frame)), Is.LessThanOrEqualTo(10));
     });
 
@@ -97,9 +97,9 @@ public sealed class Indeo5VideoEncoderTests {
       Assert.That(packets[0].IsKeyFrame, Is.True);
       Assert.That(packets[1].IsKeyFrame, Is.False);
       Assert.That(packets[2].IsKeyFrame, Is.False);
-      Assert.That((packets[0].Data.Span[0] >> 5) & 7, Is.EqualTo(Indeo5Decoder.FrameTypeIntra));
-      Assert.That((packets[1].Data.Span[0] >> 5) & 7, Is.EqualTo(Indeo5Decoder.FrameTypeInter));
-      Assert.That((packets[2].Data.Span[0] >> 5) & 7, Is.EqualTo(Indeo5Decoder.FrameTypeInter));
+      Assert.That(_FrameType(packets[0]), Is.EqualTo(Indeo5Decoder.FrameTypeIntra));
+      Assert.That(_FrameType(packets[1]), Is.EqualTo(Indeo5Decoder.FrameTypeInter));
+      Assert.That(_FrameType(packets[2]), Is.EqualTo(Indeo5Decoder.FrameTypeInter));
     });
 
     var decoder = new Indeo5Decoder(width, height);
@@ -113,6 +113,100 @@ public sealed class Indeo5VideoEncoderTests {
       Assert.That(_MaximumDifference(decoded.ChromaRed, expectedRed), Is.LessThanOrEqualTo(12), $"red chroma packet {i}");
     }
   }
+
+  [Test]
+  [Category("Unit")]
+  public void ANoReferencePFrameCanBeDroppedWithoutChangingTheFollowingReferencePicture() {
+    const int width = 64;
+    const int height = 48;
+    var encoder = Indeo5VideoEncoder.Create(_Stream(width, height));
+
+    Assert.That(encoder.TryEncode(_Picture(width, height, 1), 0, out var first), Is.True);
+    Assert.That(encoder.TryEncode(_Picture(width, height, 9), 1, Indeo5FrameMode.Disposable, out var disposable), Is.True);
+    Assert.That(encoder.TryEncode(_Picture(width, height, 3), 2, Indeo5FrameMode.Reference, out var following), Is.True);
+
+    Assert.Multiple(() => {
+      Assert.That(_FrameType(first), Is.EqualTo(Indeo5Decoder.FrameTypeIntra));
+      Assert.That(_FrameType(disposable), Is.EqualTo(Indeo5Decoder.FrameTypeInterNoReference));
+      Assert.That(_FrameType(following), Is.EqualTo(Indeo5Decoder.FrameTypeInter));
+    });
+
+    var full = new Indeo5Decoder(width, height);
+    Assert.That(full.Decode(first.Data), Is.Not.Null);
+    Assert.That(full.Decode(disposable.Data), Is.Not.Null);
+    var afterDisposable = full.Decode(following.Data);
+
+    var skipped = new Indeo5Decoder(width, height);
+    Assert.That(skipped.Decode(first.Data), Is.Not.Null);
+    var withoutDisposable = skipped.Decode(following.Data);
+
+    _AssertSamePicture(afterDisposable!, withoutDisposable!);
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void ScalableDroppablePicturesFormATemporaryChainThatTheNextReferencePictureIgnores() {
+    const int width = 64;
+    const int height = 48;
+    var encoder = Indeo5VideoEncoder.Create(_Stream(width, height), scalable: true);
+
+    Assert.That(encoder.TryEncode(_Picture(width, height, 1), 0, out var first), Is.True);
+    Assert.That(encoder.TryEncode(_Picture(width, height, 7), 1, Indeo5FrameMode.ScalableDisposable, out var scalableA), Is.True);
+    Assert.That(encoder.TryEncode(_Picture(width, height, 11), 2, Indeo5FrameMode.ScalableDisposable, out var scalableB), Is.True);
+    Assert.That(encoder.TryEncode(_Picture(width, height, 3), 3, Indeo5FrameMode.Reference, out var following), Is.True);
+
+    Assert.Multiple(() => {
+      Assert.That(_FrameType(first), Is.EqualTo(Indeo5Decoder.FrameTypeIntra));
+      Assert.That(_FrameType(scalableA), Is.EqualTo(Indeo5Decoder.FrameTypeInterScalable));
+      Assert.That(_FrameType(scalableB), Is.EqualTo(Indeo5Decoder.FrameTypeInterScalable));
+      Assert.That(_FrameType(following), Is.EqualTo(Indeo5Decoder.FrameTypeInter));
+    });
+
+    var full = new Indeo5Decoder(width, height);
+    var decodedFirst = full.Decode(first.Data);
+    var decodedA = full.Decode(scalableA.Data);
+    var decodedB = full.Decode(scalableB.Data);
+    var afterScalable = full.Decode(following.Data);
+
+    Assert.Multiple(() => {
+      Assert.That(decodedFirst, Is.Not.Null);
+      Assert.That(decodedA, Is.Not.Null);
+      Assert.That(decodedB, Is.Not.Null);
+      Assert.That(afterScalable, Is.Not.Null);
+      Assert.That(_MaximumDifference(decodedFirst!.Luma, _ExpectedLuma(_Picture(width, height, 1))), Is.LessThanOrEqualTo(40));
+      Assert.That(_MaximumDifference(decodedA!.Luma, _ExpectedLuma(_Picture(width, height, 7))), Is.LessThanOrEqualTo(48));
+      Assert.That(_MaximumDifference(decodedB!.Luma, _ExpectedLuma(_Picture(width, height, 11))), Is.LessThanOrEqualTo(48));
+      Assert.That(_MaximumDifference(afterScalable!.Luma, _ExpectedLuma(_Picture(width, height, 3))), Is.LessThanOrEqualTo(48));
+    });
+
+    var skipped = new Indeo5Decoder(width, height);
+    Assert.That(skipped.Decode(first.Data), Is.Not.Null);
+    var withoutScalable = skipped.Decode(following.Data);
+
+    _AssertSamePicture(afterScalable!, withoutScalable!);
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void ScalableDisposableModeRequiresAScalableGop() {
+    var encoder = Indeo5VideoEncoder.Create(_Stream(64, 48));
+    Assert.That(encoder.TryEncode(_Picture(64, 48, 1), 0, out _), Is.True);
+    Assert.Throws<InvalidOperationException>(() =>
+      encoder.TryEncode(_Picture(64, 48, 2), 1, Indeo5FrameMode.ScalableDisposable, out _));
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void ADisposablePictureCannotStartAStream() {
+    var encoder = Indeo5VideoEncoder.Create(_Stream(64, 48));
+    Assert.Throws<InvalidOperationException>(() =>
+      encoder.TryEncode(_Picture(64, 48, 1), 0, Indeo5FrameMode.Disposable, out _));
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void ScalableModeRequiresEvenPictureDimensions()
+    => Assert.Throws<NotSupportedException>(() => Indeo5VideoEncoder.Create(_Stream(65, 48), scalable: true));
 
   [Test]
   [Category("Unit")]
@@ -151,6 +245,18 @@ public sealed class Indeo5VideoEncoderTests {
     };
 
     Assert.Throws<InvalidDataException>(() => encoder.TryEncode(frame, null, out _));
+  }
+
+  private static int _FrameType(CodedPacket packet) => (packet.Data.Span[0] >> 5) & 7;
+
+  private static void _AssertSamePicture(IviPicture first, IviPicture second) {
+    Assert.Multiple(() => {
+      Assert.That(second.Width, Is.EqualTo(first.Width));
+      Assert.That(second.Height, Is.EqualTo(first.Height));
+      Assert.That(second.Luma, Is.EqualTo(first.Luma));
+      Assert.That(second.ChromaBlue, Is.EqualTo(first.ChromaBlue));
+      Assert.That(second.ChromaRed, Is.EqualTo(first.ChromaRed));
+    });
   }
 
   private static RawImage _Picture(int width, int height, int seed = 0) {
