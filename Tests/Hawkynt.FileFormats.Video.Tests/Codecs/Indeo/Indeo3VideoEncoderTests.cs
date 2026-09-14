@@ -82,7 +82,7 @@ public sealed class Indeo3VideoEncoderTests {
         Is.EqualTo((uint)dataSize ^ _HEADER_ID), "OS checksum");
       Assert.That(BinaryPrimitives.ReadUInt32LittleEndian(frame.AsSpan(12)), Is.EqualTo((uint)dataSize));
       Assert.That(BinaryPrimitives.ReadUInt16LittleEndian(frame.AsSpan(16)), Is.EqualTo(32), "codec version");
-      Assert.That(BinaryPrimitives.ReadUInt16LittleEndian(frame.AsSpan(18)), Is.EqualTo(1 << 2), "key-frame flag");
+      Assert.That(BinaryPrimitives.ReadUInt16LittleEndian(frame.AsSpan(18)), Is.EqualTo((1 << 0) | (1 << 2)), "periodic key-frame flags");
       Assert.That(BinaryPrimitives.ReadUInt32LittleEndian(frame.AsSpan(20)), Is.EqualTo((uint)dataSize * 8), "bits");
       Assert.That(BinaryPrimitives.ReadUInt16LittleEndian(frame.AsSpan(28)), Is.EqualTo(16), "height");
       Assert.That(BinaryPrimitives.ReadUInt16LittleEndian(frame.AsSpan(30)), Is.EqualTo(16), "width");
@@ -120,7 +120,7 @@ public sealed class Indeo3VideoEncoderTests {
       Assert.That(two.IsKeyFrame, Is.False);
       Assert.That(BinaryPrimitives.ReadUInt32LittleEndian(one.Data.Span), Is.Zero);
       Assert.That(BinaryPrimitives.ReadUInt32LittleEndian(two.Data.Span), Is.EqualTo(1));
-      Assert.That(BinaryPrimitives.ReadUInt16LittleEndian(one.Data.Span[18..]), Is.EqualTo(1 << 2));
+      Assert.That(BinaryPrimitives.ReadUInt16LittleEndian(one.Data.Span[18..]), Is.EqualTo((1 << 0) | (1 << 2)));
       Assert.That(BinaryPrimitives.ReadUInt16LittleEndian(two.Data.Span[18..]), Is.EqualTo(1 << 9));
       Assert.That(BinaryPrimitives.ReadUInt32LittleEndian(secondFrame.AsSpan(luma)), Is.EqualTo(1), "motion-vector count");
       Assert.That(secondFrame[luma + 4], Is.Zero, "motion y");
@@ -221,7 +221,9 @@ public sealed class Indeo3VideoEncoderTests {
       Assert.Multiple(() => {
         Assert.That(packet.IsKeyFrame, Is.EqualTo(i is 0 or 12), $"packet {i}");
         Assert.That((flags >> 9) & 1, Is.EqualTo(i & 1), $"buffer {i}");
-        Assert.That((flags & (1 << 2)) != 0, Is.EqualTo(i is 0 or 12), $"header key bit {i}");
+        Assert.That((flags & (1 << 0)) != 0, Is.EqualTo(i is 0 or 12), $"periodic key bit {i}");
+        Assert.That((flags & (1 << 2)) != 0, Is.EqualTo(i is 0 or 12), $"key bit {i}");
+        Assert.That((flags & (1 << 3)) != 0, Is.EqualTo(i == 11), $"next-key bit {i}");
       });
       Assert.That(decoder.TryDecode(packet, out _), Is.True, $"packet {i}");
     }
