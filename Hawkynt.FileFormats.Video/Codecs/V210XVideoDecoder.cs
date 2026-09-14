@@ -48,7 +48,7 @@ public sealed class V210XVideoDecoder : IVideoCodecDecoder<V210XVideoDecoder> {
     this._lumaSamples = checked(width * height);
     this._chromaSamples = this._lumaSamples / 2;
     this._componentCount = checked(this._lumaSamples * 2);
-    this._activeByteCount = checked(((this._componentCount + 2) / 3) * 4);
+    this._activeByteCount = checked((int)(((long)this._componentCount + 2) / 3 * 4));
   }
 
   public static string CodecName => "Uncompressed 4:2:2 10-bit (v210x)";
@@ -72,13 +72,11 @@ public sealed class V210XVideoDecoder : IVideoCodecDecoder<V210XVideoDecoder> {
         $"Video stream {stream.Index} states an odd v210x width of {stream.Width}; 4:2:2 chroma needs whole two-pixel pairs.");
 
     try {
-      _ = checked(stream.Width * stream.Height * 2);
+      return new(stream.Width, stream.Height, stream.Index);
     } catch (OverflowException error) {
       throw new InvalidDataException(
         $"Video stream {stream.Index} states a v210x picture size of {stream.Width}x{stream.Height}, which is too large to address.", error);
     }
-
-    return new(stream.Width, stream.Height, stream.Index);
   }
 
   public bool TryDecode(CodedPacket packet, out RawImage frame) {
