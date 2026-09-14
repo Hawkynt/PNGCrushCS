@@ -145,7 +145,7 @@ public sealed class FlicVideoDecoder : IVideoCodecDecoder<FlicVideoDecoder> {
           break;
         case FliChunkType.SS2:
           if (this._depth == 8) this._DecodeSs2(payload);
-          else this._DecodePixelDelta(payload, "FLI_SS2");
+          else this._DecodeHighColourSs2(payload);
           break;
         case FliChunkType.LC:
           if (this._depth != 8)
@@ -372,6 +372,70 @@ public sealed class FlicVideoDecoder : IVideoCodecDecoder<FlicVideoDecoder> {
             this._canvas[rowStart + x++] = low;
             this._canvas[rowStart + x++] = high;
           }
+        }
+      }
+      ++y;
+    }
+  }
+
+  // ============================================================================================
+  // High-colour AF12 FLX delta chunks
+  // ============================================================================================
+
+  /// <summary>
+  /// Decodes the standard type-7 DELTA_FLC/SS2 grammar used by 15-bit Autodesk/Ulead FLX.
+  /// </summary>
+  /// <remarks>
+  /// The line opcodes remain standard SS2: only <c>11</c> in the high bits is a line skip, <c>00</c>
+  /// is a packet count and <c>01</c> is undefined. The <c>10</c> last-byte opcode exists to finish an
+  /// odd-width 8-bit scanline; a 15-bit FLX pixel is already one complete word, so that opcode has no
+  /// valid high-colour meaning and is refused. Packet data is word-oriented, which makes one word one
+  /// RGB555 pixel. Autodesk/Ulead FLX counts a packet's column skip in pixels; the older Tempra FLX
+  /// variant counts that field in bytes and cannot be distinguished reliably from an AF12 header
+  /// alone, so this path deliberately implements the externally verifiable Autodesk/Ulead dialect.
+  /// </remarks>
+  private void _DecodeHighColourSs2(ReadOnlySpan<byte> payload) {
+    if (this._bytesPerPixel != 2)
+      throw new NotSupportedException($"Standard FLI_SS2 high-colour words are defined for 15/16-bit pixels, not {this._depth}-bit FLIC.");
+
+    var at = 0;
+    var lineCount = _ReadU16(payload, ref at, "a high-colour SS2 chunk's line count");
+    var y = 0;
+
+    for (var line = 0; line < lineCount; ++line) {
+      var opcode = _ReadU16(payload, ref at, "a high-colour SS2 line opcode");
+      while ((opcode & 0xC000) == 0xC000) {
+        y += -unchecked((short)opcode);
+        opcode = _ReadU16(payload, ref at, "a high-colour SS2 line opcode");
+      }
+
+      if (y >= this._height)
+        throw new InvalidDataException($"A high-colour FLI_SS2 chunk's line skips reach row {y} of a {this._height}-row picture.");
+
+      switch (opcode & 0xC000) {
+        case 0x4000:
+          throw new InvalidDataException($"A high-colour FLI_SS2 line uses undefined opcode class 01 (0x{opcode:X4}).");
+        case 0x8000:
+          throw new InvalidDataException(
+            $"A high-colour FLI_SS2 line uses the 8-bit-only last-byte opcode 0x{opcode:X4}; a 15/16-bit FLX pixel is already one word.");
+      }
+
+      var packetCount = opcode;
+      var x = 0;
+      for (var packet = 0; packet < packetCount; ++packet) {
+        x += _ReadU8(payload, ref at, "a high-colour SS2 packet's pixel skip count");
+        var count = unchecked((sbyte)_ReadU8(payload, ref at, "a high-colour SS2 packet's word count"));
+        if (count > 0) {
+          _RefuseRunPastRow(x, count, y, this._width, "pixel");
+          _ReadBytes(payload, ref at, this._canvas.AsSpan(((y * this._width) + x) * 2, count * 2),
+            "a high-colour SS2 packet's literal RGB555 words");
+          x += count;
+        } else if (count < 0) {
+          var n = -count;
+          _RefuseRunPastRow(x, n, y, this._width, "pixel");
+          var pixel = _ReadPixel(payload, ref at, "a high-colour SS2 packet's replicated RGB555 word");
+          for (var i = 0; i < n; ++i)
+            pixel.CopyTo(this._canvas.AsSpan(((y * this._width) + x++) * 2, 2));
         }
       }
       ++y;
