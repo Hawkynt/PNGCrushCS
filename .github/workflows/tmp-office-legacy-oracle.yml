@@ -70,7 +70,7 @@ jobs:
                   graphic.Width = 1800
                   graphic.Height = 1200
                   if inline:
-                      graphic.AnchorType = uno.getConstantByName('com.sun.star.text.TextContentAnchorType.AS_CHARACTER')
+                      graphic.AnchorType = uno.Enum('com.sun.star.text.TextContentAnchorType', 'AS_CHARACTER')
                   cursor = doc.Text.createTextCursor()
                   doc.Text.insertTextContent(cursor, graphic, False)
                   doc.Text.insertString(cursor, '\n', False)
