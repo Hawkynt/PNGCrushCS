@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using FileFormat.Bmp;
 using FileFormat.Codecs.Indeo;
@@ -7,26 +8,30 @@ using FileFormat.Core;
 namespace FileFormat.Codecs;
 
 /// <summary>
-/// Encodes Intel Indeo Video Interactive 4 (<c>IV41</c>) as self-contained intra pictures.
+/// Encodes Intel Indeo Video Interactive 4 (<c>IV41</c>) with intra, forward-predicted and
+/// bidirectionally predicted pictures.
 /// </summary>
 /// <remarks>
-/// This is deliberately a small encoder rather than a second Indeo implementation. The bitstream
-/// shape is derived from <see cref="Indeo4Decoder"/> and the shared IVI layer already in this package:
-/// one band per plane, YVU9 chrominance, 256-sample tiles, the direct 8x8 transform for luminance and
-/// the 4x4 Haar transform for chrominance. Every macroblock is coded and every packet is an intra
-/// picture, so there is no invented motion search, bidirectional scheduling or rate-control policy.
+/// Indeo 4's B-picture transport is unusual: the future P-picture is physically packed behind the
+/// preceding I-picture and decoded immediately, while a later null-last picture releases that held
+/// P-picture in display order. <see cref="TryEncode"/> therefore buffers three display-order pictures
+/// and emits an <c>I B P</c> group as an I packet carrying the hidden P-picture, one B packet, and one
+/// null-last packet. <see cref="Flush"/> turns a short tail into ordinary I/P pictures.
 /// <para/>
-/// The encoder uses a custom fixed six-bit Huffman book. That is enough because block coefficients
-/// are always sent through the format's escape symbol: the remaining symbols are the zero run, two
-/// six-bit halves of the signed value and end-of-block. It is intentionally less compact than Intel's
-/// encoder, but it uses only syntax the format itself defines and makes malformed size arithmetic much
-/// easier to audit.
+/// P-pictures use zero-vector prediction from the previous reconstructed anchor. B-picture
+/// macroblocks choose independently between the preceding anchor, the following anchor and their
+/// average by squared error. Motion search is deliberately separate from format correctness: the
+/// syntax, reference direction, reconstruction and packet scheduling are all real IV41, while a
+/// zero vector is a valid full-pel motion vector.
 /// <para/>
-/// Luminance is exact once RGB has been converted to the codec's YVU9 sample space: transform 3 stores
-/// each 8x8 block's samples directly. Chroma uses the inverse of Indeo's integer Haar transform; its
-/// two pre-scaled coefficient rows require division by two on encode and can therefore round by one.
-/// The format is chroma-subsampled by construction, so RGB round trips are lossy even where the coded
-/// planes themselves are exact.
+/// The encoder uses a custom fixed six-bit Huffman book. Block coefficients are sent through the
+/// format's escape symbol; macroblock quantiser and motion deltas use the same book. Quantiser zero
+/// keeps the residual coefficients unscaled. Luminance uses Indeo's direct 8x8 transform and is exact
+/// in YVU9 sample space; chroma uses the inverse of the integer 4x4 Haar transform and can round by a
+/// level before the unavoidable 4:1:0 subsampling loss.
+/// <para/>
+/// The bitstream grammar is the inverse of the existing Indeo 4 decoder. FFmpeg's LGPL Indeo 4
+/// decoder is used as the external conformance oracle; no external encoder implementation is copied.
 /// </remarks>
 [VerifiedBy(ConformanceOracle.FFmpeg)]
 public sealed class Indeo4VideoEncoder : IVideoCodecEncoder<Indeo4VideoEncoder> {
@@ -47,13 +52,17 @@ public sealed class Indeo4VideoEncoder : IVideoCodecEncoder<Indeo4VideoEncoder> 
   private const int _BLOCK_END = 4;
   private const int _HUFFMAN_BITS = 6;
   private const int _LONG_TILE_SIZE = 0xFFFFFF;
+  private const int _GROUP_SIZE = 3;
 
   private readonly MediaStreamInfo _requested;
   private readonly int _width;
   private readonly int _height;
+  private readonly List<_PendingFrame> _pending = [];
+  private readonly Queue<CodedPacket> _ready = new();
   private MediaStreamInfo? _stream;
 
   private readonly record struct _Planes(byte[] Luma, byte[] ChromaBlue, byte[] ChromaRed, int ChromaWidth, int ChromaHeight);
+  private readonly record struct _PendingFrame(_Planes Planes, long? PresentationTimestamp);
 
   private Indeo4VideoEncoder(MediaStreamInfo stream) {
     this._requested = stream;
@@ -85,7 +94,10 @@ public sealed class Indeo4VideoEncoder : IVideoCodecEncoder<Indeo4VideoEncoder> 
     return new(stream);
   }
 
-  /// <summary>Encodes one self-contained intra picture.</summary>
+  /// <summary>
+  /// Accepts one display-order picture and returns the next display-order packet when a complete IV4
+  /// prediction group makes one available.
+  /// </summary>
   public bool TryEncode(RawImage frame, long? presentationTimestamp, out CodedPacket packet) {
     ArgumentNullException.ThrowIfNull(frame);
     if (frame.Width != this._width || frame.Height != this._height)
@@ -95,29 +107,42 @@ public sealed class Indeo4VideoEncoder : IVideoCodecEncoder<Indeo4VideoEncoder> 
       throw new InvalidDataException(
         "The source RawImage does not contain enough pixel data for its declared format and dimensions.");
 
-    var planes = this._ToYvu9(frame);
-    var writer = new _BitWriter();
+    this._pending.Add(new(this._ToYvu9(frame), presentationTimestamp));
+    if (this._pending.Count == _GROUP_SIZE)
+      this._EncodeBidirectionalGroup();
 
-    this._WritePictureHeader(writer);
-    _WriteBand(writer, plane: 0, planes.Luma, this._width, this._height, _TILE_SIZE, _TILE_SIZE,
-      macroblockSize: _LUMA_MACROBLOCK, blockSize: _LUMA_BLOCK, geometry: 0, transform: 3,
-      scan: IviTables.ZigzagDirect, scanIndex: 0, haar: false);
+    if (this._ready.TryDequeue(out packet))
+      return true;
 
-    var chromaTile = (_TILE_SIZE + 3) >> 2;
-    _WriteBand(writer, plane: 1, planes.ChromaRed, planes.ChromaWidth, planes.ChromaHeight, chromaTile, chromaTile,
-      macroblockSize: _CHROMA_MACROBLOCK, blockSize: _CHROMA_BLOCK, geometry: 2, transform: 10,
-      scan: IviTables.DirectScan4x4, scanIndex: 5, haar: true);
-    _WriteBand(writer, plane: 2, planes.ChromaBlue, planes.ChromaWidth, planes.ChromaHeight, chromaTile, chromaTile,
-      macroblockSize: _CHROMA_MACROBLOCK, blockSize: _CHROMA_BLOCK, geometry: 2, transform: 10,
-      scan: IviTables.DirectScan4x4, scanIndex: 5, haar: true);
+    packet = default;
+    return false;
+  }
 
-    packet = new(
-      this._requested.Index,
-      writer.ToArray(),
-      PresentationTimestamp: presentationTimestamp,
-      DecodeTimestamp: presentationTimestamp,
-      IsKeyFrame: true);
-    return true;
+  /// <summary>
+  /// Emits delayed packets, then turns a short tail with no future anchor into an I-picture followed
+  /// by ordinary P-pictures so no input picture is discarded.
+  /// </summary>
+  public IEnumerable<CodedPacket> Flush() {
+    while (this._ready.TryDequeue(out var ready))
+      yield return ready;
+
+    if (this._pending.Count == 0)
+      yield break;
+
+    var decoder = new Indeo4Decoder();
+    var first = this._pending[0];
+    var bytes = this._EncodeIntra(first.Planes);
+    var reference = _DecodeReference(decoder, bytes);
+    yield return this._Packet(bytes, first.PresentationTimestamp, isKeyFrame: true);
+
+    for (var i = 1; i < this._pending.Count; ++i) {
+      var pending = this._pending[i];
+      bytes = this._EncodePredicted(pending.Planes, reference, backwardReference: null, Indeo4Decoder.FrameTypeInter);
+      reference = _DecodeReference(decoder, bytes);
+      yield return this._Packet(bytes, pending.PresentationTimestamp, isKeyFrame: false);
+    }
+
+    this._pending.Clear();
   }
 
   /// <summary>Describes an <c>IV41</c> VFW stream suitable for AVI or Matroska.</summary>
@@ -159,20 +184,139 @@ public sealed class Indeo4VideoEncoder : IVideoCodecEncoder<Indeo4VideoEncoder> 
   }
 
   // ============================================================================================
-  // Picture header
+  // Group scheduling and reference reconstruction
   // ============================================================================================
 
-  private void _WritePictureHeader(_BitWriter writer) {
+  private void _EncodeBidirectionalGroup() {
+    var intra = this._pending[0];
+    var bidirectional = this._pending[1];
+    var future = this._pending[2];
+    var decoder = new Indeo4Decoder();
+
+    var intraBytes = this._EncodeIntra(intra.Planes);
+    var pastReference = _DecodeReference(decoder, intraBytes);
+
+    var futureBytes = this._EncodePredicted(
+      future.Planes, pastReference, backwardReference: null, Indeo4Decoder.FrameTypeInter);
+    var futureReference = _DecodeReference(decoder, futureBytes);
+
+    var bidirectionalBytes = this._EncodePredicted(
+      bidirectional.Planes, pastReference, futureReference, Indeo4Decoder.FrameTypeBidirectional);
+
+    this._ready.Enqueue(this._Packet(
+      _PackIntraAndFuture(intraBytes, futureBytes), intra.PresentationTimestamp, isKeyFrame: true));
+    this._ready.Enqueue(this._Packet(
+      bidirectionalBytes, bidirectional.PresentationTimestamp, isKeyFrame: false));
+    this._ready.Enqueue(this._Packet(
+      _EncodeNullLast(), future.PresentationTimestamp, isKeyFrame: false));
+
+    this._pending.Clear();
+  }
+
+  private CodedPacket _Packet(byte[] data, long? presentationTimestamp, bool isKeyFrame)
+    => new(
+      this._requested.Index,
+      data,
+      PresentationTimestamp: presentationTimestamp,
+      DecodeTimestamp: presentationTimestamp,
+      IsKeyFrame: isKeyFrame);
+
+  private static IviPicture _DecodeReference(Indeo4Decoder decoder, byte[] data)
+    => decoder.Decode(data)
+       ?? throw new InvalidDataException("The Indeo 4 encoder produced an anchor packet that decoded to no picture.");
+
+  /// <summary>
+  /// Intel's B-picture mode stores the future P-picture after a zero-terminated version string inside
+  /// the preceding I packet. The decoder then skips 64 minus the low alignment bits before looking for
+  /// the trailing P start code. Empty version text is legal; the padding calculation is the actual IV4
+  /// decoder rule rather than a generic byte alignment.
+  /// </summary>
+  private static byte[] _PackIntraAndFuture(byte[] intra, byte[] future) {
+    var afterTerminatorBytes = checked(intra.Length + 1);
+    var positionBits = checked(afterTerminatorBytes * 8);
+    var paddingBytes = (64 - (positionBits & 0x18)) >> 3;
+    var futureOffset = checked(afterTerminatorBytes + paddingBytes);
+    var result = new byte[checked(futureOffset + future.Length)];
+
+    intra.CopyTo(result, 0);
+    // result[intra.Length] is the zero terminator; the rest of the gap is zero padding.
+    future.CopyTo(result, futureOffset);
+    return result;
+  }
+
+  private static byte[] _EncodeNullLast() {
+    var writer = new _BitWriter(3);
+    _WritePictureHeader(writer, Indeo4Decoder.FrameTypeNullLast, width: 0, height: 0);
+    return writer.ToArray();
+  }
+
+  // ============================================================================================
+  // Pictures and bands
+  // ============================================================================================
+
+  private byte[] _EncodeIntra(_Planes planes) {
+    var writer = new _BitWriter();
+    _WritePictureHeader(writer, Indeo4Decoder.FrameTypeIntra, this._width, this._height);
+
+    _WriteIntraBand(writer, plane: 0, planes.Luma, this._width, this._height, _TILE_SIZE, _TILE_SIZE,
+      macroblockSize: _LUMA_MACROBLOCK, blockSize: _LUMA_BLOCK, geometry: 0, transform: 3,
+      scan: IviTables.ZigzagDirect, scanIndex: 0, haar: false);
+
+    var chromaTile = (_TILE_SIZE + 3) >> 2;
+    _WriteIntraBand(writer, plane: 1, planes.ChromaRed, planes.ChromaWidth, planes.ChromaHeight, chromaTile, chromaTile,
+      macroblockSize: _CHROMA_MACROBLOCK, blockSize: _CHROMA_BLOCK, geometry: 2, transform: 10,
+      scan: IviTables.DirectScan4x4, scanIndex: 5, haar: true);
+    _WriteIntraBand(writer, plane: 2, planes.ChromaBlue, planes.ChromaWidth, planes.ChromaHeight, chromaTile, chromaTile,
+      macroblockSize: _CHROMA_MACROBLOCK, blockSize: _CHROMA_BLOCK, geometry: 2, transform: 10,
+      scan: IviTables.DirectScan4x4, scanIndex: 5, haar: true);
+
+    return writer.ToArray();
+  }
+
+  private byte[] _EncodePredicted(_Planes planes, IviPicture forwardReference, IviPicture? backwardReference, int frameType) {
+    if (frameType is not (Indeo4Decoder.FrameTypeInter or Indeo4Decoder.FrameTypeInterNoReference
+                          or Indeo4Decoder.FrameTypeBidirectional))
+      throw new ArgumentOutOfRangeException(nameof(frameType));
+    if (frameType == Indeo4Decoder.FrameTypeBidirectional && backwardReference == null)
+      throw new ArgumentNullException(nameof(backwardReference));
+
+    var writer = new _BitWriter();
+    _WritePictureHeader(writer, frameType, this._width, this._height);
+
+    _WritePredictedBand(writer, plane: 0, planes.Luma, forwardReference.Luma, backwardReference?.Luma,
+      this._width, this._height, _TILE_SIZE, _TILE_SIZE,
+      macroblockSize: _LUMA_MACROBLOCK, blockSize: _LUMA_BLOCK, geometry: 0, transform: 3,
+      scan: IviTables.ZigzagDirect, scanIndex: 0, haar: false, frameType);
+
+    var chromaTile = (_TILE_SIZE + 3) >> 2;
+    _WritePredictedBand(writer, plane: 1, planes.ChromaRed, forwardReference.ChromaRed, backwardReference?.ChromaRed,
+      planes.ChromaWidth, planes.ChromaHeight, chromaTile, chromaTile,
+      macroblockSize: _CHROMA_MACROBLOCK, blockSize: _CHROMA_BLOCK, geometry: 2, transform: 10,
+      scan: IviTables.DirectScan4x4, scanIndex: 5, haar: true, frameType);
+    _WritePredictedBand(writer, plane: 2, planes.ChromaBlue, forwardReference.ChromaBlue, backwardReference?.ChromaBlue,
+      planes.ChromaWidth, planes.ChromaHeight, chromaTile, chromaTile,
+      macroblockSize: _CHROMA_MACROBLOCK, blockSize: _CHROMA_BLOCK, geometry: 2, transform: 10,
+      scan: IviTables.DirectScan4x4, scanIndex: 5, haar: true, frameType);
+
+    return writer.ToArray();
+  }
+
+  private static void _WritePictureHeader(_BitWriter writer, int frameType, int width, int height) {
     writer.Write(_PICTURE_START_CODE, 18);
-    writer.Write(Indeo4Decoder.FrameTypeIntra, 3);
+    writer.Write(frameType, 3);
     writer.WriteFlag(false); // Transparency.
     writer.WriteFlag(false); // Reserved.
     writer.WriteFlag(false); // Picture-data size absent; bands and tiles state their own sizes.
-    writer.WriteFlag(false); // No password lock word.
 
+    if (frameType >= Indeo4Decoder.FrameTypeNullFirst) {
+      writer.Align();
+      return;
+    }
+
+    writer.WriteFlag(false); // No password lock word.
     writer.Write(_PICTURE_SIZE_ESCAPE, 3);
-    writer.Write(this._height, 16);
-    writer.Write(this._width, 16);
+    writer.Write(height, 16);
+    writer.Write(width, 16);
 
     writer.WriteFlag(true);
     writer.Write(_TILE_FACTOR, 4); // Height first.
@@ -197,21 +341,36 @@ public sealed class Indeo4VideoEncoder : IVideoCodecEncoder<Indeo4VideoEncoder> 
     writer.Align();
   }
 
-  /// <summary>
-  /// Writes a custom codebook descriptor containing one row of 64 fixed six-bit symbols.
-  /// </summary>
+  /// <summary>Writes a custom codebook descriptor containing one row of 64 fixed six-bit symbols.</summary>
   private static void _WriteSixBitCodebook(_BitWriter writer) {
-    writer.WriteFlag(true); // A codebook is explicitly selected.
-    writer.Write(7, 3);     // Selector seven means a custom descriptor follows.
-    writer.Write(1, 4);     // One descriptor row.
+    writer.WriteFlag(true);
+    writer.Write(7, 3); // Selector seven means a custom descriptor follows.
+    writer.Write(1, 4);
     writer.Write(_HUFFMAN_BITS, 4);
   }
 
-  // ============================================================================================
-  // Bands and tiles
-  // ============================================================================================
+  private static void _WriteBandHeader(_BitWriter writer, int plane, int geometry, int transform, int scanIndex) {
+    writer.Write(plane, 2);
+    writer.Write(0, 4);      // One band per plane, so every band is number zero.
+    writer.WriteFlag(false); // The band is not empty.
+    writer.WriteFlag(false); // Band-header size omitted.
+    writer.Write(0, 2);      // Whole-sample motion vectors.
+    writer.WriteFlag(false); // Checksum absent.
+    writer.Write(geometry, 2);
+    writer.WriteFlag(false); // Do not inherit motion vectors.
+    writer.WriteFlag(false); // Do not inherit quantiser deltas.
+    writer.Write(0, 5);      // Quantiser zero: coefficients are not rescaled.
+    writer.WriteFlag(false); // State the transform rather than inherit it.
+    writer.Write(transform, 5);
+    writer.Write(scanIndex, 4);
+    writer.Write(0, 5);      // The first dequantisation matrix; q=0 makes it inert.
+    writer.WriteFlag(false); // Use the picture's block codebook.
+    writer.WriteFlag(false); // Use run/value map 8, the implicit default.
+    writer.WriteFlag(false); // No run/value corrections.
+    writer.Align();
+  }
 
-  private static void _WriteBand(
+  private static void _WriteIntraBand(
     _BitWriter writer,
     int plane,
     byte[] samples,
@@ -227,48 +386,68 @@ public sealed class Indeo4VideoEncoder : IVideoCodecEncoder<Indeo4VideoEncoder> 
     int scanIndex,
     bool haar) {
 
-    writer.Write(plane, 2);
-    writer.Write(0, 4);     // One band per plane, so every band is number zero.
-    writer.WriteFlag(false); // The band is not empty.
-    writer.WriteFlag(false); // Band-header size omitted.
-    writer.Write(0, 2);      // Whole-sample motion vectors (unused in an intra picture).
-    writer.WriteFlag(false); // Checksum absent.
-    writer.Write(geometry, 2);
-    writer.WriteFlag(false); // Do not inherit motion vectors.
-    writer.WriteFlag(false); // Do not inherit quantiser deltas.
-    writer.Write(0, 5);      // Quantiser zero: the values below are not rescaled.
-    writer.WriteFlag(false); // State the transform rather than inherit it.
-    writer.Write(transform, 5);
-    writer.Write(scanIndex, 4);
-    writer.Write(0, 5);      // The first dequantisation matrix; q=0 makes it inert.
-    writer.WriteFlag(false); // Use the picture's block codebook.
-    writer.WriteFlag(false); // Use run/value map 8, the implicit default.
-    writer.WriteFlag(false); // No run/value corrections.
-    writer.Align();
+    _WriteBandHeader(writer, plane, geometry, transform, scanIndex);
 
     var pitchAlignment = plane == 0 ? 16 : 8;
     var pitch = _Align(width, pitchAlignment);
     var alignedHeight = _Align(height, pitchAlignment);
-    var residuals = new short[pitch * alignedHeight];
-    for (var y = 0; y < height; ++y) {
-      var source = y * width;
-      var target = y * pitch;
-      for (var x = 0; x < width; ++x)
-        residuals[target + x] = (short)(samples[source + x] - 128);
-    }
+    var residuals = _PadCentered(samples, width, height, pitch, alignedHeight);
 
     for (var tileY = 0; tileY < height; tileY += tileHeight)
       for (var tileX = 0; tileX < width; tileX += tileWidth) {
         var actualWidth = Math.Min(tileWidth, width - tileX);
         var actualHeight = Math.Min(tileHeight, height - tileY);
-        var tile = _WriteTile(
+        writer.WriteBytes(_WriteIntraTile(
           residuals, pitch, tileX, tileY, actualWidth, actualHeight,
-          macroblockSize, blockSize, scan, haar);
-        writer.WriteBytes(tile);
+          macroblockSize, blockSize, scan, haar));
       }
   }
 
-  private static byte[] _WriteTile(
+  private static void _WritePredictedBand(
+    _BitWriter writer,
+    int plane,
+    byte[] samples,
+    byte[] forwardSamples,
+    byte[]? backwardSamples,
+    int width,
+    int height,
+    int tileWidth,
+    int tileHeight,
+    int macroblockSize,
+    int blockSize,
+    int geometry,
+    int transform,
+    byte[] scan,
+    int scanIndex,
+    bool haar,
+    int frameType) {
+
+    _WriteBandHeader(writer, plane, geometry, transform, scanIndex);
+
+    var pitchAlignment = plane == 0 ? 16 : 8;
+    var pitch = _Align(width, pitchAlignment);
+    var alignedHeight = _Align(height, pitchAlignment);
+    var target = _PadCentered(samples, width, height, pitch, alignedHeight);
+    var forward = _PadCentered(forwardSamples, width, height, pitch, alignedHeight);
+    var backward = backwardSamples == null ? null : _PadCentered(backwardSamples, width, height, pitch, alignedHeight);
+    var residuals = new short[pitch * alignedHeight];
+
+    for (var tileY = 0; tileY < height; tileY += tileHeight)
+      for (var tileX = 0; tileX < width; tileX += tileWidth) {
+        var actualWidth = Math.Min(tileWidth, width - tileX);
+        var actualHeight = Math.Min(tileHeight, height - tileY);
+        writer.WriteBytes(_WritePredictedTile(
+          target, forward, backward, residuals, pitch,
+          tileX, tileY, actualWidth, actualHeight,
+          macroblockSize, blockSize, scan, haar, frameType));
+      }
+  }
+
+  // ============================================================================================
+  // Tiles and macroblocks
+  // ============================================================================================
+
+  private static byte[] _WriteIntraTile(
     short[] residuals,
     int pitch,
     int tileX,
@@ -290,8 +469,6 @@ public sealed class Indeo4VideoEncoder : IVideoCodecEncoder<Indeo4VideoEncoder> 
       for (var x = tileX; x < tileX + tileWidth; x += macroblockSize) {
         var pattern = 0;
 
-        // Every block is transformed before anything is written, because which of them are coded is
-        // what the macroblock's own header states and that header comes ahead of their data.
         for (var block = 0; block < blocksPerMacroblock; ++block) {
           var blockX = x + ((block & 1) != 0 ? blockSize : 0);
           var blockY = y + ((block & 2) != 0 ? blockSize : 0);
@@ -307,22 +484,12 @@ public sealed class Indeo4VideoEncoder : IVideoCodecEncoder<Indeo4VideoEncoder> 
           target[0] = dc - previousDc;
           previousDc = dc;
 
-          // A block the pattern calls coded has to carry at least one coefficient. One that opens on
-          // its end-of-block symbol leaves the scan position ahead of the first coefficient, and a
-          // reference decoder reads that as block data out of step with the bitstream rather than as
-          // an empty block. A block whose every coefficient is zero has nothing to carry anyway: its
-          // samples are the running DC prediction, which is precisely what a decoder fills an uncoded
-          // block with, and an uncoded block leaves that prediction where it stands -- which is where
-          // it already is, the DC difference above being zero.
           if (!_IsFlat(target))
             pattern |= 1 << block;
         }
 
-        macroblockHeaders.WriteFlag(false); // Intra macroblocks may not repeat a reference picture.
+        macroblockHeaders.WriteFlag(false); // An intra macroblock cannot repeat a reference.
         macroblockHeaders.Write(pattern, blocksPerMacroblock);
-
-        // The picture header says a quantiser delta is not forced onto an uncoded macroblock, so one
-        // is read only where the pattern holds a coded block, and only there may one be written.
         if (pattern != 0)
           _WriteSymbol(macroblockHeaders, 0); // Quantiser delta zero.
 
@@ -331,6 +498,82 @@ public sealed class Indeo4VideoEncoder : IVideoCodecEncoder<Indeo4VideoEncoder> 
             _WriteBlock(blockData, coefficients.Slice(block * 64, 64), blockSize * blockSize, scan);
       }
 
+    return _FinishTile(macroblockHeaders, blockData);
+  }
+
+  private static byte[] _WritePredictedTile(
+    short[] target,
+    short[] forward,
+    short[]? backward,
+    short[] residuals,
+    int pitch,
+    int tileX,
+    int tileY,
+    int tileWidth,
+    int tileHeight,
+    int macroblockSize,
+    int blockSize,
+    byte[] scan,
+    bool haar,
+    int frameType) {
+
+    var blocksPerMacroblock = macroblockSize == blockSize ? 1 : 4;
+    var typeBits = frameType == Indeo4Decoder.FrameTypeBidirectional ? 2 : 1;
+    var macroblockHeaders = new _BitWriter();
+    var blockData = new _BitWriter();
+    Span<int> coefficients = stackalloc int[4 * 64];
+
+    for (var y = tileY; y < tileY + tileHeight; y += macroblockSize)
+      for (var x = tileX; x < tileX + tileWidth; x += macroblockSize) {
+        var type = frameType == Indeo4Decoder.FrameTypeBidirectional
+          ? _ChoosePredictionType(target, forward, backward!, pitch, x, y, macroblockSize)
+          : (byte)1;
+
+        _FillResidual(target, forward, backward, residuals, pitch, x, y, macroblockSize, type);
+        var pattern = 0;
+
+        for (var block = 0; block < blocksPerMacroblock; ++block) {
+          var blockX = x + ((block & 1) != 0 ? blockSize : 0);
+          var blockY = y + ((block & 2) != 0 ? blockSize : 0);
+          var transformed = coefficients.Slice(block * 64, 64);
+          transformed.Clear();
+
+          if (haar)
+            _ForwardHaar4x4(residuals, pitch, blockX, blockY, transformed);
+          else
+            _Direct8x8(residuals, pitch, blockX, blockY, transformed);
+
+          if (!_IsFlat(transformed))
+            pattern |= 1 << block;
+        }
+
+        if (type == 1 && pattern == 0) {
+          macroblockHeaders.WriteFlag(true);
+          continue;
+        }
+
+        macroblockHeaders.WriteFlag(false);
+        macroblockHeaders.Write(type, typeBits);
+        macroblockHeaders.Write(pattern, blocksPerMacroblock);
+        if (pattern != 0)
+          _WriteSymbol(macroblockHeaders, 0);
+
+        _WriteSymbol(macroblockHeaders, 0);
+        _WriteSymbol(macroblockHeaders, 0);
+        if (type == 3) {
+          _WriteSymbol(macroblockHeaders, 0);
+          _WriteSymbol(macroblockHeaders, 0);
+        }
+
+        for (var block = 0; block < blocksPerMacroblock; ++block)
+          if ((pattern & (1 << block)) != 0)
+            _WriteBlock(blockData, coefficients.Slice(block * 64, 64), blockSize * blockSize, scan);
+      }
+
+    return _FinishTile(macroblockHeaders, blockData);
+  }
+
+  private static byte[] _FinishTile(_BitWriter macroblockHeaders, _BitWriter blockData) {
     macroblockHeaders.Align();
     blockData.Align();
     var headers = macroblockHeaders.ToArray();
@@ -346,8 +589,8 @@ public sealed class Indeo4VideoEncoder : IVideoCodecEncoder<Indeo4VideoEncoder> 
         $"An Indeo 4 tile needs {tileLength} bytes and its extended size field reaches {_LONG_TILE_SIZE}.");
 
     var writer = new _BitWriter(tileLength);
-    writer.WriteFlag(false); // Tile is not empty.
-    writer.WriteFlag(true);  // Tile data size follows.
+    writer.WriteFlag(false);
+    writer.WriteFlag(true);
     if (useShortLength)
       writer.Write(tileLength, 8);
     else {
@@ -367,6 +610,74 @@ public sealed class Indeo4VideoEncoder : IVideoCodecEncoder<Indeo4VideoEncoder> 
     return result;
   }
 
+  private static byte _ChoosePredictionType(
+    short[] target, short[] forward, short[] backward, int pitch, int x, int y, int macroblockSize) {
+    long forwardError = 0, backwardError = 0, averageError = 0;
+
+    for (var row = 0; row < macroblockSize; ++row) {
+      var at = (y + row) * pitch + x;
+      for (var column = 0; column < macroblockSize; ++column, ++at) {
+        var sample = target[at];
+        var first = forward[at];
+        var second = backward[at];
+        var average = _Average(first, second);
+        var delta = sample - first;
+        forwardError += (long)delta * delta;
+        delta = sample - second;
+        backwardError += (long)delta * delta;
+        delta = sample - average;
+        averageError += (long)delta * delta;
+      }
+    }
+
+    if (forwardError <= backwardError && forwardError <= averageError)
+      return 1;
+    if (backwardError <= averageError)
+      return 2;
+    return 3;
+  }
+
+  private static void _FillResidual(
+    short[] target,
+    short[] forward,
+    short[]? backward,
+    short[] residual,
+    int pitch,
+    int x,
+    int y,
+    int macroblockSize,
+    byte type) {
+
+    for (var row = 0; row < macroblockSize; ++row) {
+      var at = (y + row) * pitch + x;
+      for (var column = 0; column < macroblockSize; ++column, ++at) {
+        var predicted = type switch {
+          2 => backward![at],
+          3 => _Average(forward[at], backward![at]),
+          _ => forward[at],
+        };
+        residual[at] = (short)(target[at] - predicted);
+      }
+    }
+  }
+
+  private static short _Average(short first, short second) {
+    var sum = unchecked((short)(first + second));
+    return (short)(sum >> 1);
+  }
+
+  private static short[] _PadCentered(byte[] samples, int width, int height, int pitch, int alignedHeight) {
+    var result = new short[pitch * alignedHeight];
+    for (var y = 0; y < height; ++y) {
+      var source = y * width;
+      var target = y * pitch;
+      for (var x = 0; x < width; ++x)
+        result[target + x] = (short)(samples[source + x] - 128);
+    }
+
+    return result;
+  }
+
   // ============================================================================================
   // Blocks
   // ============================================================================================
@@ -379,7 +690,6 @@ public sealed class Indeo4VideoEncoder : IVideoCodecEncoder<Indeo4VideoEncoder> 
     }
   }
 
-  /// <summary>Inverts <see cref="IviTransforms.InverseHaar4x4"/> for one chrominance block.</summary>
   private static void _ForwardHaar4x4(short[] residuals, int pitch, int x, int y, Span<int> coefficients) {
     Span<int> intermediate = stackalloc int[16];
     Span<int> input = stackalloc int[4];
@@ -407,10 +717,6 @@ public sealed class Indeo4VideoEncoder : IVideoCodecEncoder<Indeo4VideoEncoder> 
     }
   }
 
-  /// <summary>
-  /// Exact inverse of the four-point integer Haar used by the decoder before the IV4 coefficient
-  /// pre-scaling is applied.
-  /// </summary>
   private static void _ForwardHaar4(ReadOnlySpan<int> samples, Span<int> coefficients) {
     var low = samples[0] + samples[1];
     var high = samples[2] + samples[3];
@@ -423,7 +729,6 @@ public sealed class Indeo4VideoEncoder : IVideoCodecEncoder<Indeo4VideoEncoder> 
   private static int _HalfRounded(int value)
     => value >= 0 ? (value + 1) >> 1 : -((-value + 1) >> 1);
 
-  /// <summary>Whether a block holds nothing but its DC prediction, and so need not be coded at all.</summary>
   private static bool _IsFlat(ReadOnlySpan<int> coefficients) {
     foreach (var coefficient in coefficients)
       if (coefficient != 0)
@@ -457,10 +762,6 @@ public sealed class Indeo4VideoEncoder : IVideoCodecEncoder<Indeo4VideoEncoder> 
     _WriteSymbol(writer, _BLOCK_END);
   }
 
-  /// <summary>
-  /// Writes one symbol from the custom [6] descriptor. Huffman codes are canonical MSB-first while
-  /// IV4's fields are LSB-first, so the six physical bits are the symbol number reversed.
-  /// </summary>
   private static void _WriteSymbol(_BitWriter writer, int symbol)
     => writer.Write(_ReverseSix(symbol), _HUFFMAN_BITS);
 
@@ -523,7 +824,6 @@ public sealed class Indeo4VideoEncoder : IVideoCodecEncoder<Indeo4VideoEncoder> 
   // Little-endian bit output
   // ============================================================================================
 
-  /// <summary>Indeo's least-significant-bit-first field writer.</summary>
   private sealed class _BitWriter {
 
     private byte[] _buffer;
