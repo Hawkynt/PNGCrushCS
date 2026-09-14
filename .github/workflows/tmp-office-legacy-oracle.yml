@@ -13,7 +13,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y libreoffice python3-uno
-      - name: Generate Word and Excel 97-2003 oracle files
+      - name: Generate Office 97-2003 oracle files
         run: |
           cat > /tmp/generate.py <<'PY'
           import binascii, os, struct, subprocess, time, zlib
@@ -59,6 +59,10 @@ jobs:
               def prop(name, value):
                   p = PropertyValue(); p.Name = name; p.Value = value; return p
 
+              def save(doc, path, filter_name):
+                  doc.storeAsURL(uno.systemPathToFileUrl(path), (prop('FilterName', filter_name), prop('Overwrite', True)))
+                  doc.close(True)
+
               def writer(path, filter_name):
                   doc = desktop.loadComponentFromURL('private:factory/swriter', '_blank', 0, ())
                   graphic = doc.createInstance('com.sun.star.text.TextGraphicObject')
@@ -68,8 +72,7 @@ jobs:
                   cursor = doc.Text.createTextCursor()
                   doc.Text.insertTextContent(cursor, graphic, False)
                   doc.Text.insertString(cursor, '\n', False)
-                  doc.storeAsURL(uno.systemPathToFileUrl(path), (prop('FilterName', filter_name), prop('Overwrite', True)))
-                  doc.close(True)
+                  save(doc, path, filter_name)
 
               def calc(path, filter_name):
                   doc = desktop.loadComponentFromURL('private:factory/scalc', '_blank', 0, ())
@@ -80,13 +83,26 @@ jobs:
                   shape.Size = Size(1800, 1200)
                   sheet.DrawPage.add(shape)
                   sheet.getCellByPosition(0, 0).String = 'oracle'
-                  doc.storeAsURL(uno.systemPathToFileUrl(path), (prop('FilterName', filter_name), prop('Overwrite', True)))
-                  doc.close(True)
+                  save(doc, path, filter_name)
+
+              def impress(path, filter_name):
+                  doc = desktop.loadComponentFromURL('private:factory/simpress', '_blank', 0, ())
+                  pages = doc.getDrawPages()
+                  page = pages.getByIndex(0)
+                  shape = doc.createInstance('com.sun.star.drawing.GraphicObjectShape')
+                  shape.GraphicURL = file_url
+                  shape.Position = Point(1000, 1000)
+                  shape.Size = Size(6000, 4000)
+                  page.add(shape)
+                  save(doc, path, filter_name)
 
               writer(out + '/oracle.doc', 'MS Word 97')
               writer(out + '/oracle.dot', 'MS Word 97 Vorlage')
               calc(out + '/oracle.xls', 'MS Excel 97')
               calc(out + '/oracle.xlt', 'MS Excel 97 Vorlage/Template')
+              impress(out + '/oracle.ppt', 'MS PowerPoint 97')
+              impress(out + '/oracle.pps', 'MS PowerPoint 97 AutoPlay')
+              impress(out + '/oracle.pot', 'MS PowerPoint 97 Vorlage')
           finally:
               soffice.terminate()
               try: soffice.wait(timeout=10)
@@ -101,14 +117,14 @@ jobs:
           import json, olefile, os
           root='/tmp/oracle'
           result={}
-          for name in ['oracle.doc','oracle.dot','oracle.xls','oracle.xlt']:
+          for name in ['oracle.doc','oracle.dot','oracle.xls','oracle.xlt','oracle.ppt','oracle.pps','oracle.pot']:
               path=os.path.join(root,name)
               ole=olefile.OleFileIO(path)
               item={'size':os.path.getsize(path),'streams':{}}
               for parts in ole.listdir(streams=True, storages=False):
                   key='/'.join(parts)
                   data=ole.openstream(parts).read()
-                  item['streams'][key]={'size':len(data),'head':data[:256].hex()}
+                  item['streams'][key]={'size':len(data),'head':data[:512].hex()}
               result[name]=item
           open(os.path.join(root,'streams.json'),'w').write(json.dumps(result,indent=2,sort_keys=True))
           print(open(os.path.join(root,'streams.json')).read())
