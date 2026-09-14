@@ -31,29 +31,29 @@ internal static class H263AnnexOVlc {
     ("111", 2),
     ("110", 3));
 
-  internal static H263VlcWriter.Code BidirectionalMacroblockTypeCode(int type) => type switch {
-    0 => new(0b11, 2),
-    1 => new(0b0001, 4),
-    2 => new(0b100, 3),
-    3 => new(0b101, 3),
-    4 => new(0b00110, 5),
-    5 => new(0b010, 3),
-    6 => new(0b011, 3),
-    7 => new(0b00111, 5),
-    8 => new(0b00100, 5),
-    9 => new(0b00101, 5),
-    10 => new(0b00001, 5),
-    11 => new(0b000001, 6),
-    12 => new(0b0000001, 7),
-    13 => new(0b000000001, 9),
+  internal static (int Code, int Length) BidirectionalMacroblockTypeCode(int type) => type switch {
+    0 => (0b11, 2),
+    1 => (0b0001, 4),
+    2 => (0b100, 3),
+    3 => (0b101, 3),
+    4 => (0b00110, 5),
+    5 => (0b010, 3),
+    6 => (0b011, 3),
+    7 => (0b00111, 5),
+    8 => (0b00100, 5),
+    9 => (0b00101, 5),
+    10 => (0b00001, 5),
+    11 => (0b000001, 6),
+    12 => (0b0000001, 7),
+    13 => (0b000000001, 9),
     _ => throw new ArgumentOutOfRangeException(nameof(type)),
   };
 
-  internal static H263VlcWriter.Code ChromaPatternCode(int pattern) => pattern switch {
-    0 => new(0b0, 1),
-    1 => new(0b10, 2),
-    2 => new(0b111, 3),
-    3 => new(0b110, 3),
+  internal static (int Code, int Length) ChromaPatternCode(int pattern) => pattern switch {
+    0 => (0b0, 1),
+    1 => (0b10, 2),
+    2 => (0b111, 3),
+    3 => (0b110, 3),
     _ => throw new ArgumentOutOfRangeException(nameof(pattern)),
   };
 }
