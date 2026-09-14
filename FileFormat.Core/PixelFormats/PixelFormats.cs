@@ -34,6 +34,7 @@ public readonly struct Rgb48 : IRawPixelFormat<Rgb48> { public static RawPixelFo
 public readonly struct Rgb565 : IRawPixelFormat<Rgb565> { public static RawPixelFormatTraits Traits => RawPixelFormats.Get(PixelFormat.Rgb565); }
 public readonly struct Gray10 : IRawPixelFormat<Gray10> { public static RawPixelFormatTraits Traits => RawPixelFormats.Get(PixelFormat.Gray10); }
 public readonly struct Rgb30 : IRawPixelFormat<Rgb30> { public static RawPixelFormatTraits Traits => RawPixelFormats.Get(PixelFormat.Rgb30); }
+public readonly struct Cfa16 : IRawPixelFormat<Cfa16> { public static RawPixelFormatTraits Traits => RawPixelFormats.Get(PixelFormat.Cfa16); }
 
 public readonly struct GrayF16 : IRawPixelFormat<GrayF16> { public static RawPixelFormatTraits Traits => RawPixelFormats.Get(PixelFormat.GrayF16); }
 public readonly struct GrayAlphaF16 : IRawPixelFormat<GrayAlphaF16> { public static RawPixelFormatTraits Traits => RawPixelFormats.Get(PixelFormat.GrayAlphaF16); }
