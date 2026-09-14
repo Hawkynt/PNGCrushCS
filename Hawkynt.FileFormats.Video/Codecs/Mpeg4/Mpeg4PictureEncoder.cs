@@ -124,7 +124,10 @@ internal sealed class Mpeg4PictureEncoder {
     this._writer.Write(17, 8);                             // Advanced Simple visual object type
     this._writer.Write(0, 1);                              // is_object_layer_identifier: version 1
     this._writer.Write(1, 4);                              // aspect_ratio_info: square pixels
-    this._writer.Write(0, 1);                              // vol_control_parameters
+    this._writer.Write(1, 1);                              // vol_control_parameters
+    this._writer.Write(1, 2);                              // chroma_format: 4:2:0
+    this._writer.Write(0, 1);                              // low_delay: B-VOPs reorder pictures
+    this._writer.Write(0, 1);                              // vbv_parameters
     this._writer.Write(0, 2);                              // video_object_layer_shape: rectangular
     this._writer.Write(1, 1);                              // marker_bit
     this._writer.Write(this._timeIncrementResolution, 16);
