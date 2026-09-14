@@ -21,31 +21,20 @@ namespace FileFormat.Codecs;
 /// lossless alpha according to the source representation; 24 or an unspecified zero writes colour
 /// only. This makes the stream description deterministic before its first frame arrives.
 /// <para/>
-/// <see cref="MediaStreamInfo"/> has no field-order property. As with the other QuickTime codecs in
-/// this library, an existing visual sample entry may request field coding through its <c>fiel</c>
-/// child: 0x0201 writes top field first and 0x0206 bottom field first. The two QuickTime orders whose
-/// coded and displayed orders disagree are refused because RDD 36 defines the two ProRes pictures in
-/// temporal/display order and has no syntax with which to preserve that distinction.
+/// <see cref="MediaStreamInfo"/> has no field-order property. An existing QuickTime visual sample
+/// entry may request field coding through its <c>fiel</c> child: 0x0201 writes top field first and
+/// 0x0206 bottom field first. The two QuickTime orders whose coded and displayed orders disagree are
+/// refused because RDD 36 defines the two ProRes pictures in temporal/display order and has no syntax
+/// with which to preserve that distinction.
 /// </remarks>
 [VerifiedBy(ConformanceOracle.FFmpeg)]
 public sealed class ProResVideoEncoder : IVideoCodecEncoder<ProResVideoEncoder> {
 
-  /// <summary>The bytes of <c>frame_size</c> and <c>frame_identifier</c> together, RDD 36:2022, 5.1.</summary>
   private const int _FRAME_PREFIX_SIZE = 8;
-
-  /// <summary>Twenty fixed bytes and the two weight matrices, RDD 36:2022, 5.1.1.</summary>
   private const int _FRAME_HEADER_SIZE = 20 + 64 + 64;
-
-  /// <summary>The QuickTime visual sample entry before codec-specific child atoms.</summary>
   private const int _VISUAL_SAMPLE_ENTRY_SIZE = 86;
-
-  /// <summary>The size of QuickTime's two-byte <c>fiel</c> field-order child atom.</summary>
   private const int _FIEL_ATOM_SIZE = 10;
-
-  /// <summary>The picture header's <c>log2_desired_slice_size_in_mb</c>: eight macroblocks a slice.</summary>
   private const int _LOG2_SLICE_SIZE = 3;
-
-  /// <summary>The height above which an unlabelled picture is taken to be BT.709 rather than BT.601.</summary>
   private const int _STANDARD_DEFINITION_LINES = 576;
 
   private readonly MediaStreamInfo _requested;
@@ -75,10 +64,8 @@ public sealed class ProResVideoEncoder : IVideoCodecEncoder<ProResVideoEncoder> 
 
   public static string CodecName => "Apple ProRes";
 
-  /// <summary>The registry's canonical code; <see cref="Accepts"/> exposes the other five profiles.</summary>
   public static CodecTag Codec => ProResProfile.Standard.Tag;
 
-  /// <summary>Whether the requested stream names any of the six Apple ProRes profiles.</summary>
   public static bool Accepts(MediaStreamInfo stream) {
     ArgumentNullException.ThrowIfNull(stream);
     if (stream.Kind != MediaStreamKind.Video)
@@ -91,7 +78,6 @@ public sealed class ProResVideoEncoder : IVideoCodecEncoder<ProResVideoEncoder> 
     return false;
   }
 
-  /// <summary>Builds an encoder for the stream described, taking the profile from the code it names.</summary>
   public static ProResVideoEncoder Create(MediaStreamInfo stream) {
     ArgumentNullException.ThrowIfNull(stream);
 
@@ -125,7 +111,6 @@ public sealed class ProResVideoEncoder : IVideoCodecEncoder<ProResVideoEncoder> 
     return new(stream, profile, interlaceMode, alphaEnabled);
   }
 
-  /// <summary>Codes one frame. ProRes has no delayed or predictive pictures.</summary>
   public bool TryEncode(RawImage frame, long? presentationTimestamp, out CodedPacket packet) {
     ArgumentNullException.ThrowIfNull(frame);
 
@@ -149,10 +134,8 @@ public sealed class ProResVideoEncoder : IVideoCodecEncoder<ProResVideoEncoder> 
     return true;
   }
 
-  /// <summary>Nothing is ever held back — a frame goes in and its packet comes out.</summary>
   public IEnumerable<CodedPacket> Flush() => [];
 
-  /// <summary>The stream as a muxer needs it, including its QuickTime visual sample entry.</summary>
   public MediaStreamInfo DescribeStream() => this._stream ??= new() {
     Index = this._requested.Index,
     Kind = MediaStreamKind.Video,
@@ -170,7 +153,6 @@ public sealed class ProResVideoEncoder : IVideoCodecEncoder<ProResVideoEncoder> 
     CodecPrivateData = this._SampleEntry(),
   };
 
-  /// <summary>Codes one input frame into one compressed ProRes frame, RDD 36:2022, 5.1.</summary>
   internal byte[] EncodeFrame(RawImage frame) {
     var targetFormat = this._profile.IsFourFourFour ? PixelFormat.Yuv444P12 : PixelFormat.Yuv422P10;
     var source = frame.Format == targetFormat
@@ -229,7 +211,6 @@ public sealed class ProResVideoEncoder : IVideoCodecEncoder<ProResVideoEncoder> 
     return bytes;
   }
 
-  /// <summary>Codes one frame picture or one extracted field picture.</summary>
   private byte[] _EncodePicture(
     RawImage source,
     ushort[]? alpha,
@@ -280,7 +261,6 @@ public sealed class ProResVideoEncoder : IVideoCodecEncoder<ProResVideoEncoder> 
       interlaced);
   }
 
-  /// <summary>Writes the fixed frame header and the profile's two quantisation matrices.</summary>
   private void _WriteFrameHeader(Span<byte> header, int alphaChannelType) {
     header.Clear();
 
@@ -301,9 +281,6 @@ public sealed class ProResVideoEncoder : IVideoCodecEncoder<ProResVideoEncoder> 
     this._profile.ChromaMatrix.CopyTo(header[84..]);
   }
 
-  /// <summary>
-  /// Widens a little-endian planar component into one frame/field picture and pads its right/bottom edge.
-  /// </summary>
   private static void _FillPicturePlane(
     ReadOnlySpan<byte> source,
     int sourceWidth,
@@ -316,6 +293,7 @@ public sealed class ProResVideoEncoder : IVideoCodecEncoder<ProResVideoEncoder> 
     int maximumSample,
     string component) {
     var targetHeight = target.Length / targetWidth;
+    var bitDepthName = maximumSample == 0x3FF ? "ten" : "twelve";
 
     for (var y = 0; y < targetHeight; ++y) {
       var pictureRow = Math.Min(y, pictureHeight - 1);
@@ -331,7 +309,7 @@ public sealed class ProResVideoEncoder : IVideoCodecEncoder<ProResVideoEncoder> 
         var sample = BinaryPrimitives.ReadUInt16LittleEndian(source[(from + x * 2)..]);
         if (sample > maximumSample)
           throw new InvalidDataException(
-            $"A ProRes {component} sample exceeds {thisDepth(maximumSample)}-bit storage: {sample} does not fit.");
+            $"A ProRes {component} sample is coded at {bitDepthName} bits; {sample} does not fit.");
 
         target[into + x] = last = sample;
       }
@@ -339,8 +317,6 @@ public sealed class ProResVideoEncoder : IVideoCodecEncoder<ProResVideoEncoder> 
       for (var x = sourceWidth; x < targetWidth; ++x)
         target[into + x] = last;
     }
-
-    static int thisDepth(int maximum) => maximum == 0x3FF ? 10 : 12;
   }
 
   private static void _FillPictureAlpha(
@@ -370,7 +346,6 @@ public sealed class ProResVideoEncoder : IVideoCodecEncoder<ProResVideoEncoder> 
     }
   }
 
-  /// <summary>Chooses RDD 36's alpha_channel_type for this frame.</summary>
   private int _AlphaChannelType(RawImage frame) {
     if (!this._alphaEnabled)
       return 0;
@@ -382,7 +357,6 @@ public sealed class ProResVideoEncoder : IVideoCodecEncoder<ProResVideoEncoder> 
     return traits.IsIndexed || traits.ComponentBitDepth is > 0 and <= 8 ? 1 : 2;
   }
 
-  /// <summary>Extracts source alpha without narrowing a sixteen-bit matte.</summary>
   private ushort[] _AlphaPlane(RawImage frame, int alphaChannelType) {
     var count = checked(this._width * this._height);
     var result = new ushort[count];
@@ -410,20 +384,17 @@ public sealed class ProResVideoEncoder : IVideoCodecEncoder<ProResVideoEncoder> 
     return result;
   }
 
-  /// <summary>Builds the QuickTime visual sample entry, with <c>fiel</c> when field coding was requested.</summary>
   private byte[] _SampleEntry() {
     var size = _VISUAL_SAMPLE_ENTRY_SIZE + (this._interlaceMode == 0 ? 0 : _FIEL_ATOM_SIZE);
     var entry = new byte[size];
 
     BinaryPrimitives.WriteUInt32BigEndian(entry, (uint)size);
-    Span<byte> tag = stackalloc byte[4];
-    this._profile.Tag.WriteBytes(tag);
-    tag.CopyTo(entry.AsSpan(4));
+    BinaryPrimitives.WriteUInt32LittleEndian(entry.AsSpan(4), this._profile.Tag.Value);
     BinaryPrimitives.WriteUInt16BigEndian(entry.AsSpan(14), 1);
     BinaryPrimitives.WriteUInt16BigEndian(entry.AsSpan(32), (ushort)this._width);
     BinaryPrimitives.WriteUInt16BigEndian(entry.AsSpan(34), (ushort)this._height);
-    BinaryPrimitives.WriteUInt32BigEndian(entry.AsSpan(36), 72u << 16);
-    BinaryPrimitives.WriteUInt32BigEndian(entry.AsSpan(40), 72u << 16);
+    BinaryPrimitives.WriteUInt32BigEndian(entry.AsSpan(36), 0x00480000);
+    BinaryPrimitives.WriteUInt32BigEndian(entry.AsSpan(40), 0x00480000);
     BinaryPrimitives.WriteUInt16BigEndian(entry.AsSpan(48), 1);
 
     ReadOnlySpan<byte> compressor = this._profile.IsFourFourFour ? "Apple ProRes 4444"u8 : "Apple ProRes 422"u8;
@@ -444,22 +415,23 @@ public sealed class ProResVideoEncoder : IVideoCodecEncoder<ProResVideoEncoder> 
     return entry;
   }
 
-  /// <summary>Reads QuickTime's field-order child from an existing visual sample entry.</summary>
   private static int _InterlaceMode(ReadOnlySpan<byte> sampleEntry) {
     if (sampleEntry.Length < _VISUAL_SAMPLE_ENTRY_SIZE)
       return 0;
 
     var statedSize = BinaryPrimitives.ReadUInt32BigEndian(sampleEntry);
-    var limit = statedSize >= _VISUAL_SAMPLE_ENTRY_SIZE && statedSize <= sampleEntry.Length
+    var limit = statedSize >= _VISUAL_SAMPLE_ENTRY_SIZE && statedSize <= (uint)sampleEntry.Length
       ? (int)statedSize
       : sampleEntry.Length;
 
     for (var at = _VISUAL_SAMPLE_ENTRY_SIZE; at + 8 <= limit;) {
       var size32 = BinaryPrimitives.ReadUInt32BigEndian(sampleEntry[at..]);
-      var atomSize = size32 == 0 ? limit - at : checked((int)size32);
+      int atomSize;
       var headerSize = 8;
 
-      if (size32 == 1) {
+      if (size32 == 0) {
+        atomSize = limit - at;
+      } else if (size32 == 1) {
         if (at + 16 > limit)
           throw new InvalidDataException("A ProRes visual sample entry ends inside an extended QuickTime child header.");
         var extended = BinaryPrimitives.ReadUInt64BigEndian(sampleEntry[(at + 8)..]);
@@ -467,6 +439,10 @@ public sealed class ProResVideoEncoder : IVideoCodecEncoder<ProResVideoEncoder> 
           throw new InvalidDataException($"A QuickTime child atom of {extended} bytes is too large to inspect in memory.");
         atomSize = (int)extended;
         headerSize = 16;
+      } else {
+        if (size32 > int.MaxValue)
+          throw new InvalidDataException($"A QuickTime child atom of {size32} bytes is too large to inspect in memory.");
+        atomSize = (int)size32;
       }
 
       if (atomSize < headerSize || atomSize > limit - at)
