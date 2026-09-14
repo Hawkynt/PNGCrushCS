@@ -130,7 +130,7 @@ public sealed class OfficeOpenXmlImagePackageTests {
 
     Assert.Multiple(() => {
       Assert.Throws<ArgumentException>(() => WordFile.FromRawImage(source, ".doc"));
-      Assert.Throws<ArgumentException>(() => ExcelFile.FromRawImage(source, ".xls"));
+      Assert.Throws<ArgumentException>(() => ExcelFile.FromRawImage(source, ".ods"));
       Assert.Throws<ArgumentException>(() => PowerPointFile.FromRawImage(source, ".odp"));
     });
   }
