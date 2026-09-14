@@ -49,12 +49,12 @@ public class ZeroCodecVideoDecoderTests {
 
   [Test]
   [Category("Unit")]
-  public void CreateRefusesUnsupportedGeometryAndKindButNotContainerBitDepthMetadata() {
+  public void CreateRefusesUnsupportedGeometryDepthAndKind() {
     Assert.Multiple(() => {
       Assert.Throws<InvalidDataException>(() => ZeroCodecVideoDecoder.Create(_Stream(0, 16)));
       Assert.Throws<NotSupportedException>(() => ZeroCodecVideoDecoder.Create(_Stream(15, 16)));
-      Assert.DoesNotThrow(() => ZeroCodecVideoDecoder.Create(_Stream(16, 16, bitsPerPixel: 0)));
-      Assert.DoesNotThrow(() => ZeroCodecVideoDecoder.Create(_Stream(16, 16, bitsPerPixel: 24)));
+      Assert.Throws<NotSupportedException>(() => ZeroCodecVideoDecoder.Create(_Stream(16, 16, bitsPerPixel: 0)));
+      Assert.Throws<NotSupportedException>(() => ZeroCodecVideoDecoder.Create(_Stream(16, 16, bitsPerPixel: 24)));
       Assert.Throws<NotSupportedException>(() => ZeroCodecVideoDecoder.Create(_Stream(16, 16, kind: MediaStreamKind.Audio)));
     });
   }
