@@ -9,66 +9,51 @@ jobs:
   probe:
     runs-on: ubuntu-latest
     steps:
-      - name: Follow ImageGear download and archive paths
+      - name: Inspect recovered ImageGear DLL
         shell: bash
         run: |
-          set -u
+          set -euo pipefail
           ROOT=/tmp/lpg-imagegear
           mkdir -p "$ROOT"
           cd "$ROOT"
           UA='Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/153 Safari/537.36'
 
-          inspect_candidate() {
-            local f="$1"
-            [ -f "$f" ] || return 0
-            echo "--- candidate $f ---"
-            ls -l "$f" || true
-            file "$f" || true
-            sha256sum "$f" || true
-            head -c 32 "$f" | xxd -g1 || true
-            unzip -l "$f" 2>/dev/null | head -80 || true
-          }
-
-          echo '=== OpenDLL cookie/token flow ==='
-          curl -A "$UA" -c od.cookies -b od.cookies -fsSL \
-            'https://www.opendll.com/index.php?arch=32bit&file-download=gear32sd.dll&version=7.0.15.15' -o od.html || true
-          token=$(grep -oE 'download\.php\?token=[0-9]+' od.html | head -1 || true)
-          echo "TOKEN=$token"
-          if [ -n "$token" ]; then
-            curl -A "$UA" -e 'https://www.opendll.com/index.php?arch=32bit&file-download=gear32sd.dll&version=7.0.15.15' \
-              -c od.cookies -b od.cookies -D od.headers -fL --max-time 30 \
-              -o od.download "https://www.opendll.com/$token" || true
-            cat od.headers || true
-            inspect_candidate od.download
-          fi
-
-          echo '=== DLL-files cookie/landing flow ==='
-          curl -A "$UA" -c df.cookies -b df.cookies -fsSL 'https://www.dll-files.com/gear32sd.dll.html' -o df.index || true
-          rel=$(grep -oE '/download/[A-Za-z0-9]+/gear32sd\.dll\.html\?c=[A-Za-z0-9=]+' df.index | head -1 || true)
-          echo "LANDING=$rel"
-          if [ -n "$rel" ]; then
-            curl -A "$UA" -e 'https://www.dll-files.com/gear32sd.dll.html' -c df.cookies -b df.cookies \
-              -D df.landing.headers -fL --max-time 30 -o df.landing "https://www.dll-files.com$rel" || true
-            cat df.landing.headers || true
-            inspect_candidate df.landing
-            echo '--- landing interesting lines ---'
-            grep -inE -B3 -A5 'download|\.zip|gear32|href=|action=|location|window\.' df.landing | tail -300 || true
-          fi
-
-          echo '=== Internet Archive item metadata: Canvas and Chip ==='
-          python3 - <<'PY'
-          import json, urllib.request
-          for ident in ['canvas-702-windows-1999','canvas-6-trial','02cnvart1','czchip199908cd']:
-              print('\n---', ident, '---')
-              try:
-                  with urllib.request.urlopen('https://archive.org/metadata/'+ident, timeout=30) as r:
-                      md=json.load(r)
-              except Exception as e:
-                  print(type(e).__name__, e); continue
-              files=md.get('files',[])
-              for f in files:
-                  name=f.get('name','')
-                  size=int(f.get('size') or 0)
-                  if name.lower().endswith(('.iso','.zip','.7z','.rar','.exe','.img','.bin','.cue')) or any(x in name.lower() for x in ('gear','imagegear','igf')):
-                      print('FILE', size, name, f.get('md5',''))
+          curl -A "$UA" -fsSL 'https://www.dll-files.com/gear32sd.dll.html' -o index.html
+          rel=$(grep -oE '/download/[A-Za-z0-9]+/gear32sd\.dll\.html\?c=[A-Za-z0-9=]+' index.html | head -1)
+          curl -A "$UA" -fsSL "https://www.dll-files.com$rel" -o landing.html
+          zipurl=$(python3 - <<'PY'
+          import html,re
+          s=open('landing.html',encoding='utf-8').read()
+          m=re.search(r'https://download\.zip\.dll-files\.com/[^"<]+gear32sd\.zip\?token=[^"<&]+(?:&amp;|&)expires=[0-9]+',s)
+          if not m: raise SystemExit(2)
+          print(html.unescape(m.group(0)))
           PY
+          )
+          echo "CDN=$zipurl"
+          curl -A "$UA" -fL "$zipurl" -o gear32sd.zip
+          unzip -l gear32sd.zip
+          unzip -o gear32sd.zip -d extracted
+          DLL=$(find extracted -type f -iname 'gear32sd.dll' -print -quit)
+          echo "DLL=$DLL"
+          file "$DLL"
+          sha256sum "$DLL"
+          md5sum "$DLL"
+          stat -c '%s bytes' "$DLL"
+
+          echo '=== matching published hashes ==='
+          test "$(sha256sum "$DLL" | cut -d' ' -f1)" = 'a42787bc5c747f306169b28d5d0e7b71c16ad48a4bc11b2b434117d349e130c2'
+          test "$(md5sum "$DLL" | cut -d' ' -f1)" = 'bd31e50ee4450d52d0a9f1a774a94775'
+
+          echo '=== exports ==='
+          objdump -p "$DLL" > pe.txt
+          grep -iE 'IG_(initialize|close|load_file|save_file|info_get|info_|image_|fltr_|error_)' pe.txt | head -1000 || true
+
+          echo '=== all likely format strings ==='
+          strings -a "$DLL" > strings.txt
+          grep -inE -B5 -A12 'IGF|ImageGear Format|\.igf|\.lpg|LPG|Xerox|XIMG|\.img|ATT|BRK|GX2|ICA|IMT|KFX' strings.txt | head -1600 || true
+
+          echo '=== exported function names from OpenDLL-like PE table ==='
+          grep -oE '_?IG_[A-Za-z0-9_]+(@[0-9]+)?' pe.txt | sort -u | grep -E 'initialize|close|load|save|info|image|error|format|fltr' | head -1000 || true
+
+          echo '=== PE version ==='
+          strings -el "$DLL" | grep -iE 'ImageGear|AccuSoft|7\.0|FileDescription|Product' | head -200 || true
