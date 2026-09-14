@@ -311,7 +311,7 @@ internal static class CompoundFileWriter {
     }
 
     for (var i = 0; i < entries.Length; ++i)
-      BinaryPrimitives.WriteUInt32LittleEndian(result.AsSpan(_SectorOffset(miniFatStart) + i * sizeof(uint)), entries[i]);
+      BinaryPrimitives.WriteUInt32LittleEndian(result.Slice(_SectorOffset(miniFatStart) + i * sizeof(uint)), entries[i]);
   }
 
   private static void _WriteDifat(
@@ -371,7 +371,7 @@ internal static class CompoundFileWriter {
       entries[i] = _FreeSector;
 
     for (var i = 0; i < entries.Length; ++i)
-      BinaryPrimitives.WriteUInt32LittleEndian(result.AsSpan(_SectorOffset(fatStart) + i * sizeof(uint)), entries[i]);
+      BinaryPrimitives.WriteUInt32LittleEndian(result.Slice(_SectorOffset(fatStart) + i * sizeof(uint)), entries[i]);
   }
 
   private static void _MarkChain(Span<uint> entries, uint start, int count) {
