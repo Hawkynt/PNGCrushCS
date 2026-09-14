@@ -155,7 +155,7 @@ public sealed class FlashSv2VideoEncoderTests {
     });
 
     Assert.That(decoder.TryDecode(delta, out var decoded), Is.True);
-    LosslessEncoderPictures.AssertSame(changed, decoded);
+    LosslessEncoderPictures.AssertSame(changed, decoded, "one-row interblock");
   }
 
   [Test]
@@ -176,7 +176,7 @@ public sealed class FlashSv2VideoEncoderTests {
     Assert.That(block, Is.EqualTo(new byte[] { 0x04, 0x00, 0x00 }));
 
     Assert.That(decoder.TryDecode(restoredPacket, out var restored), Is.True);
-    LosslessEncoderPictures.AssertSame(key, restored);
+    LosslessEncoderPictures.AssertSame(key, restored, "zero-height diff returning to key frame");
   }
 
   [Test]
