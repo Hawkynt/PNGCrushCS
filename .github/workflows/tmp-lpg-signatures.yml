@@ -1,0 +1,45 @@
+name: Temporary LPG signature research
+
+on:
+  push:
+    branches:
+      - research/lpg-paris-oracle
+
+jobs:
+  signatures:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Probe TrID and system signature databases
+        shell: bash
+        run: |
+          set -u
+          ROOT=/tmp/lpg-sig
+          mkdir -p "$ROOT"
+          cd "$ROOT"
+
+          echo '=== TrID current definitions package ==='
+          curl -fL --retry 3 -o triddefs.zip 'https://mark0.net/download/triddefs.zip' || true
+          if [ -s triddefs.zip ]; then
+            unzip -l triddefs.zip | head -80 || true
+            unzip -o triddefs.zip >/dev/null || true
+            find . -maxdepth 3 -type f -printf '%p %s\n' | head -100
+            echo '--- strings: LPG / Paris / XLPrint / Lowrey ---'
+            find . -type f -maxdepth 3 -print0 | xargs -0 strings -a 2>/dev/null | grep -iE -B8 -A12 'XLPrint|Paris.*(graphic|image)|(^|[^A-Za-z])LPG([^A-Za-z]|$)|Lowrey' | head -1200 || true
+          fi
+
+          echo '=== TrID file-extension definitions page ==='
+          curl -fsSL 'https://mark0.net/soft-trid-deflist.html' | grep -iE -B3 -A5 'LPG|Paris|XLPrint|Lowrey' | head -500 || true
+
+          echo '=== local libmagic signatures ==='
+          grep -RniE 'XLPrint|Paris.*graphic|LPG|Lowrey' /usr/share/misc /usr/share/file 2>/dev/null | head -500 || true
+
+          echo '=== freedesktop MIME database ==='
+          grep -RniE 'XLPrint|Paris.*graphic|LPG|Lowrey' /usr/share/mime 2>/dev/null | head -500 || true
+
+          echo '=== Apache Tika signatures source search ==='
+          for u in \
+            'https://raw.githubusercontent.com/apache/tika/main/tika-core/src/main/resources/org/apache/tika/mime/tika-mimetypes.xml' \
+            'https://raw.githubusercontent.com/file/file/master/magic/Magdir/images'; do
+            echo "--- $u ---"
+            curl -fsSL --max-time 30 "$u" | grep -iE -B5 -A8 'XLPrint|Paris.*graphic|LPG|Lowrey' | head -500 || true
+          done
