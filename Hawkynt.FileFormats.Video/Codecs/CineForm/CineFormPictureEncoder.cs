@@ -3,14 +3,14 @@ using System.Collections.Generic;
 
 namespace FileFormat.Codecs.CineForm;
 
-/// <summary>Builds one progressive three-channel CineForm I-frame packet.</summary>
+/// <summary>Builds one progressive CineForm I-frame packet.</summary>
 /// <remarks>
 /// The packet shape is the common subset emitted by GoPro's reference SDK and FFmpeg's <c>cfhd</c>
-/// encoder: one I-frame header and channel-size index, then Y, V and U channels, each containing a
-/// raw sixteen-bit lowpass followed by three spatial wavelet levels and three entropy-coded highpass
-/// bands per level. The tag numbers and marker values are interoperability constants, not an imported
-/// implementation; all transforms and entropy coding are the managed counterparts of this package's
-/// existing decoder.
+/// encoder: one I-frame header and channel-size index, followed by one independently transformed
+/// channel at a time. Each channel contains a raw sixteen-bit lowpass plus three spatial wavelet
+/// levels and three entropy-coded highpass bands per level. The tag numbers and marker values are
+/// interoperability constants, not an imported implementation; all transforms and entropy coding are
+/// the managed counterparts of this package's decoder.
 /// </remarks>
 internal static class CineFormPictureEncoder {
   private const int _SAMPLE_TYPE = 1;
@@ -63,7 +63,6 @@ internal static class CineFormPictureEncoder {
 
   private const int _SAMPLE_TYPE_IFRAME = 9;
   private const int _SAMPLE_TYPE_CHANNEL = 3;
-  private const int _ENCODED_FORMAT_YUV_422 = 1;
   private const int _BAND_ENCODING_CODEBOOK = 3;
 
   private const int _LOWPASS_SEGMENT = 0x1A4A;
@@ -83,26 +82,68 @@ internal static class CineFormPictureEncoder {
   private readonly record struct Level(int Width, int Height, int[] Lh, int[] Hl, int[] Hh);
 
   /// <summary>
-  /// Encodes already padded ten-bit Y, V and U planes. Channel widths are supplied independently
-  /// because 4:2:2 chroma is half the luma width.
+  /// Encodes already padded ten-bit Y, V and U planes. Kept as the compact compatibility entry point
+  /// for the original writer and its tests.
   /// </summary>
   internal static byte[] Encode(
     int[] y, int[] v, int[] u,
     int lumaWidth, int chromaWidth, int encodedHeight, int displayHeight,
+    ushort frameNumber = 0)
+    => Encode(
+      [y, v, u], [lumaWidth, chromaWidth, chromaWidth], encodedHeight, displayHeight,
+      CineFormEncodedFormat.Yuv422, 10, 0x2000, CineFormPrescale.TenBit, frameNumber);
+
+  /// <summary>
+  /// Encodes already padded channel planes in the measured CineForm channel order: Y,V,U for 4:2:2
+  /// and G,R,B[,A] for RGB[A].
+  /// </summary>
+  internal static byte[] Encode(
+    int[][] planes,
+    int[] widths,
+    int encodedHeight,
+    int displayHeight,
+    CineFormEncodedFormat encodedFormat,
+    int precision,
+    int prescaleTable,
+    ReadOnlySpan<int> prescale,
     ushort frameNumber = 0) {
 
-    if (lumaWidth <= 0 || chromaWidth * 2 != lumaWidth || encodedHeight <= 0 || displayHeight <= 0 || displayHeight > encodedHeight)
-      throw new ArgumentException("The CineForm picture geometry is not a padded 4:2:2 frame.");
+    ArgumentNullException.ThrowIfNull(planes);
+    ArgumentNullException.ThrowIfNull(widths);
 
-    if (y.Length < lumaWidth * encodedHeight || v.Length < chromaWidth * encodedHeight || u.Length < chromaWidth * encodedHeight)
-      throw new ArgumentException("A CineForm channel does not contain its complete padded plane.");
+    var expectedChannels = encodedFormat switch {
+      CineFormEncodedFormat.Yuv422 or CineFormEncodedFormat.Rgb444 => 3,
+      CineFormEncodedFormat.Rgba4444 => 4,
+      _ => throw new NotSupportedException($"This CineForm writer does not encode {encodedFormat}."),
+    };
 
-    var prescale = CineFormPrescale.TenBit;
-    ChannelTransform[] channels = [
-      _Transform(y, lumaWidth, encodedHeight, prescale),
-      _Transform(v, chromaWidth, encodedHeight, prescale),
-      _Transform(u, chromaWidth, encodedHeight, prescale),
-    ];
+    var expectedPrecision = encodedFormat == CineFormEncodedFormat.Yuv422 ? 10 : 12;
+    if (precision != expectedPrecision)
+      throw new ArgumentException($"CineForm {encodedFormat} is written at {expectedPrecision} bits, not {precision}.", nameof(precision));
+
+    if (planes.Length != expectedChannels || widths.Length != expectedChannels)
+      throw new ArgumentException($"CineForm {encodedFormat} needs exactly {expectedChannels} channel planes and widths.");
+
+    var imageWidth = widths[0];
+    if (imageWidth <= 0 || encodedHeight <= 0 || displayHeight <= 0 || displayHeight > encodedHeight)
+      throw new ArgumentException("The CineForm picture geometry is not a positive padded frame.");
+
+    if (encodedFormat == CineFormEncodedFormat.Yuv422) {
+      if ((imageWidth & 1) != 0 || widths[1] * 2 != imageWidth || widths[2] != widths[1])
+        throw new ArgumentException("A CineForm YUV 4:2:2 frame needs two half-width chroma channels.");
+    } else {
+      for (var i = 1; i < widths.Length; ++i)
+        if (widths[i] != imageWidth)
+          throw new ArgumentException("CineForm RGB and RGBA channels must all have the full image width.");
+    }
+
+    var channels = new ChannelTransform[expectedChannels];
+    for (var i = 0; i < channels.Length; ++i) {
+      var width = widths[i];
+      if (planes[i].Length < width * encodedHeight)
+        throw new ArgumentException($"CineForm channel {i} does not contain its complete padded plane.");
+      channels[i] = _Transform(planes[i], width, encodedHeight, prescale);
+    }
 
     var writer = new PacketWriter();
     writer.Tag(_SAMPLE_TYPE, _SAMPLE_TYPE_IFRAME);
@@ -114,18 +155,18 @@ internal static class CineFormPictureEncoder {
     writer.Tag(_TRANSFORM_TYPE, 0);
     writer.Tag(_NUM_FRAMES, 1);
     writer.Tag(_CHANNEL_COUNT, channels.Length);
-    writer.Tag(_ENCODED_FORMAT, _ENCODED_FORMAT_YUV_422);
+    writer.Tag(_ENCODED_FORMAT, (int)encodedFormat);
     writer.Tag(_WAVELET_COUNT, 3);
     writer.Tag(_SUBBAND_COUNT, 10);
     writer.Tag(_NUM_SPATIAL, 2);
     writer.Tag(_FIRST_WAVELET, 3);
-    writer.Tag(_IMAGE_WIDTH, lumaWidth);
+    writer.Tag(_IMAGE_WIDTH, imageWidth);
     writer.Tag(_IMAGE_HEIGHT, encodedHeight);
     if (displayHeight != encodedHeight)
       writer.Tag(-_DISPLAY_HEIGHT, displayHeight);
     writer.Tag(-_FRAME_NUMBER, frameNumber);
-    writer.Tag(_PRECISION, 10);
-    writer.Tag(_PRESCALE_TABLE, 0x2000);
+    writer.Tag(_PRECISION, precision);
+    writer.Tag(_PRESCALE_TABLE, prescaleTable);
     writer.Tag(_SAMPLE_FLAGS, 1); // progressive
 
     for (var channelIndex = 0; channelIndex < channels.Length; ++channelIndex) {
@@ -145,6 +186,9 @@ internal static class CineFormPictureEncoder {
   }
 
   private static ChannelTransform _Transform(ReadOnlySpan<int> source, int width, int height, ReadOnlySpan<int> prescale) {
+    if (prescale.Length != 3)
+      throw new ArgumentException("CineForm's progressive transform needs three prescale entries.", nameof(prescale));
+
     var current = source.ToArray();
     var currentWidth = width;
     var currentHeight = height;
