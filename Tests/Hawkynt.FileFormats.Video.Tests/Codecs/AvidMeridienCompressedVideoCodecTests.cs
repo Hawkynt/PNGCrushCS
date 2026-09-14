@@ -4,6 +4,9 @@ using System.IO;
 using System.Linq;
 using FileFormat.Core;
 using FileFormat.Jpeg;
+using FileFormat.Mp4;
+using Hawkynt.FileFormats.Video;
+using Hawkynt.FileFormats.Video.Tests;
 
 namespace FileFormat.Codecs.Tests;
 
@@ -225,6 +228,36 @@ public sealed class AvidMeridienCompressedVideoEncoderTests {
       Assert.That(description.CodecPrivateData.Span[^2], Is.EqualTo(2));
       Assert.That(description.CodecPrivateData.Span[^1], Is.EqualTo(fielDetail));
     });
+  }
+
+  [TestCase(486, 6)]
+  [TestCase(576, 1)]
+  [Category("Conformance")]
+  public void FFmpegDecodesStandardDefinitionQuickTime(int height, byte fielDetail) {
+    FFmpegOracle.RequireAvailable();
+    const int WIDTH = 720;
+    var encoder = AvidMeridienCompressedVideoEncoder.Create(_Stream(WIDTH, height));
+    Assert.That(encoder.TryEncode(_Striped(WIDTH, height), 0, out var packet), Is.True);
+
+    var description = encoder.DescribeStream();
+    var file = VideoIO.Mux<Mp4Writer>([description], [packet]);
+    var parsed = Mp4Container.Streams(Mp4Container.FromBytes(file)).Single();
+    Assert.Multiple(() => {
+      Assert.That(parsed.Codec, Is.EqualTo(CodecTag.FromCharacters("AVDJ")));
+      Assert.That(parsed.Width, Is.EqualTo(WIDTH));
+      Assert.That(parsed.Height, Is.EqualTo(height));
+      Assert.That(parsed.CodecPrivateData.Span[^2], Is.EqualTo(2));
+      Assert.That(parsed.CodecPrivateData.Span[^1], Is.EqualTo(fielDetail));
+    });
+
+    var path = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName() + ".mov");
+    try {
+      File.WriteAllBytes(path, file);
+      var (decoded, detail) = FFmpegOracle.TryDecodeFirstFrame(path, WIDTH, height);
+      Assert.That(decoded, Is.True, detail);
+    } finally {
+      try { File.Delete(path); } catch { /* best effort */ }
+    }
   }
 
   [Test]
