@@ -9,48 +9,47 @@ jobs:
   probe:
     runs-on: ubuntu-latest
     steps:
-      - name: Unpack preserved ImageGear-era installers
+      - name: Inspect Canvas cabinets and AccuSoft records
         shell: bash
         run: |
           set -euo pipefail
           ROOT=/tmp/lpg-imagegear
           mkdir -p "$ROOT"
           cd "$ROOT"
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq p7zip-full unshield
 
-          echo '=== Chip 1999-08 generated file index ==='
+          echo '=== Chip 1999 AccuSoft record context ==='
           curl -fL --retry 3 -o chip-index.zip \
             'https://archive.org/download/czchip199908cd/Chip_1999-08_cd_dic-files.zip'
-          unzip -l chip-index.zip | head -80
-          mkdir chip-index
-          unzip -q chip-index.zip -d chip-index
-          echo '--- ImageGear/AccuSoft candidates in generated index ---'
-          grep -RIniE 'imagegear|accusoft|gear32sd|gear32|officegear|\.igf([[:space:]"<>]|$)' chip-index | head -500 || true
-          echo '--- candidate filenames ---'
-          find chip-index -type f -printf '%p\n' | grep -iE 'imagegear|accusoft|gear32|officegear|igf' | head -500 || true
+          unzip -q chip-index.zip 'Chip_1999-08_cd_mainInfo.txt' -d chip
+          INFO=chip/Chip_1999-08_cd_mainInfo.txt
+          sed -n '840,920p' "$INFO"
+          echo '--- second record ---'
+          sed -n '89460,89550p' "$INFO"
+          echo '--- third record ---'
+          sed -n '93240,93340p' "$INFO"
 
-          echo '=== Canvas 7 installer containers ==='
+          echo '=== Canvas 7 cabinets ==='
           curl -fL --retry 3 -o canvas7.iso \
             'https://archive.org/download/canvas-702-windows-1999/Canvas-702-Windows-1999.iso'
-          7z l -ba canvas7.iso > canvas-list.txt
-          grep -iE '\.(cab|hdr|exe|zip|dll)([[:space:]]|$)' canvas-list.txt | head -1000 || true
+          mkdir cabs
+          for p in Canvas7/DefaultProgram.Cab Canvas7/CanvasFilter.Cab Canvas7/CanvasTools.Cab; do
+            7z e -y -ocabs canvas7.iso "$p" >/dev/null
+          done
+          find cabs -type f -printf '%f %s bytes\n'
+          mkdir cabfiles
+          for cab in cabs/*.Cab; do
+            echo "--- LIST $cab ---"
+            7z l -ba "$cab" > "${cab}.list" || true
+            grep -iE 'gear|accu|image|\.dll([[:space:]]|$)|\.igf([[:space:]]|$)|\.ig7([[:space:]]|$)|fpx' "${cab}.list" | head -1000 || true
+            sub="cabfiles/$(basename "$cab" .Cab)"
+            mkdir -p "$sub"
+            7z x -y -o"$sub" "$cab" >/dev/null || true
+            echo "--- STRINGS $cab ---"
+            find "$sub" -type f -print0 | xargs -0 strings -a 2>/dev/null \
+              | grep -iE 'GEAR32SD\.DLL|ImageGear|AccuSoft|ImageGear Format|IG_SAVE_IGF|IG_FORMAT_IGF|\.IGF([^A-Za-z]|$)|diskfile\.ig|Xerox' \
+              | head -1000 || true
+          done
 
-          mkdir canvas
-          7z x -y -ocanvas canvas7.iso -r \
-            -i'!*.cab' -i'!*.hdr' -i'!setup*.exe' -i'!_setup.dll' -i'!data*.bin' >/dev/null || true
-          echo '--- extracted installer files ---'
-          find canvas -type f -printf '%p %s\n' | head -1000
-
-          echo '--- inspect InstallShield cabinets ---'
-          while IFS= read -r cab; do
-            dir=$(dirname "$cab")
-            echo "CAB=$cab"
-            (cd "$dir" && unshield l "$(basename "$cab")" 2>&1 | grep -iE 'gear32|imagegear|accusoft|\.igf$|accucnst|gear\.h|ig7|fpx' | head -500) || true
-            7z l -ba "$cab" 2>/dev/null | grep -iE 'gear32|imagegear|accusoft|\.igf([[:space:]]|$)|accucnst|gear\.h|ig7|fpx' | head -500 || true
-          done < <(find canvas -type f -iname '*.cab')
-
-          echo '--- raw strings across setup payloads ---'
-          find canvas -type f -print0 | xargs -0 strings -a 2>/dev/null \
-            | grep -iE 'GEAR32SD\.DLL|ImageGear|AccuSoft|ImageGear Format|IG_SAVE_IGF|IG_FORMAT_IGF|\.IGF([^A-Za-z]|$)|diskfile\.ig' \
-            | head -1000 || true
+          echo '=== candidate extracted binaries/files ==='
+          find cabfiles -type f -printf '%p %s bytes\n' \
+            | grep -iE 'gear|accu|\.igf |\.ig7 |fpx|image' | head -1000 || true
