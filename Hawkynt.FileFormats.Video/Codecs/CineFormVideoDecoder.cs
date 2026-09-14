@@ -17,16 +17,13 @@ namespace FileFormat.Codecs;
 /// from GoPro's SDK source or from ffmpeg's <c>cfhd</c> decoder — both are used, if at all, only as a
 /// black-box oracle on their output.
 /// <para/>
-/// <b>Intra only</b>, like every other codec of this shape in this library: no reference handling, no
-/// state carried between packets beyond the stream's declared dimensions.
+/// <b>Intra only.</b> CineForm's ordinary CFHD picture path has no P/B pictures or temporal motion
+/// references: each packet reconstructs independently from its own spatial wavelet coefficients.
 /// <para/>
-/// <b>Scope.</b> ffmpeg's own <c>cfhd</c> encoder writes exactly three pixel formats —
-/// <c>yuv422p10le</c>, <c>gbrp12le</c> and <c>gbrap12le</c> — and this decoder reads the two of them
-/// without alpha: ten-bit 4:2:2 YUV and twelve-bit RGB, three channels each, both confirmed against
-/// real encoded files. A frame stating any other channel count, including the alpha-bearing
-/// <c>gbrap12le</c> layout, is refused by name: alpha's channel position was never measured against a
-/// real file, and guessing at it would risk exactly the wrong-picture-that-looks-right failure this
-/// library refuses to ship.
+/// <b>Scope.</b> The decoder reads all three layouts ffmpeg's current <c>cfhd</c> encoder writes:
+/// ten-bit YUV 4:2:2, twelve-bit RGB 4:4:4, and twelve-bit RGBA 4:4:4:4. The latter includes the
+/// format's alpha companding step rather than treating channel four as linear colour data. Bayer/CFA
+/// and the separate layered/interlaced VC-5 extensions are refused by name rather than guessed at.
 /// </remarks>
 public sealed class CineFormVideoDecoder : IVideoCodecDecoder<CineFormVideoDecoder> {
 
@@ -61,14 +58,21 @@ public sealed class CineFormVideoDecoder : IVideoCodecDecoder<CineFormVideoDecod
   public bool TryDecode(CodedPacket packet, out RawImage frame) {
     var channels = this.DecodeChannels(packet.Data);
 
-    frame = new() {
-      Width = channels.ImageWidth,
-      Height = channels.ImageHeight,
-      Format = PixelFormat.Rgb24,
-      PixelData = channels.IsYuv
-        ? CineFormColorConversion.YuvToRgb24(channels)
-        : CineFormColorConversion.RgbToRgb24(channels),
-    };
+    frame = channels.HasAlpha
+      ? new() {
+        Width = channels.ImageWidth,
+        Height = channels.ImageHeight,
+        Format = PixelFormat.Rgba32,
+        PixelData = CineFormColorConversion.RgbaToRgba32(channels),
+      }
+      : new() {
+        Width = channels.ImageWidth,
+        Height = channels.ImageHeight,
+        Format = PixelFormat.Rgb24,
+        PixelData = channels.IsYuv
+          ? CineFormColorConversion.YuvToRgb24(channels)
+          : CineFormColorConversion.RgbToRgb24(channels),
+      };
 
     return true;
   }
