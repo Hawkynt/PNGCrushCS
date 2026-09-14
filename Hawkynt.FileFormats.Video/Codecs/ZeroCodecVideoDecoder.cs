@@ -21,14 +21,16 @@ namespace FileFormat.Codecs;
 /// rows from the bottom upwards, and fixes the pixel format at packed UYVY 4:2:2. Its decoder is
 /// permissively licensed; this implementation independently expresses those bitstream rules in the
 /// package's own packet and packed-YUV abstractions rather than translating its source structure.
+/// Container bit-depth metadata is deliberately not used to select a coded layout: the reference
+/// decoder fixes UYVY itself, while the original VFW codec accepted several application-facing input
+/// and output formats.
 /// <para/>
 /// The decompressed picture is returned as <see cref="PixelFormat.Yuv422P8"/> so the samples remain
 /// lossless. Colour-space conversion is a caller decision; the codec itself carries no matrix that
 /// would justify choosing one here.
 /// <para/>
-/// <b>What refuses.</b> A picture with no pixels, an odd width, a depth other than the 16-bit UYVY
-/// layout implemented by the reference decoder, an inter picture before a reference exists, and a
-/// packet whose zlib stream is corrupt or does not inflate to exactly one picture.
+/// <b>What refuses.</b> A picture with no pixels, an odd width, an inter picture before a reference
+/// exists, and a packet whose zlib stream is corrupt or does not inflate to exactly one picture.
 /// </remarks>
 public sealed class ZeroCodecVideoDecoder : IVideoCodecDecoder<ZeroCodecVideoDecoder> {
 
@@ -62,11 +64,6 @@ public sealed class ZeroCodecVideoDecoder : IVideoCodecDecoder<ZeroCodecVideoDec
 
     if (stream.Kind != MediaStreamKind.Video)
       throw new NotSupportedException("ZeroCodec can only decode a video stream.");
-
-    if (stream.BitsPerPixel != 16)
-      throw new NotSupportedException(
-        $"Video stream {stream.Index} states {stream.BitsPerPixel} bits a pixel. ZeroCodec's decoded bitstream "
-        + "layout is packed UYVY 4:2:2 at 16 bits a pixel.");
 
     return new(stream, PackedYuv422Packing.For(stream, PackedYuv422Order.CbLumaCrLuma, "ZeroCodec"));
   }
