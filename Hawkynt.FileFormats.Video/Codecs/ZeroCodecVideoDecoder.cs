@@ -21,16 +21,19 @@ namespace FileFormat.Codecs;
 /// rows from the bottom upwards, and fixes the pixel format at packed UYVY 4:2:2. Its decoder is
 /// permissively licensed; this implementation independently expresses those bitstream rules in the
 /// package's own packet and packed-YUV abstractions rather than translating its source structure.
-/// Container bit-depth metadata is deliberately not used to select a coded layout: the reference
-/// decoder fixes UYVY itself, while the original VFW codec accepted several application-facing input
-/// and output formats.
+/// <para/>
+/// The original VFW codec advertised RGB, UYVY and YUY2 application-facing I/O and described an
+/// internal RGB24 conversion. No sample or independent bitstream description establishes how a ZECO
+/// stream whose container advertises another depth is laid out, while the available FFmpeg decoder
+/// implements only 16-bit UYVY. Such streams are refused rather than reinterpreted as UYVY.
 /// <para/>
 /// The decompressed picture is returned as <see cref="PixelFormat.Yuv422P8"/> so the samples remain
 /// lossless. Colour-space conversion is a caller decision; the codec itself carries no matrix that
 /// would justify choosing one here.
 /// <para/>
-/// <b>What refuses.</b> A picture with no pixels, an odd width, an inter picture before a reference
-/// exists, and a packet whose zlib stream is corrupt or does not inflate to exactly one picture.
+/// <b>What refuses.</b> A picture with no pixels, an odd width, a container depth other than the
+/// measured 16-bit UYVY layout, an inter picture before a reference exists, and a packet whose zlib
+/// stream is corrupt or does not inflate to exactly one picture.
 /// </remarks>
 public sealed class ZeroCodecVideoDecoder : IVideoCodecDecoder<ZeroCodecVideoDecoder> {
 
@@ -64,6 +67,12 @@ public sealed class ZeroCodecVideoDecoder : IVideoCodecDecoder<ZeroCodecVideoDec
 
     if (stream.Kind != MediaStreamKind.Video)
       throw new NotSupportedException("ZeroCodec can only decode a video stream.");
+
+    if (stream.BitsPerPixel != 16)
+      throw new NotSupportedException(
+        $"Video stream {stream.Index} states {stream.BitsPerPixel} bits a pixel. The independently verified "
+        + "ZeroCodec bitstream layout is packed UYVY 4:2:2 at 16 bits a pixel; the original codec's other "
+        + "advertised I/O formats do not establish another coded layout.");
 
     return new(stream, PackedYuv422Packing.For(stream, PackedYuv422Order.CbLumaCrLuma, "ZeroCodec"));
   }
