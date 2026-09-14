@@ -153,7 +153,8 @@ public class LclZlibVideoEncoderTests {
   [Category("Unit")]
   public void HistoricalYuvModesRoundTripNativeSamplesForEveryFlagCombination() {
     var modes = new[] {
-      (LclZlibVideoEncoder.ImageType.Yuv111, PixelFormat.Yuv444P8, Width: 7, Height: 5),
+      // 6x3 is deliberately not section-aligned by row: the 54-byte YUV111 payload splits at byte 27.
+      (LclZlibVideoEncoder.ImageType.Yuv111, PixelFormat.Yuv444P8, Width: 6, Height: 3),
       (LclZlibVideoEncoder.ImageType.Yuv422, PixelFormat.Yuv422P8, Width: 8, Height: 5),
       (LclZlibVideoEncoder.ImageType.Yuv411, PixelFormat.Yuv411P8, Width: 8, Height: 5),
       (LclZlibVideoEncoder.ImageType.Yuv211, PixelFormat.Yuv422P8, Width: 8, Height: 5),
@@ -192,6 +193,37 @@ public class LclZlibVideoEncoderTests {
         Assert.That(decoder.TryDecode(packet, out var decoded), Is.True);
         Assert.That(decoded.PixelData, Is.EqualTo(picture.PixelData), $"filter={pngFiltered}, split={multithreaded}");
       }
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void SplitRgbUsesHistoricalFourByteRowPadding() {
+    var picture = new RawImage {
+      Width = 3,
+      Height = 2,
+      Format = PixelFormat.Bgr24,
+      PixelData = new byte[] {
+        10, 11, 12, 13, 14, 15, 16, 17, 18,
+        1, 2, 3, 4, 5, 6, 7, 8, 9,
+      },
+    };
+    var encoder = LclZlibVideoEncoder.Create(
+      _Stream(3, 2), LclZlibVideoEncoder.ImageType.Rgb24, multithreaded: true);
+    var decoder = LclZlibVideoDecoder.Create(encoder.DescribeStream());
+
+    Assert.That(encoder.TryEncode(picture, 0, out var packet), Is.True);
+    var (first, second, sectionLength) = _InflateSplit(packet.Data);
+    var packed = first.Concat(second).ToArray();
+
+    Assert.Multiple(() => {
+      Assert.That(sectionLength, Is.EqualTo(12));
+      Assert.That(packed, Is.EqualTo(new byte[] {
+        1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 0, 0,
+        10, 11, 12, 13, 14, 15, 16, 17, 18, 0, 0, 0,
+      }));
+      Assert.That(decoder.TryDecode(packet, out var decoded), Is.True);
+      Assert.That(decoded.PixelData, Is.EqualTo(picture.PixelData));
+    });
   }
 
   [Test]
@@ -337,6 +369,13 @@ public class LclZlibVideoEncoderTests {
   public void RefusesAPictureWithNoPixels() {
     var failure = Assert.Throws<NotSupportedException>(() => LclZlibVideoEncoder.Create(_Stream(0, 4)));
     Assert.That(failure!.Message, Does.Contain("0x4"));
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void RefusesAnUnknownHistoricalImageType() {
+    Assert.Throws<ArgumentOutOfRangeException>(() =>
+      LclZlibVideoEncoder.Create(_Stream(4, 4), (LclZlibVideoEncoder.ImageType)6));
   }
 
   [Test]
