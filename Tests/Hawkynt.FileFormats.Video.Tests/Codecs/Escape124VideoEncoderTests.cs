@@ -1,4 +1,3 @@
-using System;
 using System.Buffers.Binary;
 using System.IO;
 using System.Linq;
@@ -25,7 +24,7 @@ public sealed class Escape124VideoEncoderTests {
   [Test]
   [Category("Unit")]
   public void StreamDescriptionUsesTheRplCodecNumberAndRgbDepth() {
-    var requested = _Stream(8, 8) withTimeBase: false;
+    var requested = _Stream(8, 8);
     var encoder = Escape124VideoEncoder.Create(requested);
     var described = encoder.DescribeStream();
 
@@ -52,7 +51,9 @@ public sealed class Escape124VideoEncoderTests {
     Assert.That(packet.IsKeyFrame, Is.True);
     Assert.That(packet.PresentationTimestamp, Is.EqualTo(7));
     Assert.That(packet.DecodeTimestamp, Is.EqualTo(7));
-    Assert.That(BinaryPrimitives.ReadUInt32LittleEndian(packet.Data.Span[4..8]), Is.EqualTo(packet.Data.Length));
+    Assert.That(
+      BinaryPrimitives.ReadUInt32LittleEndian(packet.Data.Span[4..8]),
+      Is.EqualTo(checked((uint)packet.Data.Length)));
 
     Assert.That(decoder.TryDecode(packet, out var decoded), Is.True);
     Assert.That(decoded.PixelData, Is.EqualTo(source.PixelData));
@@ -74,7 +75,7 @@ public sealed class Escape124VideoEncoderTests {
       Assert.That(repeat.IsKeyFrame, Is.False);
       Assert.That(repeat.Data.Length, Is.EqualTo(8));
       Assert.That(BinaryPrimitives.ReadUInt32LittleEndian(repeat.Data.Span[..4]), Is.Zero);
-      Assert.That(BinaryPrimitives.ReadUInt32LittleEndian(repeat.Data.Span[4..8]), Is.EqualTo(8));
+      Assert.That(BinaryPrimitives.ReadUInt32LittleEndian(repeat.Data.Span[4..8]), Is.EqualTo(8u));
     });
 
     Assert.That(decoder.TryDecode(repeat, out var repeated), Is.True);
@@ -102,7 +103,7 @@ public sealed class Escape124VideoEncoderTests {
 
   [Test]
   [Category("Unit")]
-  public void ThreeColourMacroblockUsesTheBestRepresentablePairAndRemainsDecodable() {
+  public void FourColourMacroblockUsesTheBestRepresentablePairAndRemainsDecodable() {
     var stream = _Stream(8, 8);
     var encoder = Escape124VideoEncoder.Create(stream);
     var decoder = Escape124VideoDecoder.Create(stream);
@@ -120,10 +121,12 @@ public sealed class Escape124VideoEncoderTests {
 
     Assert.That(encoder.TryEncode(source, 0, out var packet), Is.True);
     Assert.That(decoder.TryDecode(packet, out var decoded), Is.True);
-    Assert.That(decoded.Width, Is.EqualTo(8));
-    Assert.That(decoded.Height, Is.EqualTo(8));
-    Assert.That(decoded.Format, Is.EqualTo(PixelFormat.Rgb24));
-    Assert.That(decoded.PixelData, Has.Length.EqualTo(8 * 8 * 3));
+    Assert.Multiple(() => {
+      Assert.That(decoded.Width, Is.EqualTo(8));
+      Assert.That(decoded.Height, Is.EqualTo(8));
+      Assert.That(decoded.Format, Is.EqualTo(PixelFormat.Rgb24));
+      Assert.That(decoded.PixelData, Has.Length.EqualTo(8 * 8 * 3));
+    });
   }
 
   [Test]
