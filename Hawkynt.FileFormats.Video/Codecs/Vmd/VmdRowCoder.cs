@@ -1,34 +1,25 @@
 using System;
+using System.Buffers.Binary;
 using System.IO;
 
 namespace FileFormat.Codecs.Vmd;
 
-/// <summary>
-/// Paints a video frame's rectangle onto the persistent canvas VMD keeps between pictures, in either
-/// of the two rendering methods this decoder reads.
-/// </summary>
+/// <summary>Paints the three classic eight-bit Sierra VMD rectangle methods onto a persistent canvas.</summary>
 /// <remarks>
-/// A skip run needs no second buffer the way Interplay MVE's or id RoQ's own skip opcodes do — see
-/// either decoder's own remarks for why those reach back across pictures. Here "copy the same position
-/// from the previous frame" and "leave this byte alone" are the same instruction: nothing in a picture
-/// still being painted has touched a skipped byte yet, in the left-to-right, top-to-bottom order both
-/// methods paint in, so the canvas already holds exactly what a skip states. Method 1 is therefore
-/// written as a genuine in-place mutation of one persistent buffer rather than a read from one buffer
-/// into another.
+/// Converted from FFmpeg's LGPL-2.1-or-later <c>libavcodec/vmdvideo.c</c>; provenance and licence are
+/// recorded beside this file. Methods 1 and 3 are inter-frame codings: a control byte with its high bit
+/// clear copies that run from the preceding picture. Method 3 adds a pair-oriented RLE spelling inside
+/// literal runs. Method 2 is a plain row-major rectangle and needs no reference picture.
 /// </remarks>
 internal static class VmdRowCoder {
 
   private const byte _LITERAL_FLAG = 0x80;
   private const byte _RUN_LENGTH_MASK = 0x7F;
+  private const byte _PAIR_RLE_MARKER = 0xFF;
 
-  /// <summary>
-  /// Method 1: one control byte a run, read left to right along each row of the rectangle and never
-  /// reset between rows. A run with its top bit set is a literal — the run length is that byte's low
-  /// seven bits plus one, and that many bytes follow in the stream to paint. A run with the top bit
-  /// clear is a skip of the low seven bits plus one bytes, which needs nothing pulled from anywhere
-  /// else — see this type's own remarks.
-  /// </summary>
-  internal static void DecodeMethod1(ReadOnlySpan<byte> data, byte[] canvas, int canvasWidth, int canvasHeight, int left, int top, int width, int height) {
+  internal static void DecodeMethod1(
+    ReadOnlySpan<byte> data, byte[] canvas, int canvasWidth, int canvasHeight,
+    int left, int top, int width, int height, bool hasPreviousFrame) {
     _ValidateRectangle(canvasWidth, canvasHeight, left, top, width, height);
 
     var position = 0;
@@ -37,57 +28,148 @@ internal static class VmdRowCoder {
       var offset = 0;
 
       while (offset < width) {
-        if (position >= data.Length)
+        var control = _ReadByte(data, ref position, "method 1", row, offset, width, height);
+        var runLength = (control & _RUN_LENGTH_MASK) + 1;
+        if (offset + runLength > width)
           throw new InvalidDataException(
-            $"A method 1 VMD video frame ran out of row data at row {row}, column {offset} of a {width}x{height} rectangle.");
-
-        var control = data[position++];
+            $"A method 1 VMD run at row {row}, column {offset} is {runLength} bytes, "
+            + $"past the rectangle width of {width}.");
 
         if ((control & _LITERAL_FLAG) != 0) {
-          var runLength = (control & _RUN_LENGTH_MASK) + 1;
-          if (offset + runLength > width)
-            throw new InvalidDataException(
-              $"A method 1 VMD video frame's literal run at row {row}, column {offset} is {runLength} bytes, "
-              + $"which runs past the rectangle's own width of {width}.");
           if (position + runLength > data.Length)
             throw new InvalidDataException(
-              $"A method 1 VMD video frame's literal run at row {row}, column {offset} wants {runLength} bytes, "
+              $"A method 1 VMD literal at row {row}, column {offset} wants {runLength} bytes, "
               + "more than the packet holds.");
-
           data.Slice(position, runLength).CopyTo(canvas.AsSpan(rowStart + offset, runLength));
           position += runLength;
-          offset += runLength;
-        } else {
-          var skipLength = control + 1;
-          if (offset + skipLength > width)
-            throw new InvalidDataException(
-              $"A method 1 VMD video frame's skip run at row {row}, column {offset} is {skipLength} bytes, "
-              + $"which runs past the rectangle's own width of {width}.");
+        } else if (!hasPreviousFrame)
+          throw new InvalidDataException(
+            $"A method 1 VMD first picture asks to copy {runLength} pixels from a preceding picture that does not exist.");
 
-          // Nothing to copy — see this type's own remarks on why a skip is a no-op here.
-          offset += skipLength;
-        }
+        offset += runLength;
       }
     }
   }
 
-  /// <summary>Method 2: the rectangle's bytes in plain row-major order, one a pixel, and nothing else.</summary>
-  internal static void DecodeMethod2(ReadOnlySpan<byte> data, byte[] canvas, int canvasWidth, int canvasHeight, int left, int top, int width, int height) {
+  internal static void DecodeMethod2(
+    ReadOnlySpan<byte> data, byte[] canvas, int canvasWidth, int canvasHeight,
+    int left, int top, int width, int height) {
     _ValidateRectangle(canvasWidth, canvasHeight, left, top, width, height);
 
-    var required = (long)width * height;
+    var required = checked(width * height);
     if (data.Length < required)
       throw new InvalidDataException(
-        $"A method 2 VMD video frame is {data.Length} bytes, short of the {required} a {width}x{height} rectangle needs.");
+        $"A method 2 VMD rectangle is {data.Length} bytes, short of the {required} a {width}x{height} rectangle needs.");
 
+    for (var row = 0; row < height; ++row)
+      data.Slice(row * width, width).CopyTo(canvas.AsSpan((top + row) * canvasWidth + left, width));
+  }
+
+  internal static void DecodeMethod3(
+    ReadOnlySpan<byte> data, byte[] canvas, int canvasWidth, int canvasHeight,
+    int left, int top, int width, int height, bool hasPreviousFrame) {
+    _ValidateRectangle(canvasWidth, canvasHeight, left, top, width, height);
+
+    var position = 0;
     for (var row = 0; row < height; ++row) {
       var rowStart = (top + row) * canvasWidth + left;
-      data.Slice(row * width, width).CopyTo(canvas.AsSpan(rowStart, width));
+      var offset = 0;
+
+      while (offset < width) {
+        var control = _ReadByte(data, ref position, "method 3", row, offset, width, height);
+        var runLength = (control & _RUN_LENGTH_MASK) + 1;
+        if (offset + runLength > width)
+          throw new InvalidDataException(
+            $"A method 3 VMD run at row {row}, column {offset} is {runLength} bytes, "
+            + $"past the rectangle width of {width}.");
+
+        if ((control & _LITERAL_FLAG) == 0) {
+          if (!hasPreviousFrame)
+            throw new InvalidDataException(
+              $"A method 3 VMD first picture asks to copy {runLength} pixels from a preceding picture that does not exist.");
+          offset += runLength;
+          continue;
+        }
+
+        if (position >= data.Length)
+          throw new InvalidDataException(
+            $"A method 3 VMD literal at row {row}, column {offset} has no data behind its control byte.");
+
+        if (data[position] != _PAIR_RLE_MARKER) {
+          if (position + runLength > data.Length)
+            throw new InvalidDataException(
+              $"A method 3 VMD literal at row {row}, column {offset} wants {runLength} bytes, "
+              + "more than the packet holds.");
+          data.Slice(position, runLength).CopyTo(canvas.AsSpan(rowStart + offset, runLength));
+          position += runLength;
+          offset += runLength;
+          continue;
+        }
+
+        ++position;
+        _DecodePairRle(data, ref position, canvas.AsSpan(rowStart + offset, runLength));
+        offset += runLength;
+      }
     }
   }
 
+  /// <summary>
+  /// Expands method 3's inner RLE. An odd output begins with one literal byte; the remainder is made
+  /// of two-byte units. High-bit commands copy an even literal byte count, low-bit commands repeat one
+  /// little-endian two-byte value.
+  /// </summary>
+  private static void _DecodePairRle(ReadOnlySpan<byte> data, ref int position, Span<byte> destination) {
+    var written = 0;
+    if ((destination.Length & 1) != 0) {
+      if (position >= data.Length)
+        throw new InvalidDataException("A method 3 VMD pair-RLE run is missing its odd leading literal byte.");
+      destination[written++] = data[position++];
+    }
+
+    while (written < destination.Length) {
+      if (position >= data.Length)
+        throw new InvalidDataException(
+          $"A method 3 VMD pair-RLE run ended after {written} of {destination.Length} output bytes.");
+
+      var command = data[position++];
+      if ((command & _LITERAL_FLAG) != 0) {
+        var count = (command & _RUN_LENGTH_MASK) * 2;
+        if (count == 0)
+          continue;
+        if (written + count > destination.Length || position + count > data.Length)
+          throw new InvalidDataException("A method 3 VMD pair-RLE literal runs past its declared literal span.");
+        data.Slice(position, count).CopyTo(destination[written..]);
+        position += count;
+        written += count;
+        continue;
+      }
+
+      var repetitions = command;
+      var countBytes = repetitions * 2;
+      if (countBytes == 0)
+        continue;
+      if (written + countBytes > destination.Length || position + 2 > data.Length)
+        throw new InvalidDataException("A method 3 VMD pair-RLE repeat runs past its declared literal span.");
+
+      var pair = BinaryPrimitives.ReadUInt16LittleEndian(data[position..]);
+      position += 2;
+      for (var i = 0; i < repetitions; ++i) {
+        BinaryPrimitives.WriteUInt16LittleEndian(destination[written..], pair);
+        written += 2;
+      }
+    }
+  }
+
+  private static byte _ReadByte(ReadOnlySpan<byte> data, ref int position, string method, int row, int offset, int width, int height) {
+    if (position >= data.Length)
+      throw new InvalidDataException(
+        $"A {method} VMD rectangle ran out of row data at row {row}, column {offset} of {width}x{height}.");
+    return data[position++];
+  }
+
   private static void _ValidateRectangle(int canvasWidth, int canvasHeight, int left, int top, int width, int height) {
-    if (left < 0 || top < 0 || width <= 0 || height <= 0 || left + width > canvasWidth || top + height > canvasHeight)
+    if (left < 0 || top < 0 || width <= 0 || height <= 0
+        || left > canvasWidth - width || top > canvasHeight - height)
       throw new InvalidDataException(
         $"A VMD video frame states a rectangle of {width}x{height} at ({left},{top}), which does not fit "
         + $"inside the {canvasWidth}x{canvasHeight} picture.");

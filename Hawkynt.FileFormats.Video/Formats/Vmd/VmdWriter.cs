@@ -2,12 +2,13 @@ using System;
 using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using FileFormat.Core;
 using Hawkynt.FileFormats.Video;
 
 namespace FileFormat.Vmd;
 
-/// <summary>Writes classic 816-byte Sierra VMD files from record-prefixed demux packets.</summary>
+/// <summary>Writes classic 816-byte Sierra VMD files with a real fixed-stride block/part table.</summary>
 public sealed class VmdWriter : IVideoContainerWriter<VmdWriter> {
 
   private const int _HEADER_LENGTH = 816;
@@ -17,7 +18,9 @@ public sealed class VmdWriter : IVideoContainerWriter<VmdWriter> {
   private const int _OFFSET_WIDTH = 12;
   private const int _OFFSET_HEIGHT = 14;
   private const int _OFFSET_FLAGS = 16;
+  private const int _OFFSET_FRAMES_PER_BLOCK = 18;
   private const int _OFFSET_MULTIMEDIA_DATA = 20;
+  private const int _OFFSET_VIDEO_CODEC = 24;
   private const int _OFFSET_AUDIO_SAMPLE_RATE = 804;
   private const int _OFFSET_AUDIO_FRAME_LENGTH = 806;
   private const int _OFFSET_TOC = 812;
@@ -27,7 +30,10 @@ public sealed class VmdWriter : IVideoContainerWriter<VmdWriter> {
 
   private readonly IReadOnlyList<MediaStreamInfo> _streams;
   private readonly List<CodedPacket> _packets = [];
+  private readonly bool _isIndeo3;
   private bool _finished;
+
+  private readonly record struct _Part(byte[] Record, ReadOnlyMemory<byte> Payload, int StreamIndex);
 
   private VmdWriter(IReadOnlyList<MediaStreamInfo> streams, VideoMetadata metadata) {
     ArgumentNullException.ThrowIfNull(streams);
@@ -36,12 +42,14 @@ public sealed class VmdWriter : IVideoContainerWriter<VmdWriter> {
       throw new NotSupportedException("Classic VMD contains one video stream and at most one audio stream.");
 
     var video = streams[0];
-    if (video.Index != 0 || video.Kind != MediaStreamKind.Video
-        || !video.Codec.EqualsIgnoringCase(CodecTag.FromCharacters("VMDV")))
-      throw new NotSupportedException("VMD stream zero must be VMDV video.");
+    var native = video.Codec.EqualsIgnoringCase(CodecTag.FromCharacters("VMDV"));
+    var indeo3 = video.Codec.EqualsIgnoringCase(CodecTag.FromCharacters("IV31"))
+      || video.Codec.EqualsIgnoringCase(CodecTag.FromCharacters("IV32"));
+    if (video.Index != 0 || video.Kind != MediaStreamKind.Video || !(native || indeo3))
+      throw new NotSupportedException("VMD stream zero must be native VMDV video or embedded Indeo 3.");
     if (video.CodecPrivateData.Length != _HEADER_LENGTH)
       throw new NotSupportedException(
-        "VMD muxing needs the original classic 816-byte header in video CodecPrivateData; the codec version and initial palette live there.");
+        "VMD muxing needs the original or encoder-produced classic 816-byte VMD header in video CodecPrivateData.");
 
     if (streams.Count == 2) {
       var audio = streams[1];
@@ -51,6 +59,7 @@ public sealed class VmdWriter : IVideoContainerWriter<VmdWriter> {
     }
 
     this._streams = streams;
+    this._isIndeo3 = indeo3;
   }
 
   public static string PrimaryExtension => ".vmd";
@@ -63,13 +72,16 @@ public sealed class VmdWriter : IVideoContainerWriter<VmdWriter> {
       throw new InvalidOperationException("VMD writer has already been finished.");
     if ((uint)packet.StreamIndex >= (uint)this._streams.Count)
       throw new ArgumentOutOfRangeException(nameof(packet), packet.StreamIndex, "Packet names no declared VMD stream.");
-    if (packet.Data.Length < _FRAME_RECORD_LENGTH)
-      throw new InvalidDataException("A VMD packet must carry its original sixteen-byte frame-information record in front of its coded bytes.");
 
-    var expected = packet.StreamIndex == 0 ? _TYPE_VIDEO : _TYPE_AUDIO;
-    if (packet.Data.Span[0] != expected)
-      throw new InvalidDataException(
-        $"VMD stream {packet.StreamIndex} packet carries record type {packet.Data.Span[0]}, expected {expected}.");
+    if (!(this._isIndeo3 && packet.StreamIndex == 0)) {
+      if (packet.Data.Length < _FRAME_RECORD_LENGTH)
+        throw new InvalidDataException(
+          "A native VMD packet must carry its sixteen-byte frame-information record before its coded bytes.");
+      var expected = packet.StreamIndex == 0 ? _TYPE_VIDEO : _TYPE_AUDIO;
+      if (packet.Data.Span[0] != expected)
+        throw new InvalidDataException(
+          $"VMD stream {packet.StreamIndex} packet carries record type {packet.Data.Span[0]}, expected {expected}.");
+    }
 
     this._packets.Add(packet);
   }
@@ -82,70 +94,108 @@ public sealed class VmdWriter : IVideoContainerWriter<VmdWriter> {
       throw new InvalidDataException("VMD needs at least one frame-information record.");
 
     var header = this._streams[0].CodecPrivateData.ToArray();
-    BinaryPrimitives.WriteUInt16LittleEndian(header.AsSpan(0, 2), 814);
-    BinaryPrimitives.WriteUInt32LittleEndian(header.AsSpan(_OFFSET_MULTIMEDIA_DATA, 4), _HEADER_LENGTH);
+    BinaryPrimitives.WriteUInt16LittleEndian(header, 814);
+    BinaryPrimitives.WriteUInt32LittleEndian(header.AsSpan(_OFFSET_MULTIMEDIA_DATA), _HEADER_LENGTH);
     if (this._streams[0].Width > 0)
-      BinaryPrimitives.WriteUInt16LittleEndian(header.AsSpan(_OFFSET_WIDTH, 2), checked((ushort)this._streams[0].Width));
+      BinaryPrimitives.WriteUInt16LittleEndian(header.AsSpan(_OFFSET_WIDTH), checked((ushort)this._streams[0].Width));
     if (this._streams[0].Height > 0)
-      BinaryPrimitives.WriteUInt16LittleEndian(header.AsSpan(_OFFSET_HEIGHT, 2), checked((ushort)this._streams[0].Height));
+      BinaryPrimitives.WriteUInt16LittleEndian(header.AsSpan(_OFFSET_HEIGHT), checked((ushort)this._streams[0].Height));
+
+    if (this._isIndeo3) {
+      var tag = this._streams[0].Codec.Value;
+      BinaryPrimitives.WriteUInt32LittleEndian(header.AsSpan(_OFFSET_VIDEO_CODEC), tag);
+    }
 
     if (this._streams.Count == 2) {
-      BinaryPrimitives.WriteUInt16LittleEndian(header.AsSpan(_OFFSET_FLAGS, 2),
-        (ushort)(BinaryPrimitives.ReadUInt16LittleEndian(header.AsSpan(_OFFSET_FLAGS, 2)) | _FLAG_HAS_SOUND));
-      var audio = this._streams[1];
-      var sampleRate = _SampleRate(audio);
+      var flags = BinaryPrimitives.ReadUInt16LittleEndian(header.AsSpan(_OFFSET_FLAGS));
+      BinaryPrimitives.WriteUInt16LittleEndian(header.AsSpan(_OFFSET_FLAGS), (ushort)(flags | _FLAG_HAS_SOUND));
+      var sampleRate = _SampleRate(this._streams[1]);
       if (sampleRate > 0)
-        BinaryPrimitives.WriteUInt16LittleEndian(header.AsSpan(_OFFSET_AUDIO_SAMPLE_RATE, 2), checked((ushort)sampleRate));
+        BinaryPrimitives.WriteUInt16LittleEndian(header.AsSpan(_OFFSET_AUDIO_SAMPLE_RATE), checked((ushort)sampleRate));
     } else {
-      BinaryPrimitives.WriteUInt16LittleEndian(header.AsSpan(_OFFSET_FLAGS, 2),
-        (ushort)(BinaryPrimitives.ReadUInt16LittleEndian(header.AsSpan(_OFFSET_FLAGS, 2)) & ~_FLAG_HAS_SOUND));
-      BinaryPrimitives.WriteUInt16LittleEndian(header.AsSpan(_OFFSET_AUDIO_SAMPLE_RATE, 2), 0);
-      BinaryPrimitives.WriteInt16LittleEndian(header.AsSpan(_OFFSET_AUDIO_FRAME_LENGTH, 2), 0);
+      var flags = BinaryPrimitives.ReadUInt16LittleEndian(header.AsSpan(_OFFSET_FLAGS));
+      BinaryPrimitives.WriteUInt16LittleEndian(header.AsSpan(_OFFSET_FLAGS), (ushort)(flags & ~_FLAG_HAS_SOUND));
+      BinaryPrimitives.WriteUInt16LittleEndian(header.AsSpan(_OFFSET_AUDIO_SAMPLE_RATE), 0);
+      BinaryPrimitives.WriteInt16LittleEndian(header.AsSpan(_OFFSET_AUDIO_FRAME_LENGTH), 0);
     }
+
+    var blocks = this._BuildBlocks(header);
+    var framesPerBlock = blocks.Max(static block => block.Count);
+    if (blocks.Count > ushort.MaxValue || framesPerBlock > ushort.MaxValue)
+      throw new NotSupportedException("VMD's block count and fixed parts-per-block count are sixteen-bit fields.");
 
     using var output = new MemoryStream();
     output.Write(header);
 
-    var records = new byte[this._packets.Count][];
-    var blockOffsets = new List<uint>();
-    var sawVideo = false;
-
-    for (var i = 0; i < this._packets.Count; ++i) {
-      var packet = this._packets[i];
-      var type = packet.StreamIndex == 0 ? _TYPE_VIDEO : _TYPE_AUDIO;
-
-      // A block begins at the first record and then at each subsequent video frame. This is the
-      // canonical one-video-frame-per-block spelling; audio records between pictures remain in the
-      // same block and therefore keep their interleaving without inventing codec timing.
-      if (blockOffsets.Count == 0 || type == _TYPE_VIDEO && sawVideo)
-        blockOffsets.Add(checked((uint)output.Position));
-      if (type == _TYPE_VIDEO)
-        sawVideo = true;
-
-      var coded = packet.Data[_FRAME_RECORD_LENGTH..];
-      output.Write(coded.Span);
-
-      var record = packet.Data[.._FRAME_RECORD_LENGTH].ToArray();
-      record[0] = type;
-      BinaryPrimitives.WriteUInt32LittleEndian(record.AsSpan(2, 4), checked((uint)coded.Length));
-      records[i] = record;
+    var blockOffsets = new uint[blocks.Count];
+    foreach (var (block, index) in blocks.Select(static (value, index) => (value, index))) {
+      blockOffsets[index] = checked((uint)output.Position);
+      foreach (var part in block)
+        output.Write(part.Payload.Span);
     }
-
-    if (blockOffsets.Count > ushort.MaxValue)
-      throw new NotSupportedException("VMD block table exceeds its 16-bit block count.");
 
     var tocOffset = checked((uint)output.Position);
     foreach (var offset in blockOffsets) {
       ContainerWriterTools.WriteUInt16LittleEndian(output, 0);
       ContainerWriterTools.WriteUInt32LittleEndian(output, offset);
     }
-    foreach (var record in records)
-      output.Write(record);
+
+    var emptyRecord = new byte[_FRAME_RECORD_LENGTH];
+    foreach (var block in blocks) {
+      foreach (var part in block)
+        output.Write(part.Record);
+      for (var part = block.Count; part < framesPerBlock; ++part)
+        output.Write(emptyRecord);
+    }
 
     var bytes = output.ToArray();
-    BinaryPrimitives.WriteUInt16LittleEndian(bytes.AsSpan(_OFFSET_NUM_BLOCKS, 2), checked((ushort)blockOffsets.Count));
-    BinaryPrimitives.WriteUInt32LittleEndian(bytes.AsSpan(_OFFSET_TOC, 4), tocOffset);
+    BinaryPrimitives.WriteUInt16LittleEndian(bytes.AsSpan(_OFFSET_NUM_BLOCKS), checked((ushort)blocks.Count));
+    BinaryPrimitives.WriteUInt16LittleEndian(bytes.AsSpan(_OFFSET_FRAMES_PER_BLOCK), checked((ushort)framesPerBlock));
+    BinaryPrimitives.WriteUInt32LittleEndian(bytes.AsSpan(_OFFSET_TOC), tocOffset);
     return bytes;
+  }
+
+  private List<List<_Part>> _BuildBlocks(ReadOnlySpan<byte> header) {
+    var blocks = new List<List<_Part>>();
+    var current = new List<_Part>();
+    var currentHasVideo = false;
+
+    foreach (var packet in this._packets) {
+      var isVideo = packet.StreamIndex == 0;
+      if (isVideo && currentHasVideo) {
+        blocks.Add(current);
+        current = [];
+        currentHasVideo = false;
+      }
+
+      current.Add(this._Part(packet, header));
+      currentHasVideo |= isVideo;
+    }
+
+    if (current.Count != 0)
+      blocks.Add(current);
+    return blocks;
+  }
+
+  private _Part _Part(CodedPacket packet, ReadOnlySpan<byte> header) {
+    if (this._isIndeo3 && packet.StreamIndex == 0) {
+      var record = new byte[_FRAME_RECORD_LENGTH];
+      record[0] = _TYPE_VIDEO;
+      BinaryPrimitives.WriteUInt32LittleEndian(record.AsSpan(2), checked((uint)packet.Data.Length));
+      var left = BinaryPrimitives.ReadUInt16LittleEndian(header[10..]);
+      var top = BinaryPrimitives.ReadUInt16LittleEndian(header[8..]);
+      BinaryPrimitives.WriteUInt16LittleEndian(record.AsSpan(6), left);
+      BinaryPrimitives.WriteUInt16LittleEndian(record.AsSpan(8), top);
+      BinaryPrimitives.WriteUInt16LittleEndian(record.AsSpan(10), checked((ushort)(left + this._streams[0].Width - 1)));
+      BinaryPrimitives.WriteUInt16LittleEndian(record.AsSpan(12), checked((ushort)(top + this._streams[0].Height - 1)));
+      return new(record, packet.Data, packet.StreamIndex);
+    }
+
+    var payload = packet.Data[_FRAME_RECORD_LENGTH..];
+    var copiedRecord = packet.Data[.._FRAME_RECORD_LENGTH].ToArray();
+    copiedRecord[0] = packet.StreamIndex == 0 ? _TYPE_VIDEO : _TYPE_AUDIO;
+    BinaryPrimitives.WriteUInt32LittleEndian(copiedRecord.AsSpan(2), checked((uint)payload.Length));
+    return new(copiedRecord, payload, packet.StreamIndex);
   }
 
   private static int _SampleRate(MediaStreamInfo audio) {
