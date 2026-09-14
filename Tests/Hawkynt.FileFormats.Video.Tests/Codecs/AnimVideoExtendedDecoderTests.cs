@@ -97,23 +97,23 @@ public sealed class AnimVideoExtendedDecoderTests {
 
   [Test]
   [Category("Unit")]
-  public void OperationFourLongInfoUsesSignedLongSizeAndLongTerminator() {
+  public void OperationFourLongInfoSupportsOffsetsBeyondUshortAndSignedSizes() {
+    const int width = ushort.MaxValue;
+    const int height = 17;
+    var bytesPerRow = (width + 15) / 16 * 2;
     var decoder = AnimVideoDecoder.Create(_Stream());
-    decoder.TryDecode(new(0, _Keyframe(16, 2, new byte[4])), out _);
+    decoder.TryDecode(new(0, _Keyframe(width, height, new byte[bytesPerRow * height])), out _);
 
     var dlta = new byte[78];
     BinaryPrimitives.WriteUInt32BigEndian(dlta.AsSpan(0, 4), 32); // data at byte 64
     BinaryPrimitives.WriteUInt32BigEndian(dlta.AsSpan(32, 4), 33); // info at byte 66
     BinaryPrimitives.WriteUInt16BigEndian(dlta.AsSpan(64, 2), 0x8000);
-    BinaryPrimitives.WriteUInt32BigEndian(dlta.AsSpan(66, 4), 0); // absolute short-word destination
-    BinaryPrimitives.WriteInt32BigEndian(dlta.AsSpan(70, 4), -2); // repeat over two rows
+    BinaryPrimitives.WriteUInt32BigEndian(dlta.AsSpan(66, 4), 65536); // cannot fit a short-info offset
+    BinaryPrimitives.WriteInt32BigEndian(dlta.AsSpan(70, 4), -1); // signed long RLC count
     BinaryPrimitives.WriteUInt32BigEndian(dlta.AsSpan(74, 4), uint.MaxValue);
 
     decoder.TryDecode(new(0, _DeltaFrame(4, dlta, bits: 8 | 16 | 32)), out var frame);
-    Assert.Multiple(() => {
-      Assert.That(frame.PixelData[0], Is.EqualTo(1));
-      Assert.That(frame.PixelData[16], Is.EqualTo(1));
-    });
+    Assert.That(frame.PixelData[16 * width], Is.EqualTo(1));
   }
 
   [Test]
@@ -160,37 +160,13 @@ public sealed class AnimVideoExtendedDecoderTests {
 
   [Test]
   [Category("Unit")]
-  public void OperationFourNonRlcAcceptsLiteralRuns() {
+  public void OperationFourNonRlcRefusesInsteadOfGuessingItsWireGrammar() {
     var decoder = AnimVideoDecoder.Create(_Stream());
     decoder.TryDecode(new(0, _Keyframe(16, 1, [0, 0])), out _);
 
-    var dlta = new byte[72];
-    BinaryPrimitives.WriteUInt32BigEndian(dlta.AsSpan(0, 4), 32);
-    BinaryPrimitives.WriteUInt32BigEndian(dlta.AsSpan(32, 4), 33);
-    BinaryPrimitives.WriteUInt16BigEndian(dlta.AsSpan(64, 2), 0x8000);
-    BinaryPrimitives.WriteUInt16BigEndian(dlta.AsSpan(66, 2), 0);
-    BinaryPrimitives.WriteInt16BigEndian(dlta.AsSpan(68, 2), 1);
-    BinaryPrimitives.WriteUInt16BigEndian(dlta.AsSpan(70, 2), ushort.MaxValue);
-
-    decoder.TryDecode(new(0, _DeltaFrame(4, dlta, bits: 16)), out var frame);
-    Assert.That(frame.PixelData[0], Is.EqualTo(1));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void OperationFourNonRlcRejectsRepeatRuns() {
-    var decoder = AnimVideoDecoder.Create(_Stream());
-    decoder.TryDecode(new(0, _Keyframe(16, 1, [0, 0])), out _);
-
-    var dlta = new byte[72];
-    BinaryPrimitives.WriteUInt32BigEndian(dlta.AsSpan(0, 4), 32);
-    BinaryPrimitives.WriteUInt32BigEndian(dlta.AsSpan(32, 4), 33);
-    BinaryPrimitives.WriteUInt16BigEndian(dlta.AsSpan(64, 2), 0x8000);
-    BinaryPrimitives.WriteUInt16BigEndian(dlta.AsSpan(66, 2), 0);
-    BinaryPrimitives.WriteInt16BigEndian(dlta.AsSpan(68, 2), -1);
-    BinaryPrimitives.WriteUInt16BigEndian(dlta.AsSpan(70, 2), ushort.MaxValue);
-
-    Assert.Throws<InvalidDataException>(() => decoder.TryDecode(new(0, _DeltaFrame(4, dlta, bits: 16)), out _));
+    var failure = Assert.Throws<NotSupportedException>(
+      () => decoder.TryDecode(new(0, _DeltaFrame(4, new byte[64], bits: 16)), out _));
+    Assert.That(failure!.Message, Does.Contain("non-RLC"));
   }
 
   [Test]
