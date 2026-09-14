@@ -165,7 +165,7 @@ public sealed class LclZlibVideoEncoder : IVideoCodecEncoder<LclZlibVideoEncoder
       _ => throw new ArgumentOutOfRangeException(nameof(imageType), imageType, "LCL defines image types 0 through 5."),
     };
 
-    if (imageType is ImageType.Yuv422 or ImageType.Yuv411 && (stream.Width & 3) != 0)
+    if ((imageType is ImageType.Yuv422 or ImageType.Yuv411) && (stream.Width & 3) != 0)
       throw new NotSupportedException(
         $"LCL {imageType} writes complete four-pixel groups only; width {stream.Width} would discard trailing luma samples.");
 
@@ -177,7 +177,7 @@ public sealed class LclZlibVideoEncoder : IVideoCodecEncoder<LclZlibVideoEncoder
       throw new NotSupportedException(
         $"LCL YUV420 writes 2x2 luma blocks; {stream.Width}x{stream.Height} must have even dimensions.");
 
-    long rowBytes = (long)stream.Width * 3;
+    var rowBytes = (long)stream.Width * 3;
     var paddedRgbStride = (rowBytes + 3) & ~3L;
     var codedSizeLong = imageType switch {
       ImageType.Yuv111 => rowBytes * stream.Height,
