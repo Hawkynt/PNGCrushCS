@@ -67,6 +67,10 @@ public sealed class MagicYuvDecoder : IVideoCodecDecoder<MagicYuvDecoder> {
   public static MagicYuvDecoder Create(MediaStreamInfo stream) {
     ArgumentNullException.ThrowIfNull(stream);
     var format = MagicYuvFormat.Of(stream.Codec, stream.Index);
+    if (format.IsHighBitDepth && stream.BitsPerPixel > 0 && stream.BitsPerPixel != format.StreamBitsPerPixel)
+      throw new NotSupportedException(
+        $"Video stream {stream.Index} names {stream.Codec}, one of MagicYUV's formats deeper than eight bits, but states {stream.BitsPerPixel} bits per pixel where that FourCC uses {format.StreamBitsPerPixel}. The contradictory description is refused rather than decoded under one of the two meanings.");
+
     if (stream.Width <= 0 || stream.Height <= 0)
       throw new InvalidDataException(
         $"Video stream {stream.Index} states a picture size of {stream.Width}x{stream.Height}, which no frame can be decoded into.");
@@ -417,7 +421,7 @@ public sealed class MagicYuvDecoder : IVideoCodecDecoder<MagicYuvDecoder> {
     var channels = alpha is null ? 3 : 4;
     var (chromaWidth, chromaHeight) = this._format.PlaneSize(1, this._width, this._height);
     var pixels = new byte[this._width * this._height * channels];
-    var use709 = ((_ReadColourMatrix(flags) == 2));
+    var use709 = _ReadColourMatrix(flags) == 2;
     var fullRange = (flags & _FULL_RANGE) != 0;
 
     for (var y = 0; y < this._height; ++y) {
