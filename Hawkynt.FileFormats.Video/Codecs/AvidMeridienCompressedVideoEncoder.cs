@@ -20,7 +20,9 @@ namespace FileFormat.Codecs;
 /// <para/>
 /// JPEG coding is delegated to the image package's existing managed encoder, explicitly selecting
 /// baseline 4:2:2 rather than growing a second DCT/Huffman implementation here. The QuickTime sample
-/// description carries a <c>fiel</c> extension for the standard interlaced geometries.
+/// description carries a <c>fiel</c> extension for the standard interlaced geometries. Since the two
+/// fields are coded as separate sequential JPEG pictures, the field descriptor uses QuickTime's
+/// sequential TT/BB forms rather than its spatially-interleaved TB/BT forms.
 /// </remarks>
 [VerifiedBy(ConformanceOracle.FFmpeg)]
 public sealed class AvidMeridienCompressedVideoEncoder : IVideoCodecEncoder<AvidMeridienCompressedVideoEncoder> {
@@ -143,8 +145,8 @@ public sealed class AvidMeridienCompressedVideoEncoder : IVideoCodecEncoder<Avid
 
   private static InterlaceLayout _LayoutFor(int width, int height)
     => (width, height) switch {
-      (720, 486) => new(true, true, 14),  // 525-line/NTSC: lower field first.
-      (720, 576) => new(true, false, 9),  // 625-line/PAL: upper field first.
+      (720, 486) => new(true, true, 6),  // Sequential bottom field first (BB).
+      (720, 576) => new(true, false, 1), // Sequential top field first (TT).
       _ => new(false, false, 0),
     };
 
