@@ -156,20 +156,28 @@ public sealed class Escape124VideoEncoder : IVideoCodecEncoder<Escape124VideoEnc
       bits.Write(entry.Color1, 15);
     }
 
+    // A positive skip count leaves the decoder's counter at zero, so the superblock immediately after
+    // the run is coded without another count. For long unchanged runs that exceed the largest count,
+    // deliberately code one unchanged superblock between chunks to return the decoder to count-reading state.
     for (var sb = 0; sb < this._superblockCount;) {
-      if (this._previous is not null && this._MatchesPrevious(reconstruction, sb)) {
-        var run = 1;
+      var run = 0;
+      if (this._previous is not null)
         while (sb + run < this._superblockCount && this._MatchesPrevious(reconstruction, sb + run))
           ++run;
-        while (run > 0) {
-          var part = Math.Min(run, _MaxSkip);
-          _WriteSkip(bits, part);
-          sb += part;
-          run -= part;
-        }
+
+      if (run == 0) {
+        _WriteSkip(bits, 0);
+        _WriteSuperblock(bits);
+        ++sb;
         continue;
       }
-      _WriteSkip(bits, 0);
+
+      var skipped = Math.Min(run, _MaxSkip);
+      _WriteSkip(bits, skipped);
+      sb += skipped;
+      if (sb == this._superblockCount)
+        break;
+
       _WriteSuperblock(bits);
       ++sb;
     }
