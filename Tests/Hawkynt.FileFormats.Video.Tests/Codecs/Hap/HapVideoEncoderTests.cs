@@ -6,16 +6,7 @@ using FileFormat.Core;
 
 namespace FileFormat.Codecs.Tests;
 
-/// <summary>
-/// The Hap encoder: what it writes, what comes back untouched, and what it refuses.
-/// </summary>
-/// <remarks>
-/// The encoder as a whole was measured against ffmpeg's own <c>hap</c> encoder and decoder — see
-/// <see cref="HapVideoEncoder"/>'s own remarks for the two comparisons and their numbers. What these
-/// tests add is the part no oracle states: which pictures the format holds exactly and therefore must
-/// come back untouched, the shape of the frame around the texture, and every refusal, none of which a
-/// well-formed comparison can be made to reach.
-/// </remarks>
+/// <summary>The Hap encoder: exact block cases, framing, stream routing and refusals.</summary>
 [TestFixture]
 public class HapVideoEncoderTests {
 
@@ -78,7 +69,7 @@ public class HapVideoEncoderTests {
   }
 
   // ============================================================================================
-  // What the format holds exactly
+  // What the legacy DXT formats hold exactly
   // ============================================================================================
 
   [TestCase("Hap1")]
@@ -140,9 +131,6 @@ public class HapVideoEncoderTests {
   [Test]
   [Category("Unit")]
   public void AGreyOffThatGridLandsWithinTwoOfWhereItStarted() {
-    // Only seven of the 256 greys are on the grid at all — a grey needs its value in the image of
-    // both the five-bit and the six-bit widening, and those two agree seldom. The rest are what the
-    // reference's own endpoint search lands on, which is close and not exact.
     var source = _ByBlock(256, 16, (block, _, _) => ((byte)block, (byte)block, (byte)block, (byte)255));
     var back = _RoundTrip("Hap1", 256, 16, source);
 
@@ -155,16 +143,18 @@ public class HapVideoEncoderTests {
         ++exact;
     }
 
-    Assert.That(exact, Is.GreaterThanOrEqualTo(7), "at least the greys the grid states outright");
+    Assert.That(exact, Is.GreaterThanOrEqualTo(7));
   }
 
   // ============================================================================================
-  // The frame around the texture
+  // The frame around one texture
   // ============================================================================================
 
   [TestCase("Hap1", 0x0B, 8)]
   [TestCase("Hap5", 0x0E, 16)]
   [TestCase("HapY", 0x0F, 16)]
+  [TestCase("HapA", 0x01, 8)]
+  [TestCase("Hap7", 0x0C, 16)]
   [Category("Unit")]
   public void TheFrameIsOneLongHeaderedSectionNamingItsPixelFormat(string code, int formatNibble, int blockBytes) {
     var random = new Random(7);
@@ -174,7 +164,7 @@ public class HapVideoEncoderTests {
     var frame = _Encode(code, 16, 16, source);
 
     Assert.Multiple(() => {
-      Assert.That(frame[0], Is.Zero, "an eight-byte header states nothing in its first three bytes");
+      Assert.That(frame[0], Is.Zero);
       Assert.That(frame[1], Is.Zero);
       Assert.That(frame[2], Is.Zero);
       Assert.That(frame[3] & 0x0F, Is.EqualTo(formatNibble));
@@ -186,7 +176,7 @@ public class HapVideoEncoderTests {
       ? HapSnappyDecoder.Decompress(frame.AsSpan(8))
       : frame[8..];
 
-    Assert.That(payload, Has.Length.EqualTo(16 / 4 * (16 / 4) * blockBytes));
+    Assert.That(payload, Has.Length.EqualTo(4 * 4 * blockBytes));
   }
 
   [Test]
@@ -209,7 +199,7 @@ public class HapVideoEncoderTests {
 
     var frame = _Encode("Hap1", 64, 64, source);
 
-    Assert.That(frame[3] & 0xF0, Is.EqualTo(0xB0), "a texture of one repeated block must compress");
+    Assert.That(frame[3] & 0xF0, Is.EqualTo(0xB0));
     Assert.That(frame.Length, Is.LessThan(8 + 16 * 16 * 8));
     Assert.That(HapSnappyDecoder.Decompress(frame.AsSpan(8)), Has.Length.EqualTo(16 * 16 * 8));
   }
@@ -221,8 +211,6 @@ public class HapVideoEncoderTests {
     foreach (var length in new[] { 0, 1, 59, 60, 61, 255, 256, 300, 70000 }) {
       var payload = new byte[length];
       random.NextBytes(payload);
-
-      // Half literal, half long runs, so both the copy forms and the long literal length are reached.
       for (var i = length / 2; i < length; ++i)
         payload[i] = (byte)(i % 3);
 
@@ -232,16 +220,19 @@ public class HapVideoEncoderTests {
   }
 
   // ============================================================================================
-  // The stream it describes
+  // Stream description and registry routing
   // ============================================================================================
 
   [TestCase("Hap1", 24)]
   [TestCase("Hap5", 32)]
   [TestCase("HapY", 24)]
+  [TestCase("HapM", 32)]
+  [TestCase("HapA", 8)]
+  [TestCase("Hap7", 32)]
+  [TestCase("HapH", 48)]
   [Category("Unit")]
   public void DescribesAStreamTheDecoderAccepts(string code, int bitsPerPixel) {
     var encoder = HapVideoEncoder.Create(_Stream(code, 32, 16, 2));
-
     var described = encoder.DescribeStream();
 
     Assert.Multiple(() => {
@@ -266,15 +257,19 @@ public class HapVideoEncoderTests {
     Assert.That(HapVideoEncoder.CodecName, Is.EqualTo(HapDecoder.CodecName));
   }
 
-  [Test]
+  [TestCase("Hap1")]
+  [TestCase("Hap5")]
+  [TestCase("HapY")]
+  [TestCase("HapM")]
+  [TestCase("HapA")]
+  [TestCase("Hap7")]
+  [TestCase("HapH")]
   [Category("Unit")]
-  public void TheRegistryRoutesHap1ToThisEncoder() {
-    var stream = _Stream("Hap1", 8, 8);
+  public void TheRegistryRoutesEveryHapFourCcToThisEncoder(string code) {
+    var stream = _Stream(code, 8, 8);
 
     Assert.That(Hawkynt.FileFormats.Video.VideoFormatRegistry.CanEncode(stream), Is.True);
-    Assert.That(
-      Hawkynt.FileFormats.Video.VideoFormatRegistry.CreateEncoder(stream),
-      Is.TypeOf<HapVideoEncoder>());
+    Assert.That(Hawkynt.FileFormats.Video.VideoFormatRegistry.CreateEncoder(stream), Is.TypeOf<HapVideoEncoder>());
   }
 
   [Test]
@@ -287,6 +282,7 @@ public class HapVideoEncoderTests {
     Assert.Multiple(() => {
       Assert.That(packet.IsKeyFrame, Is.True);
       Assert.That(packet.PresentationTimestamp, Is.EqualTo(42));
+      Assert.That(packet.DecodeTimestamp, Is.EqualTo(42));
       Assert.That(packet.StreamIndex, Is.Zero);
     });
   }
@@ -308,19 +304,31 @@ public class HapVideoEncoderTests {
   }
 
   // ============================================================================================
-  // Refusals
+  // Dimensions and refusals
   // ============================================================================================
 
-  [TestCase("HapM", "Hap Q Alpha")]
-  [TestCase("HapA", "Hap Alpha-Only")]
-  [TestCase("Hap7", "Hap R")]
-  [TestCase("HapH", "Hap HDR")]
+  [TestCase(7, 8)]
+  [TestCase(8, 7)]
+  [TestCase(6, 6)]
+  [TestCase(1, 1)]
   [Category("Unit")]
-  public void ThePixelFormatsThisEncoderDoesNotWriteAreRefusedByName(string code, string named) {
-    var failure = Assert.Throws<NotSupportedException>(() => HapVideoEncoder.Create(_Stream(code, 8, 8)));
+  public void PartialEdgeBlocksArePaddedAndCroppedBackToTheContainerDimensions(int width, int height) {
+    var source = new byte[width * height * 4];
+    for (var pixel = 0; pixel < width * height; ++pixel) {
+      source[pixel * 4] = 0;
+      source[pixel * 4 + 1] = 0;
+      source[pixel * 4 + 2] = 0;
+      source[pixel * 4 + 3] = 255;
+    }
 
-    Assert.That(failure!.Message, Does.Contain(code));
-    Assert.That(failure.Message, Does.Contain(named));
+    var back = _RoundTrip("Hap1", width, height, source);
+    Assert.Multiple(() => {
+      Assert.That(back.Width, Is.EqualTo(width));
+      Assert.That(back.Height, Is.EqualTo(height));
+      Assert.That(back.Format, Is.EqualTo(PixelFormat.Rgb24));
+      Assert.That(back.PixelData, Has.Length.EqualTo(width * height * 3));
+      Assert.That(back.PixelData, Is.All.Zero);
+    });
   }
 
   [Test]
@@ -330,21 +338,11 @@ public class HapVideoEncoderTests {
     Assert.That(failure!.Message, Does.Contain("not a Hap code"));
   }
 
-  [TestCase(7, 8)]
-  [TestCase(8, 7)]
-  [TestCase(6, 6)]
-  [Category("Unit")]
-  public void APictureThatIsNotAWholeNumberOfBlocksIsRefused(int width, int height) {
-    var failure = Assert.Throws<NotSupportedException>(() => HapVideoEncoder.Create(_Stream("Hap1", width, height)));
-    Assert.That(failure!.Message, Does.Contain("texture blocks"));
-  }
-
   [Test]
   [Category("Unit")]
   public void AnAudioStreamIsRefused() {
     var stream = _Stream("Hap1", 8, 8);
     stream = new() { Index = 0, Kind = MediaStreamKind.Audio, Codec = stream.Codec, Width = 8, Height = 8 };
-
     Assert.Throws<NotSupportedException>(() => HapVideoEncoder.Create(stream));
   }
 
