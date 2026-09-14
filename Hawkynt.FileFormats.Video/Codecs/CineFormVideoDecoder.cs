@@ -9,18 +9,16 @@ namespace FileFormat.Codecs;
 /// picture.
 /// </summary>
 /// <remarks>
-/// Written from the free part of its specification, SMPTE ST 2073-1:2017 (<i>VC-5 Video Essence —
-/// Part 1: Elementary Bitstream</i>) — GoPro's own SDK documentation describes VC-5 as a "superset" of
-/// the original CineForm compression engine, standardised and better defined; what that means in
-/// practice, and what real files carry beyond what the free standard states, is in
-/// <see cref="FileFormat.Codecs.CineForm.CineFormChannelDecoder"/>'s remarks. Nothing here is derived
-/// from GoPro's SDK source or from ffmpeg's <c>cfhd</c> decoder — both are used, if at all, only as a
-/// black-box oracle on their output.
+/// The elementary wavelet model follows SMPTE ST 2073-1:2017 (<i>VC-5 Video Essence — Part 1:
+/// Elementary Bitstream</i>). Real CFHD files predate that cleaned-up standard and carry additional
+/// CineForm tags and conventions; those were cross-checked against GoPro's dual MIT/Apache-2.0 SDK and
+/// FFmpeg's LGPL <c>cfhd</c> implementation where the public standard does not define them. The measured
+/// framing details are documented in <see cref="FileFormat.Codecs.CineForm.CineFormChannelDecoder"/>.
 /// <para/>
 /// <b>Intra only.</b> CineForm's ordinary CFHD picture path has no P/B pictures or temporal motion
 /// references: each packet reconstructs independently from its own spatial wavelet coefficients.
 /// <para/>
-/// <b>Scope.</b> The decoder reads all three layouts ffmpeg's current <c>cfhd</c> encoder writes:
+/// <b>Scope.</b> The decoder reads all three layouts FFmpeg's current <c>cfhd</c> encoder writes:
 /// ten-bit YUV 4:2:2, twelve-bit RGB 4:4:4, and twelve-bit RGBA 4:4:4:4. The latter includes the
 /// format's alpha companding step rather than treating channel four as linear colour data. Bayer/CFA
 /// and the separate layered/interlaced VC-5 extensions are refused by name rather than guessed at.
