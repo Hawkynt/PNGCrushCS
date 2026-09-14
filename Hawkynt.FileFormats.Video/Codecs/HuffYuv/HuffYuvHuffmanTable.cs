@@ -10,7 +10,7 @@ namespace FileFormat.Codecs.HuffYuv;
 /// the two low residual bits literally. Only code lengths are stored in version 2/3 descriptions;
 /// codes are assigned by HuffYUV's longest-length-first rule.
 /// </remarks>
-internal sealed class HuffYuvHuffmanTable {
+internal sealed class HuffYuvHuffmanTable : IHuffYuvDecoderTable {
 
   internal const int SYMBOL_COUNT = 256;
   internal const int MAX_SYMBOL_COUNT = 16384;
@@ -78,7 +78,7 @@ internal sealed class HuffYuvHuffmanTable {
       throw new InvalidDataException($"Table {plane} describes more codes than the lengths have room for.");
   }
 
-  internal int Read(HuffYuvBitReader bits) {
+  public int Read(HuffYuvBitReader bits) {
     var code = bits.Bits(this._shortest);
     for (var length = this._shortest; length <= this._longest; ++length) {
       var count = this._count[length];
