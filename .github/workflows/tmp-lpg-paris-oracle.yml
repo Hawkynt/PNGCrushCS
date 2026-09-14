@@ -9,70 +9,75 @@ jobs:
   probe:
     runs-on: ubuntu-latest
     steps:
-      - name: Extract Paris installation and module identifiers
+      - name: Search archive indexes for Paris demo graphics
         shell: bash
         run: |
-          set -euo pipefail
-          ROOT=/tmp/paris
-          mkdir -p "$ROOT"
-          cd "$ROOT"
-
-          echo '=== Internet Archive manual file inventories ==='
+          set -u
           python3 - <<'PY'
-          import json, pathlib, urllib.parse, urllib.request
-          ids=['manualzilla-id-5804561','manualzilla-id-5890906']
-          root=pathlib.Path('/tmp/paris')
-          for ident in ids:
-              print('\n---',ident,'---')
-              with urllib.request.urlopen('https://archive.org/metadata/'+ident,timeout=60) as r:
-                  meta=json.load(r)
-              files=meta.get('files',[])
-              for f in files:
-                  n=f.get('name','')
-                  if n.lower().endswith(('.txt','.pdf','.xml','.json','.gz')):
-                      print(n, 'size='+str(f.get('size','')))
-              candidates=[f.get('name','') for f in files if f.get('name','').lower().endswith('_djvu.txt')]
-              if not candidates:
-                  candidates=[f.get('name','') for f in files if f.get('name','').lower().endswith('.txt') and 'meta' not in f.get('name','').lower()]
-              for n in candidates[:2]:
-                  u='https://archive.org/download/'+ident+'/'+urllib.parse.quote(n)
-                  dst=root/(ident+'-'+pathlib.Path(n).name)
-                  print('DOWNLOAD',u)
+          import json, urllib.parse, urllib.request
+
+          names = [
+              'MS-LOGO.LPG', 'RainDay.pcx', 'mercury1.pcx', 'petesigl.pcx',
+              'Robsig.pcx', 'Robsig1.pcx', 'PHONEP.LGO', 'Greyscal.Frm',
+              'PACK1.PAK', 'PACK2.PAK'
+          ]
+
+          def get(url, timeout=45):
+              req=urllib.request.Request(url, headers={'User-Agent':'Mozilla/5.0 LPG-format-research'})
+              with urllib.request.urlopen(req, timeout=timeout) as r:
+                  return r.read().decode('utf-8','replace')
+
+          print('=== Internet Archive advanced search ===')
+          for name in names:
+              for q in [f'"{name}"', f'filename:"{name}"']:
+                  params=[('q',q),('fl[]','identifier'),('fl[]','title'),('fl[]','description'),('rows','50'),('page','1'),('output','json')]
+                  url='https://archive.org/advancedsearch.php?'+urllib.parse.urlencode(params)
                   try:
-                      with urllib.request.urlopen(u,timeout=90) as r: dst.write_bytes(r.read())
-                  except Exception as e: print('DOWNLOAD-FAIL',type(e).__name__,e)
-          PY
+                      data=json.loads(get(url))
+                      docs=data.get('response',{}).get('docs',[])
+                      print('\n',q,'hits',len(docs))
+                      for d in docs[:50]: print(d.get('identifier',''), '|', d.get('title',''))
+                  except Exception as e: print(q, type(e).__name__, e)
 
-          echo '=== Xerox Conversion Manager manual (optional mirror) ==='
-          if curl -fL --retry 1 -o conversion.pdf 'https://download.support.xerox.com/pub/docs/Paris/userdocs/any-os/en/Paris_Converter_TM.pdf'; then
-            pdftotext -layout conversion.pdf conversion.txt || true
-          else
-            echo 'Xerox runner mirror unavailable; continuing with archived Designer manuals.'
-          fi
+          print('\n=== Wayback basename wildcard probes ===')
+          for name in names:
+              params={'url':'*/'+name,'output':'json','fl':'timestamp,original,statuscode,mimetype,digest,length','filter':'statuscode:200','collapse':'digest','limit':'1000'}
+              url='https://web.archive.org/cdx/search/cdx?'+urllib.parse.urlencode(params)
+              try:
+                  text=get(url,60)
+                  print('\n',name)
+                  print(text[:20000])
+              except Exception as e: print(name,type(e).__name__,e)
 
-          find . -maxdepth 1 -type f -name '*.txt' ! -name 'all-manuals.txt' -print0 | xargs -0 cat > all-manuals.txt
+          print('\n=== Common Crawl exact/wildcard basename probes ===')
+          try:
+              indexes=json.loads(get('https://index.commoncrawl.org/collinfo.json'))[:12]
+          except Exception as e:
+              print('index-list',type(e).__name__,e); indexes=[]
+          for idx in indexes:
+              api=idx.get('cdx-api') or idx.get('cdx_api')
+              if not api: continue
+              print('\nINDEX',idx.get('id'),api)
+              for name in names[:7]:
+                  queries=['*/'+name, '*/*'+name]
+                  for q in queries:
+                      url=api+'?'+urllib.parse.urlencode({'url':q,'output':'json','filter':'status:200'})
+                      try:
+                          text=get(url,30).strip()
+                          if text: print('QUERY',q,'\n',text[:12000])
+                      except Exception as e:
+                          msg=str(e)
+                          if '404' not in msg: print('ERR',q,type(e).__name__,msg[:300])
 
-          echo '=== literal filename-like tokens ==='
-          python3 - <<'PY'
-          import re
-          from pathlib import Path
-          s=Path('all-manuals.txt').read_text(errors='ignore')
-          extensions='exe|dll|com|bat|ini|cfg|cnf|dat|pak|lpg|img|lgo|grf|pcx|bmp|tif|tiff|env|frm|fnt|crl'
-          hits=set(m.group(0) for m in re.finditer(r'(?i)\b[A-Z0-9_$~+.-]{2,}\.(?:'+extensions+r')\b',s))
-          for h in sorted(hits,key=str.lower): print(h)
-          PY
-
-          echo '=== paths mentioning Paris/XLPrint ==='
-          grep -inEi -B2 -A4 '([A-Z]:)?[\\/].*(PARIS|XLPRINT)|(PARIS|XLPRINT).*[\\/]' all-manuals.txt | head -1200 || true
-
-          echo '=== contexts around executables, DLLs, install layout, converter and LPG ==='
-          grep -inEi -B4 -A8 '\.(exe|dll|com|bat|ini|cfg|cnf)\b|conversion manager|converter|PARIS[\\/]|XLPRINT|\.LPG\b|GRF directory|resource manager|install(ed|ation)?' all-manuals.txt | head -3000 || true
-
-          echo '=== likely program/module names ==='
-          python3 - <<'PY'
-          import re
-          from pathlib import Path
-          s=Path('all-manuals.txt').read_text(errors='ignore')
-          words=set(m.group(0) for m in re.finditer(r'(?i)\b[A-Z][A-Z0-9_$~+.-]{1,}\.(?:exe|dll|com|bat|ini|cfg|cnf)\b',s))
-          for w in sorted(words,key=str.lower): print(w)
+          print('\n=== urlscan.io public search ===')
+          for name in names[:7]:
+              for q in [f'filename:{name}', f'url:{name}']:
+                  url='https://urlscan.io/api/v1/search/?'+urllib.parse.urlencode({'q':q,'size':100})
+                  try:
+                      data=json.loads(get(url))
+                      rs=data.get('results',[])
+                      print(q,'hits',len(rs))
+                      for r in rs[:20]:
+                          p=r.get('page',{}); print(p.get('url',''),p.get('domain',''))
+                  except Exception as e: print(q,type(e).__name__,e)
           PY
