@@ -52,12 +52,12 @@ public sealed class CineFormExternalOracleTests {
       Assert.That(process.ExitCode, Is.Zero, diagnostics);
       Assert.That(diagnostics, Is.Empty, diagnostics);
 
-      var avi = VideoIO.Read<AviReader>(File.ReadAllBytes(path));
+      var avi = VideoIO.Read<AviContainer>(File.ReadAllBytes(path));
       var stream = VideoIO.FirstVideoStream(avi);
       Assert.That(stream, Is.Not.Null, "ffmpeg AVI did not expose a video stream");
       Assert.That(stream!.Codec.EqualsIgnoringCase(CodecTag.FromCharacters("CFHD")), Is.True);
 
-      var decoded = VideoIO.DecodeStream<AviReader, CineFormVideoDecoder>(avi, stream).Single();
+      var decoded = VideoIO.DecodeStream<AviContainer, CineFormVideoDecoder>(avi, stream).Single();
       Assert.Multiple(() => {
         Assert.That(decoded.Image.Width, Is.EqualTo(width));
         Assert.That(decoded.Image.Height, Is.EqualTo(height));
