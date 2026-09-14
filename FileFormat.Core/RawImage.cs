@@ -24,6 +24,13 @@ public sealed class RawImage {
   /// </summary>
   public RawImageColorInfo? ColorInfo { get; init; }
 
+  /// <summary>
+  /// Bayer phase and effective sample precision when <see cref="Format"/> is
+  /// <see cref="PixelFormat.Cfa16"/>. CFA storage deliberately keeps this semantic information out of
+  /// the pixel-format enum because all four Bayer phases are byte-identical.
+  /// </summary>
+  public RawCfaInfo? CfaInfo { get; init; }
+
   /// <summary>Optional palette entries as RGB triplets (3 bytes per entry). Required for indexed pixel formats.</summary>
   public byte[]? Palette { get; init; }
 
@@ -43,6 +50,9 @@ public sealed class RawImage {
 
   /// <summary>Whether this image stores Y, U/Cb and V/Cr as three tightly packed planes.</summary>
   public bool IsPlanarYuv => RawPixelFormats.Get(this.Format).IsPlanarYuv;
+
+  /// <summary>Whether this image is a single-sample-per-site color-filter-array sensor mosaic.</summary>
+  public bool IsColorFilterArray => RawPixelFormats.Get(this.Format).IsColorFilterArray;
 
   /// <summary>Whether this image stores IEEE 754 floating-point component samples.</summary>
   public bool IsFloatingPoint => RawPixelFormats.Get(this.Format).IsFloatingPoint;
@@ -78,7 +88,7 @@ public sealed class RawImage {
   public byte[] ToRgb24() => Format == PixelFormat.Rgb24 ? PixelData : FastRawImageConverter.Convert(this, PixelFormat.Rgb24).PixelData;
 
   /// <summary>
-  /// Returns one plane's dimensions. Packed formats have one plane equal to the image size; planar
+  /// Returns one plane's dimensions. Packed/CFA formats have one plane equal to the image size; planar
   /// YUV has a full-resolution Y plane followed by chroma planes rounded up at the subsampling edge.
   /// </summary>
   public (int Width, int Height) GetPlaneDimensions(int plane) {
@@ -128,7 +138,7 @@ public sealed class RawImage {
     return this.PixelData.AsSpan(offset, length);
   }
 
-  /// <summary>Computes the number of bytes per pixel for packed formats, or 0 for non-packed formats.</summary>
+  /// <summary>Computes the number of bytes per pixel for whole-byte single-plane formats, or 0 for non-packed formats.</summary>
   public static int BytesPerPixel(PixelFormat format) => RawPixelFormats.Get(format).BytesPerPixel;
 
   /// <summary>
@@ -167,6 +177,9 @@ public sealed class RawImage {
 
   /// <summary>Whether a format is one of the canonical Y/U/V planar layouts.</summary>
   public static bool IsPlanarYuvFormat(PixelFormat format) => RawPixelFormats.Get(format).IsPlanarYuv;
+
+  /// <summary>Whether a format is a raw color-filter-array mosaic.</summary>
+  public static bool IsColorFilterArrayFormat(PixelFormat format) => RawPixelFormats.Get(format).IsColorFilterArray;
 
   /// <summary>Whether a format stores IEEE 754 component samples.</summary>
   public static bool IsFloatingPointFormat(PixelFormat format) => RawPixelFormats.Get(format).IsFloatingPoint;
