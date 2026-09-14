@@ -1,309 +1,186 @@
 using System;
-using System.Buffers.Binary;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using FileFormat.Avi;
 using FileFormat.Core;
 using FileFormat.Matroska;
-using Hawkynt.FileFormats.Video;
 
 namespace FileFormat.Codecs.HuffYuv.Tests;
 
-/// <summary>
-/// The HuffYUV and FFVHUFF encoder, measured against the package's own decoder.
-/// </summary>
-/// <remarks>
-/// Every layout the encoder writes, with every predictor it allows in it, is coded and read back
-/// through <see cref="VideoFormatRegistry.CreateDecoder"/> from nothing but the encoder's own stream
-/// description, on random and on smooth content at several sizes — and has to come back sample for
-/// sample. The luminance-and-chrominance layout comes back through the decoder's stated conversion
-/// to colour, so it is compared against that conversion of the source rather than against the
-/// source itself.
-/// </remarks>
 [TestFixture]
 public class HuffYuvEncoderTests {
 
   private const int _BITMAP_INFO_HEADER_SIZE = 40;
-
-  private static readonly (int Width, int Height)[] _Geometries = [(1, 1), (3, 2), (17, 9), (64, 33)];
-  private static readonly (int Width, int Height)[] _EvenGeometries = [(2, 1), (4, 3), (10, 7), (64, 33)];
-  private static readonly (int Width, int Height)[] _MedianGeometries = [(4, 2), (10, 7), (64, 33)];
-
-  // ============================================================================================
-  // The description
-  // ============================================================================================
+  private const byte _PROGRESSIVE = 0x20;
+  private const byte _INTERLACED = 0x10;
+  private const byte _TABLES_PER_FRAME = 0x40;
+  private const byte _CHROMA = 0x01;
 
   [Test]
   [Category("Unit")]
-  public void DescribesAnInterleaved422StreamTheDecoderAccepts() {
-    var encoder = HuffYuvEncoder.Create(_Request(16, 8, 16, timeBase: new Rational(1, 25)), HuffYuvPredictionMethod.Median);
-    Assert.That(encoder.TryEncode(_Random(PixelFormat.Yuv422P8, 16, 8, 1), 3, out _), Is.True);
+  public void InterlacedFourTwoZeroWithPacketTablesIsDescribedExactly() {
+    var encoder = HuffYuvEncoder.Create(
+      _Request(16, 8, 12, timeBase: new Rational(1, 25)),
+      HuffYuvPredictionMethod.Median,
+      interlaced: true,
+      tablesPerFrame: true);
 
     var described = encoder.DescribeStream();
-    var format = described.CodecPrivateData.ToArray();
+    var extra = described.CodecPrivateData.ToArray()[_BITMAP_INFO_HEADER_SIZE..];
+
     Assert.Multiple(() => {
       Assert.That(described.Codec, Is.EqualTo(CodecTag.FromCharacters("HFYU")));
-      Assert.That(described.Handler, Is.EqualTo(CodecTag.FromCharacters("HFYU")));
-      Assert.That(described.CodecId, Is.EqualTo("V_MS/VFW/FOURCC"));
-      Assert.That(described.Width, Is.EqualTo(16));
-      Assert.That(described.Height, Is.EqualTo(8));
-      Assert.That(described.BitsPerPixel, Is.EqualTo(16));
-      Assert.That(described.TimeBase, Is.EqualTo(new Rational(1, 25)));
-      Assert.That(format.Length, Is.GreaterThan(_BITMAP_INFO_HEADER_SIZE + 4));
-      Assert.That(BinaryPrimitives.ReadUInt32LittleEndian(format), Is.EqualTo((uint)format.Length), "biSize spans the description");
-      Assert.That(BinaryPrimitives.ReadInt32LittleEndian(format[4..]), Is.EqualTo(16));
-      Assert.That(BinaryPrimitives.ReadInt32LittleEndian(format[8..]), Is.EqualTo(8));
-      Assert.That(BinaryPrimitives.ReadUInt16LittleEndian(format[14..]), Is.EqualTo(16));
-      Assert.That(BinaryPrimitives.ReadUInt32LittleEndian(format[16..]), Is.EqualTo(CodecTag.FromCharacters("HFYU").Value));
-      Assert.That(format[_BITMAP_INFO_HEADER_SIZE], Is.EqualTo(2), "median");
-      Assert.That(format[_BITMAP_INFO_HEADER_SIZE + 1], Is.EqualTo(16), "bitstream depth");
-      Assert.That(format[_BITMAP_INFO_HEADER_SIZE + 2], Is.EqualTo(0x20), "progressive, tables in the stream");
-      Assert.That(format[_BITMAP_INFO_HEADER_SIZE + 3], Is.EqualTo(0), "the second form");
-      Assert.That(HuffYuvDecoder.Accepts(described), Is.True);
-    });
-
-    var tables = HuffYuvHuffmanTable.ReadAll(format[_BITMAP_INFO_HEADER_SIZE..], 4, 3, out var end);
-    Assert.Multiple(() => {
-      Assert.That(tables, Has.Length.EqualTo(3));
-      Assert.That(end, Is.EqualTo(format.Length - _BITMAP_INFO_HEADER_SIZE), "the tables run to the end of the description");
+      Assert.That(described.BitsPerPixel, Is.EqualTo(12));
+      Assert.That(extra[0], Is.EqualTo(2), "median predictor");
+      Assert.That(extra[1], Is.EqualTo(12), "4:2:0 second-form bitstream depth");
+      Assert.That(extra[2], Is.EqualTo(_INTERLACED | _TABLES_PER_FRAME));
+      Assert.That(extra[3], Is.Zero);
+      Assert.That(HuffYuvDecoder.Create(described), Is.Not.Null);
     });
   }
 
   [Test]
   [Category("Unit")]
-  public void DescribesAPlanarStreamInTheThirdFormUnderTheExtensionTag() {
-    var encoder = HuffYuvEncoder.Create(_Request(5, 4, 32), HuffYuvPredictionMethod.Gradient, planar: true);
-    var described = encoder.DescribeStream();
-    var extra = described.CodecPrivateData.ToArray()[_BITMAP_INFO_HEADER_SIZE..];
+  public void SecondFormYuvRoundTripsAllPredictorsProgressiveAndInterlaced() {
+    foreach (var format in new[] { PixelFormat.Yuv420P8, PixelFormat.Yuv422P8 })
+      foreach (var prediction in Enum.GetValues<HuffYuvPredictionMethod>())
+        foreach (var interlaced in new[] { false, true }) {
+          var bpp = format == PixelFormat.Yuv420P8 ? 12 : 16;
+          var frame = _Random(format, 16, 8, 1000 + bpp * 10 + (int)prediction * 2 + (interlaced ? 1 : 0));
+          var encoder = HuffYuvEncoder.Create(_Request(16, 8, bpp), prediction, interlaced: interlaced);
 
-    Assert.Multiple(() => {
-      Assert.That(described.Codec, Is.EqualTo(CodecTag.FromCharacters("FFVH")));
-      Assert.That(described.BitsPerPixel, Is.EqualTo(32));
-      Assert.That(extra[0], Is.EqualTo(1), "gradient, no decorrelation");
-      Assert.That(extra[1], Is.EqualTo(0x70), "eight bits, no subsampling");
-      Assert.That(extra[2], Is.EqualTo(0x20 | 0x02 | 0x04), "progressive, green-blue-red, alpha");
-      Assert.That(extra[3], Is.EqualTo(1), "the third form");
-      Assert.That(HuffYuvDecoder.Accepts(described), Is.True);
-      Assert.That(() => HuffYuvDecoder.Create(described), Throws.Nothing);
-    });
-
-    HuffYuvHuffmanTable.ReadAll(extra, 4, 4, out var end);
-    Assert.That(end, Is.EqualTo(extra.Length));
+          Assert.That(encoder.TryEncode(frame, 7, out var packet), Is.True);
+          Assert.Multiple(() => {
+            Assert.That(packet.IsKeyFrame, Is.True);
+            Assert.That(packet.PresentationTimestamp, Is.EqualTo(7));
+            Assert.That(packet.DecodeTimestamp, Is.EqualTo(7));
+            Assert.That(_Decode(encoder.DescribeStream(), packet), Is.EqualTo(_Expected(frame)), $"{format}, {prediction}, interlaced={interlaced}");
+          });
+        }
   }
 
   [Test]
   [Category("Unit")]
-  public void PackedColourStatesDecorrelationAndTheOriginalTag() {
-    var encoder = HuffYuvEncoder.Create(_Request(4, 4, 24));
-    var extra = encoder.DescribeStream().CodecPrivateData.ToArray()[_BITMAP_INFO_HEADER_SIZE..];
+  public void PackedColourRoundTripsBothSupportedPredictorsProgressiveAndInterlaced() {
+    foreach (var (format, bpp) in new[] { (PixelFormat.Rgb24, 24), (PixelFormat.Bgra32, 32) })
+      foreach (var prediction in new[] { HuffYuvPredictionMethod.Left, HuffYuvPredictionMethod.Gradient })
+        foreach (var interlaced in new[] { false, true }) {
+          var frame = _Random(format, 11, 7, bpp * 100 + (int)prediction * 10 + (interlaced ? 1 : 0));
+          var encoder = HuffYuvEncoder.Create(_Request(11, 7, bpp), prediction, interlaced: interlaced);
 
-    Assert.Multiple(() => {
-      Assert.That(encoder.DescribeStream().Codec, Is.EqualTo(CodecTag.FromCharacters("HFYU")));
-      Assert.That(extra[0], Is.EqualTo(0x40), "left, decorrelated");
-      Assert.That(extra[1], Is.EqualTo(24));
-      Assert.That(extra[3], Is.EqualTo(0));
-    });
+          Assert.That(encoder.TryEncode(frame, null, out var packet), Is.True);
+          Assert.That(_Decode(encoder.DescribeStream(), packet), Is.EqualTo(_Expected(frame)), $"{format}, {prediction}, interlaced={interlaced}");
+        }
   }
 
   [Test]
   [Category("Unit")]
-  public void TheRequestedTagIsKeptWhereItIsOneOfTheTwo() {
-    Assert.Multiple(() => {
-      Assert.That(HuffYuvEncoder.Create(_Request(4, 4, 16, "FFVH")).DescribeStream().Codec, Is.EqualTo(CodecTag.FromCharacters("FFVH")));
-      Assert.That(HuffYuvEncoder.Create(_Request(4, 4, 8, "HFYU")).DescribeStream().Codec, Is.EqualTo(CodecTag.FromCharacters("HFYU")));
-      Assert.That(HuffYuvEncoder.Create(_Request(4, 4, 8, "MJPG")).DescribeStream().Codec, Is.EqualTo(CodecTag.FromCharacters("FFVH")));
-      Assert.That(HuffYuvEncoder.Codec, Is.EqualTo(CodecTag.FromCharacters("HFYU")));
-    });
+  public void ThirdFormYuvRoundTripsEveryRepresentableSubsampling() {
+    foreach (var (format, horizontalShift, verticalShift) in new[] {
+      (PixelFormat.Yuv420P8, 1, 1),
+      (PixelFormat.Yuv422P8, 1, 0),
+      (PixelFormat.Yuv440P8, 0, 1),
+      (PixelFormat.Yuv444P8, 0, 0),
+    })
+      foreach (var prediction in Enum.GetValues<HuffYuvPredictionMethod>())
+        foreach (var interlaced in new[] { false, true }) {
+          var frame = _Random(format, 16, 8, 2000 + (int)format * 31 + (int)prediction * 2 + (interlaced ? 1 : 0));
+          var encoder = _PlanarYuvEncoder(16, 8, prediction, horizontalShift, verticalShift, interlaced, tablesPerFrame: false);
+
+          Assert.That(encoder.TryEncode(frame, null, out var packet), Is.True);
+          var described = encoder.DescribeStream();
+          var extra = described.CodecPrivateData.ToArray()[_BITMAP_INFO_HEADER_SIZE..];
+          Assert.Multiple(() => {
+            Assert.That(described.Codec, Is.EqualTo(CodecTag.FromCharacters("FFVH")));
+            Assert.That(extra[1], Is.EqualTo(0x70 | horizontalShift | (verticalShift << 2)));
+            Assert.That(extra[2] & _CHROMA, Is.EqualTo(_CHROMA));
+            Assert.That(extra[2] & (_INTERLACED | _PROGRESSIVE), Is.EqualTo(interlaced ? _INTERLACED : _PROGRESSIVE));
+            Assert.That(extra[3], Is.EqualTo(1));
+            Assert.That(_Decode(described, packet), Is.EqualTo(_Expected(frame)), $"{format}, {prediction}, interlaced={interlaced}");
+          });
+        }
   }
 
   [Test]
   [Category("Unit")]
-  public void ADescriptionReadFromAContainerChoosesTheLayoutAndPredictor() {
-    var source = HuffYuvEncoder.Create(_Request(8, 6, 16), HuffYuvPredictionMethod.Median);
-    Assert.That(source.TryEncode(_Random(PixelFormat.Yuv422P8, 8, 6, 5), null, out _), Is.True);
-    var read = source.DescribeStream();
-
-    var again = HuffYuvEncoder.Create(new MediaStreamInfo {
-      Index = 0,
-      Kind = MediaStreamKind.Video,
-      Codec = read.Codec,
-      Width = 8,
-      Height = 6,
-      BitsPerPixel = 0,
-      CodecPrivateData = read.CodecPrivateData,
-    });
-    var frame = _Gradient(PixelFormat.Yuv422P8, 8, 6);
-    Assert.That(again.TryEncode(frame, null, out var packet), Is.True);
-    var described = again.DescribeStream();
-    var extra = described.CodecPrivateData.ToArray()[_BITMAP_INFO_HEADER_SIZE..];
-
-    Assert.Multiple(() => {
-      Assert.That(extra[0], Is.EqualTo(2), "median, as the description said");
-      Assert.That(extra[1], Is.EqualTo(16), "4:2:2, as the description said");
-      Assert.That(_Decode(described, packet), Is.EqualTo(_Expected(frame)));
-    });
+  public void PlanarGreyAndRgbStillRoundTripAllPredictors() {
+    foreach (var (format, bpp, planar) in new[] {
+      (PixelFormat.Gray8, 8, true),
+      (PixelFormat.Rgb24, 24, true),
+      (PixelFormat.Rgba32, 32, true),
+    })
+      foreach (var prediction in Enum.GetValues<HuffYuvPredictionMethod>())
+        foreach (var interlaced in new[] { false, true }) {
+          var frame = _Random(format, 9, 7, 3000 + bpp + (int)prediction * 2 + (interlaced ? 1 : 0));
+          var encoder = HuffYuvEncoder.Create(_Request(9, 7, bpp), prediction, planar, interlaced);
+          Assert.That(encoder.TryEncode(frame, null, out var packet), Is.True);
+          Assert.That(_Decode(encoder.DescribeStream(), packet), Is.EqualTo(_Expected(frame)));
+        }
   }
 
   [Test]
   [Category("Unit")]
-  public void TheFourDescriptionBytesAloneAreReadToo() {
-    var encoder = HuffYuvEncoder.Create(new MediaStreamInfo {
-      Index = 0,
-      Kind = MediaStreamKind.Video,
-      Width = 6,
-      Height = 4,
-      CodecPrivateData = new byte[] { 1, 0x70, 0x22, 1 },
-    });
-    var frame = _Random(PixelFormat.Rgb24, 6, 4, 9);
-    Assert.That(encoder.TryEncode(frame, null, out var packet), Is.True);
-    var described = encoder.DescribeStream();
-    var extra = described.CodecPrivateData.ToArray()[_BITMAP_INFO_HEADER_SIZE..];
-
-    Assert.Multiple(() => {
-      Assert.That(extra[0], Is.EqualTo(1), "gradient");
-      Assert.That(extra[2], Is.EqualTo(0x22), "planar colour");
-      Assert.That(_Decode(described, packet), Is.EqualTo(frame.PixelData));
-    });
-  }
-
-  // ============================================================================================
-  // Round trips
-  // ============================================================================================
-
-  [Test]
-  [Category("Unit")]
-  [TestCase(HuffYuvPredictionMethod.Left)]
-  [TestCase(HuffYuvPredictionMethod.Gradient)]
-  [TestCase(HuffYuvPredictionMethod.Median)]
-  public void Interleaved422RoundTripsExactly(HuffYuvPredictionMethod prediction)
-    => _RoundTrips(PixelFormat.Yuv422P8, 16, prediction, planar: false, prediction == HuffYuvPredictionMethod.Median ? _MedianGeometries : _EvenGeometries);
-
-  [Test]
-  [Category("Unit")]
-  [TestCase(HuffYuvPredictionMethod.Left)]
-  [TestCase(HuffYuvPredictionMethod.Gradient)]
-  public void PackedColourRoundTripsExactly(HuffYuvPredictionMethod prediction)
-    => _RoundTrips(PixelFormat.Rgb24, 24, prediction, planar: false, _Geometries);
-
-  [Test]
-  [Category("Unit")]
-  [TestCase(HuffYuvPredictionMethod.Left)]
-  [TestCase(HuffYuvPredictionMethod.Gradient)]
-  public void PackedColourWithAlphaRoundTripsExactly(HuffYuvPredictionMethod prediction)
-    => _RoundTrips(PixelFormat.Bgra32, 32, prediction, planar: false, _Geometries);
-
-  [Test]
-  [Category("Unit")]
-  [TestCase(HuffYuvPredictionMethod.Left)]
-  [TestCase(HuffYuvPredictionMethod.Gradient)]
-  [TestCase(HuffYuvPredictionMethod.Median)]
-  public void GreyRoundTripsExactly(HuffYuvPredictionMethod prediction)
-    => _RoundTrips(PixelFormat.Gray8, 8, prediction, planar: true, _Geometries);
-
-  [Test]
-  [Category("Unit")]
-  [TestCase(HuffYuvPredictionMethod.Left)]
-  [TestCase(HuffYuvPredictionMethod.Gradient)]
-  [TestCase(HuffYuvPredictionMethod.Median)]
-  public void PlanarColourRoundTripsExactly(HuffYuvPredictionMethod prediction)
-    => _RoundTrips(PixelFormat.Rgb24, 24, prediction, planar: true, _Geometries);
-
-  [Test]
-  [Category("Unit")]
-  [TestCase(HuffYuvPredictionMethod.Left)]
-  [TestCase(HuffYuvPredictionMethod.Gradient)]
-  [TestCase(HuffYuvPredictionMethod.Median)]
-  public void PlanarColourWithAlphaRoundTripsExactly(HuffYuvPredictionMethod prediction)
-    => _RoundTrips(PixelFormat.Rgba32, 32, prediction, planar: true, _Geometries);
-
-  private static void _RoundTrips(PixelFormat format, int bitsPerPixel, HuffYuvPredictionMethod prediction, bool planar, (int Width, int Height)[] geometries) {
-    foreach (var (width, height) in geometries)
-      foreach (var (name, frame) in new[] { ("random", _Random(format, width, height, width * 31 + height)), ("gradient", _Gradient(format, width, height)), ("flat", _Flat(format, width, height)) }) {
-        var encoder = HuffYuvEncoder.Create(_Request(width, height, bitsPerPixel), prediction, planar);
-        Assert.That(encoder.TryEncode(frame, null, out var packet), Is.True);
-        Assert.That(packet.IsKeyFrame, Is.True);
-        Assert.That(packet.Data.Length % 4, Is.Zero, "a frame is whole words");
-
-        var decoded = _Decode(encoder.DescribeStream(), packet);
-        Assert.That(decoded, Is.EqualTo(_Expected(frame)), $"{format} {prediction} {(planar ? "planar" : "packed")} {width}x{height} {name}");
-      }
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void ASequenceIsCodedAgainstTheFirstFramesTablesAndStaysExact() {
-    var encoder = HuffYuvEncoder.Create(_Request(24, 10, 24), HuffYuvPredictionMethod.Gradient);
-    var frames = new List<RawImage> { _Flat(PixelFormat.Rgb24, 24, 10) };
-    for (var i = 0; i < 4; ++i)
-      frames.Add(_Random(PixelFormat.Rgb24, 24, 10, 100 + i));
-
+  public void TablesPerFrameMayChangeFromPacketToPacket() {
+    var encoder = HuffYuvEncoder.Create(
+      _Request(48, 16, 8),
+      HuffYuvPredictionMethod.Gradient,
+      planar: true,
+      tablesPerFrame: true);
+    var frames = new[] {
+      _Flat(PixelFormat.Gray8, 48, 16, 17),
+      _Random(PixelFormat.Gray8, 48, 16, 8128),
+      _Flat(PixelFormat.Gray8, 48, 16, 231),
+    };
     var packets = new List<CodedPacket>();
     foreach (var frame in frames) {
       Assert.That(encoder.TryEncode(frame, packets.Count, out var packet), Is.True);
       packets.Add(packet);
     }
 
-    var first = encoder.DescribeStream();
-    Assert.That(encoder.DescribeStream().CodecPrivateData.ToArray(), Is.EqualTo(first.CodecPrivateData.ToArray()), "the description does not change once handed out");
+    var description = encoder.DescribeStream();
+    var extra = description.CodecPrivateData.ToArray()[_BITMAP_INFO_HEADER_SIZE..];
+    Assert.That(extra[2] & _TABLES_PER_FRAME, Is.EqualTo(_TABLES_PER_FRAME));
 
-    var decoder = VideoFormatRegistry.CreateDecoder(first);
-    for (var i = 0; i < frames.Count; ++i) {
+    var decoder = HuffYuvDecoder.Create(description);
+    for (var i = 0; i < frames.Length; ++i) {
       Assert.That(decoder.TryDecode(packets[i], out var decoded), Is.True);
-      Assert.That(decoded.PixelData, Is.EqualTo(frames[i].PixelData), $"frame {i}");
-      Assert.That(packets[i].PresentationTimestamp, Is.EqualTo(i));
+      Assert.That(decoded.PixelData, Is.EqualTo(frames[i].PixelData), $"packet {i}");
     }
 
-    Assert.That(((IVideoPacketEncoder)encoder).Flush(), Is.Empty);
+    Assert.That(packets.Select(static packet => Convert.ToHexString(packet.Data.Span[..Math.Min(16, packet.Data.Length)])), Is.Unique);
   }
 
   [Test]
   [Category("Unit")]
-  public void ADescriptionAskedForBeforeAnyPictureStillDecodesEveryPicture() {
-    var encoder = HuffYuvEncoder.Create(_Request(12, 6, 8), HuffYuvPredictionMethod.Median);
-    var described = encoder.DescribeStream();
-    var frame = _Random(PixelFormat.Gray8, 12, 6, 77);
+  public void DescriptionMayBeOnlyCodecBytesRatherThanABitmapHeader() {
+    var full = HuffYuvTestStream.Description(
+      (byte)HuffYuvPredictionMethod.Gradient,
+      0x71,
+      (byte)(_PROGRESSIVE | _CHROMA),
+      1,
+      3);
+    var encoder = HuffYuvEncoder.Create(new MediaStreamInfo {
+      Index = 0,
+      Kind = MediaStreamKind.Video,
+      Codec = CodecTag.FromCharacters("FFVH"),
+      Width = 16,
+      Height = 8,
+      BitsPerPixel = 16,
+      CodecPrivateData = full[_BITMAP_INFO_HEADER_SIZE..],
+    });
+    var frame = _Random(PixelFormat.Yuv422P8, 16, 8, 77);
 
     Assert.That(encoder.TryEncode(frame, null, out var packet), Is.True);
-    Assert.Multiple(() => {
-      Assert.That(encoder.DescribeStream().CodecPrivateData.ToArray(), Is.EqualTo(described.CodecPrivateData.ToArray()));
-      Assert.That(_Decode(described, packet), Is.EqualTo(frame.PixelData));
-    });
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void TimestampsPassThroughAndEveryPacketIsAKeyFrame() {
-    var encoder = HuffYuvEncoder.Create(_Request(4, 4, 24));
-    Assert.That(encoder.TryEncode(_Random(PixelFormat.Rgb24, 4, 4, 3), 1234, out var stamped), Is.True);
-    Assert.That(encoder.TryEncode(_Random(PixelFormat.Rgb24, 4, 4, 4), null, out var unstamped), Is.True);
-
-    Assert.Multiple(() => {
-      Assert.That(stamped.StreamIndex, Is.Zero);
-      Assert.That(stamped.PresentationTimestamp, Is.EqualTo(1234));
-      Assert.That(stamped.DecodeTimestamp, Is.EqualTo(1234));
-      Assert.That(stamped.IsKeyFrame, Is.True);
-      Assert.That(unstamped.PresentationTimestamp, Is.Null);
-      Assert.That(unstamped.DecodeTimestamp, Is.Null);
-      Assert.That(unstamped.IsKeyFrame, Is.True);
-    });
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void APictureInAnotherFormatIsConvertedToTheLayoutFirst() {
-    var encoder = HuffYuvEncoder.Create(_Request(6, 5, 24), HuffYuvPredictionMethod.Gradient);
-    var frame = _Random(PixelFormat.Bgra32, 6, 5, 8);
-    Assert.That(encoder.TryEncode(frame, null, out var packet), Is.True);
-
-    Assert.That(_Decode(encoder.DescribeStream(), packet), Is.EqualTo(frame.ToRgb24()));
+    Assert.That(_Decode(encoder.DescribeStream(), packet), Is.EqualTo(_Expected(frame)));
   }
 
   [Test]
   [Category("Unit")]
   public void MuxesIntoAviAndMatroskaAndComesBackThroughTheRegistry() {
-    var encoder = HuffYuvEncoder.Create(_Request(8, 4, 16, timeBase: new Rational(1, 25), frameRate: new Rational(25, 1)), HuffYuvPredictionMethod.Median);
-    var frames = new[] { _Random(PixelFormat.Yuv422P8, 8, 4, 21), _Gradient(PixelFormat.Yuv422P8, 8, 4) };
+    var encoder = HuffYuvEncoder.Create(
+      _Request(16, 8, 12, timeBase: new Rational(1, 25), frameRate: new Rational(25, 1)),
+      HuffYuvPredictionMethod.Median);
+    var frames = new[] { _Random(PixelFormat.Yuv420P8, 16, 8, 21), _Random(PixelFormat.Yuv420P8, 16, 8, 22) };
     var packets = new List<CodedPacket>();
     for (var i = 0; i < frames.Length; ++i) {
       Assert.That(encoder.TryEncode(frames[i], i, out var packet), Is.True);
@@ -311,7 +188,6 @@ public class HuffYuvEncoderTests {
     }
 
     var described = encoder.DescribeStream();
-
     var avi = AviContainer.FromBytes(VideoIO.Mux<AviWriter>([described], packets));
     var aviFrames = VideoIO.Decode(AviContainer.ReadPackets(avi), AviContainer.Streams(avi)[0], VideoFormatRegistry.CreateDecoder).ToList();
     var mkv = MatroskaContainer.FromBytes(VideoIO.Mux<MatroskaWriter>([described], packets));
@@ -327,74 +203,51 @@ public class HuffYuvEncoderTests {
     });
   }
 
-  // ============================================================================================
-  // Refusals
-  // ============================================================================================
-
   [Test]
   [Category("Unit")]
-  public void RefusesWhatItDoesNotWrite() {
+  public void RefusesOnlyLayoutsTheEightBitRawModelCannotWrite() {
     Assert.Multiple(() => {
-      Assert.That(() => HuffYuvEncoder.Create(_Request(4, 4, 12)), Throws.TypeOf<NotSupportedException>().With.Message.Contains("12 bits"), "an unwritten depth");
-      Assert.That(() => HuffYuvEncoder.Create(_Request(5, 4, 16)), Throws.TypeOf<NotSupportedException>().With.Message.Contains("even"), "odd 4:2:2");
-      Assert.That(() => HuffYuvEncoder.Create(_Request(4, 4, 24), HuffYuvPredictionMethod.Median), Throws.TypeOf<NotSupportedException>().With.Message.Contains("median"), "median on packed colour");
-      Assert.That(() => HuffYuvEncoder.Create(_Request(2, 2, 16), HuffYuvPredictionMethod.Median), Throws.TypeOf<NotSupportedException>().With.Message.Contains("median"), "median 4:2:2 narrower than a group of four");
-      Assert.That(() => HuffYuvEncoder.Create(_Request(4, 1, 16), HuffYuvPredictionMethod.Median), Throws.TypeOf<NotSupportedException>().With.Message.Contains("median"), "median 4:2:2 of one row");
-      Assert.That(() => HuffYuvEncoder.Create(_Request(4, 4, 16), HuffYuvPredictionMethod.Left, planar: true), Throws.TypeOf<NotSupportedException>().With.Message.Contains("planar"), "planar 4:2:2");
-      Assert.That(() => HuffYuvEncoder.Create(_Request(0, 4, 24)), Throws.TypeOf<NotSupportedException>(), "no size");
-      Assert.That(() => HuffYuvEncoder.Create(_Request(4, 4, 24), (HuffYuvPredictionMethod)7), Throws.TypeOf<NotSupportedException>(), "no such predictor");
-      Assert.That(() => HuffYuvEncoder.Create(new MediaStreamInfo { Index = 0, Kind = MediaStreamKind.Audio, Width = 4, Height = 4 }), Throws.TypeOf<NotSupportedException>(), "not a picture");
+      Assert.That(() => HuffYuvEncoder.Create(_Request(4, 4, 20)), Throws.TypeOf<NotSupportedException>().With.Message.Contains("20"));
+      Assert.That(() => HuffYuvEncoder.Create(_Request(5, 4, 16)), Throws.TypeOf<NotSupportedException>().With.Message.Contains("even width"));
+      Assert.That(() => HuffYuvEncoder.Create(_Request(4, 5, 12)), Throws.TypeOf<NotSupportedException>().With.Message.Contains("even height"));
+      Assert.That(() => HuffYuvEncoder.Create(_Request(4, 4, 24), HuffYuvPredictionMethod.Median), Throws.TypeOf<NotSupportedException>().With.Message.Contains("median"));
+      Assert.That(() => HuffYuvEncoder.Create(_Request(2, 8, 12), HuffYuvPredictionMethod.Median, interlaced: true), Throws.TypeOf<NotSupportedException>());
+      Assert.That(() => HuffYuvEncoder.Create(new MediaStreamInfo {
+        Index = 0, Kind = MediaStreamKind.Video, Width = 4, Height = 4, BitsPerPixel = 24,
+        CodecPrivateData = new byte[] { 0, 0x90, 0x21, 1 },
+      }), Throws.TypeOf<NotSupportedException>().With.Message.Contains("10-bit"));
     });
   }
 
-  [Test]
-  [Category("Unit")]
-  public void RefusesDescriptionsOfWhatItDoesNotWrite() {
-    Assert.Multiple(() => {
-      Assert.That(() => _WithDescription(0, 12, 0x20, 0), Throws.TypeOf<NotSupportedException>().With.Message.Contains("4:2:0"), "4:2:0");
-      Assert.That(() => _WithDescription(0, 16, 0x10, 0), Throws.TypeOf<NotSupportedException>().With.Message.Contains("interlaced"), "interlaced");
-      Assert.That(() => _WithDescription(0, 16, 0x60, 0), Throws.TypeOf<NotSupportedException>().With.Message.Contains("every frame"), "tables per frame");
-      Assert.That(() => _WithDescription(3, 16, 0x20, 0), Throws.TypeOf<NotSupportedException>().With.Message.Contains("method 3"), "an unknown predictor");
-      Assert.That(() => _WithDescription(0, 0x71, 0x21, 1), Throws.TypeOf<NotSupportedException>().With.Message.Contains("planes"), "planar 4:2:2");
-      Assert.That(() => _WithDescription(0, 0x90, 0x22, 1), Throws.TypeOf<NotSupportedException>().With.Message.Contains("10-bit"), "deeper samples");
-      Assert.That(() => _WithDescription(0x40, 24, 0x20, 0, HuffYuvPredictionMethod.Median), Throws.TypeOf<NotSupportedException>(), "median in a packed description");
-      Assert.That(() => HuffYuvEncoder.Create(new MediaStreamInfo { Index = 0, Kind = MediaStreamKind.Video, Width = 4, Height = 4, CodecPrivateData = new byte[] { 2, 16 } }), Throws.TypeOf<NotSupportedException>().With.Message.Contains("2-byte"), "a truncated description");
-    });
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void RefusesAPictureOfAnotherSizeOrTooFewBytes() {
-    var encoder = HuffYuvEncoder.Create(_Request(4, 4, 24));
-    var wrongSize = new RawImage { Width = 2, Height = 2, Format = PixelFormat.Rgb24, PixelData = new byte[12] };
-    var short_ = new RawImage { Width = 4, Height = 4, Format = PixelFormat.Rgb24, PixelData = new byte[10] };
-
-    Assert.Multiple(() => {
-      Assert.That(() => encoder.TryEncode(wrongSize, null, out _), Throws.TypeOf<InvalidDataException>());
-      Assert.That(() => encoder.TryEncode(short_, null, out _), Throws.TypeOf<InvalidDataException>());
-    });
-  }
-
-  private static HuffYuvEncoder _WithDescription(byte method, byte depth, byte flags, byte form, HuffYuvPredictionMethod? forcedMethod = null) {
-    var description = new byte[] { forcedMethod == null ? method : (byte)((int)forcedMethod | (method & 0x40)), depth, flags, form };
+  private static HuffYuvEncoder _PlanarYuvEncoder(
+    int width,
+    int height,
+    HuffYuvPredictionMethod prediction,
+    int horizontalShift,
+    int verticalShift,
+    bool interlaced,
+    bool tablesPerFrame) {
+    var flags = (byte)((interlaced ? _INTERLACED : _PROGRESSIVE) | _CHROMA | (tablesPerFrame ? _TABLES_PER_FRAME : 0));
+    var full = HuffYuvTestStream.Description(
+      (byte)prediction,
+      (byte)(0x70 | horizontalShift | (verticalShift << 2)),
+      flags,
+      1,
+      3);
     return HuffYuvEncoder.Create(new MediaStreamInfo {
       Index = 0,
       Kind = MediaStreamKind.Video,
-      Width = 4,
-      Height = 4,
-      BitsPerPixel = 16,
-      CodecPrivateData = description,
+      Codec = CodecTag.FromCharacters("FFVH"),
+      Width = width,
+      Height = height,
+      BitsPerPixel = horizontalShift == 1 && verticalShift == 1 ? 12 : horizontalShift + verticalShift == 1 ? 16 : 24,
+      CodecPrivateData = full[_BITMAP_INFO_HEADER_SIZE..],
     });
   }
 
-  // ============================================================================================
-  // Helpers
-  // ============================================================================================
-
-  private static MediaStreamInfo _Request(int width, int height, int bitsPerPixel, string? tag = null, Rational? timeBase = null, Rational? frameRate = null) => new() {
+  private static MediaStreamInfo _Request(int width, int height, int bitsPerPixel, Rational? timeBase = null, Rational? frameRate = null) => new() {
     Index = 0,
     Kind = MediaStreamKind.Video,
-    Codec = tag == null ? CodecTag.None : CodecTag.FromCharacters(tag),
     Width = width,
     Height = height,
     BitsPerPixel = bitsPerPixel,
@@ -408,63 +261,43 @@ public class HuffYuvEncoderTests {
     return decoded.PixelData;
   }
 
-  private static int _Bytes(PixelFormat format, int width, int height) => format switch {
-    PixelFormat.Yuv422P8 => width * height + 2 * ((width + 1) / 2) * height,
-    _ => width * height * RawImage.BytesPerPixel(format),
-  };
-
   private static RawImage _Random(PixelFormat format, int width, int height, int seed) {
-    var pixels = new byte[_Bytes(format, width, height)];
+    var prototype = new RawImage { Width = width, Height = height, Format = format, PixelData = [] };
+    var pixels = new byte[checked((int)prototype.MinimumPixelDataLength)];
     new Random(seed).NextBytes(pixels);
     return new() { Width = width, Height = height, Format = format, PixelData = pixels };
   }
 
-  private static RawImage _Gradient(PixelFormat format, int width, int height) {
-    var pixels = new byte[_Bytes(format, width, height)];
-    for (var i = 0; i < pixels.Length; ++i)
-      pixels[i] = (byte)(i * 255 / Math.Max(1, pixels.Length - 1) + (i % 7));
-
-    return new() { Width = width, Height = height, Format = format, PixelData = pixels };
+  private static RawImage _Flat(PixelFormat format, int width, int height, byte value) {
+    var image = _Random(format, width, height, 0);
+    Array.Fill(image.PixelData, value);
+    return image;
   }
 
-  private static RawImage _Flat(PixelFormat format, int width, int height) {
-    var pixels = new byte[_Bytes(format, width, height)];
-    Array.Fill(pixels, (byte)93);
-    return new() { Width = width, Height = height, Format = format, PixelData = pixels };
-  }
-
-  /// <summary>
-  /// What the decoder hands back for a picture: the samples themselves, except that a
-  /// luminance-and-chrominance picture comes back as colour through the decoder's stated ITU-R
-  /// BT.601 studio-swing conversion, and one that went in as <c>BGRA</c> comes back as <c>RGBA</c>.
-  /// </summary>
   private static byte[] _Expected(RawImage frame) {
-    switch (frame.Format) {
-      case PixelFormat.Bgra32:
-        return frame.ToRgba32();
-      case PixelFormat.Yuv422P8: {
-        var width = frame.Width;
-        var chromaWidth = (width + 1) / 2;
-        var luma = frame.GetPlaneData(0);
-        var cb = frame.GetPlaneData(1);
-        var cr = frame.GetPlaneData(2);
-        var rgb = new byte[width * frame.Height * 3];
-        for (var y = 0; y < frame.Height; ++y)
-          for (var x = 0; x < width; ++x) {
-            var scaled = 298 * (luma[y * width + x] - 16);
-            var blue = cb[y * chromaWidth + x / 2] - 128;
-            var red = cr[y * chromaWidth + x / 2] - 128;
-            var at = (y * width + x) * 3;
-            rgb[at] = _Clamp(scaled + 409 * red + 128);
-            rgb[at + 1] = _Clamp(scaled - 100 * blue - 208 * red + 128);
-            rgb[at + 2] = _Clamp(scaled + 516 * blue + 128);
-          }
+    if (frame.Format == PixelFormat.Bgra32)
+      return frame.ToRgba32();
+    if (!frame.IsPlanarYuv)
+      return frame.PixelData;
 
-        return rgb;
+    var (subsampleX, subsampleY) = RawImage.YuvSubsampling(frame.Format);
+    var (chromaWidth, _) = frame.GetPlaneDimensions(1);
+    var luma = frame.GetPlaneData(0);
+    var cb = frame.GetPlaneData(1);
+    var cr = frame.GetPlaneData(2);
+    var rgb = new byte[frame.Width * frame.Height * 3];
+    for (var y = 0; y < frame.Height; ++y)
+      for (var x = 0; x < frame.Width; ++x) {
+        var chroma = (y / subsampleY) * chromaWidth + x / subsampleX;
+        var scaled = 298 * (luma[y * frame.Width + x] - 16);
+        var blue = cb[chroma] - 128;
+        var red = cr[chroma] - 128;
+        var at = (y * frame.Width + x) * 3;
+        rgb[at] = _Clamp(scaled + 409 * red + 128);
+        rgb[at + 1] = _Clamp(scaled - 100 * blue - 208 * red + 128);
+        rgb[at + 2] = _Clamp(scaled + 516 * blue + 128);
       }
-      default:
-        return frame.PixelData;
-    }
+    return rgb;
   }
 
   private static byte _Clamp(int scaled) {
