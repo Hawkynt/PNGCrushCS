@@ -194,10 +194,6 @@ internal sealed class Mpeg4PictureDecoder {
   /// what keeps the run from starting early.
   /// </remarks>
   private bool _IsAtResyncMarker(ref Mpeg4BitReader reader) {
-    // The stuffing is checked and not merely stepped over. Skipping a fixed number of bits and
-    // looking for zeroes past them finds a marker one macroblock too early wherever the bits that
-    // ought to be stuffing are a macroblock instead — which is exactly what a run of skipped
-    // macroblocks in a predicted picture looks like, since each of those is a single set bit.
     var stuffing = _StuffingBefore(reader.BitPosition);
     if (reader.NextBits(stuffing) != (1 << (stuffing - 1)) - 1)
       return false;
@@ -212,13 +208,6 @@ internal sealed class Mpeg4PictureDecoder {
   /// <summary>
   /// How many bits of stuffing sit in front of a byte-aligned marker (ISO/IEC 14496-2, 6.2.5.2).
   /// </summary>
-  /// <remarks>
-  /// Between one and eight, and never nought. The stuffing is a zero bit and then ones until the next
-  /// byte boundary, so a position that is already aligned still carries a whole byte of it — which is
-  /// what makes the stuffing recognisable rather than merely absent. Treating an aligned position as
-  /// needing none is a decoder that finds every resync marker except the ones an encoder was most
-  /// likely to emit, since a macroblock ending on a byte boundary is one time in eight.
-  /// </remarks>
   private static int _StuffingBefore(int position) => 8 - (position & 7);
 
   /// <summary>How many bits the resync marker of this picture occupies (ISO/IEC 14496-2, 6.3.5.2).</summary>
@@ -231,17 +220,7 @@ internal sealed class Mpeg4PictureDecoder {
   /// <summary>
   /// Reads a video packet header and returns the macroblock its data starts at.
   /// </summary>
-  /// <remarks>
-  /// A video packet restarts everything that is predicted across macroblocks — the vectors, the intra
-  /// coefficients and the quantiser — so that a decoder joining after a lost packet can carry on. Not
-  /// restarting them would leave every macroblock of the packet predicted from a macroblock the
-  /// standard says is unavailable.
-  /// </remarks>
   private void _TakeVideoPacketHeader(ref Mpeg4BitReader reader, int address) {
-    // Read it on a copy first and keep it only if it names this macroblock. What looks like a marker
-    // in front of a macroblock that occupies no bits is a marker that belongs behind it, because the
-    // position either side of such a macroblock is the same position — and the number the header
-    // carries is the only thing in the bitstream that says which.
     var probe = reader;
     probe.Skip(_StuffingBefore(probe.BitPosition));
     probe.Skip(this._ResyncMarkerLength());
@@ -270,9 +249,6 @@ internal sealed class Mpeg4PictureDecoder {
 
     reader = probe;
     this._quantiser = quantiser;
-
-    // Everything predicted across macroblocks starts afresh here, which is what makes a video packet
-    // the unit a decoder can resynchronise on.
     this._packetStart = number;
     this._runningQuantiser = -1;
     this._forwardPredictorX = this._forwardPredictorY = this._backwardPredictorX = this._backwardPredictorY = 0;
@@ -343,11 +319,6 @@ internal sealed class Mpeg4PictureDecoder {
   /// Whether an intra block's DC is coded with its own tables rather than as an ordinary coefficient
   /// (ISO/IEC 14496-2, 7.4.1.4 and Table 6-21).
   /// </summary>
-  /// <remarks>
-  /// The picture states a quantiser above which the DC stops being special, because at a coarse
-  /// quantiser the DC's own tables cost more than they save. Nought means always special and seven
-  /// means never; the six values between are thresholds two apart starting at thirteen.
-  /// </remarks>
   private bool _UsesDcVariableLengthCodes() {
     var threshold = this._plane.IntraDcThreshold;
     if (threshold == 0)
@@ -416,17 +387,10 @@ internal sealed class Mpeg4PictureDecoder {
     this._RecordMotion(address, vectorsX, vectorsY, notCoded: false);
 
     var pattern = (luminancePattern << 2) | chromaPattern;
-    this._ReconstructPredicted(ref reader, address, pattern, vectorsX, vectorsY);
+    this._ReconstructPredicted(ref reader, address, pattern, vectorsX, vectorsY, vectorCount);
     this._runningQuantiser = this._quantiser;
   }
 
-  /// <summary>
-  /// Copies a macroblock nothing was coded for out of the reference picture.
-  /// </summary>
-  /// <remarks>
-  /// A macroblock whose <c>not_coded</c> bit is set is the co-located one of the reference with a zero
-  /// vector, and its vector counts as zero for every later macroblock's predictor.
-  /// </remarks>
   private void _CopyFromReference(int address) {
     Span<int> zero = stackalloc int[4];
     this._isDecoded[address] = true;
@@ -448,16 +412,25 @@ internal sealed class Mpeg4PictureDecoder {
 
   private void _ReconstructPredicted(
     ref Mpeg4BitReader reader, int address, int pattern, scoped ReadOnlySpan<int> vectorsX,
-    scoped ReadOnlySpan<int> vectorsY) {
+    scoped ReadOnlySpan<int> vectorsY, int vectorCount) {
     Span<int> block = stackalloc int[64];
     Span<int> prediction = stackalloc int[64];
+    Span<int> quarterMacroblock = stackalloc int[16 * 16];
 
+    var predictsOneQuarterMacroblock = this._layer.QuarterSample && vectorCount == 1;
+    if (predictsOneQuarterMacroblock)
+      this._PredictQuarterMacroblock(
+        quarterMacroblock, this._forwardReference!, address, vectorsX[0], vectorsY[0], this._plane.RoundingType);
+
+    var (chromaX, chromaY) = this._ChromaVector(vectorsX, vectorsY);
     for (var index = 0; index < 6; ++index) {
-      var (vectorX, vectorY) = index < 4
-        ? (vectorsX[index], vectorsY[index])
-        : this._ChromaVector(vectorsX, vectorsY);
-
-      this._Predict(prediction, this._forwardReference!, address, index, vectorX, vectorY, this._plane.RoundingType);
+      if (index < 4 && predictsOneQuarterMacroblock) {
+        _CopyQuarterSubBlock(prediction, quarterMacroblock, index);
+      } else {
+        var (vectorX, vectorY) = index < 4 ? (vectorsX[index], vectorsY[index]) : (chromaX, chromaY);
+        this._Predict(
+          prediction, this._forwardReference!, address, index, vectorX, vectorY, this._plane.RoundingType);
+      }
 
       if (_IsCoded(pattern, index)) {
         Mpeg4BlockDecoder.ReadInter(ref reader, block, this._quantiser, this._layer);
@@ -476,11 +449,6 @@ internal sealed class Mpeg4PictureDecoder {
   // ============================================================================================
 
   private void _DecodeBidirectionalMacroblock(ref Mpeg4BitReader reader, int address) {
-    // The two predictors run from the start of the video packet -- or of the picture, where there
-    // are no resync markers -- and not from the start of a macroblock row. 7.6.2 gives no row rule,
-    // and resetting per row is invisible for as long as every B-VOP vector is zero, which is exactly
-    // how such a mistake survives: it costs nothing until an encoder puts real motion in a B-VOP,
-    // and then every macroblock after the first in a row reconstructs a vector nobody coded.
     this._isDecoded[address] = true;
 
     Span<int> forwardX = stackalloc int[4];
@@ -488,10 +456,6 @@ internal sealed class Mpeg4PictureDecoder {
     Span<int> backwardX = stackalloc int[4];
     Span<int> backwardY = stackalloc int[4];
 
-    // A macroblock the following anchor did not code carries no bits here at all: the standard's
-    // co_located_not_coded takes the whole macroblock out of the bitstream, and it is reconstructed
-    // as a forward prediction with a zero vector. A decoder that read a MODB for it would be one
-    // codeword into the next macroblock.
     if (this._anchorMotion != null && this._anchorMotion.IsNotCoded[address]) {
       this._ReconstructBidirectional(
         ref reader, address, 0, forwardX, forwardY, backwardX, backwardY, Mpeg4VlcTables.Forward);
@@ -500,9 +464,6 @@ internal sealed class Mpeg4PictureDecoder {
 
     var mode = Mpeg4VlcTables.BidirectionalMode.Read(ref reader);
 
-    // MODB of one is the whole macroblock: no type, no pattern, no vector. It means the direct mode
-    // with a delta vector of zero, and reading a delta for it — which the direct mode otherwise
-    // carries — puts the decoder a codeword into the next macroblock.
     if (mode == 0) {
       this._DeriveDirectVectors(address, 0, 0, forwardX, forwardY, backwardX, backwardY);
       this._ReconstructBidirectional(
@@ -541,15 +502,6 @@ internal sealed class Mpeg4PictureDecoder {
     this._ReconstructBidirectional(ref reader, address, pattern, forwardX, forwardY, backwardX, backwardY, type);
   }
 
-  /// <summary>
-  /// Reads one of a bidirectionally coded macroblock's own vectors, which is one vector for the whole
-  /// macroblock.
-  /// </summary>
-  /// <remarks>
-  /// The predictor is the last vector of the same direction rather than a median of neighbours, and
-  /// it is updated only by macroblocks that carry a vector of that direction — a direct-mode or
-  /// uncoded macroblock leaves both predictors where they were.
-  /// </remarks>
   private void _ReadBidirectionalVector(
     ref Mpeg4BitReader reader, scoped Span<int> vectorX, scoped Span<int> vectorY, bool forward) {
     var fCode = forward ? this._plane.ForwardFCode : this._plane.BackwardFCode;
@@ -565,20 +517,6 @@ internal sealed class Mpeg4PictureDecoder {
     }
   }
 
-  /// <summary>
-  /// Derives the four forward and four backward vectors of a direct-mode macroblock (ISO/IEC 14496-2,
-  /// 7.6.9.5).
-  /// </summary>
-  /// <remarks>
-  /// Direct mode carries no vectors of its own, only a small delta. It takes the vectors of the
-  /// co-located macroblock of the anchor that follows this picture and scales them by where in time
-  /// this picture sits between the two it is predicted from — so a macroblock moving steadily needs
-  /// almost no bits at all, and so a bidirectionally coded picture cannot be decoded without keeping
-  /// the anchor's motion after the anchor itself is finished.
-  /// <para/>
-  /// The delta's own predictor is always zero and its motion code is always one, which is why it is
-  /// read here rather than through the ordinary vector path.
-  /// </remarks>
   private void _ReadDirectVectors(
     ref Mpeg4BitReader reader, int address,
     scoped Span<int> forwardX, scoped Span<int> forwardY, scoped Span<int> backwardX, scoped Span<int> backwardY) {
@@ -603,9 +541,6 @@ internal sealed class Mpeg4PictureDecoder {
       var anchorX = this._anchorMotion == null ? 0 : this._anchorMotion.VectorX[index];
       var anchorY = this._anchorMotion == null ? 0 : this._anchorMotion.VectorY[index];
 
-      // The direct-mode delta remains on the half-sample grid even in a quarter-sample VOL. The
-      // 2004 corrigendum therefore converts the co-located quarter-sample vector with Table 7-13
-      // before the temporal scaling is performed.
       if (this._layer.QuarterSample) {
         anchorX = Mpeg4QuarterSample.ToDirectHalfSample(anchorX);
         anchorY = Mpeg4QuarterSample.ToDirectHalfSample(anchorY);
@@ -631,32 +566,55 @@ internal sealed class Mpeg4PictureDecoder {
     var usesBackward = type is Mpeg4VlcTables.Backward or Mpeg4VlcTables.Interpolated or Mpeg4VlcTables.Direct;
     var directUsesHalfSamples = type == Mpeg4VlcTables.Direct && this._layer.QuarterSample;
     var vectorIsQuarterSample = this._layer.QuarterSample && !directUsesHalfSamples;
+    var predictsQuarterMacroblock = this._layer.QuarterSample && !directUsesHalfSamples;
 
     Span<int> block = stackalloc int[64];
     Span<int> prediction = stackalloc int[64];
     Span<int> backward = stackalloc int[64];
+    Span<int> forwardQuarterMacroblock = stackalloc int[16 * 16];
+    Span<int> backwardQuarterMacroblock = stackalloc int[16 * 16];
 
     var (chromaForwardX, chromaForwardY) = _ChromaVector(forwardX, forwardY, vectorIsQuarterSample);
     var (chromaBackwardX, chromaBackwardY) = _ChromaVector(backwardX, backwardY, vectorIsQuarterSample);
 
+    if (predictsQuarterMacroblock) {
+      if (usesForward)
+        this._PredictQuarterMacroblock(
+          forwardQuarterMacroblock, this._forwardReference!, address, forwardX[0], forwardY[0], 0);
+      if (usesBackward)
+        this._PredictQuarterMacroblock(
+          backwardQuarterMacroblock, this._backwardReference!, address, backwardX[0], backwardY[0], 0);
+    }
+
     for (var index = 0; index < 6; ++index) {
       var vectorBlock = index < 4 ? index : 0;
 
-      if (usesForward)
-        this._Predict(
-          prediction, this._forwardReference!, address, index,
-          index < 4 ? forwardX[vectorBlock] : chromaForwardX,
-          index < 4 ? forwardY[vectorBlock] : chromaForwardY, 0, directUsesHalfSamples);
-
-      if (usesBackward) {
-        var target = usesForward ? backward : prediction;
-        this._Predict(
-          target, this._backwardReference!, address, index,
-          index < 4 ? backwardX[vectorBlock] : chromaBackwardX,
-          index < 4 ? backwardY[vectorBlock] : chromaBackwardY, 0, directUsesHalfSamples);
-
+      if (index < 4 && predictsQuarterMacroblock) {
         if (usesForward)
-          Mpeg4MotionCompensation.Average(prediction, backward);
+          _CopyQuarterSubBlock(prediction, forwardQuarterMacroblock, index);
+        if (usesBackward) {
+          var target = usesForward ? backward : prediction;
+          _CopyQuarterSubBlock(target, backwardQuarterMacroblock, index);
+          if (usesForward)
+            Mpeg4MotionCompensation.Average(prediction, backward);
+        }
+      } else {
+        if (usesForward)
+          this._Predict(
+            prediction, this._forwardReference!, address, index,
+            index < 4 ? forwardX[vectorBlock] : chromaForwardX,
+            index < 4 ? forwardY[vectorBlock] : chromaForwardY, 0, directUsesHalfSamples);
+
+        if (usesBackward) {
+          var target = usesForward ? backward : prediction;
+          this._Predict(
+            target, this._backwardReference!, address, index,
+            index < 4 ? backwardX[vectorBlock] : chromaBackwardX,
+            index < 4 ? backwardY[vectorBlock] : chromaBackwardY, 0, directUsesHalfSamples);
+
+          if (usesForward)
+            Mpeg4MotionCompensation.Average(prediction, backward);
+        }
       }
 
       if ((pattern & (1 << (5 - index))) != 0) {
@@ -680,15 +638,6 @@ internal sealed class Mpeg4PictureDecoder {
       this._PredictVector(address, block, horizontal),
       Mpeg4VlcTables.ReadMotionVectorDifference(ref reader, fCode), fCode);
 
-  /// <summary>
-  /// Adds a difference to a predictor and brings the result back into the range the motion code
-  /// allows (ISO/IEC 14496-2, 7.6.3).
-  /// </summary>
-  /// <remarks>
-  /// The wraparound is a single add or subtract of the whole range and not a clamp. It is how the
-  /// far end of the range is reached at all: a vector near one end predicts a vector near the other
-  /// with a small difference, and clamping instead would produce a vector nobody coded.
-  /// </remarks>
   private static int _Reconstruct(int predictor, int difference, int fCode) {
     var scale = 1 << (fCode - 1);
     var low = -32 * scale;
@@ -702,9 +651,6 @@ internal sealed class Mpeg4PictureDecoder {
     return vector > high ? vector - range : vector;
   }
 
-  /// <summary>
-  /// The median of the three candidate predictors of ISO/IEC 14496-2 Figure 7-8.
-  /// </summary>
   private int _PredictVector(int address, int block, bool horizontal) {
     var vectors = horizontal ? this._vectorX : this._vectorY;
     var column = address % this._macroblockWidth;
@@ -720,15 +666,6 @@ internal sealed class Mpeg4PictureDecoder {
     return _Median(left.Value, above.Value, aboveRight.Value, left.Valid, above.Valid, aboveRight.Valid);
   }
 
-  /// <summary>
-  /// One candidate predictor: which block of which macroblock stands where, and whether it is there.
-  /// </summary>
-  /// <remarks>
-  /// The candidates are blocks and not macroblocks, which is what makes the four vectors of an
-  /// INTER4V macroblock predict from each other rather than all from the macroblock beside them.
-  /// Figure 7-8 sets out all twelve cases; the four inside the current macroblock are what make the
-  /// order of the four vectors matter.
-  /// </remarks>
   private (int Value, bool Valid) _CandidateOf(
     int address, int neighbour, int block, int direction, short[] vectors) {
     var (source, inNeighbour) = (block, direction) switch {
@@ -747,10 +684,6 @@ internal sealed class Mpeg4PictureDecoder {
     return (vectors[neighbour * 4 + source], true);
   }
 
-  /// <summary>
-  /// The median of three candidates, with the substitutions ISO/IEC 14496-2 7.6.2 makes where one or
-  /// more of them is not there.
-  /// </summary>
   private static int _Median(int a, int b, int c, bool validA, bool validB, bool validC) {
     var count = (validA ? 1 : 0) + (validB ? 1 : 0) + (validC ? 1 : 0);
     switch (count) {
@@ -761,8 +694,6 @@ internal sealed class Mpeg4PictureDecoder {
         return validA ? a : validB ? b : c;
 
       case 2:
-        // The one that is missing is taken as zero, which is what the standard's table amounts to
-        // once the median of three with a zero in it is written out.
         a = validA ? a : 0;
         b = validB ? b : 0;
         c = validC ? c : 0;
@@ -778,9 +709,6 @@ internal sealed class Mpeg4PictureDecoder {
     return a > b ? a : b;
   }
 
-  /// <summary>
-  /// The chrominance vector, derived from the macroblock's luminance vectors (ISO/IEC 14496-2, 7.6.5).
-  /// </summary>
   private (int X, int Y) _ChromaVector(
     scoped ReadOnlySpan<int> vectorsX, scoped ReadOnlySpan<int> vectorsY)
     => _ChromaVector(vectorsX, vectorsY, this._layer.QuarterSample);
@@ -796,6 +724,23 @@ internal sealed class Mpeg4PictureDecoder {
   // ============================================================================================
   // Reconstruction
   // ============================================================================================
+
+  private void _PredictQuarterMacroblock(
+    Span<int> prediction, Mpeg4Frame reference, int address, int vectorX, int vectorY, int rounding) {
+    var (plane, stride, origin, width, height) = reference.PlaneOf(0);
+    var left = address % this._macroblockWidth * 16;
+    var top = address / this._macroblockWidth * 16;
+    Mpeg4QuarterSample.Predict(
+      prediction, plane, stride, origin, width, height, left, top, 16, vectorX, vectorY, rounding);
+  }
+
+  private static void _CopyQuarterSubBlock(
+    Span<int> destination, scoped ReadOnlySpan<int> macroblock, int block) {
+    var left = (block & 1) * 8;
+    var top = (block >> 1) * 8;
+    for (var y = 0; y < 8; ++y)
+      macroblock.Slice((top + y) * 16 + left, 8).CopyTo(destination.Slice(y * 8, 8));
+  }
 
   private void _Predict(
     Span<int> prediction, Mpeg4Frame reference, int address, int index, int vectorX, int vectorY, int rounding,
@@ -844,10 +789,8 @@ internal sealed class Mpeg4PictureDecoder {
     }
   }
 
-  /// <summary>Whether one of a macroblock's six blocks carries coefficients.</summary>
   private static bool _IsCoded(int pattern, int index) => (pattern & (1 << (5 - index))) != 0;
 
-  /// <summary>Where one of a macroblock's six blocks sits in its plane (ISO/IEC 14496-2, Figure 6-5).</summary>
   private (int Left, int Top) _BlockOrigin(int address, int index) {
     var column = address % this._macroblockWidth;
     var row = address / this._macroblockWidth;
