@@ -6,18 +6,22 @@ using FileFormat.Core;
 
 namespace FileFormat.Codecs;
 
-/// <summary>Encodes LOCO lossless RGB, RGBA, YUV 4:2:2 and YUV 4:2:0 video frames.</summary>
+/// <summary>Encodes LOCO lossless and near-lossless RGB, RGBA, YUV 4:2:2 and YUV 4:2:0 video frames.</summary>
 /// <remarks>
 /// LOCO has no published encoder implementation to reuse. This writer is the inverse of the decoder's
 /// independently documented behaviour: the LOCO-I/JPEG-LS median-edge predictor, the adaptive Rice
-/// parameter, and the codec's stateful zero-run subcode. FFmpeg's LGPL-2.1-or-later
-/// <c>libavcodec/loco.c</c> is used as the external decoder oracle; no encoder code is copied from it.
+/// parameter, the codec's stateful zero-run subcode, and the version-two near-lossless residual rule.
+/// FFmpeg's LGPL-2.1-or-later <c>libavcodec/loco.c</c> is used as the external decoder oracle; no
+/// encoder code is copied from it.
 /// <para/>
-/// Version 1 is written, therefore every residual is exact and the near-lossless step is zero. RGB
-/// and RGBA use independent B, G, R and optional A planes stored bottom-up. YUV 4:2:2 stores Y, U, V
-/// planes and YUV 4:2:0 stores Y, V, U, matching the decoder's native planar modes without a colour
-/// conversion. RGB pictures of odd width are refused because the historical RGB decoder applies a
-/// non-invertible row-rotation compatibility transform to them. Every frame is independently coded
+/// Version 1 is selected by default and writes every residual exactly. An explicitly requested version
+/// 2 preserves its near-lossless step: a residual whose signed-byte magnitude does not exceed the step
+/// is represented by zero, while larger residuals subtract the step before Rice coding. Prediction is
+/// then driven by the reconstructed plane, so the writer never drifts away from what a decoder holds.
+/// RGB and RGBA use independent B, G, R and optional A planes stored bottom-up. YUV 4:2:2 stores Y,
+/// U, V planes and YUV 4:2:0 stores Y, V, U, matching the decoder's native planar modes without a
+/// colour conversion. RGB pictures of odd width are refused because the historical RGB decoder applies
+/// a non-invertible row-rotation compatibility transform to them. Every frame is independently coded
 /// and therefore a key frame; LOCO has no inter-picture references.
 /// </remarks>
 [VerifiedBy(ConformanceOracle.FFmpeg)]
@@ -32,7 +36,8 @@ public sealed class LocoVideoEncoder : IVideoCodecEncoder<LocoVideoEncoder> {
   private const int _RGB = 3;
   private const int _RGBA = 4;
   private const int _YV12 = 5;
-  private const int _VERSION = 1;
+  private const int _LOSSLESS_VERSION = 1;
+  private const int _NEAR_LOSSLESS_VERSION = 2;
 
   private static readonly CodecTag _Tag = CodecTag.FromCharacters("LOCO");
 
@@ -40,11 +45,13 @@ public sealed class LocoVideoEncoder : IVideoCodecEncoder<LocoVideoEncoder> {
   private readonly int _width;
   private readonly int _height;
   private readonly int _mode;
+  private readonly int _lossy;
 
-  private LocoVideoEncoder(MediaStreamInfo stream, int mode) {
+  private LocoVideoEncoder(MediaStreamInfo stream, int mode, int version, int lossy) {
     this._width = stream.Width;
     this._height = stream.Height;
     this._mode = mode;
+    this._lossy = lossy;
 
     var bitsPerPixel = _BitsPerPixel(mode);
     var header = new BitmapInfoHeader(
@@ -63,9 +70,9 @@ public sealed class LocoVideoEncoder : IVideoCodecEncoder<LocoVideoEncoder> {
     var format = new byte[BitmapInfoHeader.StructSize + 12];
     header.WriteTo(format);
     var extra = format.AsSpan(BitmapInfoHeader.StructSize);
-    BinaryPrimitives.WriteInt32LittleEndian(extra, _VERSION);
+    BinaryPrimitives.WriteInt32LittleEndian(extra, version);
     BinaryPrimitives.WriteInt32LittleEndian(extra[4..], mode);
-    BinaryPrimitives.WriteInt32LittleEndian(extra[8..], 0);
+    BinaryPrimitives.WriteInt32LittleEndian(extra[8..], lossy);
 
     this._stream = new() {
       Index = stream.Index,
@@ -99,7 +106,7 @@ public sealed class LocoVideoEncoder : IVideoCodecEncoder<LocoVideoEncoder> {
     if ((long)stream.Width * stream.Height * 4 > int.MaxValue)
       throw new NotSupportedException($"A {stream.Width}x{stream.Height} picture is too large for a LOCO frame.");
 
-    var mode = _SelectMode(stream);
+    var (mode, version, lossy) = _SelectConfiguration(stream);
     if (mode is _CYUY2 or _YUY2 or _UYVY && (stream.Width & 1) != 0)
       throw new NotSupportedException($"LOCO YUV 4:2:2 needs an even width; {stream.Width} was supplied.");
     if (mode is _CYV12 or _YV12 && ((stream.Width | stream.Height) & 1) != 0)
@@ -109,7 +116,7 @@ public sealed class LocoVideoEncoder : IVideoCodecEncoder<LocoVideoEncoder> {
       throw new NotSupportedException(
         $"LOCO RGB mode cannot faithfully encode odd-width pictures ({stream.Width} pixels): its historical decoder applies a non-invertible row rotation. Use RGBA32 or an even width.");
 
-    return new(stream, mode);
+    return new(stream, mode, version, lossy);
   }
 
   public bool TryEncode(RawImage frame, long? presentationTimestamp, out CodedPacket packet) {
@@ -187,7 +194,7 @@ public sealed class LocoVideoEncoder : IVideoCodecEncoder<LocoVideoEncoder> {
       throw new InvalidDataException("The source RawImage does not contain enough pixel data for its declared format and dimensions.");
     if (frame.Format != format)
       throw new NotSupportedException(
-        $"LOCO {layout} is lossless and requires {format} input; {frame.Format} would require a colour conversion, so it is refused rather than changed.");
+        $"LOCO {layout} requires {format} input; {frame.Format} would require a colour conversion, so it is refused rather than changed before coding.");
     return frame;
   }
 
@@ -212,21 +219,10 @@ public sealed class LocoVideoEncoder : IVideoCodecEncoder<LocoVideoEncoder> {
       throw new InvalidDataException("A LOCO source plane is shorter than its declared geometry.");
 
     var mapped = new byte[pixelCount];
-    mapped[0] = _MapResidual(_SignedByteDelta(plane[0], 128));
-    for (var x = 1; x < width; ++x)
-      mapped[x] = _MapResidual(_SignedByteDelta(plane[x], plane[x - 1]));
-
-    for (var y = 1; y < height; ++y) {
-      var row = y * width;
-      mapped[row] = _MapResidual(_SignedByteDelta(plane[row], plane[row - width]));
-      for (var x = 1; x < width; ++x) {
-        var left = plane[row + x - 1];
-        var above = plane[row - width + x];
-        var aboveLeft = plane[row - width + x - 1];
-        var prediction = _Median(left, left + above - aboveLeft, above);
-        mapped[row + x] = _MapResidual(_SignedByteDelta(plane[row + x], prediction));
-      }
-    }
+    if (this._lossy == 0)
+      _MapLosslessPlane(plane, mapped, width, height);
+    else
+      _MapNearLosslessPlane(plane, mapped, width, height, this._lossy);
 
     var bits = new MsbBitWriter(output);
     var rice = new RiceState();
@@ -234,7 +230,57 @@ public sealed class LocoVideoEncoder : IVideoCodecEncoder<LocoVideoEncoder> {
     bits.FinishByte();
   }
 
-  private static int _SelectMode(MediaStreamInfo stream) {
+  private static void _MapLosslessPlane(ReadOnlySpan<byte> plane, Span<byte> mapped, int width, int height) {
+    mapped[0] = _MapResidual(_SignedByteDelta(plane[0], 128), 0);
+    for (var x = 1; x < width; ++x)
+      mapped[x] = _MapResidual(_SignedByteDelta(plane[x], plane[x - 1]), 0);
+
+    for (var y = 1; y < height; ++y) {
+      var row = y * width;
+      mapped[row] = _MapResidual(_SignedByteDelta(plane[row], plane[row - width]), 0);
+      for (var x = 1; x < width; ++x) {
+        var left = plane[row + x - 1];
+        var above = plane[row - width + x];
+        var aboveLeft = plane[row - width + x - 1];
+        var prediction = _Median(left, left + above - aboveLeft, above);
+        mapped[row + x] = _MapResidual(_SignedByteDelta(plane[row + x], prediction), 0);
+      }
+    }
+  }
+
+  private static void _MapNearLosslessPlane(
+    ReadOnlySpan<byte> plane,
+    Span<byte> mapped,
+    int width,
+    int height,
+    int lossy) {
+    var reconstructed = new byte[checked(width * height)];
+
+    mapped[0] = _MapNearLosslessSample(plane[0], 128, lossy, out reconstructed[0]);
+    for (var x = 1; x < width; ++x)
+      mapped[x] = _MapNearLosslessSample(plane[x], reconstructed[x - 1], lossy, out reconstructed[x]);
+
+    for (var y = 1; y < height; ++y) {
+      var row = y * width;
+      mapped[row] = _MapNearLosslessSample(plane[row], reconstructed[row - width], lossy, out reconstructed[row]);
+      for (var x = 1; x < width; ++x) {
+        var left = reconstructed[row + x - 1];
+        var above = reconstructed[row - width + x];
+        var aboveLeft = reconstructed[row - width + x - 1];
+        var prediction = _Median(left, left + above - aboveLeft, above);
+        mapped[row + x] = _MapNearLosslessSample(
+          plane[row + x], prediction, lossy, out reconstructed[row + x]);
+      }
+    }
+  }
+
+  private static byte _MapNearLosslessSample(byte sample, int prediction, int lossy, out byte reconstructed) {
+    var mapped = _MapResidual(_SignedByteDelta(sample, prediction), lossy);
+    reconstructed = _Reconstruct(prediction, mapped, lossy);
+    return mapped;
+  }
+
+  private static (int Mode, int Version, int Lossy) _SelectConfiguration(MediaStreamInfo stream) {
     var format = stream.CodecPrivateData.Span;
     var offset = BitmapInfoHeader.StructSize;
     if (format.Length > offset && format.Length < offset + 12)
@@ -242,13 +288,23 @@ public sealed class LocoVideoEncoder : IVideoCodecEncoder<LocoVideoEncoder> {
         $"LOCO stream {stream.Index} carries a partial codec-private trailer; 12 bytes are required when one is supplied.");
 
     if (format.Length >= offset + 12) {
+      var version = BinaryPrimitives.ReadInt32LittleEndian(format[offset..]);
       var mode = BinaryPrimitives.ReadInt32LittleEndian(format[(offset + 4)..]);
-      if (mode is _CYUY2 or _CRGB or _CRGBA or _CYV12 or _YUY2 or _UYVY or _RGB or _RGBA or _YV12)
-        return mode;
-      throw new NotSupportedException($"LOCO stream {stream.Index} requests unknown colour mode {mode}.");
+      var lossy = BinaryPrimitives.ReadInt32LittleEndian(format[(offset + 8)..]);
+      if (mode is not (_CYUY2 or _CRGB or _CRGBA or _CYV12 or _YUY2 or _UYVY or _RGB or _RGBA or _YV12))
+        throw new NotSupportedException($"LOCO stream {stream.Index} requests unknown colour mode {mode}.");
+      if (lossy < 0 || lossy > 65536)
+        throw new NotSupportedException($"LOCO stream {stream.Index} requests an invalid near-lossless step of {lossy}.");
+
+      return version switch {
+        _LOSSLESS_VERSION => (mode, _LOSSLESS_VERSION, 0),
+        _NEAR_LOSSLESS_VERSION => (mode, _NEAR_LOSSLESS_VERSION, lossy),
+        _ => throw new NotSupportedException(
+          $"LOCO stream {stream.Index} requests codec version {version}; the writer implements versions 1 and 2."),
+      };
     }
 
-    return stream.BitsPerPixel switch {
+    var inferredMode = stream.BitsPerPixel switch {
       0 or 24 => _RGB,
       32 => _RGBA,
       16 => _YUY2,
@@ -256,6 +312,7 @@ public sealed class LocoVideoEncoder : IVideoCodecEncoder<LocoVideoEncoder> {
       _ => throw new NotSupportedException(
         $"LOCO writes RGB24, RGBA32, YUV 4:2:2 or YUV 4:2:0; video stream {stream.Index} asks for {stream.BitsPerPixel} bits per pixel."),
     };
+    return (inferredMode, _LOSSLESS_VERSION, 0);
   }
 
   private static int _BitsPerPixel(int mode) => mode switch {
@@ -269,12 +326,22 @@ public sealed class LocoVideoEncoder : IVideoCodecEncoder<LocoVideoEncoder> {
   private static int _SignedByteDelta(int value, int prediction)
     => unchecked((sbyte)(byte)(value - prediction));
 
-  private static byte _MapResidual(int residual)
-    => checked((byte)(residual switch {
-      > 0 => residual << 1,
-      < 0 => ((-residual) << 1) - 1,
-      _ => 0,
-    }));
+  private static byte _MapResidual(int residual, int lossy) {
+    if (residual > lossy)
+      return checked((byte)((residual - lossy) << 1));
+    if (residual < -lossy)
+      return checked((byte)(((-residual - lossy) << 1) - 1));
+    return 0;
+  }
+
+  private static byte _Reconstruct(int prediction, byte mapped, int lossy) {
+    if (mapped == 0)
+      return unchecked((byte)prediction);
+
+    var magnitude = ((mapped + 1) >> 1) + lossy;
+    var residual = (mapped & 1) == 0 ? magnitude : -magnitude;
+    return unchecked((byte)(prediction + residual));
+  }
 
   private static int _Median(int a, int b, int c) {
     if (a > b)
