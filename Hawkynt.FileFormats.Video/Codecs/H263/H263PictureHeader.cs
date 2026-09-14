@@ -18,8 +18,7 @@ namespace FileFormat.Codecs.H263;
 /// through the extended header of clause 5.1.4; Sorenson states it as a code that may carry an
 /// arbitrary width and height in the bitstream. H.263 has one bit for the picture type; Sorenson has
 /// two, the third value meaning a predicted picture that later pictures do not predict from. And
-/// H.263 has five bits of mode flags that a Sorenson header does not carry at all, which is why a
-/// Sorenson stream cannot ask for the annexes this decoder refuses.
+/// H.263 has five bits of mode flags that a Sorenson header does not carry at all.
 /// </remarks>
 internal sealed class H263PictureHeader {
 
@@ -53,9 +52,7 @@ internal sealed class H263PictureHeader {
   /// <remarks>
   /// Always true in H.263, where every picture that is not a B-part of a PB-frame is a reference.
   /// A Sorenson Spark stream may state a third picture type meaning a predicted picture that nothing
-  /// predicts from, which a decoder must show and must not keep — keeping it puts every following
-  /// picture one prediction out of step, and the error is a smear that grows rather than a frame that
-  /// is obviously wrong.
+  /// predicts from, which a decoder must show and must not keep.
   /// </remarks>
   internal required bool IsReference { get; init; }
 
@@ -65,43 +62,30 @@ internal sealed class H263PictureHeader {
   /// <summary>
   /// Whether the escape form of the coefficient codes carries a wider level than H.263's.
   /// </summary>
-  /// <remarks>
-  /// False for every ITU-T H.263 stream, where the escaped level is the eight bits of clause 5.4.2.
-  /// True for a Sorenson Spark stream that states version 1, which widens it. The two are the same
-  /// length up to the level, so a decoder that reads the wrong one stays in step for exactly as long
-  /// as no block needs an escape and then loses the bitstream entirely — which is why this is settled
-  /// by the header rather than guessed at from what decodes.
-  /// </remarks>
   internal required bool HasWideEscapeLevel { get; init; }
 
-  /// <summary>
-  /// Whether the picture has a group of blocks layer at all.
-  /// </summary>
-  /// <remarks>
-  /// True for every ITU-T H.263 picture and false for every Sorenson Spark one, which drops the
-  /// layer: its macroblocks run without a break from the picture header to the end of the packet, so
-  /// there is no group header to look for and no group boundary for the prediction rules to treat as
-  /// an edge. Looking for one anyway would be worse than pointless — the sixteen zero bits a group
-  /// header begins with can occur inside Sorenson macroblock data, because nothing in that stream has
-  /// to avoid producing them.
-  /// </remarks>
+  /// <summary>Whether the picture has a group of blocks layer at all.</summary>
   internal required bool HasGroupLayer { get; init; }
 
   /// <summary>
   /// Whether a motion vector may reach outside the reference picture, reading the edge sample where
-  /// it does (ITU-T H.263 Annex D.1).
+  /// it does. Annex D.1 enables this directly; Annex F Advanced Prediction requires the same boundary
+  /// extension even when Annex D's extended vector range is not selected.
+  /// </summary>
+  internal required bool AllowsVectorsOutsidePicture { get; init; }
+
+  /// <summary>
+  /// Whether motion-vector reconstruction uses Annex D.2's extended component range.
   /// </summary>
   /// <remarks>
-  /// Off for a baseline ITU-T picture, where clause 6.1.1 requires every referenced sample to lie
-  /// inside the coded picture, and a vector that reaches outside is a bitstream this decoder has
-  /// misread. Always on for a Sorenson Spark picture, whose format has no bit to turn it off with.
-  /// <para/>
-  /// This is the edge rule of Annex D.1 and not the wider vector range of D.2: the vectors are still
-  /// reconstructed into -16 to 15.5 as clause 6.1.1 does it. The two are separable and Sorenson takes
-  /// only the first — a stream that used the second would decode to a picture that tears along the
-  /// blocks whose vectors left that range, which none of the streams measured here did.
+  /// This is deliberately separate from <see cref="AllowsVectorsOutsidePicture"/>. Advanced
+  /// Prediction inherits Annex D.1's edge extension, but Annex D.2's wider component range is used
+  /// only when the unrestricted-motion-vector mode itself is selected.
   /// </remarks>
-  internal required bool AllowsVectorsOutsidePicture { get; init; }
+  internal bool UsesExtendedMotionVectorRange { get; init; }
+
+  /// <summary>Whether Annex F four-vector prediction and overlapped motion compensation are enabled.</summary>
+  internal bool UsesAdvancedPrediction { get; init; }
 
   /// <summary>The picture's temporal reference, which the container's timestamps do not replace.</summary>
   internal required int TemporalReference { get; init; }
@@ -139,9 +123,6 @@ internal sealed class H263PictureHeader {
     var freezeRelease = reader.ReadBit();
     var sourceFormat = reader.ReadBits(3);
 
-    // Bits 3 to 5 say nothing about how a sample is coded — they are instructions to a display about
-    // what to do with the pictures — so they are read and not acted on. That is deliberate rather
-    // than an omission: acting on them would mean this decoder deciding to hand back half a picture.
     _ = splitScreen;
     _ = documentCamera;
     _ = freezeRelease;
@@ -149,9 +130,7 @@ internal sealed class H263PictureHeader {
     if (sourceFormat == 7)
       throw new NotSupportedException(
         "This H.263 picture header states source format 111, the extended PTYPE of ITU-T H.263 5.1.4. The extended "
-        + "header carries the custom picture formats, the picture and clock conversion factors, and the annexes "
-        + "signalled by OPPTYPE and MPPTYPE; none of it is implemented. This decoder reads the five standard formats "
-        + "of Table 5.");
+        + "header carries custom picture formats and later optional modes that are not implemented by this parser.");
 
     var (width, height, rowsPerGroup) = _StandardFormat(sourceFormat);
 
@@ -161,21 +140,10 @@ internal sealed class H263PictureHeader {
     var advancedPrediction = reader.ReadBit() == 1;
     var pbFrames = reader.ReadBit() == 1;
 
-    if (unrestrictedMotionVectors)
-      throw new NotSupportedException(
-        "This H.263 picture uses the Unrestricted Motion Vector mode of ITU-T H.263 Annex D (PTYPE bit 10). Its "
-        + "vectors may point outside the picture and are coded over a wider range with a different table, neither of "
-        + "which is implemented.");
-
     if (arithmeticCoding)
       throw new NotSupportedException(
         "This H.263 picture uses the Syntax-based Arithmetic Coding mode of ITU-T H.263 Annex E (PTYPE bit 11). Every "
         + "variable-length code in the picture is replaced by an arithmetic-coded symbol, which is not implemented.");
-
-    if (advancedPrediction)
-      throw new NotSupportedException(
-        "This H.263 picture uses the Advanced Prediction mode of ITU-T H.263 Annex F (PTYPE bit 12): four motion "
-        + "vectors per macroblock and overlapped block motion compensation. Neither is implemented.");
 
     if (pbFrames)
       throw new NotSupportedException(
@@ -204,7 +172,9 @@ internal sealed class H263PictureHeader {
       Quantiser = quantiser,
       HasWideEscapeLevel = false,
       HasGroupLayer = true,
-      AllowsVectorsOutsidePicture = false,
+      AllowsVectorsOutsidePicture = unrestrictedMotionVectors || advancedPrediction,
+      UsesExtendedMotionVectorRange = unrestrictedMotionVectors,
+      UsesAdvancedPrediction = advancedPrediction,
       TemporalReference = temporalReference,
     };
   }
@@ -213,13 +183,6 @@ internal sealed class H263PictureHeader {
   /// How many macroblock rows one group of blocks holds, which ITU-T H.263 4.2.1 and Table 4 make a
   /// function of the picture's height alone.
   /// </summary>
-  /// <remarks>
-  /// Of the height and not of the source format, because a Sorenson Spark picture states a height
-  /// without stating a format. The five standard formats fall out of the same rule — ninety-six, a
-  /// hundred and forty-four and two hundred and eighty-eight lines are all at or under four hundred,
-  /// five hundred and seventy-six is in the middle band and one thousand one hundred and fifty-two is
-  /// in the last — so there is one rule here rather than a table and an exception.
-  /// </remarks>
   private static int _GroupRows(int height) => height <= 400 ? 1 : height <= 800 ? 2 : 4;
 
   /// <summary>The five picture formats of ITU-T H.263 Table 5.</summary>
@@ -244,10 +207,6 @@ internal sealed class H263PictureHeader {
   /// Reads the picture header of a Sorenson Spark stream, positioned just past the seventeen-bit
   /// start code.
   /// </summary>
-  /// <remarks>
-  /// Positioned past seventeen bits and not past twenty-two, because a Sorenson header has no group
-  /// number: the five bits that would be one carry a version instead, and they are read here.
-  /// </remarks>
   internal static H263PictureHeader ParseSorenson(ref H263BitReader reader) {
     var version = reader.ReadBits(5);
     if (version > 1)
@@ -284,14 +243,7 @@ internal sealed class H263PictureHeader {
         + "2 (disposable inter) are the ones defined."),
     };
 
-    // The deblocking flag asks whoever shows the picture to smooth its block edges first. It is a
-    // request about the displayed picture and not about the decode: the pictures a Sorenson stream
-    // predicts from are the unfiltered ones, which is why a decoder that ignores it stays in step
-    // with the encoder rather than drifting away from it. It is read and not acted on, so the
-    // pictures this hands back are the reconstructed ones and have not been smoothed. Every stream
-    // measured here had the flag set, and every picture matched the reference decoder's — which also
-    // does not filter — sample for sample.
-    reader.ReadBit();
+    reader.ReadBit(); // deblocking/display flag; it does not alter the predictive reference.
 
     var quantiser = _ReadQuantiser(ref reader, "the Sorenson Spark quantiser");
 
