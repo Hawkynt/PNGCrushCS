@@ -10,8 +10,9 @@ namespace FileFormat.Codecs;
 /// <remarks>
 /// Indeo 3 uses two internal reference buffers rather than MPEG-style past/future picture lists. This
 /// writer alternates those buffers: one frame in every twelve is a key/intra picture and the eleven
-/// between are inter pictures predicted from the immediately preceding reconstruction. There is no
-/// display-order reordering and therefore no B-picture analogue to emit.
+/// between are inter pictures predicted from the immediately preceding reconstruction. The periodic
+/// key pictures and the preceding picture carry the format's periodic/next-key signalling as well.
+/// There is no display-order reordering and therefore no B-picture analogue to emit.
 /// <para/>
 /// Inter planes use the format's ordinary motion-compensated cell grammar with vector <c>0,0</c> and
 /// mode 0 residuals. Unchanged blocks are copied with the codec's run escapes, while a wholly unchanged
@@ -106,7 +107,11 @@ public sealed class Indeo3VideoEncoder : IVideoCodecEncoder<Indeo3VideoEncoder> 
         + $"and carries {frame.PixelData.Length}.");
 
     var rgb = frame.Format == PixelFormat.Rgb24 ? frame.PixelData : frame.ToRgb24();
-    var encoded = this._frameEncoder.Encode(rgb, this._frameNumber, this._groupPosition == 0);
+    var encoded = this._frameEncoder.Encode(
+      rgb,
+      this._frameNumber,
+      periodicKeyFrame: this._groupPosition == 0,
+      nextFrameIsKeyFrame: this._groupPosition == _GROUP_SIZE - 1);
     this._frameNumber = unchecked(this._frameNumber + 1);
     this._groupPosition = (this._groupPosition + 1) % _GROUP_SIZE;
 
