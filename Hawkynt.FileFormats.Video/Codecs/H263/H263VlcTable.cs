@@ -72,7 +72,7 @@ internal sealed class H263VlcTable {
   internal string Name => this._name;
 
   /// <summary>Reads one code and returns the value the Recommendation attaches to it.</summary>
-  /// <exception cref="InvalidDataException">The next bits are a code the table does not define.</exception>
+  /// <exception cref="InvalidDataException">The next bits are not a complete code from this table.</exception>
   internal int Read(ref H263BitReader reader) {
     var bits = reader.NextBits(this._maxLength);
     var length = this._lengths[bits];
@@ -80,6 +80,10 @@ internal sealed class H263VlcTable {
       throw new InvalidDataException(
         $"Bit {reader.BitPosition} of the picture holds {Convert.ToString(bits, 2).PadLeft(this._maxLength, '0')}, "
         + $"which is not a code in {this._name}.");
+
+    if (length > reader.BitsRemaining)
+      throw new InvalidDataException(
+        $"The H.263 bitstream ended {length - reader.BitsRemaining} bit(s) short of a complete code in {this._name}.");
 
     reader.Skip(length);
     return this._values[bits];
