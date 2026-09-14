@@ -96,8 +96,10 @@ internal static class CineFormPictureDecoder {
 
     var planes = new Plane[channelCount];
     for (var i = 0; i < channelCount; ++i) {
+      int width;
+      int height;
       var samples = isInterlaced
-        ? _ReconstructInterlaced(channels[i], prescale, out var width, out var height)
+        ? _ReconstructInterlaced(channels[i], prescale, out width, out height)
         : CineFormChannelDecoder.Reconstruct(channels[i], prescale, out width, out height);
       _ClampToCodedRange(samples, maxSample);
       if (format == CineFormEncodedFormat.Rgba4444 && i == 3)
