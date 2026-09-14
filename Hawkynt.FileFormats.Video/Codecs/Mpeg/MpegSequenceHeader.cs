@@ -158,12 +158,6 @@ internal sealed class MpegSequenceHeader {
         "The MPEG-2 sequence extension states chroma_format 0, which ISO/IEC 13818-2 Table 6-5 leaves reserved."),
     };
 
-    if (this.ChromaFormat == MpegChromaFormat.Yuv444)
-      throw new NotSupportedException(
-        "This MPEG-2 sequence states chroma_format 3 (4:4:4), which ISO/IEC 13818-2 6.3.5 permits only in the High "
-        + "profile. This decoder reads 4:2:0 and 4:2:2; 4:4:4 is not implemented, and is refused rather than guessed "
-        + "at because no encoder available here produces one to check the result against.");
-
     this.Width |= reader.ReadBits(2) << 12;  // horizontal_size_extension
     this.Height |= reader.ReadBits(2) << 12; // vertical_size_extension
 
