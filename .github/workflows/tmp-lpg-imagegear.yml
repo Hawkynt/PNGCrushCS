@@ -9,67 +9,53 @@ jobs:
   probe:
     runs-on: ubuntu-latest
     steps:
-      - name: Narrow ImageGear oracle probe
+      - name: Inspect ImageGear 7 DLL oracle
         shell: bash
         run: |
           set -u
           ROOT=/tmp/lpg-imagegear
           mkdir -p "$ROOT"
+          cd "$ROOT"
 
-          echo '=== Internet Archive focused search ==='
+          echo '=== Download ImageGear DLL package ==='
+          URL='https://www.dll-files.com/download/bd31e50ee4450d52d0a9f1a774a94775/gear32sd.dll.html?c=SHZqdk1YN25BY2J1MzNwWHdUbkxOdz09'
+          curl -A 'Mozilla/5.0' -fL --max-time 30 -o gear.zip "$URL" || true
+          file gear.zip || true
+          ls -l gear.zip || true
+          unzip -l gear.zip || true
+          unzip -o gear.zip -d extracted || true
+          find extracted -maxdepth 3 -type f -printf '%p %s bytes\n' || true
+
+          DLL=$(find extracted -type f -iname 'gear32sd.dll' -print -quit)
+          if [ -z "${DLL:-}" ]; then
+            echo 'NO_DLL'
+            exit 0
+          fi
+
+          echo '=== Hash ==='
+          sha256sum "$DLL"
+          md5sum "$DLL"
+          file "$DLL"
+
+          echo '=== PE exports containing useful ImageGear APIs ==='
+          objdump -p "$DLL" | grep -iE 'IG_(initialize|close|load_file|save_file|info_get|image_|fltr_|error_)|IGF|FORMAT|SAVE_' | head -400 || true
+
+          echo '=== Strings related to IGF / file formats ==='
+          strings -a "$DLL" | grep -iE -B4 -A8 '(^|[^A-Za-z])(IGF|ImageGear Format|IG_FORMAT_|IG_SAVE_|\.igf|\.lpg|Paris|Xerox)([^A-Za-z]|$)' | head -800 || true
+
+          echo '=== All extension-like strings near obscure formats ==='
+          strings -a "$DLL" | grep -iE 'ATT|BRK|GX2|ICA|IMT|KFX|\.LV|Xerox|IMG|IGF|PCX|LPG' | head -500 || true
+
+          echo '=== Embedded version/product strings ==='
+          strings -el "$DLL" | grep -iE 'ImageGear|AccuSoft|version|format' | head -200 || true
+
+          echo '=== Candidate raster sample files ==='
           python3 - <<'PY'
-          import json, urllib.parse, urllib.request
-          queries = [
-              'title:(ImageGear) AND (creator:(AccuSoft) OR description:(AccuSoft))',
-              'title:(OfficeGear) AND (creator:(AccuSoft) OR description:(AccuSoft))',
-              'gear32sd.dll',
-              '"Canvas 7" AND Deneba',
-              '"Paris" AND XLPrint',
-          ]
-          for q in queries:
-              print('\n---', q, '---')
-              u='https://archive.org/advancedsearch.php?'+urllib.parse.urlencode({
-                  'q':q,'fl[]':['identifier','title','creator','year'],'rows':50,'page':1,'output':'json'
-              }, doseq=True)
-              try:
-                  with urllib.request.urlopen(u, timeout=20) as r:
-                      data=json.load(r)
-                  print('numFound', data['response'].get('numFound'))
-                  for d in data['response']['docs']:
-                      print(d.get('identifier',''), '|', d.get('title',''), '|', d.get('creator',''), '|', d.get('year',''))
-              except Exception as e:
-                  print(type(e).__name__, e)
+          from pathlib import Path
+          white=bytes.fromhex('50 50 03 00 01 00 00 00 01 00 00 00 52 00 00 00 01 00 00 00 96 00 96 00 00 00 00 00 00 00 00 00 00 00 00 00 01 00 00 00 53 00 00 00 01 00 00 00 00 01 00 01 f0 00 00 00 e5 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 1c 35')
+          black=bytes.fromhex('50 50 03 00 01 00 00 00 01 00 00 00 52 00 00 00 02 00 00 00 96 00 96 00 00 00 00 00 00 00 00 00 00 00 00 00 00 01 00 00 00 54 00 00 00 01 00 00 00 00 01 00 01 f0 00 00 00 e5 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 35 40 35')
+          Path('white.bin').write_bytes(white)
+          Path('black.bin').write_bytes(black)
           PY
-
-          echo '=== Direct DLL download-page inspection ==='
-          for url in \
-            'https://www.opendll.com/index.php?arch=32bit&file-download=gear32sd.dll&version=7.0.15.15' \
-            'https://www.dll-files.com/gear32sd.dll.html'; do
-            echo "--- $url ---"
-            html="$ROOT/page.html"
-            curl --max-time 20 -A 'Mozilla/5.0' -fsSL "$url" -o "$html" || { echo FETCH_FAILED; continue; }
-            grep -inE -B3 -A5 'gear32sd|download|\.zip|\.dll' "$html" | head -250 || true
-            echo '--- href/action candidates ---'
-            grep -oiE '(href|action)=["'"'][^"'"']+["'"']' "$html" | grep -iE 'download|gear32|\.zip|\.dll' | head -100 || true
-          done
-
-          echo '=== Wayback exact legacy file candidates ==='
-          for target in \
-            'www.accusoft.com/*ImageGear*.zip' \
-            'www.accusoft.com/*ImageGear*.exe' \
-            'www.accusoft.com/*OfficeGear*.zip' \
-            'www.accusoft.com/*OfficeGear*.exe' \
-            'ftp.accusoft.com/*.zip' \
-            'ftp.accusoft.com/*.exe' \
-            'ftp.xlprintau.dynip.com/*.zip' \
-            'ftp.xlprintau.dynip.com/*.exe'; do
-            echo "--- $target ---"
-            curl --max-time 25 -fsSLG 'https://web.archive.org/cdx/search/cdx' \
-              --data-urlencode "url=$target" \
-              --data-urlencode 'output=json' \
-              --data-urlencode 'fl=timestamp,original,statuscode,mimetype,digest,length' \
-              --data-urlencode 'filter=statuscode:200' \
-              --data-urlencode 'collapse=urlkey' \
-              --data-urlencode 'limit=1000' || true
-            echo
-          done
+          file white.bin black.bin || true
+          xxd -g1 white.bin
