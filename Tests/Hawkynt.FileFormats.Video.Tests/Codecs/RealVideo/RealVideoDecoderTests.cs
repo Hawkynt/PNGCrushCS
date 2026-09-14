@@ -45,15 +45,105 @@ public sealed class RealVideoDecoderTests {
 
   [TestCase(1)]
   [TestCase(3)]
+  [TestCase(9)]
   [Category("Unit")]
-  public void ANonzeroMicroVersion_IsRefusedByName(int micro) {
-    var stream = RealVideoTestStream.Stream("RV10", codecPrivateData: RealVideoTestStream.Micro(micro));
+  public void ANonzeroMicroVersion_DecodesPredictiveIntraDc(int micro) {
+    var picture = RealVideoTestStream.Picture(true, 8, (0, 0, 1), initialDc: (100, 120, 140))
+      .FlatPredictiveIntraMacroblock(firstInRun: true)
+      .ToArray();
 
-    var failure = Assert.Throws<NotSupportedException>(() => RealVideoDecoder.Create(stream));
+    var decoder = RealVideoDecoder.Create(
+      RealVideoTestStream.Stream("RV10", 16, 16, RealVideoTestStream.Micro(micro)));
+
+    Assert.That(decoder.TryDecode(RealVideoTestStream.Packet(picture), out var frame), Is.True);
     Assert.Multiple(() => {
-      Assert.That(failure!.Message, Does.Contain("minor 0"));
-      Assert.That(failure.Message, Does.Contain($"micro {micro}"));
+      Assert.That(frame.Width, Is.EqualTo(16));
+      Assert.That(frame.Height, Is.EqualTo(16));
+      Assert.That(frame.PixelData, Has.Length.EqualTo(16 * 16 * 3));
     });
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void PredictiveIntraDc_WrapsModulo256_AndDoesNotApplyH263s255Alias() {
+    var picture = RealVideoTestStream.Picture(true, 8, (0, 0, 2), initialDc: (255, 128, 128))
+      .FlatPredictiveIntraMacroblock(firstInRun: true)
+      .Code(H263TestStream.IntraMacroblock)
+      .Code(H263TestStream.NoLuminanceCoded)
+      .Code("0100") // Y: 255 + 1 => 0
+      .Code("00")
+      .Code("00")
+      .Code("00")
+      .Code("00") // Cb unchanged
+      .Code("00") // Cr unchanged
+      .ToArray();
+
+    var decoder = RealVideoDecoder.Create(
+      RealVideoTestStream.Stream("RV10", 32, 16, RealVideoTestStream.Micro(3)));
+    Assert.That(decoder.TryDecode(RealVideoTestStream.Packet(picture), out var frame), Is.True);
+
+    var left = frame.PixelData[0];
+    var right = frame.PixelData[(31 * 3)];
+    Assert.That(left, Is.GreaterThan(right));
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void PredictiveIntraDc_IsResetByEveryRunHeader() {
+    var first = RealVideoTestStream.Picture(true, 8, (0, 0, 1), initialDc: (40, 128, 128))
+      .FlatPredictiveIntraMacroblock(firstInRun: true)
+      .ToArray();
+    var second = RealVideoTestStream.Picture(true, 8, (1, 0, 1), initialDc: (200, 128, 128))
+      .FlatPredictiveIntraMacroblock(firstInRun: true)
+      .ToArray();
+
+    var decoder = RealVideoDecoder.Create(
+      RealVideoTestStream.Stream("RV10", 32, 16, RealVideoTestStream.Micro(3)));
+    Assert.That(decoder.TryDecode(RealVideoTestStream.Packet(first, second), out var frame), Is.True);
+
+    var left = frame.PixelData[0];
+    var right = frame.PixelData[31 * 3];
+    Assert.That(right, Is.GreaterThan(left));
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void ATruncatedPredictiveDcCode_IsRefused() {
+    var picture = RealVideoTestStream.Picture(true, 8, (0, 0, 1), initialDc: (100, 128, 128))
+      .Code(H263TestStream.IntraMacroblock)
+      .Code(H263TestStream.NoLuminanceCoded)
+      .ToArray();
+
+    var decoder = RealVideoDecoder.Create(
+      RealVideoTestStream.Stream("RV10", 16, 16, RealVideoTestStream.Micro(3)));
+    Assert.Throws<InvalidDataException>(() => decoder.TryDecode(RealVideoTestStream.Packet(picture), out _));
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void MicroVersionTwo_IsRefusedBecauseItEnablesOverlappedMotionCompensation() {
+    var failure = Assert.Throws<NotSupportedException>(
+      () => RealVideoDecoder.Create(
+        RealVideoTestStream.Stream("RV10", codecPrivateData: RealVideoTestStream.Micro(2))));
+    Assert.That(failure!.Message, Does.Contain("overlapped motion compensation"));
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void TheMinorVersion_DoesNotSelectADifferentRv10MacroblockSyntax() {
+    var picture = RealVideoTestStream.Picture(true, 8, (0, 0, 1)).FlatIntraMacroblocks(1, 140).ToArray();
+    var decoder = RealVideoDecoder.Create(
+      RealVideoTestStream.Stream("RV10", 16, 16, RealVideoTestStream.Version(7, 0)));
+    Assert.That(decoder.TryDecode(RealVideoTestStream.Packet(picture), out _), Is.True);
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void LongVectorMode_IsRefusedRatherThanWrappedAsBaselineH263() {
+    var failure = Assert.Throws<NotSupportedException>(
+      () => RealVideoDecoder.Create(
+        RealVideoTestStream.Stream("RV10", codecPrivateData: RealVideoTestStream.Version(0, 0, longVectors: true))));
+    Assert.That(failure!.Message, Does.Contain("long-vector"));
   }
 
   [Test]
@@ -212,11 +302,11 @@ public sealed class RealVideoDecoderTests {
 
   [Test]
   [Category("Unit")]
-  public void AFirstRunThatLeavesItsPositionOut_IsRefusedRatherThanGuessedAt() {
+  public void AFirstRunMayOmitItsPositionAndMeanTheWholePicture() {
     var picture = RealVideoTestStream.Picture(true, 8).FlatIntraMacroblocks(_MACROBLOCKS, 140).ToArray();
     var decoder = RealVideoDecoder.Create(RealVideoTestStream.Stream("RV10", _WIDTH, _HEIGHT));
-    var failure = Assert.Throws<NotSupportedException>(() => decoder.TryDecode(RealVideoTestStream.Packet(picture), out _));
-    Assert.That(failure!.Message, Does.Contain("leaves the macroblock position out"));
+    Assert.That(decoder.TryDecode(RealVideoTestStream.Packet(picture), out var frame), Is.True);
+    Assert.That(frame.PixelData, Has.Length.EqualTo(_WIDTH * _HEIGHT * 3));
   }
 
   [Test]
