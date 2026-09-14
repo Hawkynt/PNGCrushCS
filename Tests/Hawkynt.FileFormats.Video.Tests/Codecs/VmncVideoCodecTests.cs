@@ -78,6 +78,33 @@ public sealed class VmncVideoCodecTests {
 
   [Test]
   [Category("Unit")]
+  public void TruncatedCopyRectPayloadsAreRejected() {
+    var payload = new byte[4];
+    for (var length = 0; length < payload.Length; ++length) {
+      var decoder = VmncVideoDecoder.Create(_Stream(1, 1, 16));
+      var packet = _Packet(_Chunk(0, 0, 1, 1, 1, payload[..length]));
+
+      var failure = Assert.Throws<InvalidDataException>(() => decoder.TryDecode(new(0, packet), out _));
+      Assert.That(failure!.Message, Does.Contain("ends inside"), $"CopyRect payload prefix of {length} byte(s)");
+    }
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void CopyRectSourceMustRemainInsideThePreviousFramebuffer() {
+    var decoder = VmncVideoDecoder.Create(_Stream(3, 1, 16));
+    var payload = new byte[4];
+    BinaryPrimitives.WriteUInt16BigEndian(payload, 3);
+    BinaryPrimitives.WriteUInt16BigEndian(payload.AsSpan(2), 0);
+
+    var failure = Assert.Throws<InvalidDataException>(() =>
+      decoder.TryDecode(new(0, _Packet(_Chunk(0, 0, 1, 1, 1, payload))), out _));
+
+    Assert.That(failure!.Message, Does.Contain("outside its previous 3x1 framebuffer"));
+  }
+
+  [Test]
+  [Category("Unit")]
   public void RreAndCoRrePaintTheirSubrectangles() {
     var blue = _Rgb555(0, 0, 31);
     var red = _Rgb555(31, 0, 0);
@@ -109,6 +136,42 @@ public sealed class VmncVideoCodecTests {
     var correDecoder = VmncVideoDecoder.Create(_Stream(3, 1, 16));
     Assert.That(correDecoder.TryDecode(new(0, _Packet(_Chunk(0, 0, 3, 1, 4, corre.ToArray()))), out var correFrame), Is.True);
     Assert.That(correFrame.PixelData, Is.EqualTo(rreFrame.PixelData));
+  }
+
+  [TestCase(2, false, "RRE")]
+  [TestCase(4, true, "CoRRE")]
+  [Category("Unit")]
+  public void TruncatedRlePayloadsAreRejected(int encoding, bool compact, string name) {
+    var payload = _RlePayload(compact, 1, 0, 1, 1);
+    for (var length = 0; length < payload.Length; ++length) {
+      var decoder = VmncVideoDecoder.Create(_Stream(3, 1, 16));
+      var packet = _Packet(_Chunk(0, 0, 3, 1, checked((uint)encoding), payload[..length]));
+
+      var failure = Assert.Throws<InvalidDataException>(() => decoder.TryDecode(new(0, packet), out _));
+      Assert.That(failure!.Message, Does.Contain("ends inside"), $"{name} payload prefix of {length} byte(s)");
+    }
+  }
+
+  [TestCase(2, false, "RRE")]
+  [TestCase(4, true, "CoRRE")]
+  [Category("Unit")]
+  public void RleSubrectanglesMustRemainInsideTheirParent(int encoding, bool compact, string name) {
+    (int X, int Y, int Width, int Height)[] malformed = [
+      (2, 0, 2, 1),
+      (0, 0, 0, 1),
+      (0, 0, 1, 0),
+    ];
+
+    foreach (var rectangle in malformed) {
+      var decoder = VmncVideoDecoder.Create(_Stream(3, 1, 16));
+      var payload = _RlePayload(compact, rectangle.X, rectangle.Y, rectangle.Width, rectangle.Height);
+      var packet = _Packet(_Chunk(0, 0, 3, 1, checked((uint)encoding), payload));
+
+      var failure = Assert.Throws<InvalidDataException>(() => decoder.TryDecode(new(0, packet), out _));
+      Assert.That(failure!.Message,
+        Does.Contain($"{name} subrectangle").And.Contain("outside"),
+        $"{name} subrectangle ({rectangle.X},{rectangle.Y}) {rectangle.Width}x{rectangle.Height}");
+    }
   }
 
   [Test]
@@ -188,6 +251,25 @@ public sealed class VmncVideoCodecTests {
     var result = new byte[2];
     BinaryPrimitives.WriteUInt16LittleEndian(result, checked((ushort)((red << 10) | (green << 5) | blue)));
     return result;
+  }
+
+  private static byte[] _RlePayload(bool compact, int x, int y, int width, int height) {
+    using var output = new MemoryStream();
+    _WriteUInt32BigEndian(output, 1);
+    output.Write(_Rgb555(0, 0, 31));
+    output.Write(_Rgb555(31, 0, 0));
+    if (compact) {
+      output.WriteByte(checked((byte)x));
+      output.WriteByte(checked((byte)y));
+      output.WriteByte(checked((byte)width));
+      output.WriteByte(checked((byte)height));
+    } else {
+      _WriteUInt16BigEndian(output, checked((ushort)x));
+      _WriteUInt16BigEndian(output, checked((ushort)y));
+      _WriteUInt16BigEndian(output, checked((ushort)width));
+      _WriteUInt16BigEndian(output, checked((ushort)height));
+    }
+    return output.ToArray();
   }
 
   private static byte[] _Packet(params byte[][] chunks) {
