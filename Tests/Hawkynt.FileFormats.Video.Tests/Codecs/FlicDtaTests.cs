@@ -1,10 +1,12 @@
 using System;
 using System.Buffers.Binary;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using FileFormat.Core;
 using FileFormat.FlicVideo;
 using Hawkynt.FileFormats.Video;
+using Hawkynt.FileFormats.Video.Tests;
 
 namespace FileFormat.Codecs.Tests;
 
@@ -136,6 +138,33 @@ public sealed class FlicDtaTests {
     Assert.That(FliContainer.Streams(container)[0].BitsPerPixel, Is.EqualTo(24));
     var decoded = VideoFormatRegistry.DecodeFrames(bytes).Single().Image;
     Assert.That(decoded.PixelData, Is.EqualTo(frame.PixelData));
+  }
+
+  [Test]
+  [Category("Conformance")]
+  public void FFmpegReadsDtaTrueColourWrittenHere() {
+    FFmpegOracle.RequireAvailable();
+
+    const int width = 7;
+    const int height = 5;
+    var frame = new RawImage {
+      Width = width,
+      Height = height,
+      Format = PixelFormat.Bgr24,
+      PixelData = Enumerable.Range(0, width * height * 3).Select(i => (byte)(i * 29 + 7)).ToArray(),
+    };
+    var encoder = FlicVideoEncoder.Create(_Stream(width, height, 24));
+    Assert.That(encoder.TryEncode(frame, 0, out var packet), Is.True);
+    var bytes = VideoIO.Mux<FliWriter>([encoder.DescribeStream()], [packet]);
+    var path = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName() + ".flh");
+
+    try {
+      File.WriteAllBytes(path, bytes);
+      var (decoded, detail) = FFmpegOracle.TryDecodeFirstFrame(path, width, height);
+      Assert.That(decoded, Is.True, detail);
+    } finally {
+      try { File.Delete(path); } catch { /* best effort */ }
+    }
   }
 
   [Test]
