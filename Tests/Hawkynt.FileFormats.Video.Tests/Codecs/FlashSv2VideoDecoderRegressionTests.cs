@@ -176,6 +176,47 @@ public sealed class FlashSv2VideoDecoderRegressionTests {
 
   [Test]
   [Category("Unit")]
+  public void AZeroLengthKeyBlockIsRejected() {
+    var decoder = FlashSv2VideoDecoder.Create(_Stream());
+    var packet = new CodedPacket(
+      0,
+      _Concat(_GridHeader(16, 16, 16, 16), [0x00, 0x00]),
+      IsKeyFrame: true);
+
+    var failure = Assert.Throws<InvalidDataException>(() => decoder.TryDecode(packet, out _));
+    Assert.That(failure!.Message, Does.Contain("key frame").And.Contain("DataSize").And.Contain("0"));
+  }
+
+  [TestCase(128 * 3 - 1)]
+  [TestCase(128 * 3 + 1)]
+  [Category("Unit")]
+  public void ACustomPaletteMustInflateToExactly128Entries(int decompressedBytes) {
+    var decoder = FlashSv2VideoDecoder.Create(_Stream());
+    var palette = new byte[decompressedBytes];
+    var packet = new CodedPacket(
+      0,
+      _Concat(_GridHeader(16, 16, 16, 16, flags: 0x01), _LengthPrefixed(_Zlib(palette))),
+      IsKeyFrame: true);
+
+    var failure = Assert.Throws<InvalidDataException>(() => decoder.TryDecode(packet, out _));
+    Assert.That(failure!.Message, Does.Contain("384").And.Contain(decompressedBytes.ToString()));
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void AnEmptyCustomPaletteBlockIsRejected() {
+    var decoder = FlashSv2VideoDecoder.Create(_Stream());
+    var packet = new CodedPacket(
+      0,
+      _Concat(_GridHeader(16, 16, 16, 16, flags: 0x01), [0x00, 0x00]),
+      IsKeyFrame: true);
+
+    var failure = Assert.Throws<InvalidDataException>(() => decoder.TryDecode(packet, out _));
+    Assert.That(failure!.Message, Does.Contain("palette").And.Contain("DataSize").And.Contain("0"));
+  }
+
+  [Test]
+  [Category("Unit")]
   public void ReservedGridHeaderBitsAreRejected() {
     var decoder = FlashSv2VideoDecoder.Create(_Stream());
     var packet = new CodedPacket(0, _GridHeader(16, 16, 16, 16, flags: 0x80), IsKeyFrame: true);
