@@ -10,55 +10,52 @@ namespace FileFormat.Codecs;
 
 /// <summary>
 /// Encodes H.261 video, ITU-T Recommendation H.261 — the write direction of
-/// <see cref="H261VideoDecoder"/>, and the whole of the Recommendation's normative coding except the
-/// four macroblock types that restate the quantiser.
+/// <see cref="H261VideoDecoder"/>, including Annex D still-image transmission.
 /// </summary>
 /// <remarks>
-/// <b>QCIF and CIF, and nothing else.</b> Clause 3.1 defines two picture formats and PTYPE names one of
-/// them in a single bit; there is no source-format field with five choices, no extended header and
-/// nothing anywhere in the syntax that could state another size. So a stream of any other geometry is
-/// refused by name at <see cref="Create"/> rather than scaled, padded or cropped into one of the two —
-/// a 320x240 picture written as CIF would decode, and would be the wrong picture.
+/// <b>QCIF and CIF coded pictures, and nothing else.</b> Clause 3.1 defines two coded formats and PTYPE
+/// names one of them in a single bit; there is no source-format field with five choices and no extended
+/// header. Annex D obtains a larger still image without adding another coded format: a QCIF stream may
+/// temporarily carry a 352x288 still, and a CIF stream a 704x576 still, through
+/// <see cref="TryEncodeStillImage"/> as four decimated sub-images in the stream's ordinary coded size.
 /// <para/>
-/// <b>What it writes.</b> An intra picture every <see cref="_KEY_FRAME_INTERVAL"/> frames and a
-/// predicted picture between them; every group of blocks with its own header, as clause 4.2.2 requires
-/// whether or not it carries macroblocks; and per macroblock a choice between an intra coding, a
-/// prediction from the co-located block, a prediction at a searched whole-pixel motion vector, either
-/// of the last two with the loop filter of clause 3.2.3 on the prediction, and not being transmitted at
-/// all. That last one is H.261's only form of "nothing changed here": the address of the next
-/// transmitted macroblock steps over it (clause 4.2.3.1) and the decoder reads back what the reference
-/// left there.
+/// <b>What it writes.</b> For ordinary motion video, an intra picture every
+/// <see cref="_KEY_FRAME_INTERVAL"/> frames and predicted pictures between them; every group of blocks
+/// with its own header, as clause 4.2.2 requires whether or not it carries macroblocks; and per
+/// macroblock a choice between an intra coding, a prediction from the co-located block, a prediction at
+/// a searched whole-pixel motion vector, either of the last two with the loop filter of clause 3.2.3 on
+/// the prediction, and not being transmitted at all. H.261 has no picture-level P/B distinction and no
+/// backward reference: prediction is always from the previously reconstructed picture.
 /// <para/>
-/// <b>The temporal reference is a clock, not a frame counter.</b> Clause 3.1 fixes the source picture
-/// clock at 30000/1001 Hz and clause 4.2.1.2 says TR advances by one plus every source picture not
-/// transmitted since the previous coded one. When packet timestamps and a time base are supplied they
-/// are mapped onto that clock relative to the first picture; otherwise a stated frame rate determines
-/// the skipped source pictures. With neither, consecutive input pictures are treated as consecutive
-/// H.261 source pictures. A declared rate faster than the source clock is refused because no TR
-/// sequence can represent it.
+/// For Annex D a double-width, double-height still is separated according to Figure D.1 into sub-images
+/// 0, 1, 2 and 3. Each carries HI_RES zero and TR equal to its sub-image number, and the same ordinary
+/// macroblock decision logic is used: where a reference exists it may choose intra or prediction from
+/// the previously reconstructed coded frame, exactly as Annex D.5 permits. The four picture syntaxes
+/// share one bit writer, so no byte padding is inserted between them. The last reconstructed sub-image
+/// remains the reference when motion video resumes, exactly as Annex D.3 requires.
 /// <para/>
-/// <b>What it does not write.</b> The four macroblock types carrying MQUANT (Table 2 rows 2, 4, 7 and
-/// 10). The quantiser is stated once in each group's header and held across the picture, which is a
-/// choice rather than a limitation: there is no rate control here for a mid-group change to serve, and
-/// a fixed step is what makes the same picture code to the same bytes every time. Nor the bit-stuffing
-/// codeword of clause 4.2.3.1, which exists to fill a channel this encoder is not driving, nor the
-/// still image transmission of Annex D, which the decoder beside this refuses to read.
+/// <b>The ordinary temporal reference is a clock, not a frame counter.</b> Clause 3.1 fixes the source
+/// picture clock at 30000/1001 Hz and clause 4.2.1.2 says TR advances by one plus every source picture
+/// not transmitted since the previous coded one. When packet timestamps and a time base are supplied
+/// they are mapped onto that clock relative to the first ordinary picture; otherwise a stated frame
+/// rate determines the skipped source pictures. Annex D owns TR's low two bits while HI_RES is zero and
+/// therefore does not advance this ordinary-video source-picture counter.
 /// <para/>
-/// <b>Lossy, and by construction.</b> H.261 has no lossless form at all — every coded block goes
-/// through the transform and the quantiser of clause 4.2.4, and nothing but a picture already sitting
-/// on that quantiser's own reconstruction grid comes back exactly. What this encoder does guarantee is
-/// that its own reconstruction is the one a decoder will build: every picture is coded against what the
-/// last one reconstructed to and never against what was handed in, so the error of a long run of
-/// predicted pictures stays the quantiser's own and does not accumulate on top of itself.
+/// <b>What it deliberately does not choose.</b> The four macroblock types carrying MQUANT (Table 2 rows
+/// 2, 4, 7 and 10). The quantiser is stated once in each group's header and held across the picture,
+/// which is an encoder policy rather than missing syntax support: the decoder accepts MQUANT and there
+/// is no rate-control loop here for a mid-group change to serve. The bit-stuffing codeword of clause
+/// 4.2.3.1 is likewise unnecessary when not driving a fixed-rate channel.
 /// <para/>
-/// <b>Measured against ffmpeg.</b> Six streams written here — two of sixty frames and four of thirty, at
-/// both picture formats — were decoded by ffmpeg's own H.261 decoder, which accepted every picture of
-/// every one, and compared against this encoder's own reconstruction plane by plane on the 4:2:0 samples
-/// rather than after a colour conversion: seventy-nine differing samples of twenty-two million, none by
-/// more than one level, which is what Annex A's accuracy bound allows two conforming inverse transforms
-/// to differ by. Against the pictures that went in, the peak signal-to-noise ratio runs from 31.7 dB on
-/// the noisiest of the six to 48.0 dB on the flattest. The stream-by-stream numbers are in
-/// <a href="https://github.com/Hawkynt/PNGCrushCS/blob/main/Hawkynt.FileFormats.Video/codec-notes.md">codec-notes.md</a>.
+/// <b>Lossy, and by construction.</b> H.261 has no lossless form at all — every coded block goes through
+/// the transform and the quantiser of clause 4.2.4. The encoder always predicts from its own previous
+/// reconstruction rather than from the original source, so encoder and decoder references stay locked.
+/// <para/>
+/// <b>Measured against ffmpeg.</b> The ordinary-video path was measured over six streams, both formats,
+/// with every picture accepted by ffmpeg and reconstructed samples agreeing within Annex A's transform
+/// tolerance. FFmpeg does not assemble Annex D high-resolution stills; that path is therefore pinned by
+/// the Recommendation's explicit Figure D.1 pattern and syntax tests rather than pretending ffmpeg is
+/// an oracle for a feature it ignores.
 /// </remarks>
 [VerifiedBy(ConformanceOracle.FFmpeg)]
 public sealed class H261VideoEncoder : IVideoCodecEncoder<H261VideoEncoder> {
@@ -66,28 +63,24 @@ public sealed class H261VideoEncoder : IVideoCodecEncoder<H261VideoEncoder> {
   /// <summary>The four-character code containers name ITU-T H.261 with.</summary>
   private static readonly CodecTag _Tag = CodecTag.FromCharacters("H261");
 
-  /// <summary>QCIF, the smaller of the two formats clause 3.1 defines.</summary>
+  /// <summary>QCIF, the smaller of the two coded formats clause 3.1 defines.</summary>
   private static readonly (int Width, int Height) _Qcif = (176, 144);
 
-  /// <summary>CIF, the larger.</summary>
+  /// <summary>CIF, the larger coded format.</summary>
   private static readonly (int Width, int Height) _Cif = (352, 288);
 
-  /// <summary>How many pictures apart the intra ones are.</summary>
-  /// <remarks>
-  /// Twelve, which is what the codec's own era used and what makes a stream seekable at roughly
-  /// half-second granularity at the frame rates it was written for. It is also what bounds the drift:
-  /// the encoder codes against its own reconstruction so nothing accumulates, but a predicted picture
-  /// that predicts badly stays badly predicted until the next intra one.
-  /// </remarks>
+  /// <summary>Figure D.1 sample parity for sub-images 0, 1, 2 and 3 respectively.</summary>
+  private static readonly (int X, int Y)[] _StillImageOffsets = [
+    (0, 0),
+    (0, 1),
+    (1, 1),
+    (1, 0),
+  ];
+
+  /// <summary>How many ordinary pictures apart the periodic intra pictures are.</summary>
   private const int _KEY_FRAME_INTERVAL = 12;
 
-  /// <summary>The quantiser every group states, the GQUANT field being five bits wide and holding 1 to 31.</summary>
-  /// <remarks>
-  /// Eight, near the middle of the range. There is no rate control here at all — the quantiser is
-  /// stated per group of blocks and this encoder writes the same value into every one of them — so a
-  /// fixed step is the whole of the decision, and a caller wanting a particular bit rate is better
-  /// served by choosing the picture format than by anything this class could do within one.
-  /// </remarks>
+  /// <summary>The fixed GQUANT value this encoder writes.</summary>
   private const int _QUANTISER = 8;
 
   /// <summary>The temporal reference field is five bits (clause 4.2.1.2), so it counts modulo this.</summary>
@@ -130,9 +123,7 @@ public sealed class H261VideoEncoder : IVideoCodecEncoder<H261VideoEncoder> {
 
   public static CodecTag Codec => _Tag;
 
-  /// <summary>
-  /// Builds an encoder for the stream described, or refuses a geometry H.261 cannot state.
-  /// </summary>
+  /// <summary>Builds an encoder for one of H.261's two coded stream geometries.</summary>
   public static H261VideoEncoder Create(MediaStreamInfo stream) {
     ArgumentNullException.ThrowIfNull(stream);
 
@@ -155,23 +146,38 @@ public sealed class H261VideoEncoder : IVideoCodecEncoder<H261VideoEncoder> {
       return new(stream, isCif: true);
 
     throw new NotSupportedException(
-      $"H.261 codes {_Qcif.Width}x{_Qcif.Height} (QCIF) and {_Cif.Width}x{_Cif.Height} (CIF) and no other picture "
-      + $"size; {stream.Width}x{stream.Height} was asked for. ITU-T H.261 clause 3.1 defines exactly those two "
-      + "formats and clause 4.2.1.3 names one of them in a single bit of PTYPE, so there is no syntax in this "
-      + "Recommendation for stating another — a picture of this size written as one of the two would decode, and "
-      + "would be the wrong picture.");
+      $"H.261 codes {_Qcif.Width}x{_Qcif.Height} (QCIF) and {_Cif.Width}x{_Cif.Height} (CIF) and no other coded "
+      + $"picture size; {stream.Width}x{stream.Height} was asked for. Annex D's larger still pictures are carried "
+      + "inside a QCIF or CIF stream as four ordinary-size sub-images rather than as another stream geometry.");
   }
 
-  /// <summary>Codes one picture, either whole or against the one before it.</summary>
+  /// <summary>Codes one ordinary motion picture in the stream's QCIF/CIF geometry.</summary>
   public bool TryEncode(RawImage frame, long? presentationTimestamp, out CodedPacket packet) {
     ArgumentNullException.ThrowIfNull(frame);
 
     if (frame.Width != this._width || frame.Height != this._height)
       throw new InvalidDataException(
-        $"This H.261 stream is {this._width}x{this._height}; a picture of {frame.Width}x{frame.Height} arrived. "
-        + "The two formats of clause 3.1 are stated by one bit of every picture header, so a stream can change "
-        + "between them only by starting again, and this one is not doing that.");
+        $"This H.261 stream is {this._width}x{this._height}; a motion picture of {frame.Width}x{frame.Height} arrived. "
+        + $"Use {nameof(TryEncodeStillImage)} for Annex D's {2 * this._width}x{2 * this._height} still-image mode.");
 
+    return this._TryEncodeMotionPicture(frame, presentationTimestamp, out packet);
+  }
+
+  /// <summary>
+  /// Codes one Annex D still image at twice the stream width and height as sub-images 0, 1, 2 and 3.
+  /// </summary>
+  public bool TryEncodeStillImage(RawImage frame, long? presentationTimestamp, out CodedPacket packet) {
+    ArgumentNullException.ThrowIfNull(frame);
+
+    if (frame.Width != 2 * this._width || frame.Height != 2 * this._height)
+      throw new InvalidDataException(
+        $"Annex D still-image transmission on this {this._width}x{this._height} H.261 stream requires exactly "
+        + $"{2 * this._width}x{2 * this._height} samples; a {frame.Width}x{frame.Height} picture arrived.");
+
+    return this._TryEncodeStillImage(frame, presentationTimestamp, out packet);
+  }
+
+  private bool _TryEncodeMotionPicture(RawImage frame, long? presentationTimestamp, out CodedPacket packet) {
     var intra = this._reference == null || this._sinceKeyFrame >= _KEY_FRAME_INTERVAL;
     var source = this._ToPlanes(frame);
     var temporalReference = this._TemporalReference(presentationTimestamp);
@@ -196,17 +202,51 @@ public sealed class H261VideoEncoder : IVideoCodecEncoder<H261VideoEncoder> {
     return true;
   }
 
+  /// <summary>Writes one Annex D still as four unpadded, sequential sub-pictures.</summary>
+  private bool _TryEncodeStillImage(RawImage frame, long? presentationTimestamp, out CodedPacket packet) {
+    var subImages = this._ToStillImageSubImages(frame);
+    var writer = new H261BitWriter();
+    var reference = this._reference;
+    var independentlyDecodable = reference == null;
+
+    for (var index = 0; index < subImages.Length; ++index) {
+      var target = new H263Frame(this._macroblockWidth, this._macroblockHeight);
+      var encoder = new H261PictureEncoder(
+        intra: false,
+        temporalReference: index,
+        quantiser: _QUANTISER,
+        source: subImages[index],
+        target: target,
+        reference: reference,
+        isCif: this._isCif,
+        groupCount: this._groupCount,
+        isStillImage: true,
+        writer: writer);
+
+      encoder.EncodeIntoBitstream();
+      reference = target;
+    }
+
+    // Annex D.3: the previous frame remains the reference regardless of whether it was motion video or
+    // a still-image sub-picture. Sub-image 3 is the last frame actually coded.
+    this._reference = reference;
+    this._sinceKeyFrame = 1;
+
+    packet = new(
+      this._requested.Index,
+      writer.ToArray(),
+      PresentationTimestamp: presentationTimestamp,
+      DecodeTimestamp: presentationTimestamp,
+      Duration: 1,
+      IsKeyFrame: independentlyDecodable);
+
+    return true;
+  }
+
   /// <summary>Nothing is ever held back: H.261 has no bidirectional prediction to reorder around.</summary>
   public IEnumerable<CodedPacket> Flush() => [];
 
-  /// <summary>
-  /// The stream as a muxer needs it: a <c>BITMAPINFOHEADER</c> naming H.261.
-  /// </summary>
-  /// <remarks>
-  /// Unlike Microsoft's MPEG-4, an H.261 picture header states its own size — one bit choosing between
-  /// the two formats — so the header here is what a container's stream description wants rather than
-  /// something the bitstream would be undecodable without.
-  /// </remarks>
+  /// <summary>The stream description used by containers: the coded QCIF/CIF size, never Annex D's display size.</summary>
   public MediaStreamInfo DescribeStream() {
     if (this._stream != null)
       return this._stream;
@@ -242,24 +282,20 @@ public sealed class H261VideoEncoder : IVideoCodecEncoder<H261VideoEncoder> {
     };
   }
 
-  /// <summary>
-  /// Maps this picture onto H.261's 30000/1001 Hz source picture clock and returns the five low bits.
-  /// </summary>
+  /// <summary>Maps an ordinary motion picture onto H.261's 30000/1001 Hz source picture clock.</summary>
   private int _TemporalReference(long? presentationTimestamp) {
     var sourcePictureNumber = this._SourcePictureNumber(presentationTimestamp);
     if (this._lastSourcePictureNumber is { } previous && sourcePictureNumber <= previous)
       throw new InvalidDataException(
         $"This H.261 picture maps to source picture {sourcePictureNumber}, not after the previously coded source "
-        + $"picture {previous}. ITU-T H.261 clauses 3.1 and 4.2.1.2 require each transmitted picture to occupy a "
-        + "later 30000/1001 Hz source-picture interval; reduce the frame rate or supply increasing timestamps.");
+        + $"picture {previous}. ITU-T H.261 clauses 3.1 and 4.2.1.2 require each transmitted motion picture to "
+        + "occupy a later 30000/1001 Hz source-picture interval; reduce the frame rate or supply increasing timestamps.");
 
     this._lastSourcePictureNumber = sourcePictureNumber;
     return (int)(sourcePictureNumber % _TEMPORAL_REFERENCE_PERIOD);
   }
 
-  /// <summary>
-  /// The number of the H.261 source-picture interval occupied by this input picture, relative to the first one.
-  /// </summary>
+  /// <summary>The ordinary source-picture interval number, relative to the first ordinary picture.</summary>
   private Int128 _SourcePictureNumber(long? presentationTimestamp) {
     var timeBase = this._requested.TimeBase;
     if (this._pictureIndex == 0 && presentationTimestamp is { } firstTimestamp && _IsPositive(timeBase))
@@ -281,8 +317,6 @@ public sealed class H261VideoEncoder : IVideoCodecEncoder<H261VideoEncoder> {
     if (_IsPositive(frameRate))
       return _ScaleToSourcePictureClock(this._pictureIndex, frameRate.Denominator, frameRate.Numerator);
 
-    // With no timing information at all there is no evidence that source pictures were omitted, so
-    // consecutive inputs are the consecutive 29.97 Hz source pictures clause 4.2.1.2 describes.
     return this._pictureIndex;
   }
 
@@ -290,10 +324,6 @@ public sealed class H261VideoEncoder : IVideoCodecEncoder<H261VideoEncoder> {
   private static Int128 _ScaleToSourcePictureClock(Int128 units, long secondsNumerator, long secondsDenominator) {
     var numerator = checked(units * secondsNumerator * _SOURCE_PICTURE_RATE_NUMERATOR);
     var denominator = checked((Int128)secondsDenominator * _SOURCE_PICTURE_RATE_DENOMINATOR);
-
-    // External container clocks are commonly coarser than 30000/1001 Hz. Assign the picture to the
-    // nearest source interval rather than systematically one interval early when its timestamp was
-    // rounded by such a clock; exact H.261/NTSC time bases of course divide without a remainder.
     var quotient = numerator / denominator;
     var remainder = numerator % denominator;
     return remainder >= (denominator + 1) / 2 ? checked(quotient + 1) : quotient;
@@ -302,17 +332,7 @@ public sealed class H261VideoEncoder : IVideoCodecEncoder<H261VideoEncoder> {
   private static bool _IsPositive(Rational value)
     => value.IsKnown && value.Numerator > 0 && value.Denominator > 0;
 
-  /// <summary>
-  /// The picture as the 4:2:0 planes the coding works on.
-  /// </summary>
-  /// <remarks>
-  /// Both formats are a whole number of macroblocks in each direction, so nothing is padded and nothing
-  /// is cropped — every sample of the planes is a sample of the picture. A picture already in
-  /// <see cref="PixelFormat.Yuv420P8"/> is taken exactly as it stands, with no colour conversion
-  /// anywhere in the path; anything else goes through the ITU-R BT.601 studio-swing convention this
-  /// package's decoders display with, and it is there and only there that the rounding of a colour
-  /// matrix enters.
-  /// </remarks>
+  /// <summary>The ordinary picture as the 4:2:0 planes the coding works on.</summary>
   private H263Frame _ToPlanes(RawImage frame) {
     var planes = RawYuvPlanes.Subsampled(frame, PixelFormat.Yuv420P8, this._width / 2, this._height / 2);
     var source = new H263Frame(this._macroblockWidth, this._macroblockHeight);
@@ -324,5 +344,42 @@ public sealed class H261VideoEncoder : IVideoCodecEncoder<H261VideoEncoder> {
     Array.Copy(planes, lumaSamples + chromaSamples, source.Cr, 0, chromaSamples);
 
     return source;
+  }
+
+  /// <summary>Separates a double-size Annex D still into Figure D.1's four coded-size 4:2:0 frames.</summary>
+  private H263Frame[] _ToStillImageSubImages(RawImage frame) {
+    var stillWidth = 2 * this._width;
+    var stillHeight = 2 * this._height;
+
+    // A high-resolution 4:2:0 still has chroma dimensions width/2,height/2 = the ordinary luma size.
+    var planes = RawYuvPlanes.Subsampled(frame, PixelFormat.Yuv420P8, this._width, this._height);
+    var lumaSamples = stillWidth * stillHeight;
+    var chromaSamples = this._width * this._height;
+    var luma = planes.AsSpan(0, lumaSamples);
+    var cb = planes.AsSpan(lumaSamples, chromaSamples);
+    var cr = planes.AsSpan(lumaSamples + chromaSamples, chromaSamples);
+
+    var result = new H263Frame[4];
+    for (var index = 0; index < result.Length; ++index) {
+      var subImage = result[index] = new(this._macroblockWidth, this._macroblockHeight);
+      var (offsetX, offsetY) = _StillImageOffsets[index];
+
+      _DecimatePlane(luma, stillWidth, subImage.Luma, subImage.LumaWidth, offsetX, offsetY);
+      _DecimatePlane(cb, this._width, subImage.Cb, subImage.ChromaWidth, offsetX, offsetY);
+      _DecimatePlane(cr, this._width, subImage.Cr, subImage.ChromaWidth, offsetX, offsetY);
+    }
+
+    return result;
+  }
+
+  private static void _DecimatePlane(
+    ReadOnlySpan<byte> source, int sourceWidth, Span<byte> target, int targetWidth, int offsetX, int offsetY) {
+    var targetHeight = target.Length / targetWidth;
+    for (var y = 0; y < targetHeight; ++y) {
+      var sourceRow = (2 * y + offsetY) * sourceWidth + offsetX;
+      var targetRow = y * targetWidth;
+      for (var x = 0; x < targetWidth; ++x)
+        target[targetRow + x] = source[sourceRow + 2 * x];
+    }
   }
 }

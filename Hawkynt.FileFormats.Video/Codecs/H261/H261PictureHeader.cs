@@ -12,10 +12,10 @@ namespace FileFormat.Codecs.H261;
 /// constrained, and only because nothing exists yet for an inter macroblock to predict from, which is
 /// enforced where the macroblocks are decoded and not here.
 /// <para/>
-/// Only two sizes exist — QCIF and CIF, named directly by one bit of PTYPE (clause 3.1) — where H.263
-/// names one of five formats and, past that, an entire extended header (clause 5.1.4) for anything
-/// else. There is nothing here that plays that role: a source format H.261 does not define is not a
-/// syntax this header can even state.
+/// Only two ordinary picture sizes exist — QCIF and CIF, named directly by one bit of PTYPE (clause
+/// 3.1). Annex D's still-image transmission does not add a third coded size: HI_RES selects four
+/// QCIF/CIF sub-images whose temporal-reference low bits identify the samples to interleave into a
+/// picture twice as wide and twice as high.
 /// </remarks>
 internal sealed class H261PictureHeader {
 
@@ -31,13 +31,13 @@ internal sealed class H261PictureHeader {
   /// <summary>How many bits <see cref="GroupStartCode"/> occupies.</summary>
   internal const int GroupStartCodeLength = 16;
 
-  /// <summary>The picture's width in pixels: 176 for QCIF, 352 for CIF.</summary>
+  /// <summary>The coded sub-picture's width in pixels: 176 for QCIF, 352 for CIF.</summary>
   internal required int Width { get; init; }
 
   /// <summary>Whether this is a CIF picture rather than QCIF.</summary>
   internal bool IsCif => this.Width == 352;
 
-  /// <summary>The picture's height in pixels: 144 for QCIF, 288 for CIF.</summary>
+  /// <summary>The coded sub-picture's height in pixels: 144 for QCIF, 288 for CIF.</summary>
   internal required int Height { get; init; }
 
   /// <summary>Macroblocks across: eleven for QCIF, twenty-two for CIF.</summary>
@@ -60,7 +60,13 @@ internal sealed class H261PictureHeader {
   /// <summary>The picture's temporal reference, five bits (clause 4.2.1.2).</summary>
   internal required int TemporalReference { get; init; }
 
-  /// <summary>Whether another header describes the same picture geometry as this one.</summary>
+  /// <summary>Whether HI_RES selects Annex D still-image transmission rather than ordinary motion video.</summary>
+  internal required bool IsStillImage { get; init; }
+
+  /// <summary>Which of Annex D's four sub-images this picture carries.</summary>
+  internal int StillImageSubImageIndex => this.TemporalReference & 0b11;
+
+  /// <summary>Whether another header describes the same coded sub-picture geometry as this one.</summary>
   internal bool SameGeometryAs(H261PictureHeader other) {
     ArgumentNullException.ThrowIfNull(other);
 
@@ -79,14 +85,15 @@ internal sealed class H261PictureHeader {
     reader.ReadBits(3);
 
     var isCif = reader.ReadBit() == 1;
+    var isStillImage = reader.ReadBit() == 0;
 
-    var stillImageOff = reader.ReadBit() == 1;
-    if (!stillImageOff)
-      throw new NotSupportedException(
-        "This H.261 picture sets HI_RES to 0 in PTYPE, requesting the still image transmission of Annex D: four "
-        + "sub-images sub-sampled from a picture at four times this stream's resolution, sent as a sequence of "
-        + "ordinary pictures whose temporal reference low bits select which sub-image each belongs to. That "
-        + "reassembly is not implemented.");
+    // Annex D.3 gives the low two bits of TR a second meaning while HI_RES is zero and requires the
+    // upper three bits to be zero. Refusing a non-canonical value here prevents four independent old
+    // temporal references from being mistaken for one high-resolution still picture.
+    if (isStillImage && (temporalReference & ~0b11) != 0)
+      throw new InvalidDataException(
+        $"This H.261 Annex D still-image sub-picture has temporal reference {temporalReference}; Annex D.3 "
+        + "requires the three high bits of TR to be zero and uses only the low two bits to identify sub-images 0 to 3.");
 
     // Bit 6 is spare and carries nothing (clause 4.2.1.3).
     reader.ReadBit();
@@ -101,6 +108,7 @@ internal sealed class H261PictureHeader {
       Width = width,
       Height = height,
       TemporalReference = temporalReference,
+      IsStillImage = isStillImage,
     };
   }
 }
