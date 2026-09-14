@@ -202,9 +202,19 @@ public sealed class Ffv1Decoder : IVideoCodecDecoder<Ffv1Decoder> {
       }
     }
 
+    if (!keyframe && parameters.IntraOnly)
+      throw new InvalidDataException("The FFV1 configuration record says every frame is a keyframe, but this frame says it is not one.");
+
+    if (!keyframe && !this._HasCodingState(parameters))
+      throw new InvalidDataException(
+        "This FFV1 frame is not a keyframe and depends on entropy-coder state from an earlier frame. Start decoding at a keyframe instead.");
+
     frame = this._DecodeFrame(parameters, data, coder, keyframe, zero, one);
     return true;
   }
+
+  private bool _HasCodingState(Ffv1Parameters parameters)
+    => parameters.CoderType == 0 ? this._golombStates != null : this._rangeStates != null;
 
   // ============================================================================================
   // The frame
