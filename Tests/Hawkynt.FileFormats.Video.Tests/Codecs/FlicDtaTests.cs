@@ -68,9 +68,12 @@ public sealed class FlicDtaTests {
   [Test]
   [Category("Unit")]
   public void EightBitEncoderUsesSs2ForASmallSecondFrameChange() {
-    var first = _Indexed(64, 2, 3);
-    var second = _Indexed(64, 2, 3);
-    second.PixelData[70] = 9;
+    var first = _Indexed(64, 2, 0);
+    for (var i = 0; i < first.PixelData.Length; ++i)
+      first.PixelData[i] = (byte)(i * 37 + 11);
+    var second = _Indexed(64, 2, 0);
+    first.PixelData.CopyTo(second.PixelData, 0);
+    second.PixelData[70] ^= 0x5A;
     var encoder = FlicVideoEncoder.Create(_Stream(64, 2, 8));
 
     Assert.That(encoder.TryEncode(first, 0, out var key), Is.True);
@@ -93,8 +96,8 @@ public sealed class FlicDtaTests {
   public void Rgb565EncoderUsesDtaLcAndRoundTrips() {
     const int width = 80;
     var first = new RawImage { Width = width, Height = 2, Format = PixelFormat.Rgb565, PixelData = new byte[width * 4] };
-    for (var i = 0; i < first.PixelData.Length; i += 2)
-      BinaryPrimitives.WriteUInt16LittleEndian(first.PixelData.AsSpan(i), 0x1234);
+    for (var pixel = 0; pixel < width * 2; ++pixel)
+      BinaryPrimitives.WriteUInt16LittleEndian(first.PixelData.AsSpan(pixel * 2), checked((ushort)(0x1000 + pixel)));
     var second = new RawImage { Width = width, Height = 2, Format = PixelFormat.Rgb565, PixelData = (byte[])first.PixelData.Clone() };
     BinaryPrimitives.WriteUInt16LittleEndian(second.PixelData.AsSpan((width + 11) * 2), 0x5678);
     var encoder = FlicVideoEncoder.Create(_Stream(width, 2, 16));
