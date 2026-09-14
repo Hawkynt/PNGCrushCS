@@ -1,0 +1,47 @@
+name: Temporary ProRes validation
+
+on:
+  pull_request:
+    branches: [main, master]
+    paths:
+      - 'Hawkynt.FileFormats.Video/Codecs/ProRes/**'
+      - 'Hawkynt.FileFormats.Video/Codecs/ProResVideoEncoder.cs'
+      - 'Hawkynt.FileFormats.Video/Codecs/ProResVideoDecoder.cs'
+      - 'Tests/Hawkynt.FileFormats.Video.Tests/Codecs/ProRes/**'
+      - '.github/workflows/tmp-prores-validation.yml'
+
+jobs:
+  ffmpeg-oracle:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: PNGCrushCS
+
+      - uses: actions/checkout@v4
+        with:
+          repository: Hawkynt/CompressionWorkbench
+          path: CompressionWorkbench
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Install FFmpeg
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+          ffmpeg -version | head -n 1
+
+      - name: Build video tests
+        working-directory: PNGCrushCS
+        run: >-
+          dotnet build Tests/Hawkynt.FileFormats.Video.Tests/Hawkynt.FileFormats.Video.Tests.csproj
+          -c Release -p:EnableWindowsTargeting=true
+
+      - name: Compare generated ProRes component planes with FFmpeg
+        working-directory: PNGCrushCS
+        run: >-
+          dotnet test Tests/Hawkynt.FileFormats.Video.Tests/Hawkynt.FileFormats.Video.Tests.csproj
+          -c Release -p:EnableWindowsTargeting=true --no-build
+          --filter "FullyQualifiedName~ProResVideoEncoderOracleTests"
