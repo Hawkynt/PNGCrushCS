@@ -112,7 +112,7 @@ public sealed class VmncVideoDecoder : IVideoCodecDecoder<VmncVideoDecoder> {
 
     // CopyRect is explicitly a reference to the preceding framebuffer, not to rectangles that happen
     // to occur earlier in this same update. Keep that reference stable while this packet is painted.
-    var referenceCanvas = this._canvas;
+    var referenceCanvas = (uint[])this._canvas.Clone();
     var referenceWidth = this._width;
     var referenceHeight = this._height;
 
@@ -381,16 +381,17 @@ public sealed class VmncVideoDecoder : IVideoCodecDecoder<VmncVideoDecoder> {
         || redShift >= storageBits || greenShift >= storageBits || blueShift >= storageBits)
       throw new InvalidDataException($"VMnc stream {this._streamIndex} carries an invalid RFB true-colour descriptor.");
 
+    var descriptor = new PixelDescriptor(true, redMaximum, greenMaximum, blueMaximum, redShift, greenShift, blueShift);
     var formatChanged = bytesPerPixel != this._bytesPerPixel
       || bigEndian != this._bigEndian
-      || this._pixelDescriptor != new PixelDescriptor(true, redMaximum, greenMaximum, blueMaximum, redShift, greenShift, blueShift);
+      || this._pixelDescriptor != descriptor;
     var sizeChanged = width != this._width || height != this._height;
 
     this._width = width;
     this._height = height;
     this._bytesPerPixel = bytesPerPixel;
     this._bigEndian = bigEndian;
-    this._pixelDescriptor = new(true, redMaximum, greenMaximum, blueMaximum, redShift, greenShift, blueShift);
+    this._pixelDescriptor = descriptor;
 
     if (sizeChanged || formatChanged)
       this._canvas = new uint[checked(width * height)];
@@ -477,7 +478,7 @@ public sealed class VmncVideoDecoder : IVideoCodecDecoder<VmncVideoDecoder> {
   }
 
   private void _RequireRectangle(int x, int y, int width, int height) {
-    if (width < 0 || height < 0 || x > this._width - width || y > this._height - height)
+    if (x > this._width - width || y > this._height - height)
       throw new InvalidDataException(
         $"VMnc stream {this._streamIndex} carries rectangle ({x},{y}) {width}x{height} outside its {this._width}x{this._height} canvas.");
   }
