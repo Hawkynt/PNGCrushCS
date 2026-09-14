@@ -12,6 +12,7 @@ public sealed class MveContainer : IVideoContainerReader<MveContainer> {
   public required ReadOnlyMemory<byte> Data { get; init; }
   public required int Width { get; init; }
   public required int Height { get; init; }
+  public required int VideoBitsPerPixel { get; init; }
   public required int VideoFrameCount { get; init; }
   public required bool HasAudio { get; init; }
   public required bool AudioIsStereo { get; init; }
@@ -52,6 +53,7 @@ public sealed class MveContainer : IVideoContainerReader<MveContainer> {
       Codec = CodecTag.FromCharacters("IMVE"),
       Width = container.Width,
       Height = container.Height,
+      BitsPerPixel = container.VideoBitsPerPixel,
       TimeBase = _VIDEO_TIME_BASE,
       FrameRate = frameRate,
       DeclaredFrameCount = container.VideoFrameCount,
