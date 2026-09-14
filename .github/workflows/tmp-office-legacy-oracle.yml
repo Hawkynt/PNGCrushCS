@@ -63,12 +63,14 @@ jobs:
                   doc.storeAsURL(uno.systemPathToFileUrl(path), (prop('FilterName', filter_name), prop('Overwrite', True)))
                   doc.close(True)
 
-              def writer(path, filter_name):
+              def writer(path, filter_name, inline=False):
                   doc = desktop.loadComponentFromURL('private:factory/swriter', '_blank', 0, ())
                   graphic = doc.createInstance('com.sun.star.text.TextGraphicObject')
                   graphic.GraphicURL = file_url
                   graphic.Width = 1800
                   graphic.Height = 1200
+                  if inline:
+                      graphic.AnchorType = uno.getConstantByName('com.sun.star.text.TextContentAnchorType.AS_CHARACTER')
                   cursor = doc.Text.createTextCursor()
                   doc.Text.insertTextContent(cursor, graphic, False)
                   doc.Text.insertString(cursor, '\n', False)
@@ -98,6 +100,8 @@ jobs:
 
               writer(out + '/oracle.doc', 'MS Word 97')
               writer(out + '/oracle.dot', 'MS Word 97 Vorlage')
+              writer(out + '/oracle-inline.doc', 'MS Word 97', True)
+              writer(out + '/oracle-inline.dot', 'MS Word 97 Vorlage', True)
               calc(out + '/oracle.xls', 'MS Excel 97')
               calc(out + '/oracle.xlt', 'MS Excel 97 Vorlage/Template')
               impress(out + '/oracle.ppt', 'MS PowerPoint 97')
@@ -117,19 +121,19 @@ jobs:
           import json, olefile, os
           root='/tmp/oracle'
           result={}
-          for name in ['oracle.doc','oracle.dot','oracle.xls','oracle.xlt','oracle.ppt','oracle.pps','oracle.pot']:
+          for name in ['oracle.doc','oracle.dot','oracle-inline.doc','oracle-inline.dot','oracle.xls','oracle.xlt','oracle.ppt','oracle.pps','oracle.pot']:
               path=os.path.join(root,name)
               ole=olefile.OleFileIO(path)
               item={'size':os.path.getsize(path),'streams':{}}
               for parts in ole.listdir(streams=True, storages=False):
                   key='/'.join(parts)
                   data=ole.openstream(parts).read()
-                  item['streams'][key]={'size':len(data),'head':data[:512].hex()}
+                  item['streams'][key]={'size':len(data),'head':data[:1024].hex()}
               result[name]=item
           open(os.path.join(root,'streams.json'),'w').write(json.dumps(result,indent=2,sort_keys=True))
           print(open(os.path.join(root,'streams.json')).read())
           PY
       - uses: actions/upload-artifact@v4
         with:
-          name: legacy-office-oracles
+          name: legacy-office-oracles-inline
           path: /tmp/oracle
