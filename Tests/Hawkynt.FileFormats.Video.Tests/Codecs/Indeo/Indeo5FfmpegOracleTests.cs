@@ -12,34 +12,73 @@ public sealed class Indeo5FfmpegOracleTests {
 
   [Test]
   public void FfmpegDecodesTheCompleteIPSequence() {
-    FFmpegOracle.RequireAvailable();
-
-    const int width = 64;
-    const int height = 48;
-    var requested = new MediaStreamInfo {
-      Index = 0,
-      Kind = MediaStreamKind.Video,
-      Codec = CodecTag.FromCharacters("IV50"),
-      Handler = CodecTag.FromCharacters("IV50"),
-      Width = width,
-      Height = height,
-      TimeBase = new(1, 25),
-      FrameRate = new(25, 1),
-    };
-    var encoder = Indeo5VideoEncoder.Create(requested);
+    var encoder = Indeo5VideoEncoder.Create(_Stream(64, 48));
     var packets = new List<CodedPacket>();
 
     for (var frame = 0; frame < 3; ++frame) {
-      Assert.That(encoder.TryEncode(_Picture(width, height, frame), frame, out var packet), Is.True);
+      Assert.That(encoder.TryEncode(_Picture(64, 48, frame), frame, out var packet), Is.True);
       packets.Add(packet);
     }
+
+    _AssertFfmpegDecodes(encoder, packets, expectedFrames: 3);
+  }
+
+  [Test]
+  public void FfmpegDecodesANoReferenceDroppablePictureBetweenReferences() {
+    var encoder = Indeo5VideoEncoder.Create(_Stream(64, 48));
+    var packets = new List<CodedPacket>();
+
+    Assert.That(encoder.TryEncode(_Picture(64, 48, 0), 0, out var first), Is.True);
+    packets.Add(first);
+    Assert.That(encoder.TryEncode(_Picture(64, 48, 1), 1, Indeo5FrameMode.Disposable, out var disposable), Is.True);
+    packets.Add(disposable);
+    Assert.That(encoder.TryEncode(_Picture(64, 48, 2), 2, Indeo5FrameMode.Reference, out var following), Is.True);
+    packets.Add(following);
+
+    _AssertFfmpegDecodes(encoder, packets, expectedFrames: 3);
+  }
+
+  [Test]
+  public void FfmpegDecodesTheScalableDroppableChain() {
+    var encoder = Indeo5VideoEncoder.Create(_Stream(64, 48), scalable: true);
+    var packets = new List<CodedPacket>();
+
+    Assert.That(encoder.TryEncode(_Picture(64, 48, 0), 0, out var first), Is.True);
+    packets.Add(first);
+    Assert.That(encoder.TryEncode(_Picture(64, 48, 1), 1, Indeo5FrameMode.ScalableDisposable, out var scalableA), Is.True);
+    packets.Add(scalableA);
+    Assert.That(encoder.TryEncode(_Picture(64, 48, 2), 2, Indeo5FrameMode.ScalableDisposable, out var scalableB), Is.True);
+    packets.Add(scalableB);
+    Assert.That(encoder.TryEncode(_Picture(64, 48, 3), 3, Indeo5FrameMode.Reference, out var following), Is.True);
+    packets.Add(following);
+
+    _AssertFfmpegDecodes(encoder, packets, expectedFrames: 4);
+  }
+
+  private static MediaStreamInfo _Stream(int width, int height) => new() {
+    Index = 0,
+    Kind = MediaStreamKind.Video,
+    Codec = CodecTag.FromCharacters("IV50"),
+    Handler = CodecTag.FromCharacters("IV50"),
+    Width = width,
+    Height = height,
+    TimeBase = new(1, 25),
+    FrameRate = new(25, 1),
+  };
+
+  private static void _AssertFfmpegDecodes(
+    Indeo5VideoEncoder encoder,
+    IReadOnlyList<CodedPacket> packets,
+    int expectedFrames) {
+
+    FFmpegOracle.RequireAvailable();
 
     var avi = VideoIO.Mux<AviWriter>([encoder.DescribeStream()], packets);
     var path = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName() + ".avi");
 
     try {
       File.WriteAllBytes(path, avi);
-      var (decoded, detail) = FFmpegOracle.TryDecodeFrameCount(path, width, height, expectedFrames: 3);
+      var (decoded, detail) = FFmpegOracle.TryDecodeFrameCount(path, 64, 48, expectedFrames);
       Assert.That(decoded, Is.True, detail);
     } finally {
       try { File.Delete(path); } catch { /* best effort */ }
