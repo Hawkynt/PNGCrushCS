@@ -6,17 +6,23 @@ using FileFormat.Core;
 
 namespace FileFormat.Codecs;
 
-/// <summary>Encodes Intel Indeo 3 as independently decodable <c>IV32</c> intra frames.</summary>
+/// <summary>Encodes Intel Indeo 3 <c>IV32</c> intra and forward-predicted pictures.</summary>
 /// <remarks>
-/// Indeo 3 itself has inter prediction, a recursive cell tree, several coding modes and twenty-four
-/// quantisation tables. The writer starts with the conservative subset: one intra cell per plane,
-/// mode 0 and the finest table. Every packet can therefore be decoded without any packet before it.
-/// That costs bytes, but it is the useful direction to be incomplete in: the packet is ordinary
-/// Indeo 3 rather than a private dialect that only this package understands.
+/// Indeo 3 uses two internal reference buffers rather than MPEG-style past/future picture lists. This
+/// writer alternates those buffers: one frame in every twelve is a key/intra picture and the eleven
+/// between are inter pictures predicted from the immediately preceding reconstruction. There is no
+/// display-order reordering and therefore no B-picture analogue to emit.
 /// <para/>
-/// Input is converted to the codec's YUV 4:1:0 sampling. The seven-bit plane samples are selected by
-/// solving against the decoder's actual packed-delta arithmetic, so the output is deterministic and
-/// the quantisation error is the format's error, not a disagreement between encoder and decoder math.
+/// Inter planes use the format's ordinary motion-compensated cell grammar with vector <c>0,0</c> and
+/// mode 0 residuals. Unchanged blocks are copied with the codec's run escapes, while a wholly unchanged
+/// plane becomes one VQ-tree copy leaf. The encoder deliberately predicts from its own reconstruction,
+/// not the source, because the seven-bit YUV 4:1:0/VQ path is lossy and source-side prediction would
+/// accumulate drift.
+/// <para/>
+/// Eight-bit sample mode, half-sample motion vectors and the obscure VQ-tree SkipCell procedure remain
+/// outside the writer: no known reference encoder sample uses the first two, and even FFmpeg's Indeo 3
+/// decoder marks SkipCell as unimplemented. The normal key/inter/reference path is interoperable and
+/// is checked by the decoder beside it plus FFmpeg as an independent oracle.
 /// </remarks>
 [VerifiedBy(ConformanceOracle.FFmpeg)]
 public sealed class Indeo3VideoEncoder : IVideoCodecEncoder<Indeo3VideoEncoder> {
@@ -26,9 +32,12 @@ public sealed class Indeo3VideoEncoder : IVideoCodecEncoder<Indeo3VideoEncoder> 
   private const int _MIN_DIMENSION = 16;
   private const int _MAX_WIDTH = 640;
   private const int _MAX_HEIGHT = 480;
+  private const int _GROUP_SIZE = 12;
 
   private readonly MediaStreamInfo _stream;
+  private readonly Indeo3FrameEncoder _frameEncoder;
   private uint _frameNumber;
+  private int _groupPosition;
 
   private Indeo3VideoEncoder(MediaStreamInfo stream) {
     var header = new BitmapInfoHeader(
@@ -62,6 +71,7 @@ public sealed class Indeo3VideoEncoder : IVideoCodecEncoder<Indeo3VideoEncoder> 
       Language = stream.Language,
       Name = stream.Name,
     };
+    this._frameEncoder = new(stream.Width, stream.Height);
   }
 
   public static string CodecName => "Intel Indeo 3";
@@ -83,7 +93,7 @@ public sealed class Indeo3VideoEncoder : IVideoCodecEncoder<Indeo3VideoEncoder> 
     return new(stream);
   }
 
-  /// <summary>Encodes one picture immediately; the encoder buffers no frames.</summary>
+  /// <summary>Encodes one picture immediately; no display-order reordering is required by Indeo 3.</summary>
   public bool TryEncode(RawImage frame, long? presentationTimestamp, out CodedPacket packet) {
     ArgumentNullException.ThrowIfNull(frame);
     if (frame.Width != this._stream.Width || frame.Height != this._stream.Height)
@@ -96,15 +106,17 @@ public sealed class Indeo3VideoEncoder : IVideoCodecEncoder<Indeo3VideoEncoder> 
         + $"and carries {frame.PixelData.Length}.");
 
     var rgb = frame.Format == PixelFormat.Rgb24 ? frame.PixelData : frame.ToRgb24();
-    var data = Indeo3FrameEncoder.Encode(rgb, frame.Width, frame.Height, this._frameNumber);
+    var encoded = this._frameEncoder.Encode(rgb, this._frameNumber, this._groupPosition == 0);
     this._frameNumber = unchecked(this._frameNumber + 1);
+    this._groupPosition = (this._groupPosition + 1) % _GROUP_SIZE;
 
     packet = new(
       StreamIndex: this._stream.Index,
-      Data: data,
+      Data: encoded.Data,
       PresentationTimestamp: presentationTimestamp,
       DecodeTimestamp: presentationTimestamp,
-      IsKeyFrame: true);
+      Duration: 1,
+      IsKeyFrame: encoded.IsKeyFrame);
     return true;
   }
 
