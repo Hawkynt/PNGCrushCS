@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Linq;
 using FileFormat.Core;
 using Hawkynt.FileFormats.Video;
 
@@ -19,7 +20,7 @@ public sealed class UtVideoT2Tests {
   public void DescriptionNamesTheT2LayoutAndRegistryRoutesItToTheT2Decoder(string code, int bitsPerPixel) {
     var encoder = UtVideoT2Encoder.Create(_Stream(code, 32, 9), 3, 30);
     var stream = encoder.DescribeStream();
-    var description = stream.CodecPrivateData.Span;
+    var description = stream.CodecPrivateData.ToArray();
 
     Assert.Multiple(() => {
       Assert.That(stream.Codec, Is.EqualTo(CodecTag.FromCharacters(code)));
