@@ -8,82 +8,37 @@ using FileFormat.Core;
 namespace FileFormat.Codecs;
 
 /// <summary>
-/// Decodes Flash Screen Video 2 (FSV2): the same block grid as FSV1, extended with a colourspace that
-/// packs a pixel into one byte or two, a compression technique that primes a block against the bytes
-/// its cell held at the last key frame rather than restating them, and updates that touch only a run
-/// of a cell's rows rather than the whole thing. Read from the SWF File Format Specification's own
-/// appendix, like FSV1, and despite the name a genuinely different bitstream rather than a variant of
-/// it — nothing below the grid header is shared with <see cref="FlashSvVideoDecoder"/>.
+/// Decodes Flash Screen Video 2 (FSV2): block-grid keyframes and interframes, 24-bit BGR and the
+/// hybrid 15/7-bit colorspace, partial-row updates, custom palettes, and the measured
+/// <c>ZlibPrimeCompressPrevious</c> form of ZLIB priming.
 /// </summary>
 /// <remarks>
-/// <b>The grid header gains one byte of flags.</b> Behind FSV1's four-byte <c>BlockWidth</c>/
-/// <c>ImageWidth</c>/<c>BlockHeight</c>/<c>ImageHeight</c> word sits six reserved bits, then
-/// <c>HasIFrameImage</c> and <c>HasPaletteInfo</c>. The specification describes <c>HasIFrameImage</c>'s
-/// second list of blocks only as interblocks "that must be combined with the previous keyblocks to
-/// produce the image", without saying how, and no stream measured sets the flag to check a reading
-/// against — so it refuses by name rather than guess at a compositing rule nothing here can verify.
-/// <c>HasPaletteInfo</c> carries a new 128-entry colour table as a v1 <c>IMAGEBLOCK</c>: 384 bytes,
-/// three a colour, decompressed exactly the way this package's FSV1 decoder already reads one.
+/// The packet and block syntax comes from Adobe's SWF File Format Specification v19. The priming
+/// behavior that the specification leaves underspecified was measured against FFmpeg-generated FSV2
+/// streams: a primed block's raw DEFLATE stream uses the corresponding cell's coded bytes from the
+/// last container key frame as its preset dictionary. <see cref="RawDeflate"/> implements that RFC 1951
+/// path because the .NET compression wrappers do not expose preset dictionaries.
 /// <para/>
-/// <b>Every block carries a format byte the grid itself never had.</b> Three reserved bits, a two-bit
-/// <c>ColorDepth</c> — 24-bit RGB, or, measured on every one of hundreds of blocks across every stream
-/// this was built against, the 15/7-bit hybrid colourspace — and three coding flags: <c>HasDiffBlocks</c>,
-/// <c>ZlibPrimeCompressCurrent</c> and <c>ZlibPrimeCompressPrevious</c>.
+/// A non-empty diff block is composed on the key-frame reference for its cell, not on the immediately
+/// previous displayed frame. A zero-length IMAGEBLOCKV2 is different: it means the displayed cell is
+/// unchanged and therefore leaves the current canvas alone. References keep both the coded bytes used
+/// for later DEFLATE priming and an already-decoded BGR copy used for composition, so changing the
+/// hybrid palette cannot retroactively recolor the last key frame.
 /// <para/>
-/// <b>The hybrid colourspace is a per-pixel choice, not a per-block one.</b> The specification states the
-/// decode directly: fetch a byte; a set high bit means fetch a second byte and read the pair as a 15-bit
-/// colour, the first byte's low seven bits over bits 14-8 and the second byte whole over bits 7-0, which
-/// this package widens to 24 bits the same way its other 5-5-5 formats already do — five bits repeated
-/// rather than shifted; a clear high bit means the low seven bits index the 128-entry palette directly.
-/// That makes a block's decompressed byte count unknowable in advance, so a block is decompressed whole
-/// and then walked pixel by pixel.
-/// <para/>
-/// <b>"ZLIB priming" is a preset dictionary keyed to the container's own key frames, not a continued
-/// stream.</b> The first reading tried here was this package's own ZMBV decoder's trick — one zlib
-/// stream held open per cell — and it is wrong: an unprimed block decompresses alone as a complete,
-/// terminated zlib stream, and a stream that already reached its own end cannot be resumed. A primed
-/// block's raw bytes, fed to an ordinary DEFLATE decoder with no history, fail outright with a match
-/// reaching before the start of the data — the diagnostic a genuine preset dictionary produces and
-/// nothing else does. What primes a block, verified against ffmpeg's own decode pixel for pixel, is the
-/// exact byte sequence — in this format's own one-or-two-byte coded form — that this same grid cell held
-/// the last time the <em>container</em> stated a key frame; a full-coverage block sent on an ordinary
-/// interframe does not become that reference, which was found the hard way: two consecutive full,
-/// unprimed blocks on interframes decode correctly on their own but are not what the block after them
-/// primes against, where the key frame twelve frames earlier still is. Since neither .NET's zlib
-/// wrapper nor DEFLATE exposes a preset dictionary, <see cref="RawDeflate"/> reads RFC 1951 itself.
-/// <para/>
-/// <c>ZlibPrimeCompressCurrent</c> — priming against a *different* cell's data, named by an
-/// <c>IMAGEPRIMEPOSITION</c> the header would carry in that case — is not this and never appears in
-/// anything measured, so it refuses by name.
-/// <para/>
-/// <b>Every block is composed onto the reference, not onto the frame before it.</b> Before a block's own
-/// rows are written, the whole cell is repainted from the reference the last key frame established — so
-/// a transient interframe update, primed or not, that leaves part of a cell untouched shows that
-/// reference there and not whatever an earlier interframe happened to leave behind. A diff block's own
-/// rows are named by an <c>IMAGEDIFFPOSITION</c> — a row and a count, both counted the way every row in
-/// this format already is, from the cell's own bottom — ahead of the pixel data. A block whose count is
-/// zero and carries no data at all is not an error: it still repaints the cell from the reference and
-/// writes nothing further, which is how a cell that drifted away from its reference through several
-/// interframes is put back with three bytes.
-/// <para/>
-/// <b>Measured against ffmpeg</b>, built with its own flashsv2 encoder. See the codec's section of
-/// <c>README.md</c> for the streams, the frame count and what each one exercises.
-/// <para/>
-/// <b>What refuses.</b> Everything FSV1 already refuses, at the same points; a grid header setting
-/// <c>HasIFrameImage</c>; a block format byte naming a colour depth the specification does not define,
-/// or setting <c>ZlibPrimeCompressCurrent</c>; a diff block whose row range reaches outside its own
-/// cell; a key frame block that does not cover its whole cell, since nothing measured exercises what a
-/// partial reference would mean; a primed block whose cell has no reference to prime against; and a
-/// decompressed pixel stream that runs out before the pixel count a block's position in the grid calls
-/// for.
+/// <b>What remains deliberately unsupported.</b> <c>HasIFrameImage</c> is described only as a second
+/// grid of interblocks that must be combined with previous keyblocks, without defining the state
+/// transition. <c>ZlibPrimeCompressCurrent</c> names another block by row and column but does not define
+/// the byte sequence used as the priming dictionary. FFmpeg still marks both paths unsupported as
+/// well. Guessing either would create a private codec variant, so both are rejected explicitly.
+/// Flash Screen Video 2 has no B-picture syntax or bidirectional temporal prediction.
 /// </remarks>
 public sealed class FlashSv2VideoDecoder : IVideoCodecDecoder<FlashSv2VideoDecoder> {
 
   private static readonly CodecTag _Tag = CodecTag.FromCharacters("FSV2");
 
-  /// <summary>DEFLATE's own limit on how far back a match may reach, and so on how much of a cell's
-  /// reference a preset dictionary can use.</summary>
   private const int _MaxDictionary = 32768;
+
+  private sealed record _ReferenceBlock(byte[] Encoded, byte[] PixelsBgr);
 
   private readonly int _streamIndex;
 
@@ -94,19 +49,14 @@ public sealed class FlashSv2VideoDecoder : IVideoCodecDecoder<FlashSv2VideoDecod
   private int _columns;
   private int _rows;
 
-  /// <summary>The picture as coded, bottom row first, three bytes (B, G, R) a pixel.</summary>
+  /// <summary>The displayed picture as coded, bottom row first, three bytes (B, G, R) per pixel.</summary>
   private byte[]? _canvas;
 
-  /// <summary>128 entries, three bytes (B, G, R) apiece, replaced whenever a packet carries a palette of
-  /// its own and the default from <see cref="FlashSv2Palette"/> until one does.</summary>
+  /// <summary>128 entries, three bytes (B, G, R) apiece.</summary>
   private byte[] _paletteBgr = FlashSv2Palette.DefaultBgr();
 
-  /// <summary>
-  /// One grid cell's complete decoded byte buffer as it stood at the last container key frame — the
-  /// whole cell repaints from this before any block's own rows are written, and it is the only thing a
-  /// primed block's preset dictionary is ever built from.
-  /// </summary>
-  private readonly Dictionary<int, byte[]> _reference = [];
+  /// <summary>Per-cell state established by the most recent container key frame.</summary>
+  private readonly Dictionary<int, _ReferenceBlock> _reference = [];
 
   private FlashSv2VideoDecoder(int streamIndex) => this._streamIndex = streamIndex;
 
@@ -129,7 +79,7 @@ public sealed class FlashSv2VideoDecoder : IVideoCodecDecoder<FlashSv2VideoDecod
     if (data.Length < 5)
       throw new InvalidDataException(
         $"Video stream {this._streamIndex} carries a Flash Screen Video 2 packet of {data.Length} byte(s), where "
-        + "the grid header alone is five.");
+        + "the grid header alone is five bytes.");
 
     var blockWidth = (((data[0] >> 4) & 0xF) + 1) * 16;
     var imageWidth = ((data[0] & 0xF) << 8) | data[1];
@@ -142,17 +92,21 @@ public sealed class FlashSv2VideoDecoder : IVideoCodecDecoder<FlashSv2VideoDecod
         + "which no frame can be decoded into.");
 
     var flags = data[4];
+    if ((flags & 0xFC) != 0)
+      throw new InvalidDataException(
+        $"Video stream {this._streamIndex} carries a Flash Screen Video 2 grid header whose six reserved bits are "
+        + $"not zero (0x{flags:X2}).");
+
     var hasIFrameImage = (flags & 0x02) != 0;
     var hasPaletteInfo = (flags & 0x01) != 0;
 
     if (hasIFrameImage)
       throw new NotSupportedException(
         $"Video stream {this._streamIndex} carries a Flash Screen Video 2 packet whose grid header sets "
-        + "HasIFrameImage. The specification describes that second list of blocks only as interblocks that must "
-        + "be combined with the previous keyblocks, without saying how, and no stream this was measured against "
-        + "sets the flag to check a reading against.");
+        + "HasIFrameImage. The specification does not define how that second interblock grid changes the key-block "
+        + "state, and implementing an unverified interpretation would create an incompatible codec variant.");
 
-    this._EnsureGeometry(imageWidth, imageHeight, blockWidth, blockHeight);
+    this._EnsureGeometry(imageWidth, imageHeight, blockWidth, blockHeight, packet.IsKeyFrame);
 
     var offset = 5;
 
@@ -195,7 +149,7 @@ public sealed class FlashSv2VideoDecoder : IVideoCodecDecoder<FlashSv2VideoDecod
         offset += 2;
 
         if (blockSize == 0)
-          continue; // Unchanged since the picture before this one.
+          continue;
 
         if (offset + blockSize > data.Length)
           throw new InvalidDataException(
@@ -210,6 +164,11 @@ public sealed class FlashSv2VideoDecoder : IVideoCodecDecoder<FlashSv2VideoDecod
       }
     }
 
+    if (offset != data.Length)
+      throw new InvalidDataException(
+        $"Video stream {this._streamIndex} carries {data.Length - offset} trailing byte(s) after the final Flash "
+        + "Screen Video 2 block.");
+
     frame = new() {
       Width = this._width,
       Height = this._height,
@@ -222,12 +181,17 @@ public sealed class FlashSv2VideoDecoder : IVideoCodecDecoder<FlashSv2VideoDecod
   private void _DecodeBlock(
     ReadOnlySpan<byte> block, byte[] canvas, int gridColumn, int gridRow, int canvasRow, int canvasColumn,
     int columnWidth, int rowHeight, bool isKeyFrame) {
-    if (block.Length < 1)
+    if (block.IsEmpty)
       throw new InvalidDataException(
         $"Video stream {this._streamIndex} carries a Flash Screen Video 2 block at grid position "
         + $"({gridColumn},{gridRow}) with no format byte.");
 
     var format = block[0];
+    if ((format & 0xE0) != 0)
+      throw new InvalidDataException(
+        $"Video stream {this._streamIndex} carries a Flash Screen Video 2 block at grid position "
+        + $"({gridColumn},{gridRow}) whose three reserved format bits are not zero (0x{format:X2}).");
+
     var colorDepth = (format >> 3) & 0x3;
     var hasDiffBlocks = (format & 0x04) != 0;
     var primeCurrent = (format & 0x02) != 0;
@@ -236,8 +200,9 @@ public sealed class FlashSv2VideoDecoder : IVideoCodecDecoder<FlashSv2VideoDecod
     if (primeCurrent)
       throw new NotSupportedException(
         $"Video stream {this._streamIndex} carries a Flash Screen Video 2 block at grid position "
-        + $"({gridColumn},{gridRow}) whose format byte sets ZlibPrimeCompressCurrent — priming against a "
-        + "different cell's data, named by an IMAGEPRIMEPOSITION. No stream this was measured against sets it.");
+        + $"({gridColumn},{gridRow}) whose format byte sets ZlibPrimeCompressCurrent. The format names a source "
+        + "block but does not define the exact priming byte sequence, and no independent implementation provides "
+        + "an interoperability oracle for it.");
 
     if (colorDepth != 0 && colorDepth != 2)
       throw new NotSupportedException(
@@ -259,7 +224,7 @@ public sealed class FlashSv2VideoDecoder : IVideoCodecDecoder<FlashSv2VideoDecod
       pixelRowCount = block[headerOffset + 1];
       headerOffset += 2;
 
-      if (pixelRowStart < 0 || pixelRowCount < 0 || pixelRowStart + pixelRowCount > rowHeight)
+      if (pixelRowStart + pixelRowCount > rowHeight)
         throw new InvalidDataException(
           $"Video stream {this._streamIndex} carries a Flash Screen Video 2 diff block at grid position "
           + $"({gridColumn},{gridRow}) stating rows {pixelRowStart}..{pixelRowStart + pixelRowCount}, outside its "
@@ -269,53 +234,87 @@ public sealed class FlashSv2VideoDecoder : IVideoCodecDecoder<FlashSv2VideoDecod
     if (isKeyFrame && (pixelRowStart != 0 || pixelRowCount != rowHeight))
       throw new NotSupportedException(
         $"Video stream {this._streamIndex} carries a Flash Screen Video 2 block at grid position "
-        + $"({gridColumn},{gridRow}) on a key frame that does not cover its whole {rowHeight}-row cell. No stream "
-        + "this was measured against does this, and what a partial reference would mean for a later primed block "
-        + "is not stated anywhere.");
+        + $"({gridColumn},{gridRow}) on a key frame that does not cover its whole {rowHeight}-row cell. A keyblock "
+        + "must contain the complete block image before it can become a reference.");
 
     var cellKey = gridRow * this._columns + gridColumn;
+    this._reference.TryGetValue(cellKey, out var reference);
+
+    if (hasDiffBlocks && reference == null)
+      throw new InvalidDataException(
+        $"Video stream {this._streamIndex} carries a Flash Screen Video 2 diff block at grid position "
+        + $"({gridColumn},{gridRow}) before a key frame established that cell's reference.");
+
     var compressed = block[headerOffset..];
 
     byte[] decoded;
     if (primePrevious) {
-      if (!this._reference.TryGetValue(cellKey, out var reference))
+      if (reference == null)
         throw new InvalidDataException(
           $"Video stream {this._streamIndex} carries a Flash Screen Video 2 block at grid position "
           + $"({gridColumn},{gridRow}) priming against its own cell before any key frame established one.");
 
-      var dictionary = reference.Length > _MaxDictionary ? reference[^_MaxDictionary..] : reference;
+      var encodedReference = reference.Encoded;
+      var dictionary = encodedReference.Length > _MaxDictionary ? encodedReference[^_MaxDictionary..] : encodedReference;
       decoded = RawDeflate.Decode(compressed, dictionary);
     } else
       decoded = _InflateAll(compressed);
 
-    // Every block composes onto the reference the last key frame established, not onto whatever an
-    // earlier interframe happened to leave on screen.
-    if (this._reference.TryGetValue(cellKey, out var current))
-      this._PaintReference(current, canvas, canvasRow, canvasColumn, columnWidth, rowHeight, gridColumn, gridRow);
+    if (hasDiffBlocks)
+      this._PaintReference(reference!.PixelsBgr, canvas, canvasRow, canvasColumn, columnWidth, rowHeight);
 
     if (pixelRowCount > 0)
-      this._PaintRows(decoded, canvas, canvasRow + pixelRowStart, canvasColumn, columnWidth, pixelRowCount, gridColumn, gridRow);
+      this._PaintRows(decoded, colorDepth, canvas, canvasRow + pixelRowStart, canvasColumn, columnWidth, pixelRowCount, gridColumn, gridRow);
+    else if (decoded.Length != 0)
+      throw new InvalidDataException(
+        $"Video stream {this._streamIndex} carries a zero-height Flash Screen Video 2 diff block at grid position "
+        + $"({gridColumn},{gridRow}) that nevertheless decompresses to {decoded.Length} byte(s).");
 
     if (isKeyFrame)
-      this._reference[cellKey] = decoded;
+      this._reference[cellKey] = new(decoded, this._CaptureCell(canvas, canvasRow, canvasColumn, columnWidth, rowHeight));
   }
 
-  private void _PaintReference(byte[] reference, byte[] canvas, int canvasRow, int canvasColumn, int columnWidth, int rowHeight, int gridColumn, int gridRow)
-    => this._PaintRows(reference, canvas, canvasRow, canvasColumn, columnWidth, rowHeight, gridColumn, gridRow);
+  private void _PaintReference(
+    byte[] reference, byte[] canvas, int canvasRow, int canvasColumn, int columnWidth, int rowHeight) {
+    var rowBytes = columnWidth * 3;
+    var stride = this._width * 3;
+    for (var row = 0; row < rowHeight; ++row)
+      reference.AsSpan(row * rowBytes, rowBytes).CopyTo(canvas.AsSpan((canvasRow + row) * stride + canvasColumn * 3, rowBytes));
+  }
 
-  private void _PaintRows(byte[] decoded, byte[] canvas, int canvasRowStart, int canvasColumn, int columnWidth, int rowCount, int gridColumn, int gridRow) {
-    var cursor = 0;
+  private void _PaintRows(
+    byte[] decoded, int colorDepth, byte[] canvas, int canvasRowStart, int canvasColumn, int columnWidth, int rowCount,
+    int gridColumn, int gridRow) {
     var stride = this._width * 3;
 
-    for (var i = 0; i < rowCount; ++i) {
-      var rowOffset = (canvasRowStart + i) * stride + canvasColumn * 3;
+    if (colorDepth == 0) {
+      var rowBytes = columnWidth * 3;
+      var expected = rowBytes * rowCount;
+      if (decoded.Length != expected)
+        throw new InvalidDataException(
+          $"Video stream {this._streamIndex} carries a 24-bit Flash Screen Video 2 block at grid position "
+          + $"({gridColumn},{gridRow}) that decompresses to {decoded.Length} byte(s), where {expected} are required.");
 
-      for (var j = 0; j < columnWidth; ++j)
-        cursor = this._DecodePixel(decoded, cursor, canvas, rowOffset + j * 3, gridColumn, gridRow);
+      for (var row = 0; row < rowCount; ++row)
+        decoded.AsSpan(row * rowBytes, rowBytes)
+          .CopyTo(canvas.AsSpan((canvasRowStart + row) * stride + canvasColumn * 3, rowBytes));
+      return;
     }
+
+    var cursor = 0;
+    for (var row = 0; row < rowCount; ++row) {
+      var rowOffset = (canvasRowStart + row) * stride + canvasColumn * 3;
+      for (var column = 0; column < columnWidth; ++column)
+        cursor = this._DecodeHybridPixel(decoded, cursor, canvas, rowOffset + column * 3, gridColumn, gridRow);
+    }
+
+    if (cursor != decoded.Length)
+      throw new InvalidDataException(
+        $"Video stream {this._streamIndex} carries a hybrid Flash Screen Video 2 block at grid position "
+        + $"({gridColumn},{gridRow}) with {decoded.Length - cursor} unused decompressed byte(s) after its pixels.");
   }
 
-  private int _DecodePixel(byte[] decoded, int cursor, byte[] canvas, int destination, int gridColumn, int gridRow) {
+  private int _DecodeHybridPixel(byte[] decoded, int cursor, byte[] canvas, int destination, int gridColumn, int gridRow) {
     var first = _NextByte(decoded, ref cursor, this._streamIndex, gridColumn, gridRow);
     if ((first & 0x80) == 0) {
       var entry = (first & 0x7F) * 3;
@@ -336,6 +335,17 @@ public sealed class FlashSv2VideoDecoder : IVideoCodecDecoder<FlashSv2VideoDecod
     return cursor;
   }
 
+  private byte[] _CaptureCell(byte[] canvas, int canvasRow, int canvasColumn, int columnWidth, int rowHeight) {
+    var rowBytes = columnWidth * 3;
+    var result = new byte[rowBytes * rowHeight];
+    var stride = this._width * 3;
+    for (var row = 0; row < rowHeight; ++row)
+      canvas.AsSpan((canvasRow + row) * stride + canvasColumn * 3, rowBytes)
+        .CopyTo(result.AsSpan(row * rowBytes, rowBytes));
+
+    return result;
+  }
+
   private static byte _NextByte(byte[] decoded, ref int cursor, int streamIndex, int gridColumn, int gridRow) {
     if (cursor >= decoded.Length)
       throw new InvalidDataException(
@@ -347,8 +357,6 @@ public sealed class FlashSv2VideoDecoder : IVideoCodecDecoder<FlashSv2VideoDecod
 
   private static byte _Widen(int channel) => (byte)((channel << 3) | (channel >> 2));
 
-  /// <summary>Decompresses a complete zlib stream to whatever it holds — an unprimed block's decompressed
-  /// length is not stated anywhere, since the hybrid colourspace makes it depend on the pixels.</summary>
   private static byte[] _InflateAll(ReadOnlySpan<byte> compressed) {
     if (compressed.IsEmpty)
       return [];
@@ -360,33 +368,25 @@ public sealed class FlashSv2VideoDecoder : IVideoCodecDecoder<FlashSv2VideoDecod
     return output.ToArray();
   }
 
-  /// <summary>Decompresses a v1-shaped <c>IMAGEBLOCK</c> to exactly the 384 bytes a 128-entry, three-byte
-  /// colour table needs.</summary>
   private static byte[] _InflatePalette(ReadOnlyMemory<byte> compressed, int streamIndex) {
-    const int _paletteBytes = 128 * 3;
+    const int _PALETTE_BYTES = 128 * 3;
     using var source = new MemoryStream(compressed.ToArray(), writable: false);
     using var zlib = new ZLibStream(source, CompressionMode.Decompress);
-    var decompressed = new byte[_paletteBytes];
+    var decompressed = new byte[_PALETTE_BYTES];
     try {
       zlib.ReadExactly(decompressed);
     } catch (EndOfStreamException ex) {
       throw new InvalidDataException(
         $"Video stream {streamIndex} carries a Flash Screen Video 2 palette block whose zlib data decompresses to "
-        + $"fewer than the {_paletteBytes} byte(s) a 128-entry colour table needs.", ex);
+        + $"fewer than the {_PALETTE_BYTES} byte(s) a 128-entry colour table needs.", ex);
     }
 
     return decompressed;
   }
 
-  private void _EnsureGeometry(int imageWidth, int imageHeight, int blockWidth, int blockHeight) {
+  private void _EnsureGeometry(int imageWidth, int imageHeight, int blockWidth, int blockHeight, bool isKeyFrame) {
     if (this._canvas == null) {
-      this._width = imageWidth;
-      this._height = imageHeight;
-      this._blockWidth = blockWidth;
-      this._blockHeight = blockHeight;
-      this._columns = _BlockCount(imageWidth, blockWidth);
-      this._rows = _BlockCount(imageHeight, blockHeight);
-      this._canvas = new byte[imageWidth * imageHeight * 3];
+      this._ConfigureGeometry(imageWidth, imageHeight, blockWidth, blockHeight);
       return;
     }
 
@@ -394,10 +394,24 @@ public sealed class FlashSv2VideoDecoder : IVideoCodecDecoder<FlashSv2VideoDecod
         && this._blockWidth == blockWidth && this._blockHeight == blockHeight)
       return;
 
-    throw new NotSupportedException(
-      $"Video stream {this._streamIndex} changes its Flash Screen Video 2 geometry from {this._width}x{this._height} "
-      + $"in {this._blockWidth}x{this._blockHeight} blocks to {imageWidth}x{imageHeight} in {blockWidth}x{blockHeight} "
-      + "blocks part way through, and neither the canvas nor the per-cell references this decoder built follow it.");
+    if (!isKeyFrame)
+      throw new NotSupportedException(
+        $"Video stream {this._streamIndex} changes its Flash Screen Video 2 geometry from {this._width}x{this._height} "
+        + $"in {this._blockWidth}x{this._blockHeight} blocks to {imageWidth}x{imageHeight} in {blockWidth}x{blockHeight} "
+        + "blocks on an interframe. A new grid can only establish its references at a key frame.");
+
+    this._reference.Clear();
+    this._ConfigureGeometry(imageWidth, imageHeight, blockWidth, blockHeight);
+  }
+
+  private void _ConfigureGeometry(int imageWidth, int imageHeight, int blockWidth, int blockHeight) {
+    this._width = imageWidth;
+    this._height = imageHeight;
+    this._blockWidth = blockWidth;
+    this._blockHeight = blockHeight;
+    this._columns = _BlockCount(imageWidth, blockWidth);
+    this._rows = _BlockCount(imageHeight, blockHeight);
+    this._canvas = new byte[imageWidth * imageHeight * 3];
   }
 
   private static int _BlockCount(int imageSize, int blockSize) => (imageSize + blockSize - 1) / blockSize;
