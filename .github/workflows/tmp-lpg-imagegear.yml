@@ -9,42 +9,48 @@ jobs:
   probe:
     runs-on: ubuntu-latest
     steps:
-      - name: Inspect preserved Canvas ImageGear media
+      - name: Unpack preserved ImageGear-era installers
         shell: bash
         run: |
           set -euo pipefail
           ROOT=/tmp/lpg-imagegear
           mkdir -p "$ROOT"
           cd "$ROOT"
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq p7zip-full unshield
 
-          ISO_URL='https://archive.org/download/canvas-702-windows-1999/Canvas-702-Windows-1999.iso'
-          echo '=== download preserved Canvas 7.0.2 Windows CD ==='
-          curl -fL --retry 3 --retry-delay 2 -o canvas7.iso "$ISO_URL"
-          ls -lh canvas7.iso
-          md5sum canvas7.iso
-          test "$(md5sum canvas7.iso | cut -d' ' -f1)" = 'b6ed40364f717a4909f99e3b58ca8ee0'
+          echo '=== Chip 1999-08 generated file index ==='
+          curl -fL --retry 3 -o chip-index.zip \
+            'https://archive.org/download/czchip199908cd/Chip_1999-08_cd_dic-files.zip'
+          unzip -l chip-index.zip | head -80
+          mkdir chip-index
+          unzip -q chip-index.zip -d chip-index
+          echo '--- ImageGear/AccuSoft candidates in generated index ---'
+          grep -RIniE 'imagegear|accusoft|gear32sd|gear32|officegear|\.igf([[:space:]"<>]|$)' chip-index | head -500 || true
+          echo '--- candidate filenames ---'
+          find chip-index -type f -printf '%p\n' | grep -iE 'imagegear|accusoft|gear32|officegear|igf' | head -500 || true
 
-          command -v 7z >/dev/null || { sudo apt-get update -qq && sudo apt-get install -y -qq p7zip-full; }
-          echo '=== relevant CD paths ==='
-          7z l -ba canvas7.iso > files.txt
-          grep -iE 'gear32|imagegear|accusoft|\.igf([[:space:]]|$)|accucnst|gear\.h|ig7([[:space:]]|$)' files.txt | head -1000 || true
+          echo '=== Canvas 7 installer containers ==='
+          curl -fL --retry 3 -o canvas7.iso \
+            'https://archive.org/download/canvas-702-windows-1999/Canvas-702-Windows-1999.iso'
+          7z l -ba canvas7.iso > canvas-list.txt
+          grep -iE '\.(cab|hdr|exe|zip|dll)([[:space:]]|$)' canvas-list.txt | head -1000 || true
 
-          echo '=== all DLLs with gear-like names ==='
-          grep -iE '\.dll([[:space:]]|$)' files.txt | grep -iE 'gear|accu|image|fpx' | head -500 || true
+          mkdir canvas
+          7z x -y -ocanvas canvas7.iso -r \
+            -i'!*.cab' -i'!*.hdr' -i'!setup*.exe' -i'!_setup.dll' -i'!data*.bin' >/dev/null || true
+          echo '--- extracted installer files ---'
+          find canvas -type f -printf '%p %s\n' | head -1000
 
-          echo '=== extract all candidate ImageGear files ==='
-          mkdir extracted
-          7z e -y -oextracted canvas7.iso -r \
-            -i'!*GEAR32*.DLL' -i'!*IGFPX*.DLL' -i'!*ACCUCNST*' -i'!*GEAR.H' -i'!*.IGF' -i'!*.IG7' >/dev/null || true
-          find extracted -maxdepth 1 -type f -printf '%f %s bytes\n' | sort | head -1000
-          for f in extracted/*; do
-            [ -f "$f" ] || continue
-            echo "--- $f ---"
-            file "$f" || true
-            sha256sum "$f" || true
-            if file "$f" | grep -q 'PE32'; then
-              strings -a "$f" | grep -iE 'IGF|ImageGear Format|\.igf|\.lpg|LPG|Xerox|ATT|BRK|GX2|ICA|IMT|KFX|diskfile\.ig' | head -500 || true
-            else
-              head -c 256 "$f" | xxd -g1 || true
-            fi
-          done
+          echo '--- inspect InstallShield cabinets ---'
+          while IFS= read -r cab; do
+            dir=$(dirname "$cab")
+            echo "CAB=$cab"
+            (cd "$dir" && unshield l "$(basename "$cab")" 2>&1 | grep -iE 'gear32|imagegear|accusoft|\.igf$|accucnst|gear\.h|ig7|fpx' | head -500) || true
+            7z l -ba "$cab" 2>/dev/null | grep -iE 'gear32|imagegear|accusoft|\.igf([[:space:]]|$)|accucnst|gear\.h|ig7|fpx' | head -500 || true
+          done < <(find canvas -type f -iname '*.cab')
+
+          echo '--- raw strings across setup payloads ---'
+          find canvas -type f -print0 | xargs -0 strings -a 2>/dev/null \
+            | grep -iE 'GEAR32SD\.DLL|ImageGear|AccuSoft|ImageGear Format|IG_SAVE_IGF|IG_FORMAT_IGF|\.IGF([^A-Za-z]|$)|diskfile\.ig' \
+            | head -1000 || true
