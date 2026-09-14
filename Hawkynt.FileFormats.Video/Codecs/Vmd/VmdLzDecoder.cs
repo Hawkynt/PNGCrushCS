@@ -4,107 +4,86 @@ using System.IO;
 
 namespace FileFormat.Codecs.Vmd;
 
-/// <summary>
-/// VMD's own LZSS variant: a 4096-byte ring buffer addressed by an absolute twelve-bit position
-/// rather than a lookback distance, seeded with either the format's fixed preload dictionary or
-/// nothing but spaces, unpacking whatever the coding-method byte in front of it says is compressed.
-/// </summary>
+/// <summary>Decodes the two LZSS initialisations used by Sierra VMD video.</summary>
 /// <remarks>
-/// <b>Only the preload-dictionary form is decoded.</b> Sierra's own published description of this
-/// algorithm gives two initialisations — a four-byte marker (<c>34 12 78 56</c>) that switches the
-/// ring buffer's write position to <c>0x111</c> and turns on an eighteen-byte escape for a longer
-/// match, or, when that marker is absent, a plain position of <c>0xFEE</c> with no escape at all — and
-/// states both as the same otherwise-identical algorithm. They are not. Reproducing the marker form
-/// exactly against a real intraframe was straightforward; the marker-absent form, measured against a
-/// real interframe whose first several output bytes are provably wrong — the picture that byte range
-/// paints does not match ffmpeg's decode even though the row coding built on top of it consumes every
-/// byte cleanly and never runs off the end of anything — was not recovered by any reading tried:
-/// different starting positions for the ring buffer, treating the four bytes after the length field as
-/// always consumed whether or not they are the marker, and combinations of both, each checked against
-/// the same real bytes, come closer without reaching exact. Nothing published states a third
-/// possibility, so a marker-absent stream is refused by name rather than decoded wrong. It is also the
-/// less common of the two forms in what this decoder was measured against: a marker-present stream
-/// decodes every interframe of one real file outright and the marker-absent form only appears at all
-/// in one of six, where it accounts for well under half that file's own frames.
+/// Converted from FFmpeg's LGPL-2.1-or-later <c>libavcodec/vmdvideo.c</c>; provenance and licence are
+/// recorded in <c>THIRD-PARTY-NOTICE.FFmpeg.txt</c> beside this file. VMD addresses a 4096-byte ring
+/// buffer by absolute twelve-bit position. Streams beginning with <c>34 12 78 56</c> start writing at
+/// <c>0x111</c> and extend an eighteen-byte match with one extra length byte. Streams without that
+/// marker start at <c>0xFEE</c> and have no extended-length escape.
 /// </remarks>
 internal static class VmdLzDecoder {
 
   private const int _WINDOW_SIZE = 4096;
   private const int _WINDOW_MASK = _WINDOW_SIZE - 1;
   private const byte _INITIAL_FILL = 0x20;
-  private const int _MARKER_LENGTH = 4;
-  private const int _DATA_LEFT_LENGTH = 4;
-  private const int _PRELOAD_QUEUE_POSITION = 0x111;
-  private const int _NO_PRELOAD_QUEUE_POSITION = 0xFEE;
-  private const int _MINIMUM_CHAIN_LENGTH = 3;
-  private const int _CHAIN_LENGTH_BITS = 4;
-  private const byte _CHAIN_LENGTH_MASK = (1 << _CHAIN_LENGTH_BITS) - 1;
-  private const int _SPECIAL_CHAIN_LENGTH = 18; // the escape's own threshold, only reachable with the preload marker
-  private const byte _EIGHT_LITERAL_TAG = 0xFF;
+  private const int _LENGTH_FIELD_SIZE = 4;
+  private const int _MARKER_SIZE = 4;
+  private const int _PRELOAD_POSITION = 0x111;
+  private const int _PLAIN_POSITION = 0xFEE;
+  private const int _MINIMUM_MATCH = 3;
+  private const int _EXTENDED_MATCH = 18;
   private const int _EIGHT_LITERAL_COUNT = 8;
+  private const byte _EIGHT_LITERAL_TAG = 0xFF;
 
   private static readonly byte[] _PreloadMarker = [0x34, 0x12, 0x78, 0x56];
 
-  /// <summary>Whether the four bytes right after the output length state the preload marker this
-  /// decoder requires — checked once by the caller so it can refuse a marker-absent stream by name
-  /// before doing any decompression at all.</summary>
   internal static bool HasPreloadMarker(ReadOnlySpan<byte> input)
-    => input.Length >= _DATA_LEFT_LENGTH + _MARKER_LENGTH && input.Slice(_DATA_LEFT_LENGTH, _MARKER_LENGTH).SequenceEqual(_PreloadMarker);
+    => input.Length >= _LENGTH_FIELD_SIZE + _MARKER_SIZE
+       && input.Slice(_LENGTH_FIELD_SIZE, _MARKER_SIZE).SequenceEqual(_PreloadMarker);
 
-  /// <summary>Decompresses a marker-present VMD LZ chunk in full.</summary>
-  internal static byte[] Decode(ReadOnlySpan<byte> input) {
-    if (input.Length < _DATA_LEFT_LENGTH + _MARKER_LENGTH)
-      throw new InvalidDataException($"A VMD LZ chunk is {input.Length} bytes, short of the eight its own output length and preload marker need.");
+  /// <summary>Expands one VMD LZ chunk and requires its own declared output length to fit the supplied limit.</summary>
+  internal static byte[] Decode(ReadOnlySpan<byte> input, int maximumOutputLength = int.MaxValue) {
+    if (input.Length < _LENGTH_FIELD_SIZE)
+      throw new InvalidDataException(
+        $"A VMD LZ chunk is {input.Length} bytes, short of its four-byte decompressed-length field.");
 
     var outputLength = BinaryPrimitives.ReadUInt32LittleEndian(input);
-    var output = new byte[outputLength];
-    var outputPosition = 0;
+    if (outputLength > int.MaxValue || outputLength > maximumOutputLength)
+      throw new InvalidDataException(
+        $"A VMD LZ chunk declares {outputLength} decompressed bytes, beyond the permitted {maximumOutputLength}.");
 
+    var marker = HasPreloadMarker(input);
+    var inputPosition = _LENGTH_FIELD_SIZE + (marker ? _MARKER_SIZE : 0);
+    var queuePosition = marker ? _PRELOAD_POSITION : _PLAIN_POSITION;
+    var extendedMatch = marker;
+
+    var output = new byte[(int)outputLength];
+    var outputPosition = 0;
     var queue = new byte[_WINDOW_SIZE];
     Array.Fill(queue, _INITIAL_FILL);
-    var queuePosition = _PRELOAD_QUEUE_POSITION;
-
-    var inputPosition = _DATA_LEFT_LENGTH + _MARKER_LENGTH;
 
     while (outputPosition < output.Length) {
       var tag = _ReadByte(input, ref inputPosition);
 
       if (tag == _EIGHT_LITERAL_TAG && output.Length - outputPosition > _EIGHT_LITERAL_COUNT) {
-        for (var i = 0; i < _EIGHT_LITERAL_COUNT; ++i) {
-          var b = _ReadByte(input, ref inputPosition);
-          output[outputPosition++] = b;
-          queue[queuePosition] = b;
-          queuePosition = (queuePosition + 1) & _WINDOW_MASK;
-        }
-
+        for (var i = 0; i < _EIGHT_LITERAL_COUNT; ++i)
+          _WriteLiteral(_ReadByte(input, ref inputPosition), output, ref outputPosition, queue, ref queuePosition);
         continue;
       }
 
       for (var bit = 0; bit < 8 && outputPosition < output.Length; ++bit) {
         if (((tag >> bit) & 1) != 0) {
-          var b = _ReadByte(input, ref inputPosition);
-          output[outputPosition++] = b;
-          queue[queuePosition] = b;
-          queuePosition = (queuePosition + 1) & _WINDOW_MASK;
+          _WriteLiteral(_ReadByte(input, ref inputPosition), output, ref outputPosition, queue, ref queuePosition);
           continue;
         }
 
-        var b0 = _ReadByte(input, ref inputPosition);
-        var b1 = _ReadByte(input, ref inputPosition);
-        var chainOffset = b0 | ((b1 & 0xF0) << 4);
-        var chainLength = (b1 & _CHAIN_LENGTH_MASK) + _MINIMUM_CHAIN_LENGTH;
-        if (chainLength == _SPECIAL_CHAIN_LENGTH)
-          chainLength = _SPECIAL_CHAIN_LENGTH + _ReadByte(input, ref inputPosition);
+        var low = _ReadByte(input, ref inputPosition);
+        var highAndLength = _ReadByte(input, ref inputPosition);
+        var offset = low | ((highAndLength & 0xF0) << 4);
+        var length = (highAndLength & 0x0F) + _MINIMUM_MATCH;
+        if (extendedMatch && length == _EXTENDED_MATCH)
+          length += _ReadByte(input, ref inputPosition);
 
-        if (outputPosition + chainLength > output.Length)
+        if (outputPosition + length > output.Length)
           throw new InvalidDataException(
-            $"A VMD LZ back-reference at output byte {outputPosition} asks for {chainLength} bytes, "
-            + $"which runs past the chunk's own declared output length of {output.Length}.");
+            $"A VMD LZ back-reference at output byte {outputPosition} asks for {length} bytes, "
+            + $"past the declared output length of {output.Length}.");
 
-        for (var i = 0; i < chainLength; ++i) {
-          var b = queue[(chainOffset + i) & _WINDOW_MASK];
-          output[outputPosition++] = b;
-          queue[queuePosition] = b;
+        for (var i = 0; i < length; ++i) {
+          var value = queue[(offset + i) & _WINDOW_MASK];
+          output[outputPosition++] = value;
+          queue[queuePosition] = value;
           queuePosition = (queuePosition + 1) & _WINDOW_MASK;
         }
       }
@@ -113,9 +92,16 @@ internal static class VmdLzDecoder {
     return output;
   }
 
+  private static void _WriteLiteral(byte value, byte[] output, ref int outputPosition, byte[] queue, ref int queuePosition) {
+    output[outputPosition++] = value;
+    queue[queuePosition] = value;
+    queuePosition = (queuePosition + 1) & _WINDOW_MASK;
+  }
+
   private static byte _ReadByte(ReadOnlySpan<byte> input, ref int position) {
-    if (position >= input.Length)
-      throw new InvalidDataException($"A VMD LZ chunk ran out of input at byte {position} before its declared output length was reached.");
+    if ((uint)position >= (uint)input.Length)
+      throw new InvalidDataException(
+        $"A VMD LZ chunk ran out of input at byte {position} before its declared output length was reached.");
 
     return input[position++];
   }
