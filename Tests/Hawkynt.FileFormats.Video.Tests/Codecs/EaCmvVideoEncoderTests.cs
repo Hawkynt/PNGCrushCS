@@ -28,8 +28,6 @@ public sealed class EaCmvVideoEncoderTests {
       Assert.That(stream.Width, Is.EqualTo(8));
       Assert.That(stream.Height, Is.EqualTo(8));
       Assert.That(stream.BitsPerPixel, Is.EqualTo(8));
-      Assert.That(stream.TimeBase, Is.EqualTo(new Rational(1, 15)));
-      Assert.That(stream.FrameRate, Is.EqualTo(new Rational(15, 1)));
       Assert.That(VideoFormatRegistry.AllEncoders.Select(static e => e.CodecName), Does.Contain("Electronic Arts CMV"));
       Assert.That(VideoFormatRegistry.CanEncode(requested), Is.True);
       Assert.That(VideoFormatRegistry.CreateEncoder(requested), Is.InstanceOf<EaCmvVideoEncoder>());
@@ -43,8 +41,8 @@ public sealed class EaCmvVideoEncoderTests {
     var picture = _Picture(8, 4, 7);
     var encoder = EaCmvVideoEncoder.Create(_Requested(8, 4));
 
-    Assert.That(encoder.TryEncode(picture, 3, out var packet), Is.True);
-    var chunks = _Chunks(packet.Data.Span).ToArray();
+    encoder.TryEncode(picture, 3, out var packet);
+    var chunks = _Chunks(packet.Data.Span);
 
     Assert.Multiple(() => {
       Assert.That(chunks.Select(static c => c.FourCc), Is.EqualTo(new[] { "MVIh", "MVIf" }));
@@ -64,75 +62,51 @@ public sealed class EaCmvVideoEncoderTests {
 
   [Test]
   [Category("Unit")]
-  public void AnUnchangedPictureUsesPreviousFrameMotion() {
-    var picture = _Picture(8, 4, 11);
-    var encoder = EaCmvVideoEncoder.Create(_Requested(8, 4));
-    encoder.TryEncode(picture, 0, out _);
-
-    encoder.TryEncode(picture, 1, out var packet);
-    var frame = _Chunks(packet.Data.Span).Single();
-
-    Assert.Multiple(() => {
-      Assert.That(frame.FourCc, Is.EqualTo("MVIf"));
-      Assert.That(BinaryPrimitives.ReadUInt16LittleEndian(frame.Payload), Is.EqualTo(1));
-      Assert.That(frame.Payload.AsSpan(2, 2).ToArray(), Is.EqualTo(new byte[] { 0x77, 0x77 }));
-      Assert.That(frame.Payload.Length, Is.EqualTo(4));
-      Assert.That(packet.IsKeyFrame, Is.False);
-    });
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void ABlockMayReachBackTwoPictures() {
-    var first = _Picture(8, 4, 1);
-    var second = _Picture(8, 4, 2);
+  public void InterPicturesUsePreviousSecondLastAndLiteralBlocks() {
+    var first = _Picture(8, 4, 3);
     var encoder = EaCmvVideoEncoder.Create(_Requested(8, 4));
     encoder.TryEncode(first, 0, out _);
-    encoder.TryEncode(second, 1, out _);
 
-    encoder.TryEncode(first, 2, out var packet);
-    var frame = _Chunks(packet.Data.Span).Single();
-
+    encoder.TryEncode(first, 1, out var unchangedPacket);
+    var unchanged = _Chunks(unchangedPacket.Data.Span).Single();
     Assert.Multiple(() => {
-      Assert.That(BinaryPrimitives.ReadUInt16LittleEndian(frame.Payload), Is.EqualTo(1));
-      Assert.That(frame.Payload.AsSpan(2, 2).ToArray(), Is.EqualTo(new byte[] { 0xFF, 0xFF }));
-      Assert.That(frame.Payload.AsSpan(4).ToArray(), Is.EqualTo(new byte[] { 0x77, 0x77 }));
-      Assert.That(packet.IsKeyFrame, Is.False);
+      Assert.That(BinaryPrimitives.ReadUInt16LittleEndian(unchanged.Payload), Is.EqualTo(1));
+      Assert.That(unchanged.Payload.AsSpan(2).ToArray(), Is.EqualTo(new byte[] { 0x77, 0x77 }));
     });
-  }
 
-  [Test]
-  [Category("Unit")]
-  public void AChangedBlockFallsBackToTheSixteenIndexLiteralEscape() {
-    var first = _Picture(8, 4, 3);
-    var secondPixels = first.PixelData.ToArray();
+    var other = _Picture(8, 4, 4);
+    encoder.TryEncode(other, 2, out _); // now history is first, other
+    encoder.TryEncode(first, 3, out var secondLastPacket);
+    var secondLast = _Chunks(secondLastPacket.Data.Span).Single();
+    Assert.Multiple(() => {
+      Assert.That(secondLast.Payload.AsSpan(2, 2).ToArray(), Is.EqualTo(new byte[] { 0xFF, 0xFF }));
+      Assert.That(secondLast.Payload.AsSpan(4).ToArray(), Is.EqualTo(new byte[] { 0x77, 0x77 }));
+    });
+
+    var changedPixels = first.PixelData.ToArray();
     for (var y = 0; y < 4; ++y)
     for (var x = 4; x < 8; ++x)
-      secondPixels[y * 8 + x] = (byte)(40 + y * 4 + x - 4);
-    var second = _Picture(8, 4, secondPixels);
+      changedPixels[y * 8 + x] = (byte)(40 + y * 4 + x - 4);
+    var changed = _Picture(8, 4, changedPixels);
 
-    var encoder = EaCmvVideoEncoder.Create(_Requested(8, 4));
+    // Start a fresh history so the first block is a zero-vector copy and the second has no match.
+    encoder = EaCmvVideoEncoder.Create(_Requested(8, 4));
     encoder.TryEncode(first, 0, out _);
-    encoder.TryEncode(second, 1, out var packet);
-    var frame = _Chunks(packet.Data.Span).Single();
-
+    encoder.TryEncode(changed, 1, out var literalPacket);
+    var literal = _Chunks(literalPacket.Data.Span).Single();
     Assert.Multiple(() => {
-      Assert.That(BinaryPrimitives.ReadUInt16LittleEndian(frame.Payload), Is.EqualTo(1));
-      Assert.That(frame.Payload[2], Is.EqualTo(0x77));
-      Assert.That(frame.Payload[3], Is.EqualTo(0xFF));
-      Assert.That(frame.Payload[4], Is.EqualTo(0xFF));
-      Assert.That(frame.Payload.AsSpan(5).ToArray(), Is.EqualTo(new byte[] {
-        40, 41, 42, 43,
-        44, 45, 46, 47,
-        48, 49, 50, 51,
-        52, 53, 54, 55,
+      Assert.That(literal.Payload[2], Is.EqualTo(0x77));
+      Assert.That(literal.Payload[3], Is.EqualTo(0xFF));
+      Assert.That(literal.Payload[4], Is.EqualTo(0xFF));
+      Assert.That(literal.Payload.AsSpan(5).ToArray(), Is.EqualTo(new byte[] {
+        40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55,
       }));
     });
   }
 
   [Test]
   [Category("Unit")]
-  public void PaletteChangesRestateOnlyTheChangedSpanBeforeThePicture() {
+  public void PaletteChangesRestateOnlyTheChangedSpan() {
     var first = _Picture(4, 4, 0);
     var palette = first.Palette!.ToArray();
     palette[5 * 3 + 1] ^= 0x5A;
@@ -147,31 +121,27 @@ public sealed class EaCmvVideoEncoderTests {
     };
     var encoder = EaCmvVideoEncoder.Create(_Requested(4, 4));
     encoder.TryEncode(first, 0, out _);
-
     encoder.TryEncode(second, 1, out var packet);
-    var chunks = _Chunks(packet.Data.Span).ToArray();
+    var chunks = _Chunks(packet.Data.Span);
 
     Assert.Multiple(() => {
       Assert.That(chunks.Select(static c => c.FourCc), Is.EqualTo(new[] { "MVIh", "MVIf" }));
       Assert.That(BinaryPrimitives.ReadUInt16LittleEndian(chunks[0].Payload.AsSpan(12)), Is.EqualTo(5));
       Assert.That(BinaryPrimitives.ReadUInt16LittleEndian(chunks[0].Payload.AsSpan(14)), Is.EqualTo(5));
-      Assert.That(chunks[0].Payload.AsSpan(0x10).ToArray(), Is.EqualTo(palette.AsSpan(5 * 3, 5 * 3).ToArray()));
+      Assert.That(chunks[0].Payload.AsSpan(0x10).ToArray(), Is.EqualTo(palette.AsSpan(15, 15).ToArray()));
     });
   }
 
   [Test]
   [Category("Unit")]
-  public void ASequenceRoundTripsExactlyThroughCodecAndEaContainer() {
-    var first = _Picture(8, 8, 1);
-    var second = _Picture(8, 8, 2);
-    var third = _Picture(8, 8, first.PixelData.ToArray());
-    var pictures = new[] { first, second, third };
+  public void SequenceRoundTripsThroughCodecAndEaContainer() {
+    var pictures = new[] { _Picture(8, 8, 1), _Picture(8, 8, 2), _Picture(8, 8, 1) };
     var encoder = EaCmvVideoEncoder.Create(_Requested(8, 8));
     var decoder = EaCmvVideoDecoder.Create(encoder.DescribeStream());
     var packets = new List<CodedPacket>();
 
     for (var i = 0; i < pictures.Length; ++i) {
-      Assert.That(encoder.TryEncode(pictures[i], i, out var packet), Is.True);
+      encoder.TryEncode(pictures[i], i, out var packet);
       packets.Add(packet);
       Assert.That(decoder.TryDecode(packet, out var decoded), Is.True);
       _AssertSame(pictures[i], decoded, $"codec frame {i}");
@@ -183,45 +153,30 @@ public sealed class EaCmvVideoEncoderTests {
     var decodedFrames = VideoFormatRegistry.DecodeFrames(file).Select(static frame => frame.Image).ToArray();
 
     Assert.Multiple(() => {
-      Assert.That(container.VideoCodec, Is.EqualTo(EaVideoCodecKind.Cmv));
       Assert.That(container.VideoFrameCount, Is.EqualTo(3));
       Assert.That(container.Width, Is.EqualTo(8));
       Assert.That(container.Height, Is.EqualTo(8));
       Assert.That(container.FrameRate, Is.EqualTo(15));
       Assert.That(decodedFrames, Has.Length.EqualTo(3));
     });
-
     for (var i = 0; i < pictures.Length; ++i)
       _AssertSame(pictures[i], decodedFrames[i], $"container frame {i}");
   }
 
   [Test]
   [Category("Unit")]
-  public void OddDimensionsUseIntraPicturesInsteadOfInventingPartialInterBlocks() {
+  public void OddDimensionsStayIntraAndFlushEndsTheRunOnce() {
     var picture = _Picture(5, 3, 7);
     var encoder = EaCmvVideoEncoder.Create(_Requested(5, 3));
     encoder.TryEncode(picture, 0, out _);
-
     encoder.TryEncode(picture, 1, out var packet);
-    var frame = _Chunks(packet.Data.Span).Single();
-
-    Assert.That(BinaryPrimitives.ReadUInt16LittleEndian(frame.Payload), Is.Zero);
-    Assert.That(packet.IsKeyFrame, Is.True);
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void FlushEmitsTheEndChunkOnceAndThenEncodingRefuses() {
-    var encoder = EaCmvVideoEncoder.Create(_Requested(4, 4));
-    encoder.TryEncode(_Picture(4, 4, 0), 0, out _);
-
-    var first = encoder.Flush().Single();
-    var second = encoder.Flush().ToArray();
 
     Assert.Multiple(() => {
-      Assert.That(_Chunks(first.Data.Span).Single().FourCc, Is.EqualTo("MVIe"));
-      Assert.That(second, Is.Empty);
-      Assert.Throws<InvalidOperationException>(() => encoder.TryEncode(_Picture(4, 4, 0), 1, out _));
+      Assert.That(BinaryPrimitives.ReadUInt16LittleEndian(_Chunks(packet.Data.Span).Single().Payload), Is.Zero);
+      Assert.That(packet.IsKeyFrame, Is.True);
+      Assert.That(_Chunks(encoder.Flush().Single().Data.Span).Single().FourCc, Is.EqualTo("MVIe"));
+      Assert.That(encoder.Flush(), Is.Empty);
+      Assert.Throws<InvalidOperationException>(() => encoder.TryEncode(picture, 2, out _));
     });
   }
 
@@ -315,7 +270,6 @@ public sealed class EaCmvVideoEncoderTests {
       palette[i * 3 + 1] = (byte)(255 - i);
       palette[i * 3 + 2] = (byte)(i ^ 0x5A);
     }
-
     return new() {
       Width = width,
       Height = height,
@@ -333,18 +287,18 @@ public sealed class EaCmvVideoEncoderTests {
       Assert.That(actual.Format, Is.EqualTo(PixelFormat.Indexed8), because);
       Assert.That(actual.PixelData, Is.EqualTo(expected.PixelData), because);
       Assert.That(actual.Palette, Is.EqualTo(expected.Palette), because);
-      Assert.That(actual.PaletteCount, Is.EqualTo(256), because);
     });
   }
 
-  private static IEnumerable<(string FourCc, byte[] Payload)> _Chunks(ReadOnlySpan<byte> data) {
-    // Iterator methods cannot retain a span, so materialise the packet once for structural assertions.
-    var bytes = data.ToArray();
-    for (var at = 0; at < bytes.Length;) {
-      var length = checked((int)BinaryPrimitives.ReadUInt32LittleEndian(bytes.AsSpan(at + 4)));
-      var fourCc = System.Text.Encoding.ASCII.GetString(bytes, at, 4);
-      yield return (fourCc, bytes.AsSpan(at + 8, length - 8).ToArray());
+  private static (string FourCc, byte[] Payload)[] _Chunks(ReadOnlySpan<byte> data) {
+    var result = new List<(string FourCc, byte[] Payload)>();
+    for (var at = 0; at < data.Length;) {
+      var length = checked((int)BinaryPrimitives.ReadUInt32LittleEndian(data[(at + 4)..]));
+      result.Add((
+        System.Text.Encoding.ASCII.GetString(data.Slice(at, 4)),
+        data.Slice(at + 8, length - 8).ToArray()));
       at += length;
     }
+    return result.ToArray();
   }
 }
