@@ -166,9 +166,7 @@ public static class PeResourceReader {
       });
     }
 
-    // The editor parser retains the exact Type -> Name -> Language path, including named selectors
-    // and all language variants, so use it for embedded images instead of the legacy flattened scan.
-    imageResources.AddRange(PeResourceEditor.GetEmbeddedImages(bytes));
+    _AddEmbeddedImages(bytes, otherResources, imageResources);
 
     return new PeResourceFile {
       IconGroups = groups,
@@ -180,6 +178,38 @@ public static class PeResourceReader {
   public static PeResourceFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
     return FromSpan(data);
+  }
+
+  private static void _AddEmbeddedImages(
+    byte[] data,
+    List<(int TypeId, int ResourceId, int Offset, int Size)> legacyResources,
+    List<PeImageResource> images
+  ) {
+    // Prefer the editor parser because it retains the exact Type -> Name -> Language path, including
+    // named selectors and all language variants. Keep the legacy flattened scan as a compatibility
+    // fallback for deliberately loose PE headers that this reader historically accepted.
+    try {
+      images.AddRange(PeResourceEditor.GetEmbeddedImages(data));
+      return;
+    } catch (InvalidDataException) {
+      // Fall through to the lenient legacy view.
+    } catch (InvalidOperationException) {
+      // Fall through to the lenient legacy view.
+    }
+
+    foreach (var (typeId, resourceId, offset, size) in legacyResources) {
+      var formatHint = _DetectImageSignature(data, offset, size);
+      if (formatHint is null)
+        continue;
+
+      images.Add(new PeImageResource {
+        ResourceType = PeImageResourceType.EmbeddedImage,
+        ResourceTypeId = typeId,
+        ResourceId = resourceId,
+        Data = data.AsSpan(offset, size).ToArray(),
+        FormatHint = formatHint,
+      });
+    }
   }
 
   private static bool _FindSectionForRva(
