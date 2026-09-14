@@ -7,13 +7,13 @@ using FileFormat.Core;
 
 namespace FileFormat.Codecs;
 
-/// <summary>Encodes interoperable RealVideo 1 (<c>RV10</c>) intra pictures.</summary>
+/// <summary>Encodes interoperable RealVideo 1 (<c>RV10</c>) intra and predicted pictures.</summary>
 /// <remarks>
 /// RealVideo 1 replaces H.263's picture/group headers and reuses its macroblock and block layers. This
 /// encoder deliberately writes the original revision-zero syntax: one explicitly positioned run per
-/// picture, no PB frames, and intra pictures only. Intra-only is larger than predictive coding but is
-/// a complete, independently decodable write path and avoids inventing a second motion-estimation
-/// implementation beside the ones already used by other codecs.
+/// picture and no PB frames. Pictures are grouped as one intra anchor followed by predicted pictures;
+/// the prediction and motion-vector writer is the same H.263 macroblock implementation the decoder
+/// shares, and every reference is reconstructed from the bytes just emitted before it is used again.
 /// </remarks>
 [VerifiedBy(ConformanceOracle.FFmpeg)]
 public sealed class RealVideoEncoder : IVideoCodecEncoder<RealVideoEncoder> {
