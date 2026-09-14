@@ -64,6 +64,8 @@ internal static class CineFormPictureDecoder {
       throw new NotSupportedException(
         $"This decoder reads CineForm's three-channel YUV/RGB and four-channel RGBA layouts; this frame states ChannelCount {channelCount}.");
 
+    _ValidateHeaderLayout(encodedFormat, precision, channelCount);
+
     // With a raw index present, begin after its size words. Every tag the channel decoder needs sits
     // after the index; starting at packet zero would reinterpret those size words as tag/value pairs.
     // Sparse VC-5-style fixtures have no index and therefore keep the historical start at zero.
@@ -73,15 +75,6 @@ internal static class CineFormPictureDecoder {
       channels[i] = CineFormChannelDecoder.Parse(data, ref position);
 
     var format = _ResolveFormat(encodedFormat, channels);
-    if (format == CineFormEncodedFormat.Bayer)
-      throw new NotSupportedException(
-        "CineForm Bayer/CFA frames need the format's four-channel CFA reconstruction stage; treating those channels as RGBA would produce a plausible but wrong picture.");
-
-    var expectedChannels = format == CineFormEncodedFormat.Rgba4444 ? 4 : 3;
-    if (channelCount != expectedChannels)
-      throw new InvalidDataException(
-        $"CineForm EncodedFormat {(int)format} ({format}) needs {expectedChannels} channels, but the frame states {channelCount}.");
-
     var codedPrecision = format == CineFormEncodedFormat.Yuv422 ? 10 : 12;
     if (precision != 0 && precision != codedPrecision)
       throw new InvalidDataException(
@@ -108,15 +101,47 @@ internal static class CineFormPictureDecoder {
     };
   }
 
+  private static void _ValidateHeaderLayout(CineFormEncodedFormat encodedFormat, int precision, int channelCount) {
+    switch (encodedFormat) {
+      case CineFormEncodedFormat.Unspecified:
+        return;
+
+      case CineFormEncodedFormat.Bayer:
+        throw new NotSupportedException(
+          "CineForm Bayer/CFA frames need the format's four-channel CFA reconstruction stage; treating those channels as RGBA would produce a plausible but wrong picture.");
+
+      case CineFormEncodedFormat.Yuv422:
+        if (channelCount != 3)
+          throw new InvalidDataException($"CineForm YUV 4:2:2 needs three channels, but the frame states {channelCount}.");
+        if (precision != 0 && precision != 10)
+          throw new InvalidDataException($"CineForm YUV 4:2:2 is coded at 10 bits, but the frame states Precision {precision}.");
+        return;
+
+      case CineFormEncodedFormat.Rgb444:
+        if (channelCount != 3)
+          throw new InvalidDataException($"CineForm RGB 4:4:4 needs three channels, but the frame states {channelCount}.");
+        if (precision != 0 && precision != 12)
+          throw new InvalidDataException($"CineForm RGB 4:4:4 is coded at 12 bits, but the frame states Precision {precision}.");
+        return;
+
+      case CineFormEncodedFormat.Rgba4444:
+        if (channelCount != 4)
+          throw new InvalidDataException($"CineForm RGBA 4:4:4:4 needs four channels, but the frame states {channelCount}.");
+        if (precision != 0 && precision != 12)
+          throw new InvalidDataException($"CineForm RGBA 4:4:4:4 is coded at 12 bits, but the frame states Precision {precision}.");
+        return;
+
+      default:
+        throw new NotSupportedException($"CineForm EncodedFormat {(int)encodedFormat} is not known to this decoder.");
+    }
+  }
+
   private static CineFormEncodedFormat _ResolveFormat(
     CineFormEncodedFormat encodedFormat,
     CineFormChannelDecoder.ParsedChannel[] channels) {
 
     if (encodedFormat != CineFormEncodedFormat.Unspecified)
-      return encodedFormat switch {
-        CineFormEncodedFormat.Yuv422 or CineFormEncodedFormat.Bayer or CineFormEncodedFormat.Rgb444 or CineFormEncodedFormat.Rgba4444 => encodedFormat,
-        _ => throw new NotSupportedException($"CineForm EncodedFormat {(int)encodedFormat} is not known to this decoder."),
-      };
+      return encodedFormat;
 
     if (channels.Length == 4)
       return CineFormEncodedFormat.Rgba4444;
