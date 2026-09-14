@@ -213,8 +213,9 @@ internal sealed class H263PictureHeader {
       if (reader.ReadBit() != 1)
         throw new InvalidDataException("The anti-emulation marker in H.263 CPFMT is zero.");
       var heightIndication = reader.ReadBits(9);
-      if (heightIndication == 0)
-        throw new InvalidDataException("H.263 CPFMT states picture height indication zero, which is forbidden.");
+      if (heightIndication is < 1 or > 288)
+        throw new InvalidDataException(
+          $"H.263 CPFMT states picture height indication {heightIndication}; PHI must be 1 through 288 (4 through 1152 lines). ");
       height = heightIndication * 4;
       rowsPerGroup = _GroupRows(height);
 
@@ -223,6 +224,9 @@ internal sealed class H263PictureHeader {
         var parHeight = reader.ReadBits(8);
         if (parWidth == 0 || parHeight == 0)
           throw new InvalidDataException("H.263 EPAR states a zero pixel-aspect-ratio component, which is forbidden.");
+        if (_GreatestCommonDivisor(parWidth, parHeight) != 1)
+          throw new InvalidDataException(
+            $"H.263 EPAR states {parWidth}:{parHeight}; PAR Width and PAR Height must be relatively prime.");
       }
     } else {
       (width, height, rowsPerGroup) = _StandardFormat(sourceFormat);
@@ -260,6 +264,12 @@ internal sealed class H263PictureHeader {
       EnhancementLayerNumber = enhancementLayerNumber,
       ReferenceLayerNumber = referenceLayerNumber,
     };
+  }
+
+  private static int _GreatestCommonDivisor(int left, int right) {
+    while (right != 0)
+      (left, right) = (right, left % right);
+    return left;
   }
 
   private static int _GroupRows(int height) => height <= 400 ? 1 : height <= 800 ? 2 : 4;
