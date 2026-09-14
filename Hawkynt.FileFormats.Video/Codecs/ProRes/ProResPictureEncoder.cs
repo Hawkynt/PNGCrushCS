@@ -19,17 +19,12 @@ namespace FileFormat.Codecs.ProRes;
 /// affordable.
 /// <para/>
 /// <b>The rate decision is one index for the whole picture.</b> A profile allows a macroblock so many
-/// bits on average (<see cref="ProResProfile.BitsPerMacroblock"/>), which gives the picture a byte
-/// budget; the quantisation index is the smallest one whose coded slices together fit it, found by
+/// colour bits on average (<see cref="ProResProfile.BitsPerMacroblock"/>), which gives the picture a
+/// byte budget; the quantisation index is the smallest one whose coded colour fits it, found by
 /// bisection over the 1 to 224 that 6.3.1 permits and then confirmed, because coded size falls with
-/// the index without being strictly monotone in it.
-/// <para/>
-/// One index rather than one per slice, because the alternative is worse in both directions. Capping
-/// each slice at its own share of the budget leaves the easy slices' unspent share unspent and
-/// quantises the hard ones far past what the picture as a whole could afford — measured, that coded a
-/// detailed 1280x718 picture to under a third of its allowance while pushing the busiest slices to a
-/// quantisation index above a hundred. Spending the budget where the picture needs it is what a
-/// picture-wide index does for nothing.
+/// the index without being strictly monotone in it. Lossless alpha is deliberately outside that
+/// budget: its size is determined by the matte and Apple's published 4444 rates are stated without
+/// alpha.
 /// <para/>
 /// The transform runs once per picture and only the quantisation and the entropy coding are repeated,
 /// so the search costs a fraction of the coding it decides.
@@ -39,8 +34,11 @@ internal static class ProResPictureEncoder {
   /// <summary>The eight bytes of a picture header, RDD 36:2022, 5.2.1.</summary>
   private const int _PICTURE_HEADER_SIZE = 8;
 
-  /// <summary>The slice header this writes, RDD 36:2022, 5.3.1, there being no alpha to size.</summary>
+  /// <summary>The six colour-size bytes of a slice header when no alpha is present.</summary>
   private const int _SLICE_HEADER_SIZE = 6;
+
+  /// <summary>The two extra bytes that state the red-difference size when alpha follows it.</summary>
+  private const int _ALPHA_SLICE_HEADER_SIZE = 8;
 
   /// <summary>The largest quantisation index RDD 36:2022, 6.3.1 permits.</summary>
   private const int _MAXIMUM_QUANTISATION_INDEX = 224;
@@ -48,36 +46,48 @@ internal static class ProResPictureEncoder {
   /// <summary>The largest coded size a slice's own table entry can state.</summary>
   private const int _MAXIMUM_SLICE_SIZE = 0xFFFF;
 
-  /// <summary>One slice's transformed coefficients, before any quantisation has been decided.</summary>
-  private sealed record Slice(double[] Luma, double[] Cb, double[] Cr, int LumaBlocks, int ChromaBlocks);
+  /// <summary>One slice's transformed coefficients and optional already-coded lossless alpha.</summary>
+  private sealed record Slice(
+    double[] Luma,
+    double[] Cb,
+    double[] Cr,
+    byte[] Alpha,
+    int LumaBlocks,
+    int ChromaBlocks);
 
-  /// <summary>
-  /// Codes one picture.
-  /// </summary>
+  /// <summary>Codes one frame picture or one field picture.</summary>
   /// <param name="planes">The component samples, padded out to whole macroblocks.</param>
-  /// <param name="profile">The profile whose weights and data rate apply.</param>
+  /// <param name="profile">The profile whose weights and colour data rate apply.</param>
   /// <param name="widthInMacroblocks">The picture's width in macroblocks.</param>
-  /// <param name="heightInMacroblocks">The picture's height in macroblocks.</param>
+  /// <param name="heightInMacroblocks">The picture's coded height in macroblocks.</param>
+  /// <param name="pictureHeight">The picture's actual height before bottom padding.</param>
   /// <param name="log2DesiredSliceSize">The picture header's <c>log2_desired_slice_size_in_mb</c>.</param>
+  /// <param name="interlaced">Whether this is a field picture, selecting Figure 5's coefficient scan.</param>
   internal static byte[] Encode(
     ProResPlanes planes,
     ProResProfile profile,
     int widthInMacroblocks,
     int heightInMacroblocks,
-    int log2DesiredSliceSize) {
-    var sliceSizes = ProResSliceLayout.Build(widthInMacroblocks, log2DesiredSliceSize);
-    var slices = _Transform(planes, sliceSizes, heightInMacroblocks);
+    int pictureHeight,
+    int log2DesiredSliceSize,
+    bool interlaced) {
+    if (pictureHeight <= 0 || pictureHeight > heightInMacroblocks * 16)
+      throw new ArgumentOutOfRangeException(nameof(pictureHeight));
 
-    var budget = (profile.BitsPerMacroblock * widthInMacroblocks * heightInMacroblocks + 7) / 8;
+    var sliceSizes = ProResSliceLayout.Build(widthInMacroblocks, log2DesiredSliceSize);
+    var slices = _Transform(planes, sliceSizes, heightInMacroblocks, pictureHeight);
+    var scan = interlaced ? ProResScan.Interlaced : ProResScan.Progressive;
+
+    var budget = ((long)profile.BitsPerMacroblock * widthInMacroblocks * heightInMacroblocks + 7) / 8;
     var writer = new ProResBitWriter();
     var scanned = _ScratchFor(slices);
-    var index = _ChooseQuantisationIndex(slices, profile, budget, writer, scanned);
+    var index = _ChooseQuantisationIndex(slices, profile, budget, writer, scanned, scan);
 
     var coded = new byte[slices.Length][];
     var total = 0;
     for (var i = 0; i < slices.Length; ++i) {
-      coded[i] = _EncodeSlice(slices[i], profile, index, writer, scanned);
-      total += coded[i].Length;
+      coded[i] = _EncodeSlice(slices[i], profile, index, writer, scanned, scan);
+      total = checked(total + coded[i].Length);
     }
 
     return _Assemble(coded, total, log2DesiredSliceSize);
@@ -85,7 +95,11 @@ internal static class ProResPictureEncoder {
 
   /// <summary>Lays the coded slices out behind the picture header and its slice table.</summary>
   private static byte[] _Assemble(byte[][] slices, int total, int log2DesiredSliceSize) {
-    var pictureSize = _PICTURE_HEADER_SIZE + slices.Length * 2 + total;
+    if (slices.Length > ushort.MaxValue)
+      throw new InvalidDataException(
+        $"A ProRes picture contains {slices.Length} slices, but its picture header can state at most {ushort.MaxValue}.");
+
+    var pictureSize = checked(_PICTURE_HEADER_SIZE + slices.Length * 2 + total);
     var picture = new byte[pictureSize];
 
     // 5.2.1. The header is the eight bytes of its own fixed fields, so the size field holds eight and
@@ -105,73 +119,100 @@ internal static class ProResPictureEncoder {
     return picture;
   }
 
-  /// <summary>
-  /// The smallest quantisation index whose coded picture fits the profile's budget.
-  /// </summary>
-  /// <remarks>
-  /// Bisection first, on the assumption that a coarser quantiser codes to fewer bytes; then the
-  /// answer is confirmed and raised one step at a time where it was not, because that assumption
-  /// holds overwhelmingly but not universally — a coarser quantiser can lengthen a run of zeroes past
-  /// the point where its codebook adapts and cost a bit more than the finer one did.
-  /// </remarks>
+  /// <summary>The smallest quantisation index whose coded colour picture fits the profile's budget.</summary>
   private static int _ChooseQuantisationIndex(
-    Slice[] slices, ProResProfile profile, int budget, ProResBitWriter writer, int[] scanned) {
+    Slice[] slices,
+    ProResProfile profile,
+    long budget,
+    ProResBitWriter writer,
+    int[] scanned,
+    int[] scan) {
     var low = 1;
     var high = _MAXIMUM_QUANTISATION_INDEX;
 
     while (low < high) {
       var middle = (low + high) / 2;
-      if (_PictureSize(slices, profile, middle, writer, scanned) <= budget)
+      if (_PictureSize(slices, profile, middle, writer, scanned, scan) <= budget)
         high = middle;
       else
         low = middle + 1;
     }
 
-    while (low < _MAXIMUM_QUANTISATION_INDEX && _PictureSize(slices, profile, low, writer, scanned) > budget)
+    while (low < _MAXIMUM_QUANTISATION_INDEX && _PictureSize(slices, profile, low, writer, scanned, scan) > budget)
       ++low;
 
     return low;
   }
 
-  private static int _PictureSize(
-    Slice[] slices, ProResProfile profile, int index, ProResBitWriter writer, int[] scanned) {
-    var total = 0;
+  /// <summary>
+  /// Measures only colour. Alpha has no quantiser and therefore cannot participate in choosing one.
+  /// </summary>
+  private static long _PictureSize(
+    Slice[] slices,
+    ProResProfile profile,
+    int index,
+    ProResBitWriter writer,
+    int[] scanned,
+    int[] scan) {
+    long total = 0;
     foreach (var slice in slices)
       total += _SLICE_HEADER_SIZE
-        + _ComponentSize(profile.LumaMatrix, slice.Luma, slice.LumaBlocks, index, writer, scanned)
-        + _ComponentSize(profile.ChromaMatrix, slice.Cb, slice.ChromaBlocks, index, writer, scanned)
-        + _ComponentSize(profile.ChromaMatrix, slice.Cr, slice.ChromaBlocks, index, writer, scanned);
+        + _ComponentSize(profile.LumaMatrix, slice.Luma, slice.LumaBlocks, index, writer, scanned, scan)
+        + _ComponentSize(profile.ChromaMatrix, slice.Cb, slice.ChromaBlocks, index, writer, scanned, scan)
+        + _ComponentSize(profile.ChromaMatrix, slice.Cr, slice.ChromaBlocks, index, writer, scanned, scan);
 
     return total;
   }
 
   /// <summary>Codes one slice at the picture's quantisation index, RDD 36:2022, 5.3.1.</summary>
   private static byte[] _EncodeSlice(
-    Slice slice, ProResProfile profile, int index, ProResBitWriter writer, int[] scanned) {
-    var luma = _Component(profile.LumaMatrix, slice.Luma, slice.LumaBlocks, index, writer, scanned);
-    var cb = _Component(profile.ChromaMatrix, slice.Cb, slice.ChromaBlocks, index, writer, scanned);
-    var cr = _Component(profile.ChromaMatrix, slice.Cr, slice.ChromaBlocks, index, writer, scanned);
+    Slice slice,
+    ProResProfile profile,
+    int index,
+    ProResBitWriter writer,
+    int[] scanned,
+    int[] scan) {
+    var luma = _Component(profile.LumaMatrix, slice.Luma, slice.LumaBlocks, index, writer, scanned, scan);
+    var cb = _Component(profile.ChromaMatrix, slice.Cb, slice.ChromaBlocks, index, writer, scanned, scan);
+    var cr = _Component(profile.ChromaMatrix, slice.Cr, slice.ChromaBlocks, index, writer, scanned, scan);
+    var hasAlpha = slice.Alpha.Length != 0;
+    var headerSize = hasAlpha ? _ALPHA_SLICE_HEADER_SIZE : _SLICE_HEADER_SIZE;
 
-    var size = _SLICE_HEADER_SIZE + luma.Length + cb.Length + cr.Length;
+    var size = checked(headerSize + luma.Length + cb.Length + cr.Length + slice.Alpha.Length);
     if (size > _MAXIMUM_SLICE_SIZE)
       throw new InvalidDataException(
         $"A ProRes slice coded to {size} bytes, which its two-byte table entry cannot state.");
 
     var bytes = new byte[size];
-    bytes[0] = _SLICE_HEADER_SIZE << 3;
+    bytes[0] = (byte)(headerSize << 3);
     bytes[1] = (byte)index;
     BinaryPrimitives.WriteUInt16BigEndian(bytes.AsSpan(2), (ushort)luma.Length);
     BinaryPrimitives.WriteUInt16BigEndian(bytes.AsSpan(4), (ushort)cb.Length);
-    luma.CopyTo(bytes, _SLICE_HEADER_SIZE);
-    cb.CopyTo(bytes, _SLICE_HEADER_SIZE + luma.Length);
-    cr.CopyTo(bytes, _SLICE_HEADER_SIZE + luma.Length + cb.Length);
+    if (hasAlpha)
+      BinaryPrimitives.WriteUInt16BigEndian(bytes.AsSpan(6), (ushort)cr.Length);
+
+    var at = headerSize;
+    luma.CopyTo(bytes, at);
+    at += luma.Length;
+    cb.CopyTo(bytes, at);
+    at += cb.Length;
+    cr.CopyTo(bytes, at);
+    at += cr.Length;
+    if (hasAlpha)
+      slice.Alpha.CopyTo(bytes, at);
 
     return bytes;
   }
 
   private static int _ComponentSize(
-    byte[] weights, double[] transformed, int blockCount, int index, ProResBitWriter writer, int[] scanned) {
-    _Quantise(weights, transformed, blockCount, index, scanned);
+    byte[] weights,
+    double[] transformed,
+    int blockCount,
+    int index,
+    ProResBitWriter writer,
+    int[] scanned,
+    int[] scan) {
+    _Quantise(weights, transformed, blockCount, index, scanned, scan);
     writer.Reset();
     ProResCoefficients.Encode(writer, scanned.AsSpan(0, blockCount * 64), blockCount);
 
@@ -179,8 +220,14 @@ internal static class ProResPictureEncoder {
   }
 
   private static byte[] _Component(
-    byte[] weights, double[] transformed, int blockCount, int index, ProResBitWriter writer, int[] scanned) {
-    _Quantise(weights, transformed, blockCount, index, scanned);
+    byte[] weights,
+    double[] transformed,
+    int blockCount,
+    int index,
+    ProResBitWriter writer,
+    int[] scanned,
+    int[] scan) {
+    _Quantise(weights, transformed, blockCount, index, scanned, scan);
     writer.Reset();
     ProResCoefficients.Encode(writer, scanned.AsSpan(0, blockCount * 64), blockCount);
 
@@ -196,21 +243,14 @@ internal static class ProResPictureEncoder {
     return new int[largest * 64];
   }
 
-  /// <summary>
-  /// Quantises a component's transformed blocks straight into the scanned order they are coded in.
-  /// </summary>
-  /// <remarks>
-  /// The inverse of the one pass <see cref="ProResBlocks.Reconstruct"/> does: 7.3 gives
-  /// <c>F[v][u] = QF[v][u] · W[v][u] · qScale / 8</c>, so what goes into the bitstream is
-  /// <c>F · 8 / (W · qScale)</c> to nearest, and 7.2.1's index calculation decides where. Doing the
-  /// scan here rather than afterwards means the coefficients are already in the order the run-length
-  /// coding wants them, which is by frequency across the whole slice and not block by block.
-  /// <para/>
-  /// The scan is the progressive one: this encoder writes <c>interlace_mode</c> 0, and 7.2.2 makes
-  /// that the choice of scan.
-  /// </remarks>
-  private static void _Quantise(byte[] weights, double[] transformed, int blockCount, int index, int[] scanned) {
-    var scan = ProResScan.Progressive;
+  /// <summary>Quantises transformed blocks straight into the scan order they are coded in.</summary>
+  private static void _Quantise(
+    byte[] weights,
+    double[] transformed,
+    int blockCount,
+    int index,
+    int[] scanned,
+    int[] scan) {
     var scale = ProResPictureDecoder.QuantisationScale(index);
 
     Array.Clear(scanned, 0, blockCount * 64);
@@ -231,23 +271,43 @@ internal static class ProResPictureEncoder {
   }
 
   /// <summary>Transforms every block of every slice of the picture, in the order they are coded in.</summary>
-  private static Slice[] _Transform(ProResPlanes planes, int[] sliceSizes, int heightInMacroblocks) {
+  private static Slice[] _Transform(
+    ProResPlanes planes,
+    int[] sliceSizes,
+    int heightInMacroblocks,
+    int pictureHeight) {
     var chromaBlocks = planes.ChromaWidth == planes.Width ? 4 : 2;
-    var slices = new Slice[heightInMacroblocks * sliceSizes.Length];
+    var slices = new Slice[checked(heightInMacroblocks * sliceSizes.Length)];
     var at = 0;
 
     for (var row = 0; row < heightInMacroblocks; ++row) {
       var macroblock = 0;
+      var sliceHeight = Math.Min(16, pictureHeight - row * 16);
+      if (sliceHeight <= 0)
+        throw new InvalidDataException("The coded ProRes macroblock rows exceed the picture height they describe.");
 
       for (var j = 0; j < sliceSizes.Length; ++j) {
-        slices[at++] = new(
-          _TransformComponent(planes, 0, 4, sliceSizes[j], macroblock, row),
-          _TransformComponent(planes, 1, chromaBlocks, sliceSizes[j], macroblock, row),
-          _TransformComponent(planes, 2, chromaBlocks, sliceSizes[j], macroblock, row),
-          4 * sliceSizes[j],
-          chromaBlocks * sliceSizes[j]);
+        var sliceMacroblocks = sliceSizes[j];
+        var alpha = planes.Alpha is null
+          ? []
+          : ProResAlpha.Encode(
+            planes.Alpha,
+            planes.AlphaBitDepth,
+            planes.Width,
+            macroblock * 16,
+            row * 16,
+            sliceMacroblocks * 16,
+            sliceHeight);
 
-        macroblock += sliceSizes[j];
+        slices[at++] = new(
+          _TransformComponent(planes, 0, 4, sliceMacroblocks, macroblock, row),
+          _TransformComponent(planes, 1, chromaBlocks, sliceMacroblocks, macroblock, row),
+          _TransformComponent(planes, 2, chromaBlocks, sliceMacroblocks, macroblock, row),
+          alpha,
+          4 * sliceMacroblocks,
+          chromaBlocks * sliceMacroblocks);
+
+        macroblock += sliceMacroblocks;
       }
     }
 
