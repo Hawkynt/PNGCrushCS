@@ -28,9 +28,11 @@ namespace FileFormat.Codecs;
 /// backward reference: prediction is always from the previously reconstructed picture.
 /// <para/>
 /// For Annex D a double-width, double-height still is separated according to Figure D.1 into sub-images
-/// 0, 1, 2 and 3, each coded intra with HI_RES zero and TR equal to its sub-image number. The four
-/// picture syntaxes share one bit writer, so no byte padding is inserted between them. The last decoded
-/// sub-image remains the reference when motion video resumes, exactly as Annex D.3 requires.
+/// 0, 1, 2 and 3. Each carries HI_RES zero and TR equal to its sub-image number, and the same ordinary
+/// macroblock decision logic is used: where a reference exists it may choose intra or prediction from
+/// the previously reconstructed coded frame, exactly as Annex D.5 permits. The four picture syntaxes
+/// share one bit writer, so no byte padding is inserted between them. The last reconstructed sub-image
+/// remains the reference when motion video resumes, exactly as Annex D.3 requires.
 /// <para/>
 /// <b>The ordinary temporal reference is a clock, not a frame counter.</b> Clause 3.1 fixes the source
 /// picture clock at 30000/1001 Hz and clause 4.2.1.2 says TR advances by one plus every source picture
@@ -200,16 +202,17 @@ public sealed class H261VideoEncoder : IVideoCodecEncoder<H261VideoEncoder> {
     return true;
   }
 
-  /// <summary>Writes one Annex D still as four unpadded, sequential intra sub-pictures.</summary>
+  /// <summary>Writes one Annex D still as four unpadded, sequential sub-pictures.</summary>
   private bool _TryEncodeStillImage(RawImage frame, long? presentationTimestamp, out CodedPacket packet) {
     var subImages = this._ToStillImageSubImages(frame);
     var writer = new H261BitWriter();
     var reference = this._reference;
+    var independentlyDecodable = reference == null;
 
     for (var index = 0; index < subImages.Length; ++index) {
       var target = new H263Frame(this._macroblockWidth, this._macroblockHeight);
       var encoder = new H261PictureEncoder(
-        intra: true,
+        intra: false,
         temporalReference: index,
         quantiser: _QUANTISER,
         source: subImages[index],
@@ -235,7 +238,7 @@ public sealed class H261VideoEncoder : IVideoCodecEncoder<H261VideoEncoder> {
       PresentationTimestamp: presentationTimestamp,
       DecodeTimestamp: presentationTimestamp,
       Duration: 1,
-      IsKeyFrame: true);
+      IsKeyFrame: independentlyDecodable);
 
     return true;
   }
