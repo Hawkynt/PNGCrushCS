@@ -14,10 +14,10 @@ public enum Ffv1EntropyCoder {
 
 /// <summary>Which standard FFV1 context model is written.</summary>
 public enum Ffv1ContextModel {
-  /// <summary>Three eleven-level neighbour quantisers; 666 contexts for eight-bit samples.</summary>
+  /// <summary>The smaller standard context model.</summary>
   Small = 0,
 
-  /// <summary>Two eleven-level and three five-level neighbour quantisers; 7563 contexts for eight-bit samples.</summary>
+  /// <summary>The larger standard context model.</summary>
   Large = 1,
 }
 
@@ -26,6 +26,13 @@ public sealed record Ffv1EncoderOptions {
 
   /// <summary>FFV1 bitstream version. RFC 9043 defines versions 0, 1 and 3.</summary>
   public int Version { get; init; } = 3;
+
+  /// <summary>
+  /// Number of significant bits in each source sample, or zero to infer it from the chosen
+  /// <see cref="FileFormat.Core.PixelFormat"/>. A wider 16-bit storage format may be used for any
+  /// nine-through-sixteen-bit FFV1 stream as long as all supplied sample values fit this width.
+  /// </summary>
+  public int BitsPerRawSample { get; init; }
 
   /// <summary>Entropy coder for prediction differences.</summary>
   public Ffv1EntropyCoder EntropyCoder { get; init; } = Ffv1EntropyCoder.Range;
