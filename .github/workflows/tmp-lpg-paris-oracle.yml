@@ -1,0 +1,82 @@
+name: Temporary LPG Paris oracle research
+
+on:
+  push:
+    branches:
+      - research/lpg-paris-oracle
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Extract Paris installation and module identifiers
+        shell: bash
+        run: |
+          set -euo pipefail
+          ROOT=/tmp/paris
+          mkdir -p "$ROOT"
+          cd "$ROOT"
+
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq poppler-utils
+
+          echo '=== Internet Archive manual file inventories ==='
+          python3 - <<'PY'
+          import json, pathlib, urllib.parse, urllib.request
+          ids=['manualzilla-id-5804561','manualzilla-id-5890906']
+          root=pathlib.Path('/tmp/paris')
+          for ident in ids:
+              print('\n---',ident,'---')
+              with urllib.request.urlopen('https://archive.org/metadata/'+ident,timeout=60) as r:
+                  meta=json.load(r)
+              files=meta.get('files',[])
+              for f in files:
+                  n=f.get('name','')
+                  if n.lower().endswith(('.txt','.pdf','.xml','.json','.gz')):
+                      print(n, 'size='+str(f.get('size','')))
+              candidates=[f.get('name','') for f in files if f.get('name','').lower().endswith('_djvu.txt')]
+              if not candidates:
+                  candidates=[f.get('name','') for f in files if f.get('name','').lower().endswith('.txt') and 'meta' not in f.get('name','').lower()]
+              for n in candidates[:2]:
+                  u='https://archive.org/download/'+ident+'/'+urllib.parse.quote(n)
+                  dst=root/(ident+'-'+pathlib.Path(n).name)
+                  print('DOWNLOAD',u)
+                  try:
+                      with urllib.request.urlopen(u,timeout=90) as r: dst.write_bytes(r.read())
+                  except Exception as e: print('DOWNLOAD-FAIL',type(e).__name__,e)
+          PY
+
+          echo '=== Xerox Conversion Manager manual ==='
+          curl -fL --retry 3 -o conversion.pdf 'https://download.support.xerox.com/pub/docs/Paris/userdocs/any-os/en/Paris_Converter_TM.pdf'
+          pdftotext -layout conversion.pdf conversion.txt
+
+          cat ./*.txt > all-manuals.txt || true
+
+          echo '=== literal filename-like tokens ==='
+          python3 - <<'PY'
+          import re
+          from pathlib import Path
+          s=Path('all-manuals.txt').read_text(errors='ignore')
+          pats=[
+              r'(?i)\b[A-Z0-9_$~+.-]{2,}\.(?:exe|dll|com|bat|ini|cfg|cnf|dat|pak|lpg|img|lgo|grf|pcx|bmp|tif|tiff)\b',
+              r'(?i)\b(?:[A-Z]:)?[\\/][^\r\n<>"\x27]{1,100}(?:PARIS|XLPRINT)[^\r\n<>"\x27]{0,100}',
+          ]
+          hits=set()
+          for p in pats:
+              hits.update(m.group(0).strip() for m in re.finditer(p,s))
+          for h in sorted(hits,key=str.lower): print(h)
+          PY
+
+          echo '=== contexts around executables, DLLs, install layout, converter and LPG ==='
+          grep -inEi -B4 -A8 '\.(exe|dll|com|bat|ini|cfg|cnf)\b|conversion manager|converter|PARIS[\\/]|XLPRINT|\.LPG\b|GRF directory|resource manager|install(ed|ation)?' all-manuals.txt | head -3000 || true
+
+          echo '=== likely program/module names ==='
+          python3 - <<'PY'
+          import re
+          from pathlib import Path
+          s=Path('all-manuals.txt').read_text(errors='ignore')
+          words=set()
+          for m in re.finditer(r'(?i)\b[A-Z][A-Z0-9_$~+.-]{1,}\.(?:exe|dll|com|bat|ini|cfg|cnf)\b',s):
+              words.add(m.group(0))
+          for w in sorted(words,key=str.lower): print(w)
+          PY
