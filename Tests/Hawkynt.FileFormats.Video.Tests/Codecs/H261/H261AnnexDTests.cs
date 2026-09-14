@@ -83,7 +83,7 @@ public sealed class H261AnnexDTests {
   [Category("Unit")]
   public void TheEncoderWritesFourSequentialUnpaddedAnnexDSubPictures() {
     var encoder = H261VideoEncoder.Create(_Stream(176, 144));
-    Assert.That(encoder.TryEncode(_StillPicture(352, 288), 0, out var packet), Is.True);
+    Assert.That(encoder.TryEncodeStillImage(_StillPicture(352, 288), 0, out var packet), Is.True);
     Assert.That(packet.IsKeyFrame, Is.True);
 
     var reader = new H263BitReader(packet.Data.Span);
@@ -120,7 +120,7 @@ public sealed class H261AnnexDTests {
     var encoder = H261VideoEncoder.Create(_Stream(176, 144));
     var decoder = H261VideoDecoder.Create(encoder.DescribeStream());
 
-    Assert.That(encoder.TryEncode(_StillPicture(352, 288, luminance), 0, out var packet), Is.True);
+    Assert.That(encoder.TryEncodeStillImage(_StillPicture(352, 288, luminance), 0, out var packet), Is.True);
     Assert.That(decoder.TryDecode(packet, out var frame), Is.True);
 
     Assert.Multiple(() => {
@@ -130,6 +130,20 @@ public sealed class H261AnnexDTests {
       Assert.That(_Red(frame, 0, 1), Is.EqualTo(_Grey(luminance[1])).Within(2));
       Assert.That(_Red(frame, 1, 1), Is.EqualTo(_Grey(luminance[2])).Within(2));
       Assert.That(_Red(frame, 1, 0), Is.EqualTo(_Grey(luminance[3])).Within(2));
+    });
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void AnnexDStillImageEncodingRequiresExactlyDoubleTheStreamDimensions() {
+    var encoder = H261VideoEncoder.Create(_Stream(176, 144));
+
+    var failure = Assert.Throws<InvalidDataException>(
+      () => encoder.TryEncodeStillImage(_StillPicture(176, 144), 0, out _));
+
+    Assert.Multiple(() => {
+      Assert.That(failure!.Message, Does.Contain("352x288"));
+      Assert.That(failure.Message, Does.Contain("176x144"));
     });
   }
 
@@ -162,12 +176,11 @@ public sealed class H261AnnexDTests {
     return new() { Width = width, Height = height, Format = PixelFormat.Yuv420P8, PixelData = planes };
   }
 
-  private static int _SubImageAt(int x, int y) => ((x & 1), (y & 1)) switch {
-    (0, 0) => 0,
-    (0, 1) => 1,
-    (1, 1) => 2,
-    (1, 0) => 3,
-  };
+  private static int _SubImageAt(int x, int y) {
+    var oddX = (x & 1) != 0;
+    var oddY = (y & 1) != 0;
+    return oddY ? oddX ? 2 : 1 : oddX ? 3 : 0;
+  }
 
   private static byte _Red(RawImage image, int x, int y) => image.PixelData[(y * image.Width + x) * 3];
 
