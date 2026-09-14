@@ -7,55 +7,24 @@ using FileFormat.Core;
 
 namespace FileFormat.Codecs;
 
-/// <summary>
-/// Decodes VC-1 video, SMPTE 421M — the codec Windows Media Video 9 is, under its four-character code
-/// <c>WMV3</c>.
-/// </summary>
+/// <summary>Decodes VC-1 / Windows Media Video 9 progressive Simple and Main profile pictures.</summary>
 /// <remarks>
-/// <b>Intra pictures of the Simple and Main profiles, and nothing else.</b> That is the first rung of
-/// the format and it is where this stops. What it covers is the whole of SMPTE 421M 8.1: the picture
-/// layer of Figure 13, the predicted coded block pattern of 8.1.2.1, the differentially coded DC of
-/// 8.1.3.1 with both of its tables, the three-dimensional run-level AC coding of 8.1.3.4 with all
-/// eight coding sets and all three escape modes, DC and AC prediction with the scan each implies, both
-/// quantisers, the integer inverse transform of Annex A, and the overlap smoothing of 8.5.1.
+/// I and BI pictures use the complete intra block path. P pictures additionally support 1-MV zero-differential
+/// prediction with transformed residuals, and B pictures support direct prediction from both anchor pictures with
+/// transformed residuals. Anchor pictures are retained in coded order and released in display order, so a coded
+/// <c>I, P, B</c> sequence is displayed as <c>I, B, P</c> as SMPTE 421M requires.
 /// <para/>
-/// The sequence header is not in the bitstream at all. Simple and Main profile state it as the
-/// thirty-two bit <c>STRUCT_C</c> of Annex J, which the container carries as the stream's private
-/// data — so a Windows Media Video stream cannot be decoded from its packets alone, and the demuxer's
-/// habit of handing the codec's private data across untouched is what makes it decodable at all.
-/// <para/>
-/// <b>What it does not do refuses by name.</b> Predicted and bidirectionally predicted pictures need
-/// motion compensation against reference sample planes this decoder does not build, so each is
-/// refused as what it is. A skipped picture is different: it carries no motion or residual syntax and
-/// means the previous picture over again, so the last displayed RGB samples are retained solely to
-/// honour that case. The Advanced profile is refused at the stream, under its own codes <c>WVC1</c> and
-/// <c>WMVA</c>, since it carries a sequence header and an entry point structure of its own inside a byte
-/// stream and shares only its block layer with what is here.
-/// Multi-resolution coding, range reduction and the in-loop deblocking filter are refused where the
-/// stream signals them. There is no fallback that substitutes a plausible-looking picture for syntax
-/// this decoder does not understand.
+/// Advanced profile remains a separate bitstream shape and is refused by name. Predictive tools that do not yet have a
+/// reconstruction path (non-zero motion, mixed/4-MV, intensity compensation, compressed bitplanes, differential
+/// quantisation and variable inter transforms) are likewise refused rather than approximated.
 /// </remarks>
 public sealed class Vc1VideoDecoder : IVideoCodecDecoder<Vc1VideoDecoder> {
 
-  /// <summary>The codes containers name a Simple or Main profile stream with.</summary>
-  /// <remarks>
-  /// <c>WMV3</c> is what an ASF and an AVI carry; <c>WMV9</c> appears on a few files written by
-  /// third-party muxers for the same bitstream.
-  /// </remarks>
   private static readonly CodecTag[] _Tags = [
     CodecTag.FromCharacters("WMV3"),
     CodecTag.FromCharacters("WMV9"),
   ];
 
-  /// <summary>The codes that name the Advanced profile, which this refuses by name rather than ignores.</summary>
-  /// <remarks>
-  /// <c>WMVA</c> is Windows Media Video 9 Advanced Profile as it was written before the profile was
-  /// standardised, and it belongs here rather than beside <c>WMV3</c> despite the family resemblance
-  /// of the name: what follows the tag is a sequence header and an entry point structure carried as
-  /// markered elements, not the thirty-two bit <c>STRUCT_C</c> the Simple and Main profiles state.
-  /// Reading it as though it were <c>STRUCT_C</c> would find a profile and a quantiser in bits that
-  /// mean something else entirely.
-  /// </remarks>
   private static readonly CodecTag[] _AdvancedTags = [
     CodecTag.FromCharacters("WVC1"),
     CodecTag.FromCharacters("WMVA"),
@@ -65,21 +34,28 @@ public sealed class Vc1VideoDecoder : IVideoCodecDecoder<Vc1VideoDecoder> {
   private readonly Vc1SequenceHeader _sequence;
   private readonly int _width;
   private readonly int _height;
-  private readonly Vc1PictureDecoder _pictures;
-  private byte[]? _previousPixels;
+  private readonly int _macroblockWidth;
+  private readonly int _macroblockHeight;
+  private readonly Vc1PictureDecoder _intraPictures;
+  private readonly Vc1PredictivePictureDecoder _predictivePictures;
+  private readonly Queue<RawImage> _ready = [];
+  private Vc1Frame? _pastAnchor;
+  private Vc1Frame? _futureAnchor;
 
   private Vc1VideoDecoder(Vc1SequenceHeader sequence, int width, int height) {
     this._sequence = sequence;
     this._width = width;
     this._height = height;
-    this._pictures = new(sequence, (width + 15) / 16, (height + 15) / 16);
+    this._macroblockWidth = (width + 15) / 16;
+    this._macroblockHeight = (height + 15) / 16;
+    this._intraPictures = new(sequence, this._macroblockWidth, this._macroblockHeight);
+    this._predictivePictures = new(sequence, this._macroblockWidth, this._macroblockHeight);
   }
 
-  public static string CodecName => "VC-1 / Windows Media Video 9 (SMPTE 421M, Simple and Main profile intra pictures)";
+  public static string CodecName => "VC-1 / Windows Media Video 9 (SMPTE 421M, progressive Simple/Main profile)";
 
   public static bool Accepts(MediaStreamInfo stream) {
     ArgumentNullException.ThrowIfNull(stream);
-
     if (stream.Kind != MediaStreamKind.Video)
       return false;
 
@@ -87,28 +63,14 @@ public sealed class Vc1VideoDecoder : IVideoCodecDecoder<Vc1VideoDecoder> {
            || stream.CodecId is "V_MS/VFW/FOURCC/WMV3" or "V_VC1";
   }
 
-  /// <summary>
-  /// Builds a decoder for one stream, reading its sequence header out of the container's private data.
-  /// </summary>
-  /// <remarks>
-  /// The private data arrives as the container found it, which for both ASF and AVI means a
-  /// <c>BITMAPINFOHEADER</c> with the sequence header sitting past its end. The header states its own
-  /// length, so stepping over it is the container-independent way to reach what belongs to the codec —
-  /// and a stream whose private data is only the four bytes is read just as well.
-  /// </remarks>
   public static Vc1VideoDecoder Create(MediaStreamInfo stream) {
     ArgumentNullException.ThrowIfNull(stream);
 
     if (_Matches(stream.Codec, _AdvancedTags) || stream.CodecId == "V_VC1")
       throw new NotSupportedException(
         $"Stream {stream.Index} is VC-1 Advanced profile ({stream.Codec}), which states its sequence header and entry "
-        + "point inside the bitstream rather than in the container. Only the Simple and Main profiles are read here.");
+        + "point inside the bitstream rather than in the container. The progressive Simple and Main profiles are read here.");
 
-    // A stream this codec names but whose private data holds no sequence header is one it cannot
-    // decode, which the contract for this method makes a refusal rather than a complaint about the
-    // bytes: Simple and Main profile put the sequence header nowhere else, so there is nothing to fall
-    // back on and nothing to be read later. The refusal names the code, because a caller offered a
-    // decoder and refused wants to know which codec went missing.
     Vc1SequenceHeader sequence;
     try {
       sequence = Vc1SequenceHeader.ReadFrom(_SequenceHeaderBytes(stream.CodecPrivateData.Span));
@@ -120,50 +82,30 @@ public sealed class Vc1VideoDecoder : IVideoCodecDecoder<Vc1VideoDecoder> {
     }
 
     if (sequence.Profile == Vc1Profile.Advanced)
-      throw new NotSupportedException(
-        $"Stream {stream.Index} states the Advanced profile in its sequence header, which is not read here.");
-
+      throw new NotSupportedException($"Stream {stream.Index} states the Advanced profile in its sequence header, which is not read here.");
     if (stream.Width <= 0 || stream.Height <= 0)
       throw new NotSupportedException(
         $"Stream {stream.Index} states a size of {stream.Width}x{stream.Height}. Simple and Main profile VC-1 carries no "
         + "picture size in the bitstream, so the container's is the only one there is.");
-
     if (sequence.MultiResolution)
       throw new NotSupportedException(
-        $"Stream {stream.Index} is coded with multi-resolution coding (MULTIRES), whose pictures are decoded at half "
-        + "size and upsampled for display. That is not read here.");
-
+        $"Stream {stream.Index} is coded with multi-resolution coding (MULTIRES), whose pictures are decoded at half size and upsampled for display.");
     if (sequence.RangeReduction)
       throw new NotSupportedException(
-        $"Stream {stream.Index} is coded with range reduction (RANGERED), which scales every reconstructed sample after "
-        + "decoding. That is not read here.");
-
+        $"Stream {stream.Index} is coded with range reduction (RANGERED), which scales reconstructed samples after decoding.");
     if (sequence.LoopFilter)
       throw new NotSupportedException(
-        $"Stream {stream.Index} is coded with the in-loop deblocking filter (LOOPFILTER), which is part of the "
-        + "reconstruction rather than a postprocess and cannot be left out. That is not read here.");
+        $"Stream {stream.Index} is coded with the in-loop deblocking filter (LOOPFILTER), which is part of reference reconstruction and cannot be omitted.");
 
     return new(sequence, stream.Width, stream.Height);
   }
 
-  /// <summary>A <c>BITMAPINFOHEADER</c>, which is a fixed forty bytes whatever it says about itself.</summary>
   private const int _BITMAP_INFO_HEADER_SIZE = 40;
 
-  /// <summary>The sequence header inside a stream's private data, past the bitmap header if there is one.</summary>
-  /// <remarks>
-  /// Past a fixed forty bytes and not past the size the header states. The <c>biSize</c> field counts
-  /// the codec's own data as well as the structure in both of the containers that carry this — a
-  /// Windows Media stream states 44 for a forty-byte header and four bytes of sequence header — so
-  /// stepping over what it says steps over the very thing being looked for, and lands on the size
-  /// field again. Read as a sequence header, that field's low nibble is a profile number of 2, which
-  /// is not a profile at all: the refusal is loud, but only because the reserved bits caught it.
-  /// </remarks>
   private static ReadOnlySpan<byte> _SequenceHeaderBytes(ReadOnlySpan<byte> privateData) {
     if (privateData.Length <= _BITMAP_INFO_HEADER_SIZE)
       return privateData;
 
-    // A BITMAPINFOHEADER never states a size below its own, and four bytes of sequence header cannot be
-    // mistaken for one: read as a length, the largest a sequence header can state is far past a header.
     var declared = BinaryPrimitives.ReadUInt32LittleEndian(privateData);
     return declared is >= _BITMAP_INFO_HEADER_SIZE and <= 0xFFFF
       ? privateData[_BITMAP_INFO_HEADER_SIZE..]
@@ -174,47 +116,150 @@ public sealed class Vc1VideoDecoder : IVideoCodecDecoder<Vc1VideoDecoder> {
     foreach (var tag in tags)
       if (codec.EqualsIgnoringCase(tag))
         return true;
-
     return false;
   }
 
-  /// <summary>Decodes one packet and hands back the picture it holds.</summary>
-  /// <returns><c>false</c> when the packet held no picture that can be displayed yet.</returns>
+  /// <summary>Consumes one coded picture and returns the next picture that is due for display, if one is ready.</summary>
   public bool TryDecode(CodedPacket packet, out RawImage frame) {
     var data = packet.Data.Span;
 
-    // A Simple or Main profile picture of one byte or fewer is a skipped picture: the previous picture
-    // over again (7.1.1.4). A stream that begins with one has nothing to repeat; after the first real
-    // picture the retained RGB samples are enough because a skipped picture changes no sample.
     if (data.Length <= 1) {
-      if (this._previousPixels == null) {
-        frame = null!;
-        return false;
-      }
-
-      frame = new() {
-        Width = this._width,
-        Height = this._height,
-        Format = PixelFormat.Rgb24,
-        PixelData = (byte[])this._previousPixels.Clone(),
-      };
-      return true;
+      this._DecodeSkippedAnchor();
+      return this._TakeReady(out frame);
     }
 
-    var picture = this._pictures.Decode(data, default, out _);
-    var pixels = Vc1ColorConversion.ToRgb24(picture, this._width, this._height);
+    var peek = new Vc1BitReader(data);
+    var header = Vc1PictureHeader.ReadFrom(ref peek, this._sequence);
 
-    frame = new() {
+    switch (header.PictureType) {
+      case Vc1PictureType.Intra:
+        this._DecodeAnchorIntra(data);
+        break;
+      case Vc1PictureType.Predicted:
+        this._DecodeAnchorPredicted(data);
+        break;
+      case Vc1PictureType.Bidirectional:
+        this._DecodeB(data);
+        break;
+      case Vc1PictureType.BidirectionalIntra:
+        this._Enqueue(this._DecodeIntra(data));
+        break;
+      default:
+        throw new InvalidDataException($"Unexpected VC-1 picture type {header.PictureType}.");
+    }
+
+    return this._TakeReady(out frame);
+  }
+
+  private void _DecodeAnchorIntra(ReadOnlySpan<byte> data) {
+    var decoded = this._DecodeIntra(data);
+    if (this._sequence.MaxBFrames == 0) {
+      this._pastAnchor = decoded;
+      this._Enqueue(decoded);
+      return;
+    }
+
+    if (this._pastAnchor == null && this._futureAnchor == null) {
+      this._pastAnchor = decoded;
+      this._Enqueue(decoded);
+      return;
+    }
+
+    this._PromoteFutureAnchor();
+    this._futureAnchor = decoded;
+  }
+
+  private void _DecodeAnchorPredicted(ReadOnlySpan<byte> data) {
+    if (this._sequence.MaxBFrames == 0) {
+      var reference = this._pastAnchor
+                      ?? throw new InvalidDataException("A VC-1 P picture appears before any anchor picture it can reference.");
+      var decoded = this._predictivePictures.DecodePredicted(data, reference, out _);
+      this._pastAnchor = decoded;
+      this._Enqueue(decoded);
+      return;
+    }
+
+    this._PromoteFutureAnchor();
+    var past = this._pastAnchor
+               ?? throw new InvalidDataException("A VC-1 P picture appears before any anchor picture it can reference.");
+    this._futureAnchor = this._predictivePictures.DecodePredicted(data, past, out _);
+  }
+
+  private void _DecodeB(ReadOnlySpan<byte> data) {
+    if (this._sequence.MaxBFrames == 0)
+      throw new InvalidDataException("A VC-1 B picture is present although MAXBFRAMES is zero.");
+
+    var past = this._pastAnchor
+               ?? throw new InvalidDataException("A VC-1 B picture has no temporally previous anchor picture.");
+    var future = this._futureAnchor
+                 ?? throw new InvalidDataException("A VC-1 B picture has no already-decoded subsequent anchor picture.");
+    this._Enqueue(this._predictivePictures.DecodeBidirectional(data, past, future, out _));
+  }
+
+  private void _DecodeSkippedAnchor() {
+    if (this._sequence.MaxBFrames == 0) {
+      var reference = this._pastAnchor;
+      if (reference == null)
+        return;
+      var repeated = _Clone(reference);
+      this._pastAnchor = repeated;
+      this._Enqueue(repeated);
+      return;
+    }
+
+    this._PromoteFutureAnchor();
+    if (this._pastAnchor != null)
+      this._futureAnchor = _Clone(this._pastAnchor);
+  }
+
+  private Vc1Frame _DecodeIntra(ReadOnlySpan<byte> data) {
+    var reader = new Vc1BitReader(data);
+    var header = Vc1PictureHeader.ReadFrom(ref reader, this._sequence);
+    var result = new Vc1Frame(this._macroblockWidth, this._macroblockHeight);
+    this._intraPictures.DecodeIntra(ref reader, header, result);
+    return result;
+  }
+
+  private void _PromoteFutureAnchor() {
+    if (this._futureAnchor == null)
+      return;
+
+    this._Enqueue(this._futureAnchor);
+    this._pastAnchor = this._futureAnchor;
+    this._futureAnchor = null;
+  }
+
+  private void _Enqueue(Vc1Frame picture) {
+    this._ready.Enqueue(new() {
       Width = this._width,
       Height = this._height,
       Format = PixelFormat.Rgb24,
-      PixelData = pixels,
-    };
-    this._previousPixels = (byte[])pixels.Clone();
+      PixelData = Vc1ColorConversion.ToRgb24(picture, this._width, this._height),
+    });
+  }
 
+  private bool _TakeReady(out RawImage frame) {
+    if (this._ready.Count == 0) {
+      frame = null!;
+      return false;
+    }
+
+    frame = this._ready.Dequeue();
     return true;
   }
 
-  /// <summary>Nothing is ever held back, so there is nothing left when the packets run out.</summary>
-  public IEnumerable<RawImage> Flush() => [];
+  private static Vc1Frame _Clone(Vc1Frame source) {
+    var result = new Vc1Frame(source.LumaWidth / 16, source.LumaHeight / 16);
+    source.Luma.CopyTo(result.Luma, 0);
+    source.Cb.CopyTo(result.Cb, 0);
+    source.Cr.CopyTo(result.Cr, 0);
+    return result;
+  }
+
+  /// <summary>Releases any delayed anchor picture after the final B picture has been consumed.</summary>
+  public IEnumerable<RawImage> Flush() {
+    this._PromoteFutureAnchor();
+    while (this._ready.Count != 0)
+      yield return this._ready.Dequeue();
+  }
 }
