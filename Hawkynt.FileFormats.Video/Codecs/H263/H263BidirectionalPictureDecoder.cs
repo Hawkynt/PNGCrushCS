@@ -34,6 +34,8 @@ internal sealed class H263BidirectionalPictureDecoder {
   private readonly bool[] _hasForward;
   private readonly bool[] _hasBackward;
   private readonly bool[] _groupHasHeader;
+  private readonly int _temporalDistance;
+  private readonly int _bidirectionalDistance;
   private int _quantiser;
 
   internal H263BidirectionalPictureDecoder(
@@ -51,6 +53,15 @@ internal sealed class H263BidirectionalPictureDecoder {
     if (past.LumaWidth != target.LumaWidth || past.LumaHeight != target.LumaHeight
         || future.LumaWidth != target.LumaWidth || future.LumaHeight != target.LumaHeight)
       throw new InvalidDataException("An Annex O B-picture and both temporal references must have the same coded geometry.");
+
+    this._temporalDistance = _TemporalDistance(past.TemporalReference, future.TemporalReference);
+    this._bidirectionalDistance = _TemporalDistance(past.TemporalReference, header.TemporalReference);
+    if (this._temporalDistance == 0
+        || this._bidirectionalDistance == 0
+        || this._bidirectionalDistance >= this._temporalDistance)
+      throw new InvalidDataException(
+        $"The Annex O temporal references are inconsistent: past={past.TemporalReference}, B={header.TemporalReference}, future={future.TemporalReference}. "
+        + "The B-picture temporal reference must lie strictly between its previous and subsequent references, modulo 256.");
 
     this._macroblockWidth = header.MacroblockWidth;
     this._macroblockHeight = header.MacroblockHeight;
@@ -189,16 +200,10 @@ internal sealed class H263BidirectionalPictureDecoder {
     var futureVectorX = this._future.HasMotion[address] ? this._future.MotionX[address] : 0;
     var futureVectorY = this._future.HasMotion[address] ? this._future.MotionY[address] : 0;
 
-    var trd = _TemporalDistance(this._past.TemporalReference, this._future.TemporalReference);
-    var trb = _TemporalDistance(this._past.TemporalReference, this._header.TemporalReference);
-    if (trd == 0 || trb == 0 || trb >= trd)
-      throw new InvalidDataException(
-        $"The Annex O direct-mode temporal references are inconsistent: past={this._past.TemporalReference}, B={this._header.TemporalReference}, future={this._future.TemporalReference}.");
-
-    var forwardX = trb * futureVectorX / trd;
-    var forwardY = trb * futureVectorY / trd;
-    var backwardX = (trb - trd) * futureVectorX / trd;
-    var backwardY = (trb - trd) * futureVectorY / trd;
+    var forwardX = this._bidirectionalDistance * futureVectorX / this._temporalDistance;
+    var forwardY = this._bidirectionalDistance * futureVectorY / this._temporalDistance;
+    var backwardX = (this._bidirectionalDistance - this._temporalDistance) * futureVectorX / this._temporalDistance;
+    var backwardY = (this._bidirectionalDistance - this._temporalDistance) * futureVectorY / this._temporalDistance;
 
     this._ReconstructInter(ref reader, address, pattern, forwardX, forwardY, (backwardX, backwardY));
   }
@@ -223,7 +228,8 @@ internal sealed class H263BidirectionalPictureDecoder {
   /// <summary>
   /// Annex O keeps independent predictor fields for forward and backward vectors. A neighbour that
   /// does not carry a vector in the requested direction contributes zero; direct vectors are not fed
-  /// back into either field.
+  /// back into either field. Picture and GOB edges still use the ordinary 6.1.1 substitutions before
+  /// the same-direction availability rule is applied.
   /// </summary>
   private int _PredictVector(int address, bool forward, bool horizontal) {
     var vectors = forward
@@ -241,9 +247,16 @@ internal sealed class H263BidirectionalPictureDecoder {
     var aboveAddress = address - this._macroblockWidth;
     var aboveRightAddress = aboveAddress + 1;
 
-    var left = atLeftEdge || !present[leftAddress] ? 0 : vectors[leftAddress];
-    var above = atTop || !present[aboveAddress] ? 0 : vectors[aboveAddress];
-    var aboveRight = atTop || atRightEdge || !present[aboveRightAddress] ? 0 : vectors[aboveRightAddress];
+    var left = atLeftEdge ? 0 : present[leftAddress] ? vectors[leftAddress] : 0;
+    var above = atTop ? left : present[aboveAddress] ? vectors[aboveAddress] : 0;
+    var aboveRight = atTop
+      ? left
+      : atRightEdge ? 0 : present[aboveRightAddress] ? vectors[aboveRightAddress] : 0;
+
+    // As in 6.1.1, the right-edge substitution is applied after the top-edge substitution.
+    if (atRightEdge)
+      aboveRight = 0;
+
     return _Median(left, above, aboveRight);
   }
 
