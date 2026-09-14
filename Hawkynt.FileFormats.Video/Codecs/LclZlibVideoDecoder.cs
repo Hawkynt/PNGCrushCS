@@ -23,7 +23,8 @@ namespace FileFormat.Codecs;
 /// <para/>
 /// All six LCL image types are exposed losslessly: YUV111 as 4:4:4, YUV422 and YUV211 as 4:2:2, YUV411 as
 /// 4:1:1, YUV420 as 4:2:0, and RGB24 as BGR24. LCL stores chroma as signed bytes centered at zero; canonical
-/// <see cref="RawImage"/> YUV stores those same samples biased by 128. Coded rows run bottom-up, as in the
+/// <see cref="RawImage"/> YUV stores those same samples biased by 128. Its published RGB conversion is the
+/// full-range BT.601/JPEG matrix, which is retained as colour metadata. Coded rows run bottom-up, as in the
 /// reference decoder. YUV422 and YUV411 historically allow a partial final horizontal group; the format contains
 /// no luma samples for that tail, so the corresponding canonical samples remain zero while the one chroma sample
 /// explicitly replicated by the reference decoder is replicated here too.
@@ -128,19 +129,58 @@ public sealed class LclZlibVideoDecoder : IVideoCodecDecoder<LclZlibVideoDecoder
       throw new NotSupportedException(
         $"Video stream {stream.Index} is {stream.Width}x{stream.Height}, but LCL YUV420 stores 2x2 luma blocks and requires even dimensions.");
 
-    var packedRgbStrideLong = (long)stream.Width * 3;
-    var paddedRgbStrideLong = (packedRgbStrideLong + 3) & ~3L;
-    var decodedCapacityLong = header.ImageType switch {
-      _IMAGE_TYPE_YUV111 => (long)stream.Width * stream.Height * 3,
-      _IMAGE_TYPE_YUV422 => (long)(stream.Width & ~3) * stream.Height * 2,
-      _IMAGE_TYPE_RGB24 => paddedRgbStrideLong * stream.Height,
-      _IMAGE_TYPE_YUV411 => (long)(stream.Width & ~3) * stream.Height * 3 / 2,
-      _IMAGE_TYPE_YUV211 => (long)stream.Width * stream.Height * 2,
-      _IMAGE_TYPE_YUV420 => (long)stream.Width * stream.Height * 3 / 2,
-      _ => throw new InvalidOperationException(),
-    };
+    long packedRgbStrideLong = 0;
+    long paddedRgbStrideLong = 0;
+    long decodedCapacityLong;
+    long canonicalLengthLong;
+    try {
+      checked {
+        var width = (long)stream.Width;
+        var height = (long)stream.Height;
+        switch (header.ImageType) {
+          case _IMAGE_TYPE_YUV111:
+            decodedCapacityLong = width * height * 3;
+            canonicalLengthLong = decodedCapacityLong;
+            break;
 
-    if (packedRgbStrideLong > int.MaxValue || paddedRgbStrideLong > int.MaxValue || decodedCapacityLong > int.MaxValue)
+          case _IMAGE_TYPE_YUV422:
+            decodedCapacityLong = (width & ~3L) * height * 2;
+            canonicalLengthLong = width * height + ((width + 1) / 2) * height * 2;
+            break;
+
+          case _IMAGE_TYPE_RGB24:
+            packedRgbStrideLong = width * 3;
+            paddedRgbStrideLong = (packedRgbStrideLong + 3) & ~3L;
+            decodedCapacityLong = paddedRgbStrideLong * height;
+            canonicalLengthLong = packedRgbStrideLong * height;
+            break;
+
+          case _IMAGE_TYPE_YUV411:
+            decodedCapacityLong = (width & ~3L) * height / 2 * 3;
+            canonicalLengthLong = width * height + ((width + 3) / 4) * height * 2;
+            break;
+
+          case _IMAGE_TYPE_YUV211:
+            decodedCapacityLong = width * height * 2;
+            canonicalLengthLong = width * height + (width / 2) * height * 2;
+            break;
+
+          case _IMAGE_TYPE_YUV420:
+            decodedCapacityLong = width * height / 2 * 3;
+            canonicalLengthLong = width * height + (width / 2) * (height / 2) * 2;
+            break;
+
+          default:
+            throw new InvalidOperationException();
+        }
+      }
+    } catch (OverflowException ex) {
+      throw new InvalidDataException(
+        $"Video stream {stream.Index} states a picture size of {stream.Width}x{stream.Height}, whose LCL buffer-size arithmetic overflows.", ex);
+    }
+
+    if (decodedCapacityLong > int.MaxValue || canonicalLengthLong > int.MaxValue
+      || packedRgbStrideLong > int.MaxValue || paddedRgbStrideLong > int.MaxValue)
       throw new InvalidDataException(
         $"Video stream {stream.Index} states a picture size of {stream.Width}x{stream.Height}, whose decoded LCL frame is too large for one managed byte array.");
 
@@ -163,10 +203,9 @@ public sealed class LclZlibVideoDecoder : IVideoCodecDecoder<LclZlibVideoDecoder
     var decoded = new byte[this._decodedCapacity];
     int decodedLength;
 
-    var packedRgbBytes = checked(this._packedRgbStride * this._height);
-    if (this._compression == _COMPRESSION_NORMAL
-      && this._imageType == _IMAGE_TYPE_RGB24
-      && source.Length == packedRgbBytes) {
+    if (this._imageType == _IMAGE_TYPE_RGB24
+      && this._compression == _COMPRESSION_NORMAL
+      && source.Length == checked(this._packedRgbStride * this._height)) {
       source.CopyTo(decoded);
       decodedLength = source.Length;
     } else if (this._multithreaded) {
