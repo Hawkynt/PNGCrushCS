@@ -57,15 +57,6 @@ internal static class CineFormColorConversion {
 
   /// <summary>Packs an RGB frame (channel order G, R, B — see <see cref="CineFormChannelDecoder"/>) at
   /// twelve bits into 8-bit RGB.</summary>
-  /// <remarks>
-  /// <see cref="ChannelScaling.Reduce16"/> narrows a value that fills its declared sixteen-bit range,
-  /// which is only true here because <see cref="CineFormPictureDecoder.Decode"/> has already clamped
-  /// every channel sample to the twelve bits it is coded at — see that method's remarks for why a
-  /// wavelet reconstruction needs that clamp at all. A sample handed to this method unclamped and
-  /// negative, or above 4095, would shift out of range and have its reduction's own out-of-range
-  /// result silently wrapped by the <c>byte</c> cast, which is a fault this method relies on not
-  /// happening rather than one it guards against itself.
-  /// </remarks>
   internal static byte[] RgbToRgb24(CineFormPictureDecoder.Result frame) {
     var width = frame.ImageWidth;
     var height = frame.ImageHeight;
@@ -78,15 +69,42 @@ internal static class CineFormColorConversion {
       var row = y * g.Width;
       var target = y * width * 3;
       for (var x = 0; x < width; ++x) {
-        rgb[target] = ChannelScaling.Reduce16(r.Samples[row + x] << 4);
-        rgb[target + 1] = ChannelScaling.Reduce16(g.Samples[row + x] << 4);
-        rgb[target + 2] = ChannelScaling.Reduce16(b.Samples[row + x] << 4);
+        rgb[target] = _Reduce12(r.Samples[row + x]);
+        rgb[target + 1] = _Reduce12(g.Samples[row + x]);
+        rgb[target + 2] = _Reduce12(b.Samples[row + x]);
         target += 3;
       }
     }
 
     return rgb;
   }
+
+  /// <summary>Packs a twelve-bit RGBA frame whose coded channel order is G, R, B, A into RGBA32.</summary>
+  internal static byte[] RgbaToRgba32(CineFormPictureDecoder.Result frame) {
+    var width = frame.ImageWidth;
+    var height = frame.ImageHeight;
+    var g = frame.Channels[0];
+    var r = frame.Channels[1];
+    var b = frame.Channels[2];
+    var a = frame.Channels[3];
+
+    var rgba = new byte[width * height * 4];
+    for (var y = 0; y < height; ++y) {
+      var row = y * g.Width;
+      var target = y * width * 4;
+      for (var x = 0; x < width; ++x) {
+        rgba[target] = _Reduce12(r.Samples[row + x]);
+        rgba[target + 1] = _Reduce12(g.Samples[row + x]);
+        rgba[target + 2] = _Reduce12(b.Samples[row + x]);
+        rgba[target + 3] = _Reduce12(a.Samples[row + x]);
+        target += 4;
+      }
+    }
+
+    return rgba;
+  }
+
+  private static byte _Reduce12(int value) => ChannelScaling.Reduce16(value << 4);
 
   private static int _Chroma(int[] plane, int row, int x, bool subsampled, int lastColumn) {
     if (!subsampled)
