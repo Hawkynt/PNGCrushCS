@@ -197,7 +197,7 @@ public sealed class Indeo3VideoEncoderTests {
     var frame = inter.Data.ToArray();
     var yOffset = (int)BinaryPrimitives.ReadUInt32LittleEndian(frame.AsSpan(32));
     var vOffset = (int)BinaryPrimitives.ReadUInt32LittleEndian(frame.AsSpan(36));
-    var luma = frame.AsSpan(16 + yOffset, vOffset - yOffset);
+    var luma = frame[(16 + yOffset)..(16 + vOffset)];
 
     Assert.Multiple(() => {
       Assert.That(luma[6], Is.EqualTo(0b1111_0000));
