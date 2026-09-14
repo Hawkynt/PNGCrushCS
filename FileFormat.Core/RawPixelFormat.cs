@@ -8,6 +8,7 @@ public enum RawPixelFormatKind {
   Indexed,
   FloatingPoint,
   PlanarYuv,
+  ColorFilterArray,
 }
 
 /// <summary>How alpha, when supported, is represented by a raw pixel format.</summary>
@@ -25,7 +26,7 @@ public enum RawPixelAlphaKind {
 /// <param name="Kind">Broad storage/interpretation family.</param>
 /// <param name="StorageBitsPerPixel">Physical in-memory storage bits per pixel used by the compatibility representation.</param>
 /// <param name="BytesPerPixel">Whole bytes per packed pixel, or zero for sub-byte/planar layouts.</param>
-/// <param name="ComponentBitDepth">Nominal component precision where one value describes every component; zero for mixed layouts.</param>
+/// <param name="ComponentBitDepth">Nominal component precision where one value describes every component; zero for mixed or image-described layouts.</param>
 /// <param name="Alpha">How alpha can be represented.</param>
 /// <param name="PlaneCount">Number of physical sample planes.</param>
 /// <param name="IndexBitDepth">Logical index width for indexed formats, otherwise zero.</param>
@@ -46,6 +47,7 @@ public readonly record struct RawPixelFormatTraits(
   public bool IsIndexed => this.Kind == RawPixelFormatKind.Indexed;
   public bool IsFloatingPoint => this.Kind == RawPixelFormatKind.FloatingPoint;
   public bool IsPlanarYuv => this.Kind == RawPixelFormatKind.PlanarYuv;
+  public bool IsColorFilterArray => this.Kind == RawPixelFormatKind.ColorFilterArray;
   public bool CanRepresentAlpha => this.Alpha != RawPixelAlphaKind.None;
 
   /// <summary>Maximum number of distinct palette entries addressable by this indexed representation.</summary>
@@ -82,6 +84,7 @@ public static class RawPixelFormats {
     PixelFormat.Rgb565 => _Packed(format, 16, 2, 0),
     PixelFormat.Gray10 => _Packed(format, 16, 2, 10),
     PixelFormat.Rgb30 => _Packed(format, 32, 4, 10),
+    PixelFormat.Cfa16 => _Cfa(format),
     PixelFormat.GrayF16 => _Floating(format, 16, 2, 16),
     PixelFormat.GrayAlphaF16 => _Floating(format, 32, 4, 16, RawPixelAlphaKind.Channel),
     PixelFormat.RgbF16 => _Floating(format, 48, 6, 16),
@@ -126,8 +129,8 @@ public static class RawPixelFormats {
   };
 
   /// <summary>
-  /// Checks value-level invariants that are stricter than the compatibility storage type. This is
-  /// currently needed by logical indexed widths such as Indexed6 that are stored as legacy Indexed8.
+  /// Checks value-level invariants that are stricter than the compatibility storage type: logical
+  /// indexed widths and CFA images whose phase/precision live on the image rather than in the enum.
   /// </summary>
   public static void ValidateDeclaredRepresentation(RawImage image, RawPixelFormatTraits traits) {
     ArgumentNullException.ThrowIfNull(image);
@@ -137,6 +140,23 @@ public static class RawPixelFormats {
 
     if (!image.HasEnoughPixelData)
       throw new ArgumentException("The raw image does not contain enough pixel data for its declared dimensions.", nameof(image));
+
+    if (traits.IsColorFilterArray) {
+      if (image.CfaInfo is not { } cfa)
+        throw new ArgumentException("A Cfa16 image must declare its Bayer phase and effective bit depth in CfaInfo.", nameof(image));
+
+      var maximum = cfa.BitDepth == 16 ? ushort.MaxValue : (1 << cfa.BitDepth) - 1;
+      var pixelCount = checked(image.Width * image.Height);
+      for (var i = 0; i < pixelCount; ++i) {
+        var offset = i * 2;
+        var sample = image.PixelData[offset] | image.PixelData[offset + 1] << 8;
+        if (sample > maximum)
+          throw new ArgumentException(
+            $"CFA pixel {i} has value {sample}, outside the 0..{maximum} range declared by {cfa.BitDepth}-bit CfaInfo.",
+            nameof(image));
+      }
+      return;
+    }
 
     if (!traits.IsIndexed)
       return;
@@ -150,11 +170,11 @@ public static class RawPixelFormats {
     if (storageTraits.IndexBitDepth == traits.IndexBitDepth)
       return;
 
-    var pixelCount = checked(image.Width * image.Height);
+    var indexedPixelCount = checked(image.Width * image.Height);
     var maximumIndex = traits.MaximumPaletteEntries - 1;
 
     if (image.Format == PixelFormat.Indexed8) {
-      for (var i = 0; i < pixelCount; ++i)
+      for (var i = 0; i < indexedPixelCount; ++i)
         if (image.PixelData[i] > maximumIndex)
           throw new ArgumentException(
             $"Pixel {i} uses palette index {image.PixelData[i]}, outside the 0..{maximumIndex} range of an Indexed{traits.IndexBitDepth} image.",
@@ -163,7 +183,7 @@ public static class RawPixelFormats {
     }
 
     if (image.Format == PixelFormat.Indexed16) {
-      for (var i = 0; i < pixelCount; ++i) {
+      for (var i = 0; i < indexedPixelCount; ++i) {
         var offset = i * 2;
         var index = image.PixelData[offset] | image.PixelData[offset + 1] << 8;
         if (index > maximumIndex)
@@ -200,6 +220,9 @@ public static class RawPixelFormats {
       RawPixelAlphaKind.Palette,
       IndexBitDepth: bitDepth
     );
+
+  private static RawPixelFormatTraits _Cfa(PixelFormat format)
+    => new(format, RawPixelFormatKind.ColorFilterArray, 16, 2, 0);
 
   private static RawPixelFormatTraits _Yuv(
     PixelFormat format,
