@@ -103,7 +103,7 @@ public sealed class Indeo3VideoEncoderTests {
 
   [Test]
   [Category("Unit")]
-  public void ConsecutivePicturesStayIndependentKeyFramesAndAdvanceTheFrameNumber() {
+  public void ConsecutivePicturesUseAlternatingBuffersAndAnInterFrame() {
     var encoder = Indeo3VideoEncoder.Create(_Stream(16, 16));
     var first = _Flat(16, 16, 32);
     var second = _Flat(16, 16, 220);
@@ -111,11 +111,23 @@ public sealed class Indeo3VideoEncoderTests {
     Assert.That(encoder.TryEncode(first, 10, out var one), Is.True);
     Assert.That(encoder.TryEncode(second, 11, out var two), Is.True);
 
+    var secondFrame = two.Data.ToArray();
+    var lumaOffset = (int)BinaryPrimitives.ReadUInt32LittleEndian(secondFrame.AsSpan(32));
+    var luma = 16 + lumaOffset;
+
     Assert.Multiple(() => {
       Assert.That(one.IsKeyFrame, Is.True);
-      Assert.That(two.IsKeyFrame, Is.True);
+      Assert.That(two.IsKeyFrame, Is.False);
       Assert.That(BinaryPrimitives.ReadUInt32LittleEndian(one.Data.Span), Is.Zero);
       Assert.That(BinaryPrimitives.ReadUInt32LittleEndian(two.Data.Span), Is.EqualTo(1));
+      Assert.That(BinaryPrimitives.ReadUInt16LittleEndian(one.Data.Span[18..]), Is.EqualTo(1 << 2));
+      Assert.That(BinaryPrimitives.ReadUInt16LittleEndian(two.Data.Span[18..]), Is.EqualTo(1 << 9));
+      Assert.That(BinaryPrimitives.ReadUInt32LittleEndian(secondFrame.AsSpan(luma)), Is.EqualTo(1), "motion-vector count");
+      Assert.That(secondFrame[luma + 4], Is.Zero, "motion y");
+      Assert.That(secondFrame[luma + 5], Is.Zero, "motion x");
+      Assert.That(secondFrame[luma + 6], Is.EqualTo(0b1111_0000), "MC inter then VQ data");
+      Assert.That(secondFrame[luma + 7], Is.Zero, "motion-vector index");
+      Assert.That(secondFrame[luma + 8], Is.Zero, "mode 0, table 0");
     });
 
     var decoder = Indeo3VideoDecoder.Create(encoder.DescribeStream());
@@ -123,6 +135,96 @@ public sealed class Indeo3VideoEncoderTests {
     Assert.That(decoder.TryDecode(two, out var decoded), Is.True);
     Assert.That(decoded.Width, Is.EqualTo(16));
     Assert.That(decoded.Height, Is.EqualTo(16));
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void AnUnchangedPictureCollapsesToWholePlaneReferenceCopies() {
+    var encoder = Indeo3VideoEncoder.Create(_Stream(32, 24));
+    var source = _Flat(32, 24, 128);
+
+    Assert.That(encoder.TryEncode(source, 0, out var first), Is.True);
+    Assert.That(encoder.TryEncode(source, 1, out var second), Is.True);
+
+    var frame = second.Data.ToArray();
+    var yOffset = (int)BinaryPrimitives.ReadUInt32LittleEndian(frame.AsSpan(32));
+    var vOffset = (int)BinaryPrimitives.ReadUInt32LittleEndian(frame.AsSpan(36));
+    var uOffset = (int)BinaryPrimitives.ReadUInt32LittleEndian(frame.AsSpan(40));
+
+    Assert.Multiple(() => {
+      Assert.That(second.IsKeyFrame, Is.False);
+      Assert.That(second.Data.Length, Is.LessThan(first.Data.Length));
+      Assert.That(vOffset - yOffset, Is.EqualTo(8));
+      Assert.That(uOffset - vOffset, Is.EqualTo(8));
+    });
+
+    foreach (var offset in new[] { yOffset, vOffset, uOffset }) {
+      var plane = 16 + offset;
+      Assert.Multiple(() => {
+        Assert.That(BinaryPrimitives.ReadUInt32LittleEndian(frame.AsSpan(plane)), Is.EqualTo(1));
+        Assert.That(frame[plane + 4], Is.Zero);
+        Assert.That(frame[plane + 5], Is.Zero);
+        Assert.That(frame[plane + 6], Is.EqualTo(0b1110_0000), "MC inter, VQ null, copy procedure");
+        Assert.That(frame[plane + 7], Is.Zero, "motion-vector index");
+      });
+    }
+
+    var decoder = Indeo3VideoDecoder.Create(encoder.DescribeStream());
+    Assert.That(decoder.TryDecode(first, out var firstDecoded), Is.True);
+    Assert.That(decoder.TryDecode(second, out var secondDecoded), Is.True);
+    Assert.That(secondDecoded.PixelData, Is.EqualTo(firstDecoded.PixelData));
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void AChangedBlockUsesResidualsWhileStaticBlocksUseTheRunEscape() {
+    const int width = 32;
+    const int height = 16;
+    var first = _Flat(width, height, 64);
+    var changed = first.PixelData.ToArray();
+    for (var y = 0; y < 4; ++y)
+    for (var x = 0; x < 4; ++x) {
+      var at = (y * width + x) * 3;
+      changed[at] = 224;
+      changed[at + 1] = 224;
+      changed[at + 2] = 224;
+    }
+
+    var encoder = Indeo3VideoEncoder.Create(_Stream(width, height));
+    Assert.That(encoder.TryEncode(first, 0, out _), Is.True);
+    Assert.That(encoder.TryEncode(_Rgb(width, height, changed), 1, out var inter), Is.True);
+
+    var frame = inter.Data.ToArray();
+    var yOffset = (int)BinaryPrimitives.ReadUInt32LittleEndian(frame.AsSpan(32));
+    var vOffset = (int)BinaryPrimitives.ReadUInt32LittleEndian(frame.AsSpan(36));
+    var luma = frame.AsSpan(16 + yOffset, vOffset - yOffset);
+
+    Assert.Multiple(() => {
+      Assert.That(luma[6], Is.EqualTo(0b1111_0000));
+      Assert.That(luma[8], Is.Zero);
+      Assert.That(luma.Contains((byte)0xFB), Is.True, "block-run escape");
+    });
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void EveryTwelfthPictureStartsANewReferenceGroup() {
+    const int width = 16;
+    const int height = 16;
+    var encoder = Indeo3VideoEncoder.Create(_Stream(width, height));
+    var decoder = Indeo3VideoDecoder.Create(encoder.DescribeStream());
+
+    for (var i = 0; i < 13; ++i) {
+      Assert.That(encoder.TryEncode(_Flat(width, height, (byte)(40 + i * 8)), i, out var packet), Is.True);
+      var flags = BinaryPrimitives.ReadUInt16LittleEndian(packet.Data.Span[18..]);
+
+      Assert.Multiple(() => {
+        Assert.That(packet.IsKeyFrame, Is.EqualTo(i is 0 or 12), $"packet {i}");
+        Assert.That((flags >> 9) & 1, Is.EqualTo(i & 1), $"buffer {i}");
+        Assert.That((flags & (1 << 2)) != 0, Is.EqualTo(i is 0 or 12), $"header key bit {i}");
+      });
+      Assert.That(decoder.TryDecode(packet, out _), Is.True, $"packet {i}");
+    }
   }
 
   [Test]
@@ -185,19 +287,25 @@ public sealed class Indeo3VideoEncoderTests {
 
   [Test]
   [Category("Conformance")]
-  public void FfmpegReadsTheAviWhenItIsAvailable() {
+  public void FfmpegReadsInterFramesAndTheNextKeyFrameWhenItIsAvailable() {
     FFmpegOracle.RequireAvailable();
 
     const int width = 64;
     const int height = 48;
+    const int frameCount = 13;
     var encoder = Indeo3VideoEncoder.Create(_Stream(width, height));
-    Assert.That(encoder.TryEncode(_Flat(width, height, 128), 0, out var packet), Is.True);
-    var avi = VideoIO.Mux<AviWriter>([encoder.DescribeStream()], [packet]);
+    var packets = new CodedPacket[frameCount];
+    for (var i = 0; i < packets.Length; ++i) {
+      Assert.That(encoder.TryEncode(_Flat(width, height, (byte)(64 + i * 6)), i, out var packet), Is.True);
+      packets[i] = packet;
+    }
+
+    var avi = VideoIO.Mux<AviWriter>([encoder.DescribeStream()], packets);
     var path = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName() + ".avi");
 
     try {
       File.WriteAllBytes(path, avi);
-      var (decoded, output) = FFmpegOracle.TryDecodeFirstFrame(path, width, height);
+      var (decoded, output) = FFmpegOracle.TryDecodeFrameCount(path, width, height, frameCount);
       Assert.That(decoded, Is.True, output);
     } finally {
       try { File.Delete(path); } catch { /* best effort */ }
