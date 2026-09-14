@@ -22,11 +22,13 @@ internal sealed class Ffv1SliceEncoder {
   private readonly int[][][] _quantTables;
   private readonly int _sampleBits;
   private readonly int _foldShift;
+  private readonly Ffv1SliceDecoder _model;
 
   internal Ffv1SliceEncoder(Ffv1Parameters parameters) {
     this._quantTables = parameters.QuantTables;
     this._sampleBits = parameters.SampleBits;
     this._foldShift = 32 - parameters.SampleBits;
+    this._model = new(parameters);
   }
 
   /// <summary>Codes every line of a plane with the range coder.</summary>
@@ -111,7 +113,7 @@ internal sealed class Ffv1SliceEncoder {
     var topLeft = plane.At(x - 1, y - 1);
 
     var context = Ffv1SliceDecoder.ContextOf(tables, plane, x, y, left, top, topLeft);
-    var difference = plane[x, y] - Ffv1SliceDecoder.Median(left, top, left + top - topLeft);
+    var difference = plane[x, y] - this._model.Predict(left, top, topLeft);
 
     if (context < 0) {
       context = -context;
