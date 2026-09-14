@@ -77,7 +77,7 @@ public static class RawPixelFormats {
     PixelFormat.Indexed4 => _Indexed(4, PixelFormat.Indexed4, 4, 0),
     PixelFormat.Indexed1 => _Indexed(1, PixelFormat.Indexed1, 1, 0),
     PixelFormat.Indexed16 => _Indexed(16, PixelFormat.Indexed16, 16, 2),
-    PixelFormat.Rgba64 => _Packed(format, 64, 8, 16),
+    PixelFormat.Rgba64 => _Packed(format, 64, 8, 16, RawPixelAlphaKind.Channel),
     PixelFormat.Rgb48 => _Packed(format, 48, 6, 16),
     PixelFormat.Rgb565 => _Packed(format, 16, 2, 0),
     PixelFormat.Gray10 => _Packed(format, 16, 2, 10),
