@@ -80,13 +80,13 @@ internal static class FliReader {
     var supportedDepth = magic switch {
       MAGIC_FLI => depth == 8,
       MAGIC_FLC => depth is 8 or 15,
-      MAGIC_DTA => depth is 8 or 15 or 16 or 24,
+      MAGIC_DTA => depth is 15 or 16 or 24,
       _ => false,
     };
     if (!supportedDepth)
       throw new NotSupportedException(
         $"The file states {storedDepth} bits per pixel under magic 0x{magic:X4}. This reader supports "
-        + "8-bit FLI/FLC, Autodesk 15-bit FLX, and DTA 8/15/16/24-bit extended FLIC; that combination is not one of them.");
+        + "8-bit FLI/FLC, Autodesk 15-bit FLX, and DTA 15/16/24-bit extended FLIC; that combination is not one of them.");
 
     // FLI has no frame-offset fields. FLC, FLX and AF44 DTA files share the FLC-shaped 128-byte
     // header and may place prefix data ahead of frame one.
