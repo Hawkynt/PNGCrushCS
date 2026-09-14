@@ -20,13 +20,28 @@ public sealed class PeImageResource {
 
   /// <summary>
   /// Numeric PE resource type that owns this image. Icons and cursors name their group resource
-  /// types (RT_GROUP_ICON=14, RT_GROUP_CURSOR=12); bitmaps use RT_BITMAP=2; embedded images retain
-  /// the custom or predefined type under which their payload was found.
+  /// types (RT_GROUP_ICON=14, RT_GROUP_CURSOR=12); bitmaps use RT_BITMAP=2. For a named PE resource
+  /// type this remains 0 and <see cref="ResourceTypeName"/> carries the exact selector instead.
   /// </summary>
   public int ResourceTypeId { get; init; }
 
-  /// <summary>The resource ID within its type category.</summary>
+  /// <summary>The named PE resource type, or <see langword="null"/> when the type is numeric.</summary>
+  public string? ResourceTypeName { get; init; }
+
+  /// <summary>
+  /// Numeric resource ID within its type category. For a named resource this remains 0 and
+  /// <see cref="ResourceName"/> carries the exact selector instead.
+  /// </summary>
   public int ResourceId { get; init; }
+
+  /// <summary>The named PE resource name, or <see langword="null"/> when the resource uses a numeric ID.</summary>
+  public string? ResourceName { get; init; }
+
+  /// <summary>The numeric PE language ID, or <see langword="null"/> when not retained or when the language key is named.</summary>
+  public int? LanguageId { get; init; }
+
+  /// <summary>The named PE language key, or <see langword="null"/> for the usual numeric LANGID.</summary>
+  public string? LanguageName { get; init; }
 
   /// <summary>The raw resource data. For Icon/Cursor this is a complete ICO/CUR file.
   /// For Bitmap this is a complete BMP file (BITMAPFILEHEADER prepended).

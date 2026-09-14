@@ -76,6 +76,37 @@ internal static class PeResourceEditor {
     }).ToArray();
   }
 
+  internal static IReadOnlyList<PeImageResource> GetEmbeddedImages(byte[] source) {
+    ArgumentNullException.ThrowIfNull(source);
+    var layout = _Parse(source);
+    var result = new List<PeImageResource>();
+
+    foreach (var resource in layout.Resources) {
+      // These types have dedicated PE image representations. In particular an RT_ICON payload may
+      // itself be PNG, but exposing it again as an EmbeddedImage would lose its group semantics.
+      if (resource.Type.Id is 1 or 2 or 3 or 12 or 14)
+        continue;
+
+      var formatHint = PeResourceReader._DetectImageSignature(source, resource.DataOffset, resource.DataSize);
+      if (formatHint is null)
+        continue;
+
+      result.Add(new PeImageResource {
+        ResourceType = PeImageResourceType.EmbeddedImage,
+        ResourceTypeId = resource.Type.Id ?? 0,
+        ResourceTypeName = resource.Type.Name,
+        ResourceId = resource.Name.Id ?? 0,
+        ResourceName = resource.Name.Name,
+        LanguageId = resource.Language.Id,
+        LanguageName = resource.Language.Name,
+        Data = source.AsSpan(resource.DataOffset, resource.DataSize).ToArray(),
+        FormatHint = formatHint,
+      });
+    }
+
+    return result;
+  }
+
   internal static byte[] ReplaceResource(
     byte[] source,
     int typeId,
@@ -136,6 +167,13 @@ internal static class PeResourceEditor {
     var componentId = BinaryPrimitives.ReadUInt16LittleEndian(groupData[(groupEntryOffset + 12)..]);
     var componentLanguage = group.Language.Id;
     var component = _FindNumeric(layout, componentType, componentId, componentLanguage);
+    if (_IsGroupComponentShared(source, layout, groupType, componentId, component.Language))
+      throw new InvalidOperationException(
+        $"{(isCursor ? "RT_CURSOR" : "RT_ICON")} resource {componentId} is referenced by multiple "
+        + $"{(isCursor ? "cursor" : "icon")}-group entries; replacing it here would silently change every reference. "
+        + "Replace the raw component explicitly or rebuild the resource tree instead."
+      );
+
     var replacementImage = IcoDib.FromRawImage(image);
 
     byte[] replacementPayload;
@@ -174,6 +212,42 @@ internal static class PeResourceEditor {
     }
 
     return _ReplaceLeaf(updated, layout, group, updatedGroupData);
+  }
+
+  private static bool _IsGroupComponentShared(
+    byte[] source,
+    Layout layout,
+    int groupType,
+    int componentId,
+    ResourceIdentifier language
+  ) {
+    var expectedGroupKind = groupType == 12 ? 2 : 1;
+    var references = 0;
+
+    foreach (var candidate in layout.Resources) {
+      if (candidate.Type.Id != groupType || candidate.Language != language || candidate.DataSize < 6)
+        continue;
+
+      var data = source.AsSpan(candidate.DataOffset, candidate.DataSize);
+      if (BinaryPrimitives.ReadUInt16LittleEndian(data) != 0
+          || BinaryPrimitives.ReadUInt16LittleEndian(data[2..]) != expectedGroupKind)
+        continue;
+
+      var count = BinaryPrimitives.ReadUInt16LittleEndian(data[4..]);
+      const int entrySize = 14;
+      if (count == 0 || count > (data.Length - 6) / entrySize)
+        continue;
+
+      for (var i = 0; i < count; ++i) {
+        var entryOffset = 6 + i * entrySize;
+        if (BinaryPrimitives.ReadUInt16LittleEndian(data[(entryOffset + 12)..]) != componentId)
+          continue;
+        if (++references > 1)
+          return true;
+      }
+    }
+
+    return false;
   }
 
   private static ResourceLeaf _FindNumeric(Layout layout, int typeId, int resourceId, int? languageId) {

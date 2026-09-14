@@ -204,7 +204,7 @@ public sealed class PeResourceFile :
         => PeResourceEditor.ReplaceGroupImage(source, true, resource.ResourceId, languageId, groupImageIndex, image),
 
       PeImageResourceType.EmbeddedImage when groupImageIndex is null
-        => _ReplaceEmbeddedBytes(resource, image, languageId),
+        => _ReplaceEmbeddedBytes(resource, image, languageId ?? resource.LanguageId),
 
       PeImageResourceType.Bitmap or PeImageResourceType.EmbeddedImage
         => throw new ArgumentException("A group-image index is only valid for icon and cursor groups.", nameof(groupImageIndex)),
@@ -218,7 +218,11 @@ public sealed class PeResourceFile :
   private byte[] _ReplaceEmbeddedBytes(PeImageResource resource, RawImage image, int? languageId) {
     if (resource.ResourceTypeId <= 0)
       throw new InvalidOperationException(
-        "The embedded image does not expose its owning PE resource type; use ReplaceResource(typeId, resourceId, ...) with encoded bytes instead."
+        "The embedded image does not expose a numeric owning PE resource type; use ReplaceResource(typeId, resourceId, ...) with encoded bytes instead."
+      );
+    if (resource.ResourceName is not null)
+      throw new InvalidOperationException(
+        "The embedded image uses a named PE resource selector; use the raw resource API once named-resource replacement is available."
       );
 
     byte[] encoded = resource.FormatHint switch {
@@ -263,7 +267,11 @@ public sealed class PeResourceFile :
           PeImageResourceType.Icon => 14,
           _ => 0,
         },
+        ResourceTypeName = image.ResourceTypeName,
         ResourceId = image.ResourceId,
+        ResourceName = image.ResourceName,
+        LanguageId = image.LanguageId,
+        LanguageName = image.LanguageName,
         Data = image.Data,
         FormatHint = image.FormatHint,
       };
