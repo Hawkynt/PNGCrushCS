@@ -1,6 +1,5 @@
 using System;
 using System.Buffers.Binary;
-using System.Collections.Generic;
 using System.IO;
 using FileFormat.Core;
 using FileFormat.Fpx;
@@ -69,34 +68,24 @@ internal static class ExcelBinaryFile {
   internal static byte[] Write(RawImage source) {
     var image = source.EnsureFormat(PixelFormat.Rgb24);
     var worksheet = _BuildWorksheet(image);
-    var globals = _BuildWorkbookGlobals(worksheet.Length, out var boundSheetPointerOffset);
+    var globals = _BuildWorkbookGlobals(worksheet.Bytes.Length, out var boundSheetPointerOffset);
 
     var sheetOffset = globals.Length;
     BinaryPrimitives.WriteUInt32LittleEndian(globals.AsSpan(boundSheetPointerOffset), checked((uint)sheetOffset));
-
-    // Index.ibXF is an absolute file pointer within the Workbook stream. Patch it after the
-    // worksheet's absolute position is known.
-    var indexIbXfPatch = BinaryPrimitives.ReadInt32LittleEndian(worksheet.AsSpan(0, sizeof(int)));
-    var defColWidthOffset = BinaryPrimitives.ReadInt32LittleEndian(worksheet.AsSpan(sizeof(int), sizeof(int)));
-    var worksheetBytes = worksheet[8..];
     BinaryPrimitives.WriteUInt32LittleEndian(
-      worksheetBytes.AsSpan(indexIbXfPatch),
-      checked((uint)(sheetOffset + defColWidthOffset)));
+      worksheet.Bytes.AsSpan(worksheet.IndexIbXfPatch),
+      checked((uint)(sheetOffset + worksheet.DefColWidthOffset)));
 
-    var workbook = new byte[checked(globals.Length + worksheetBytes.Length)];
+    var workbook = new byte[checked(globals.Length + worksheet.Bytes.Length)];
     globals.CopyTo(workbook, 0);
-    worksheetBytes.CopyTo(workbook, globals.Length);
+    worksheet.Bytes.CopyTo(workbook, globals.Length);
 
     var compound = new CompoundFileWriter(_Excel8ClassId);
     compound.AddStream(0, "Workbook", workbook);
     return compound.Build();
   }
 
-  /// <summary>
-  /// Builds a worksheet. The first eight bytes are private patch metadata removed by <see cref="Write"/>:
-  /// the offset of Index.ibXF and the offset of DefColWidth in the actual worksheet stream.
-  /// </summary>
-  private static byte[] _BuildWorksheet(RawImage image) {
+  private static WorksheetBytes _BuildWorksheet(RawImage image) {
     using var body = new MemoryStream();
     _WriteBof(body, 0x0010);
 
@@ -126,12 +115,7 @@ internal static class ExcelBinaryFile {
     _WriteRecord(body, _Window2, window2);
     _WriteRecord(body, _Eof, ReadOnlySpan<byte>.Empty);
 
-    var payload = body.ToArray();
-    var result = new byte[checked(payload.Length + 8)];
-    BinaryPrimitives.WriteInt32LittleEndian(result, checked(indexIbXfPatch - 8));
-    BinaryPrimitives.WriteInt32LittleEndian(result.AsSpan(4), checked(defColWidthOffset - 8));
-    payload.CopyTo(result, 8);
-    return result;
+    return new(body.ToArray(), indexIbXfPatch, defColWidthOffset);
   }
 
   private static byte[] _BuildWorkbookGlobals(int worksheetLength, out int boundSheetPointerOffset) {
@@ -170,7 +154,7 @@ internal static class ExcelBinaryFile {
 
     Span<byte> boundSheet = stackalloc byte[14];
     boundSheet.Clear();
-    boundSheet[6] = 6; // cch
+    boundSheet[6] = 6;
     boundSheet[7] = 0; // compressed 8-bit characters
     "Sheet1"u8.CopyTo(boundSheet[8..]);
     var recordStart = checked((int)stream.Position);
@@ -178,22 +162,19 @@ internal static class ExcelBinaryFile {
     boundSheetPointerOffset = checked(recordStart + 4);
 
     _WriteRecord(stream, _Eof, ReadOnlySpan<byte>.Empty);
-
-    // Keep the parameter in the checked arithmetic path: a corrupt caller cannot wrap the eventual
-    // BoundSheet pointer simply because globals happen to be small.
     _ = checked(stream.Length + worksheetLength);
     return stream.ToArray();
   }
 
   private static byte[] _DefaultFont() {
     var result = new byte[21];
-    BinaryPrimitives.WriteUInt16LittleEndian(result, 200);      // 10 pt, twips
-    BinaryPrimitives.WriteUInt16LittleEndian(result.AsSpan(4), 0x7FFF); // automatic colour
-    BinaryPrimitives.WriteUInt16LittleEndian(result.AsSpan(6), 400);    // normal weight
-    result[12] = 0; // family
-    result[13] = 1; // system/default charset
+    BinaryPrimitives.WriteUInt16LittleEndian(result, 200);
+    BinaryPrimitives.WriteUInt16LittleEndian(result.AsSpan(4), 0x7FFF);
+    BinaryPrimitives.WriteUInt16LittleEndian(result.AsSpan(6), 400);
+    result[12] = 0;
+    result[13] = 1;
     result[14] = 5;
-    result[15] = 0; // compressed Unicode
+    result[15] = 0;
     "Arial"u8.CopyTo(result.AsSpan(16));
     return result;
   }
@@ -201,8 +182,7 @@ internal static class ExcelBinaryFile {
   private static byte[] _DefaultXf(bool style) {
     var result = new byte[20];
     BinaryPrimitives.WriteUInt16LittleEndian(result.AsSpan(4), style ? (ushort)0xFFF5 : (ushort)0x0001);
-    result[6] = 0x20; // vertical bottom
-    // No border/fill pattern; automatic foreground/background colour indexes.
+    result[6] = 0x20;
     BinaryPrimitives.WriteUInt16LittleEndian(result.AsSpan(18), 0x20C0);
     return result;
   }
@@ -218,8 +198,7 @@ internal static class ExcelBinaryFile {
     dib.AsSpan(0, firstDibBytes).CopyTo(first.AsSpan(8));
     _WriteRecord(stream, _BkHim, first);
 
-    var at = firstDibBytes;
-    while (at < dib.Length) {
+    for (var at = firstDibBytes; at < dib.Length;) {
       var count = Math.Min(_MaximumRecordPayload, dib.Length - at);
       _WriteRecord(stream, _Continue, dib.AsSpan(at, count));
       at += count;
@@ -233,7 +212,7 @@ internal static class ExcelBinaryFile {
     var rowBytes = checked(image.Width * 3);
     var stride = checked((rowBytes + 3) & ~3);
     var result = new byte[checked(12 + stride * image.Height)];
-    BinaryPrimitives.WriteUInt32LittleEndian(result, 12); // BITMAPCOREHEADER
+    BinaryPrimitives.WriteUInt32LittleEndian(result, 12);
     BinaryPrimitives.WriteUInt16LittleEndian(result.AsSpan(4), checked((ushort)image.Width));
     BinaryPrimitives.WriteUInt16LittleEndian(result.AsSpan(6), checked((ushort)image.Height));
     BinaryPrimitives.WriteUInt16LittleEndian(result.AsSpan(8), 1);
@@ -249,8 +228,7 @@ internal static class ExcelBinaryFile {
   }
 
   private static RawImage _ReadBackground(ReadOnlySpan<byte> workbook) {
-    var at = 0;
-    while (at + 4 <= workbook.Length) {
+    for (var at = 0; at + 4 <= workbook.Length;) {
       var type = BinaryPrimitives.ReadUInt16LittleEndian(workbook[at..]);
       var length = BinaryPrimitives.ReadUInt16LittleEndian(workbook[(at + 2)..]);
       var payloadStart = checked(at + 4);
@@ -259,7 +237,7 @@ internal static class ExcelBinaryFile {
         throw new InvalidDataException($"BIFF record 0x{type:X4} extends past the end of the Workbook stream.");
 
       if (type == _BkHim)
-        return _ReadBkHim(workbook, payloadStart, length, ref at);
+        return _ReadBkHim(workbook, payloadStart, length);
 
       at = payloadEnd;
     }
@@ -267,7 +245,7 @@ internal static class ExcelBinaryFile {
     throw new InvalidDataException("Excel Workbook stream contains no BkHim worksheet background image.");
   }
 
-  private static RawImage _ReadBkHim(ReadOnlySpan<byte> workbook, int payloadStart, int length, ref int recordOffset) {
+  private static RawImage _ReadBkHim(ReadOnlySpan<byte> workbook, int payloadStart, int length) {
     if (length < 8)
       throw new InvalidDataException("BkHim record is shorter than its 8-byte header.");
 
@@ -301,7 +279,6 @@ internal static class ExcelBinaryFile {
       next = continuationEnd;
     }
 
-    recordOffset = next;
     return _ReadDib(dib);
   }
 
@@ -310,30 +287,29 @@ internal static class ExcelBinaryFile {
       throw new InvalidDataException("BkHim bitmap is shorter than a BITMAPCOREHEADER.");
 
     var headerSize = BinaryPrimitives.ReadUInt32LittleEndian(dib);
-    if (headerSize == 12) {
-      var width = BinaryPrimitives.ReadUInt16LittleEndian(dib[4..]);
-      var height = BinaryPrimitives.ReadUInt16LittleEndian(dib[6..]);
-      var planes = BinaryPrimitives.ReadUInt16LittleEndian(dib[8..]);
-      var bpp = BinaryPrimitives.ReadUInt16LittleEndian(dib[10..]);
-      if (width == 0 || height == 0 || planes != 1 || bpp != 24)
-        throw new InvalidDataException("BkHim BITMAPCOREHEADER is not an uncompressed 24-bit bitmap.");
+    if (headerSize != 12)
+      throw new InvalidDataException($"BkHim bitmap uses unsupported DIB header size {headerSize}; only the BIFF8 12-byte core header is supported.");
 
-      var rowBytes = checked(width * 3);
-      var stride = checked((rowBytes + 3) & ~3);
-      var required = checked(12 + stride * height);
-      if (dib.Length < required)
-        throw new InvalidDataException("BkHim bitmap pixels are truncated.");
+    var width = BinaryPrimitives.ReadUInt16LittleEndian(dib[4..]);
+    var height = BinaryPrimitives.ReadUInt16LittleEndian(dib[6..]);
+    var planes = BinaryPrimitives.ReadUInt16LittleEndian(dib[8..]);
+    var bpp = BinaryPrimitives.ReadUInt16LittleEndian(dib[10..]);
+    if (width == 0 || height == 0 || planes != 1 || bpp != 24)
+      throw new InvalidDataException("BkHim BITMAPCOREHEADER is not an uncompressed 24-bit bitmap.");
 
-      var pixels = new byte[checked(rowBytes * height)];
-      for (var y = 0; y < height; ++y) {
-        var sourceY = height - 1 - y;
-        dib.Slice(checked(12 + sourceY * stride), rowBytes).CopyTo(pixels.AsSpan(checked(y * rowBytes)));
-      }
+    var rowBytes = checked(width * 3);
+    var stride = checked((rowBytes + 3) & ~3);
+    var required = checked(12 + stride * height);
+    if (dib.Length < required)
+      throw new InvalidDataException("BkHim bitmap pixels are truncated.");
 
-      return new() { Width = width, Height = height, Format = PixelFormat.Rgb24, PixelData = pixels };
+    var pixels = new byte[checked(rowBytes * height)];
+    for (var y = 0; y < height; ++y) {
+      var sourceY = height - 1 - y;
+      dib.Slice(checked(12 + sourceY * stride), rowBytes).CopyTo(pixels.AsSpan(checked(y * rowBytes)));
     }
 
-    throw new InvalidDataException($"BkHim bitmap uses unsupported DIB header size {headerSize}; only the BIFF8 12-byte core header is supported.");
+    return new() { Width = width, Height = height, Format = PixelFormat.Rgb24, PixelData = pixels };
   }
 
   private static void _WriteBof(Stream stream, ushort substreamType) {
@@ -357,4 +333,6 @@ internal static class ExcelBinaryFile {
     stream.Write(header);
     stream.Write(payload);
   }
+
+  private readonly record struct WorksheetBytes(byte[] Bytes, int IndexIbXfPatch, int DefColWidthOffset);
 }
