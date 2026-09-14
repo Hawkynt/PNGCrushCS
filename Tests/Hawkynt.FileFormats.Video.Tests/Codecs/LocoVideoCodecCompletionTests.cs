@@ -14,10 +14,10 @@ public sealed class LocoVideoCodecCompletionTests {
   public void Yuv422DecoderPreservesTheCodedSamples() {
     var decoder = LocoVideoDecoder.Create(_Stream(2, 1, mode: 1));
 
-    Assert.That(decoder.TryDecode(new(0, new byte[] { 0x8A, 0x88, 0x88 }), out var frame), Is.True);
+    Assert.That(decoder.TryDecode(new(0, new byte[] { 0x8A, 0xA0, 0xC0 }), out var frame), Is.True);
     Assert.Multiple(() => {
       Assert.That(frame.Format, Is.EqualTo(PixelFormat.Yuv422P8));
-      Assert.That(frame.PixelData, Is.EqualTo(new byte[] { 128, 128, 128, 128 }));
+      Assert.That(frame.PixelData, Is.EqualTo(new byte[] { 128, 128, 129, 130 }));
     });
   }
 
@@ -26,10 +26,10 @@ public sealed class LocoVideoCodecCompletionTests {
   public void Yuv420DecoderPreservesTheCodedSamplesAndYv12PlaneOrder() {
     var decoder = LocoVideoDecoder.Create(_Stream(2, 2, mode: 5));
 
-    Assert.That(decoder.TryDecode(new(0, new byte[] { 0x8E, 0x88, 0x88 }), out var frame), Is.True);
+    Assert.That(decoder.TryDecode(new(0, new byte[] { 0x8E, 0xC0, 0xA0 }), out var frame), Is.True);
     Assert.Multiple(() => {
       Assert.That(frame.Format, Is.EqualTo(PixelFormat.Yuv420P8));
-      Assert.That(frame.PixelData, Is.EqualTo(new byte[] { 128, 128, 128, 128, 128, 128 }));
+      Assert.That(frame.PixelData, Is.EqualTo(new byte[] { 128, 128, 128, 128, 129, 130 }));
     });
   }
 
@@ -47,7 +47,7 @@ public sealed class LocoVideoCodecCompletionTests {
   [Category("Unit")]
   public void Yuv422EncoderWritesTheExpectedThreePlanesAndRoundTrips() {
     var encoder = LocoVideoEncoder.Create(_Stream(2, 1, mode: 1));
-    var pixels = new byte[] { 128, 128, 128, 128 };
+    var pixels = new byte[] { 128, 128, 129, 130 };
 
     Assert.That(encoder.TryEncode(new() {
       Width = 2,
@@ -57,7 +57,7 @@ public sealed class LocoVideoCodecCompletionTests {
     }, 7, out var packet), Is.True);
 
     Assert.Multiple(() => {
-      Assert.That(packet.Data.ToArray(), Is.EqualTo(new byte[] { 0x8A, 0x88, 0x88 }));
+      Assert.That(packet.Data.ToArray(), Is.EqualTo(new byte[] { 0x8A, 0xA0, 0xC0 }));
       Assert.That(packet.IsKeyFrame, Is.True);
       Assert.That(encoder.DescribeStream().BitsPerPixel, Is.EqualTo(16));
     });
@@ -74,7 +74,7 @@ public sealed class LocoVideoCodecCompletionTests {
   [Category("Unit")]
   public void Yuv420EncoderWritesYThenVThenUAndRoundTripsToCanonicalYuv() {
     var encoder = LocoVideoEncoder.Create(_Stream(2, 2, mode: 5));
-    var pixels = new byte[] { 128, 128, 128, 128, 128, 128 };
+    var pixels = new byte[] { 128, 128, 128, 128, 129, 130 };
 
     Assert.That(encoder.TryEncode(new() {
       Width = 2,
@@ -84,7 +84,7 @@ public sealed class LocoVideoCodecCompletionTests {
     }, null, out var packet), Is.True);
 
     Assert.Multiple(() => {
-      Assert.That(packet.Data.ToArray(), Is.EqualTo(new byte[] { 0x8E, 0x88, 0x88 }));
+      Assert.That(packet.Data.ToArray(), Is.EqualTo(new byte[] { 0x8E, 0xC0, 0xA0 }));
       Assert.That(encoder.DescribeStream().BitsPerPixel, Is.EqualTo(12));
       Assert.That(_Mode(encoder.DescribeStream()), Is.EqualTo(5));
     });
