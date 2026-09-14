@@ -163,7 +163,7 @@ public sealed class RascVideoEncoder : IVideoCodecEncoder<RascVideoEncoder> {
       var red = source[sourceAt++];
       var green = source[sourceAt++];
       var blue = source[sourceAt++];
-      var value = (ushort)((red >> 3) | ((green >> 3) << 5) | ((blue >> 3) << 10));
+      var value = (ushort)((blue >> 3) | ((green >> 3) << 5) | ((red >> 3) << 10));
       BinaryPrimitives.WriteUInt16LittleEndian(result.AsSpan(pixel * 2, 2), value);
     }
     return result;
@@ -201,9 +201,9 @@ public sealed class RascVideoEncoder : IVideoCodecEncoder<RascVideoEncoder> {
     if (this._bitsPerPixel == 8)
       for (var i = 0; i < 256; ++i) {
         var paletteAt = i * 3;
-        var value = (uint)(this._palette![paletteAt]
+        var value = (uint)(this._palette![paletteAt + 2]
                            | (this._palette[paletteAt + 1] << 8)
-                           | (this._palette[paletteAt + 2] << 16));
+                           | (this._palette[paletteAt] << 16));
         BinaryPrimitives.WriteUInt32LittleEndian(payload.AsSpan(72 + i * 4, 4), value);
       }
 
