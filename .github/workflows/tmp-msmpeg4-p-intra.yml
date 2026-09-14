@@ -27,7 +27,7 @@ jobs:
       - name: Apply focused MS-MPEG-4 changes
         run: python .github/workflows/scripts/tmp-msmpeg4-p-intra.py
 
-      - name: Fix test accessibility
+      - name: Fix test harness
         shell: bash
         run: |
           python - <<'PY'
@@ -40,6 +40,7 @@ jobs:
           text = text.replace(
               'public void SceneChangeUsesTheIntraMacroblockFormInsideAPredictedPicture(string tag, MsMpeg4Version version) {',
               'public void SceneChangeUsesTheIntraMacroblockFormInsideAPredictedPicture(string tag, int versionValue) {\n    var version = (MsMpeg4Version)versionValue;')
+          text = text.replace('new Mpeg4BitReader(second.Data);', 'new Mpeg4BitReader(second.Data.Span);')
           path.write_text(text, encoding='utf-8', newline='\n')
           PY
 
