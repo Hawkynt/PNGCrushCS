@@ -16,11 +16,81 @@ jobs:
         with:
           ref: feat/h265-fractional-motion
           fetch-depth: 0
-      - name: Apply patch
+      - name: Apply exact replacement patch
         shell: bash
         run: |
-          git apply --check .github/hevc-completion.patch
-          git apply .github/hevc-completion.patch
+          python3 - <<'PY'
+          from pathlib import Path
+
+          lines = Path('.github/hevc-completion.patch').read_text().splitlines(keepends=True)
+          i = 0
+          changed = []
+          while i < len(lines):
+            if not lines[i].startswith('diff --git '):
+              i += 1
+              continue
+
+            header = lines[i].rstrip('\n').split(' b/', 1)
+            if len(header) != 2:
+              raise SystemExit(f'Cannot parse diff header: {lines[i]!r}')
+            path = header[1]
+            i += 1
+            section = []
+            while i < len(lines) and not lines[i].startswith('diff --git '):
+              section.append(lines[i])
+              i += 1
+
+            is_new = any(line.startswith('--- /dev/null') for line in section)
+            hunks = []
+            current = None
+            for line in section:
+              if line.startswith('@@'):
+                if current is not None:
+                  hunks.append(current)
+                current = []
+                continue
+              if current is not None:
+                current.append(line)
+            if current is not None:
+              hunks.append(current)
+
+            target = Path(path)
+            if is_new:
+              if target.exists():
+                raise SystemExit(f'New-file target already exists: {path}')
+              content = ''.join(
+                line[1:] for hunk in hunks for line in hunk
+                if line.startswith('+') and not line.startswith('+++')
+              )
+              target.parent.mkdir(parents=True, exist_ok=True)
+              target.write_text(content)
+              changed.append(path)
+              continue
+
+            content = target.read_text()
+            for hunk_number, hunk in enumerate(hunks, 1):
+              old = ''.join(
+                line[1:] for line in hunk
+                if (line.startswith(' ') or line.startswith('-')) and not line.startswith('---')
+              )
+              new = ''.join(
+                line[1:] for line in hunk
+                if (line.startswith(' ') or line.startswith('+')) and not line.startswith('+++')
+              )
+              occurrences = content.count(old)
+              if occurrences != 1:
+                raise SystemExit(
+                  f'{path}: hunk {hunk_number} old block occurs {occurrences} times, expected exactly once'
+                )
+              content = content.replace(old, new, 1)
+            target.write_text(content)
+            changed.append(path)
+
+          if not changed:
+            raise SystemExit('Patch changed no files')
+          print('\n'.join(changed))
+          PY
+          git diff --check
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add Hawkynt.FileFormats.Video/Codecs/H265/H265PcmStillCodec.cs
