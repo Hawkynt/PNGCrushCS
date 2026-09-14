@@ -1,0 +1,51 @@
+name: Regenerate FlashSV2 support documentation
+
+on:
+  push:
+    branches: [feat/flashsv2-read-write]
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/flashsv2-read-write
+      - name: Update generated-registry documentation
+        shell: python
+        run: |
+          from pathlib import Path
+
+          readme = Path('Hawkynt.FileFormats.Video/README.md')
+          text = readme.read_text(encoding='utf-8')
+          old = "| [Flash Screen Video 2](https://wiki.multimedia.cx/index.php/Flash_screen_video) | ⚠️ | — | — | `FSV2` at 24-bit RGB and the 15-bit depth. `HasIFrameImage`, `ZlibPrimeCompressCurrent` and key-frame blocks that do not cover their cell refused — the specification describes none of the three well enough to check a reading | [SWF File Format Specification](https://open-flash.github.io/mirrors/swf-spec-19.pdf) |"
+          new = "| [Flash Screen Video 2](https://wiki.multimedia.cx/index.php/Flash_screen_video) | ⚠️ | ✅ | ffmpeg | `FSV2`; 24-bit BGR and the hybrid 15/7-bit colourspace, custom palettes, partial-row interblocks and `ZlibPrimeCompressPrevious`. `HasIFrameImage` and `ZlibPrimeCompressCurrent` remain explicit refusals. The lossless encoder writes 64x64 24-bit keyblocks/interblocks, a full key frame every twelfth picture, zero-sized unchanged cells and the smallest row range differing from the last key frame; it uses independent zlib streams rather than optional priming | [SWF File Format Specification](https://open-flash.github.io/mirrors/swf-spec-19.pdf) |"
+          if old in text:
+              text = text.replace(old, new, 1)
+          elif new not in text:
+              raise SystemExit('FSV2 README support row was not found in either expected form')
+          readme.write_text(text, encoding='utf-8')
+
+          notes = Path('Hawkynt.FileFormats.Video/codec-notes.md')
+          text = notes.read_text(encoding='utf-8')
+          marker = '**Encoding writes lossless 24-bit keyblocks and interblocks.**'
+          if marker not in text:
+              start = text.index('### Flash Screen Video 2')
+              next_heading = text.index('\n### ', start + len('### Flash Screen Video 2'))
+              paragraph = "\n\n**Encoding writes lossless 24-bit keyblocks and interblocks.** The writer uses 64x64 cells and starts a new key frame every twelve pictures. On an interframe a cell identical to the previous displayed picture is the format's zero-sized unchanged block; otherwise the writer sends the smallest contiguous row range that differs from the last key frame. A cell that changed on an earlier interframe and then returns completely to the key-frame image is therefore a zero-height diff block rather than an unchanged block. Each payload is an independent zlib stream: previous-block priming is an optional compression mode, not required syntax, and the writer does not invent the underspecified current-block priming or I-frame-image forms. Flash Screen Video 2 has no B-picture or backward-reference syntax.\n\nThe write path is checked outside its own decoder: a dedicated FFmpeg oracle muxes fourteen pictures through FLV, crosses both interframe chains and a key-frame boundary, decodes every picture as BGR24 with FFmpeg, and requires every byte to match the source. Malformed input is kept separate from unsupported syntax: a key frame may not use a zero-sized block because it must establish every cell's reference, and a custom palette must inflate to exactly 128 three-byte entries.\n"
+              text = text[:next_heading] + paragraph + text[next_heading:]
+              notes.write_text(text, encoding='utf-8')
+      - name: Commit documentation
+        shell: bash
+        run: |
+          if git diff --quiet; then
+            exit 0
+          fi
+          git config user.name Hawkynt
+          git config user.email github@synthelicz.de
+          git add Hawkynt.FileFormats.Video/README.md Hawkynt.FileFormats.Video/codec-notes.md
+          git commit -m "Update FlashSV2 support documentation"
+          git push origin HEAD:feat/flashsv2-read-write
