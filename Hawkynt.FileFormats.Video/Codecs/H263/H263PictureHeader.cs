@@ -185,7 +185,8 @@ internal sealed class H263PictureHeader {
       throw new NotSupportedException("This H.263+ picture enables Reference Picture Resampling (Annex P), which is not implemented.");
     if (reducedResolutionUpdate)
       throw new NotSupportedException("This H.263+ picture enables Reduced-Resolution Update (Annex Q), which is not implemented.");
-    if (roundingType != 0 && pictureKind is not H263PictureKind.Predicted)
+    if (roundingType != 0
+        && pictureKind is not (H263PictureKind.Predicted or H263PictureKind.ImprovedPb or H263PictureKind.EnhancementPredicted))
       throw new InvalidDataException("H.263 MPPTYPE permits RTYPE=1 only for P, Improved-PB and EP pictures.");
 
     switch (pictureKind) {
@@ -215,7 +216,7 @@ internal sealed class H263PictureHeader {
       var heightIndication = reader.ReadBits(9);
       if (heightIndication is < 1 or > 288)
         throw new InvalidDataException(
-          $"H.263 CPFMT states picture height indication {heightIndication}; PHI must be 1 through 288 (4 through 1152 lines). ");
+          $"H.263 CPFMT states picture height indication {heightIndication}; PHI must be 1 through 288 (4 through 1152 lines).");
       height = heightIndication * 4;
       rowsPerGroup = _GroupRows(height);
 
