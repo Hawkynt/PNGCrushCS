@@ -15,7 +15,7 @@ namespace FileFormat.Codecs;
 /// <para/>
 /// Avid permits the JPEG coded picture to be taller than the container's display geometry. As with
 /// FFmpeg's AVDJ compatibility path, the excess is discarded from the top and the displayed image
-/// keeps the bottom-left rectangle. Field order is taken first from QuickTime's <c>fiel</c> sample
+/// keeps the bottom-left rectangle. Field placement is taken first from QuickTime's <c>fiel</c> sample
 /// description, then from the old Avid MJPEG extradata discriminator, and finally from the two D1
 /// Meridien geometries whose polarity is defined by Avid (486-line NTSC and 576-line PAL).
 /// <para/>
@@ -36,13 +36,13 @@ public sealed class AvidMeridienCompressedVideoDecoder : IVideoCodecDecoder<Avid
   private readonly int _streamIndex;
   private readonly int _width;
   private readonly int _height;
-  private readonly bool? _firstFieldOnOddRows;
+  private readonly bool? _firstCodedFieldOnOddRows;
 
   private AvidMeridienCompressedVideoDecoder(MediaStreamInfo stream) {
     this._streamIndex = stream.Index;
     this._width = stream.Width;
     this._height = stream.Height;
-    this._firstFieldOnOddRows = _FieldOrder(stream.CodecPrivateData.Span, stream.Height);
+    this._firstCodedFieldOnOddRows = _FieldPlacement(stream.CodecPrivateData.Span, stream.Height);
   }
 
   public static string CodecName => "Avid Meridien Compressed";
@@ -90,12 +90,12 @@ public sealed class AvidMeridienCompressedVideoDecoder : IVideoCodecDecoder<Avid
         $"Video stream {this._streamIndex} carries AVDJ fields with incompatible decoded layouts: "
         + $"{first.Width}x{first.Height} {first.Format} and {second.Width}x{second.Height} {second.Format}.");
 
-    if (this._firstFieldOnOddRows is not { } firstFieldOnOddRows)
+    if (this._firstCodedFieldOnOddRows is not { } firstCodedFieldOnOddRows)
       throw new NotSupportedException(
         $"Video stream {this._streamIndex} carries two-field AVDJ at {this._width}x{this._height}, but neither its "
-        + "codec data nor a standard Meridien D1 geometry states which field is temporally first.");
+        + "codec data nor a standard Meridien D1 geometry states the spatial placement of the first coded field.");
 
-    frame = this._CropToDisplay(_Weave(first, second, firstFieldOnOddRows));
+    frame = this._CropToDisplay(_Weave(first, second, firstCodedFieldOnOddRows));
     return true;
   }
 
@@ -168,18 +168,18 @@ public sealed class AvidMeridienCompressedVideoDecoder : IVideoCodecDecoder<Avid
   }
 
   /// <summary>Returns whether the first coded field occupies odd zero-based output rows.</summary>
-  private static bool? _FieldOrder(ReadOnlySpan<byte> privateData, int height) {
-    if (_QuickTimeFieldOrder(privateData) is { } quickTime)
+  private static bool? _FieldPlacement(ReadOnlySpan<byte> privateData, int height) {
+    if (_QuickTimeFieldPlacement(privateData) is { } quickTime)
       return quickTime;
 
-    if (_AvidExtraFieldOrder(privateData) is { } avid)
+    if (_AvidExtraFieldPlacement(privateData) is { } avid)
       return avid;
 
     // AVI readers in this package retain the complete BITMAPINFOHEADER before codec-private bytes.
     if (privateData.Length >= 40) {
       var headerSize = BinaryPrimitives.ReadUInt32LittleEndian(privateData);
       if (headerSize >= 40 && headerSize <= privateData.Length
-          && _AvidExtraFieldOrder(privateData[(int)headerSize..]) is { } afterHeader)
+          && _AvidExtraFieldPlacement(privateData[(int)headerSize..]) is { } afterHeader)
         return afterHeader;
     }
 
@@ -190,7 +190,7 @@ public sealed class AvidMeridienCompressedVideoDecoder : IVideoCodecDecoder<Avid
     };
   }
 
-  private static bool? _AvidExtraFieldOrder(ReadOnlySpan<byte> data) {
+  private static bool? _AvidExtraFieldPlacement(ReadOnlySpan<byte> data) {
     if (data.Length <= 12
         || BinaryPrimitives.ReadUInt32LittleEndian(data) != 0x2C
         || BinaryPrimitives.ReadUInt32LittleEndian(data[4..]) != 0x18)
@@ -203,7 +203,7 @@ public sealed class AvidMeridienCompressedVideoDecoder : IVideoCodecDecoder<Avid
     };
   }
 
-  private static bool? _QuickTimeFieldOrder(ReadOnlySpan<byte> data) {
+  private static bool? _QuickTimeFieldPlacement(ReadOnlySpan<byte> data) {
     if (data.Length < _VISUAL_SAMPLE_ENTRY_HEADER)
       return null;
 
@@ -218,9 +218,11 @@ public sealed class AvidMeridienCompressedVideoDecoder : IVideoCodecDecoder<Avid
         if (fields != 2)
           return null;
 
+        // QuickTime/FFmpeg distinguish coded order from display order. For spatial weaving we only
+        // need the coded field's parity: TT/TB code top first, BB/BT code bottom first.
         return detail switch {
-          14 => true,  // lowest-address (top/even) field is temporally later => odd field first
-          9 => false,  // lowest-address (top/even) field is temporally earlier => even field first
+          1 or 9 => false,
+          6 or 14 => true,
           _ => null,
         };
       }
