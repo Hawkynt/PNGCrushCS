@@ -135,6 +135,33 @@ public sealed class H261AnnexDTests {
 
   [Test]
   [Category("Unit")]
+  public void StillImageAfterMotionVideoUsesThePreviousCodedFrameAsItsReference() {
+    byte[] flat = [80, 80, 80, 80];
+    var encoder = H261VideoEncoder.Create(_Stream(176, 144));
+
+    Assert.That(encoder.TryEncode(_StillPicture(176, 144, flat), 0, out var motionPacket), Is.True);
+    Assert.That(encoder.TryEncodeStillImage(_StillPicture(352, 288, flat), 1, out var stillPacket), Is.True);
+    Assert.That(stillPacket.IsKeyFrame, Is.False, "sub-image 0 may predict from the preceding motion frame");
+
+    // A flat 80 picture reconstructs exactly at the fixed intra DC step, so the first still sub-image
+    // has no reason to transmit any residual or intra macroblock and is genuinely dependent on that
+    // motion reference. Decoding the still packet alone must therefore fail rather than invent it.
+    var isolated = H261VideoDecoder.Create(_Stream(176, 144));
+    Assert.Throws<InvalidDataException>(() => isolated.TryDecode(stillPacket, out _));
+
+    var decoder = H261VideoDecoder.Create(_Stream(176, 144));
+    Assert.That(decoder.TryDecode(motionPacket, out _), Is.True);
+    Assert.That(decoder.TryDecode(stillPacket, out var still), Is.True);
+    Assert.Multiple(() => {
+      Assert.That(still.Width, Is.EqualTo(352));
+      Assert.That(still.Height, Is.EqualTo(288));
+      Assert.That(_Red(still, 0, 0), Is.EqualTo(_Grey(80)).Within(2));
+      Assert.That(_Red(still, 1, 1), Is.EqualTo(_Grey(80)).Within(2));
+    });
+  }
+
+  [Test]
+  [Category("Unit")]
   public void AnnexDStillImageEncodingRequiresExactlyDoubleTheStreamDimensions() {
     var encoder = H261VideoEncoder.Create(_Stream(176, 144));
 
