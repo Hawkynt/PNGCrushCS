@@ -26,7 +26,7 @@ public enum RawPixelAlphaKind {
 /// <param name="StorageBitsPerPixel">Physical in-memory storage bits per pixel used by the compatibility representation.</param>
 /// <param name="BytesPerPixel">Whole bytes per packed pixel, or zero for sub-byte/planar layouts.</param>
 /// <param name="ComponentBitDepth">Nominal component precision where one value describes every component; zero for mixed layouts.</param>
-/// <param name="Alpha">How alpha can be represented.</param>
+/// <param name="Alpha">How alpha, when supported, is represented.</param>
 /// <param name="PlaneCount">Number of physical sample planes.</param>
 /// <param name="IndexBitDepth">Logical index width for indexed formats, otherwise zero.</param>
 /// <param name="ChromaSubsampleX">Horizontal chroma subsampling factor for planar YUV.</param>
@@ -77,7 +77,7 @@ public static class RawPixelFormats {
     PixelFormat.Indexed4 => _Indexed(4, PixelFormat.Indexed4, 4, 0),
     PixelFormat.Indexed1 => _Indexed(1, PixelFormat.Indexed1, 1, 0),
     PixelFormat.Indexed16 => _Indexed(16, PixelFormat.Indexed16, 16, 2),
-    PixelFormat.Rgba64 => _Packed(format, 64, 8, 16, RawPixelAlphaKind.Channel),
+    PixelFormat.Rgba64 => _Packed(format, 64, 8, 16),
     PixelFormat.Rgb48 => _Packed(format, 48, 6, 16),
     PixelFormat.Rgb565 => _Packed(format, 16, 2, 0),
     PixelFormat.Gray10 => _Packed(format, 16, 2, 10),
@@ -90,6 +90,7 @@ public static class RawPixelFormats {
     PixelFormat.GrayAlphaF32 => _Floating(format, 64, 8, 32, RawPixelAlphaKind.Channel),
     PixelFormat.RgbF32 => _Floating(format, 96, 12, 32),
     PixelFormat.RgbaF32 => _Floating(format, 128, 16, 32, RawPixelAlphaKind.Channel),
+    PixelFormat.Yuv411P8 => _Yuv(format, 12, 8, 4, 1),
     PixelFormat.Yuv420P8 => _Yuv(format, 12, 8, 2, 2),
     PixelFormat.Yuv422P8 => _Yuv(format, 16, 8, 2, 1),
     PixelFormat.Yuv440P8 => _Yuv(format, 16, 8, 1, 2),
