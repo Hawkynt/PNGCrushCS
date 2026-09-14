@@ -33,7 +33,8 @@ internal static class H263BlockDecoder {
   internal static void ReadIntra(
     ref H263BitReader reader, scoped Span<int> block, int quantiser, bool hasCoefficients, bool wideEscapeLevel) {
     block.Clear();
-    block[0] = H263Quantisation.DequantiseIntraDc(_ReadIntraDc(ref reader));
+    var dc = _ReadIntraDc(ref reader);
+    block[0] = reader.HasRealVideoPredictiveIntraDc ? dc * 8 : H263Quantisation.DequantiseIntraDc(dc);
 
     if (hasCoefficients)
       _ReadCoefficients(ref reader, block, 0, quantiser, wideEscapeLevel);
@@ -57,7 +58,7 @@ internal static class H263BlockDecoder {
   /// one hundred and twenty-eight are left out because a block full of them would help the coded data
   /// look like a start code, and the level the second would have carried is coded as 255 instead.
   /// RealVideo's predictive syntax reconstructs an eight-bit value modulo 256, so those two numeric
-  /// results are valid there and must not be rejected by H.263's literal-field rule.
+  /// results are valid there and so is 255 itself; none of H.263's literal-field aliases applies.
   /// </remarks>
   private static int _ReadIntraDc(ref H263BitReader reader) {
     var value = reader.ReadIntraDc();
