@@ -27,6 +27,39 @@ public sealed class Mpeg4QuarterSampleTests {
 
   [Test]
   [Category("Unit")]
+  public void SingleVectorMacroblockAndInter4vHaveDifferentInternalMirrors() {
+    // A one-vector macroblock is one 16x16 qpel operation. Four-vector mode applies the same filter
+    // independently to each 8x8 luminance block, so the internal x=8 boundary is a real mirror only
+    // for INTER4V. A ramp makes the distinction one sample wide and therefore difficult to hide with
+    // a coincidental flat-picture pass.
+    var reference = new byte[17 * 17];
+    for (var y = 0; y < 17; ++y)
+      for (var x = 0; x < 17; ++x)
+        reference[y * 17 + x] = (byte)(12 * x);
+
+    Span<int> macroblock = stackalloc int[16 * 16];
+    Mpeg4QuarterSample.Predict(macroblock, reference, 17, 0, 17, 17, 0, 0, 16, 2, 0, 0);
+
+    Span<int> inter4v = stackalloc int[16 * 16];
+    Span<int> block = stackalloc int[64];
+    for (var blockIndex = 0; blockIndex < 4; ++blockIndex) {
+      var left = (blockIndex & 1) * 8;
+      var top = (blockIndex >> 1) * 8;
+      Mpeg4QuarterSample.Predict(block, reference, 17, 0, 17, 17, left, top, 8, 2, 0, 0);
+      for (var y = 0; y < 8; ++y)
+        block.Slice(y * 8, 8).CopyTo(inter4v.Slice((top + y) * 16 + left, 8));
+    }
+
+    Assert.Multiple(() => {
+      Assert.That(macroblock[7], Is.EqualTo(90));
+      Assert.That(inter4v[7], Is.EqualTo(91));
+      Assert.That(macroblock[8], Is.EqualTo(102));
+      Assert.That(inter4v[8], Is.EqualTo(101));
+    });
+  }
+
+  [Test]
+  [Category("Unit")]
   public void QuarterPositionsAreFilteredHorizontallyBeforeVertically() {
     // A two-dimensional gradient makes the two passes observable independently. These five samples
     // are obtained directly from the corrected Figure 7-30/7-31 procedure: horizontal 1/4 first,
@@ -94,11 +127,22 @@ public sealed class Mpeg4QuarterSampleTests {
 
   [Test]
   [Category("Unit")]
-  public void PredictionRequiresOneCompleteEightByEightDestination() {
-    var reference = new byte[9 * 9];
-    var tooSmall = new int[63];
+  public void PredictionRequiresACompleteDestinationForItsBlockSize() {
+    var eightReference = new byte[9 * 9];
+    var sixteenReference = new byte[17 * 17];
 
-    Assert.Throws<ArgumentException>(() =>
-      Mpeg4QuarterSample.Predict(tooSmall, reference, 9, 0, 9, 9, 0, 0, 0, 0, 0));
+    Assert.Multiple(() => {
+      Assert.Throws<ArgumentException>(() =>
+        Mpeg4QuarterSample.Predict(new int[63], eightReference, 9, 0, 9, 9, 0, 0, 8, 0, 0, 0));
+      Assert.Throws<ArgumentException>(() =>
+        Mpeg4QuarterSample.Predict(new int[255], sixteenReference, 17, 0, 17, 17, 0, 0, 16, 0, 0, 0));
+    });
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void UnsupportedPredictionBlockSizeIsRejected() {
+    Assert.Throws<ArgumentOutOfRangeException>(() =>
+      Mpeg4QuarterSample.Predict(new int[12 * 12], new byte[13 * 13], 13, 0, 13, 13, 0, 0, 12, 0, 0, 0));
   }
 }
