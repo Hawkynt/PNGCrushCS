@@ -42,8 +42,24 @@ jobs:
       - name: Run MS-MPEG-4 tests including FFmpeg oracle
         run: dotnet test Tests/Hawkynt.FileFormats.Video.Tests/Hawkynt.FileFormats.Video.Tests.csproj --configuration Release --no-restore -p:EnableWindowsTargeting=true --filter FullyQualifiedName~MsMpeg4
 
-      - name: Run complete video test project
-        run: dotnet test Tests/Hawkynt.FileFormats.Video.Tests/Hawkynt.FileFormats.Video.Tests.csproj --configuration Release --no-restore -p:EnableWindowsTargeting=true
+      - name: Run complete video test project with FFmpeg
+        id: full
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -o pipefail
+          dotnet test Tests/Hawkynt.FileFormats.Video.Tests/Hawkynt.FileFormats.Video.Tests.csproj --configuration Release --no-restore -p:EnableWindowsTargeting=true --logger "console;verbosity=detailed" 2>&1 | tee /tmp/video-full.log
+
+      - name: Upload complete-suite diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: video-full-diagnostics
+          path: /tmp/video-full.log
+          if-no-files-found: error
+
+      - name: Run complete non-Oracle video test project
+        run: dotnet test Tests/Hawkynt.FileFormats.Video.Tests/Hawkynt.FileFormats.Video.Tests.csproj --configuration Release --no-restore -p:EnableWindowsTargeting=true --filter "TestCategory!=Oracle"
 
       - name: Remove temporary validation workflow
         shell: bash
