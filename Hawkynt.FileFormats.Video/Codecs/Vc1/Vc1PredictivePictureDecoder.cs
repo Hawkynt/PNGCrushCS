@@ -194,7 +194,7 @@ internal sealed class Vc1PredictivePictureDecoder {
     int mbY) {
     var (first, stride) = firstReference.PlaneOf(blockIndex);
     var (to, _) = destination.PlaneOf(blockIndex);
-    var second = secondReference?.PlaneOf(blockIndex).Samples;
+    int[]? second = secondReference == null ? null : secondReference.PlaneOf(blockIndex).Samples;
     var x = blockIndex < 4 ? (mbX * 16) + ((blockIndex & 1) * 8) : mbX * 8;
     var y = blockIndex < 4 ? (mbY * 16) + ((blockIndex >> 1) * 8) : mbY * 8;
 
@@ -203,7 +203,8 @@ internal sealed class Vc1PredictivePictureDecoder {
       for (var column = 0; column < 8; ++column) {
         var index = at + column;
         var prediction = second == null ? first[index] : (first[index] + second[index] + 1) >> 1;
-        var value = prediction + residual[(row * 8) + column];
+        var delta = residual.IsEmpty ? 0 : residual[(row * 8) + column];
+        var value = prediction + delta;
         to[index] = value < 0 ? 0 : value > 255 ? 255 : value;
       }
     }
