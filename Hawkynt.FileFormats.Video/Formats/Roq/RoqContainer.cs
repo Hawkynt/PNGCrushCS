@@ -17,12 +17,12 @@ public sealed class RoqContainer : IVideoContainerReader<RoqContainer> {
   public required bool AudioIsStereo { get; init; }
   public required int FrameRate { get; init; }
   public required int MotionScale { get; init; }
+  internal bool IsExtendedProfile { get; init; }
 
   private static readonly Rational _AudioTimeBase = new(1, 22050);
 
   public static string PrimaryExtension => ".roq";
   public static string[] FileExtensions => [".roq"];
-
   public static RoqContainer FromSpan(ReadOnlySpan<byte> data) => RoqReader.Open(data.ToArray());
 
   public static RoqContainer FromBytes(byte[] data) {
@@ -39,7 +39,6 @@ public sealed class RoqContainer : IVideoContainerReader<RoqContainer> {
 
   public static IReadOnlyList<MediaStreamInfo> Streams(RoqContainer container) {
     ArgumentNullException.ThrowIfNull(container);
-    var rate = new Rational(container.FrameRate, 1);
     var video = new MediaStreamInfo {
       Index = 0,
       Kind = MediaStreamKind.Video,
@@ -47,9 +46,9 @@ public sealed class RoqContainer : IVideoContainerReader<RoqContainer> {
       Width = container.Width,
       Height = container.Height,
       TimeBase = new Rational(1, container.FrameRate),
-      FrameRate = rate,
+      FrameRate = new Rational(container.FrameRate, 1),
       DeclaredFrameCount = container.VideoFrameCount,
-      CodecPrivateData = new byte[] { checked((byte)container.MotionScale) },
+      CodecPrivateData = new byte[] { checked((byte)container.MotionScale), container.IsExtendedProfile ? (byte)1 : (byte)0 },
     };
 
     if (!container.HasAudio)

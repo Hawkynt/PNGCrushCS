@@ -23,6 +23,7 @@ public sealed class RoqVideoDecoder : IVideoCodecDecoder<RoqVideoDecoder> {
 
   private readonly RoqCodebook _codebook = new();
   private readonly int _motionScale;
+  private readonly bool _allowExtensions;
   private int _width;
   private int _height;
   private bool _hasAlpha;
@@ -32,7 +33,10 @@ public sealed class RoqVideoDecoder : IVideoCodecDecoder<RoqVideoDecoder> {
   private bool _nextTargetIsA = true;
   private bool _hasDecodedFirstPicture;
 
-  private RoqVideoDecoder(int motionScale) => this._motionScale = motionScale;
+  private RoqVideoDecoder(int motionScale, bool allowExtensions) {
+    this._motionScale = motionScale;
+    this._allowExtensions = allowExtensions;
+  }
 
   public static string CodecName => "id RoQ";
 
@@ -45,7 +49,8 @@ public sealed class RoqVideoDecoder : IVideoCodecDecoder<RoqVideoDecoder> {
     ArgumentNullException.ThrowIfNull(stream);
     var privateData = stream.CodecPrivateData.Span;
     var motionScale = privateData.Length > 0 && privateData[0] == 2 ? 2 : 1;
-    return new(motionScale);
+    var allowExtensions = privateData.Length > 1 && privateData[1] != 0;
+    return new(motionScale, allowExtensions);
   }
 
   public bool TryDecode(CodedPacket packet, out RawImage frame) {
@@ -69,8 +74,10 @@ public sealed class RoqVideoDecoder : IVideoCodecDecoder<RoqVideoDecoder> {
         RoqChunkType.INFO => this._ReadInfo(payload, argument),
         RoqChunkType.QUAD_CODEBOOK => this._ReadCodebook(payload, argument),
         RoqChunkType.QUAD_VQ => this._DecodeVq(payload, argument),
-        RoqChunkType.JPEG => this._DecodeJpeg(payload),
-        RoqChunkType.HANG => this._DecodeHang(payload, argument),
+        RoqChunkType.JPEG when this._allowExtensions => this._DecodeJpeg(payload),
+        RoqChunkType.JPEG => throw new NotSupportedException("RoQ_JPEG belongs to the Trilobyte RoQ profile; create the decoder from an extended-profile RoQ container stream to enable it."),
+        RoqChunkType.HANG when this._allowExtensions => this._DecodeHang(payload, argument),
+        RoqChunkType.HANG => throw new NotSupportedException("RoQ_HANG belongs to the Trilobyte RoQ profile."),
         _ => throw new NotSupportedException($"A RoQ video packet contains chunk type 0x{id:X4}, which is not a video chunk this decoder reads."),
       };
 
@@ -79,7 +86,6 @@ public sealed class RoqVideoDecoder : IVideoCodecDecoder<RoqVideoDecoder> {
           throw new InvalidDataException("One RoQ coded packet contains more than one picture; the codec API can return only one picture per packet.");
         picture = decoded;
       }
-
       at += _HeaderLength + (int)size;
     }
 
@@ -100,13 +106,15 @@ public sealed class RoqVideoDecoder : IVideoCodecDecoder<RoqVideoDecoder> {
     if (width == 0 || height == 0)
       throw new InvalidDataException($"RoQ_INFO states a picture of {width}x{height}, which has no pixels.");
     if (block != 8 || subBlock != 4)
-      throw new NotSupportedException($"RoQ_INFO states block fields {block}/{subBlock}; only the established 8/4 quadtree is defined.");
+      throw new NotSupportedException($"RoQ_INFO states block fields {block}/{subBlock}; only the defined 8/4 quadtree is supported.");
     if (width % _Macroblock != 0 || height % _Macroblock != 0)
       throw new NotSupportedException($"RoQ_INFO states {width}x{height}, not a whole number of {_Macroblock}-pixel macroblocks.");
 
     var hasAlpha = argument == 1;
     if (width == this._width && height == this._height && hasAlpha == this._hasAlpha)
       return null;
+    if (this._width != 0 && !this._allowExtensions)
+      throw new NotSupportedException($"This RoQ stream changes picture format from {this._width}x{this._height} to {width}x{height}; direct standard-profile decoding does not accept format changes.");
 
     this._codebook.Configure(hasAlpha);
     this._width = width;
