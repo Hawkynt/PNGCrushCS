@@ -15,13 +15,15 @@ namespace FileFormat.Codecs;
 /// FFmpeg's LGPL <c>cfhd</c> implementation where the public standard does not define them. The measured
 /// framing details are documented in <see cref="FileFormat.Codecs.CineForm.CineFormChannelDecoder"/>.
 /// <para/>
-/// <b>Intra only.</b> CineForm's ordinary CFHD picture path has no P/B pictures or temporal motion
-/// references: each packet reconstructs independently from its own spatial wavelet coefficients.
+/// <b>Intra only.</b> CineForm has no MPEG-style P/B pictures or motion references here. Progressive
+/// samples use three spatial wavelet levels. Legacy interlaced YUV remains one independently decodable
+/// picture and uses a horizontal/field-pair transform at the finest level followed by the same two
+/// coarser spatial levels.
 /// <para/>
-/// <b>Scope.</b> The decoder reads all three layouts FFmpeg's current <c>cfhd</c> encoder writes:
-/// ten-bit YUV 4:2:2, twelve-bit RGB 4:4:4, and twelve-bit RGBA 4:4:4:4. The latter includes the
-/// format's alpha companding step rather than treating channel four as linear colour data. Bayer/CFA
-/// and the separate layered/interlaced VC-5 extensions are refused by name rather than guessed at.
+/// <b>Scope.</b> The decoder reads ten-bit YUV 4:2:2 progressive and legacy interlaced samples, plus
+/// twelve-bit RGB 4:4:4 and RGBA 4:4:4:4 progressive samples. Bayer/CFA and the separate 14/17-subband
+/// field/field-plus transforms remain distinct extensions and are refused explicitly rather than
+/// silently interpreted as the ten-subband picture layout.
 /// </remarks>
 public sealed class CineFormVideoDecoder : IVideoCodecDecoder<CineFormVideoDecoder> {
 
