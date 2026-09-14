@@ -16,10 +16,10 @@ namespace FileFormat.Codecs;
 /// <b>What it writes.</b> One configuration record for the container, and one frame per picture:
 /// version 3 with micro-version 4, the range coder with its default state transition table, eight
 /// bits a sample, the small context model — three quantisers of eleven levels, 666 contexts — one
-/// quantisation table set, a checksum on every slice, and every frame a keyframe with the context
-/// model reset, so a stream can be entered anywhere and a damaged frame takes nothing else with it.
-/// That is what <c>ffmpeg -c:v ffv1 -level 3 -coder 1 -context 0 -slicecrc 1 -g 1</c> writes, and
-/// ffmpeg reads what this writes.
+/// quantisation table set, and a checksum on every slice. The keyframe interval is configurable:
+/// keyframes reset the entropy model while the frames between them carry that model forward. FFV1
+/// remains intra-frame either way — every frame still codes every sample and no picture is used as a
+/// forward or backward prediction reference.
 /// <para/>
 /// <b>What goes in.</b> The coded format is fixed when the encoder is built, because the container
 /// needs the record before the first picture arrives. Grey and grey with alpha are coded as one and
@@ -31,14 +31,14 @@ namespace FileFormat.Codecs;
 /// <para/>
 /// <b>Slices.</b> The grid is chosen the way ffmpeg chooses it when nothing is asked for — the
 /// first grid of two or more rows whose slices are no larger than 360 by 288 — or stated outright
-/// through <see cref="Create(MediaStreamInfo, PixelFormat, int, int)"/>. A grid is refused when a
+/// through <see cref="Create(MediaStreamInfo, PixelFormat, int, int, int)"/>. A grid is refused when a
 /// slice would be narrower than a pixel or, with subsampled chrominance and an odd picture width or
 /// height, when the slices' chrominance blocks would leave a column or row that no slice codes: a
 /// version 3 reader has no way to recover those samples, and ffmpeg refuses the same grids.
 /// <para/>
 /// <b>What is left.</b> The Golomb-Rice coder, versions 0 and 1, samples deeper than eight bits, a
-/// stream's own state transition table, the large context model, and carrying the context model
-/// across frames. Each is a smaller stream or an older reader, not a different picture.
+/// stream's own state transition table and the large context model. Each is a different entropy or
+/// compatibility choice, not a different picture-prediction mode.
 /// </remarks>
 [VerifiedBy(ConformanceOracle.FFmpeg)]
 public sealed class Ffv1Encoder : IVideoCodecEncoder<Ffv1Encoder> {
@@ -67,12 +67,16 @@ public sealed class Ffv1Encoder : IVideoCodecEncoder<Ffv1Encoder> {
   private readonly Ffv1Parameters _parameters;
   private readonly byte[] _zeroState;
   private readonly byte[] _oneState;
+  private readonly int _keyFrameInterval;
+  private byte[][][][]? _rangeStates;
+  private ulong _frameNumber;
 
-  private Ffv1Encoder(MediaStreamInfo stream, PixelFormat format, int horizontalSlices, int verticalSlices) {
+  private Ffv1Encoder(MediaStreamInfo stream, PixelFormat format, int horizontalSlices, int verticalSlices, int keyFrameInterval) {
     var (colourSpace, chromaPlanes, horizontalShift, verticalShift, extraPlane) = _Layout(format);
     _RefuseGrid(stream.Width, stream.Height, horizontalSlices, verticalSlices, chromaPlanes && colourSpace == _COLOUR_SPACE_YCBCR, horizontalShift, verticalShift);
 
-    var record = _WriteConfigurationRecord(colourSpace, chromaPlanes, horizontalShift, verticalShift, extraPlane, horizontalSlices, verticalSlices);
+    var record = _WriteConfigurationRecord(
+      colourSpace, chromaPlanes, horizontalShift, verticalShift, extraPlane, horizontalSlices, verticalSlices, keyFrameInterval == 1);
     (this._zeroState, this._oneState) = Ffv1StateTransition.Build([]);
 
     // Read back through the decoder's own parser rather than kept from what was written: the
@@ -81,6 +85,7 @@ public sealed class Ffv1Encoder : IVideoCodecEncoder<Ffv1Encoder> {
     var states = _FreshStates();
     this._parameters = Ffv1Parameters.Read(new Ffv1RangeCoder(record.AsMemory(..^4), this._zeroState, this._oneState), states, true);
     this._format = format;
+    this._keyFrameInterval = keyFrameInterval;
     this._stream = new() {
       Index = stream.Index,
       Kind = MediaStreamKind.Video,
@@ -110,8 +115,8 @@ public sealed class Ffv1Encoder : IVideoCodecEncoder<Ffv1Encoder> {
   /// Eight bits is grey, twelve is 4:2:0, sixteen is 4:2:2, twenty-four is colour and thirty-two is
   /// colour with alpha. A stream that states nothing is coded as colour, which is what every decoder
   /// here hands back and the only choice that loses nothing whatever arrives. Anything else — 4:4:4,
-  /// 4:4:0, grey with alpha, a slice grid of one's own — is asked for by name through
-  /// <see cref="Create(MediaStreamInfo, PixelFormat, int, int)"/>.
+  /// 4:4:0, grey with alpha, a slice grid or keyframe interval of one's own — is asked for by name
+  /// through <see cref="Create(MediaStreamInfo, PixelFormat, int, int, int)"/>.
   /// </remarks>
   public static Ffv1Encoder Create(MediaStreamInfo stream) {
     ArgumentNullException.ThrowIfNull(stream);
@@ -131,7 +136,7 @@ public sealed class Ffv1Encoder : IVideoCodecEncoder<Ffv1Encoder> {
   }
 
   /// <summary>
-  /// Builds an encoder for one coded format and, where asked, one slice grid.
+  /// Builds an encoder for one coded format and, where asked, one slice grid and keyframe interval.
   /// </summary>
   /// <param name="stream">The stream to describe: index, size, time base and the rest are carried over.</param>
   /// <param name="format">
@@ -142,7 +147,12 @@ public sealed class Ffv1Encoder : IVideoCodecEncoder<Ffv1Encoder> {
   /// </param>
   /// <param name="horizontalSlices">How many columns of slices, or nought to choose as ffmpeg would.</param>
   /// <param name="verticalSlices">How many rows of slices, or nought to choose as ffmpeg would.</param>
-  public static Ffv1Encoder Create(MediaStreamInfo stream, PixelFormat format, int horizontalSlices = 0, int verticalSlices = 0) {
+  /// <param name="keyFrameInterval">
+  /// Number of frames from one entropy-state reset to the next. One makes every frame independently
+  /// decodable; a larger value carries only the entropy statistics between frames, never pixels.
+  /// </param>
+  public static Ffv1Encoder Create(
+    MediaStreamInfo stream, PixelFormat format, int horizontalSlices = 0, int verticalSlices = 0, int keyFrameInterval = 1) {
     ArgumentNullException.ThrowIfNull(stream);
     if (stream.Kind != MediaStreamKind.Video)
       throw new NotSupportedException($"FFV1 codes video, and stream {stream.Index} is {stream.Kind}.");
@@ -150,6 +160,9 @@ public sealed class Ffv1Encoder : IVideoCodecEncoder<Ffv1Encoder> {
     if (stream.Width <= 0 || stream.Height <= 0)
       throw new NotSupportedException(
         $"Video stream {stream.Index} states a picture size of {stream.Width}x{stream.Height}, and FFV1 needs the size before the first picture to describe the stream.");
+
+    if (keyFrameInterval <= 0)
+      throw new ArgumentOutOfRangeException(nameof(keyFrameInterval), keyFrameInterval, "An FFV1 keyframe interval must be at least one frame.");
 
     var coded = _CodedFormat(format);
     var (colourSpace, chromaPlanes, horizontalShift, verticalShift, _) = _Layout(coded);
@@ -161,16 +174,14 @@ public sealed class Ffv1Encoder : IVideoCodecEncoder<Ffv1Encoder> {
     if (horizontalSlices <= 0)
       (horizontalSlices, verticalSlices) = _DefaultGrid(stream.Width, stream.Height, subsampled, horizontalShift, verticalShift);
 
-    return new(stream, coded, horizontalSlices, verticalSlices);
+    return new(stream, coded, horizontalSlices, verticalSlices, keyFrameInterval);
   }
 
-  /// <summary>
-  /// Turns one picture into one keyframe.
-  /// </summary>
+  /// <summary>Turns one picture into one complete FFV1 frame.</summary>
   /// <remarks>
-  /// Every packet is a whole frame and a keyframe: the context model starts from its initial states
-  /// in every slice of every frame, so nothing about a frame depends on the one before it and the
-  /// presentation timestamp is the decoding timestamp.
+  /// A keyframe resets each slice's entropy contexts. A later frame in the same GOP reuses those
+  /// adaptive contexts but still codes every sample of the picture; FFV1 has no inter-picture motion
+  /// prediction or frame reordering, so presentation and decoding timestamps remain the same.
   /// </remarks>
   public bool TryEncode(RawImage frame, long? presentationTimestamp, out CodedPacket packet) {
     ArgumentNullException.ThrowIfNull(frame);
@@ -184,14 +195,16 @@ public sealed class Ffv1Encoder : IVideoCodecEncoder<Ffv1Encoder> {
 
     var source = this._TakeLosslessly(frame);
     var planes = this._PlanesOf(source);
-    var data = this._EncodeFrame(planes);
+    var keyframe = this._frameNumber % (ulong)this._keyFrameInterval == 0;
+    var data = this._EncodeFrame(planes, keyframe);
+    ++this._frameNumber;
 
     packet = new(
       StreamIndex: this._stream.Index,
       Data: data,
       PresentationTimestamp: presentationTimestamp,
       DecodeTimestamp: presentationTimestamp,
-      IsKeyFrame: true);
+      IsKeyFrame: keyframe);
     return true;
   }
 
@@ -203,7 +216,8 @@ public sealed class Ffv1Encoder : IVideoCodecEncoder<Ffv1Encoder> {
 
   /// <summary>Writes the record a version 3 container carries (RFC 9043 §4.2), checksum included.</summary>
   private static byte[] _WriteConfigurationRecord(
-    int colourSpace, bool chromaPlanes, int horizontalShift, int verticalShift, bool extraPlane, int horizontalSlices, int verticalSlices) {
+    int colourSpace, bool chromaPlanes, int horizontalShift, int verticalShift, bool extraPlane,
+    int horizontalSlices, int verticalSlices, bool intraOnly) {
     var (zero, one) = Ffv1StateTransition.Build([]);
     var coder = new Ffv1RangeEncoder(zero, one);
     var states = _FreshStates();
@@ -227,9 +241,9 @@ public sealed class Ffv1Encoder : IVideoCodecEncoder<Ffv1Encoder> {
     _WriteQuantTable(coder, _ONE_LEVEL_RUNS);
     _WriteQuantTable(coder, _ONE_LEVEL_RUNS);
 
-    coder.Put(states, 0, 0);          // no initial states of its own
-    coder.Symbol(states, 1, false);   // a checksum on every slice
-    coder.Symbol(states, 1, false);   // every frame a keyframe
+    coder.Put(states, 0, 0);                   // no initial states of its own
+    coder.Symbol(states, 1, false);            // a checksum on every slice
+    coder.Symbol(states, intraOnly ? 1 : 0, false);
 
     var body = coder.Terminate(false);
     var record = new byte[body.Length + 4];
@@ -255,7 +269,7 @@ public sealed class Ffv1Encoder : IVideoCodecEncoder<Ffv1Encoder> {
   // The frame
   // ============================================================================================
 
-  private byte[] _EncodeFrame(Ffv1Plane[] planes) {
+  private byte[] _EncodeFrame(Ffv1Plane[] planes, bool keyframe) {
     var parameters = this._parameters;
     var output = new MemoryStream();
     var encoder = new Ffv1SliceEncoder(parameters);
@@ -264,14 +278,15 @@ public sealed class Ffv1Encoder : IVideoCodecEncoder<Ffv1Encoder> {
     // at 128 for every frame, because the first slice begins at the same byte the frame does.
     var frameCoder = new Ffv1RangeEncoder(this._zeroState, this._oneState);
     var keyframeState = _FreshStates();
-    frameCoder.Put(keyframeState, 0, 1);
+    frameCoder.Put(keyframeState, 0, keyframe ? 1 : 0);
 
+    var sliceIndex = 0;
     for (var sliceY = 0; sliceY < parameters.VerticalSlices; ++sliceY)
-      for (var sliceX = 0; sliceX < parameters.HorizontalSlices; ++sliceX) {
-        var first = sliceX == 0 && sliceY == 0;
+      for (var sliceX = 0; sliceX < parameters.HorizontalSlices; ++sliceX, ++sliceIndex) {
+        var first = sliceIndex == 0;
         var coder = first ? frameCoder : new Ffv1RangeEncoder(this._zeroState, this._oneState);
 
-        this._EncodeSlice(encoder, coder, planes, sliceX, sliceY);
+        this._EncodeSlice(encoder, coder, planes, sliceX, sliceY, sliceIndex, keyframe);
         _AppendSlice(output, coder.Terminate(true));
       }
 
@@ -279,7 +294,9 @@ public sealed class Ffv1Encoder : IVideoCodecEncoder<Ffv1Encoder> {
   }
 
   /// <summary>Codes one slice: its header (RFC 9043 §4.5), then its samples.</summary>
-  private void _EncodeSlice(Ffv1SliceEncoder encoder, Ffv1RangeEncoder coder, Ffv1Plane[] planes, int sliceX, int sliceY) {
+  private void _EncodeSlice(
+    Ffv1SliceEncoder encoder, Ffv1RangeEncoder coder, Ffv1Plane[] planes,
+    int sliceX, int sliceY, int sliceIndex, bool keyframe) {
     var parameters = this._parameters;
     var headerStates = _FreshStates();
 
@@ -303,7 +320,7 @@ public sealed class Ffv1Encoder : IVideoCodecEncoder<Ffv1Encoder> {
     for (var plane = 0; plane < planes.Length; ++plane)
       slicePlanes[plane] = this._CutOut(planes[plane], plane, x, y, width, height);
 
-    var states = this._FreshContexts();
+    var states = this._ContextsForSlice(sliceIndex, keyframe);
 
     if (parameters.ColourSpaceType == _COLOUR_SPACE_YCBCR) {
       for (var plane = 0; plane < slicePlanes.Length; ++plane)
@@ -350,7 +367,20 @@ public sealed class Ffv1Encoder : IVideoCodecEncoder<Ffv1Encoder> {
     return cut;
   }
 
-  /// <summary>The initial states of every context of every kind of plane, which every slice of every frame starts from.</summary>
+  /// <summary>Gets a slice's adaptive contexts, resetting them at keyframes and carrying them otherwise.</summary>
+  private byte[][][] _ContextsForSlice(int slice, bool keyframe) {
+    var sliceCount = this._parameters.HorizontalSlices * this._parameters.VerticalSlices;
+    this._rangeStates ??= new byte[sliceCount][][][];
+    if (this._rangeStates.Length != sliceCount)
+      this._rangeStates = new byte[sliceCount][][][];
+
+    if (keyframe || this._rangeStates[slice] == null)
+      this._rangeStates[slice] = this._FreshContexts();
+
+    return this._rangeStates[slice];
+  }
+
+  /// <summary>The initial states of every context of every kind of plane.</summary>
   private byte[][][] _FreshContexts() {
     var parameters = this._parameters;
     var kinds = new byte[3][][];
