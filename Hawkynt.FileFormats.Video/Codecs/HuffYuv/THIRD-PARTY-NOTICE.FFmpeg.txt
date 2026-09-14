@@ -1,0 +1,37 @@
+The HuffYUV / FFVHUFF implementation in this directory, and HuffYuvDecoder.cs
+and HuffYuvEncoder.cs beside it, use FFmpeg (https://ffmpeg.org/) as the
+reference implementation for the bitstream layout, prediction rules, interlaced
+row scheduling and per-frame Huffman-table placement. FFmpeg is licensed under
+the GNU Lesser General Public License version 2.1 or later. This package is
+licensed under the GNU Lesser General Public License version 3 or later, into
+which LGPL-2.1-or-later code may be taken.
+
+Files consulted:
+
+  libavcodec/huffyuvenc.c       encoder header/extradata, pixel-layout selection,
+                                residual order, interlaced and 4:2:0 row schedule,
+                                per-frame Huffman tables and final word swapping
+  libavcodec/huffyuvdec.c       decoder row scheduling and high-bit-depth residual
+                                reconstruction used to delimit the eight-bit scope
+  libavcodec/huffyuv.c          shared Huffman-table construction and codec helpers
+  libavcodec/huffyuv.h          shared format state and constants
+
+The implementation is expressed in the architecture and naming of this package;
+no external binary or native dependency is introduced.
+
+FFmpeg's HuffYUV encoder source carries:
+
+  Copyright (c) 2002-2014 Michael Niedermayer <michaelni@gmx.at>
+
+FFmpeg is free software; you can redistribute it and/or modify it under the
+terms of the GNU Lesser General Public License as published by the Free Software
+Foundation; either version 2.1 of the License, or (at your option) any later
+version.
+
+FFmpeg is distributed in the hope that it will be useful, but WITHOUT ANY
+WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
+PARTICULAR PURPOSE. See the GNU Lesser General Public License for more details.
+
+You should have received a copy of the GNU Lesser General Public License along
+with FFmpeg; if not, write to the Free Software Foundation, Inc., 51 Franklin
+Street, Fifth Floor, Boston, MA 02110-1301 USA.
