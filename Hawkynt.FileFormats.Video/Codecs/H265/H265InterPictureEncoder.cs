@@ -25,10 +25,11 @@ namespace FileFormat.Codecs.H265;
 /// the same arithmetic the decoder will do. Anything else accumulates as drift over a group of
 /// pictures, which looks like the picture slowly dissolving rather than like a bug.
 /// <para/>
-/// <b>What it does not do.</b> One prediction unit per coding unit, one reference, integer-sample
-/// motion, and no rate-distortion search over coding unit sizes. Each of those costs compression
-/// and none of them costs correctness: the syntax is ordinary Main-profile HEVC and any decoder
-/// reads it.
+/// <b>What it does not do.</b> One prediction unit per coding unit, one reference, and no
+/// rate-distortion search over coding unit sizes. Each of those costs compression and none of them
+/// costs correctness: the syntax is ordinary Main-profile HEVC and any decoder reads it. Motion is
+/// searched to the quarter-sample precision the bitstream carries, using the decoder's normative
+/// interpolation rather than a second approximation of it.
 /// </remarks>
 internal sealed class H265InterPictureEncoder : IH265MotionContext {
 
@@ -398,7 +399,7 @@ internal sealed class H265InterPictureEncoder : IH265MotionContext {
   /// a bidirectional block costs two vectors where a single-list one costs one.
   /// </remarks>
   private H265MotionInfo _ChooseMotion(int x0, int y0, int size) {
-    var fromPast = this._Search(x0, y0, size, this._reference);
+    var fromPast = this._Search(x0, y0, size, this._reference, 0);
     var best = H265MotionInfo.None;
     best.Set(0, true, 0, fromPast.X, fromPast.Y);
 
@@ -407,7 +408,7 @@ internal sealed class H265InterPictureEncoder : IH265MotionContext {
 
     var bestCost = this._ResidualCost(x0, y0, size, best);
 
-    var fromFuture = this._Search(x0, y0, size, this._future);
+    var fromFuture = this._Search(x0, y0, size, this._future, 1);
     var backward = H265MotionInfo.None;
     backward.Set(1, true, 0, fromFuture.X, fromFuture.Y);
 
@@ -527,15 +528,21 @@ internal sealed class H265InterPictureEncoder : IH265MotionContext {
   // ── prediction, residual and reconstruction ─────────────────────────────────
 
   /// <summary>
-  /// Searches the reference for the block that costs the fewest bits to correct.
+  /// Searches the reference for the block that leaves the smallest luminance residual.
   /// </summary>
   /// <remarks>
   /// The zero vector is the incumbent rather than the first candidate scanned. A block whose content
   /// did not move has to come out with the zero vector and not with whichever equally good
   /// displacement the scan happened to reach first — the zero vector is nearly always what the
   /// predictor already says, so it is the one that costs nothing to state.
+  /// <para/>
+  /// Whole-sample positions are cheap to compare directly and establish the coarse minimum. The
+  /// search then refines the eight neighbours at half-sample precision and the eight neighbours at
+  /// quarter-sample precision. Those fractional candidates are measured by running the decoder's
+  /// actual interpolation and comparing its reconstructed prediction, so the search cannot disagree
+  /// with the decoder about filter rounding, edge extension or chroma-vector scaling.
   /// </remarks>
-  private (int X, int Y) _Search(int x0, int y0, int size, H265Picture reference) {
+  private (int X, int Y) _Search(int x0, int y0, int size, H265Picture reference, int list) {
     var width = Math.Min(size, this._sps.Width - x0);
     var height = Math.Min(size, this._sps.Height - y0);
 
@@ -555,7 +562,42 @@ internal sealed class H265InterPictureEncoder : IH265MotionContext {
         best = (dx * _QUARTER_SAMPLE, dy * _QUARTER_SAMPLE);
       }
 
-    return best;
+    var bestX = best.X;
+    var bestY = best.Y;
+    var bestPredictionCost = this._MotionCost(x0, y0, size, list, bestX, bestY);
+    var maximum = _SEARCH_RANGE * _QUARTER_SAMPLE;
+
+    for (var step = _QUARTER_SAMPLE >> 1; step > 0; step >>= 1) {
+      var centreX = bestX;
+      var centreY = bestY;
+
+      for (var dy = -step; dy <= step; dy += step)
+        for (var dx = -step; dx <= step; dx += step) {
+          if (dx == 0 && dy == 0)
+            continue;
+
+          var candidateX = centreX + dx;
+          var candidateY = centreY + dy;
+          if (Math.Abs(candidateX) > maximum || Math.Abs(candidateY) > maximum)
+            continue;
+
+          var cost = this._MotionCost(x0, y0, size, list, candidateX, candidateY);
+          if (cost >= bestPredictionCost)
+            continue;
+
+          bestPredictionCost = cost;
+          bestX = candidateX;
+          bestY = candidateY;
+        }
+    }
+
+    return (bestX, bestY);
+  }
+
+  private long _MotionCost(int x0, int y0, int size, int list, int mvX, int mvY) {
+    var motion = H265MotionInfo.None;
+    motion.Set(list, true, 0, mvX, mvY);
+    return this._ResidualCost(x0, y0, size, motion);
   }
 
   private int _MatchCost(
