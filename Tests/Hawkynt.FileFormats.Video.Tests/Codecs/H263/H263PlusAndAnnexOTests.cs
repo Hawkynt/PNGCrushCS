@@ -51,10 +51,8 @@ public sealed class H263PlusAndAnnexOTests {
   [Category("Unit")]
   public void CustomPictureHeightIndicationAboveTheNormativeMaximumIsRejected() {
     var data = _CustomPlusHeader(heightIndication: 289);
-    var reader = new H263BitReader(data);
-    reader.Skip(22);
 
-    var failure = Assert.Throws<InvalidDataException>(() => H263PictureHeader.Parse(ref reader));
+    var failure = Assert.Throws<InvalidDataException>(() => _ParseHeaderAfterStart(data));
     Assert.That(failure!.Message, Does.Contain("PHI"));
     Assert.That(failure.Message, Does.Contain("288"));
   }
@@ -63,10 +61,8 @@ public sealed class H263PlusAndAnnexOTests {
   [Category("Unit")]
   public void ExtendedPixelAspectRatioMustBeRelativelyPrime() {
     var data = _CustomPlusHeader(pixelAspectRatio: 15, parWidth: 4, parHeight: 2);
-    var reader = new H263BitReader(data);
-    reader.Skip(22);
 
-    var failure = Assert.Throws<InvalidDataException>(() => H263PictureHeader.Parse(ref reader));
+    var failure = Assert.Throws<InvalidDataException>(() => _ParseHeaderAfterStart(data));
     Assert.That(failure!.Message, Does.Contain("relatively prime"));
   }
 
@@ -286,9 +282,9 @@ public sealed class H263PlusAndAnnexOTests {
   [Category("Unit")]
   public void TruncatedVlcCannotTurnPeekPaddingIntoARealCodeword() {
     var table = new H263VlcTable("test table", ("100000000", 7));
-    var reader = new H263BitReader(new byte[] { 0x80 }); // only eight bits; the ninth zero exists only in NextBits padding
+    var data = new byte[] { 0x80 }; // only eight bits; the ninth zero exists only in NextBits padding
 
-    var failure = Assert.Throws<InvalidDataException>(() => table.Read(ref reader));
+    var failure = Assert.Throws<InvalidDataException>(() => _ReadVlc(table, data));
     Assert.That(failure!.Message, Does.Contain("short"));
   }
 
@@ -296,6 +292,17 @@ public sealed class H263PlusAndAnnexOTests {
     var reader = new H263BitReader(data);
     Assert.That(reader.ReadBits(22), Is.EqualTo(_PICTURE_START_CODE));
     return H263PictureHeader.Parse(ref reader);
+  }
+
+  private static H263PictureHeader _ParseHeaderAfterStart(byte[] data) {
+    var reader = new H263BitReader(data);
+    reader.Skip(22);
+    return H263PictureHeader.Parse(ref reader);
+  }
+
+  private static int _ReadVlc(H263VlcTable table, byte[] data) {
+    var reader = new H263BitReader(data);
+    return table.Read(ref reader);
   }
 
   private static H263Frame _DecodeBMacroblocks(
