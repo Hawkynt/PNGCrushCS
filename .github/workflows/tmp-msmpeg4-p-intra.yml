@@ -34,7 +34,18 @@ jobs:
         run: dotnet restore Tests/Hawkynt.FileFormats.Video.Tests/Hawkynt.FileFormats.Video.Tests.csproj -p:EnableWindowsTargeting=true
 
       - name: Run MS-MPEG-4 tests
-        run: dotnet test Tests/Hawkynt.FileFormats.Video.Tests/Hawkynt.FileFormats.Video.Tests.csproj --configuration Release --no-restore -p:EnableWindowsTargeting=true --filter FullyQualifiedName~MsMpeg4
+        shell: bash
+        run: |
+          set -o pipefail
+          dotnet test Tests/Hawkynt.FileFormats.Video.Tests/Hawkynt.FileFormats.Video.Tests.csproj --configuration Release --no-restore -p:EnableWindowsTargeting=true --filter FullyQualifiedName~MsMpeg4 --logger "console;verbosity=detailed" 2>&1 | tee /tmp/msmpeg4-focused.log
+
+      - name: Upload focused failure log
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: msmpeg4-focused-failure
+          path: /tmp/msmpeg4-focused.log
+          if-no-files-found: error
 
       - name: Run complete video test project
         run: dotnet test Tests/Hawkynt.FileFormats.Video.Tests/Hawkynt.FileFormats.Video.Tests.csproj --configuration Release --no-restore -p:EnableWindowsTargeting=true
