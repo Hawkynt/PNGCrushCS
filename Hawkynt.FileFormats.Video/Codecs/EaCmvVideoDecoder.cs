@@ -174,7 +174,7 @@ public sealed class EaCmvVideoDecoder : IVideoCodecDecoder<EaCmvVideoDecoder> {
       Height = this._height,
       Format = PixelFormat.Indexed8,
       PixelData = target.Indices,
-      Palette = this._palette.ToArray(),
+      Palette = (byte[])this._palette.Clone(),
       PaletteCount = 256,
     };
   }
