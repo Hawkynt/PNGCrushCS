@@ -34,7 +34,7 @@ jobs:
           ffmpeg -version | head -n 1
 
       - name: Check whitespace
-        run: git diff --check main...HEAD
+        run: git diff --check origin/main...HEAD
 
       - name: Restore video tests
         run: dotnet restore Tests/Hawkynt.FileFormats.Video.Tests/Hawkynt.FileFormats.Video.Tests.csproj -p:EnableWindowsTargeting=true
