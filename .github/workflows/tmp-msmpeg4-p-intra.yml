@@ -27,6 +27,22 @@ jobs:
       - name: Apply focused MS-MPEG-4 changes
         run: python .github/workflows/scripts/tmp-msmpeg4-p-intra.py
 
+      - name: Fix test accessibility
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('Tests/Hawkynt.FileFormats.Video.Tests/Codecs/MsMpeg4/MsMpeg4PredictedIntraMacroblockTests.cs')
+          text = path.read_text(encoding='utf-8')
+          text = text.replace('[TestCase("MPG4", MsMpeg4Version.Version1)]', '[TestCase("MPG4", 1)]')
+          text = text.replace('[TestCase("MP42", MsMpeg4Version.Version2)]', '[TestCase("MP42", 2)]')
+          text = text.replace('[TestCase("MP43", MsMpeg4Version.Version3)]', '[TestCase("MP43", 3)]')
+          text = text.replace(
+              'public void SceneChangeUsesTheIntraMacroblockFormInsideAPredictedPicture(string tag, MsMpeg4Version version) {',
+              'public void SceneChangeUsesTheIntraMacroblockFormInsideAPredictedPicture(string tag, int versionValue) {\n    var version = (MsMpeg4Version)versionValue;')
+          path.write_text(text, encoding='utf-8', newline='\n')
+          PY
+
       - name: Check whitespace
         run: git diff --check
 
