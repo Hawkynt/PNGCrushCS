@@ -1,222 +1,263 @@
 using System;
 using System.Buffers.Binary;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using FileFormat.Codecs.Vqa;
 using FileFormat.Core;
 using Hawkynt.FileFormats.Video;
 
 namespace FileFormat.Codecs.Tests;
 
-/// <summary>
-/// The VQA decoder's codebook-and-index-table decode, its codebook rate control, and the version and
-/// colour-depth refusals, on pictures built here byte by byte.
-/// </summary>
-/// <remarks>
-/// Three real files — two Red Alert, one original Command &amp; Conquer, 320x156, 85 and 160 pictures,
-/// 245 in all — were decoded here and by ffmpeg and compared sample for sample against ffmpeg's own
-/// <c>rgb24</c> output: every picture is identical. What that comparison cannot reach on demand is
-/// exercised here instead: a solid-fill block against a codebook-copy block, the index table's
-/// two-half split read directly, and — the finding this decoder rests on — that a codebook finished
-/// accumulating from its eighth <c>CBPZ</c> piece during picture N becomes current starting with
-/// picture N+1, not picture N itself.
-/// </remarks>
 [TestFixture]
 public sealed class VqaVideoDecoderTests {
 
-  private const int _WIDTH = 8;
-  private const int _HEIGHT = 2;
-  private const int _BLOCK_WIDTH = 4;
-  private const int _BLOCK_HEIGHT = 2;
-
-  // ============================================================================================
-  // Which streams it takes
-  // ============================================================================================
-
   [Test]
   [Category("Unit")]
-  public void TheVqaCodeIsTaken()
-    => Assert.That(VqaVideoDecoder.Accepts(_Stream()), Is.True);
-
-  [Test]
-  [Category("Unit")]
-  public void AnotherCodecsCodeIsNotTaken() {
-    var stream = new MediaStreamInfo { Index = 0, Kind = MediaStreamKind.Video, Codec = CodecTag.FromCharacters("cvid") };
-
-    Assert.That(VqaVideoDecoder.Accepts(stream), Is.False);
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void TheCodecIsRegistered() {
-    var stream = _Stream();
-
+  public void TheCodecIsRegisteredForAllDefinedVqaVersions() {
     Assert.That(VideoFormatRegistry.AllCodecs.Select(c => c.CodecName), Does.Contain("Westwood VQA Video"));
-    Assert.That(VideoFormatRegistry.CanDecode(stream), Is.True);
-    Assert.That(VideoFormatRegistry.CreateDecoder(stream), Is.InstanceOf<VqaVideoDecoder>());
-  }
-
-  // ============================================================================================
-  // Refusals
-  // ============================================================================================
-
-  [Test]
-  [Category("Unit")]
-  public void VersionOneRefuses() {
-    var stream = _Stream(version: 1);
-
-    var failure = Assert.Throws<NotSupportedException>(() => VqaVideoDecoder.Create(stream));
-    Assert.That(failure!.Message, Does.Contain("version 1"));
+    Assert.That(VideoFormatRegistry.CreateDecoder(_Stream(version: 1)), Is.InstanceOf<VqaVideoDecoder>());
+    Assert.That(VideoFormatRegistry.CreateDecoder(_Stream(version: 2)), Is.InstanceOf<VqaVideoDecoder>());
+    Assert.That(VideoFormatRegistry.CreateDecoder(_Stream(version: 3, highColour: true)), Is.InstanceOf<VqaVideoDecoder>());
   }
 
   [Test]
   [Category("Unit")]
-  public void TheHighColourFlagRefuses() {
-    var stream = _Stream(highColour: true);
-
-    Assert.Throws<NotSupportedException>(() => VqaVideoDecoder.Create(stream));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void APictureThatIsNotAWholeNumberOfBlocksRefuses() {
-    var stream = _Stream(width: 9);
-
-    Assert.Throws<NotSupportedException>(() => VqaVideoDecoder.Create(stream));
-  }
-
-  // ============================================================================================
-  // Blocks
-  // ============================================================================================
-
-  [Test]
-  [Category("Unit")]
-  public void ASolidFillBlockPaintsOneColourAcrossTheWholeBlock() {
-    var decoder = VqaVideoDecoder.Create(_Stream());
-    var table = _Table(topValues: [7, 7], lowValues: [0x0f, 0x0f]); // one row of two blocks, both filled
-
-    Assert.That(decoder.TryDecode(new(0, _Picture(codebook: [], palette: null, table)), out var picture), Is.True);
-
-    Assert.That(picture.PixelData, Is.EqualTo(Enumerable.Repeat((byte)7, _WIDTH * _HEIGHT)));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void ACodebookEntryIsCopiedBlockForBlock() {
-    var decoder = VqaVideoDecoder.Create(_Stream());
-    // Entry 0: 4x2 bytes, distinct per pixel so row-major placement is checkable.
+  public void VersionTwoSplitTableUsesCodebookAndSolidBlocks() {
+    var decoder = VqaVideoDecoder.Create(_Stream(width: 8, height: 2));
     byte[] codebook = [10, 11, 12, 13, 20, 21, 22, 23];
-    var table = _Table(topValues: [0, 0x0f], lowValues: [0, 0x0f]); // block 0 = codebook entry 0; block 1 = solid fill (not checked here)
+    var table = new byte[] { 0, 7, 0, 0x0f };
 
-    Assert.That(decoder.TryDecode(new(0, _Picture(codebook, palette: null, table)), out var picture), Is.True);
+    decoder.TryDecode(new(0, _Picture(_Chunk("CBF0", codebook), _Chunk("VPT0", table))), out var picture);
 
-    Assert.That(picture.PixelData[..4], Is.EqualTo(new byte[] { 10, 11, 12, 13 }));
-    Assert.That(picture.PixelData[_WIDTH..(_WIDTH + 4)], Is.EqualTo(new byte[] { 20, 21, 22, 23 }));
+    Assert.Multiple(() => {
+      Assert.That(picture.PixelData[..4], Is.EqualTo(new byte[] { 10, 11, 12, 13 }));
+      Assert.That(picture.PixelData[4..8], Is.EqualTo(new byte[] { 7, 7, 7, 7 }));
+      Assert.That(picture.PixelData[8..12], Is.EqualTo(new byte[] { 20, 21, 22, 23 }));
+    });
   }
-
-  // ============================================================================================
-  // Codebook rate control
-  // ============================================================================================
 
   [Test]
   [Category("Unit")]
-  public void APartialCodebookThatCompletesOnPictureNBecomesCurrentOnPictureNPlusOne() {
-    var decoder = VqaVideoDecoder.Create(_Stream());
-    var oldCodebook = new byte[] { 1, 1, 1, 1, 1, 1, 1, 1 };
-    var newCodebook = new byte[] { 9, 9, 9, 9, 9, 9, 9, 9 };
-    var table = _Table(topValues: [0, 0], lowValues: [0, 0]); // both blocks: codebook entry 0
+  public void VersionOneUsesSequentialLittleEndianPointersAndInvertedSolidColour() {
+    var decoder = VqaVideoDecoder.Create(_Stream(version: 1, width: 8, height: 2));
+    byte[] codebook = [1, 2, 3, 4, 5, 6, 7, 8];
+    // entry zero, then solid colour 7 => LoVal = 255 - 7 = 248, HiVal = ff
+    byte[] table = [0, 0, 248, 0xff];
 
-    // Picture 0: full codebook (all 1s).
-    decoder.TryDecode(new(0, _Picture(oldCodebook, palette: null, table)), out var first);
-    Assert.That(first.PixelData, Is.EqualTo(Enumerable.Repeat((byte)1, _WIDTH * _HEIGHT)));
+    decoder.TryDecode(new(0, _Picture(_Chunk("CBF0", codebook), _Chunk("VPT0", table))), out var picture);
 
-    // Pictures 1-7: seven of the eight pieces of a new codebook, plus this picture's own index table —
-    // still built from the OLD codebook, since the new one has not finished accumulating yet.
-    for (var i = 0; i < 7; ++i) {
-      decoder.TryDecode(new(0, _PictureWithCodebookPiece(newCodebook.AsSpan(i, 1).ToArray(), table)), out var middle);
-      Assert.That(middle.PixelData, Is.EqualTo(Enumerable.Repeat((byte)1, _WIDTH * _HEIGHT)), $"picture {i + 1}");
-    }
-
-    // Picture 8: the eighth and final piece arrives, completing the new codebook — but THIS picture
-    // still reads the old one; the new one is not current until the picture after it.
-    decoder.TryDecode(new(0, _PictureWithCodebookPiece(newCodebook.AsSpan(7, 1).ToArray(), table)), out var eighth);
-    Assert.That(eighth.PixelData, Is.EqualTo(Enumerable.Repeat((byte)1, _WIDTH * _HEIGHT)), "the delivering picture itself");
-
-    // Picture 9: the new codebook is current at last.
-    decoder.TryDecode(new(0, _Picture(codebook: [], palette: null, table)), out var ninth);
-    Assert.That(ninth.PixelData, Is.EqualTo(Enumerable.Repeat((byte)9, _WIDTH * _HEIGHT)), "the picture after the one that completed it");
+    Assert.Multiple(() => {
+      Assert.That(picture.PixelData[..4], Is.EqualTo(new byte[] { 1, 2, 3, 4 }));
+      Assert.That(picture.PixelData[4..8], Is.EqualTo(new byte[] { 7, 7, 7, 7 }));
+      Assert.That(picture.PixelData[8..12], Is.EqualTo(new byte[] { 5, 6, 7, 8 }));
+    });
   }
-
-  // ============================================================================================
-  // Palette
-  // ============================================================================================
 
   [Test]
   [Category("Unit")]
-  public void ASixBitPaletteEntryIsWidenedByRepeatingItsTopBits() {
-    var decoder = VqaVideoDecoder.Create(_Stream());
-    var palette = new byte[768];
-    palette[0] = 63; // red of colour 0: six-bit maximum
-    var table = _Table(topValues: [0, 0], lowValues: [0x0f, 0x0f]);
+  public void FourPixelTallVersionTwoUsesFfAsTheSolidSentinel() {
+    var decoder = VqaVideoDecoder.Create(_Stream(width: 4, height: 4, blockHeight: 4));
 
-    decoder.TryDecode(new(0, _Picture(codebook: [], palette, table)), out var picture);
+    decoder.TryDecode(new(0, _Picture(_Chunk("VPT0", new byte[] { 23, 0xff }))), out var picture);
 
-    Assert.That(picture.Palette![0], Is.EqualTo(255)); // (63 << 2) | (63 >> 4) = 255
+    Assert.That(picture.PixelData, Is.EqualTo(Enumerable.Repeat((byte)23, 16)));
   }
-
-  /// <summary>Four real files from the original Command &amp; Conquer demo carry a 753-byte palette
-  /// chunk — 251 colours, not the full 256 — and nothing past what a chunk states is touched.</summary>
-  [Test]
-  [Category("Unit")]
-  public void APaletteChunkNamingFewerThanTwoHundredFiftySixColoursLeavesTheRestUntouched() {
-    var decoder = VqaVideoDecoder.Create(_Stream());
-    var shortPalette = new byte[6]; // two colours only
-    shortPalette[0] = 63; // colour 0's red: six-bit maximum
-    shortPalette[3] = 32; // colour 1's red
-    var table = _Table(topValues: [0, 0], lowValues: [0x0f, 0x0f]);
-
-    decoder.TryDecode(new(0, _Picture(codebook: [], shortPalette, table)), out var picture);
-
-    Assert.That(picture.Palette![0], Is.EqualTo(255), "colour 0, stated");
-    Assert.That(picture.Palette![3], Is.GreaterThan(0), "colour 1, stated");
-    Assert.That(picture.Palette![6], Is.EqualTo(0), "colour 2, never stated, stays at its default");
-  }
-
-  // ============================================================================================
-  // Malformed pictures
-  // ============================================================================================
 
   [Test]
   [Category("Unit")]
-  public void AnUncompressedIndexTableShorterThanThePictureNeedsRefusesByName() {
-    var decoder = VqaVideoDecoder.Create(_Stream());
-    var tooShortTable = new byte[] { 0 }; // the real table needs blocksWide*blocksHigh*2 = 4 bytes
+  public void PartialCompressedCodebookBecomesCurrentAfterTheCompletingPicture() {
+    var decoder = VqaVideoDecoder.Create(_Stream(width: 4, height: 2, codebookParts: 2));
+    var oldBook = Enumerable.Repeat((byte)1, 8).ToArray();
+    var newBook = Enumerable.Repeat((byte)9, 8).ToArray();
+    byte[] table = [0, 0];
 
-    var chunks = new System.Collections.Generic.List<byte>();
-    chunks.AddRange(_Chunk("VPT0", tooShortTable));
+    decoder.TryDecode(new(0, _Picture(_Chunk("CBF0", oldBook), _Chunk("VPT0", table))), out _);
+    var compressed = VqaFormat80.CompressLiterals(newBook);
+    var split = compressed.Length / 2;
 
-    var failure = Assert.Throws<InvalidDataException>(() => decoder.TryDecode(new(0, chunks.ToArray()), out _));
+    decoder.TryDecode(new(0, _Picture(_Chunk("CBPZ", compressed[..split]), _Chunk("VPT0", table))), out var before);
+    decoder.TryDecode(new(0, _Picture(_Chunk("CBPZ", compressed[split..]), _Chunk("VPT0", table))), out var completing);
+    decoder.TryDecode(new(0, _Picture(_Chunk("VPT0", table))), out var after);
+
+    Assert.Multiple(() => {
+      Assert.That(before.PixelData, Is.EqualTo(Enumerable.Repeat((byte)1, 8)));
+      Assert.That(completing.PixelData, Is.EqualTo(Enumerable.Repeat((byte)1, 8)));
+      Assert.That(after.PixelData, Is.EqualTo(Enumerable.Repeat((byte)9, 8)));
+    });
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void PaletteValuesAreSixBitAndPersist() {
+    var decoder = VqaVideoDecoder.Create(_Stream(width: 4, height: 2));
+    var palette = new byte[6];
+    palette[0] = 63;
+    palette[3] = 32;
+    byte[] table = [0, 0x0f];
+
+    decoder.TryDecode(new(0, _Picture(_Chunk("CPL0", palette), _Chunk("VPT0", table))), out var picture);
+
+    Assert.Multiple(() => {
+      Assert.That(picture.Palette![0], Is.EqualTo(255));
+      Assert.That(picture.Palette[3], Is.EqualTo(ChannelScaling.Expand6(32)));
+      Assert.That(picture.Palette[6], Is.Zero);
+    });
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void HiColorSkipKeepsThePreviousFrameBlock() {
+    var decoder = VqaVideoDecoder.Create(_Stream(version: 3, highColour: true, width: 8, height: 2));
+    var red = _SolidVector(0x7c00);
+    var green = _SolidVector(0x03e0);
+    var blue = _SolidVector(0x001f);
+
+    var firstPointers = _Words((3 << 13) | 0, (3 << 13) | 1);
+    decoder.TryDecode(new(0, _Picture(_Chunk("CBF0", _Codebook(red, green)), _Chunk("VPTR", firstPointers))), out _);
+
+    // skip the left block, replace the right block with blue
+    var secondPointers = _Words(1, (3 << 13) | 0);
+    decoder.TryDecode(new(0, _Picture(_Chunk("CBF0", _Codebook(blue)), _Chunk("VPTR", secondPointers))), out var second);
+
+    Assert.Multiple(() => {
+      Assert.That(second.PixelData[..3], Is.EqualTo(new byte[] { 255, 0, 0 }));
+      Assert.That(second.PixelData[4 * 3..4 * 3 + 3], Is.EqualTo(new byte[] { 0, 0, 255 }));
+    });
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void HiColorTypeOneRepeatsAFirst256Vector() {
+    var decoder = VqaVideoDecoder.Create(_Stream(version: 3, highColour: true, width: 8, height: 2));
+    var pointers = _Words((1 << 13) | 0); // minimum count is two blocks
+
+    decoder.TryDecode(new(0, _Picture(_Chunk("CBF0", _Codebook(_SolidVector(0x7c00))), _Chunk("VPTR", pointers))), out var picture);
+
+    Assert.That(picture.PixelData.Where((_, i) => i % 3 == 0), Is.All.EqualTo(255));
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void HiColorTypeTwoUsesFollowingByteIndices() {
+    var decoder = VqaVideoDecoder.Create(_Stream(version: 3, highColour: true, width: 12, height: 2));
+    var pointerBytes = new List<byte>(_Words((2 << 13) | 0));
+    pointerBytes.Add(1);
+    pointerBytes.Add(2);
+
+    decoder.TryDecode(new(0, _Picture(
+      _Chunk("CBF0", _Codebook(_SolidVector(0x7c00), _SolidVector(0x03e0), _SolidVector(0x001f))),
+      _Chunk("VPTR", pointerBytes.ToArray()))), out var picture);
+
+    Assert.Multiple(() => {
+      Assert.That(picture.PixelData[..3], Is.EqualTo(new byte[] { 255, 0, 0 }));
+      Assert.That(picture.PixelData[12..15], Is.EqualTo(new byte[] { 0, 255, 0 }));
+      Assert.That(picture.PixelData[24..27], Is.EqualTo(new byte[] { 0, 0, 255 }));
+    });
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void HiColorTypeFiveRepeatsAnArbitraryVector() {
+    var decoder = VqaVideoDecoder.Create(_Stream(version: 3, highColour: true, width: 8, height: 2));
+    var pointers = new List<byte>(_Words((5 << 13) | 0));
+    pointers.Add(2);
+
+    decoder.TryDecode(new(0, _Picture(_Chunk("CBF0", _Codebook(_SolidVector(0x03e0))), _Chunk("VPTR", pointers.ToArray()))), out var picture);
+
+    Assert.That(picture.PixelData.Where((_, i) => i % 3 == 1), Is.All.EqualTo(255));
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void HiColorAlphaSkipPreservesIndividualPreviousPixels() {
+    var decoder = VqaVideoDecoder.Create(_Stream(version: 3, highColour: true, width: 4, height: 2, overlay: true));
+    var blue = _SolidVector(0x001f);
+    decoder.TryDecode(new(0, _Picture(_Chunk("CBF0", _Codebook(blue)), _Chunk("VPTR", _Words((3 << 13) | 0)))), out _);
+
+    var overlay = _SolidVector(0x7c00);
+    overlay[0] |= 0x8000;
+    decoder.TryDecode(new(0, _Picture(_Chunk("CBF0", _Codebook(overlay)), _Chunk("VPTR", _Words((4 << 13) | 0)))), out var picture);
+
+    Assert.Multiple(() => {
+      Assert.That(picture.PixelData[..3], Is.EqualTo(new byte[] { 0, 0, 255 }), "transparent pixel stays blue");
+      Assert.That(picture.PixelData[3..6], Is.EqualTo(new byte[] { 255, 0, 0 }), "opaque pixel becomes red");
+    });
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void HiColorVprzUsesNormalFormat80() {
+    var decoder = VqaVideoDecoder.Create(_Stream(version: 3, highColour: true, width: 4, height: 2));
+    var pointers = _Words((3 << 13) | 0);
+
+    decoder.TryDecode(new(0, _Picture(
+      _Chunk("CBF0", _Codebook(_SolidVector(0x7c00))),
+      _Chunk("VPRZ", VqaFormat80.CompressLiterals(pointers)))), out var picture);
+
+    Assert.That(picture.PixelData[..3], Is.EqualTo(new byte[] { 255, 0, 0 }));
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void ReservedHiColorPointerTypeRefuses() {
+    var decoder = VqaVideoDecoder.Create(_Stream(version: 3, highColour: true, width: 4, height: 2));
+
+    var failure = Assert.Throws<InvalidDataException>(() =>
+      decoder.TryDecode(new(0, _Picture(_Chunk("VPTR", _Words(7 << 13)))), out _));
+
+    Assert.That(failure!.Message, Does.Contain("type 7"));
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void ShortUncompressedIndexTableRefusesByName() {
+    var decoder = VqaVideoDecoder.Create(_Stream(width: 8, height: 2));
+
+    var failure = Assert.Throws<InvalidDataException>(() =>
+      decoder.TryDecode(new(0, _Picture(_Chunk("VPT0", new byte[] { 0 }))), out _));
+
     Assert.That(failure!.Message, Does.Contain("index table"));
-    Assert.That(failure.Message, Does.Contain("4"));
-    Assert.That(failure.Message, Does.Contain("1"));
   }
 
-  // ============================================================================================
-  // Helpers
-  // ============================================================================================
+  [Test]
+  [Category("Unit")]
+  public void UnsupportedGeometryAndContradictoryVersionRefuse() {
+    Assert.Throws<NotSupportedException>(() => VqaVideoDecoder.Create(_Stream(width: 9, height: 2)));
+    Assert.Throws<NotSupportedException>(() => VqaVideoDecoder.Create(_Stream(version: 1, highColour: true)));
+    Assert.Throws<InvalidDataException>(() => VqaVideoDecoder.Create(_Stream(version: 3, highColour: false)));
+  }
 
-  private static MediaStreamInfo _Stream(int version = 2, bool highColour = false, int width = _WIDTH) {
+  private static MediaStreamInfo _Stream(
+    int version = 2,
+    bool highColour = false,
+    int width = 4,
+    int height = 2,
+    int blockHeight = 2,
+    int codebookParts = 8,
+    bool overlay = false) {
     var header = new byte[42];
     BinaryPrimitives.WriteUInt16LittleEndian(header, (ushort)version);
-    header[2] = (byte)(highColour ? 0x10 : 0);
-    header[10] = _BLOCK_WIDTH;
-    header[11] = _BLOCK_HEIGHT;
+    BinaryPrimitives.WriteUInt16LittleEndian(header.AsSpan(2), (ushort)((highColour ? 0x10 : 0) | (overlay ? 0x04 : 0)));
+    BinaryPrimitives.WriteUInt16LittleEndian(header.AsSpan(6), (ushort)width);
+    BinaryPrimitives.WriteUInt16LittleEndian(header.AsSpan(8), (ushort)height);
+    header[10] = 4;
+    header[11] = (byte)blockHeight;
+    header[12] = 15;
+    header[13] = (byte)codebookParts;
+    BinaryPrimitives.WriteUInt16LittleEndian(header.AsSpan(14), highColour ? (ushort)0 : (ushort)256);
     return new() {
-      Index = 0, Kind = MediaStreamKind.Video, Codec = CodecTag.FromCharacters("WSVQ"),
-      Width = width, Height = _HEIGHT, CodecPrivateData = header,
+      Index = 0,
+      Kind = MediaStreamKind.Video,
+      Codec = CodecTag.FromCharacters("WSVQ"),
+      Width = width,
+      Height = height,
+      BitsPerPixel = highColour ? 15 : 8,
+      CodecPrivateData = header,
     };
   }
 
-  private static byte[] _Table(byte[] topValues, byte[] lowValues) => [.. topValues, .. lowValues];
+  private static byte[] _Picture(params byte[][] chunks) => chunks.SelectMany(x => x).ToArray();
 
   private static byte[] _Chunk(string id, byte[] payload) {
     var chunk = new byte[8 + payload.Length + (payload.Length & 1)];
@@ -226,20 +267,23 @@ public sealed class VqaVideoDecoderTests {
     return chunk;
   }
 
-  private static byte[] _Picture(byte[] codebook, byte[]? palette, byte[] table) {
-    var chunks = new System.Collections.Generic.List<byte>();
-    if (codebook.Length > 0)
-      chunks.AddRange(_Chunk("CBF0", codebook));
-    if (palette != null)
-      chunks.AddRange(_Chunk("CPL0", palette));
-    chunks.AddRange(_Chunk("VPT0", table));
-    return chunks.ToArray();
+  private static ushort[] _SolidVector(ushort colour) => Enumerable.Repeat(colour, 8).ToArray();
+
+  private static byte[] _Codebook(params ushort[][] vectors) {
+    var result = new byte[vectors.Sum(v => v.Length) * 2];
+    var at = 0;
+    foreach (var vector in vectors)
+      foreach (var pixel in vector) {
+        BinaryPrimitives.WriteUInt16LittleEndian(result.AsSpan(at), pixel);
+        at += 2;
+      }
+    return result;
   }
 
-  private static byte[] _PictureWithCodebookPiece(byte[] piece, byte[] table) {
-    var chunks = new System.Collections.Generic.List<byte>();
-    chunks.AddRange(_Chunk("CBP0", piece));
-    chunks.AddRange(_Chunk("VPT0", table));
-    return chunks.ToArray();
+  private static byte[] _Words(params int[] values) {
+    var result = new byte[values.Length * 2];
+    for (var i = 0; i < values.Length; ++i)
+      BinaryPrimitives.WriteUInt16LittleEndian(result.AsSpan(i * 2), checked((ushort)values[i]));
+    return result;
   }
 }
