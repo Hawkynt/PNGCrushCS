@@ -199,8 +199,9 @@ internal sealed class Indeo5Decoder : IviDecoder {
             + "encoder is known to have written it, so what its scan and quantisation would be has never "
             + "been observed.");
 
-        layoutChanged = macroblockSize != band.MacroblockSize || blockSize != band.BlockSize;
-        if (layoutChanged) {
+        var bandLayoutChanged = macroblockSize != band.MacroblockSize || blockSize != band.BlockSize;
+        layoutChanged |= bandLayoutChanged;
+        if (bandLayoutChanged) {
           band.MacroblockSize = macroblockSize;
           band.BlockSize = blockSize;
         }
