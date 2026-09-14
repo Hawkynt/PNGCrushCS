@@ -73,7 +73,8 @@ internal static class WordBinaryFile {
       throw new InvalidDataException("Word document contains no Data stream for its picture.");
 
     var pictureData = compound.Read(dataEntry.Value);
-    var pngAt = pictureData.AsSpan().IndexOf(PngFile.Signature);
+    ReadOnlySpan<byte> pngSignature = [137, 80, 78, 71, 13, 10, 26, 10];
+    var pngAt = pictureData.AsSpan().IndexOf(pngSignature);
     if (pngAt < 0)
       throw new InvalidDataException("Word Data stream contains no decodable PNG inline picture.");
 
@@ -119,8 +120,6 @@ internal static class WordBinaryFile {
     BinaryPrimitives.WriteUInt16LittleEndian(result.AsSpan(4), _PicfSize);
     BinaryPrimitives.WriteUInt16LittleEndian(result.AsSpan(6), 0x0064); // MFPF.MM_SHAPE
 
-    // Fit within a 2x2 inch box. PICF dimensions are signed 16-bit twips; fitting here avoids the
-    // historical overflow of the native-pixel-at-96-DPI convention for large source images.
     var scale = Math.Min(2880d / image.Width, 2880d / image.Height);
     var goalWidth = Math.Max(1, (int)Math.Round(image.Width * scale));
     var goalHeight = Math.Max(1, (int)Math.Round(image.Height * scale));
@@ -132,19 +131,18 @@ internal static class WordBinaryFile {
     _InlineShape.CopyTo(result.AsSpan(_PicfSize));
     var at = _PicfSize + _InlineShape.Length;
 
-    // OfficeArtFBSE containing one inline OfficeArtBlipPNG.
-    BinaryPrimitives.WriteUInt16LittleEndian(result.AsSpan(at), 0x0062); // recVer=2, recInstance=6 (PNG)
+    BinaryPrimitives.WriteUInt16LittleEndian(result.AsSpan(at), 0x0062);
     BinaryPrimitives.WriteUInt16LittleEndian(result.AsSpan(at + 2), 0xF007);
     BinaryPrimitives.WriteUInt32LittleEndian(result.AsSpan(at + 4), checked((uint)fbseBodyLength));
     at += 8;
-    result[at] = 0x06;     // btWin32: PNG
-    result[at + 1] = 0x06; // btMacOS: PNG
+    result[at] = 0x06;
+    result[at + 1] = 0x06;
     uid.CopyTo(result, at + 2);
     BinaryPrimitives.WriteUInt32LittleEndian(result.AsSpan(at + 20), checked((uint)blipLength));
-    BinaryPrimitives.WriteUInt32LittleEndian(result.AsSpan(at + 24), 1); // cRef
+    BinaryPrimitives.WriteUInt32LittleEndian(result.AsSpan(at + 24), 1);
     at += fbseFixedBody;
 
-    BinaryPrimitives.WriteUInt16LittleEndian(result.AsSpan(at), 0x6E00); // one UID PNG BLIP
+    BinaryPrimitives.WriteUInt16LittleEndian(result.AsSpan(at), PowerPointFile.PngBlipVersionAndInstance);
     BinaryPrimitives.WriteUInt16LittleEndian(result.AsSpan(at + 2), PowerPointFile.PngBlipType);
     BinaryPrimitives.WriteUInt32LittleEndian(result.AsSpan(at + 4), checked((uint)(blipPrefix + png.Length)));
     uid.CopyTo(result, at + 8);
