@@ -33,16 +33,21 @@ public sealed class Ffv1Encoder : IVideoCodecEncoder<Ffv1Encoder> {
   private const int _MICRO_VERSION = 4;
   private const int _COLOUR_SPACE_YCBCR = 0;
   private const int _COLOUR_SPACE_RGB = 1;
-  private const int _BITS_PER_RAW_SAMPLE = 8;
   private const int _PICTURE_STRUCTURE_PROGRESSIVE = 3;
   private const int _MAX_SLICES_PER_AXIS = 256;
   private const int _LARGEST_DEFAULT_SLICE = 360 * 288;
 
-  /// <summary>The first half of the standard eleven-level quantiser, as runs of equal entries.</summary>
+  /// <summary>The first half of the standard eight-bit eleven-level quantiser, as runs of equal entries.</summary>
   private static ReadOnlySpan<int> _ELEVEN_LEVEL_RUNS => [1, 1, 3, 7, 23, 93];
 
-  /// <summary>The first half of the standard five-level quantiser.</summary>
+  /// <summary>The first half of the standard eight-bit five-level quantiser.</summary>
   private static ReadOnlySpan<int> _FIVE_LEVEL_RUNS => [1, 3, 124];
+
+  /// <summary>The high-bit-depth nine-level quantiser used by FFmpeg and RFC-compatible implementations.</summary>
+  private static ReadOnlySpan<int> _NINE_LEVEL_HIGH_RUNS => [5, 8, 14, 29, 72];
+
+  /// <summary>The high-bit-depth five-level quantiser paired with <see cref="_NINE_LEVEL_HIGH_RUNS"/>.</summary>
+  private static ReadOnlySpan<int> _FIVE_LEVEL_HIGH_RUNS => [11, 39, 78];
 
   /// <summary>A quantiser that switches one context input off.</summary>
   private static ReadOnlySpan<int> _ONE_LEVEL_RUNS => [128];
@@ -62,8 +67,10 @@ public sealed class Ffv1Encoder : IVideoCodecEncoder<Ffv1Encoder> {
 
   private Ffv1Encoder(
     MediaStreamInfo stream, PixelFormat format, Ffv1EncoderOptions options, int horizontalSlices, int verticalSlices) {
+    var bitsPerRawSample = Ffv1SampleIO.ResolveBitDepth(format, options.BitsPerRawSample);
     this._format = format;
     this._options = options with {
+      BitsPerRawSample = bitsPerRawSample,
       HorizontalSlices = horizontalSlices,
       VerticalSlices = verticalSlices,
       StateTransitionDelta = options.StateTransitionDelta is null ? null : (int[])options.StateTransitionDelta.Clone(),
@@ -133,7 +140,7 @@ public sealed class Ffv1Encoder : IVideoCodecEncoder<Ffv1Encoder> {
       24 => PixelFormat.Rgb24,
       32 => PixelFormat.Rgba32,
       _ => throw new NotSupportedException(
-        $"Video stream {stream.Index} states {stream.BitsPerPixel} bits per pixel, which names no eight-bit format FFV1 is written in here. Name the format outright instead."),
+        $"Video stream {stream.Index} states {stream.BitsPerPixel} bits per pixel, which is ambiguous or unsupported for FFV1 inference here. Name the raw pixel format outright instead."),
     };
 
     return Create(stream, format, new Ffv1EncoderOptions());
@@ -142,7 +149,7 @@ public sealed class Ffv1Encoder : IVideoCodecEncoder<Ffv1Encoder> {
   /// <summary>
   /// Builds the default version 3 range-coder encoder with a chosen slice grid and keyframe interval.
   /// </summary>
-  /// <remarks>This overload is retained as the compact API; use the options overload for coder, version and context choices.</remarks>
+  /// <remarks>This overload is retained as the compact API; use the options overload for coder, version, sample depth and context choices.</remarks>
   public static Ffv1Encoder Create(
     MediaStreamInfo stream, PixelFormat format, int horizontalSlices = 0, int verticalSlices = 0, int keyFrameInterval = 1)
     => Create(stream, format, new() {
@@ -175,6 +182,15 @@ public sealed class Ffv1Encoder : IVideoCodecEncoder<Ffv1Encoder> {
     if (options.KeyFrameInterval <= 0)
       throw new ArgumentOutOfRangeException(nameof(options), options.KeyFrameInterval, "An FFV1 keyframe interval must be at least one frame.");
 
+    var coded = _CodedFormat(format);
+    var bitsPerRawSample = Ffv1SampleIO.ResolveBitDepth(coded, options.BitsPerRawSample);
+    if (options.Version == 0 && bitsPerRawSample != 8)
+      throw new NotSupportedException("FFV1 version 0 has no bits-per-raw-sample field and is therefore limited to eight-bit samples.");
+
+    if (bitsPerRawSample > 8 && options.EntropyCoder == Ffv1EntropyCoder.GolombRice)
+      throw new NotSupportedException(
+        "RFC 9043 says Golomb-Rice should not be used above eight bits and FFmpeg forces such streams to the range coder; deep-sample output is therefore range-coded here for interoperability.");
+
     if (options.EntropyCoder == Ffv1EntropyCoder.RangeCustom) {
       if (options.StateTransitionDelta is not { Length: 256 })
         throw new ArgumentException("A custom FFV1 range coder needs exactly 256 state-transition deltas.", nameof(options));
@@ -185,7 +201,6 @@ public sealed class Ffv1Encoder : IVideoCodecEncoder<Ffv1Encoder> {
     } else if (options.StateTransitionDelta is { Length: > 0 })
       throw new ArgumentException("State-transition deltas are meaningful only with the custom range coder.", nameof(options));
 
-    var coded = _CodedFormat(format);
     var (colourSpace, chromaPlanes, horizontalShift, verticalShift, _) = _Layout(coded);
     var subsampled = chromaPlanes && colourSpace == _COLOUR_SPACE_YCBCR;
 
@@ -209,7 +224,7 @@ public sealed class Ffv1Encoder : IVideoCodecEncoder<Ffv1Encoder> {
       horizontalSlices = verticalSlices = 1;
     }
 
-    return new(stream, coded, options, horizontalSlices, verticalSlices);
+    return new(stream, coded, options with { BitsPerRawSample = bitsPerRawSample }, horizontalSlices, verticalSlices);
   }
 
   /// <summary>Turns one picture into one complete FFV1 frame.</summary>
@@ -283,7 +298,7 @@ public sealed class Ffv1Encoder : IVideoCodecEncoder<Ffv1Encoder> {
 
     coder.Symbol(states, colourSpace, false);
     if (options.Version >= 1)
-      coder.Symbol(states, _BITS_PER_RAW_SAMPLE, false);
+      coder.Symbol(states, options.BitsPerRawSample, false);
 
     coder.Put(states, 0, chromaPlanes ? 1 : 0);
     coder.Symbol(states, horizontalShift, false);
@@ -296,7 +311,7 @@ public sealed class Ffv1Encoder : IVideoCodecEncoder<Ffv1Encoder> {
       coder.Symbol(states, 1, false); // one table set
     }
 
-    _WriteQuantTableSet(coder, options.ContextModel);
+    _WriteQuantTableSet(coder, options.ContextModel, options.BitsPerRawSample > 8);
 
     if (options.Version < 3)
       return;
@@ -306,12 +321,15 @@ public sealed class Ffv1Encoder : IVideoCodecEncoder<Ffv1Encoder> {
     coder.Symbol(states, options.KeyFrameInterval == 1 ? 1 : 0, false);
   }
 
-  private static void _WriteQuantTableSet(Ffv1RangeEncoder coder, Ffv1ContextModel model) {
-    _WriteQuantTable(coder, _ELEVEN_LEVEL_RUNS);
-    _WriteQuantTable(coder, _ELEVEN_LEVEL_RUNS);
-    _WriteQuantTable(coder, model == Ffv1ContextModel.Small ? _ELEVEN_LEVEL_RUNS : _FIVE_LEVEL_RUNS);
-    _WriteQuantTable(coder, model == Ffv1ContextModel.Small ? _ONE_LEVEL_RUNS : _FIVE_LEVEL_RUNS);
-    _WriteQuantTable(coder, model == Ffv1ContextModel.Small ? _ONE_LEVEL_RUNS : _FIVE_LEVEL_RUNS);
+  private static void _WriteQuantTableSet(Ffv1RangeEncoder coder, Ffv1ContextModel model, bool deepSamples) {
+    var primary = deepSamples ? _NINE_LEVEL_HIGH_RUNS : _ELEVEN_LEVEL_RUNS;
+    var secondary = deepSamples ? _FIVE_LEVEL_HIGH_RUNS : _FIVE_LEVEL_RUNS;
+
+    _WriteQuantTable(coder, primary);
+    _WriteQuantTable(coder, primary);
+    _WriteQuantTable(coder, model == Ffv1ContextModel.Small ? primary : secondary);
+    _WriteQuantTable(coder, model == Ffv1ContextModel.Small ? _ONE_LEVEL_RUNS : secondary);
+    _WriteQuantTable(coder, model == Ffv1ContextModel.Small ? _ONE_LEVEL_RUNS : secondary);
   }
 
   private static void _WriteQuantTable(Ffv1RangeEncoder coder, ReadOnlySpan<int> runs) {
@@ -397,7 +415,7 @@ public sealed class Ffv1Encoder : IVideoCodecEncoder<Ffv1Encoder> {
 
     coder.Symbol(headerStates, _PICTURE_STRUCTURE_PROGRESSIVE, false);
     coder.Symbol(headerStates, 0, false); // sample aspect ratio unknown
-    coder.Symbol(headerStates, 1, false);
+    coder.Symbol(headerStates, 0, false);
 
     var x = (int)((long)sliceX * this._stream.Width / this._parameters.HorizontalSlices);
     var y = (int)((long)sliceY * this._stream.Height / this._parameters.VerticalSlices);
@@ -443,6 +461,9 @@ public sealed class Ffv1Encoder : IVideoCodecEncoder<Ffv1Encoder> {
   }
 
   private static void _AppendSlice(MemoryStream output, byte[] slice, bool checksum) {
+    if (slice.Length >= 1 << 24)
+      throw new InvalidDataException($"An FFV1 slice is {slice.Length} bytes; its 24-bit length field can describe at most {(1 << 24) - 1}.");
+
     if (!checksum) {
       output.Write(slice);
       output.WriteByte((byte)(slice.Length >> 16));
@@ -477,7 +498,7 @@ public sealed class Ffv1Encoder : IVideoCodecEncoder<Ffv1Encoder> {
   }
 
   private static byte[] _Concat(byte[] first, byte[] second) {
-    var result = new byte[first.Length + second.Length];
+    var result = new byte[checked(first.Length + second.Length)];
     first.CopyTo(result, 0);
     second.CopyTo(result, first.Length);
     return result;
@@ -488,7 +509,7 @@ public sealed class Ffv1Encoder : IVideoCodecEncoder<Ffv1Encoder> {
   // ============================================================================================
 
   private byte[][][] _RangeContextsForSlice(int slice, bool keyframe) {
-    var sliceCount = this._parameters.HorizontalSlices * this._parameters.VerticalSlices;
+    var sliceCount = checked(this._parameters.HorizontalSlices * this._parameters.VerticalSlices);
     this._rangeStates ??= new byte[sliceCount][][][];
     if (keyframe || this._rangeStates[slice] == null)
       this._rangeStates[slice] = this._FreshRangeContexts();
@@ -497,7 +518,7 @@ public sealed class Ffv1Encoder : IVideoCodecEncoder<Ffv1Encoder> {
   }
 
   private Ffv1GolombState[][] _GolombContextsForSlice(int slice, bool keyframe) {
-    var sliceCount = this._parameters.HorizontalSlices * this._parameters.VerticalSlices;
+    var sliceCount = checked(this._parameters.HorizontalSlices * this._parameters.VerticalSlices);
     this._golombStates ??= new Ffv1GolombState[sliceCount][][];
     if (keyframe || this._golombStates[slice] == null)
       this._golombStates[slice] = this._FreshGolombContexts();
@@ -550,16 +571,16 @@ public sealed class Ffv1Encoder : IVideoCodecEncoder<Ffv1Encoder> {
   // ============================================================================================
 
   private static (int ColourSpace, bool ChromaPlanes, int HorizontalShift, int VerticalShift, bool ExtraPlane) _Layout(PixelFormat format) => format switch {
-    PixelFormat.Gray8 => (_COLOUR_SPACE_YCBCR, false, 0, 0, false),
-    PixelFormat.GrayAlpha16 => (_COLOUR_SPACE_YCBCR, false, 0, 0, true),
-    PixelFormat.Yuv420P8 => (_COLOUR_SPACE_YCBCR, true, 1, 1, false),
-    PixelFormat.Yuv422P8 => (_COLOUR_SPACE_YCBCR, true, 1, 0, false),
-    PixelFormat.Yuv440P8 => (_COLOUR_SPACE_YCBCR, true, 0, 1, false),
-    PixelFormat.Yuv444P8 => (_COLOUR_SPACE_YCBCR, true, 0, 0, false),
-    PixelFormat.Rgb24 => (_COLOUR_SPACE_RGB, true, 0, 0, false),
-    PixelFormat.Rgba32 => (_COLOUR_SPACE_RGB, true, 0, 0, true),
+    PixelFormat.Gray8 or PixelFormat.Gray10 or PixelFormat.Gray16 => (_COLOUR_SPACE_YCBCR, false, 0, 0, false),
+    PixelFormat.GrayAlpha16 or PixelFormat.GrayAlpha32 => (_COLOUR_SPACE_YCBCR, false, 0, 0, true),
+    PixelFormat.Yuv420P8 or PixelFormat.Yuv420P10 or PixelFormat.Yuv420P12 or PixelFormat.Yuv420P16 => (_COLOUR_SPACE_YCBCR, true, 1, 1, false),
+    PixelFormat.Yuv422P8 or PixelFormat.Yuv422P10 or PixelFormat.Yuv422P12 or PixelFormat.Yuv422P16 => (_COLOUR_SPACE_YCBCR, true, 1, 0, false),
+    PixelFormat.Yuv440P8 or PixelFormat.Yuv440P10 or PixelFormat.Yuv440P12 or PixelFormat.Yuv440P16 => (_COLOUR_SPACE_YCBCR, true, 0, 1, false),
+    PixelFormat.Yuv444P8 or PixelFormat.Yuv444P10 or PixelFormat.Yuv444P12 or PixelFormat.Yuv444P16 => (_COLOUR_SPACE_YCBCR, true, 0, 0, false),
+    PixelFormat.Rgb24 or PixelFormat.Rgb48 => (_COLOUR_SPACE_RGB, true, 0, 0, false),
+    PixelFormat.Rgba32 or PixelFormat.Rgba64 => (_COLOUR_SPACE_RGB, true, 0, 0, true),
     _ => throw new NotSupportedException(
-      $"{format} is not a format FFV1 is written in here. Eight-bit grey, grey with alpha, planar 4:2:0, 4:2:2, 4:4:0 and 4:4:4, and packed colour with or without alpha are."),
+      $"{format} is not a raw integer format FFV1 is written in here. Supported layouts are grey, grey-alpha, planar 4:2:0/4:2:2/4:4:0/4:4:4, and RGB/RGBA at eight through sixteen significant bits."),
   };
 
   private static PixelFormat _CodedFormat(PixelFormat format) {
@@ -585,7 +606,7 @@ public sealed class Ffv1Encoder : IVideoCodecEncoder<Ffv1Encoder> {
 
     if (!lossless)
       throw new NotSupportedException(
-        $"The stream is coded as {this._format} and this picture is {frame.Format}. Nothing here converts between the two without changing samples, so it is refused rather than coded losslessly as something it is not; convert the picture first, or build the encoder for {frame.Format}.");
+        $"The stream is coded as {this._format} and this picture is {frame.Format}. Nothing here converts between the two without changing sample values, so it is refused rather than coded losslessly as something it is not; convert the picture first, or build the encoder for {frame.Format}.");
 
     return FastRawImageConverter.Convert(frame, this._format);
   }
@@ -593,8 +614,10 @@ public sealed class Ffv1Encoder : IVideoCodecEncoder<Ffv1Encoder> {
   private Ffv1Plane[] _PlanesOf(RawImage source) {
     var width = source.Width;
     var height = source.Height;
-    var data = source.PixelData;
-    var count = width * height;
+    var data = source.PixelData.AsSpan();
+    var count = checked(width * height);
+    var bits = this._parameters.BitsPerRawSample;
+    var sampleMask = (1 << bits) - 1;
 
     if (this._parameters.ColourSpaceType == _COLOUR_SPACE_RGB) {
       var channels = this._parameters.ExtraPlane ? 4 : 3;
@@ -602,19 +625,29 @@ public sealed class Ffv1Encoder : IVideoCodecEncoder<Ffv1Encoder> {
       for (var plane = 0; plane < channels; ++plane)
         planes[plane] = new(width, height);
 
-      var offset = 1 << _BITS_PER_RAW_SAMPLE;
+      var offset = 1 << bits;
+      var oldRgbTransform = bits is >= 9 and <= 15 && !this._parameters.ExtraPlane;
       for (var i = 0; i < count; ++i) {
-        var red = data[i * channels];
-        var green = data[i * channels + 1];
-        var blue = data[i * channels + 2];
+        var red = _ReadCheckedSample(data, i * channels, source.Format, sampleMask);
+        var green = _ReadCheckedSample(data, i * channels + 1, source.Format, sampleMask);
+        var blue = _ReadCheckedSample(data, i * channels + 2, source.Format, sampleMask);
 
-        var blueDifference = blue - green;
-        var redDifference = red - green;
-        planes[0].Samples[i] = green + ((blueDifference + redDifference) >> 2);
-        planes[1].Samples[i] = blueDifference + offset;
-        planes[2].Samples[i] = redDifference + offset;
+        if (oldRgbTransform) {
+          var greenDifference = green - blue;
+          var redDifference = red - blue;
+          planes[0].Samples[i] = blue + ((greenDifference + redDifference) >> 2);
+          planes[1].Samples[i] = greenDifference + offset;
+          planes[2].Samples[i] = redDifference + offset;
+        } else {
+          var blueDifference = blue - green;
+          var redDifference = red - green;
+          planes[0].Samples[i] = green + ((blueDifference + redDifference) >> 2);
+          planes[1].Samples[i] = blueDifference + offset;
+          planes[2].Samples[i] = redDifference + offset;
+        }
+
         if (channels == 4)
-          planes[3].Samples[i] = data[i * 4 + 3];
+          planes[3].Samples[i] = _ReadCheckedSample(data, i * 4 + 3, source.Format, sampleMask);
       }
 
       return planes;
@@ -624,15 +657,15 @@ public sealed class Ffv1Encoder : IVideoCodecEncoder<Ffv1Encoder> {
       var luma = new Ffv1Plane(width, height);
       if (!this._parameters.ExtraPlane) {
         for (var i = 0; i < count; ++i)
-          luma.Samples[i] = data[i];
+          luma.Samples[i] = _ReadCheckedSample(data, i, source.Format, sampleMask);
 
         return [luma];
       }
 
       var alpha = new Ffv1Plane(width, height);
       for (var i = 0; i < count; ++i) {
-        luma.Samples[i] = data[i * 2];
-        alpha.Samples[i] = data[i * 2 + 1];
+        luma.Samples[i] = _ReadCheckedSample(data, i * 2, source.Format, sampleMask);
+        alpha.Samples[i] = _ReadCheckedSample(data, i * 2 + 1, source.Format, sampleMask);
       }
 
       return [luma, alpha];
@@ -642,12 +675,21 @@ public sealed class Ffv1Encoder : IVideoCodecEncoder<Ffv1Encoder> {
     for (var plane = 0; plane < 3; ++plane) {
       var (planeWidth, planeHeight) = source.GetPlaneDimensions(plane);
       var samples = source.GetPlaneData(plane);
+      var sampleCount = checked(planeWidth * planeHeight);
       yuv[plane] = new(planeWidth, planeHeight);
-      for (var i = 0; i < samples.Length; ++i)
-        yuv[plane].Samples[i] = samples[i];
+      for (var i = 0; i < sampleCount; ++i)
+        yuv[plane].Samples[i] = _ReadCheckedSample(samples, i, source.Format, sampleMask);
     }
 
     return yuv;
+  }
+
+  private static int _ReadCheckedSample(ReadOnlySpan<byte> data, int sampleIndex, PixelFormat format, int mask) {
+    var value = Ffv1SampleIO.ReadSample(data, sampleIndex, format);
+    if ((value & ~mask) != 0)
+      throw new InvalidDataException($"{format} sample {sampleIndex} has value {value}, outside the 0..{mask} range stated for this FFV1 stream.");
+
+    return value;
   }
 
   // ============================================================================================
