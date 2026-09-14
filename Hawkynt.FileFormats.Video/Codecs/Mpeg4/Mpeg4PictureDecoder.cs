@@ -455,7 +455,7 @@ internal sealed class Mpeg4PictureDecoder {
     for (var index = 0; index < 6; ++index) {
       var (vectorX, vectorY) = index < 4
         ? (vectorsX[index], vectorsY[index])
-        : _ChromaVector(vectorsX, vectorsY);
+        : this._ChromaVector(vectorsX, vectorsY);
 
       this._Predict(prediction, this._forwardReference!, address, index, vectorX, vectorY, this._plane.RoundingType);
 
@@ -603,6 +603,14 @@ internal sealed class Mpeg4PictureDecoder {
       var anchorX = this._anchorMotion == null ? 0 : this._anchorMotion.VectorX[index];
       var anchorY = this._anchorMotion == null ? 0 : this._anchorMotion.VectorY[index];
 
+      // The direct-mode delta remains on the half-sample grid even in a quarter-sample VOL. The
+      // 2004 corrigendum therefore converts the co-located quarter-sample vector with Table 7-13
+      // before the temporal scaling is performed.
+      if (this._layer.QuarterSample) {
+        anchorX = Mpeg4QuarterSample.ToDirectHalfSample(anchorX);
+        anchorY = Mpeg4QuarterSample.ToDirectHalfSample(anchorY);
+      }
+
       forwardX[block] = this._forwardDistance * anchorX / distance + deltaX;
       forwardY[block] = this._forwardDistance * anchorY / distance + deltaY;
 
@@ -621,13 +629,15 @@ internal sealed class Mpeg4PictureDecoder {
     int type) {
     var usesForward = type is Mpeg4VlcTables.Forward or Mpeg4VlcTables.Interpolated or Mpeg4VlcTables.Direct;
     var usesBackward = type is Mpeg4VlcTables.Backward or Mpeg4VlcTables.Interpolated or Mpeg4VlcTables.Direct;
+    var directUsesHalfSamples = type == Mpeg4VlcTables.Direct && this._layer.QuarterSample;
+    var vectorIsQuarterSample = this._layer.QuarterSample && !directUsesHalfSamples;
 
     Span<int> block = stackalloc int[64];
     Span<int> prediction = stackalloc int[64];
     Span<int> backward = stackalloc int[64];
 
-    var (chromaForwardX, chromaForwardY) = _ChromaVector(forwardX, forwardY);
-    var (chromaBackwardX, chromaBackwardY) = _ChromaVector(backwardX, backwardY);
+    var (chromaForwardX, chromaForwardY) = _ChromaVector(forwardX, forwardY, vectorIsQuarterSample);
+    var (chromaBackwardX, chromaBackwardY) = _ChromaVector(backwardX, backwardY, vectorIsQuarterSample);
 
     for (var index = 0; index < 6; ++index) {
       var vectorBlock = index < 4 ? index : 0;
@@ -636,14 +646,14 @@ internal sealed class Mpeg4PictureDecoder {
         this._Predict(
           prediction, this._forwardReference!, address, index,
           index < 4 ? forwardX[vectorBlock] : chromaForwardX,
-          index < 4 ? forwardY[vectorBlock] : chromaForwardY, 0);
+          index < 4 ? forwardY[vectorBlock] : chromaForwardY, 0, directUsesHalfSamples);
 
       if (usesBackward) {
         var target = usesForward ? backward : prediction;
         this._Predict(
           target, this._backwardReference!, address, index,
           index < 4 ? backwardX[vectorBlock] : chromaBackwardX,
-          index < 4 ? backwardY[vectorBlock] : chromaBackwardY, 0);
+          index < 4 ? backwardY[vectorBlock] : chromaBackwardY, 0, directUsesHalfSamples);
 
         if (usesForward)
           Mpeg4MotionCompensation.Average(prediction, backward);
@@ -769,22 +779,37 @@ internal sealed class Mpeg4PictureDecoder {
   }
 
   /// <summary>
-  /// The chrominance vector, derived from the macroblock's luminance vectors (ISO/IEC 14496-2, 7.6.2).
+  /// The chrominance vector, derived from the macroblock's luminance vectors (ISO/IEC 14496-2, 7.6.5).
   /// </summary>
-  private static (int X, int Y) _ChromaVector(scoped ReadOnlySpan<int> vectorsX, scoped ReadOnlySpan<int> vectorsY)
-    => (Mpeg4MotionCompensation.ToChroma(vectorsX[0] + vectorsX[1] + vectorsX[2] + vectorsX[3]),
-      Mpeg4MotionCompensation.ToChroma(vectorsY[0] + vectorsY[1] + vectorsY[2] + vectorsY[3]));
+  private (int X, int Y) _ChromaVector(
+    scoped ReadOnlySpan<int> vectorsX, scoped ReadOnlySpan<int> vectorsY)
+    => _ChromaVector(vectorsX, vectorsY, this._layer.QuarterSample);
+
+  private static (int X, int Y) _ChromaVector(
+    scoped ReadOnlySpan<int> vectorsX, scoped ReadOnlySpan<int> vectorsY, bool quarterSample)
+    => quarterSample
+      ? (Mpeg4QuarterSample.ToChroma(vectorsX[0], vectorsX[1], vectorsX[2], vectorsX[3]),
+        Mpeg4QuarterSample.ToChroma(vectorsY[0], vectorsY[1], vectorsY[2], vectorsY[3]))
+      : (Mpeg4MotionCompensation.ToChroma(vectorsX[0] + vectorsX[1] + vectorsX[2] + vectorsX[3]),
+        Mpeg4MotionCompensation.ToChroma(vectorsY[0] + vectorsY[1] + vectorsY[2] + vectorsY[3]));
 
   // ============================================================================================
   // Reconstruction
   // ============================================================================================
 
   private void _Predict(
-    Span<int> prediction, Mpeg4Frame reference, int address, int index, int vectorX, int vectorY, int rounding) {
+    Span<int> prediction, Mpeg4Frame reference, int address, int index, int vectorX, int vectorY, int rounding,
+    bool forceHalfSample = false) {
     var (plane, stride, origin, width, height) = reference.PlaneOf(index);
     var (left, top) = this._BlockOrigin(address, index);
-    var border = index < 4 ? Mpeg4Frame.Border : Mpeg4Frame.Border / 2;
 
+    if (index < 4 && this._layer.QuarterSample && !forceHalfSample) {
+      Mpeg4QuarterSample.Predict(
+        prediction, plane, stride, origin, width, height, left, top, vectorX, vectorY, rounding);
+      return;
+    }
+
+    var border = index < 4 ? Mpeg4Frame.Border : Mpeg4Frame.Border / 2;
     Mpeg4MotionCompensation.PredictHalfSample(
       prediction, plane, stride, origin, border, width, height, left, top, vectorX, vectorY, rounding);
   }
