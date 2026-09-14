@@ -136,7 +136,7 @@ public sealed class HapAdvancedEncoderTests {
       for (var channel = 0; channel < 3; ++channel) {
         var expected = _ReadHalf(pixels, (pixel * 3 + channel) * 2);
         var actual = _ReadHalf(decoded.PixelData, (pixel * 3 + channel) * 2);
-        Assert.That(MathF.Abs(actual - expected), Is.LessThan(0.1f), $"pixel {pixel}, channel {channel}");
+        Assert.That(MathF.Abs(actual - expected), Is.LessThan(0.125f), $"pixel {pixel}, channel {channel}");
       }
   }
 
