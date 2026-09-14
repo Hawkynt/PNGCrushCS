@@ -163,6 +163,25 @@ public class ProResVideoEncoderAdvancedTests {
 
   [Test]
   [Category("Unit")]
+  public void AVisualSampleEntryWhoseStatedSizeCutsOffItsChildrenIsRefused() {
+    var entry = _InterlacedStream(48, 32, "apcn", 0x0201).CodecPrivateData.ToArray();
+    BinaryPrimitives.WriteUInt32BigEndian(entry, 85);
+    var stream = new MediaStreamInfo {
+      Index = 0,
+      Kind = MediaStreamKind.Video,
+      Codec = CodecTag.FromCharacters("apcn"),
+      Width = 48,
+      Height = 32,
+      BitsPerPixel = 24,
+      CodecPrivateData = entry,
+    };
+
+    var refusal = Assert.Throws<InvalidDataException>(() => ProResVideoEncoder.Create(stream));
+    Assert.That(refusal!.Message, Does.Contain("85").And.Contain("96").And.Contain("child atoms"));
+  }
+
+  [Test]
+  [Category("Unit")]
   public void DecoderAcceptsZeroStuffingAndRefusesNonZeroStuffing() {
     const int WIDTH = 32;
     const int HEIGHT = 32;

@@ -420,9 +420,15 @@ public sealed class ProResVideoEncoder : IVideoCodecEncoder<ProResVideoEncoder> 
       return 0;
 
     var statedSize = BinaryPrimitives.ReadUInt32BigEndian(sampleEntry);
-    var limit = statedSize >= _VISUAL_SAMPLE_ENTRY_SIZE && statedSize <= (uint)sampleEntry.Length
-      ? (int)statedSize
-      : sampleEntry.Length;
+    int limit;
+    if (statedSize == 0) {
+      limit = sampleEntry.Length;
+    } else {
+      if (statedSize < _VISUAL_SAMPLE_ENTRY_SIZE || statedSize > (uint)sampleEntry.Length)
+        throw new InvalidDataException(
+          $"A ProRes visual sample entry states {statedSize} bytes but carries {sampleEntry.Length}; its child atoms cannot be located safely.");
+      limit = (int)statedSize;
+    }
 
     for (var at = _VISUAL_SAMPLE_ENTRY_SIZE; at + 8 <= limit;) {
       var size32 = BinaryPrimitives.ReadUInt32BigEndian(sampleEntry[at..]);
