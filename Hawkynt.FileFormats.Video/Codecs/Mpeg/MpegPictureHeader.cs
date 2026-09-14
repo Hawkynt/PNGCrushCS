@@ -21,6 +21,9 @@ namespace FileFormat.Codecs.Mpeg;
 /// </remarks>
 internal sealed class MpegPictureHeader {
 
+  /// <summary>Display-order position within the group; both fields of an ordinary coded frame share it.</summary>
+  internal int TemporalReference { get; private set; }
+
   /// <summary>Which of I, P, B, D this picture is.</summary>
   internal int CodingType { get; private set; }
 
@@ -43,6 +46,9 @@ internal sealed class MpegPictureHeader {
   /// <summary>picture_structure: 1 top field, 2 bottom field, 3 a whole frame (13818-2, Table 6-14).</summary>
   internal int PictureStructure { get; private set; } = 3;
 
+  /// <summary>top_field_first, needed by the field-distance arithmetic of frame dual-prime prediction.</summary>
+  internal bool TopFieldFirst { get; private set; }
+
   /// <summary>
   /// frame_pred_frame_dct: every macroblock of this picture is frame predicted and frame
   /// transformed, so neither <c>frame_motion_type</c> nor <c>dct_type</c> is coded.
@@ -63,12 +69,10 @@ internal sealed class MpegPictureHeader {
 
   /// <summary>Reads a picture header, positioned just past its start code.</summary>
   internal static MpegPictureHeader Parse(ref MpegBitReader reader) {
-    var header = new MpegPictureHeader();
-
-    reader.ReadBits(10); // temporal_reference — display order within the group, which the reordering
-                         // rule this decoder uses does not need: an anchor is shown when the next
-                         // one arrives.
-    header.CodingType = reader.ReadBits(3);
+    var header = new MpegPictureHeader {
+      TemporalReference = reader.ReadBits(10),
+      CodingType = reader.ReadBits(3),
+    };
     reader.ReadBits(16); // vbv_delay
 
     if (header.CodingType is MpegPictureDecoder.PredictiveCoded or MpegPictureDecoder.BidirectionallyCoded) {
@@ -122,10 +126,7 @@ internal sealed class MpegPictureHeader {
 
     this.IntraDcPrecision = reader.ReadBits(2);
     this.PictureStructure = reader.ReadBits(2);
-
-    reader.ReadBit(); // top_field_first — which field is displayed first, and in a frame picture
-                      // decoded here both are reconstructed together, so it changes no sample.
-
+    this.TopFieldFirst = reader.ReadBit() == 1;
     this.FramePredFrameDct = reader.ReadBit() == 1;
     this.ConcealmentMotionVectors = reader.ReadBit() == 1;
     this.NonLinearQuantiser = reader.ReadBit() == 1;
@@ -152,12 +153,10 @@ internal sealed class MpegPictureHeader {
         "The MPEG-2 picture coding extension states picture_structure 0, which ISO/IEC 13818-2 Table 6-14 leaves "
         + "reserved.");
 
-    if (this.PictureStructure != 3)
-      throw new NotSupportedException(
-        $"This MPEG-2 picture is a field picture (picture_structure {this.PictureStructure}, "
-        + $"{(this.PictureStructure == 1 ? "top" : "bottom")} field), in which the two fields of a frame are coded as "
-        + "two separate pictures with their own headers and their own prediction (ISO/IEC 13818-2, 6.3.10 and 7.6.4). "
-        + "This decoder reads frame pictures; field pictures are not implemented.");
+    if (this.PictureStructure != 3 && this.FramePredFrameDct)
+      throw new InvalidDataException(
+        $"This MPEG-2 picture is a {(this.PictureStructure == 1 ? "top" : "bottom")} field picture but states "
+        + "frame_pred_frame_dct 1. ISO/IEC 13818-2 6.3.10 requires that flag to be zero in every field picture.");
   }
 
   /// <summary>
