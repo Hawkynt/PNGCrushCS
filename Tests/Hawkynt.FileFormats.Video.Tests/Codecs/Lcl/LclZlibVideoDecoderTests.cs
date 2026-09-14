@@ -184,6 +184,23 @@ public class LclZlibVideoDecoderTests {
 
   [Test]
   [Category("Unit")]
+  public void RefusesDimensionsWhoseSizeArithmeticOverflows() {
+    var failure = Assert.Throws<InvalidDataException>(() =>
+      LclZlibVideoDecoder.Create(_Stream(int.MaxValue, int.MaxValue, _PrivateData(int.MaxValue, int.MaxValue, imageType: 0))));
+    Assert.That(failure!.Message, Does.Contain("arithmetic overflows"));
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void RefusesDimensionsWhoseCanonicalFrameCannotFitManagedMemory() {
+    const int height = 400_000_000;
+    var failure = Assert.Throws<InvalidDataException>(() =>
+      LclZlibVideoDecoder.Create(_Stream(3, height, _PrivateData(3, height, imageType: 1))));
+    Assert.That(failure!.Message, Does.Contain("too large"));
+  }
+
+  [Test]
+  [Category("Unit")]
   public void APaddedRgbRowIsUnpackedToItsExactPixelCount() {
     var decoder = LclZlibVideoDecoder.Create(_Stream(3, 2));
     var coded = new byte[] {
