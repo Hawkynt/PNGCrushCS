@@ -37,7 +37,6 @@ namespace FileFormat.Codecs;
 /// they exist to permit parallel second-stage decompression, not to represent pictures unavailable in
 /// the simple form.
 /// </remarks>
-[VerifiedBy(ConformanceOracle.FFmpeg)]
 public sealed class HapVideoEncoder : IVideoCodecEncoder<HapVideoEncoder> {
 
   private static readonly CodecTag _Hap1 = CodecTag.FromCharacters("Hap1");
@@ -100,7 +99,7 @@ public sealed class HapVideoEncoder : IVideoCodecEncoder<HapVideoEncoder> {
 
   public static string CodecName => "Hap";
 
-  /// <summary>The registry's canonical code; <see cref="IVideoCodecEncoder{TSelf}.Accepts"/> handles the aliases.</summary>
+  /// <summary>The registry's canonical code; the encoder's static acceptance hook handles the aliases.</summary>
   public static CodecTag Codec => _Hap1;
 
   static bool IVideoCodecEncoder<HapVideoEncoder>.Accepts(MediaStreamInfo stream) {
