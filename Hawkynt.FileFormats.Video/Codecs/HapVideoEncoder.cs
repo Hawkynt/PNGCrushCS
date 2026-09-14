@@ -6,68 +6,36 @@ using FileFormat.Core;
 namespace FileFormat.Codecs;
 
 /// <summary>
-/// Encodes Vidvox Hap: a DXT/BC texture, block for block as a graphics card would be loaded with it,
-/// wrapped in the format's one-section frame and offered to Snappy.
+/// Encodes every Vidvox Hap stream variant: BC1, BC3, Scaled YCoCg, YCoCg plus BC4 alpha, BC4
+/// alpha-only, BC7 and BC6H, wrapped in Hap's sectioned frame format with optional Snappy.
 /// </summary>
 /// <remarks>
-/// <b>What it writes.</b> Three of Hap's seven pixel formats — <c>Hap1</c> (DXT1/BC1, no alpha),
-/// <c>Hap5</c> (DXT5/BC3 with alpha) and <c>HapY</c> (Scaled YCoCg DXT5) — which are exactly the
-/// three ffmpeg's own <c>hap</c> encoder writes and therefore exactly the three there is an oracle
-/// for. <see cref="Create"/> takes the variant from the code the stream names and a caller naming
-/// none gets <c>Hap1</c>. Every frame is a key frame; Hap has no inter-frame coding of any kind.
+/// <b>There are no P- or B-frames in Hap.</b> Every packet is a complete independently decodable
+/// texture image, so every packet this encoder emits is a key frame and decode/presentation order are
+/// identical. Hap defines no forward or backward references, motion vectors, reference-picture lists
+/// or other inter-frame state to implement.
 /// <para/>
-/// <b>What it refuses, by name.</b> <c>HapM</c> (Hap Q Alpha), <c>HapA</c> (Hap Alpha-Only),
-/// <c>Hap7</c> (Hap R, BC7) and <c>HapH</c> (Hap HDR, BC6) — all four decoded by
-/// <see cref="HapDecoder"/> and none of them written here, because no encoder this package can be
-/// measured against produces one and a BC6 or BC7 texture assembled from a specification alone would
-/// be a plausible picture with nothing to check it against. A picture whose width or height is not a
-/// whole number of four-sample blocks is refused too, as ffmpeg's own encoder refuses it: the format
-/// carries no cropped-picture size, so the only alternative would be padding a texture the decoder
-/// would then hand back at the wrong size. And a picture that is neither
-/// <see cref="PixelFormat.Rgb24"/> nor <see cref="PixelFormat.Rgba32"/> is refused rather than
-/// converted — those two are what <see cref="HapDecoder"/> hands back, so a decode and a re-encode
-/// need no conversion, and whether any other conversion may lose something is not this codec's
-/// decision.
+/// <b>Texture coding.</b> <c>Hap1</c>, <c>Hap5</c> and <c>HapY</c> use the existing DXT writer,
+/// originally ported from FFmpeg's separately MIT-licensed <c>texturedspenc.c</c> and already measured
+/// against FFmpeg in both directions. <c>HapA</c> and the alpha image of <c>HapM</c> use the RGTC1/BC4
+/// endpoint ramp defined by the RGTC specification. <c>Hap7</c> uses a specification-derived BC7 mode
+/// 6 encoder, and <c>HapH</c> uses a specification-derived one-subset BC6H encoder, selecting BC6S for
+/// a frame containing any negative finite sample and BC6U otherwise. BC7 and BC6H deliberately start
+/// with one conforming mode rather than pretending that a full mode/partition rate-distortion search
+/// is required for interoperability; such a search would improve quality, not add syntax support.
 /// <para/>
-/// <b>The frame.</b> One top-level section, its header always the eight-byte form, its type byte the
-/// pixel format in the low nibble and the second-stage compressor in the high one. The texture is
-/// offered to Snappy whole — one chunk, no Decode Instructions Container — and the result is kept only
-/// where it came out smaller than the texture; otherwise the type byte says uncompressed and the
-/// texture is written as it is. That is ffmpeg's own single-chunk behaviour, header form included.
-/// This encoder never writes the chunked "consult decode instructions" form, which exists so a GPU
-/// upload can be split across threads and costs a decoder nothing to be without.
+/// <b>Odd dimensions are valid.</b> BC1/3/4/6/7 are 4x4 block formats whose image dimensions need not
+/// be multiples of four. The last block is completed here by replicating its right/bottom edge and the
+/// container dimensions crop those padding samples again on decode. The previous writer rejected such
+/// pictures even though the decoder already rounded the block grid up and the Hap project publishes
+/// odd-dimension conformance material.
 /// <para/>
-/// <b>Lossy by construction, and here is where.</b> DXT quantises each 4x4 block to two 5-6-5
-/// endpoints and a two-bit index a pixel, so a block holding three or more colours cannot come back as
-/// it went in — that is the format, not a setting. <b>What the format can hold exactly does come back
-/// exactly.</b> The endpoints are 5-6-5 words widened back by <see cref="HapBlockDecoding"/>'s own
-/// tables, which state 32 red and blue values and 64 green ones — 65536 colours — and every one of
-/// them, alone or two to a block, survives a <c>Hap1</c> or <c>Hap5</c> round trip untouched:
-/// measured over all 65536, one to a block and again chequered in pairs, 1048576 pixels a picture at
-/// max delta 0. <c>Hap5</c> carries any single alpha value a block holds exactly as well, all 256 of
-/// them, the ramp going unused when a block's minimum and maximum coincide. Off that grid the coding
-/// is as close as the reference's own endpoint search gets: no farther than 2 from any of the 256
-/// greys, and no farther than 1 from any of the 32768 colours of the bit-replicated 5-5-5 grid.
-/// <c>HapY</c> is lossy even for a flat block — its chroma transform is not reversible in eight bits,
-/// and it is the format's own transform.
-/// <para/>
-/// <b>Measured against ffmpeg, in both directions.</b> The block compression is FFmpeg's
-/// <c>libavcodec/texturedspenc.c</c> carried across whole — an MIT-licensed file inside an LGPL
-/// project — so the comparison is not "close enough" but byte for byte. Over 24 streams ffmpeg wrote
-/// at 4x4, 12x8, 68x36, 64x64, 96x64, 128x96, 160x120 and 320x240 in all three pixel formats, 96
-/// textures and 1210880 texture bytes, pseudo-random pictures and photographic-looking gradients
-/// alike: 20 bytes differ, in 3 textures, and every one of them is a block where the reference's own
-/// endpoint choice returns a colour the grid states exactly a level or two off and this encoder
-/// writes it exactly instead — 48 pixels exact here and not there, none the other way round. Every
-/// other byte of every other block is the reference's own.
-/// <para/>
-/// The other direction is the one that matters: 24 streams written here, 240 frames, muxed and handed
-/// to ffmpeg's own Hap decoder, which reads them at its own native pixel format (<c>rgb0</c> for
-/// <c>Hap1</c> and <c>HapY</c>, <c>rgba</c> for <c>Hap5</c>, so nothing is converted behind the
-/// comparison). Against this package's decode of the same packets: 12108800 samples, every one
-/// identical. 146 of those 240 frames went out Snappy-compressed and 94 uncompressed, so Google's own
-/// Snappy — which is what ffmpeg reads them with — accepted this package's block writer on 146 of
-/// them.
+/// <b>Framing.</b> A single texture is offered to Snappy as one block and kept compressed only when it
+/// is smaller. <c>HapM</c> writes the format's sole permitted two-image combination: a Scaled YCoCg
+/// DXT5 section followed by an RGTC1/BC4 alpha section, both independently second-stage compressed,
+/// inside a 0x0D multiple-image section. Decode-instruction/chunk tables remain a decoder feature:
+/// they exist to permit parallel second-stage decompression, not to represent pictures unavailable in
+/// the simple form.
 /// </remarks>
 [VerifiedBy(ConformanceOracle.FFmpeg)]
 public sealed class HapVideoEncoder : IVideoCodecEncoder<HapVideoEncoder> {
@@ -80,35 +48,35 @@ public sealed class HapVideoEncoder : IVideoCodecEncoder<HapVideoEncoder> {
   private static readonly CodecTag _Hap7 = CodecTag.FromCharacters("Hap7");
   private static readonly CodecTag _HapH = CodecTag.FromCharacters("HapH");
 
-  /// <summary>The side of a compressed texture block, in pixels.</summary>
   private const int _BLOCK = 4;
 
-  /// <summary>The low nibble of a top-level type byte, one value a pixel format.</summary>
   private const byte _FORMAT_DXT1_RGB = 0x0B;
   private const byte _FORMAT_DXT5_RGBA = 0x0E;
   private const byte _FORMAT_DXT5_SCALED_YCOCG = 0x0F;
+  private const byte _FORMAT_BC7_RGBA = 0x0C;
+  private const byte _FORMAT_RGTC1_ALPHA = 0x01;
+  private const byte _FORMAT_BC6_UNSIGNED = 0x02;
+  private const byte _FORMAT_BC6_SIGNED = 0x03;
+  private const byte _MULTI_IMAGE = 0x0D;
 
-  /// <summary>The high nibble of a top-level type byte, naming the second-stage compressor.</summary>
   private const byte _COMPRESSOR_NONE = 0xA0;
   private const byte _COMPRESSOR_SNAPPY = 0xB0;
 
   private readonly MediaStreamInfo _stream;
-  private readonly CodecTag _tag;
-  private readonly HapPixelFormat _format;
+  private readonly Variant _variant;
   private readonly int _width;
   private readonly int _height;
   private readonly int _blocksAcross;
   private readonly int _blockRows;
-  private readonly int _blockBytes;
+  private readonly int _blockCount;
 
-  private HapVideoEncoder(MediaStreamInfo stream, CodecTag tag, HapPixelFormat format) {
-    this._tag = tag;
-    this._format = format;
+  private HapVideoEncoder(MediaStreamInfo stream, CodecTag tag, Variant variant) {
+    this._variant = variant;
     this._width = stream.Width;
     this._height = stream.Height;
-    this._blocksAcross = stream.Width / _BLOCK;
-    this._blockRows = stream.Height / _BLOCK;
-    this._blockBytes = format == HapPixelFormat.Dxt1Rgb ? 8 : 16;
+    this._blocksAcross = (stream.Width - 1) / _BLOCK + 1;
+    this._blockRows = (stream.Height - 1) / _BLOCK + 1;
+    this._blockCount = checked(this._blocksAcross * this._blockRows);
     this._stream = new() {
       Index = stream.Index,
       Kind = MediaStreamKind.Video,
@@ -119,7 +87,12 @@ public sealed class HapVideoEncoder : IVideoCodecEncoder<HapVideoEncoder> {
       DeclaredFrameCount = stream.DeclaredFrameCount,
       Width = stream.Width,
       Height = stream.Height,
-      BitsPerPixel = format == HapPixelFormat.Dxt5Rgba ? 32 : 24,
+      BitsPerPixel = variant switch {
+        Variant.HapA => 8,
+        Variant.HapH => 48,
+        Variant.Hap1 or Variant.HapY => 24,
+        _ => 32,
+      },
       Language = stream.Language,
       Name = stream.Name,
     };
@@ -127,10 +100,21 @@ public sealed class HapVideoEncoder : IVideoCodecEncoder<HapVideoEncoder> {
 
   public static string CodecName => "Hap";
 
-  /// <summary>The code the registry routes here, and what this writes unless the stream names another.</summary>
+  /// <summary>The registry's canonical code; <see cref="IVideoCodecEncoder{TSelf}.Accepts"/> handles the aliases.</summary>
   public static CodecTag Codec => _Hap1;
 
-  /// <summary>Builds an encoder for the stream described, taking the pixel format from its code.</summary>
+  static bool IVideoCodecEncoder<HapVideoEncoder>.Accepts(MediaStreamInfo stream) {
+    ArgumentNullException.ThrowIfNull(stream);
+    if (stream.Kind != MediaStreamKind.Video)
+      return false;
+
+    var codec = stream.Codec;
+    return codec.EqualsIgnoringCase(_Hap1) || codec.EqualsIgnoringCase(_Hap5) || codec.EqualsIgnoringCase(_HapY)
+      || codec.EqualsIgnoringCase(_HapM) || codec.EqualsIgnoringCase(_HapA) || codec.EqualsIgnoringCase(_Hap7)
+      || codec.EqualsIgnoringCase(_HapH);
+  }
+
+  /// <summary>Builds an encoder for the requested Hap FourCC; an unspecified code defaults to Hap1.</summary>
   public static HapVideoEncoder Create(MediaStreamInfo stream) {
     ArgumentNullException.ThrowIfNull(stream);
 
@@ -139,53 +123,29 @@ public sealed class HapVideoEncoder : IVideoCodecEncoder<HapVideoEncoder> {
 
     if (stream.Width <= 0 || stream.Height <= 0)
       throw new InvalidDataException(
-        $"Video stream {stream.Index} states a picture size of {stream.Width}x{stream.Height}, which no frame can "
-        + "be coded from.");
+        $"Video stream {stream.Index} states a picture size of {stream.Width}x{stream.Height}, which no frame can be coded from.");
 
-    if (stream.Width % _BLOCK != 0 || stream.Height % _BLOCK != 0)
-      throw new NotSupportedException(
-        $"Video stream {stream.Index} states {stream.Width}x{stream.Height}, which is not a whole number of "
-        + $"{_BLOCK}x{_BLOCK} texture blocks in each direction. A Hap frame carries the texture and nothing else, so "
-        + "there is nowhere to state that part of the last block or row is to be thrown away; ffmpeg's own Hap "
-        + "encoder refuses the same size.");
-
-    var (tag, format) = _VariantOf(stream.Codec, stream.Index);
-    return new(stream, tag, format);
+    var (tag, variant) = _VariantOf(stream.Codec, stream.Index);
+    return new(stream, tag, variant);
   }
 
-  /// <summary>Which pixel format a stream's code asks for, and what to say about the ones not written.</summary>
-  private static (CodecTag Tag, HapPixelFormat Format) _VariantOf(CodecTag codec, int index) {
+  private static (CodecTag Tag, Variant Variant) _VariantOf(CodecTag codec, int index) {
     if (codec == CodecTag.None || codec.EqualsIgnoringCase(_Hap1))
-      return (_Hap1, HapPixelFormat.Dxt1Rgb);
-
+      return (_Hap1, Variant.Hap1);
     if (codec.EqualsIgnoringCase(_Hap5))
-      return (_Hap5, HapPixelFormat.Dxt5Rgba);
-
+      return (_Hap5, Variant.Hap5);
     if (codec.EqualsIgnoringCase(_HapY))
-      return (_HapY, HapPixelFormat.Dxt5ScaledYCoCg);
-
-    var unwritten = _Unwritten(codec);
-    if (unwritten != null)
-      throw new NotSupportedException(
-        $"Video stream {index} asks for {codec}, {unwritten}. This encoder writes Hap1, Hap5 and HapY — the three "
-        + "pixel formats there is a second encoder to measure the result against; a texture in any of the others "
-        + "would be a plausible picture with nothing to check it against, so it is refused rather than written.");
-
-    throw new NotSupportedException(
-      $"Video stream {index} asks for {codec}, which is not a Hap code at all.");
-  }
-
-  private static string? _Unwritten(CodecTag codec) {
+      return (_HapY, Variant.HapY);
     if (codec.EqualsIgnoringCase(_HapM))
-      return "Hap Q Alpha — a Scaled YCoCg image and a separate RGTC1/BC4 alpha image in one frame";
-
+      return (_HapM, Variant.HapM);
     if (codec.EqualsIgnoringCase(_HapA))
-      return "Hap Alpha-Only — a single RGTC1/BC4 channel";
-
+      return (_HapA, Variant.HapA);
     if (codec.EqualsIgnoringCase(_Hap7))
-      return "Hap R — a BC7 texture";
+      return (_Hap7, Variant.Hap7);
+    if (codec.EqualsIgnoringCase(_HapH))
+      return (_HapH, Variant.HapH);
 
-    return codec.EqualsIgnoringCase(_HapH) ? "Hap HDR — a signed or unsigned BC6H texture" : null;
+    throw new NotSupportedException($"Video stream {index} asks for {codec}, which is not a Hap code at all.");
   }
 
   public bool TryEncode(RawImage frame, long? presentationTimestamp, out CodedPacket packet) {
@@ -193,15 +153,21 @@ public sealed class HapVideoEncoder : IVideoCodecEncoder<HapVideoEncoder> {
 
     if (frame.Width != this._width || frame.Height != this._height)
       throw new InvalidDataException(
-        $"This Hap stream is {this._width}x{this._height}; a picture of {frame.Width}x{frame.Height} cannot be coded "
-        + "into it. The picture size is stated by the container and never by the frame.");
+        $"This Hap stream is {this._width}x{this._height}; a picture of {frame.Width}x{frame.Height} cannot be coded into it. "
+        + "The picture size is stated by the container and never by the frame.");
 
     if (!frame.HasEnoughPixelData)
       throw new InvalidDataException("The source RawImage does not contain enough pixel data for its declared format and dimensions.");
 
+    var data = this._variant switch {
+      Variant.HapM => this._WriteHapM(frame),
+      Variant.HapH => this._WriteHapH(frame),
+      _ => this._WriteImageSection(this.CompressTexture(frame), _PixelFormatCode(this._variant)),
+    };
+
     packet = new(
       this._stream.Index,
-      this._WriteFrame(this.CompressTexture(frame)),
+      data,
       PresentationTimestamp: presentationTimestamp,
       DecodeTimestamp: presentationTimestamp,
       Duration: 1,
@@ -211,46 +177,125 @@ public sealed class HapVideoEncoder : IVideoCodecEncoder<HapVideoEncoder> {
 
   public MediaStreamInfo DescribeStream() => this._stream;
 
-  /// <summary>Compresses one picture into the texture a Hap section carries, framing left off.</summary>
-  internal byte[] CompressTexture(RawImage frame) {
+  /// <summary>Compresses the variant's primary texture, leaving Hap section framing off.</summary>
+  internal byte[] CompressTexture(RawImage frame) => this._variant switch {
+    Variant.Hap1 => this._CompressRgbaTexture(frame, HapPixelFormat.Dxt1Rgb),
+    Variant.Hap5 => this._CompressRgbaTexture(frame, HapPixelFormat.Dxt5Rgba),
+    Variant.HapY or Variant.HapM => this._CompressRgbaTexture(frame, HapPixelFormat.Dxt5ScaledYCoCg),
+    Variant.HapA => this._CompressAlphaTexture(frame),
+    Variant.Hap7 => this._CompressRgbaTexture(frame, HapPixelFormat.Bc7Rgba),
+    Variant.HapH => this._CompressHdrTexture(frame, out _),
+    _ => throw new InvalidOperationException("Unknown Hap encoder variant."),
+  };
+
+  private byte[] _CompressRgbaTexture(RawImage frame, HapPixelFormat format) {
     var pixels = this._AsRgba(frame);
-    var stride = this._width * 4;
-    var texture = new byte[this._blocksAcross * this._blockRows * this._blockBytes];
+    var blockBytes = format == HapPixelFormat.Dxt1Rgb ? 8 : 16;
+    var texture = new byte[checked(this._blockCount * blockBytes)];
+    Span<byte> block = stackalloc byte[64];
 
-    for (var blockRow = 0; blockRow < this._blockRows; ++blockRow) {
-      var rowAt = blockRow * stride * _BLOCK;
+    for (var blockRow = 0; blockRow < this._blockRows; ++blockRow)
       for (var blockColumn = 0; blockColumn < this._blocksAcross; ++blockColumn) {
-        var block = pixels.AsSpan(rowAt + blockColumn * _BLOCK * 4);
-        var destination = texture.AsSpan((blockRow * this._blocksAcross + blockColumn) * this._blockBytes, this._blockBytes);
+        this._FillRgbaBlock(pixels, blockColumn, blockRow, block);
+        var destination = texture.AsSpan((blockRow * this._blocksAcross + blockColumn) * blockBytes, blockBytes);
 
-        switch (this._format) {
+        switch (format) {
           case HapPixelFormat.Dxt1Rgb:
-            HapBlockEncoding.CompressDxt1(block, stride, destination);
+            HapBlockEncoding.CompressDxt1(block, 16, destination);
             break;
           case HapPixelFormat.Dxt5Rgba:
-            HapBlockEncoding.CompressDxt5(block, stride, destination);
+            HapBlockEncoding.CompressDxt5(block, 16, destination);
+            break;
+          case HapPixelFormat.Dxt5ScaledYCoCg:
+            HapBlockEncoding.CompressScaledYCoCg(block, 16, destination);
+            break;
+          case HapPixelFormat.Bc7Rgba:
+            HapBc7Encoding.Compress(block, destination);
             break;
           default:
-            HapBlockEncoding.CompressScaledYCoCg(block, stride, destination);
-            break;
+            throw new InvalidOperationException($"{format} is not an RGBA-input Hap texture format.");
         }
       }
-    }
 
     return texture;
   }
 
-  /// <summary>
-  /// The picture as four bytes a pixel, which is the one layout the block compressor reads.
-  /// </summary>
-  /// <remarks>
-  /// A <see cref="PixelFormat.Rgb24"/> picture is widened with a fully opaque alpha rather than with
-  /// whatever the padding byte happened to hold: the block compressor compares whole RGBA words when
-  /// it asks whether a block is one colour, so an alpha that varies would split blocks that do not.
-  /// </remarks>
+  private byte[] _CompressAlphaTexture(RawImage frame) {
+    if (frame.Format is not (PixelFormat.Gray8 or PixelFormat.Rgba32 or PixelFormat.Rgb24))
+      throw new NotSupportedException(
+        $"Hap alpha textures are written from Gray8, Rgba32 or Rgb24 pictures; {frame.Format} would require an unrelated conversion first.");
+
+    var texture = new byte[checked(this._blockCount * 8)];
+    Span<byte> block = stackalloc byte[16];
+
+    for (var blockRow = 0; blockRow < this._blockRows; ++blockRow)
+      for (var blockColumn = 0; blockColumn < this._blocksAcross; ++blockColumn) {
+        for (var y = 0; y < 4; ++y) {
+          var sourceY = Math.Min(blockRow * 4 + y, this._height - 1);
+          for (var x = 0; x < 4; ++x) {
+            var sourceX = Math.Min(blockColumn * 4 + x, this._width - 1);
+            var pixel = sourceY * this._width + sourceX;
+            block[y * 4 + x] = frame.Format switch {
+              PixelFormat.Gray8 => frame.PixelData[pixel],
+              PixelFormat.Rgba32 => frame.PixelData[pixel * 4 + 3],
+              PixelFormat.Rgb24 => 255,
+              _ => 0,
+            };
+          }
+        }
+
+        HapBc4Encoding.Compress(block, texture.AsSpan((blockRow * this._blocksAcross + blockColumn) * 8, 8));
+      }
+
+    return texture;
+  }
+
+  private byte[] _CompressHdrTexture(RawImage frame, out byte formatCode) {
+    if (frame.Format != PixelFormat.RgbF16)
+      throw new NotSupportedException(
+        $"Hap HDR is written from RgbF16 so BC6H receives the decoder's native half-float samples; {frame.Format} would require a conversion first.");
+
+    var source = frame.PixelData;
+    var sampleCount = checked(this._width * this._height * 3);
+    var isSigned = false;
+    for (var sample = 0; sample < sampleCount; ++sample) {
+      var bits = _ReadU16(source, sample * 2);
+      if ((bits & 0x7C00) == 0x7C00)
+        throw new InvalidDataException($"Hap HDR sample {sample} is an infinity or NaN; BC6H carries finite floating-point values only.");
+      if ((bits & 0x8000) != 0 && (bits & 0x7FFF) != 0)
+        isSigned = true;
+    }
+
+    formatCode = isSigned ? _FORMAT_BC6_SIGNED : _FORMAT_BC6_UNSIGNED;
+    var texture = new byte[checked(this._blockCount * 16)];
+    Span<ushort> block = stackalloc ushort[48];
+
+    for (var blockRow = 0; blockRow < this._blockRows; ++blockRow)
+      for (var blockColumn = 0; blockColumn < this._blocksAcross; ++blockColumn) {
+        for (var y = 0; y < 4; ++y) {
+          var sourceY = Math.Min(blockRow * 4 + y, this._height - 1);
+          for (var x = 0; x < 4; ++x) {
+            var sourceX = Math.Min(blockColumn * 4 + x, this._width - 1);
+            var sourcePixel = (sourceY * this._width + sourceX) * 6;
+            var destinationPixel = (y * 4 + x) * 3;
+            block[destinationPixel] = _ReadU16(source, sourcePixel);
+            block[destinationPixel + 1] = _ReadU16(source, sourcePixel + 2);
+            block[destinationPixel + 2] = _ReadU16(source, sourcePixel + 4);
+          }
+        }
+
+        HapBc6Encoding.Compress(
+          block,
+          isSigned,
+          texture.AsSpan((blockRow * this._blocksAcross + blockColumn) * 16, 16));
+      }
+
+    return texture;
+  }
+
   private byte[] _AsRgba(RawImage frame) {
-    var count = this._width * this._height;
-    var pixels = new byte[count * 4];
+    var count = checked(this._width * this._height);
+    var pixels = new byte[checked(count * 4)];
     var source = frame.PixelData;
 
     switch (frame.Format) {
@@ -267,40 +312,81 @@ public sealed class HapVideoEncoder : IVideoCodecEncoder<HapVideoEncoder> {
           pixels[to + 2] = source[from + 2];
           pixels[to + 3] = 255;
         }
-
         break;
 
       default:
         throw new NotSupportedException(
-          $"Hap is written here from Rgb24 and Rgba32 pictures only; a {frame.Format} picture would have to be "
-          + "converted first, and whether that conversion may lose anything is not this codec's decision. Those two "
-          + "are what the Hap decoder hands back, so a decode and a re-encode need none.");
+          $"Hap1/Hap5/HapY/HapM/Hap7 are written from Rgb24 and Rgba32 pictures; a {frame.Format} picture would have to be converted first.");
     }
 
     return pixels;
   }
 
-  /// <summary>
-  /// Wraps one texture in the format's single top-level section, compressing it where that helps.
-  /// </summary>
-  private byte[] _WriteFrame(byte[] texture) {
-    var compressed = HapSnappyEncoder.Compress(texture);
-    var payload = compressed.Length < texture.Length ? compressed : texture;
-    var compressor = ReferenceEquals(payload, texture) ? _COMPRESSOR_NONE : _COMPRESSOR_SNAPPY;
+  private void _FillRgbaBlock(ReadOnlySpan<byte> pixels, int blockColumn, int blockRow, Span<byte> block) {
+    for (var y = 0; y < 4; ++y) {
+      var sourceY = Math.Min(blockRow * 4 + y, this._height - 1);
+      for (var x = 0; x < 4; ++x) {
+        var sourceX = Math.Min(blockColumn * 4 + x, this._width - 1);
+        var from = (sourceY * this._width + sourceX) * 4;
+        pixels.Slice(from, 4).CopyTo(block.Slice((y * 4 + x) * 4, 4));
+      }
+    }
+  }
 
-    var frame = new byte[8 + payload.Length];
-    frame[3] = (byte)(compressor | this._PixelFormatCode());
+  private byte[] _WriteHapM(RawImage frame) {
+    var colour = this._WriteImageSection(
+      this._CompressRgbaTexture(frame, HapPixelFormat.Dxt5ScaledYCoCg),
+      _FORMAT_DXT5_SCALED_YCOCG);
+    var alpha = this._WriteImageSection(this._CompressAlphaTexture(frame), _FORMAT_RGTC1_ALPHA);
+    var payload = new byte[checked(colour.Length + alpha.Length)];
+    colour.CopyTo(payload, 0);
+    alpha.CopyTo(payload, colour.Length);
+    return _WriteLongSection(_MULTI_IMAGE, payload);
+  }
+
+  private byte[] _WriteHapH(RawImage frame) {
+    var texture = this._CompressHdrTexture(frame, out var formatCode);
+    return this._WriteImageSection(texture, formatCode);
+  }
+
+  private byte[] _WriteImageSection(byte[] texture, byte formatCode) {
+    var compressed = HapSnappyEncoder.Compress(texture);
+    var useSnappy = compressed.Length < texture.Length;
+    var payload = useSnappy ? compressed : texture;
+    var compressor = useSnappy ? _COMPRESSOR_SNAPPY : _COMPRESSOR_NONE;
+    return _WriteLongSection((byte)(compressor | formatCode), payload);
+  }
+
+  private static byte[] _WriteLongSection(byte type, ReadOnlySpan<byte> payload) {
+    var frame = new byte[checked(8 + payload.Length)];
+    frame[3] = type;
     frame[4] = (byte)payload.Length;
     frame[5] = (byte)(payload.Length >> 8);
     frame[6] = (byte)(payload.Length >> 16);
     frame[7] = (byte)(payload.Length >> 24);
-    payload.CopyTo(frame, 8);
+    payload.CopyTo(frame.AsSpan(8));
     return frame;
   }
 
-  private byte _PixelFormatCode() => this._format switch {
-    HapPixelFormat.Dxt1Rgb => _FORMAT_DXT1_RGB,
-    HapPixelFormat.Dxt5Rgba => _FORMAT_DXT5_RGBA,
-    _ => _FORMAT_DXT5_SCALED_YCOCG,
+  private static byte _PixelFormatCode(Variant variant) => variant switch {
+    Variant.Hap1 => _FORMAT_DXT1_RGB,
+    Variant.Hap5 => _FORMAT_DXT5_RGBA,
+    Variant.HapY => _FORMAT_DXT5_SCALED_YCOCG,
+    Variant.HapA => _FORMAT_RGTC1_ALPHA,
+    Variant.Hap7 => _FORMAT_BC7_RGBA,
+    _ => throw new InvalidOperationException($"{variant} does not have one fixed single-image format code."),
   };
+
+  private static ushort _ReadU16(ReadOnlySpan<byte> data, int offset)
+    => (ushort)(data[offset] | (data[offset + 1] << 8));
+
+  private enum Variant {
+    Hap1,
+    Hap5,
+    HapY,
+    HapM,
+    HapA,
+    Hap7,
+    HapH,
+  }
 }
