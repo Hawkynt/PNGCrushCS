@@ -26,7 +26,9 @@ internal sealed class Indeo3FrameEncoder {
   private const uint _OS_HEADER_ID = 0x46524D48; // MKBETAG('F', 'R', 'M', 'H')
   private const ushort _CODEC_VERSION = 32;
 
+  private const int _PERIODIC_KEY_FRAME = 1 << 0;
   private const int _KEY_FRAME = 1 << 2;
+  private const int _NEXT_FRAME_IS_KEY = 1 << 3;
   private const int _BUFFER_SHIFT = 9;
 
   private const int _OS_HEADER_LENGTH = 16;
@@ -63,8 +65,12 @@ internal sealed class Indeo3FrameEncoder {
     this._chromaHeight = Indeo3Plane.Align(height >> 2, 4);
   }
 
-  /// <summary>Encodes one RGB picture, optionally forcing an independently decodable intra frame.</summary>
-  internal EncodedFrame Encode(ReadOnlySpan<byte> rgb, uint frameNumber, bool forceKeyFrame) {
+  /// <summary>Encodes one RGB picture and its frame-group signalling.</summary>
+  internal EncodedFrame Encode(
+    ReadOnlySpan<byte> rgb,
+    uint frameNumber,
+    bool periodicKeyFrame,
+    bool nextFrameIsKeyFrame) {
     var luma = new byte[checked(this._width * this._height)];
     var blueDifference = new byte[checked(this._chromaWidth * this._chromaHeight)];
     var redDifference = new byte[blueDifference.Length];
@@ -73,7 +79,7 @@ internal sealed class Indeo3FrameEncoder {
 
     var bufferSelect = this._nextBuffer;
     var referenceBuffer = bufferSelect ^ 1;
-    var isKeyFrame = forceKeyFrame
+    var isKeyFrame = periodicKeyFrame
       || this._reconstructedLuma[referenceBuffer] is null
       || this._reconstructedBlueDifference[referenceBuffer] is null
       || this._reconstructedRedDifference[referenceBuffer] is null
@@ -108,11 +114,28 @@ internal sealed class Indeo3FrameEncoder {
     this._reconstructedRedDifference[bufferSelect] = v.Reconstructed;
     this._nextBuffer ^= 1;
 
-    return new(_BuildFrame(y.Data, u.Data, v.Data, this._width, this._height, frameNumber, bufferSelect, isKeyFrame), isKeyFrame);
+    return new(
+      _BuildFrame(
+        y.Data, u.Data, v.Data,
+        this._width, this._height,
+        frameNumber, bufferSelect,
+        isKeyFrame,
+        periodicKeyFrame && isKeyFrame,
+        nextFrameIsKeyFrame),
+      isKeyFrame);
   }
 
   private static byte[] _BuildFrame(
-    byte[] y, byte[] u, byte[] v, int width, int height, uint frameNumber, int bufferSelect, bool isKeyFrame) {
+    byte[] y,
+    byte[] u,
+    byte[] v,
+    int width,
+    int height,
+    uint frameNumber,
+    int bufferSelect,
+    bool isKeyFrame,
+    bool isPeriodicKeyFrame,
+    bool nextFrameIsKeyFrame) {
     var yOffset = _BITSTREAM_HEADER_LENGTH;
     var vOffset = checked(yOffset + y.Length);
     var uOffset = checked(vOffset + v.Length);
@@ -129,7 +152,10 @@ internal sealed class Indeo3FrameEncoder {
     BinaryPrimitives.WriteUInt32LittleEndian(osHeader[8..], frameNumber ^ (uint)dataSize ^ _OS_HEADER_ID);
     BinaryPrimitives.WriteUInt32LittleEndian(osHeader[12..], (uint)dataSize);
 
-    var flags = (isKeyFrame ? _KEY_FRAME : 0) | (bufferSelect << _BUFFER_SHIFT);
+    var flags = (isPeriodicKeyFrame ? _PERIODIC_KEY_FRAME : 0)
+      | (isKeyFrame ? _KEY_FRAME : 0)
+      | (nextFrameIsKeyFrame ? _NEXT_FRAME_IS_KEY : 0)
+      | (bufferSelect << _BUFFER_SHIFT);
     var bitstreamHeader = frame.AsSpan(_OS_HEADER_LENGTH, _BITSTREAM_HEADER_LENGTH);
     BinaryPrimitives.WriteUInt16LittleEndian(bitstreamHeader, _CODEC_VERSION);
     BinaryPrimitives.WriteUInt16LittleEndian(bitstreamHeader[2..], (ushort)flags);
