@@ -119,15 +119,18 @@ public sealed class FlashSv2VideoDecoder : IVideoCodecDecoder<FlashSv2VideoDecod
       var paletteSize = (data[offset] << 8) | data[offset + 1];
       offset += 2;
 
-      if (paletteSize > 0) {
-        if (offset + paletteSize > data.Length)
-          throw new InvalidDataException(
-            $"Video stream {this._streamIndex} carries a Flash Screen Video 2 palette block stating {paletteSize} "
-            + $"compressed byte(s), where only {data.Length - offset} remain in the packet.");
+      if (paletteSize == 0)
+        throw new InvalidDataException(
+          $"Video stream {this._streamIndex} carries a Flash Screen Video 2 packet with HasPaletteInfo set but "
+          + "a palette DataSize of 0. A custom palette must carry all 128 three-byte entries.");
 
-        this._paletteBgr = _InflatePalette(packet.Data.Slice(offset, paletteSize), this._streamIndex);
-        offset += paletteSize;
-      }
+      if (offset + paletteSize > data.Length)
+        throw new InvalidDataException(
+          $"Video stream {this._streamIndex} carries a Flash Screen Video 2 palette block stating {paletteSize} "
+          + $"compressed byte(s), where only {data.Length - offset} remain in the packet.");
+
+      this._paletteBgr = _InflatePalette(packet.Data.Slice(offset, paletteSize), this._streamIndex);
+      offset += paletteSize;
     }
 
     var canvas = this._canvas!;
@@ -148,8 +151,15 @@ public sealed class FlashSv2VideoDecoder : IVideoCodecDecoder<FlashSv2VideoDecod
         var blockSize = (data[offset] << 8) | data[offset + 1];
         offset += 2;
 
-        if (blockSize == 0)
+        if (blockSize == 0) {
+          if (isKeyFrame)
+            throw new InvalidDataException(
+              $"Video stream {this._streamIndex} carries a Flash Screen Video 2 key frame whose block at grid "
+              + $"position ({column},{row}) has DataSize 0. Zero-sized blocks are the interframe unchanged-block "
+              + "form and cannot establish a keyblock reference.");
+
           continue;
+        }
 
         if (offset + blockSize > data.Length)
           throw new InvalidDataException(
@@ -370,16 +380,11 @@ public sealed class FlashSv2VideoDecoder : IVideoCodecDecoder<FlashSv2VideoDecod
 
   private static byte[] _InflatePalette(ReadOnlyMemory<byte> compressed, int streamIndex) {
     const int _PALETTE_BYTES = 128 * 3;
-    using var source = new MemoryStream(compressed.ToArray(), writable: false);
-    using var zlib = new ZLibStream(source, CompressionMode.Decompress);
-    var decompressed = new byte[_PALETTE_BYTES];
-    try {
-      zlib.ReadExactly(decompressed);
-    } catch (EndOfStreamException ex) {
+    var decompressed = _InflateAll(compressed.Span);
+    if (decompressed.Length != _PALETTE_BYTES)
       throw new InvalidDataException(
         $"Video stream {streamIndex} carries a Flash Screen Video 2 palette block whose zlib data decompresses to "
-        + $"fewer than the {_PALETTE_BYTES} byte(s) a 128-entry colour table needs.", ex);
-    }
+        + $"{decompressed.Length} byte(s), where exactly {_PALETTE_BYTES} are required for 128 three-byte entries.");
 
     return decompressed;
   }
