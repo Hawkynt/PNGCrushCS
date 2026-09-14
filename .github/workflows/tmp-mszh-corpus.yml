@@ -64,10 +64,100 @@ jobs:
           sed -i 's/^          //' expected.md5
           md5sum --check expected.md5
 
+      - name: Add temporary native-frame dump mode
+        shell: python
+        run: |
+          from pathlib import Path
+
+          program = Path('Tools/parity/Decode/Program.cs')
+          text = program.read_text()
+          marker = '// Every frame of an animation, rather than the one a still viewer would draw.'
+          block = r'''
+          // Temporary corpus-oracle path: writes decoder-native bytes without RGB conversion.
+          if (args[0] == "--native-frames") {
+            if (args.Length < 3) {
+              Console.Error.WriteLine("usage: Decode --native-frames <file> <output directory>");
+              return 2;
+            }
+
+            var animation = new FileInfo(args[1]);
+            var into = args[2];
+            Directory.CreateDirectory(into);
+            var containers = VideoParity.ContainersClaiming(animation);
+            if (containers.Count == 0) {
+              Console.Error.WriteLine($"no container claims {animation.Name}");
+              return 2;
+            }
+
+            return VideoParity.WriteNativeFrames(animation, into, containers[0]);
+          }
+
+          '''
+          if marker not in text:
+              raise SystemExit('Program.cs insertion marker not found')
+          program.write_text(text.replace(marker, block + marker, 1))
+
+          parity = Path('Tools/parity/Decode/VideoParity.cs')
+          text = parity.read_text()
+          method = r'''
+
+            /// <summary>Writes every decoded frame in its native RawImage byte layout for codec-oracle comparisons.</summary>
+            internal static int WriteNativeFrames(FileInfo source, string into, VideoFormatEntry entry) {
+              var bytes = File.ReadAllBytes(source.FullName);
+              IReadOnlyList<MediaStreamInfo> streams;
+              try {
+                streams = entry.ReadStreams(bytes);
+              } catch (Exception failure) {
+                Console.Error.WriteLine($"{source.Name}: {entry.Name} would not open it — {failure.GetType().Name}: {failure.Message}");
+                return 1;
+              }
+
+              var video = streams.FirstOrDefault(s => s.Kind == MediaStreamKind.Video);
+              if (video == null) {
+                Console.Error.WriteLine($"{source.Name}: {entry.Name} holds no video stream");
+                return 1;
+              }
+
+              try {
+                VideoFormatRegistry.CreateDecoder(video);
+              } catch (Exception failure) {
+                Console.Error.WriteLine($"{source.Name}: {failure.GetType().Name}: {failure.Message}");
+                return 1;
+              }
+
+              var frame = 0;
+              try {
+                foreach (var decoded in _Frames(entry, bytes, video)) {
+                  var picture = decoded.Image;
+                  var wanted = picture.MinimumPixelDataLength;
+                  if (wanted > int.MaxValue || picture.PixelData.LongLength < wanted) {
+                    Console.Error.WriteLine($"{source.Name}: frame {frame} carries too few native bytes for {picture.Width}x{picture.Height} {picture.Format}");
+                    return 1;
+                  }
+
+                  var path = Path.Combine(into, $"{source.Name}.{frame:D2}.{picture.Format}.raw");
+                  File.WriteAllBytes(path, picture.PixelData.AsSpan(0, (int)wanted).ToArray());
+                  Console.WriteLine($"{path}\t{picture.Width}x{picture.Height}\t{picture.Format}\tpts={decoded.PresentationTimestamp}");
+                  ++frame;
+                }
+              } catch (Exception failure) {
+                Console.Error.WriteLine($"{source.Name}: frame {frame} — {failure.GetType().Name}: {failure.Message}");
+                return 1;
+              }
+
+              Console.WriteLine($"{entry.Name}: {frame} native frame(s) from {source.Name}");
+              return frame == 0 ? 1 : 0;
+            }
+          '''
+          at = text.rfind('\n}')
+          if at < 0:
+              raise SystemExit('VideoParity.cs class terminator not found')
+          parity.write_text(text[:at] + method + text[at:])
+
       - name: Build parity decoder
         run: dotnet build Tools/parity/Decode/Decode.csproj -c Release --nologo
 
-      - name: Decode corpus with PNGCrushCS and FFmpeg
+      - name: Decode corpus natively with PNGCrushCS and FFmpeg
         shell: bash
         run: |
           set -euo pipefail
@@ -75,78 +165,98 @@ jobs:
           mkdir -p /tmp/mszh-ours /tmp/mszh-ffmpeg
           for path in /tmp/mszh-samples/*.avi; do
             file=$(basename "$path")
-            mkdir -p "/tmp/mszh-ours/$file" "/tmp/mszh-ffmpeg/$file"
-            echo "=== $file ==="
-            dotnet run --project Tools/parity/Decode/Decode.csproj -c Release --no-build -- --frames "$path" "/tmp/mszh-ours/$file"
-            ffmpeg -hide_banner -loglevel error -y -i "$path" -map 0:v:0 -an -sn -dn -vsync 0 -start_number 0 "/tmp/mszh-ffmpeg/$file/$file.%02d.ppm"
+            mkdir -p "/tmp/mszh-ours/$file"
+            case "$file" in
+              mszh_rgb24*) pix_fmt=bgr24 ;;
+              mszh_yuv111*) pix_fmt=yuv444p ;;
+              mszh_yuv211*|mszh_yuv422*) pix_fmt=yuv422p ;;
+              mszh_yuv411*) pix_fmt=yuv411p ;;
+              mszh_yuv420*) pix_fmt=yuv420p ;;
+              *) echo "no oracle pixel format for $file" >&2; exit 1 ;;
+            esac
+            echo "=== $file ($pix_fmt) ==="
+            dotnet run --project Tools/parity/Decode/Decode.csproj -c Release --no-build -- --native-frames "$path" "/tmp/mszh-ours/$file"
+            ffmpeg -hide_banner -loglevel error -y -i "$path" -map 0:v:0 -an -sn -dn -vsync 0 -pix_fmt "$pix_fmt" -f rawvideo "/tmp/mszh-ffmpeg/$file.raw"
           done
 
-      - name: Compare decoded pixels byte for byte
+      - name: Compare native decoded samples byte for byte
         shell: python
         run: |
           from pathlib import Path
+          import subprocess
           import sys
 
           ours_root = Path('/tmp/mszh-ours')
           ff_root = Path('/tmp/mszh-ffmpeg')
+          sample_root = Path('/tmp/mszh-samples')
 
-          def ppm(path: Path):
-              data = path.read_bytes()
-              if not data.startswith(b'P6'):
-                  raise ValueError(f'{path}: not P6 PPM')
-              at = 2
-              tokens = []
-              while len(tokens) < 3:
-                  while at < len(data) and data[at] in b' \t\r\n':
-                      at += 1
-                  if at < len(data) and data[at] == ord('#'):
-                      while at < len(data) and data[at] not in b'\r\n':
-                          at += 1
-                      continue
-                  start = at
-                  while at < len(data) and data[at] not in b' \t\r\n':
-                      at += 1
-                  tokens.append(data[start:at])
-              while at < len(data) and data[at] in b' \t\r\n':
-                  at += 1
-              width, height, maximum = map(int, tokens)
-              if maximum != 255:
-                  raise ValueError(f'{path}: max value {maximum}')
-              pixels = data[at:]
-              expected = width * height * 3
-              if len(pixels) != expected:
-                  raise ValueError(f'{path}: {len(pixels)} pixel bytes, expected {expected}')
-              return width, height, pixels
+          def dimensions(path: Path):
+              out = subprocess.check_output([
+                  'ffprobe', '-v', 'error', '-select_streams', 'v:0',
+                  '-show_entries', 'stream=width,height', '-of', 'csv=p=0:s=x', str(path)
+              ], text=True).strip()
+              width, height = map(int, out.split('x'))
+              return width, height
+
+          def yuv411_from_expanded_444(data: bytes, width: int, height: int):
+              samples = width * height
+              if len(data) != samples * 3:
+                  raise ValueError(f'expanded 4:1:1 frame has {len(data)} bytes, expected {samples * 3}')
+              if width % 4:
+                  raise ValueError(f'4:1:1 corpus width {width} is not divisible by four')
+              y = data[:samples]
+              cb444 = data[samples:samples * 2]
+              cr444 = data[samples * 2:]
+              cb = bytearray()
+              cr = bytearray()
+              for row in range(height):
+                  base = row * width
+                  for x in range(0, width, 4):
+                      c = cb444[base + x]
+                      r = cr444[base + x]
+                      if cb444[base + x:base + x + 4] != bytes([c]) * 4:
+                          raise ValueError(f'Cb is not constant across row {row}, columns {x}..{x + 3}')
+                      if cr444[base + x:base + x + 4] != bytes([r]) * 4:
+                          raise ValueError(f'Cr is not constant across row {row}, columns {x}..{x + 3}')
+                      cb.append(c)
+                      cr.append(r)
+              return y + bytes(cb) + bytes(cr)
 
           failures = []
+          total_frames = 0
           for ours_dir in sorted(p for p in ours_root.iterdir() if p.is_dir()):
               name = ours_dir.name
-              ff_dir = ff_root / name
-              ours = sorted(ours_dir.glob('*.ppm'))
-              ref = sorted(ff_dir.glob('*.ppm'))
-              if len(ours) != len(ref):
-                  failures.append(f'{name}: frame count ours={len(ours)} ffmpeg={len(ref)}')
+              width, height = dimensions(sample_root / name)
+              frames = sorted(ours_dir.glob('*.raw'))
+              if not frames:
+                  failures.append(f'{name}: PNGCrushCS wrote no native frames')
                   continue
 
-              for i, (left_path, right_path) in enumerate(zip(ours, ref)):
-                  lw, lh, left = ppm(left_path)
-                  rw, rh, right = ppm(right_path)
-                  if (lw, lh) != (rw, rh):
-                      failures.append(f'{name} frame {i}: geometry ours={lw}x{lh} ffmpeg={rw}x{rh}')
-                      continue
-                  if left == right:
-                      continue
+              ours = bytearray()
+              for frame in frames:
+                  data = frame.read_bytes()
+                  if 'yuv411' in name:
+                      data = yuv411_from_expanded_444(data, width, height)
+                  ours += data
 
-                  diffs = [abs(a - b) for a, b in zip(left, right)]
-                  differing = sum(d != 0 for d in diffs)
-                  first = next(j for j, d in enumerate(diffs) if d)
-                  failures.append(
-                      f'{name} frame {i}: {differing}/{len(left)} RGB bytes differ; '
-                      f'max abs diff={max(diffs)}, first byte {first}: ours={left[first]} ffmpeg={right[first]}'
-                  )
+              ref = (ff_root / f'{name}.raw').read_bytes()
+              total_frames += len(frames)
+              if bytes(ours) == ref:
+                  print(f'{name}: {len(frames)} frame(s), {len(ref)} native bytes — exact')
+                  continue
+
+              common = min(len(ours), len(ref))
+              first = next((i for i in range(common) if ours[i] != ref[i]), None)
+              if first is None:
+                  failures.append(f'{name}: byte lengths differ ours={len(ours)} ffmpeg={len(ref)} with common prefix identical')
+                  continue
+              failures.append(
+                  f'{name}: first native mismatch byte {first}: ours={ours[first]} ffmpeg={ref[first]}; '
+                  f'lengths ours={len(ours)} ffmpeg={len(ref)}'
+              )
 
           if failures:
               print('\n'.join(failures), file=sys.stderr)
               raise SystemExit(1)
 
-          print('Every decoded RGB byte of every frame matched FFmpeg for all MSZH corpus files.')
+          print(f'All {total_frames} decoded frames matched FFmpeg byte-for-byte in native sample space.')
