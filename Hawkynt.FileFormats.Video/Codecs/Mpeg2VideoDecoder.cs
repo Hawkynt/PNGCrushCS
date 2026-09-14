@@ -16,52 +16,42 @@ namespace FileFormat.Codecs;
 /// picture, slice, macroblock and block layers are the same walk with a few more fields in them.
 /// What it adds is carried in extension start codes the older standard left empty.
 /// <para/>
-/// <b>What it adds, and which of it is here.</b> The sequence and picture coding extensions;
-/// 4:2:0 with MPEG-2's own chrominance siting and 4:2:2; <c>intra_dc_precision</c>, so a picture may
-/// code its DC to nine, ten or eleven bits; the non-linear quantiser scale; the alternate scan; the
-/// second intra coefficient table (Table B.15); loadable chrominance quantiser matrices;
-/// concealment motion vectors; 13818-2's own dequantisation, which does not force every coefficient
-/// odd the way MPEG-1's does but corrects the parity of each block once at the end; and interlaced
-/// coding within a frame picture — field DCT and field-based motion compensation, where the two
-/// halves of a macroblock are predicted separately from either field of the reference.
+/// <b>Implemented MPEG-2 syntax.</b> The sequence and picture coding extensions; 4:2:0 with MPEG-2's
+/// chrominance siting, 4:2:2, and the 4:4:4 syntax defined by 13818-2; <c>intra_dc_precision</c>;
+/// linear and non-linear quantiser scales; both coefficient scans and both intra VLC tables;
+/// separate luminance/chrominance quantiser matrices; concealment motion vectors; and MPEG-2
+/// mismatch control. Frame pictures support frame and field DCT, frame and field motion prediction,
+/// forward/backward B prediction and dual-prime prediction. Field pictures are paired as coded
+/// frames with top/bottom parity preserved, including I/I, I/P, P/P and B/B pairs; a second P field
+/// can use the first reconstructed field immediately, and field macroblocks support field, 16x8 and
+/// dual-prime motion compensation with the reference-field rules of 7.6.3.
 /// <para/>
-/// <b>What it refuses, by name.</b> Field pictures, where the two fields of a frame are two coded
-/// pictures rather than one; dual-prime prediction; 4:4:4; and the three scalability extensions.
-/// Each throws naming the field and the clause. None of them is approximated, and there is no
-/// <c>catch</c> anywhere that hands back a blank, a copied or a zero-filled frame — a decoder that
-/// answers an interlaced field picture with something picture-shaped is worse than one that says it
-/// cannot read it, because nobody checks a picture that looks like a picture.
+/// <b>4:4:4 boundary.</b> H.262 defines 4:4:4 macroblock ordering, coded-block-pattern extension,
+/// quantisation and full-resolution chroma motion-vector rules, and those decoding rules are
+/// implemented here. H.262 Annex D also says that 4:4:4 is not supported by <em>any</em> defined
+/// profile. In particular there is no such conforming subset as "High Profile 4:4:4". The decoder
+/// therefore accepts chroma_format 3 as interoperability syntax, but does not claim that such a
+/// bitstream conforms to High Profile or to another H.262 profile.
 /// <para/>
-/// <b>Measured.</b> Thirty-seven streams, eleven hundred frames, decoded here and by ffmpeg and
-/// compared sample by sample on every frame and not on the first: progressive and interlaced, 4:2:0
-/// and 4:2:2, 64x48 up to 704x480, sizes that are and are not whole macroblocks, greyscale so that no
-/// chrominance convention could mask a luminance error, with and without the alternate scan, the
-/// non-linear quantiser, the second intra table and each intra DC precision, and through an
-/// elementary stream, a program stream and a transport stream. Every one produced the frame count
-/// ffprobe counts.
+/// <b>Still refused.</b> The sequence, spatial-picture and temporal-picture scalability extensions
+/// are not implemented. A sequence that changes reference-picture geometry while old references are
+/// live is also refused rather than guessed. Malformed field pairs, forbidden field-reference
+/// selections and motion vectors that leave their reference plane are rejected instead of clamped or
+/// replaced with a plausible-looking picture.
 /// <para/>
-/// Twenty-seven of the thirty-seven are identical sample for sample on every frame; the other ten
-/// differ in at most thirteen samples of one frame, by at most three levels, and the difference is
-/// flat from frame to frame rather than growing across a group of pictures — which is the thing worth
-/// measuring, because a fault in motion compensation or dequantisation grows and a rounding
-/// difference does not. On the same streams ffmpeg's own two inverse transforms differ from each
-/// other by tens of thousands of samples a frame, so this residual is three orders of magnitude
-/// inside the tolerance the standard's own accuracy bound allows.
+/// <b>Measured.</b> The established corpus contains thirty-seven streams and eleven hundred frames,
+/// decoded here and by ffmpeg and compared sample by sample on every frame: progressive and
+/// interlaced frame pictures, 4:2:0 and 4:2:2, 64x48 up to 704x480, sizes that are and are not whole
+/// macroblocks, the alternate scan, non-linear quantisation, the second intra table and every intra
+/// DC precision, through elementary, program and transport streams. Twenty-seven of those thirty-seven
+/// streams are identical sample for sample; the other ten differ in at most thirteen samples of one
+/// frame, by at most three levels, without reference-chain drift. The advanced field-picture,
+/// dual-prime and 4:4:4 paths additionally have bit-exact unit streams and executable FFmpeg oracle
+/// tests; when FFmpeg is absent those oracle tests are reported inconclusive rather than silently
+/// counted as evidence.
 /// </remarks>
 public sealed class Mpeg2VideoDecoder : IVideoCodecDecoder<Mpeg2VideoDecoder> {
 
-  /// <summary>The four-character codes containers name MPEG-2 video with.</summary>
-  /// <remarks>
-  /// <c>MPEG</c> is here rather than with MPEG-1. An AVI or a Matroska stating it is stating "one of
-  /// the two MPEGs" and is in practice far more often the later one — and since the engine reads
-  /// both, claiming it here costs nothing and turns what used to be "no codec for this stream" into
-  /// a decode either way.
-  /// <para/>
-  /// <c>EM2V</c> and <c>MMES</c> are two encoders' own spellings of plain 13818-2, and neither is
-  /// here on the strength of a table. Three elementary streams were muxed under each of them and
-  /// under <c>MPG2</c> and decoded here and by ffmpeg: every tag produced the picture the <c>MPG2</c>
-  /// spelling of the identical stream produces, to the sample.
-  /// </remarks>
   private static readonly CodecTag[] _Tags = [
     CodecTag.FromCharacters("MPG2"),
     CodecTag.FromCharacters("MPEG"),
@@ -74,7 +64,6 @@ public sealed class Mpeg2VideoDecoder : IVideoCodecDecoder<Mpeg2VideoDecoder> {
     CodecTag.FromCharacters("MMES"),
   ];
 
-  /// <summary>What Matroska calls an MPEG-2 video track.</summary>
   private const string _MATROSKA_CODEC_ID = "V_MPEG2";
 
   private readonly MpegVideoDecoder _decoder = new();
@@ -97,33 +86,26 @@ public sealed class Mpeg2VideoDecoder : IVideoCodecDecoder<Mpeg2VideoDecoder> {
     return false;
   }
 
-  /// <summary>
-  /// Builds a decoder for one stream.
-  /// </summary>
+  /// <summary>Builds a decoder for one stream.</summary>
   /// <remarks>
-  /// Nothing is read from the stream description, not even the dimensions — and for MPEG-2 that
-  /// matters more than it did for MPEG-1, because a transport stream states a stream type and
-  /// nothing else at all. Every one of the picture's properties is in the sequence header and the
-  /// sequence extension of the stream itself.
+  /// Nothing is read from the stream description, not even the dimensions. Every coded picture
+  /// property needed for reconstruction is carried by the sequence and picture headers/extensions.
   /// </remarks>
   public static Mpeg2VideoDecoder Create(MediaStreamInfo stream) {
     ArgumentNullException.ThrowIfNull(stream);
-
     return new();
   }
 
-  /// <summary>
-  /// Decodes one packet — one coded picture — and hands back whichever picture is due for display.
-  /// </summary>
+  /// <summary>Decodes one packet and hands back whichever complete frame is due for display.</summary>
   /// <returns>
-  /// <c>false</c> when the packet decoded but the picture it produced is not the one due next, which
-  /// is the case for the first anchor of a stream and for any packet that holds no picture at all.
+  /// <c>false</c> when the packet decoded but no complete frame is due yet. That includes the first
+  /// anchor of a stream and the first field picture of a field-coded frame.
   /// </returns>
   public bool TryDecode(CodedPacket packet, out RawImage frame) {
     this._decoder.DecodePacket(packet.Data.Span);
     return this._decoder.TryTakeReady(out frame);
   }
 
-  /// <summary>The pictures still held when the packets run out: the last anchor, and anything queued behind it.</summary>
+  /// <summary>The complete pictures still held when the packets run out.</summary>
   public IEnumerable<RawImage> Flush() => this._decoder.Flush();
 }

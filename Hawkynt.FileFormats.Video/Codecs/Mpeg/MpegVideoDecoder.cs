@@ -30,26 +30,31 @@ internal sealed class MpegVideoDecoder {
   /// <summary>The anchor two anchors back, which a B picture predicts forwards from.</summary>
   private MpegFrame? _previousAnchor;
 
-  /// <summary>The most recent anchor, which a P picture predicts from and a B picture predicts backwards from.</summary>
+  /// <summary>The most recent complete reference frame.</summary>
   private MpegFrame? _currentAnchor;
 
   private MpegSequenceHeader? _anchorGeometry;
 
   /// <summary>
-  /// The most recently reconstructed anchor, which is what the next P picture predicts from.
+  /// The first field of a field-coded frame while its complementary field has not arrived yet.
   /// </summary>
   /// <remarks>
-  /// Exposed for the encoder. An encoder must predict from the picture its decoder will hold, not
-  /// from the source it was given, or the two drift apart a little with every predicted picture
-  /// until the error is visible. Reading the anchor back out of this decoder makes the reference
-  /// identical by construction rather than by a second implementation of dequantisation and the
-  /// inverse transform that would have to be kept in step.
+  /// This is deliberately not filed as <see cref="_currentAnchor"/> yet. H.262 lets the second field
+  /// of a P-coded frame use the first field immediately, but a later coded frame may not use the
+  /// half-finished frame. Keeping it separately expresses that difference instead of pretending a
+  /// half frame is a complete reference picture.
   /// </remarks>
-  internal MpegFrame? CurrentAnchor => this._currentAnchor;
+  private MpegFrame? _pendingFieldFrame;
+  private int _pendingFieldParity = -1;
+  private int _pendingFieldCodingType;
 
   /// <summary>
-  /// Decodes one packet and queues whichever pictures became due for display.
+  /// The most recently reconstructed complete anchor, which is what an encoder's next P picture
+  /// predicts from.
   /// </summary>
+  internal MpegFrame? CurrentAnchor => this._currentAnchor;
+
+  /// <summary>Decodes one packet and queues whichever complete frame became due for display.</summary>
   internal void DecodePacket(ReadOnlySpan<byte> data) {
     var reader = new MpegBitReader(data);
     MpegPictureDecoder? picture = null;
@@ -59,6 +64,11 @@ internal sealed class MpegVideoDecoder {
     while (_TryReadStartCode(ref reader, out var code))
       switch (code) {
         case MpegStartCode.SequenceHeader:
+          if (this._pendingFieldFrame != null)
+            throw new InvalidDataException(
+              "An MPEG sequence header arrived between the two field pictures of one coded frame. H.262 requires "
+              + "the complementary fields of a field-coded frame to be consecutive pictures.");
+
           this._sequence = MpegSequenceHeader.Parse(ref reader, this._sequence);
           break;
 
@@ -67,17 +77,17 @@ internal sealed class MpegVideoDecoder {
           break;
 
         case MpegStartCode.Group:
+          if (this._pendingFieldFrame != null)
+            throw new InvalidDataException(
+              "An MPEG group header arrived between the two field pictures of one coded frame. H.262 requires "
+              + "the complementary fields of a field-coded frame to be consecutive pictures.");
+
           // time_code, closed_gop and broken_link. Nothing in them changes a sample: the reordering
-          // this decoder does follows from the picture types alone, and it stays correct across an
-          // open group because a B picture's forward reference is the anchor before the group's.
+          // follows from picture types and stays correct across an open group.
           reader.Skip(27);
           break;
 
         case MpegStartCode.Picture:
-          // A second picture start code in one packet finishes the first. The container here cuts a
-          // packet per picture so this never fires for it, but a caller with packets from elsewhere —
-          // a program stream, an AVI, its own buffer — may well hand over several at once, and a
-          // decoder that kept only the last would drop frames without saying anything.
           if (picture != null)
             this._FinishPicture(picture);
 
@@ -99,9 +109,6 @@ internal sealed class MpegVideoDecoder {
         case MpegStartCode.SequenceEnd:
         case MpegStartCode.UserData:
         default:
-          // The sequence end code carries nothing; user data is bytes the standards give no meaning
-          // to and reserved codes are bytes they have not given one to yet. All three are stepped
-          // over, which the walk does by simply looking for the next start code.
           break;
       }
 
@@ -109,8 +116,13 @@ internal sealed class MpegVideoDecoder {
       this._FinishPicture(picture);
   }
 
-  /// <summary>The pictures still held when the packets run out: the last anchor, and anything queued behind it.</summary>
+  /// <summary>The complete frames still held when the packets run out.</summary>
   internal IEnumerable<RawImage> Flush() {
+    if (this._pendingFieldFrame != null)
+      throw new InvalidDataException(
+        $"The MPEG stream ended after a {(this._pendingFieldParity == 0 ? "top" : "bottom")} field picture without "
+        + "the complementary field required to complete its coded frame.");
+
     while (this._ready.Count > 0)
       yield return this._ready.Dequeue();
 
@@ -122,7 +134,6 @@ internal sealed class MpegVideoDecoder {
     this._previousAnchor = null;
   }
 
-  /// <summary>Whether a decoded picture is waiting to be handed out.</summary>
   internal bool TryTakeReady(out RawImage frame) {
     if (this._ready.Count > 0) {
       frame = this._ready.Dequeue();
@@ -137,19 +148,6 @@ internal sealed class MpegVideoDecoder {
   // Extensions — 13818-2, 6.2.2.2
   // ============================================================================================
 
-  /// <summary>
-  /// Acts on one extension, positioned just past its start code.
-  /// </summary>
-  /// <remarks>
-  /// The four-bit identifier says which extension this is on its own, so there is no need to know
-  /// whether the last start code was a sequence header or a picture header to tell a sequence
-  /// extension from a picture coding extension. That is deliberate on the standard's part and it is
-  /// what makes this a flat switch rather than a state machine.
-  /// <para/>
-  /// The three scalable extensions are refused and not skipped. A scalable stream's base layer is
-  /// decodable on its own, so skipping them would produce a picture — the wrong one, missing every
-  /// enhancement the stream carried, and with no indication that anything was missing.
-  /// </remarks>
   private void _ReadExtension(ref MpegBitReader reader, MpegPictureHeader? header, ref bool sawPictureCodingExtension) {
     var identifier = reader.ReadBits(4);
     switch (identifier) {
@@ -191,8 +189,6 @@ internal sealed class MpegVideoDecoder {
       case _COPYRIGHT_EXTENSION:
       case _PICTURE_DISPLAY_EXTENSION:
       default:
-        // Display geometry, copyright identification and pan-and-scan offsets. None of them changes
-        // a sample, and the walk steps over them by looking for the next start code.
         break;
     }
   }
@@ -223,22 +219,95 @@ internal sealed class MpegVideoDecoder {
 
     this._RefuseGeometryChangeMidStream();
 
+    var isFieldPicture = sequence.IsMpeg2 && header.PictureStructure != 3;
+    if (isFieldPicture && sequence.ProgressiveSequence)
+      throw new InvalidDataException(
+        "An MPEG-2 progressive_sequence contains a field picture. ISO/IEC 13818-2 requires every picture of a "
+        + "progressive sequence to have picture_structure Frame picture.");
+
+    if (!isFieldPicture) {
+      if (this._pendingFieldFrame != null)
+        throw new InvalidDataException(
+          "An MPEG frame picture arrived while the previous field picture still lacked its complementary field. "
+          + "H.262 requires the two fields of a field-coded frame to be consecutive pictures.");
+
+      return MpegPictureDecoder.BeginPicture(
+        sequence,
+        new(sequence.MacroblockWidth * 16, sequence.MacroblockHeight * 16, sequence.ChromaFormat),
+        this._previousAnchor, this._currentAnchor, header);
+    }
+
+    var parity = header.PictureStructure - 1;
+    if (this._pendingFieldFrame == null) {
+      return MpegPictureDecoder.BeginPicture(
+        sequence,
+        new(sequence.MacroblockWidth * 16, sequence.MacroblockHeight * 16, sequence.ChromaFormat),
+        this._previousAnchor, this._currentAnchor, header);
+    }
+
+    if (parity == this._pendingFieldParity)
+      throw new InvalidDataException(
+        $"Two consecutive MPEG-2 field pictures both state {(parity == 0 ? "top" : "bottom")} field. H.262 requires "
+        + "the second field of a coded frame to have the opposite parity from the first.");
+
+    if (!_IsValidFieldPair(this._pendingFieldCodingType, header.CodingType))
+      throw new InvalidDataException(
+        $"An MPEG-2 field-coded frame begins with picture_coding_type {this._pendingFieldCodingType} and ends with "
+        + $"type {header.CodingType}. H.262 permits I/I or I/P for a coded I-frame, P/P for a coded P-frame, and "
+        + "B/B for a coded B-frame.");
+
     return MpegPictureDecoder.BeginPicture(
       sequence,
-      new(sequence.MacroblockWidth * 16, sequence.MacroblockHeight * 16, sequence.ChromaFormat),
-      this._previousAnchor, this._currentAnchor, header);
+      this._pendingFieldFrame,
+      this._previousAnchor, this._currentAnchor, header,
+      pairedFieldReference: this._pendingFieldCodingType == MpegPictureDecoder.BidirectionallyCoded
+        ? null
+        : this._pendingFieldFrame,
+      pairedFieldParity: this._pendingFieldParity,
+      isSecondField: true,
+      firstFieldCodingType: this._pendingFieldCodingType);
   }
 
-  /// <summary>
-  /// Files a finished picture: shows it now if it is a B picture, or holds it and shows the anchor it
-  /// displaces.
-  /// </summary>
+  private static bool _IsValidFieldPair(int first, int second) => first switch {
+    MpegPictureDecoder.IntraCoded => second is MpegPictureDecoder.IntraCoded or MpegPictureDecoder.PredictiveCoded,
+    MpegPictureDecoder.PredictiveCoded => second == MpegPictureDecoder.PredictiveCoded,
+    MpegPictureDecoder.BidirectionallyCoded => second == MpegPictureDecoder.BidirectionallyCoded,
+    _ => false,
+  };
+
+  /// <summary>Files a finished picture, combining field pictures before applying frame reordering.</summary>
   private void _FinishPicture(MpegPictureDecoder picture) {
     picture.RefuseIfIncomplete();
 
-    if (picture.CodingType == MpegPictureDecoder.BidirectionallyCoded) {
-      // A B picture is never a reference, so it is due the moment it is decoded and nothing keeps it.
-      this._ready.Enqueue(this._ToImage(picture.Target));
+    if (!picture.IsFieldPicture) {
+      this._FinishFrame(picture.Target, picture.CodingType == MpegPictureDecoder.BidirectionallyCoded);
+      return;
+    }
+
+    if (this._pendingFieldFrame == null) {
+      this._pendingFieldFrame = picture.Target;
+      this._pendingFieldParity = picture.FieldParity;
+      this._pendingFieldCodingType = picture.CodingType;
+      return;
+    }
+
+    if (!ReferenceEquals(this._pendingFieldFrame, picture.Target))
+      throw new InvalidDataException(
+        "The two field pictures of an MPEG-2 coded frame were reconstructed into different frame buffers. This "
+        + "indicates an internal field-pairing error rather than a valid bitstream condition.");
+
+    var codedFrameIsB = this._pendingFieldCodingType == MpegPictureDecoder.BidirectionallyCoded;
+    var completed = this._pendingFieldFrame;
+    this._pendingFieldFrame = null;
+    this._pendingFieldParity = -1;
+    this._pendingFieldCodingType = 0;
+
+    this._FinishFrame(completed, codedFrameIsB);
+  }
+
+  private void _FinishFrame(MpegFrame frame, bool isBidirectional) {
+    if (isBidirectional) {
+      this._ready.Enqueue(this._ToImage(frame));
       return;
     }
 
@@ -246,20 +315,10 @@ internal sealed class MpegVideoDecoder {
       this._ready.Enqueue(this._ToImage(this._currentAnchor));
 
     this._previousAnchor = this._currentAnchor;
-    this._currentAnchor = picture.Target;
+    this._currentAnchor = frame;
     this._anchorGeometry = this._sequence;
   }
 
-  /// <summary>
-  /// Refuses a picture size that changes while pictures predicted from the old one are still held.
-  /// </summary>
-  /// <remarks>
-  /// A repeated sequence header is normal and usually restates the same values; it is allowed to load
-  /// new quantiser matrices, which affects only pictures after it and is fine. A different picture
-  /// size is not fine: the held anchors are the old size, and a P picture of the new size predicting
-  /// from them has no defined meaning. Rescaling them, or reading the smaller one into the larger,
-  /// would be inventing the parts that were never coded.
-  /// </remarks>
   private void _RefuseGeometryChangeMidStream() {
     if (this._anchorGeometry == null || this._sequence == null || this._anchorGeometry.SameGeometryAs(this._sequence))
       return;
@@ -281,15 +340,6 @@ internal sealed class MpegVideoDecoder {
     };
   }
 
-  /// <summary>
-  /// Moves to the next start code and consumes it, answering <c>false</c> at the end of the packet.
-  /// </summary>
-  /// <remarks>
-  /// Start codes are byte-aligned and may be preceded by any number of zero bytes, which encoders use
-  /// as padding (11172-2, 2.4.2.1; 13818-2, 6.2.1). So the search aligns first and then looks for
-  /// <c>00 00 01</c> from there, which finds the code whatever the slice before it left the bit
-  /// position at.
-  /// </remarks>
   private static bool _TryReadStartCode(ref MpegBitReader reader, out byte code) {
     reader.AlignToByte();
 
