@@ -1,8 +1,11 @@
 extern alias Images;
 using System;
 using System.Buffers.Binary;
+using System.IO;
 using BitmapInfoHeader = Images::FileFormat.Bmp.BitmapInfoHeader;
+using FileFormat.Avi;
 using FileFormat.Core;
+using Hawkynt.FileFormats.Video.Tests;
 
 namespace FileFormat.Codecs.Tests;
 
@@ -94,6 +97,40 @@ public sealed class LocoVideoCodecCompletionTests {
     Assert.That(decoded.PixelData, Is.EqualTo(pixels));
   }
 
+  [TestCase(12, PixelFormat.Yuv420P8)]
+  [TestCase(16, PixelFormat.Yuv422P8)]
+  [Category("Conformance")]
+  public void NativeYuvEncoderIsAcceptedByFfmpeg(int bitsPerPixel, PixelFormat format) {
+    FFmpegOracle.RequireAvailable();
+
+    const int width = 8;
+    const int height = 4;
+    var requested = new MediaStreamInfo {
+      Index = 0,
+      Kind = MediaStreamKind.Video,
+      Codec = CodecTag.FromCharacters("LOCO"),
+      Handler = CodecTag.FromCharacters("LOCO"),
+      Width = width,
+      Height = height,
+      BitsPerPixel = bitsPerPixel,
+      TimeBase = new Rational(1, 25),
+      FrameRate = new Rational(25, 1),
+    };
+    var encoder = LocoVideoEncoder.Create(requested);
+    var frame = _NativeYuv(width, height, format);
+
+    Assert.That(encoder.TryEncode(frame, 0, out var packet), Is.True);
+    var avi = VideoIO.Mux<AviWriter>([encoder.DescribeStream()], [packet]);
+    var path = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName() + ".avi");
+    try {
+      File.WriteAllBytes(path, avi);
+      var (decoded, detail) = FFmpegOracle.TryDecodeFirstFrame(path, width, height);
+      Assert.That(decoded, Is.True, detail);
+    } finally {
+      try { File.Delete(path); } catch { /* best effort */ }
+    }
+  }
+
   [Test]
   [Category("Unit")]
   public void BitsPerPixelSelectsNativeYuvWhenNoTrailerWasSupplied() {
@@ -144,6 +181,28 @@ public sealed class LocoVideoCodecCompletionTests {
 
     var exception = Assert.Throws<NotSupportedException>(() => encoder.TryEncode(frame, null, out _));
     Assert.That(exception!.Message, Does.Contain(nameof(PixelFormat.Yuv422P8)));
+  }
+
+  private static RawImage _NativeYuv(int width, int height, PixelFormat format) {
+    var chromaWidth = width >> 1;
+    var chromaHeight = format == PixelFormat.Yuv420P8 ? height >> 1 : height;
+    var yLength = checked(width * height);
+    var chromaLength = checked(chromaWidth * chromaHeight);
+    var data = new byte[checked(yLength + 2 * chromaLength)];
+
+    for (var y = 0; y < height; ++y)
+      for (var x = 0; x < width; ++x)
+        data[y * width + x] = (byte)(32 + x * 17 + y * 7);
+
+    var uAt = yLength;
+    var vAt = yLength + chromaLength;
+    for (var y = 0; y < chromaHeight; ++y)
+      for (var x = 0; x < chromaWidth; ++x) {
+        data[uAt + y * chromaWidth + x] = (byte)(80 + x * 9 + y * 3);
+        data[vAt + y * chromaWidth + x] = (byte)(160 - x * 7 - y * 5);
+      }
+
+    return new() { Width = width, Height = height, Format = format, PixelData = data };
   }
 
   private static MediaStreamInfo _Stream(int width, int height, int mode, int version = 1, int lossy = 0) {
