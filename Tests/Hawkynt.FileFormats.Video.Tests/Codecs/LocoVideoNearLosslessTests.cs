@@ -40,7 +40,7 @@ public sealed class LocoVideoNearLosslessTests {
     const int height = 4;
     const int lossy = 3;
     var source = _Pattern(width, height);
-    var encoder = LocoVideoEncoder.Create(_Stream(width, height, mode: 5, lossy));
+    var encoder = LocoVideoEncoder.Create(_Stream(width, height, mode: 5, lossy: lossy));
 
     Assert.That(encoder.TryEncode(new() {
       Width = width,
@@ -59,8 +59,7 @@ public sealed class LocoVideoNearLosslessTests {
   [Test]
   [Category("Unit")]
   public void WriterRefusesUnknownCodecVersionsRatherThanGuessingTheirSemantics() {
-    var stream = _Stream(2, 2, mode: 5, lossy: 1);
-    BinaryPrimitives.WriteInt32LittleEndian(stream.CodecPrivateData.Span[BitmapInfoHeader.StructSize..], 3);
+    var stream = _Stream(2, 2, mode: 5, lossy: 1, version: 3);
 
     var exception = Assert.Throws<NotSupportedException>(() => LocoVideoEncoder.Create(stream));
     Assert.That(exception!.Message, Does.Contain("versions 1 and 2"));
@@ -86,10 +85,10 @@ public sealed class LocoVideoNearLosslessTests {
     return data;
   }
 
-  private static MediaStreamInfo _Stream(int width, int height, int mode, int lossy) {
+  private static MediaStreamInfo _Stream(int width, int height, int mode, int lossy, int version = 2) {
     var format = new byte[BitmapInfoHeader.StructSize + 12];
     var extra = format.AsSpan(BitmapInfoHeader.StructSize);
-    BinaryPrimitives.WriteInt32LittleEndian(extra, 2);
+    BinaryPrimitives.WriteInt32LittleEndian(extra, version);
     BinaryPrimitives.WriteInt32LittleEndian(extra[4..], mode);
     BinaryPrimitives.WriteInt32LittleEndian(extra[8..], lossy);
 
