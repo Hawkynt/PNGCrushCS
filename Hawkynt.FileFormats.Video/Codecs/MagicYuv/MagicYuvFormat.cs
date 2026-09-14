@@ -5,13 +5,8 @@ namespace FileFormat.Codecs.MagicYuv;
 
 /// <summary>What a MagicYUV stream's samples mean.</summary>
 internal enum MagicYuvColourSpace {
-  /// <summary>One plane of luminance and nothing else.</summary>
   Grey,
-
-  /// <summary>Blue, green and red planes, with an alpha plane after them where there is one.</summary>
   Rgb,
-
-  /// <summary>Luminance and two chrominance planes, with an alpha plane where there is one.</summary>
   Yuv,
 }
 
@@ -19,8 +14,8 @@ internal enum MagicYuvColourSpace {
 /// <remarks>
 /// MagicYUV never published a bitstream specification. The format-byte/depth mapping below is
 /// cross-checked against FFmpeg's LGPL-2.1-or-later decoder and OxideAV's MIT-licensed clean-room
-/// implementation. The latter also independently documents the per-depth Huffman limit: 12, 14,
-/// 16 and 18 bits for 8, 10, 12 and 14-bit samples respectively.
+/// implementation. The latter also independently documents the per-depth Huffman limit and the
+/// vendor BITMAPINFOHEADER depth values.
 /// </remarks>
 internal sealed class MagicYuvFormat {
   internal static readonly byte[] Signature = [(byte)'M', (byte)'A', (byte)'G', (byte)'Y'];
@@ -34,7 +29,8 @@ internal sealed class MagicYuvFormat {
     int chromaVerticalShift,
     bool hasAlpha,
     int bitDepth,
-    byte formatByte
+    byte formatByte,
+    int streamBitsPerPixel
   ) {
     this.ColourSpace = colourSpace;
     this.PlaneCount = planeCount;
@@ -43,6 +39,7 @@ internal sealed class MagicYuvFormat {
     this.HasAlpha = hasAlpha;
     this.BitDepth = bitDepth;
     this.FormatByte = formatByte;
+    this.StreamBitsPerPixel = streamBitsPerPixel;
   }
 
   internal MagicYuvColourSpace ColourSpace { get; }
@@ -52,12 +49,12 @@ internal sealed class MagicYuvFormat {
   internal bool HasAlpha { get; }
   internal int BitDepth { get; }
   internal byte FormatByte { get; }
+  internal int StreamBitsPerPixel { get; }
   internal int SymbolCount => 1 << this.BitDepth;
   internal int SampleMask => this.SymbolCount - 1;
   internal int MaxHuffmanLength => this.BitDepth + 4;
   internal bool IsHighBitDepth => this.BitDepth > 8;
 
-  /// <summary>Canonical <see cref="RawImage"/> storage used at the codec boundary.</summary>
   internal PixelFormat NativePixelFormat => (this.ColourSpace, this.BitDepth, this.HasAlpha, this.ChromaHorizontalShift, this.ChromaVerticalShift) switch {
     (MagicYuvColourSpace.Grey, 8, _, _, _) => PixelFormat.Gray8,
     (MagicYuvColourSpace.Grey, 10, _, _, _) => PixelFormat.Gray10,
@@ -71,7 +68,6 @@ internal sealed class MagicYuvFormat {
     (MagicYuvColourSpace.Yuv, 10, false, 1, 1) => PixelFormat.Yuv420P10,
     (MagicYuvColourSpace.Yuv, 10, false, 1, 0) => PixelFormat.Yuv422P10,
     (MagicYuvColourSpace.Yuv, 10, false, 0, 0) => PixelFormat.Yuv444P10,
-    // Core has no planar YUVA pixel format; M8YA is authored from RGBA and split explicitly.
     (MagicYuvColourSpace.Yuv, 8, true, _, _) => PixelFormat.Rgba32,
     _ => throw new NotSupportedException(
       $"No RawImage representation exists for {this.BitDepth}-bit {this.ColourSpace} samples."),
@@ -103,23 +99,23 @@ internal sealed class MagicYuvFormat {
   internal static MagicYuvFormat Of(CodecTag codec, int streamIndex) {
     var name = codec.ToString();
     return name switch {
-      "M8RG" => new(MagicYuvColourSpace.Rgb, 3, 0, 0, false, 8, 0x65),
-      "M8RA" => new(MagicYuvColourSpace.Rgb, 4, 0, 0, true, 8, 0x66),
-      "M8Y4" => new(MagicYuvColourSpace.Yuv, 3, 0, 0, false, 8, 0x67),
-      "M8Y2" => new(MagicYuvColourSpace.Yuv, 3, 1, 0, false, 8, 0x68),
-      "M8Y0" => new(MagicYuvColourSpace.Yuv, 3, 1, 1, false, 8, 0x69),
-      "M8YA" => new(MagicYuvColourSpace.Yuv, 4, 0, 0, true, 8, 0x6A),
-      "M8G0" => new(MagicYuvColourSpace.Grey, 1, 0, 0, false, 8, 0x6B),
-      "M0Y2" => new(MagicYuvColourSpace.Yuv, 3, 1, 0, false, 10, 0x6C),
-      "M0RG" => new(MagicYuvColourSpace.Rgb, 3, 0, 0, false, 10, 0x6D),
-      "M0RA" => new(MagicYuvColourSpace.Rgb, 4, 0, 0, true, 10, 0x6E),
-      "M2RG" => new(MagicYuvColourSpace.Rgb, 3, 0, 0, false, 12, 0x6F),
-      "M2RA" => new(MagicYuvColourSpace.Rgb, 4, 0, 0, true, 12, 0x70),
-      "M4RG" => new(MagicYuvColourSpace.Rgb, 3, 0, 0, false, 14, 0x71),
-      "M4RA" => new(MagicYuvColourSpace.Rgb, 4, 0, 0, true, 14, 0x72),
-      "M0G0" => new(MagicYuvColourSpace.Grey, 1, 0, 0, false, 10, 0x73),
-      "M0Y4" => new(MagicYuvColourSpace.Yuv, 3, 0, 0, false, 10, 0x76),
-      "M0Y0" => new(MagicYuvColourSpace.Yuv, 3, 1, 1, false, 10, 0x7B),
+      "M8RG" => new(MagicYuvColourSpace.Rgb, 3, 0, 0, false, 8, 0x65, 24),
+      "M8RA" => new(MagicYuvColourSpace.Rgb, 4, 0, 0, true, 8, 0x66, 32),
+      "M8Y4" => new(MagicYuvColourSpace.Yuv, 3, 0, 0, false, 8, 0x67, 24),
+      "M8Y2" => new(MagicYuvColourSpace.Yuv, 3, 1, 0, false, 8, 0x68, 24),
+      "M8Y0" => new(MagicYuvColourSpace.Yuv, 3, 1, 1, false, 8, 0x69, 24),
+      "M8YA" => new(MagicYuvColourSpace.Yuv, 4, 0, 0, true, 8, 0x6A, 32),
+      "M8G0" => new(MagicYuvColourSpace.Grey, 1, 0, 0, false, 8, 0x6B, 24),
+      "M0Y2" => new(MagicYuvColourSpace.Yuv, 3, 1, 0, false, 10, 0x6C, 20),
+      "M0RG" => new(MagicYuvColourSpace.Rgb, 3, 0, 0, false, 10, 0x6D, 30),
+      "M0RA" => new(MagicYuvColourSpace.Rgb, 4, 0, 0, true, 10, 0x6E, 40),
+      "M2RG" => new(MagicYuvColourSpace.Rgb, 3, 0, 0, false, 12, 0x6F, 36),
+      "M2RA" => new(MagicYuvColourSpace.Rgb, 4, 0, 0, true, 12, 0x70, 48),
+      "M4RG" => new(MagicYuvColourSpace.Rgb, 3, 0, 0, false, 14, 0x71, 42),
+      "M4RA" => new(MagicYuvColourSpace.Rgb, 4, 0, 0, true, 14, 0x72, 56),
+      "M0G0" => new(MagicYuvColourSpace.Grey, 1, 0, 0, false, 10, 0x73, 10),
+      "M0Y4" => new(MagicYuvColourSpace.Yuv, 3, 0, 0, false, 10, 0x76, 30),
+      "M0Y0" => new(MagicYuvColourSpace.Yuv, 3, 1, 1, false, 10, 0x7B, 15),
       "M8GA" => throw new NotSupportedException(
         $"Video stream {streamIndex} is M8GA — grey with an alpha channel — which is not one of MagicYUV v7's native formats."),
       "MAGY" => throw new NotSupportedException(
