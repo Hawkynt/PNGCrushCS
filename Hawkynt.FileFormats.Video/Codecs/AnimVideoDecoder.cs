@@ -19,9 +19,10 @@ namespace FileFormat.Codecs;
 /// <para/>
 /// Implemented delta layouts are methods 2, 3, 5, 6, 7 and 8. Method 5 also recognises DPaint Anim
 /// Brush's documented <c>bits == 4</c> XOR extension. Method 4 follows the specification's
-/// <c>SetDLTAshort</c> grammar and supports all six option bits the ANHD defines: short/long data,
-/// set/XOR writes, separate/shared info lists, literal-only/RLC streams, horizontal/vertical traversal,
-/// and 16/32-bit info fields. Undefined option bits are refused. Method 74 remains impossible to
+/// <c>SetDLTAshort</c> grammar for the RLC form, including short/long data, set/XOR writes,
+/// separate/shared info lists, horizontal/vertical traversal and 16/32-bit info fields. The ANHD names
+/// a non-RLC method-4 variant but publishes no wire grammar for it, so that combination is refused
+/// instead of inferred. Undefined option bits are refused as well. Method 74 remains impossible to
 /// implement interoperably: its format was reserved with “details to be released later” and no
 /// description was published.
 /// <para/>
@@ -346,6 +347,9 @@ public sealed class AnimVideoDecoder : IVideoCodecDecoder<AnimVideoDecoder> {
     var vertical = (bits & 16) != 0;
     var infoSize = (bits & 32) != 0 ? 4 : 2;
 
+    if (!runLengthCoded)
+      throw new NotSupportedException(
+        $"IFF ANIM method 4 states the non-RLC variant (bits 0x{bits:x8}), but the published format defines no wire grammar for it.");
     if (vertical && bytesPerRow % itemSize != 0)
       throw new NotSupportedException(
         $"IFF ANIM method 4 vertical long-data traversal requires the {bytesPerRow}-byte bitplane row width to be divisible by {itemSize}.");
@@ -382,16 +386,14 @@ public sealed class AnimVideoDecoder : IVideoCodecDecoder<AnimVideoDecoder> {
           : unchecked((int)rawSize);
         if (size == 0)
           continue;
-        if (!runLengthCoded && size < 0)
-          throw new InvalidDataException("IFF ANIM method 4 non-RLC data contains a negative repeat-run size.");
 
         var count64 = size < 0 ? -size : size;
         if (count64 > int.MaxValue)
           throw new InvalidDataException("IFF ANIM method 4 run is too large to represent safely.");
         var count = (int)count64;
 
-        // dest is a WORD* for short-data mode and a LONG* for long-data mode. Consequently the
-        // absolute per-op offset is expressed in data items, not invariably in 16-bit words.
+        // In the long-data variant the analogous playback routine uses LONG* planeptr/dest, so the
+        // absolute per-op offset counts data items: WORDs in short-data mode, LONGs in long-data mode.
         var destination64 = (ulong)offset * (uint)itemSize;
         if (destination64 > int.MaxValue)
           throw new InvalidDataException("IFF ANIM method 4 destination offset is too large to represent safely.");
