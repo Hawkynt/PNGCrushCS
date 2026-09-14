@@ -1,3 +1,4 @@
+using System;
 using System.Buffers.Binary;
 using System.IO;
 using System.Linq;
@@ -97,6 +98,32 @@ public sealed class Escape124VideoEncoderTests {
 
     Assert.That(encoder.TryEncode(secondSource, 1, out var second), Is.True);
     Assert.That(second.IsKeyFrame, Is.False);
+    Assert.That(decoder.TryDecode(second, out var decoded), Is.True);
+    Assert.That(decoded.PixelData, Is.EqualTo(secondSource.PixelData));
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void SkipRunsBeyondTheLargestCodeForceOneRefreshAndStaySynchronized() {
+    const int superblocks = 4232;
+    var width = superblocks * 8;
+    var stream = _Stream(width, 8);
+    var encoder = Escape124VideoEncoder.Create(stream);
+    var decoder = Escape124VideoDecoder.Create(stream);
+    var firstSource = _Solid(width, 8, 255, 0, 0);
+    var secondSource = _Solid(width, 8, 255, 0, 0);
+
+    for (var y = 0; y < 8; ++y)
+    for (var x = width - 8; x < width; ++x) {
+      var at = (y * width + x) * 3;
+      secondSource.PixelData[at] = 0;
+      secondSource.PixelData[at + 1] = 0;
+      secondSource.PixelData[at + 2] = 255;
+    }
+
+    Assert.That(encoder.TryEncode(firstSource, 0, out var first), Is.True);
+    Assert.That(decoder.TryDecode(first, out _), Is.True);
+    Assert.That(encoder.TryEncode(secondSource, 1, out var second), Is.True);
     Assert.That(decoder.TryDecode(second, out var decoded), Is.True);
     Assert.That(decoded.PixelData, Is.EqualTo(secondSource.PixelData));
   }
