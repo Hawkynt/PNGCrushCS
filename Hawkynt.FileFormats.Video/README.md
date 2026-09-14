@@ -55,7 +55,7 @@ quietly come to mean "some of it". How each codec was measured is in
 | [H.264 Annex B byte stream](https://en.wikipedia.org/wiki/Advanced_Video_Coding) | `H264Video` | `.264`, `.h264`, `.avc`, `.x264` | ✅ | ✅ | none | [ITU-T H.264](https://www.itu.int/rec/T-REC-H.264) |
 | [H.265 / HEVC Annex B byte stream](https://en.wikipedia.org/wiki/High_Efficiency_Video_Coding) | `H265Video` | `.265`, `.h265`, `.hevc`, `.x265` | ✅ | ✅ | none | [ITU-T H.265](https://www.itu.int/rec/T-REC-H.265) |
 | [H.263 elementary byte stream](https://en.wikipedia.org/wiki/H.263) | `H263Video` | `.263`, `.h263` | ✅ | ✅ | none | [ITU-T H.263](https://www.itu.int/rec/T-REC-H.263) |
-| [AV1 low-overhead OBU byte stream](https://aomediacodec.github.io/av1-spec/) | `Av1Video` | `.obu` | ✅ | ✅ | none | [AV1 Bitstream & Decoding Process](https://aomediacodec.github.io/av1-spec/) |
+| [AV1 low-overhead OBU byte stream](https://en.wikipedia.org/wiki/AV1) | `Av1Video` | `.obu` | ✅ | ✅ | none | [AV1 Bitstream & Decoding Process](https://aomediacodec.github.io/av1-spec/) |
 | [MPEG Program Stream](https://en.wikipedia.org/wiki/MPEG_program_stream) | `MpegProgramStream` | `.mpg`, `.mpeg`, `.vob`, `.m2p`, `.m2ps` | ✅ | ✅ | none | [MPEG-2 Systems](https://mpeg.chiariglione.org/standards/mpeg-2/systems) |
 | [MPEG Transport Stream](https://en.wikipedia.org/wiki/MPEG_transport_stream) | `TransportStream` | `.ts`, `.m2ts`, `.mts`, `.m2t`, `.tsv` | ✅ | ✅ | none | [MPEG-2 Systems](https://mpeg.chiariglione.org/standards/mpeg-2/systems) |
 | [Motion JPEG stream](https://en.wikipedia.org/wiki/Motion_JPEG) | `Mjpeg` | `.mjpg`, `.mjpeg` | ✅ | ✅ | ffmpeg | [JPEG / ITU-T T.81](https://www.itu.int/rec/T-REC-T.81) |
@@ -74,7 +74,7 @@ quietly come to mean "some of it". How each codec was measured is in
 | [Commodore CDXL](https://en.wikipedia.org/wiki/CDXL) | `Cdxl` | `.cdxl` | ✅ | ✅ | none | [MultimediaWiki CDXL](https://wiki.multimedia.cx/index.php/CDXL) |
 | [IFF ANIM](https://en.wikipedia.org/wiki/ANIM) | `Anim` | `.anim`, `.iff` | ✅ | ✅ | none | [Amiga ANIM IFF](https://wiki.amigaos.net/wiki/ANIM_IFF_Animation) |
 | [Sierra VMD](https://wiki.multimedia.cx/index.php/Sierra_VMD) | `Vmd` | `.vmd` | ✅ | ✅ | none | [MultimediaWiki VMD](https://wiki.multimedia.cx/index.php/VMD) |
-| [PlayStation STR](https://wiki.multimedia.cx/index.php/PlayStation_STR) | `Str` | `.str` | ✅ | ✅ | none | [MultimediaWiki STR](https://wiki.multimedia.cx/index.php/STR) |
+| [PlayStation STR](https://wiki.multimedia.cx/index.php/PlayStation_STR) | `Str` | `.str` | ✅ | ✅ | none | [MultimediaWiki STR](https://wiki.multimedia.cx/index.php/PlayStation_STR) |
 | [ARMovie/RPL](https://wiki.multimedia.cx/index.php/ARMovie) | `Rpl` | `.rpl` | ✅ | ✅ | none | [MultimediaWiki ARMovie](https://wiki.multimedia.cx/index.php/ARMovie) |
 
 **Oracle** names the program outside this repository that has read a file this container's muxer
@@ -206,9 +206,9 @@ measurement notes are in
 | [Electronic Arts CMV](https://wiki.multimedia.cx/index.php/Electronic_Arts_CMV) | ⚠️ | — | — | `cmv `; palettised 4x4 block replacement against the last two pictures. Pictures that are not a whole number of blocks, and mid-stream size changes, refused | [MultimediaWiki EA CMV](https://wiki.multimedia.cx/index.php/Electronic_Arts_CMV) |
 | [Commodore CDXL Video](https://en.wikipedia.org/wiki/CDXL) | ✅ | — | — | `CDXL`; bit-planar pictures through a twelve-bit palette or through Hold-And-Modify | [MultimediaWiki CDXL](https://wiki.multimedia.cx/index.php/CDXL) |
 | [IFF ANIM Video](https://en.wikipedia.org/wiki/ANIM) | ⚠️ | — | — | `ANIM`; compression method 5 (Byte Vertical Delta) only, palettised or Hold-And-Modify. The other four methods the specification names are not decoded | [Amiga ANIM IFF](https://wiki.amigaos.net/wiki/ANIM_IFF_CEL_Animations) |
-| [Brute Force & Ignorance Video](https://wiki.multimedia.cx/index.php/BFI) | ✅ | — | — | `BFIV`; palettised 8-bit with literal runs, back-references, carried runs and fills | [MultimediaWiki BFI](https://wiki.multimedia.cx/index.php/Brute_Force_%26_Ignorance) |
+| [Brute Force & Ignorance Video](https://wiki.multimedia.cx/index.php/BFI) | ✅ | — | — | `BFIV`; palettised 8-bit with literal runs, back-references, carried runs and fills | [MultimediaWiki BFI](https://wiki.multimedia.cx/index.php/BFI) |
 | [Sierra VMD Video](https://wiki.multimedia.cx/index.php/VMD) | ⚠️ | — | — | `VMDV` codec version 2, 8-bit palettised, painted one rectangle at a time. New-palette frames, empty rectangles, LZ rectangles without the preload marker and unknown rendering methods refused | [MultimediaWiki VMD](https://wiki.multimedia.cx/index.php/VMD) |
-| [Smacker Video](https://wiki.multimedia.cx/index.php/Smacker) | ✅ | — | — | `SMK2` and `SMK4`; 8-bit palettised 4x4 blocks read through four Huffman tables the file states once and every frame shares, with the running palette resolved here rather than in the demuxer. A picture that is not a whole number of blocks refuses, as does a stream stating none of its four tables. The composition of those four tables — the piece RAD's own description leaves out, and what this codec sat undecoded on — is adapted from FFmpeg's LGPL-2.1-or-later decoder | [FFmpeg `smacker.c`](https://github.com/FFmpeg/FFmpeg/blob/master/libavcodec/smacker.c) |
+| [Smacker Video](https://wiki.multimedia.cx/index.php/Smacker) | ✅ | — | — | `SMK2` and `SMK4`; 8-bit palettised 4x4 blocks read through four Huffman tables the file states once and every frame shares, with the running palette resolved here rather than in the demuxer. A picture that is not a whole number of 4x4 blocks refuses, as does a stream stating none of its four tables. The composition of those four tables — the piece RAD's own description leaves out, and what this codec sat undecoded on — is adapted from FFmpeg's LGPL-2.1-or-later decoder | [FFmpeg `smacker.c`](https://github.com/FFmpeg/FFmpeg/blob/master/libavcodec/smacker.c) |
 | [Escape 124](https://wiki.multimedia.cx/index.php/Escape_124) | ⚠️ | — | — | ARMovie/RPL codec id 124; 8x8 superblocks, so dimensions not divisible by eight are refused rather than left fringed. Adapted from FFmpeg's LGPL-2.1-or-later decoder | [FFmpeg `escape124.c`](https://github.com/FFmpeg/FFmpeg/blob/master/libavcodec/escape124.c) |
 | [Eidos Escape 130](https://wiki.multimedia.cx/index.php/Escape_130) | ✅ | — | — | ARMovie/RPL codec id 130; 2x2 blocks, so a picture must be a whole number of them | [MultimediaWiki Escape 130](https://wiki.multimedia.cx/index.php/Escape_130) |
 
@@ -301,7 +301,7 @@ because that reasoning still holds for everything reached without one.
 
 FFmpeg is not the only source. The H.264 decoder's CABAC engine — `Codecs/H264/`, the arithmetic
 decoder and its context tables — is adapted from
-[OxideAV/oxideav-h264](https://github.com/oxideav/oxideav-h264)'s `src/cabac.rs` and
+[OxideAV/oxideav-h264](https://github.com/OxideAV/oxideav-h264)'s `src/cabac.rs` and
 `src/cabac_ctx.rs`, under the MIT licence. A verbatim copy of that licence and the statement of what
 was taken sit beside the code in
 [`Codecs/H264/THIRD-PARTY-NOTICE.OxideAV.txt`](https://github.com/Hawkynt/PNGCrushCS/blob/main/Hawkynt.FileFormats.Video/Codecs/H264/THIRD-PARTY-NOTICE.OxideAV.txt),
@@ -453,7 +453,7 @@ the formats that were investigated and left unimplemented, with the reasons, are
 | --- | --- | --- |
 | [FFmpeg](https://ffmpeg.org/) | Foreign source code + oracle | Both, and the distinction matters. Seventeen decoders and sixteen encoders are converted from its LGPL-2.1-or-later sources — the notices beside each name the files — and separately it is the decoder almost every codec here is measured against. A codec converted from it is never also *verified* by it alone; where that is the only check available, the row says so. |
 | [`libavcodec/texturedspenc.c`](https://github.com/FFmpeg/FFmpeg/blob/master/libavcodec/texturedspenc.c) | Foreign source code (MIT) | The one file taken from FFmpeg's tree that is not LGPL: it carries its own MIT grant and states it derives from public-domain code. Hap's block compression. |
-| [OxideAV](https://github.com/oxideav/oxideav-h264) | Foreign source code | H.264 CABAC context tables and arithmetic decoder. |
+| [OxideAV](https://github.com/OxideAV/oxideav-h264) | Foreign source code | H.264 CABAC context tables and arithmetic decoder. |
 | [libde265 (`dec265`)](https://github.com/strukturag/libde265) | Oracle | A second opinion on HEVC, independent of FFmpeg — the two disagreed with each other on two streams where our decoder matched one of them. |
 | [x265](https://bitbucket.org/multicoreware/x265_git/) | Corpus producer | Intra HEVC streams at every chroma format and depth the decoder claims. |
 | [libaom](https://aomedia.googlesource.com/aom/) / [SVT-AV1](https://gitlab.com/AOMediaCodec/SVT-AV1) | Corpus producers | AV1 elementary streams for the low-overhead OBU container. |
