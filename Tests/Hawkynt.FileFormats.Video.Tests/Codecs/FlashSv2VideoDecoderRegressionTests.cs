@@ -36,13 +36,13 @@ public sealed class FlashSv2VideoDecoderRegressionTests {
   }
 
   private static byte[] _Block(byte format, ReadOnlySpan<byte> raw, byte? rowStart = null, byte? rowCount = null) {
-    var compressed = raw.IsEmpty ? [] : _Zlib(raw);
+    byte[] compressed = raw.IsEmpty ? [] : _Zlib(raw);
     var headerLength = rowStart.HasValue ? 3 : 1;
     var payload = new byte[headerLength + compressed.Length];
     payload[0] = format;
     if (rowStart.HasValue) {
       payload[1] = rowStart.Value;
-      payload[2] = rowCount!.Value;
+      payload[2] = rowCount.GetValueOrDefault();
     }
     compressed.CopyTo(payload.AsSpan(headerLength));
     return _LengthPrefixed(payload);
