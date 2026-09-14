@@ -8,7 +8,7 @@ jobs:
   probe:
     runs-on: ubuntu-latest
     steps:
-      - name: Execute ImageGear header detector without init
+      - name: Execute corrected ImageGear header oracle
         shell: bash
         run: |
           set -euo pipefail
@@ -53,7 +53,6 @@ jobs:
           for name,data in [('white.bin',white),('black.bin',black),('white.igf',white),('white.lpg',white)]: Path(name).write_bytes(data)
           row=b'\x00\x00\xff\x00'
           Path('known.bmp').write_bytes(b'BM'+struct.pack('<IHHI',58,0,0,54)+struct.pack('<IIIHHIIIIII',40,1,1,1,24,0,4,2835,2835,0,0)+row)
-          Path('known.pcx').write_bytes(bytes([10,5,1,8])+struct.pack('<HHHHHH',0,0,0,0,72,72)+bytes(48)+bytes([0,1])+struct.pack('<H',1)+bytes(60)+bytes([255,0,0]))
           def chunk(t,d): return struct.pack('>I',len(d))+t+d+struct.pack('>I',zlib.crc32(t+d)&0xffffffff)
           Path('known.png').write_bytes(b'\x89PNG\r\n\x1a\n'+chunk(b'IHDR',struct.pack('>IIBBBBB',1,1,8,2,0,0,0))+chunk(b'IDAT',zlib.compress(b'\x00\xff\x00\x00'))+chunk(b'IEND',b''))
           PY
@@ -62,44 +61,43 @@ jobs:
           #include <windows.h>
           #include <stdint.h>
           #include <stdio.h>
-          #include <string.h>
-          typedef int (__cdecl *fn_info)(const char*,int*,int*,void*);
-          typedef int (__cdecl *fn_load)(const char*,uint32_t*);
-          typedef int (__cdecl *fn_dims)(uint32_t,uint32_t*,uint32_t*,int*);
-          typedef int (__cdecl *fn_errcheck)(void);
-          typedef void (__cdecl *fn_errget)(int,char*,int,int*,int*,long*,long*);
-          typedef void (__cdecl *fn_errclear)(void);
-          static void errors(HMODULE m,int n){
-            fn_errget get=(fn_errget)GetProcAddress(m,"IG_error_get");
-            fn_errclear clear=(fn_errclear)GetProcAddress(m,"IG_error_clear");
-            if(get) for(int i=0;i<n;i++){char mod[128]={0};int line=0,code=0;long v1=0,v2=0;get(i,mod,sizeof mod,&line,&code,&v1,&v2);printf(" ERR[%d] code=%d module=%s line=%d v1=%ld v2=%ld",i,code,mod,line,v1,v2);}
-            if(clear) clear();
-          }
+
+          typedef int (__stdcall *fn_info)(const char*, int*, int*, void*);
+          typedef int (__stdcall *fn_load)(const char*, uintptr_t*);
+          typedef int (__stdcall *fn_dims)(uintptr_t, uint32_t*, uint32_t*, unsigned int*);
+          typedef int (__stdcall *fn_delete)(uintptr_t);
+
           int main(int argc,char**argv){
             if(argc<3)return 1;
-            HMODULE m=LoadLibraryA(argv[1]); if(!m){printf("DLL %s loadfail=%lu\n",argv[1],GetLastError());return 2;}
-            fn_info info=(fn_info)GetProcAddress(m,"IG_info_get"); fn_load load=(fn_load)GetProcAddress(m,"IG_load_file"); fn_dims dims=(fn_dims)GetProcAddress(m,"IG_image_dimensions_get"); fn_errcheck chk=(fn_errcheck)GetProcAddress(m,"IG_error_check");
-            printf("DLL=%s info=%p load=%p dims=%p errcheck=%p\n",argv[1],info,load,dims,chk);
+            HMODULE m=LoadLibraryA(argv[1]);
+            if(!m){printf("DLL %s loadfail=%lu\n",argv[1],GetLastError());return 2;}
+            fn_info info=(fn_info)GetProcAddress(m,"IG_info_get");
+            fn_load load=(fn_load)GetProcAddress(m,"IG_load_file");
+            fn_dims dims=(fn_dims)GetProcAddress(m,"IG_image_dimensions_get");
+            fn_delete del=(fn_delete)GetProcAddress(m,"IG_image_delete");
+            printf("DLL=%s info=%p load=%p dims=%p delete=%p\n",argv[1],info,load,dims,del);
             for(int i=2;i<argc;i++){
-              int fmt=-1,comp=-1; unsigned char dib[256]; memset(dib,0xcc,sizeof dib);
-              int rc=info?info(argv[i],&fmt,&comp,dib):-999; int ec=chk?chk():rc;
-              printf("INFO %s rc=%d ec=%d fmt=%d comp=%d dib=",argv[i],rc,ec,fmt,comp); for(int j=0;j<40;j++)printf("%02x",dib[j]); errors(m,ec); puts("");
-              uint32_t h=0; rc=load?load(argv[i],&h):-999; ec=chk?chk():rc; printf("LOAD %s rc=%d ec=%d h=%08x",argv[i],rc,ec,h);
-              if(h&&dims){uint32_t w=0,hh=0;int bpp=0;int dr=dims(h,&w,&hh,&bpp);printf(" dims=%d:%ux%u/%d",dr,w,hh,bpp);} errors(m,ec); puts("");
+              int fmt=-1,comp=-1;
+              int rc=info?info(argv[i],&fmt,&comp,NULL):-999;
+              printf("INFO %-12s rc=%d fmt=%d comp=%d\n",argv[i],rc,fmt,comp);
+              uintptr_t h=0;
+              rc=load?load(argv[i],&h):-999;
+              printf("LOAD %-12s rc=%d h=%08lx",argv[i],rc,(unsigned long)h);
+              if(rc==0 && h && dims){
+                uint32_t w=0,hh=0; unsigned int bpp=0;
+                int dr=dims(h,&w,&hh,&bpp);
+                printf(" dims_rc=%d %ux%u bpp=%u",dr,w,hh,bpp);
+              }
+              if(h&&del)del(h);
+              puts("");
             }
             return 0;
           }
           C
-          i686-w64-mingw32-gcc -O2 probe.c -o probe.exe
+          i686-w64-mingw32-gcc -O2 -Wall probe.c -o probe.exe
           export WINEDEBUG=-all
           wineboot -u >/dev/null 2>&1 || true
           for dll in GEAR7.DLL GEAR98.DLL; do
             echo "=== ORACLE $dll ==="
-            wine ./probe.exe "$dll" known.bmp known.pcx known.png white.bin black.bin white.igf white.lpg || true
+            wine ./probe.exe "$dll" known.bmp known.png white.bin black.bin white.igf white.lpg || true
           done
-
-          echo '=== Chip ACCUSOFT/ImageGear directory records ==='
-          curl -fL --retry 3 -o chip-index.zip 'https://archive.org/download/czchip199908cd/Chip_1999-08_cd_dic-files.zip'
-          unzip -qo chip-index.zip 'Chip_1999-08_cd_mainInfo.txt' -d chip
-          INFO=chip/Chip_1999-08_cd_mainInfo.txt
-          grep -n -i -B4 -A8 'IMAGEG~1\|ACCUSOFT' "$INFO" | head -300 || true
