@@ -118,6 +118,30 @@ public sealed class AnimVideoExtendedDecoderTests {
 
   [Test]
   [Category("Unit")]
+  public void OperationFourSharedInfoPointerCanDriveMultiplePlanes() {
+    var decoder = AnimVideoDecoder.Create(_Stream());
+    decoder.TryDecode(new(0, _Keyframe(16, 1, new byte[4], planes: 2, palette: _Palette4())), out _);
+
+    var dlta = new byte[74];
+    BinaryPrimitives.WriteUInt32BigEndian(dlta.AsSpan(0, 4), 32); // plane 0 data at byte 64
+    BinaryPrimitives.WriteUInt32BigEndian(dlta.AsSpan(4, 4), 33); // plane 1 data at byte 66
+    BinaryPrimitives.WriteUInt32BigEndian(dlta.AsSpan(32, 4), 34); // shared info at byte 68
+    BinaryPrimitives.WriteUInt32BigEndian(dlta.AsSpan(36, 4), 34);
+    BinaryPrimitives.WriteUInt16BigEndian(dlta.AsSpan(64, 2), 0x8000);
+    BinaryPrimitives.WriteUInt16BigEndian(dlta.AsSpan(66, 2), 0x4000);
+    BinaryPrimitives.WriteUInt16BigEndian(dlta.AsSpan(68, 2), 0);
+    BinaryPrimitives.WriteInt16BigEndian(dlta.AsSpan(70, 2), 1);
+    BinaryPrimitives.WriteUInt16BigEndian(dlta.AsSpan(72, 2), ushort.MaxValue);
+
+    decoder.TryDecode(new(0, _DeltaFrame(4, dlta, bits: 4 | 8 | 16)), out var frame);
+    Assert.Multiple(() => {
+      Assert.That(frame.PixelData[0], Is.EqualTo(1));
+      Assert.That(frame.PixelData[1], Is.EqualTo(2));
+    });
+  }
+
+  [Test]
+  [Category("Unit")]
   public void OperationFourHorizontalTraversalAdvancesByOneDataItem() {
     var decoder = AnimVideoDecoder.Create(_Stream());
     decoder.TryDecode(new(0, _Keyframe(32, 2, new byte[8])), out _);
@@ -295,8 +319,8 @@ public sealed class AnimVideoExtendedDecoderTests {
     Codec = CodecTag.FromCharacters("ANIM"),
   };
 
-  private static byte[] _Keyframe(int width, int height, byte[] body)
-    => _Form(_Chunk("BMHD", _Bmhd(width, height)), _Chunk("CMAP", _Palette()), _Chunk("BODY", body));
+  private static byte[] _Keyframe(int width, int height, byte[] body, byte planes = 1, byte[]? palette = null)
+    => _Form(_Chunk("BMHD", _Bmhd(width, height, planes)), _Chunk("CMAP", palette ?? _Palette()), _Chunk("BODY", body));
 
   private static byte[] _DirectFrame(int width, int height, byte[] body)
     => _Form(_Chunk("BMHD", _Bmhd(width, height)), _Chunk("ANHD", _Anhd(0)), _Chunk("BODY", body));
@@ -304,11 +328,11 @@ public sealed class AnimVideoExtendedDecoderTests {
   private static byte[] _DeltaFrame(byte operation, byte[] dlta, byte interleave = 0, uint bits = 0)
     => _Form(_Chunk("ANHD", _Anhd(operation, interleave, bits)), _Chunk("DLTA", dlta));
 
-  private static byte[] _Bmhd(int width, int height) {
+  private static byte[] _Bmhd(int width, int height, byte planes = 1) {
     var result = new byte[20];
     BinaryPrimitives.WriteUInt16BigEndian(result.AsSpan(0, 2), (ushort)width);
     BinaryPrimitives.WriteUInt16BigEndian(result.AsSpan(2, 2), (ushort)height);
-    result[8] = 1;
+    result[8] = planes;
     return result;
   }
 
@@ -321,6 +345,13 @@ public sealed class AnimVideoExtendedDecoderTests {
   }
 
   private static byte[] _Palette() => [0, 0, 0, 255, 255, 255];
+
+  private static byte[] _Palette4() => [
+    0, 0, 0,
+    255, 0, 0,
+    0, 255, 0,
+    0, 0, 255,
+  ];
 
   private static byte[] _Method5(byte[] column0, byte[] column1) {
     var result = new byte[64 + column0.Length + column1.Length];
