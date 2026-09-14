@@ -16,8 +16,8 @@ namespace FileFormat.Codecs;
 /// <b>QCIF and CIF coded pictures, and nothing else.</b> Clause 3.1 defines two coded formats and PTYPE
 /// names one of them in a single bit; there is no source-format field with five choices and no extended
 /// header. Annex D obtains a larger still image without adding another coded format: a QCIF stream may
-/// temporarily accept a 352x288 still, and a CIF stream a 704x576 still, and transmits it as four
-/// decimated sub-images in the stream's ordinary coded size.
+/// temporarily carry a 352x288 still, and a CIF stream a 704x576 still, through
+/// <see cref="TryEncodeStillImage"/> as four decimated sub-images in the stream's ordinary coded size.
 /// <para/>
 /// <b>What it writes.</b> For ordinary motion video, an intra picture every
 /// <see cref="_KEY_FRAME_INTERVAL"/> frames and predicted pictures between them; every group of blocks
@@ -27,7 +27,7 @@ namespace FileFormat.Codecs;
 /// the prediction, and not being transmitted at all. H.261 has no picture-level P/B distinction and no
 /// backward reference: prediction is always from the previously reconstructed picture.
 /// <para/>
-/// For Annex D a double-width, double-height input is separated according to Figure D.1 into sub-images
+/// For Annex D a double-width, double-height still is separated according to Figure D.1 into sub-images
 /// 0, 1, 2 and 3, each coded intra with HI_RES zero and TR equal to its sub-image number. The four
 /// picture syntaxes share one bit writer, so no byte padding is inserted between them. The last decoded
 /// sub-image remains the reference when motion video resumes, exactly as Annex D.3 requires.
@@ -149,21 +149,30 @@ public sealed class H261VideoEncoder : IVideoCodecEncoder<H261VideoEncoder> {
       + "inside a QCIF or CIF stream as four ordinary-size sub-images rather than as another stream geometry.");
   }
 
-  /// <summary>
-  /// Codes an ordinary stream-size motion picture or an Annex D still picture twice as wide and high.
-  /// </summary>
+  /// <summary>Codes one ordinary motion picture in the stream's QCIF/CIF geometry.</summary>
   public bool TryEncode(RawImage frame, long? presentationTimestamp, out CodedPacket packet) {
     ArgumentNullException.ThrowIfNull(frame);
 
-    if (frame.Width == this._width && frame.Height == this._height)
-      return this._TryEncodeMotionPicture(frame, presentationTimestamp, out packet);
+    if (frame.Width != this._width || frame.Height != this._height)
+      throw new InvalidDataException(
+        $"This H.261 stream is {this._width}x{this._height}; a motion picture of {frame.Width}x{frame.Height} arrived. "
+        + $"Use {nameof(TryEncodeStillImage)} for Annex D's {2 * this._width}x{2 * this._height} still-image mode.");
 
-    if (frame.Width == 2 * this._width && frame.Height == 2 * this._height)
-      return this._TryEncodeStillImage(frame, presentationTimestamp, out packet);
+    return this._TryEncodeMotionPicture(frame, presentationTimestamp, out packet);
+  }
 
-    throw new InvalidDataException(
-      $"This H.261 stream codes {this._width}x{this._height} motion pictures and, through Annex D, "
-      + $"{2 * this._width}x{2 * this._height} still pictures; a {frame.Width}x{frame.Height} picture arrived.");
+  /// <summary>
+  /// Codes one Annex D still image at twice the stream width and height as sub-images 0, 1, 2 and 3.
+  /// </summary>
+  public bool TryEncodeStillImage(RawImage frame, long? presentationTimestamp, out CodedPacket packet) {
+    ArgumentNullException.ThrowIfNull(frame);
+
+    if (frame.Width != 2 * this._width || frame.Height != 2 * this._height)
+      throw new InvalidDataException(
+        $"Annex D still-image transmission on this {this._width}x{this._height} H.261 stream requires exactly "
+        + $"{2 * this._width}x{2 * this._height} samples; a {frame.Width}x{frame.Height} picture arrived.");
+
+    return this._TryEncodeStillImage(frame, presentationTimestamp, out packet);
   }
 
   private bool _TryEncodeMotionPicture(RawImage frame, long? presentationTimestamp, out CodedPacket packet) {
@@ -204,12 +213,12 @@ public sealed class H261VideoEncoder : IVideoCodecEncoder<H261VideoEncoder> {
         temporalReference: index,
         quantiser: _QUANTISER,
         source: subImages[index],
-        target,
-        reference,
+        target: target,
+        reference: reference,
         isCif: this._isCif,
         groupCount: this._groupCount,
         isStillImage: true,
-        writer);
+        writer: writer);
 
       encoder.EncodeIntoBitstream();
       reference = target;
