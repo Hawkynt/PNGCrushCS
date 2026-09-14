@@ -18,11 +18,12 @@ namespace FileFormat.Codecs;
 /// and avoids the common bug of resetting both references whenever a later operation-0 BODY appears.
 /// <para/>
 /// Implemented delta layouts are methods 2, 3, 5, 6, 7 and 8. Method 5 also recognises DPaint Anim
-/// Brush's documented <c>bits == 4</c> XOR extension. Method 4 is decoded for the normative short-info,
-/// vertical, run-length-coded form described by the specification's SetDLTAshort routine, with short or
-/// long data and separate or shared info lists; method-4 variants for which that routine gives no wire
-/// algorithm are refused instead of guessed. Method 74 remains impossible to implement interoperably:
-/// its format was reserved with “details to be released later” and no description was published.
+/// Brush's documented <c>bits == 4</c> XOR extension. Method 4 follows the specification's
+/// <c>SetDLTAshort</c> grammar and supports all six option bits the ANHD defines: short/long data,
+/// set/XOR writes, separate/shared info lists, literal-only/RLC streams, horizontal/vertical traversal,
+/// and 16/32-bit info fields. Undefined option bits are refused. Method 74 remains impossible to
+/// implement interoperably: its format was reserved with “details to be released later” and no
+/// description was published.
 /// <para/>
 /// A BODY is stored in scanline-interleaved ILBM order, while every delta format addresses the Amiga
 /// bitmap as separate contiguous planes. BODY data is therefore transposed once into plane-major state;
@@ -336,54 +337,91 @@ public sealed class AnimVideoDecoder : IVideoCodecDecoder<AnimVideoDecoder> {
     if ((bits & ~0x3Fu) != 0)
       throw new InvalidDataException($"IFF ANIM method 4 has undefined option bits set: 0x{bits:x8}.");
 
-    var longData = (bits & 1) != 0;
+    var itemSize = (bits & 1) != 0 ? 4 : 2;
     var xor = (bits & 2) != 0;
+    // Bit 2 selects one shared info list rather than one per plane. The wire representation needs no
+    // special branch: the specification writes the shared pointer into every applicable pointer slot,
+    // and even explicitly permits arbitrary subsets of planes to share one list.
     var runLengthCoded = (bits & 8) != 0;
     var vertical = (bits & 16) != 0;
-    var longInfo = (bits & 32) != 0;
-    if (xor || !runLengthCoded || !vertical || longInfo)
-      throw new NotSupportedException(
-        "IFF ANIM method 4 is decoded for the specification's normative vertical RLC routine with set semantics and 16-bit info entries; "
-        + $"received bits 0x{bits:x8}.");
+    var infoSize = (bits & 32) != 0 ? 4 : 2;
 
-    var itemSize = longData ? 4 : 2;
+    if (vertical && bytesPerRow % itemSize != 0)
+      throw new NotSupportedException(
+        $"IFF ANIM method 4 vertical long-data traversal requires the {bytesPerRow}-byte bitplane row width to be divisible by {itemSize}.");
+
+    var destinationStep = vertical ? bytesPerRow : itemSize;
+    var terminator = infoSize == 4 ? uint.MaxValue : ushort.MaxValue;
+
     for (var plane = 0; plane < planes; ++plane) {
+      // SetDLTAshort receives a WORD* and adds these LONG table values to that pointer. The table
+      // values therefore remain 16-bit-WORD offsets even when data words or info fields themselves
+      // are LONGs.
       var dataWords = BinaryPrimitives.ReadUInt32BigEndian(dlta.AsSpan(plane * 4, 4));
       var infoWords = BinaryPrimitives.ReadUInt32BigEndian(dlta.AsSpan((plane + 8) * 4, 4));
-      if (dataWords == 0 || infoWords == 0)
+      if (dataWords == 0 && infoWords == 0)
         continue;
+      if (dataWords == 0 || infoWords == 0)
+        throw new InvalidDataException("IFF ANIM method 4 has only one of its data/info pointers for a changed plane.");
+
       var dataPos64 = (ulong)dataWords * 2;
       var infoPos64 = (ulong)infoWords * 2;
-      if (dataPos64 >= (ulong)dlta.Length || infoPos64 >= (ulong)dlta.Length)
+      if (dataPos64 > (ulong)dlta.Length || infoPos64 >= (ulong)dlta.Length)
         throw new InvalidDataException("IFF ANIM method 4 points outside its DLTA chunk.");
-      var dataPos = (int)dataPos64;
-      var infoPos = (int)infoPos64;
+      var dataPos = checked((int)dataPos64);
+      var infoPos = checked((int)infoPos64);
 
       while (true) {
-        if (infoPos + 2 > dlta.Length)
-          throw new InvalidDataException("IFF ANIM method 4 info list ended before its terminator.");
-        var offsetWords = BinaryPrimitives.ReadUInt16BigEndian(dlta.AsSpan(infoPos, 2));
-        infoPos += 2;
-        if (offsetWords == ushort.MaxValue)
+        var offset = _ReadUnsigned(dlta, ref infoPos, infoSize, "method 4 info offset");
+        if (offset == terminator)
           break;
-        if (infoPos + 2 > dlta.Length)
-          throw new InvalidDataException("IFF ANIM method 4 info list is missing a run size.");
-        var size = BinaryPrimitives.ReadInt16BigEndian(dlta.AsSpan(infoPos, 2));
-        infoPos += 2;
+
+        var rawSize = _ReadUnsigned(dlta, ref infoPos, infoSize, "method 4 info run size");
+        long size = infoSize == 2
+          ? unchecked((short)rawSize)
+          : unchecked((int)rawSize);
         if (size == 0)
           continue;
+        if (!runLengthCoded && size < 0)
+          throw new InvalidDataException("IFF ANIM method 4 non-RLC data contains a negative repeat-run size.");
 
-        var destination = checked((int)offsetWords * 2);
-        var count = Math.Abs((int)size);
+        var count64 = size < 0 ? -size : size;
+        if (count64 > int.MaxValue)
+          throw new InvalidDataException("IFF ANIM method 4 run is too large to represent safely.");
+        var count = (int)count64;
+
+        // dest is a WORD* for short-data mode and a LONG* for long-data mode. Consequently the
+        // absolute per-op offset is expressed in data items, not invariably in 16-bit words.
+        var destination64 = (ulong)offset * (uint)itemSize;
+        if (destination64 > int.MaxValue)
+          throw new InvalidDataException("IFF ANIM method 4 destination offset is too large to represent safely.");
+        var destination = (int)destination64;
+
         if (size < 0) {
           var valuePos = dataPos;
           _RequireBytes(dlta, valuePos, itemSize, "method 4 repeated value");
           for (var i = 0; i < count; ++i)
-            _CopyRawItem(buffer, plane * planeSize, planeSize, destination + i * bytesPerRow, itemSize, dlta, valuePos, xor: false);
+            _CopyRawItem(
+              buffer,
+              plane * planeSize,
+              planeSize,
+              checked(destination + i * destinationStep),
+              itemSize,
+              dlta,
+              valuePos,
+              xor);
           dataPos += itemSize;
         } else {
           for (var i = 0; i < count; ++i) {
-            _CopyRawItem(buffer, plane * planeSize, planeSize, destination + i * bytesPerRow, itemSize, dlta, dataPos, xor: false);
+            _CopyRawItem(
+              buffer,
+              plane * planeSize,
+              planeSize,
+              checked(destination + i * destinationStep),
+              itemSize,
+              dlta,
+              dataPos,
+              xor);
             dataPos += itemSize;
           }
         }
