@@ -76,6 +76,135 @@ public sealed class AnimVideoExtendedDecoderTests {
 
   [Test]
   [Category("Unit")]
+  public void OperationFourLongDataOffsetsAddressLongwords() {
+    var decoder = AnimVideoDecoder.Create(_Stream());
+    decoder.TryDecode(new(0, _Keyframe(64, 1, new byte[8])), out _);
+
+    var dlta = new byte[74];
+    BinaryPrimitives.WriteUInt32BigEndian(dlta.AsSpan(0, 4), 32); // WORD pointer -> byte 64
+    BinaryPrimitives.WriteUInt32BigEndian(dlta.AsSpan(32, 4), 34); // WORD pointer -> byte 68
+    BinaryPrimitives.WriteUInt32BigEndian(dlta.AsSpan(64, 4), 0x80000000);
+    BinaryPrimitives.WriteUInt16BigEndian(dlta.AsSpan(68, 2), 1); // absolute LONG destination
+    BinaryPrimitives.WriteInt16BigEndian(dlta.AsSpan(70, 2), 1);
+    BinaryPrimitives.WriteUInt16BigEndian(dlta.AsSpan(72, 2), ushort.MaxValue);
+
+    decoder.TryDecode(new(0, _DeltaFrame(4, dlta, bits: 1 | 8 | 16)), out var frame);
+    Assert.Multiple(() => {
+      Assert.That(frame.PixelData[16], Is.Zero, "a LONG offset must not be mistaken for a WORD offset");
+      Assert.That(frame.PixelData[32], Is.EqualTo(1));
+    });
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void OperationFourLongInfoUsesSignedLongSizeAndLongTerminator() {
+    var decoder = AnimVideoDecoder.Create(_Stream());
+    decoder.TryDecode(new(0, _Keyframe(16, 2, new byte[4])), out _);
+
+    var dlta = new byte[78];
+    BinaryPrimitives.WriteUInt32BigEndian(dlta.AsSpan(0, 4), 32); // data at byte 64
+    BinaryPrimitives.WriteUInt32BigEndian(dlta.AsSpan(32, 4), 33); // info at byte 66
+    BinaryPrimitives.WriteUInt16BigEndian(dlta.AsSpan(64, 2), 0x8000);
+    BinaryPrimitives.WriteUInt32BigEndian(dlta.AsSpan(66, 4), 0); // absolute short-word destination
+    BinaryPrimitives.WriteInt32BigEndian(dlta.AsSpan(70, 4), -2); // repeat over two rows
+    BinaryPrimitives.WriteUInt32BigEndian(dlta.AsSpan(74, 4), uint.MaxValue);
+
+    decoder.TryDecode(new(0, _DeltaFrame(4, dlta, bits: 8 | 16 | 32)), out var frame);
+    Assert.Multiple(() => {
+      Assert.That(frame.PixelData[0], Is.EqualTo(1));
+      Assert.That(frame.PixelData[16], Is.EqualTo(1));
+    });
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void OperationFourHorizontalTraversalAdvancesByOneDataItem() {
+    var decoder = AnimVideoDecoder.Create(_Stream());
+    decoder.TryDecode(new(0, _Keyframe(32, 2, new byte[8])), out _);
+
+    var dlta = new byte[74];
+    BinaryPrimitives.WriteUInt32BigEndian(dlta.AsSpan(0, 4), 32);
+    BinaryPrimitives.WriteUInt32BigEndian(dlta.AsSpan(32, 4), 34);
+    BinaryPrimitives.WriteUInt16BigEndian(dlta.AsSpan(64, 2), 0x8000);
+    BinaryPrimitives.WriteUInt16BigEndian(dlta.AsSpan(66, 2), 0x8000);
+    BinaryPrimitives.WriteUInt16BigEndian(dlta.AsSpan(68, 2), 0);
+    BinaryPrimitives.WriteInt16BigEndian(dlta.AsSpan(70, 2), 2);
+    BinaryPrimitives.WriteUInt16BigEndian(dlta.AsSpan(72, 2), ushort.MaxValue);
+
+    decoder.TryDecode(new(0, _DeltaFrame(4, dlta, bits: 8)), out var frame);
+    Assert.Multiple(() => {
+      Assert.That(frame.PixelData[0], Is.EqualTo(1));
+      Assert.That(frame.PixelData[16], Is.EqualTo(1));
+      Assert.That(frame.PixelData[32], Is.Zero);
+      Assert.That(frame.PixelData[48], Is.Zero);
+    });
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void OperationFourXorTogglesInsteadOfReplacing() {
+    var decoder = AnimVideoDecoder.Create(_Stream());
+    decoder.TryDecode(new(0, _Keyframe(16, 1, [0x80, 0x00])), out _);
+
+    var dlta = new byte[72];
+    BinaryPrimitives.WriteUInt32BigEndian(dlta.AsSpan(0, 4), 32);
+    BinaryPrimitives.WriteUInt32BigEndian(dlta.AsSpan(32, 4), 33);
+    BinaryPrimitives.WriteUInt16BigEndian(dlta.AsSpan(64, 2), 0x8000);
+    BinaryPrimitives.WriteUInt16BigEndian(dlta.AsSpan(66, 2), 0);
+    BinaryPrimitives.WriteInt16BigEndian(dlta.AsSpan(68, 2), 1);
+    BinaryPrimitives.WriteUInt16BigEndian(dlta.AsSpan(70, 2), ushort.MaxValue);
+
+    decoder.TryDecode(new(0, _DeltaFrame(4, dlta, bits: 2 | 8 | 16)), out var frame);
+    Assert.That(frame.PixelData[0], Is.Zero);
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void OperationFourNonRlcAcceptsLiteralRuns() {
+    var decoder = AnimVideoDecoder.Create(_Stream());
+    decoder.TryDecode(new(0, _Keyframe(16, 1, [0, 0])), out _);
+
+    var dlta = new byte[72];
+    BinaryPrimitives.WriteUInt32BigEndian(dlta.AsSpan(0, 4), 32);
+    BinaryPrimitives.WriteUInt32BigEndian(dlta.AsSpan(32, 4), 33);
+    BinaryPrimitives.WriteUInt16BigEndian(dlta.AsSpan(64, 2), 0x8000);
+    BinaryPrimitives.WriteUInt16BigEndian(dlta.AsSpan(66, 2), 0);
+    BinaryPrimitives.WriteInt16BigEndian(dlta.AsSpan(68, 2), 1);
+    BinaryPrimitives.WriteUInt16BigEndian(dlta.AsSpan(70, 2), ushort.MaxValue);
+
+    decoder.TryDecode(new(0, _DeltaFrame(4, dlta, bits: 16)), out var frame);
+    Assert.That(frame.PixelData[0], Is.EqualTo(1));
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void OperationFourNonRlcRejectsRepeatRuns() {
+    var decoder = AnimVideoDecoder.Create(_Stream());
+    decoder.TryDecode(new(0, _Keyframe(16, 1, [0, 0])), out _);
+
+    var dlta = new byte[72];
+    BinaryPrimitives.WriteUInt32BigEndian(dlta.AsSpan(0, 4), 32);
+    BinaryPrimitives.WriteUInt32BigEndian(dlta.AsSpan(32, 4), 33);
+    BinaryPrimitives.WriteUInt16BigEndian(dlta.AsSpan(64, 2), 0x8000);
+    BinaryPrimitives.WriteUInt16BigEndian(dlta.AsSpan(66, 2), 0);
+    BinaryPrimitives.WriteInt16BigEndian(dlta.AsSpan(68, 2), -1);
+    BinaryPrimitives.WriteUInt16BigEndian(dlta.AsSpan(70, 2), ushort.MaxValue);
+
+    Assert.Throws<InvalidDataException>(() => decoder.TryDecode(new(0, _DeltaFrame(4, dlta, bits: 16)), out _));
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void OperationFourUndefinedOptionBitsRefuse() {
+    var decoder = AnimVideoDecoder.Create(_Stream());
+    decoder.TryDecode(new(0, _Keyframe(16, 1, [0, 0])), out _);
+
+    var dlta = new byte[64];
+    Assert.Throws<InvalidDataException>(() => decoder.TryDecode(new(0, _DeltaFrame(4, dlta, bits: 1u << 6)), out _));
+  }
+
+  [Test]
+  [Category("Unit")]
   public void AnimBrushMethodFiveXorTogglesInsteadOfStores() {
     var decoder = AnimVideoDecoder.Create(_Stream());
     decoder.TryDecode(new(0, _Keyframe(16, 1, [0x80, 0x00])), out _);
