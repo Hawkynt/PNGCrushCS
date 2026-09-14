@@ -309,15 +309,30 @@ public class MagicYuvEncoderTests {
   [Category("Unit")]
   public void TheLayoutsItCannotWriteAreRefusedByName() {
     foreach (var (code, reason) in new[] {
-      ("M8YA", "alpha"),
-      ("M8GA", "alpha"),
+      ("M8GA", "grey with alpha"),
       ("MAGY", "before it gave each pixel format"),
-      ("M0RG", "deeper than eight bits"),
-      ("M2RA", "deeper than eight bits"),
-      ("M4RG", "deeper than eight bits"),
     }) {
       var failure = Assert.Throws<NotSupportedException>(() => MagicYuvEncoder.Create(_Stream(code, 8, 8)), code);
       Assert.That(failure!.Message, Does.Contain(code).And.Contain(reason), code);
+    }
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void ADeepFourccWithContradictoryBitsPerPixelIsRefused() {
+    foreach (var (code, stated, expected) in new[] {
+      ("M0G0", 8, 10),
+      ("M0Y2", 24, 20),
+      ("M0RG", 24, 30),
+      ("M2RA", 32, 48),
+      ("M4RG", 48, 42),
+    }) {
+      var failure = Assert.Throws<NotSupportedException>(
+        () => MagicYuvEncoder.Create(_Stream(code, 8, 8, stated)), code);
+      Assert.That(
+        failure!.Message,
+        Does.Contain(code).And.Contain($"{stated} bits per pixel").And.Contain($"uses {expected}"),
+        code);
     }
   }
 
@@ -350,12 +365,13 @@ public class MagicYuvEncoderTests {
 
   // ============================================================================================
 
-  private static MediaStreamInfo _Stream(string code, int width, int height) => new() {
+  private static MediaStreamInfo _Stream(string code, int width, int height, int bitsPerPixel = 0) => new() {
     Index = 0,
     Kind = MediaStreamKind.Video,
     Codec = CodecTag.FromCharacters(code),
     Width = width,
     Height = height,
+    BitsPerPixel = bitsPerPixel,
   };
 
   private static MediaStreamInfo _Describe(CodecTag codec, int bitsPerPixel)
