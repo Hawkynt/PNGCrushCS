@@ -65,11 +65,12 @@ jobs:
         run: |
           $path = 'Hawkynt.FileFormats.Video/Codecs/Mpeg4/Mpeg4PictureEncoder.cs'
           $text = [IO.File]::ReadAllText($path)
-          $old = "    this._writer.Write(0, 1);                              // vol_control_parameters`n"
-          $new = "    this._writer.Write(1, 1);                              // vol_control_parameters`n" +
-                 "    this._writer.Write(1, 2);                              // chroma_format: 4:2:0`n" +
-                 "    this._writer.Write(0, 1);                              // low_delay: B-VOPs reorder pictures`n" +
-                 "    this._writer.Write(0, 1);                              // vbv_parameters`n"
+          $old = '    this._writer.Write(0, 1);                              // vol_control_parameters'
+          $newline = [Environment]::NewLine
+          $new = '    this._writer.Write(1, 1);                              // vol_control_parameters' + $newline +
+                 '    this._writer.Write(1, 2);                              // chroma_format: 4:2:0' + $newline +
+                 '    this._writer.Write(0, 1);                              // low_delay: B-VOPs reorder pictures' + $newline +
+                 '    this._writer.Write(0, 1);                              // vbv_parameters'
           if (($text.Split($old).Count - 1) -ne 1) { throw 'expected exactly one VOL control-parameter field' }
           [IO.File]::WriteAllText($path, $text.Replace($old, $new))
       - name: Build video package
