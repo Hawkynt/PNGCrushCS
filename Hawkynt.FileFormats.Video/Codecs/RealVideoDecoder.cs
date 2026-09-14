@@ -9,10 +9,11 @@ namespace FileFormat.Codecs;
 
 /// <summary>Decodes RealVideo 1, named <c>RV10</c> or <c>RV13</c> by RealMedia containers.</summary>
 /// <remarks>
-/// RealVideo 1 replaces H.263's picture/group headers and reuses its macroblock layer. The original
-/// major-1/minor-0/micro-0 syntax is implemented here. Later micro versions alter intra-DC coding and
-/// are refused rather than decoded through the wrong H.263 path. RealVideo 2, 3 and 4 remain distinct
-/// codecs and are not accepted by this decoder.
+/// RealVideo 1 replaces H.263's picture/group headers and reuses its macroblock layer. Revision-zero
+/// streams use H.263's literal intra DC values; non-zero micro revisions use RealVideo's predictive
+/// intra-DC VLC and per-run Y/Cb/Cr seeds. Micro revision 2 additionally enables overlapped motion
+/// compensation and is refused until the shared H.263 Advanced Prediction path implements it.
+/// RealVideo 2, 3 and 4 remain distinct codecs and are not accepted by this decoder.
 /// </remarks>
 public sealed class RealVideoDecoder : IVideoCodecDecoder<RealVideoDecoder> {
 
@@ -86,14 +87,18 @@ public sealed class RealVideoDecoder : IVideoCodecDecoder<RealVideoDecoder> {
         $"This stream is named {stream.Codec} but its private data states bitstream version 0x{version.Version:X8}, "
         + "whose major version names a different generation of RealVideo.");
 
-    if (version.Minor != RealVideoBitstreamVersion.IMPLEMENTED_MINOR
-        || version.Micro != RealVideoBitstreamVersion.IMPLEMENTED_MICRO)
+    if (version.UsesOverlappedMotionCompensation)
       throw new NotSupportedException(
-        $"This RealVideo 1 stream states version 0x{version.Version:X8} (minor {version.Minor}, micro {version.Micro}). "
-        + $"Only minor {RealVideoBitstreamVersion.IMPLEMENTED_MINOR}, micro {RealVideoBitstreamVersion.IMPLEMENTED_MICRO} "
-        + "is implemented. Non-zero RV10 micro versions use RealVideo-specific predictive intra-DC coding; micro 2 "
-        + "also enables overlapped motion compensation. Decoding those pictures as baseline H.263 would produce "
-        + "plausible corruption rather than a reliable refusal.");
+        $"This RealVideo 1 stream states version 0x{version.Version:X8} (micro {version.Micro}), which enables "
+        + "overlapped motion compensation. That is H.263 Advanced Prediction territory and the shared macroblock "
+        + "decoder does not implement it yet; decoding it as ordinary one-vector prediction would be wrong.");
+
+    var privateData = stream.CodecPrivateData.Span;
+    if (privateData.Length >= 4 && (privateData[3] & 1) != 0)
+      throw new NotSupportedException(
+        "This RealVideo 1 stream enables the long-vector motion mode in its codec private data. The shared H.263 "
+        + "decoder currently implements the baseline modulo vector range only, so this stream is refused rather "
+        + "than wrapping its motion vectors incorrectly.");
 
     var macroblockWidth = (stream.Width + 15) / 16;
     var macroblockHeight = (stream.Height + 15) / 16;
@@ -156,6 +161,9 @@ public sealed class RealVideoDecoder : IVideoCodecDecoder<RealVideoDecoder> {
         throw new InvalidDataException(
           $"A run of this RealVideo picture states that it is {(run.IsIntra ? "intra" : "predicted")} coded where the "
           + $"first run states {(first.IsIntra ? "intra" : "predicted")}.");
+
+      if (run.HasPredictiveIntraDc)
+        reader.UseRealVideoPredictiveIntraDc(run.LumaDc, run.CbDc, run.CrDc);
 
       picture.DecodeRun(ref reader, run.FirstMacroblock, run.MacroblockCount, run.Quantiser);
 
