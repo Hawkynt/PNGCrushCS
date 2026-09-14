@@ -27,6 +27,78 @@ internal static class ProResAlpha {
   private const int _MAXIMUM_RUN = 2048;
 
   /// <summary>
+  /// Encodes the alpha rectangle belonging to one slice.
+  /// </summary>
+  /// <remarks>
+  /// The source plane may be wider than the visible frame because a ProRes picture is padded to
+  /// whole macroblocks. Alpha is still coded for the complete horizontal slice width, while the last
+  /// macroblock row is coded only to the picture's actual vertical size. That asymmetry is exactly
+  /// the <c>sliceHorizontalSize</c>/<c>sliceVerticalSize</c> pair of 5.3.3.
+  /// </remarks>
+  internal static byte[] Encode(
+    ReadOnlySpan<ushort> source,
+    int alphaBitDepth,
+    int planeWidth,
+    int originX,
+    int originY,
+    int sliceWidth,
+    int sliceHeight) {
+    if (alphaBitDepth is not (8 or 16))
+      throw new ArgumentOutOfRangeException(nameof(alphaBitDepth), alphaBitDepth, "ProRes alpha is eight or sixteen bits.");
+    if (planeWidth <= 0 || originX < 0 || originY < 0 || sliceWidth <= 0 || sliceHeight <= 0)
+      throw new ArgumentOutOfRangeException(nameof(sliceWidth), "A ProRes alpha slice must describe a non-empty rectangle inside its plane.");
+
+    var required = checked((originY + sliceHeight - 1) * planeWidth + originX + sliceWidth);
+    if (required > source.Length)
+      throw new InvalidDataException(
+        $"A ProRes alpha slice needs sample {required - 1}, but its plane contains only {source.Length} samples.");
+
+    var writer = new ProResBitWriter();
+    var mask = alphaBitDepth == 8 ? 0xFF : 0xFFFF;
+    var shortMagnitude = alphaBitDepth == 8 ? 8 : 64;
+    var magnitudeBits = alphaBitDepth == 8 ? 3 : 6;
+    var previous = -1;
+    var count = checked(sliceWidth * sliceHeight);
+    var at = 0;
+
+    while (at < count) {
+      var alpha = _Sample(source, planeWidth, originX, originY, sliceWidth, at);
+      if (alpha > mask)
+        throw new InvalidDataException(
+          $"A ProRes {alphaBitDepth}-bit alpha sample is {alpha}, outside the 0..{mask} range.");
+
+      var run = 1;
+      while (run < _MAXIMUM_RUN && at + run < count) {
+        var next = _Sample(source, planeWidth, originX, originY, sliceWidth, at + run);
+        if (next > mask)
+          throw new InvalidDataException(
+            $"A ProRes {alphaBitDepth}-bit alpha sample is {next}, outside the 0..{mask} range.");
+        if (next != alpha)
+          break;
+        ++run;
+      }
+
+      var difference = alpha - previous;
+      if (difference != 0 && difference >= -shortMagnitude && difference <= shortMagnitude) {
+        writer.Bit(0);
+        writer.Bits(Math.Abs(difference) - 1, magnitudeBits);
+        writer.Bit(difference < 0 ? 1 : 0);
+      } else {
+        // The escaped form is modulo the alpha width. This is why a fully opaque first sample
+        // (255/65535 after previous=-1) legitimately writes an escaped zero.
+        writer.Bit(1);
+        writer.Bits(difference & mask, alphaBitDepth);
+      }
+
+      _WriteRun(writer, run);
+      previous = alpha;
+      at += run;
+    }
+
+    return writer.ToArray();
+  }
+
+  /// <summary>
   /// Decodes one slice's alpha values into a plane.
   /// </summary>
   /// <param name="data">The slice's alpha data, which run to the end of the slice.</param>
@@ -58,7 +130,7 @@ internal static class ProResAlpha {
     var count = sliceWidth * sliceHeight;
 
     // 5.3.3: the previous alpha of the first run is −1, so a slice that begins fully opaque codes a
-    // difference of one rather than a difference of 255 or 65535.
+    // difference of one modulo the alpha width rather than a difference of 255 or 65535.
     var previous = -1;
     var at = 0;
 
@@ -85,6 +157,37 @@ internal static class ProResAlpha {
         target[row * planeWidth + column] = (ushort)alpha;
       }
     }
+  }
+
+  private static ushort _Sample(
+    ReadOnlySpan<ushort> source,
+    int planeWidth,
+    int originX,
+    int originY,
+    int sliceWidth,
+    int index) {
+    var y = index / sliceWidth;
+    var x = index - y * sliceWidth;
+    return source[(originY + y) * planeWidth + originX + x];
+  }
+
+  private static void _WriteRun(ProResBitWriter writer, int run) {
+    if (run is < 1 or > _MAXIMUM_RUN)
+      throw new ArgumentOutOfRangeException(nameof(run));
+
+    if (run == 1) {
+      writer.Bit(1);
+      return;
+    }
+
+    writer.Bit(0);
+    if (run <= 16) {
+      writer.Bits(run - 1, 4);
+      return;
+    }
+
+    writer.Bits(0, 4);
+    writer.Bits(run - 1, 11);
   }
 
   /// <summary>
