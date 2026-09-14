@@ -1,4 +1,5 @@
 using System;
+using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.IO;
 using FileFormat.Core;
@@ -11,81 +12,43 @@ namespace FileFormat.Vqa;
 /// </summary>
 /// <remarks>
 /// Like RoQ, Interplay MVE and id Cinematic, this is its own container: nothing wraps it, because a
-/// file only ever holds this one video codec and Westwood's own ADPCM audio. Unlike any of those three,
-/// its chunk layout is RIFF's own — a four-character ID and a size on every chunk, <c>FORM</c>
-/// wrapping the rest — except that the size is big-endian where RIFF's own chunks are little-endian.
-/// See <see cref="VqaReader"/> for the chunk walk that answers only where a picture's bytes are; what a
-/// codebook entry or an index byte means is <see cref="Codecs.VqaVideoDecoder"/>'s alone.
+/// file only ever holds this one video codec and Westwood's own audio. Its chunk layout is IFF-like —
+/// a four-character ID and a big-endian size — with <c>FORM/WVQA</c> wrapping the stream.
 /// <para/>
-/// <b>Only the 256-colour, version-2 form is decoded.</b> The header states a version — <c>1</c> for
-/// the format's original use in Legend of Kyrandia III, <c>2</c> for the far more common form behind
-/// Command &amp; Conquer, Red Alert and most of Westwood's later catalogue — and a flag byte that marks
-/// a separate fifteen-bit-colour form. Version 1's index table decodes to values with no structure this
-/// reader's own two real version-1 samples could find a fit for: the two-value split-table reading
-/// version 2 files decode exactly under is not it, and nothing else this reader was built against states
-/// what version 1 uses instead. Version 1 and the high-colour form are therefore left to the codec to
-/// refuse by name, the same way a container never itself refuses a codec it has not decoded.
+/// The coded video may be version-1/version-2 palettised VQA or version-2/version-3 HiColor VQA. The
+/// container deliberately does not interpret codebooks or pointer commands; the forty-two-byte VQHD
+/// payload is carried verbatim as codec private data so <see cref="Codecs.VqaVideoDecoder"/> owns that
+/// syntax. VQHD's frame-rate and colour-count fields are container-visible stream metadata, however,
+/// and are surfaced here rather than being hard-coded to the common 15 fps / 8-bit case.
 /// </remarks>
 [FormatMimeType("video/x-vqa")]
 public sealed class VqaContainer : IVideoContainerReader<VqaContainer> {
 
-  /// <summary>The whole file, which every packet is a window onto.</summary>
   public required ReadOnlyMemory<byte> Data { get; init; }
-
-  /// <summary>Picture width in pixels.</summary>
   public required int Width { get; init; }
-
-  /// <summary>Picture height in pixels.</summary>
   public required int Height { get; init; }
-
-  /// <summary>A codebook entry's width in pixels — four in every sample this was measured against.</summary>
   public required int BlockWidth { get; init; }
-
-  /// <summary>A codebook entry's height in pixels — two in every sample this was measured against.</summary>
   public required int BlockHeight { get; init; }
-
-  /// <summary>How many <c>VQFR</c> chunks the header states the file holds.</summary>
   public required int VideoFrameCount { get; init; }
-
-  /// <summary>The audio sample rate the header states, in hertz, or zero for a file with no sound.</summary>
   public required int AudioSampleRate { get; init; }
-
-  /// <summary>Audio channel count, or zero where <see cref="AudioSampleRate"/> is zero.</summary>
   public required int AudioChannels { get; init; }
-
-  /// <summary>The forty-two-byte <c>VQHD</c> payload verbatim, carried through as the video stream's
-  /// private data so the codec can read the version and high-colour flag this container does not
-  /// interpret.</summary>
   public required ReadOnlyMemory<byte> HeaderPayload { get; init; }
 
-  private static readonly Rational _VIDEO_TIME_BASE = new(1, 15);
   private static readonly CodecTag _VIDEO_CODEC = CodecTag.FromCharacters("WSVQ");
   private static readonly CodecTag _AUDIO_CODEC = CodecTag.FromCharacters("WSAD");
 
-  // -------- Format identity --------
-
   public static string PrimaryExtension => ".vqa";
-
   public static string[] FileExtensions => [".vqa"];
 
-  /// <summary>
-  /// <c>FORM</c> alone is IFF's own signature, shared by AIFF and other unrelated formats built on the
-  /// same envelope — the four bytes right after <c>FORM</c>'s own size that name the form's type,
-  /// <c>WVQA</c>, are what actually says "this is a Westwood VQA file".
-  /// </summary>
   public static bool? MatchesSignature(ReadOnlySpan<byte> header)
     => header.Length >= 12 && header[..4].SequenceEqual("FORM"u8) && header.Slice(8, 4).SequenceEqual("WVQA"u8)
       ? true
       : null;
 
-  // -------- Demux --------
-
   public static VqaContainer FromSpan(ReadOnlySpan<byte> data) => VqaReader.Open(data.ToArray());
 
-  /// <summary>Opens a file over the caller's array, keeping it rather than copying it.</summary>
   public static VqaContainer FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
-
     return VqaReader.Open(data);
   }
 
@@ -93,12 +56,17 @@ public sealed class VqaContainer : IVideoContainerReader<VqaContainer> {
     ArgumentNullException.ThrowIfNull(file);
     if (!file.Exists)
       throw new FileNotFoundException("Westwood VQA file not found.", file.FullName);
-
     return VqaReader.Open(File.ReadAllBytes(file.FullName));
   }
 
   public static IReadOnlyList<MediaStreamInfo> Streams(VqaContainer container) {
     ArgumentNullException.ThrowIfNull(container);
+
+    var header = container.HeaderPayload.Span;
+    var version = BinaryPrimitives.ReadUInt16LittleEndian(header);
+    var statedRate = header[12];
+    var framesPerSecond = statedRate != 0 ? statedRate : version == 1 ? 10 : 15;
+    var colours = BinaryPrimitives.ReadUInt16LittleEndian(header[14..]);
 
     var video = new MediaStreamInfo {
       Index = 0,
@@ -106,8 +74,9 @@ public sealed class VqaContainer : IVideoContainerReader<VqaContainer> {
       Codec = _VIDEO_CODEC,
       Width = container.Width,
       Height = container.Height,
-      TimeBase = _VIDEO_TIME_BASE,
-      FrameRate = new(15, 1),
+      BitsPerPixel = colours == 0 ? 15 : 8,
+      TimeBase = new(1, framesPerSecond),
+      FrameRate = new(framesPerSecond, 1),
       DeclaredFrameCount = container.VideoFrameCount,
       CodecPrivateData = container.HeaderPayload,
     };
@@ -120,6 +89,9 @@ public sealed class VqaContainer : IVideoContainerReader<VqaContainer> {
       Kind = MediaStreamKind.Audio,
       Codec = _AUDIO_CODEC,
       TimeBase = new(1, container.AudioSampleRate),
+      SampleRate = container.AudioSampleRate,
+      Channels = container.AudioChannels,
+      BitsPerSample = header[27] == 0 && version == 1 ? 8 : header[27],
     };
 
     return [video, audio];
@@ -127,12 +99,9 @@ public sealed class VqaContainer : IVideoContainerReader<VqaContainer> {
 
   public static IEnumerable<CodedPacket> ReadPackets(VqaContainer container) {
     ArgumentNullException.ThrowIfNull(container);
-
     return VqaReader.ReadPackets(container);
   }
 
-  /// <summary>Nothing beyond the streams themselves. A VQA file has no field for a title, an author or
-  /// a creation date.</summary>
   public static VideoMetadata Metadata(VqaContainer container) {
     ArgumentNullException.ThrowIfNull(container);
 
