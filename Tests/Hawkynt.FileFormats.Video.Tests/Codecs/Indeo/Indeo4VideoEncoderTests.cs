@@ -106,6 +106,8 @@ public sealed class Indeo4VideoEncoderTests {
       }));
       Assert.That(packets.Select(p => p.IsKeyFrame), Is.EqualTo(new[] { true, false, false, true, false, false }));
       Assert.That(packets.Select(p => p.PresentationTimestamp), Is.EqualTo(Enumerable.Range(0, 6).Select(i => (long?)i)));
+      Assert.That(packets.Select(p => p.DecodeTimestamp), Is.EqualTo(Enumerable.Range(0, 6).Select(i => (long?)i)),
+        "IV41 hides the future P picture inside the I packet rather than emitting a separately timestamped coding-order packet");
     });
 
     var decoder = new Indeo4Decoder();
@@ -123,6 +125,28 @@ public sealed class Indeo4VideoEncoderTests {
   }
 
   [Test]
+  [Category("RoundTrip")]
+  public void ABidirectionalResidualIsAppliedRatherThanOnlyItsPredictor() {
+    const int width = 32;
+    const int height = 32;
+    var sources = new[] {
+      _SolidGray(width, height, 0),
+      _SolidGray(width, height, 80),
+      _SolidGray(width, height, 102),
+    };
+    var encoder = Indeo4VideoEncoder.Create(_Stream(width, height));
+    var packets = _EncodeAll(encoder, sources.Select((frame, index) => (frame, (long?)index)));
+
+    var decoder = new Indeo4Decoder();
+    Assert.That(decoder.Decode(packets[0].Data), Is.Not.Null);
+    var between = decoder.Decode(packets[1].Data);
+
+    Assert.That(between, Is.Not.Null);
+    Assert.That(between!.Luma, Is.EqualTo(_ExpectedLuma(sources[1])),
+      "a B picture with a non-zero residual must not collapse to whichever reference predictor was cheapest");
+  }
+
+  [Test]
   [Category("Unit")]
   public void APerfectMidpointUsesBothReferences() {
     const int width = 32;
@@ -136,8 +160,75 @@ public sealed class Indeo4VideoEncoderTests {
 
     Assert.That(packets, Has.Count.EqualTo(3));
     Assert.That(_FrameType(packets[1]), Is.EqualTo(Indeo4Decoder.FrameTypeBidirectional));
-    Assert.That(_FirstLumaMacroblockType(packets[1]), Is.EqualTo(3),
+    Assert.That(_FirstLumaMacroblock(packets[1]).Type, Is.EqualTo(3),
       "a midpoint macroblock should use the average of its forward and backward references");
+  }
+
+  [Test]
+  [Category("RoundTrip")]
+  public void PredictiveOddEdgesKeepVisibleChromaSeparateFromPadding() {
+    const int width = 19;
+    const int height = 19;
+    var sources = Enumerable.Range(0, 3).Select(i => _ColourMotion(width, height, i)).ToArray();
+    var encoder = Indeo4VideoEncoder.Create(_Stream(width, height));
+    var packets = _EncodeAll(encoder, sources.Select((frame, index) => (frame, (long?)index)));
+    var decoder = new Indeo4Decoder();
+
+    for (var index = 0; index < packets.Count; ++index) {
+      var decoded = decoder.Decode(packets[index].Data);
+      Assert.That(decoded, Is.Not.Null, $"packet {index} produced no display picture");
+      Assert.Multiple(() => {
+        Assert.That(decoded!.ChromaWidth, Is.EqualTo(5));
+        Assert.That(decoded.ChromaHeight, Is.EqualTo(5));
+        Assert.That(decoded.Luma, Is.EqualTo(_ExpectedLuma(sources[index])), $"luma differs in picture {index}");
+      });
+
+      var (blue, red) = _ExpectedChroma(sources[index]);
+      Assert.Multiple(() => {
+        Assert.That(_MaximumDifference(decoded!.ChromaBlue, blue), Is.LessThanOrEqualTo(2),
+          $"Cb at an odd predictive edge differs in picture {index}");
+        Assert.That(_MaximumDifference(decoded.ChromaRed, red), Is.LessThanOrEqualTo(2),
+          $"Cr at an odd predictive edge differs in picture {index}");
+      });
+    }
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void AWholeSampleShiftWritesANonZeroMotionVector() {
+    const int width = 32;
+    const int height = 32;
+    var first = _MotionRamp(width, height);
+    var second = _ShiftRight(first);
+    var encoder = Indeo4VideoEncoder.Create(_Stream(width, height));
+    var packets = _EncodeAll(encoder, [(first, 0L), (second, 1L)]);
+
+    Assert.That(packets, Has.Count.EqualTo(2));
+    var macroblock = _FirstLumaMacroblock(packets[1]);
+    Assert.Multiple(() => {
+      Assert.That(macroblock.Type, Is.EqualTo(1));
+      Assert.That(macroblock.MotionX, Is.EqualTo(2), "one whole sample is two half-sample motion units");
+      Assert.That(macroblock.MotionY, Is.Zero);
+    });
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void AHalfSampleShiftWritesAnOddMotionVector() {
+    const int width = 32;
+    const int height = 32;
+    var first = _BinaryMotionPattern(width, height);
+    var second = _BlendRight(first);
+    var encoder = Indeo4VideoEncoder.Create(_Stream(width, height));
+    var packets = _EncodeAll(encoder, [(first, 0L), (second, 1L)]);
+
+    Assert.That(packets, Has.Count.EqualTo(2));
+    var macroblock = _FirstLumaMacroblock(packets[1]);
+    Assert.Multiple(() => {
+      Assert.That(macroblock.Type, Is.EqualTo(1));
+      Assert.That(macroblock.MotionX, Is.EqualTo(1), "an odd IV41 motion component selects half-sample interpolation");
+      Assert.That(macroblock.MotionY, Is.Zero);
+    });
   }
 
   [Test]
@@ -159,6 +250,7 @@ public sealed class Indeo4VideoEncoderTests {
       Assert.That(_FrameType(packets[1]), Is.EqualTo(Indeo4Decoder.FrameTypeInter));
       Assert.That(packets.Select(p => p.IsKeyFrame), Is.EqualTo(new[] { true, false }));
       Assert.That(packets.Select(p => p.PresentationTimestamp), Is.EqualTo(new long?[] { 5, 6 }));
+      Assert.That(packets.Select(p => p.DecodeTimestamp), Is.EqualTo(new long?[] { 5, 6 }));
     });
 
     var decoder = new Indeo4Decoder();
@@ -265,17 +357,20 @@ public sealed class Indeo4VideoEncoderTests {
     return (int)reader.Read(3);
   }
 
-  private static int _FirstLumaMacroblockType(CodedPacket packet) {
+  private readonly record struct _Macroblock(byte Type, byte Pattern, int MotionX, int MotionY, int BackwardX, int BackwardY);
+
+  private static _Macroblock _FirstLumaMacroblock(CodedPacket packet) {
     var reader = new IviBitReader(packet.Data);
     Assert.That(reader.Read(18), Is.EqualTo(0x3FFF8));
-    Assert.That(reader.Read(3), Is.EqualTo(Indeo4Decoder.FrameTypeBidirectional));
-    reader.Skip(2);
-    Assert.That(reader.ReadFlag(), Is.False);
-    Assert.That(reader.ReadFlag(), Is.False);
+    var frameType = (int)reader.Read(3);
+    Assert.That(frameType, Is.AnyOf(Indeo4Decoder.FrameTypeInter, Indeo4Decoder.FrameTypeBidirectional));
+    reader.Skip(2); // Transparency and reserved.
+    Assert.That(reader.ReadFlag(), Is.False, "the encoder omits picture-data size");
+    Assert.That(reader.ReadFlag(), Is.False, "the encoder writes no lock word");
     Assert.That(reader.Read(3), Is.EqualTo(7));
-    reader.Skip(32);
+    reader.Skip(32); // Height and width.
     Assert.That(reader.ReadFlag(), Is.True);
-    reader.Skip(8);
+    reader.Skip(8); // Tile factors.
     Assert.That(reader.Read(2), Is.Zero);
     Assert.That(reader.Read(2), Is.EqualTo(3));
     Assert.That(reader.Read(2), Is.EqualTo(3));
@@ -295,7 +390,7 @@ public sealed class Indeo4VideoEncoderTests {
     Assert.That(reader.Read(4), Is.Zero);
     Assert.That(reader.ReadFlag(), Is.False);
     Assert.That(reader.ReadFlag(), Is.False);
-    Assert.That(reader.Read(2), Is.Zero);
+    Assert.That(reader.Read(2), Is.EqualTo(1), "predicted bands state half-sample motion precision");
     Assert.That(reader.ReadFlag(), Is.False);
     Assert.That(reader.Read(2), Is.Zero);
     Assert.That(reader.ReadFlag(), Is.False);
@@ -317,9 +412,48 @@ public sealed class Indeo4VideoEncoderTests {
       reader.Skip(24);
     reader.Align();
 
-    Assert.That(reader.ReadFlag(), Is.False, "type 3 cannot use the forward-repeat shorthand");
-    return (int)reader.Read(2);
+    if (reader.ReadFlag())
+      return new(1, 0, 0, 0, 0, 0);
+
+    var typeBits = frameType == Indeo4Decoder.FrameTypeBidirectional ? 2 : 1;
+    var type = (byte)reader.Read(typeBits);
+    var pattern = (byte)reader.Read(4);
+    if (pattern != 0)
+      Assert.That(_ReadFixedSymbol(reader), Is.Zero, "the encoder uses quantiser delta zero");
+
+    var motionY = _ToSigned(_ReadFixedSymbol(reader));
+    var motionX = _ToSigned(_ReadFixedSymbol(reader));
+    var forwardX = motionX;
+    var forwardY = motionY;
+    var backwardX = 0;
+    var backwardY = 0;
+
+    if (type == 3) {
+      motionY += _ToSigned(_ReadFixedSymbol(reader));
+      motionX += _ToSigned(_ReadFixedSymbol(reader));
+      backwardX = -motionX;
+      backwardY = -motionY;
+    } else if (type == 2) {
+      backwardX = -motionX;
+      backwardY = -motionY;
+      forwardX = 0;
+      forwardY = 0;
+    }
+
+    return new(type, pattern, forwardX, forwardY, backwardX, backwardY);
   }
+
+  private static int _ReadFixedSymbol(IviBitReader reader) => _ReverseSix((int)reader.Read(6));
+
+  private static int _ReverseSix(int value) {
+    var reversed = 0;
+    for (var i = 0; i < 6; ++i)
+      reversed |= ((value >> i) & 1) << (5 - i);
+
+    return reversed;
+  }
+
+  private static int _ToSigned(int value) => -((value >> 1) ^ -(value & 1));
 
   private static void _SkipFixedCodebook(IviBitReader reader) {
     Assert.That(reader.ReadFlag(), Is.True);
@@ -372,6 +506,101 @@ public sealed class Indeo4VideoEncoderTests {
     return new() {
       Width = width,
       Height = height,
+      Format = PixelFormat.Rgb24,
+      PixelData = pixels,
+    };
+  }
+
+  private static RawImage _ColourMotion(int width, int height, int phase) {
+    var pixels = new byte[width * height * 3];
+    for (var y = 0; y < height; ++y)
+      for (var x = 0; x < width; ++x) {
+        var shifted = x + phase * 2;
+        var at = (y * width + x) * 3;
+        pixels[at] = (byte)((shifted * 9 + y * 5 + 37) & 0xFF);
+        pixels[at + 1] = (byte)((shifted * 3 + y * 11 + 71) & 0xFF);
+        pixels[at + 2] = (byte)((shifted * 7 + y * 13 + 19) & 0xFF);
+      }
+
+    return new() {
+      Width = width,
+      Height = height,
+      Format = PixelFormat.Rgb24,
+      PixelData = pixels,
+    };
+  }
+
+  private static RawImage _MotionRamp(int width, int height) {
+    var pixels = new byte[width * height * 3];
+    for (var y = 0; y < height; ++y)
+      for (var x = 0; x < width; ++x) {
+        var value = (byte)((x * 19 + y * 43 + x * y * 3 + 17) & 0xFF);
+        var at = (y * width + x) * 3;
+        pixels[at] = pixels[at + 1] = pixels[at + 2] = value;
+      }
+
+    return new() {
+      Width = width,
+      Height = height,
+      Format = PixelFormat.Rgb24,
+      PixelData = pixels,
+    };
+  }
+
+  private static RawImage _BinaryMotionPattern(int width, int height) {
+    var pixels = new byte[width * height * 3];
+    for (var y = 0; y < height; ++y)
+      for (var x = 0; x < width; ++x) {
+        var hash = unchecked((uint)(x * x * 3 + y * y * 5 + x * y * 7 + x * 11 + y * 13));
+        hash ^= hash >> 7;
+        hash *= 0x9E3779B1u;
+        hash ^= hash >> 16;
+        var value = (byte)((hash & 1) == 0 ? 0 : 102);
+        var at = (y * width + x) * 3;
+        pixels[at] = pixels[at + 1] = pixels[at + 2] = value;
+      }
+
+    return new() {
+      Width = width,
+      Height = height,
+      Format = PixelFormat.Rgb24,
+      PixelData = pixels,
+    };
+  }
+
+  private static RawImage _ShiftRight(RawImage source) {
+    var pixels = new byte[source.Width * source.Height * 3];
+    for (var y = 0; y < source.Height; ++y)
+      for (var x = 0; x < source.Width; ++x) {
+        var from = (y * source.Width + Math.Min(x + 1, source.Width - 1)) * 3;
+        var to = (y * source.Width + x) * 3;
+        pixels[to] = source.PixelData[from];
+        pixels[to + 1] = source.PixelData[from + 1];
+        pixels[to + 2] = source.PixelData[from + 2];
+      }
+
+    return new() {
+      Width = source.Width,
+      Height = source.Height,
+      Format = PixelFormat.Rgb24,
+      PixelData = pixels,
+    };
+  }
+
+  private static RawImage _BlendRight(RawImage source) {
+    var pixels = new byte[source.Width * source.Height * 3];
+    for (var y = 0; y < source.Height; ++y)
+      for (var x = 0; x < source.Width; ++x) {
+        var left = (y * source.Width + x) * 3;
+        var right = (y * source.Width + Math.Min(x + 1, source.Width - 1)) * 3;
+        var to = left;
+        for (var channel = 0; channel < 3; ++channel)
+          pixels[to + channel] = (byte)((source.PixelData[left + channel] + source.PixelData[right + channel]) >> 1);
+      }
+
+    return new() {
+      Width = source.Width,
+      Height = source.Height,
       Format = PixelFormat.Rgb24,
       PixelData = pixels,
     };
