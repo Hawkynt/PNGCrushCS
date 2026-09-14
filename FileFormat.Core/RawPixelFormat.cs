@@ -26,7 +26,7 @@ public enum RawPixelAlphaKind {
 /// <param name="StorageBitsPerPixel">Physical in-memory storage bits per pixel used by the compatibility representation.</param>
 /// <param name="BytesPerPixel">Whole bytes per packed pixel, or zero for sub-byte/planar layouts.</param>
 /// <param name="ComponentBitDepth">Nominal component precision where one value describes every component; zero for mixed layouts.</param>
-/// <param name="Alpha">How alpha, when supported, is represented.</param>
+/// <param name="Alpha">How alpha can be represented.</param>
 /// <param name="PlaneCount">Number of physical sample planes.</param>
 /// <param name="IndexBitDepth">Logical index width for indexed formats, otherwise zero.</param>
 /// <param name="ChromaSubsampleX">Horizontal chroma subsampling factor for planar YUV.</param>
