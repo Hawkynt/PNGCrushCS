@@ -7,13 +7,17 @@ using FileFormat.Core;
 namespace FileFormat.Codecs;
 
 /// <summary>
-/// Decodes classic Ut Video, the lossless codec of UMEZAWA Takeshi: Huffman coding over a
-/// prediction, in six colour spaces, with the frame cut into slices that decode independently.
+/// Decodes Ut Video, the lossless codec of UMEZAWA Takeshi: Huffman coding over a prediction, in
+/// six colour spaces, with the frame cut into slices that decode independently of one another.
 /// </summary>
 /// <remarks>
-/// Lossless and intra only — every frame stands alone. The separate T2 <c>UM*</c> family is handled
-/// by <see cref="UtVideoT2Decoder"/>, because it has a different packet format and optional temporal
-/// references.
+/// Lossless and intra only — every frame stands alone, which is what makes it a capture and editing
+/// codec. There is no transform and no quantiser. A sample is predicted from its neighbours, the
+/// difference is Huffman coded with one table a plane, and the plane is cut into horizontal bands
+/// that share the table but nothing else, so that a decoder with four cores can use them.
+/// <para/>
+/// The separate T2 <c>UM*</c> family is handled by <see cref="UtVideoT2Decoder"/>, because it has a
+/// different packet format and optional temporal references.
 /// <para/>
 /// <b>What the format's own description gives, and what it does not.</b> The author publishes the
 /// four-character codes and their colour spaces, and the community write-up gives the sixteen bytes
@@ -56,7 +60,7 @@ namespace FileFormat.Codecs;
 /// </remarks>
 public sealed class UtVideoDecoder : IVideoCodecDecoder<UtVideoDecoder> {
 
-  /// <summary>The classic codes this decoder answers to.</summary>
+  /// <summary>The codes this decoder answers to.</summary>
   private static readonly CodecTag[] _Tags = [
     CodecTag.FromCharacters("ULRG"),
     CodecTag.FromCharacters("ULRA"),
@@ -68,7 +72,15 @@ public sealed class UtVideoDecoder : IVideoCodecDecoder<UtVideoDecoder> {
     CodecTag.FromCharacters("ULH4"),
   ];
 
-  /// <summary>The Pro codes this decoder names in its refusal rather than leaving unmatched.</summary>
+  /// <summary>
+  /// The codes this decoder names in its refusal rather than leaving to no decoder at all.
+  /// </summary>
+  /// <remarks>
+  /// They are accepted so that <see cref="Create"/> can say what is wrong with the stream. A caller
+  /// that gets no decoder at all learns only that nothing matched, which for a file whose code
+  /// plainly reads <c>UQY2</c> is a worse answer than "that is Ut Video Pro and its bitstream is not
+  /// published".
+  /// </remarks>
   private static readonly CodecTag[] _RefusedTags = [
     CodecTag.FromCharacters("UQRG"),
     CodecTag.FromCharacters("UQRA"),
@@ -179,6 +191,24 @@ public sealed class UtVideoDecoder : IVideoCodecDecoder<UtVideoDecoder> {
     return planes;
   }
 
+  /// <summary>
+  /// Undoes the decorrelation: blue and red are stored as their distance from green.
+  /// </summary>
+  /// <remarks>
+  /// A picture is mostly grey, so blue less green and red less green are small where blue and red
+  /// are not, and small numbers are what a Huffman table is good at. It happens after the spatial
+  /// prediction has been undone because both are additions and the order between them does not
+  /// matter.
+  /// <para/>
+  /// <b>There is 128 in it as well as green.</b> The community write-up says only that red and blue
+  /// are "a difference to the correspondent green value", and a decoder that adds green alone is out
+  /// by exactly 128 on every sample of both planes — a picture whose reds and blues are inverted
+  /// rather than one that looks broken. Measured on frames where dropping the 128 puts the maximum
+  /// difference against ffmpeg at exactly that and keeping it puts it at nought.
+  /// <para/>
+  /// This belongs with the decoding and not with the colour, because the result is what the plane
+  /// holds: an alpha plane is not decorrelated, and neither is green.
+  /// </remarks>
   private static void _Correlate(byte[][] planes) {
     var green = planes[0];
     var blue = planes[1];
@@ -191,6 +221,18 @@ public sealed class UtVideoDecoder : IVideoCodecDecoder<UtVideoDecoder> {
     }
   }
 
+  // ============================================================================================
+  // A plane
+  // ============================================================================================
+
+  /// <summary>
+  /// Reads one plane: its code lengths, where each of its slices ends, and then the slices.
+  /// </summary>
+  /// <remarks>
+  /// The end offsets are counted from the start of the plane's data rather than from the start of
+  /// each slice, so a slice runs from the previous offset to its own and the last of them is the
+  /// length of everything.
+  /// </remarks>
   private byte[] _DecodePlane(
     ReadOnlySpan<byte> data, ref int at, int index, int width, int height, int verticalShift,
     UtVideoPredictor predictor) {
@@ -243,6 +285,7 @@ public sealed class UtVideoDecoder : IVideoCodecDecoder<UtVideoDecoder> {
     return samples;
   }
 
+  /// <summary>Reads one slice's symbols and turns them into samples.</summary>
   private void _DecodeSlice(
     ReadOnlySpan<byte> slice, UtVideoHuffmanTable table, byte[] samples, int width, int firstRow,
     int lastRow, UtVideoPredictor predictor, int plane) {
@@ -263,6 +306,8 @@ public sealed class UtVideoDecoder : IVideoCodecDecoder<UtVideoDecoder> {
         return;
       case UtVideoPredictor.Median:
       case UtVideoPredictor.Gradient: {
+        // The first row of a slice has nothing above it, so it is read from the left whichever of
+        // the two the frame states; the rows under it are predicted from their neighbours.
         var firstRowEnd = Math.Min(from + width, to);
         UtVideoPrediction.AddLeft(samples.AsSpan(from, firstRowEnd - from), UtVideoPrediction.SLICE_START);
         UtVideoPrediction.AddPredicted(
@@ -275,12 +320,25 @@ public sealed class UtVideoDecoder : IVideoCodecDecoder<UtVideoDecoder> {
     }
   }
 
+  // ============================================================================================
+  // What comes out
+  // ============================================================================================
+
   private RawImage _Compose(byte[][] planes) => this._format.ColourSpace switch {
     UtVideoColourSpace.Rgb => this._FromColour(planes, false),
     UtVideoColourSpace.Rgba => this._FromColour(planes, true),
     _ => this._FromYuv(planes),
   };
 
+  /// <summary>
+  /// Puts the colour planes back in order.
+  /// </summary>
+  /// <remarks>
+  /// The planes are green, blue and red in that order, with alpha after them where there is one.
+  /// The order is not published correctly anywhere: the community write-up gives it as green, red,
+  /// blue, where every file measured here has blue second and red third — which is settled by the
+  /// blues and reds of a test pattern coming out the right way round rather than swapped.
+  /// </remarks>
   private RawImage _FromColour(byte[][] planes, bool hasAlpha) {
     var count = this._width * this._height;
     var green = planes[0];
@@ -307,6 +365,17 @@ public sealed class UtVideoDecoder : IVideoCodecDecoder<UtVideoDecoder> {
     };
   }
 
+  /// <summary>
+  /// Turns the luminance and chrominance planes into the packed colour every reader here hands back.
+  /// </summary>
+  /// <remarks>
+  /// The conversion is a display convention and not part of the coding, but which of the two
+  /// conventions to use is part of it: <c>ULY2</c> and <c>ULH2</c> are the same bits against
+  /// different primaries, and the four-character code is the only thing that says which. Both are
+  /// studio swing — luminance running 16 to 235 rather than filling the byte — and each chrominance
+  /// sample is repeated across the block it covers, which is what a subsampled picture's samples
+  /// mean and what the reference decoder's own conversion does.
+  /// </remarks>
   private RawImage _FromYuv(byte[][] planes) {
     var luma = planes[0];
     var cb = planes[1];
@@ -315,6 +384,8 @@ public sealed class UtVideoDecoder : IVideoCodecDecoder<UtVideoDecoder> {
     var chromaWidth = this._width >> format.ChromaHorizontalShift;
     var chromaHeight = this._height >> format.ChromaVerticalShift;
     var pixels = new byte[this._width * this._height * 3];
+
+    // BT.601 and BT.709 at studio swing, scaled by 256.
     var (toRed, toGreenFromBlue, toGreenFromRed, toBlue) = format.IsBt709
       ? (459, -55, -136, 541)
       : (409, -100, -208, 516);
@@ -327,9 +398,11 @@ public sealed class UtVideoDecoder : IVideoCodecDecoder<UtVideoDecoder> {
       for (var x = 0; x < this._width; ++x) {
         var chromaColumn = Math.Min(x >> format.ChromaHorizontalShift, chromaWidth - 1);
         var at = chromaRow * chromaWidth + chromaColumn;
+
         var scaledLuma = 298 * (luma[lumaRow + x] - 16);
         var blueDifference = cb[at] - 128;
         var redDifference = cr[at] - 128;
+
         pixels[target] = _Clamp(scaledLuma + toRed * redDifference + 128);
         pixels[target + 1] = _Clamp(scaledLuma + toGreenFromBlue * blueDifference + toGreenFromRed * redDifference + 128);
         pixels[target + 2] = _Clamp(scaledLuma + toBlue * blueDifference + 128);
