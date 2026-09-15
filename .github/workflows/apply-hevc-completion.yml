@@ -21,6 +21,7 @@ jobs:
         run: |
           python3 - <<'PY'
           from pathlib import Path
+          import re
 
           lines = Path('.github/hevc-completion.patch').read_text().splitlines(keepends=True)
           i = 0
@@ -68,6 +69,7 @@ jobs:
               continue
 
             content = target.read_text()
+            search_start = 0
             for hunk_number, hunk in enumerate(hunks, 1):
               old = ''.join(
                 line[1:] for line in hunk
@@ -77,12 +79,15 @@ jobs:
                 line[1:] for line in hunk
                 if (line.startswith(' ') or line.startswith('+')) and not line.startswith('+++')
               )
-              occurrences = content.count(old)
-              if occurrences != 1:
-                raise SystemExit(
-                  f'{path}: hunk {hunk_number} old block occurs {occurrences} times, expected exactly once'
-                )
-              content = content.replace(old, new, 1)
+              at = content.find(old, search_start)
+              if at < 0:
+                raise SystemExit(f'{path}: hunk {hunk_number} old block not found after offset {search_start}')
+              second = content.find(old, at + 1)
+              if second >= 0:
+                print(f'{path}: hunk {hunk_number} is non-unique; applying first occurrence after previous hunk at byte {at}')
+              content = content[:at] + new + content[at + len(old):]
+              search_start = at + len(new)
+
             target.write_text(content)
             changed.append(path)
 
