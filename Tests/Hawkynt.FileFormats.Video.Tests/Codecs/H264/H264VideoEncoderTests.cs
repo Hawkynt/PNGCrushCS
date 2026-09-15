@@ -109,14 +109,14 @@ public sealed class H264VideoEncoderTests {
         Is.EqualTo(new long?[] { 0, 1, 2, 3, 4 }));
     });
 
-    var pReader = _SliceDataReader(packets[1], expectedSliceType: 5, referencePicture: true, bPicture: false);
-    Assert.That(pReader.ReadUnsignedExpGolomb(), Is.EqualTo(4),
+    var pSyntax = _FirstMacroblockSyntax(packets[1], expectedSliceType: 5, referencePicture: true, bPicture: false);
+    Assert.That(pSyntax.SkipRun, Is.EqualTo(4),
       "the 32x32 repeated P picture should be four P_Skip macroblocks, not four intra fallbacks");
 
-    var bReader = _SliceDataReader(packets[2], expectedSliceType: 6, referencePicture: false, bPicture: true);
+    var bSyntax = _FirstMacroblockSyntax(packets[2], expectedSliceType: 6, referencePicture: false, bPicture: true);
     Assert.Multiple(() => {
-      Assert.That(bReader.ReadUnsignedExpGolomb(), Is.Zero, "the first B macroblock is explicitly coded, not direct-skip");
-      Assert.That(bReader.ReadUnsignedExpGolomb(), Is.EqualTo(3),
+      Assert.That(bSyntax.SkipRun, Is.Zero, "the first B macroblock is explicitly coded, not direct-skip");
+      Assert.That(bSyntax.MacroblockType, Is.EqualTo(3),
         "the repeated B picture should use B_Bi_16x16 and therefore both reference lists");
     });
 
@@ -258,7 +258,7 @@ public sealed class H264VideoEncoderTests {
     return reader.ReadUnsignedExpGolomb();
   }
 
-  private static H264BitReader _SliceDataReader(
+  private static FirstMacroblockSyntax _FirstMacroblockSyntax(
     CodedPacket packet,
     int expectedSliceType,
     bool referencePicture,
@@ -286,8 +286,12 @@ public sealed class H264VideoEncoderTests {
       Assert.That(reader.ReadBit(), Is.Zero); // adaptive reference marking
     Assert.That(reader.ReadSignedExpGolomb(), Is.Zero); // slice_qp_delta
     Assert.That(reader.ReadUnsignedExpGolomb(), Is.EqualTo(1)); // deblocking disabled
-    return reader;
+
+    var skipRun = reader.ReadUnsignedExpGolomb();
+    return new(skipRun, skipRun == 0 ? reader.ReadUnsignedExpGolomb() : null);
   }
+
+  private readonly record struct FirstMacroblockSyntax(ulong SkipRun, ulong? MacroblockType);
 
   private static MediaStreamInfo _Stream(int width, int height)
     => new() {
