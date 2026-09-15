@@ -46,3 +46,59 @@ jobs:
       # was simply the slowest thing on the critical path, and a pull request sat waiting on a
       # reporting metric. coverage.yml measures it daily, where it has the time and blocks nobody.
       coverage: false
+
+  hap-reference-oracle:
+    name: Hap reference oracle
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.x
+            10.0.x
+
+      - name: Build pinned Vidvox and bcdec oracle
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y libsnappy-dev
+
+          git clone --quiet https://github.com/Vidvox/hap.git "$RUNNER_TEMP/vidvox-hap"
+          git -C "$RUNNER_TEMP/vidvox-hap" checkout --quiet --detach d847f6bbd3be88575dd4ef33a877243780e3be76
+
+          git clone --quiet https://github.com/iOrange/bcdec.git "$RUNNER_TEMP/bcdec"
+          git -C "$RUNNER_TEMP/bcdec" checkout --quiet --detach 80859ed3b7afb1c527a2a99d70c61457bea72d0c
+
+          cc -std=c17 -O2 -Wall -Wextra \
+            -I"$RUNNER_TEMP/vidvox-hap/source" \
+            -I"$RUNNER_TEMP/bcdec" \
+            Tests/Hawkynt.FileFormats.Video.Tests/Tools/hap-reference-oracle.c \
+            "$RUNNER_TEMP/vidvox-hap/source/hap.c" \
+            -lsnappy \
+            -o "$RUNNER_TEMP/hap-reference-oracle"
+
+      - name: Run deterministic Hap R/HDR oracle
+        shell: bash
+        env:
+          HAP_REFERENCE_ORACLE: ${{ runner.temp }}/hap-reference-oracle
+          HAP_REFERENCE_ARTIFACTS: ${{ runner.temp }}/hap-reference-artifacts
+        run: |
+          dotnet test Tests/Hawkynt.FileFormats.Video.Tests/Hawkynt.FileFormats.Video.Tests.csproj \
+            -c Release \
+            -p:EnableWindowsTargeting=true \
+            --filter "FullyQualifiedName~HapReferenceOracleTests"
+
+      - name: Upload Hap oracle frames and extracted textures
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hap-reference-oracle
+          path: ${{ runner.temp }}/hap-reference-artifacts
+          if-no-files-found: warn
