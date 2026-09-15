@@ -39,6 +39,9 @@ internal sealed class H265VideoSequenceEncoder {
   /// <summary>How many bidirectional pictures sit between one anchor and the next.</summary>
   private const int _BIDIRECTIONAL_COUNT = 2;
 
+  /// <summary>How many already reconstructed anchors remain available to a later picture.</summary>
+  private const int _MAX_PAST_REFERENCES = 2;
+
   /// <summary>The quantiser inter pictures code their residual at.</summary>
   /// <remarks>
   /// Stated once and written into the slice header as a delta from the picture parameter set's 26.
@@ -65,8 +68,7 @@ internal sealed class H265VideoSequenceEncoder {
   private readonly H265PictureParameterSet _parsedPps;
   private readonly byte[] _configuration;
 
-  private H265Picture? _reference;
-  private int _referencePoc;
+  private readonly List<Reference> _references = [];
   private int _groupStart;
   private int _displayIndex;
 
@@ -80,6 +82,7 @@ internal sealed class H265VideoSequenceEncoder {
   private readonly Queue<long?> _decodeTimestamps = new();
 
   private readonly record struct Pending((byte[] Y, byte[] Cb, byte[] Cr) Planes, int DisplayIndex, long? Timestamp);
+  private readonly record struct Reference(H265Picture Picture, int Poc);
 
   /// <summary>One coded access unit and what a container needs to place it.</summary>
   internal readonly record struct Coded(byte[] Sample, bool IsKeyFrame, long? PresentationTimestamp, long? DecodeTimestamp);
@@ -102,7 +105,8 @@ internal sealed class H265VideoSequenceEncoder {
       this._codedWidth, this._codedHeight, this._displayWidth, this._displayHeight, level,
       maxDecPicBufferingMinus1: _BIDIRECTIONAL_COUNT + 1,
       log2MaxPocLsbMinus4: _LOG2_MAX_POC_LSB_MINUS4,
-      maxNumReorderPics: _BIDIRECTIONAL_COUNT);
+      maxNumReorderPics: _BIDIRECTIONAL_COUNT,
+      maxTransformHierarchyDepthInter: 1);
     this._sps = H265PcmStillCodec._MakeNal(H265NalUnitType.SequenceParameterSet, sps);
     this._pps = H265PcmStillCodec._MakeNal(H265NalUnitType.PictureParameterSet, H265PcmStillCodec._BuildPps());
 
@@ -131,7 +135,7 @@ internal sealed class H265VideoSequenceEncoder {
     var index = this._displayIndex++;
     this._decodeTimestamps.Enqueue(presentationTimestamp);
 
-    if (this._reference == null || index % _GROUP_LENGTH == 0) {
+    if (this._references.Count == 0 || index % _GROUP_LENGTH == 0) {
       // A group boundary closes the one before it: anything still waiting has no anchor coming, so
       // it is coded against the one behind it rather than held past the picture it would predict from.
       this._DrainPendingAsPredicted();
@@ -157,15 +161,14 @@ internal sealed class H265VideoSequenceEncoder {
   /// <summary>Codes the anchor that the waiting pictures predict forward from, then those pictures.</summary>
   private void _EncodeGroup() {
     var anchor = this._pending[^1];
-    var past = this._reference!;
-    var pastPoc = this._referencePoc;
+    var past = this._references.ToArray();
 
     var future = this._EncodeAnchor(anchor);
 
     foreach (var pending in this._pending)
       if (pending.DisplayIndex != anchor.DisplayIndex)
         this._ready.Enqueue(this._Wrap(
-          this._EncodeBidirectionalPicture(pending, past, pastPoc, future, anchor.DisplayIndex),
+          this._EncodeBidirectionalPicture(pending, past, future),
           keyFrame: false, pending.Timestamp));
 
     this._pending.Clear();
@@ -207,27 +210,32 @@ internal sealed class H265VideoSequenceEncoder {
     // Uncompressed coding units store their samples exactly and no filter runs over them, so the
     // reconstruction is the source. A predicted picture can be built on it without the encoder
     // having to decode what it just wrote.
-    this._reference = this._ToPicture(planes, 0);
-    this._referencePoc = 0;
+    this._references.Clear();
+    this._references.Add(new(this._ToPicture(planes, 0), 0));
     this._groupStart = displayIndex;
     return slice;
   }
 
   private byte[] _EncodePredictedPicture((byte[] Y, byte[] Cb, byte[] Cr) planes, int displayIndex) {
-    var reference = this._reference
-                    ?? throw new InvalidOperationException("A predicted picture needs a reference that was coded first.");
+    if (this._references.Count == 0)
+      throw new InvalidOperationException("A predicted picture needs a reference that was coded first.");
 
     var poc = displayIndex - this._groupStart;
-    var header = this._BuildSliceHeader(H265SliceType.P, poc, this._referencePoc, futurePoc: null);
+    var pastPocs = _Pocs(this._references);
+    var header = this._BuildSliceHeader(
+      H265SliceType.P, poc, pastPocs, futurePoc: null,
+      activeL0: this._references.Count, activeL1: 0);
     var source = this._ToPicture(planes, poc);
 
     var parsed = this._ParseSliceHeader(header);
+    var list0 = _Pictures(this._references);
     var encoder = new H265InterPictureEncoder(
-      this._parsedSps, this._parsedPps, parsed, source, reference, null, parsed.SliceQpY);
+      this._parsedSps, this._parsedPps, parsed, source, list0, [], parsed.SliceQpY);
 
     var slice = _Assemble(header, encoder.Encode(), H265NalUnitType.TrailingReference);
-    this._reference = encoder.Reconstruction;
-    this._referencePoc = poc;
+    this._references.Insert(0, new(encoder.Reconstruction, poc));
+    if (this._references.Count > _MAX_PAST_REFERENCES)
+      this._references.RemoveAt(this._references.Count - 1);
     return slice;
   }
 
@@ -240,15 +248,26 @@ internal sealed class H265VideoSequenceEncoder {
   /// picture a matter of that picture alone: an error in one cannot reach the next.
   /// </remarks>
   private byte[] _EncodeBidirectionalPicture(
-    Pending pending, H265Picture past, int pastPoc, H265Picture future, int futureDisplayIndex) {
+    Pending pending, IReadOnlyList<Reference> past, H265Picture future) {
     var poc = pending.DisplayIndex - this._groupStart;
-    var futurePoc = futureDisplayIndex - this._groupStart;
-    var header = this._BuildSliceHeader(H265SliceType.B, poc, pastPoc, futurePoc);
+    var futurePoc = future.PictureOrderCount;
+    var pastPocs = _Pocs(past);
+    var active = past.Count + 1;
+    var header = this._BuildSliceHeader(H265SliceType.B, poc, pastPocs, futurePoc, active, active);
     var source = this._ToPicture(pending.Planes, poc);
 
     var parsed = this._ParseSliceHeader(header);
+    var list0 = new List<H265Picture>(active);
+    foreach (var reference in past)
+      list0.Add(reference.Picture);
+    list0.Add(future);
+
+    var list1 = new List<H265Picture>(active) { future };
+    foreach (var reference in past)
+      list1.Add(reference.Picture);
+
     var encoder = new H265InterPictureEncoder(
-      this._parsedSps, this._parsedPps, parsed, source, past, future, parsed.SliceQpY);
+      this._parsedSps, this._parsedPps, parsed, source, list0, list1, parsed.SliceQpY);
 
     return _Assemble(header, encoder.Encode(), H265NalUnitType.TrailingNonReference);
   }
@@ -273,7 +292,8 @@ internal sealed class H265VideoSequenceEncoder {
   /// name is dropped from the buffer, so the set is the reference management rather than a
   /// description of it.
   /// </remarks>
-  private byte[] _BuildSliceHeader(H265SliceType type, int poc, int pastPoc, int? futurePoc) {
+  private byte[] _BuildSliceHeader(
+    H265SliceType type, int poc, IReadOnlyList<int> pastPocs, int? futurePoc, int activeL0, int activeL1) {
     var w = new H265PcmStillCodec.Bits();
     w.WriteBit(1); // first_slice_segment_in_pic_flag
     w.WriteUe(0);  // slice_pic_parameter_set_id
@@ -283,16 +303,27 @@ internal sealed class H265VideoSequenceEncoder {
     w.WriteBit(0); // short_term_ref_pic_set_sps_flag
 
     // st_ref_pic_set()
-    w.WriteUe(1);  // num_negative_pics
+    w.WriteUe((uint)pastPocs.Count);  // num_negative_pics
     w.WriteUe(futurePoc.HasValue ? 1u : 0u); // num_positive_pics
-    w.WriteUe((uint)(poc - pastPoc - 1)); // delta_poc_s0_minus1
-    w.WriteBit(1); // used_by_curr_pic_s0_flag
+    var previousPoc = poc;
+    foreach (var pastPoc in pastPocs) {
+      w.WriteUe((uint)(previousPoc - pastPoc - 1)); // delta_poc_s0_minus1
+      w.WriteBit(1); // used_by_curr_pic_s0_flag
+      previousPoc = pastPoc;
+    }
     if (futurePoc.HasValue) {
       w.WriteUe((uint)(futurePoc.Value - poc - 1)); // delta_poc_s1_minus1
       w.WriteBit(type == H265SliceType.B ? 1 : 0); // used_by_curr_pic_s1_flag
     }
 
-    w.WriteBit(0); // num_ref_idx_active_override_flag — the parameter set's one per list stands
+    var overrideActive = activeL0 != this._parsedPps.NumRefIdxL0DefaultActive
+                         || (type == H265SliceType.B && activeL1 != this._parsedPps.NumRefIdxL1DefaultActive);
+    w.WriteBit(overrideActive ? 1 : 0);
+    if (overrideActive) {
+      w.WriteUe((uint)(activeL0 - 1));
+      if (type == H265SliceType.B)
+        w.WriteUe((uint)(activeL1 - 1));
+    }
     if (type == H265SliceType.B)
       w.WriteBit(0); // mvd_l1_zero_flag
 
@@ -302,6 +333,20 @@ internal sealed class H265VideoSequenceEncoder {
     w.WriteSe(_QUANTISER - _PARAMETER_SET_QUANTISER); // slice_qp_delta
     w.WriteByteAlignment();
     return w.ToArray();
+  }
+
+  private static H265Picture[] _Pictures(IReadOnlyList<Reference> references) {
+    var pictures = new H265Picture[references.Count];
+    for (var i = 0; i < references.Count; ++i)
+      pictures[i] = references[i].Picture;
+    return pictures;
+  }
+
+  private static int[] _Pocs(IReadOnlyList<Reference> references) {
+    var pocs = new int[references.Count];
+    for (var i = 0; i < references.Count; ++i)
+      pocs[i] = references[i].Poc;
+    return pocs;
   }
 
   /// <summary>
