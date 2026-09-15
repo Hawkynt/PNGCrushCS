@@ -11,7 +11,7 @@ public sealed class H265PcmFrameDecoderTests {
   [Test]
   [Category("RoundTrip")]
   [Category("HappyPath")]
-  public void GeneralFrameDecoderLeavesAndRestartsCabacAroundEveryPcmCodingUnit() {
+  public void GeneralFrameDecoderLeavesAndRestartsCabacAroundFourPcmCodingUnits() {
     var y = new byte[_WIDTH * _HEIGHT];
     var cb = new byte[_WIDTH * _HEIGHT / 4];
     var cr = new byte[_WIDTH * _HEIGHT / 4];
