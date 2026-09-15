@@ -15,6 +15,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           path: PNGCrushCS
+          fetch-depth: 0
 
       - name: Check out CompressionWorkbench sibling
         uses: actions/checkout@v4
