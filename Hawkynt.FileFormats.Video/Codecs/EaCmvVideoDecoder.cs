@@ -3,7 +3,7 @@ using System.Buffers.Binary;
 using System.IO;
 using FileFormat.Codecs.Ea;
 using FileFormat.Core;
-using FileFormat.Ea;
+using EaChunks = FileFormat.Ea.EaChunkType;
 
 namespace FileFormat.Codecs;
 
@@ -78,18 +78,18 @@ public sealed class EaCmvVideoDecoder : IVideoCodecDecoder<EaCmvVideoDecoder> {
       var payload = chunk.Slice(_CHUNK_HEADER_LENGTH, chunkLength - _CHUNK_HEADER_LENGTH);
 
       switch (fourCc) {
-        case EaChunkType.MVIh:
+        case EaChunks.MVIh:
           this._ReadHeader(payload);
           break;
 
-        case EaChunkType.MVIf:
+        case EaChunks.MVIf:
           if (decoded != null)
             throw new NotSupportedException(
               "One Electronic Arts CMV packet contains more than one MVIf picture. The decoder contract can return only one picture per packet.");
           decoded = this._DecodePicture(payload);
           break;
 
-        case EaChunkType.MVIe:
+        case EaChunks.MVIe:
           this._Reset();
           break;
 
@@ -126,6 +126,9 @@ public sealed class EaCmvVideoDecoder : IVideoCodecDecoder<EaCmvVideoDecoder> {
     var height = BinaryPrimitives.ReadUInt16LittleEndian(payload[6..]);
     if (width == 0 || height == 0)
       throw new InvalidDataException($"MVIh states a picture of {width}x{height}, which has no pixels.");
+    if ((long)width * height > int.MaxValue)
+      throw new InvalidDataException(
+        $"MVIh states a {width}x{height} picture whose palette-index raster cannot fit in one managed CMV frame.");
 
     if (this._width != 0 && (width != this._width || height != this._height)) {
       // Motion vectors are coordinates in the old geometry. The new header starts a new reference
@@ -180,7 +183,7 @@ public sealed class EaCmvVideoDecoder : IVideoCodecDecoder<EaCmvVideoDecoder> {
   }
 
   private void _DecodeIntra(ReadOnlySpan<byte> raster, EaCmvFrame target) {
-    var pixelCount = checked(this._width * this._height);
+    var pixelCount = target.Indices.Length;
     if (raster.Length < pixelCount)
       throw new InvalidDataException(
         $"An intra MVIf chunk carries {raster.Length} raster bytes, short of the {pixelCount} its {this._width}x{this._height} picture needs.");
@@ -242,8 +245,8 @@ public sealed class EaCmvVideoDecoder : IVideoCodecDecoder<EaCmvVideoDecoder> {
           var sy = by * _BLOCK + yy + dy;
           for (var xx = 0; xx < _BLOCK; ++xx) {
             var sx = bx * _BLOCK + xx + dx;
-            var value = sx >= 0 && sx < this._width && sy >= 0 && sy < this._height
-              ? source.Indices[sy * this._width + sx]
+            var value = sx >= 0 && sx < source.Width && sy >= 0 && sy < source.Height
+              ? source.Indices[sy * source.Width + sx]
               : (byte)0;
             target.Indices[(by * _BLOCK + yy) * this._width + bx * _BLOCK + xx] = value;
           }
