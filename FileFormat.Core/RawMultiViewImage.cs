@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Linq;
 
 namespace FileFormat.Core;
@@ -47,13 +48,20 @@ public sealed record RawImageView(
 /// </remarks>
 public sealed class RawMultiViewImage {
   private readonly RawImageView[] _views;
+  private readonly ReadOnlyCollection<RawImageView> _readOnlyViews;
 
   public RawMultiViewImage(IEnumerable<RawImageView> views) {
     ArgumentNullException.ThrowIfNull(views);
 
-    this._views = views.OrderBy(static view => view.Index).ToArray();
-    if (this._views.Length < 2)
+    var materialized = views.ToArray();
+    if (materialized.Length < 2)
       throw new ArgumentException("A multi-view image needs at least two simultaneous views.", nameof(views));
+    if (materialized.Any(static view => view is null))
+      throw new ArgumentException("A multi-view image cannot contain a null view.", nameof(views));
+
+    Array.Sort(materialized, static (left, right) => left.Index.CompareTo(right.Index));
+    this._views = materialized;
+    this._readOnlyViews = Array.AsReadOnly(this._views);
 
     var first = this._views[0];
     if (first.Image is null)
@@ -86,7 +94,7 @@ public sealed class RawMultiViewImage {
   }
 
   /// <summary>All views ordered by their stable <see cref="RawImageView.Index"/>.</summary>
-  public IReadOnlyList<RawImageView> Views => this._views;
+  public IReadOnlyList<RawImageView> Views => this._readOnlyViews;
 
   public int Width { get; }
   public int Height { get; }
