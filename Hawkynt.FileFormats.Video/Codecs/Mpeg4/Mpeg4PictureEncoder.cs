@@ -16,16 +16,15 @@ internal sealed class Mpeg4PictureEncoder {
   /// <summary>The largest positive or negative coefficient the third escape's signed twelve bits state.</summary>
   private const int _MAX_LEVEL = 2047;
 
-  /// <summary>How far a motion search looks, in whole samples, around the predicted vector.</summary>
+  /// <summary>How far the integer stage of the quarter-sample motion search looks, in whole samples.</summary>
   /// <remarks>
-  /// vop_fcode_forward is one here, so 7.6.3 gives a vector the range [-32, 31] half-samples, which
-  /// is [-16, 15.5] whole ones. Fifteen keeps every candidate inside that: the range is not merely
-  /// what a vector costs to state but what it means, because a vector outside it is wrapped by a
-  /// whole range on the way back and returns as a different vector.
+  /// With quarter_sample and f_code one the coded component range [-32,31] is measured in quarter
+  /// samples, so the integer stage safely reaches seven whole samples each way. The refinement below
+  /// then uses the remaining fractional positions and can reach the exact coded endpoints.
   /// </remarks>
-  private const int _SEARCH_RANGE = 15;
+  private const int _SEARCH_RANGE = 7;
 
-  /// <summary>The half-sample range vop_fcode_forward 1 permits.</summary>
+  /// <summary>The quarter-sample range vop_fcode_forward 1 permits.</summary>
   private const int _VECTOR_LOW = -32;
   private const int _VECTOR_HIGH = 31;
   private const int _VECTOR_RANGE = 64;
@@ -157,21 +156,21 @@ internal sealed class Mpeg4PictureEncoder {
 
   /// <summary>
   /// The fixed set of coding tools this encoder uses: Advanced Simple rectangular 8-bit 4:2:0,
-  /// half-sample motion, H.263 quantisation, progressive, no sprites, resync markers, partitioning or
-  /// scalability. Advanced Simple is named because B-VOPs are outside the Simple object type.
+  /// quarter-sample motion, H.263 quantisation, progressive, no sprites, resync markers, partitioning
+  /// or scalability. Advanced Simple is named because B-VOPs and quarter-sample motion are outside
+  /// the Simple object type.
   /// </summary>
   private void _WriteVideoObjectLayer() {
     this._StartCode(Mpeg4StartCode.FirstVideoObjectLayer);
     this._writer.Write(0, 1);                              // random_accessible_vol
     this._writer.Write(17, 8);                             // Advanced Simple visual object type
-    this._writer.Write(0, 1);                              // is_object_layer_identifier: version 1
+    this._writer.Write(1, 1);                              // is_object_layer_identifier
+    this._writer.Write(2, 4);                              // verid 2: quarter_sample syntax is present
+    this._writer.Write(1, 3);                              // video_object_layer_priority
     this._writer.Write(1, 4);                              // aspect_ratio_info: square pixels
     // vol_control_parameters carries low_delay, and low_delay is the difference between a stream that
-    // reorders pictures and one that promises never to. Leaving the block out does not leave the
-    // question open: a decoder that finds no low_delay takes the stream at its word as low-delay, and
-    // then meets a B-VOP it was told could not exist. FFmpeg says so in as many words -- "low_delay
-    // flag set incorrectly" -- and refuses the picture. Because this encoder writes B-VOPs, the block
-    // is present and states the answer.
+    // reorders pictures and one that promises never to. Because this encoder writes B-VOPs, the block
+    // is present and explicitly clears low_delay.
     this._writer.Write(1, 1);                              // vol_control_parameters
     this._writer.Write(1, 2);                              // chroma_format: 4:2:0
     this._writer.Write(0, 1);                              // low_delay: pictures are reordered
@@ -188,12 +187,15 @@ internal sealed class Mpeg4PictureEncoder {
     this._writer.Write(1, 1);                              // marker_bit
     this._writer.Write(0, 1);                              // interlaced
     this._writer.Write(1, 1);                              // obmc_disable
-    this._writer.Write(0, 1);                              // sprite_enable, verid 1
+    this._writer.Write(0, 2);                              // sprite_enable, verid 2
     this._writer.Write(0, 1);                              // not_8_bit
     this._writer.Write(0, 1);                              // quant_type: H.263
+    this._writer.Write(1, 1);                              // quarter_sample
     this._writer.Write(1, 1);                              // complexity_estimation_disable
     this._writer.Write(1, 1);                              // resync_marker_disable
     this._writer.Write(0, 1);                              // data_partitioned
+    this._writer.Write(0, 1);                              // newpred_enable
+    this._writer.Write(0, 1);                              // reduced_resolution_vop_enable
     this._writer.Write(0, 1);                              // scalability
     this._NextStartCode();
   }
@@ -272,18 +274,12 @@ internal sealed class Mpeg4PictureEncoder {
   // P-VOP macroblocks
   // ============================================================================================
 
-  /// <summary>
-  /// Writes one zero-vector inter macroblock. This is real temporal prediction: unchanged areas cost
-  /// no transform coefficients and changed areas carry only a residual. Motion search is an encoder
-  /// optimisation, not a prerequisite for a predictive VOP, and keeping the vector at zero gives a
-  /// deterministic baseline whose bitstream is still the normative P-VOP syntax.
-  /// </summary>
   private void _WritePredictedMacroblock(int address) {
     Span<int> levels = stackalloc int[6 * 64];
     Span<int> prediction = stackalloc int[64];
     var codedPattern = 0;
 
-    var (vectorX, vectorY) = this._SearchMotion(this._forwardReference!, address);
+    var (vectorX, vectorY) = this._SearchMotion(this._forwardReference!, address, this._roundingType);
 
     for (var block = 0; block < 6; ++block) {
       this._PredictForward(prediction, address, block, vectorX, vectorY);
@@ -293,10 +289,6 @@ internal sealed class Mpeg4PictureEncoder {
         codedPattern |= 1 << (5 - block);
     }
 
-    // not_coded: the macroblock is not in the bitstream at all and is the co-located one of the
-    // reference with a zero vector. It is what makes a predicted picture cheap, and it is available
-    // only when there is genuinely nothing to say -- no displacement and no residual. The
-    // reconstruction still has to happen, or this encoder's anchor would differ from the decoder's.
     if (vectorX == 0 && vectorY == 0 && codedPattern == 0) {
       this._writer.Write(1, 1);
       this._RecordNotCoded(address);
@@ -317,9 +309,6 @@ internal sealed class Mpeg4PictureEncoder {
     this._WriteVlc(Mpeg4VlcTables.PredictedMacroblockType, _INTER_MACROBLOCK * 4 + chrominancePattern);
     this._WriteVlc(Mpeg4VlcTables.LuminancePattern, luminancePattern ^ 0xF);
 
-    // One vector for the whole macroblock, coded as the difference from 7.6.2's median of three
-    // neighbours. The vector is recorded only after it is written, because the predictor is formed
-    // from macroblocks before this one and this one is not yet among them.
     this._WriteVectorDifference(vectorX - this._PredictVector(this._motion.VectorX, address));
     this._WriteVectorDifference(vectorY - this._PredictVector(this._motion.VectorY, address));
     this._RecordMotion(address, vectorX, vectorY);
@@ -335,54 +324,52 @@ internal sealed class Mpeg4PictureEncoder {
   }
 
   /// <summary>
-  /// Finds the whole-sample vector whose luminance prediction differs least from the source, in the
-  /// half-sample units the syntax counts.
+  /// Finds a qpel vector by integer-pel search followed by local quarter-pel refinement.
   /// </summary>
-  /// <remarks>
-  /// The search is whole-sample, so the vector it returns is always even and its luminance
-  /// prediction is a plain copy. The zero vector is the incumbent and only a strictly better one
-  /// displaces it: on flat or repeating content many vectors score identically, and a background
-  /// macroblock that came out of here with a vector would spend bits saying that nothing moved.
-  /// <para/>
-  /// The reference carries a border wide enough for any vector the syntax can state, so a candidate
-  /// never needs rejecting for reading past the edge -- 7.6.5's unrestricted vectors are what the
-  /// border is for.
-  /// </remarks>
-  private (int X, int Y) _SearchMotion(Mpeg4Frame reference, int address) {
-    var (plane, stride, origin, _, _) = reference.PlaneOf(0);
+  private (int X, int Y) _SearchMotion(Mpeg4Frame reference, int address, int rounding) {
+    var (plane, stride, origin, width, height) = reference.PlaneOf(0);
     var (sourcePlane, sourceStride, sourceOrigin, _, _) = this._source.PlaneOf(0);
     var left = address % this._macroblockWidth * 16;
     var top = address / this._macroblockWidth * 16;
 
-    // The zero vector is the incumbent, scored before the loop rather than met somewhere inside it,
-    // and only a strictly better candidate displaces it. That is not a tie-break detail: a
-    // macroblock that did not move has to come out of here with a zero vector or not_coded cannot
-    // leave it out, and on flat or repeating content many vectors score identically. Taking the
-    // first equal-scoring candidate instead picks whichever corner the scan began at, nothing is
-    // ever skipped, and a predicted picture ends up larger than the intra picture it replaces.
     var best = (X: 0, Y: 0);
-    var bestCost = _Cost(sourcePlane, sourceStride, sourceOrigin, plane, stride, origin,
-      left, top, 0, 0, int.MaxValue);
+    var bestCost = _QuarterSampleCost(
+      sourcePlane, sourceStride, sourceOrigin, plane, stride, origin, width, height,
+      left, top, 0, 0, rounding, int.MaxValue);
 
     for (var candidateY = -_SEARCH_RANGE; candidateY <= _SEARCH_RANGE; ++candidateY)
     for (var candidateX = -_SEARCH_RANGE; candidateX <= _SEARCH_RANGE; ++candidateX) {
-      var cost = _Cost(sourcePlane, sourceStride, sourceOrigin, plane, stride, origin,
+      var cost = _IntegerCost(sourcePlane, sourceStride, sourceOrigin, plane, stride, origin,
         left, top, candidateX, candidateY, bestCost);
       if (cost >= bestCost)
         continue;
 
       bestCost = cost;
-      best = (2 * candidateX, 2 * candidateY);
+      best = (4 * candidateX, 4 * candidateY);
+    }
+
+    var integerBest = best;
+    for (var deltaY = -3; deltaY <= 3; ++deltaY)
+    for (var deltaX = -3; deltaX <= 3; ++deltaX) {
+      var vectorX = integerBest.X + deltaX;
+      var vectorY = integerBest.Y + deltaY;
+      if (vectorX is < _VECTOR_LOW or > _VECTOR_HIGH || vectorY is < _VECTOR_LOW or > _VECTOR_HIGH)
+        continue;
+
+      var cost = _QuarterSampleCost(
+        sourcePlane, sourceStride, sourceOrigin, plane, stride, origin, width, height,
+        left, top, vectorX, vectorY, rounding, bestCost);
+      if (cost >= bestCost)
+        continue;
+
+      bestCost = cost;
+      best = (vectorX, vectorY);
     }
 
     return best;
   }
 
-  /// <summary>
-  /// Absolute difference between a macroblock and the prediction one whole-sample vector offers,
-  /// abandoned as soon as it cannot beat <paramref name="ceiling"/>.
-  /// </summary>
-  private static int _Cost(
+  private static int _IntegerCost(
     byte[] sourcePlane, int sourceStride, int sourceOrigin,
     byte[] plane, int stride, int origin,
     int left, int top, int vectorX, int vectorY, int ceiling) {
@@ -397,12 +384,25 @@ internal sealed class Mpeg4PictureEncoder {
     return cost;
   }
 
+  private static int _QuarterSampleCost(
+    byte[] sourcePlane, int sourceStride, int sourceOrigin,
+    byte[] plane, int stride, int origin, int width, int height,
+    int left, int top, int vectorX, int vectorY, int rounding, int ceiling) {
+    Span<int> prediction = stackalloc int[16 * 16];
+    Mpeg4QuarterSample.Predict(
+      prediction, plane, stride, origin, width, height, left, top, 16, vectorX, vectorY, rounding);
+
+    var cost = 0;
+    for (var y = 0; y < 16 && cost < ceiling; ++y) {
+      var sourceRow = sourceOrigin + (top + y) * sourceStride + left;
+      for (var x = 0; x < 16; ++x)
+        cost += Math.Abs(sourcePlane[sourceRow + x] - prediction[y * 16 + x]);
+    }
+
+    return cost;
+  }
+
   /// <summary>Writes one vector component's difference, folded into the range the f_code states.</summary>
-  /// <remarks>
-  /// Both the vector and the one it is predicted from lie inside the range while their difference
-  /// need not, and 7.6.3 brings the sum back by adding or subtracting a whole range rather than by
-  /// clamping. Folding here is how the far end of the range is reached at all.
-  /// </remarks>
   private void _WriteVectorDifference(int difference) {
     if (difference < _VECTOR_LOW)
       difference += _VECTOR_RANGE;
@@ -412,13 +412,6 @@ internal sealed class Mpeg4PictureEncoder {
     this._WriteVlc(Mpeg4VlcTables.MotionVectorDifference, difference);
   }
 
-  /// <summary>The median of the three candidate predictors of Figure 7-8.</summary>
-  /// <remarks>
-  /// Every macroblock this encoder writes carries one vector, so the four per-block entries of a
-  /// macroblock are equal and Figure 7-8's twelve cases collapse to the three neighbouring
-  /// macroblocks. The validity rules are the decoder's: a candidate outside the picture is not
-  /// there, and one that is missing counts as zero once the median is written out.
-  /// </remarks>
   private int _PredictVector(short[] vectors, int address) {
     var column = address % this._macroblockWidth;
     var row = address / this._macroblockWidth;
@@ -471,20 +464,12 @@ internal sealed class Mpeg4PictureEncoder {
   // B-VOP macroblocks
   // ============================================================================================
 
-  /// <summary>
-  /// Chooses forward, backward or interpolated zero-vector prediction per macroblock and codes the
-  /// residual. The choice is made by sample SSE before quantisation, so B-VOPs genuinely use both
-  /// anchors where their average is the better predictor without needing a motion-search heuristic.
-  /// </summary>
   private void _WriteBidirectionalMacroblock(int address) {
-    // 6.3.7.2: where the following anchor did not code this macroblock, the B-VOP does not carry it
-    // either. Writing one anyway would not merely waste bits -- it would shift every macroblock
-    // after it, because the decoder is not reading a macroblock here at all.
     if (this._anchorMotion != null && this._anchorMotion.IsNotCoded[address])
       return;
 
-    var forward = this._SearchMotion(this._forwardReference!, address);
-    var backward = this._SearchMotion(this._backwardReference!, address);
+    var forward = this._SearchMotion(this._forwardReference!, address, rounding: 0);
+    var backward = this._SearchMotion(this._backwardReference!, address, rounding: 0);
     var type = this._BestBidirectionalType(address, forward, backward);
 
     Span<int> levels = stackalloc int[6 * 64];
@@ -507,8 +492,6 @@ internal sealed class Mpeg4PictureEncoder {
       this._WriteVlc(Mpeg4VlcTables.BidirectionalQuantiserDifference, 0);
     }
 
-    // Only the directions this macroblock actually uses are written, and only those move their
-    // predictor. The order is forward then backward, which is the order they are read in.
     switch (type) {
       case Mpeg4VlcTables.Forward:
         this._WriteBidirectionalVector(forward, isForward: true);
@@ -537,7 +520,6 @@ internal sealed class Mpeg4PictureEncoder {
     }
   }
 
-  /// <summary>Writes one B-VOP vector as the difference from its direction's running predictor.</summary>
   private void _WriteBidirectionalVector((int X, int Y) vector, bool isForward) {
     ref var predictorX = ref (isForward ? ref this._forwardPredictorX : ref this._backwardPredictorX);
     ref var predictorY = ref (isForward ? ref this._forwardPredictorY : ref this._backwardPredictorY);
@@ -614,11 +596,6 @@ internal sealed class Mpeg4PictureEncoder {
       levels[index] = _NearestH263Level(coefficients[index], this._quantiser);
   }
 
-  /// <summary>
-  /// Inverts the decoder's H.263 reconstruction by choosing the nearest level that reconstruction
-  /// can actually produce. Level zero is special, so the candidate around the algebraic inverse is
-  /// compared with zero and its immediate neighbours rather than rounded by a separate formula.
-  /// </summary>
   private static int _NearestH263Level(double coefficient, int quantiser) {
     if (coefficient == 0)
       return 0;
@@ -682,9 +659,6 @@ internal sealed class Mpeg4PictureEncoder {
     var isLuminance = block < 4;
     var dcScaler = Mpeg4Quantisation.DcScaler(this._quantiser, isLuminance);
 
-    // Apply the decoder's predictor once to a zero differential to obtain exactly the predicted level,
-    // then once with the real differential. The second pass overwrites the temporary current-block
-    // state with the final DC; its predictor only reads neighbouring blocks, never the current one.
     Span<int> predicted = stackalloc int[64];
     var fromAbove = this._prediction.PredictsFromAbove(address, block);
     this._prediction.Apply(address, block, predicted, this._quantiser, dcScaler, predictAc: false, fromAbove);
@@ -707,14 +681,9 @@ internal sealed class Mpeg4PictureEncoder {
     var bits = differential > 0 ? differential : differential + (1 << size) - 1;
     this._writer.Write(bits, size);
     if (size > 8)
-      this._writer.Write(1, 1);                            // marker_bit
+      this._writer.Write(1, 1);
   }
 
-  /// <summary>
-  /// Writes non-zero terms through escape type 3. It is longer than Annex B's common rows, but it can
-  /// state every legal (last, run, level) triple directly and keeps this baseline writer independent
-  /// of a second inverse index over the already validated decoder tables.
-  /// </summary>
   private void _WriteCoefficients(ReadOnlySpan<int> levels, Mpeg4VlcTable table, int first) {
     var lastIndex = -1;
     for (var scan = first; scan < 64; ++scan)
@@ -734,12 +703,12 @@ internal sealed class Mpeg4PictureEncoder {
       previous = scan;
 
       this._WriteVlc(table, Mpeg4VlcTables.CoefficientEscape);
-      this._writer.Write(3, 2);                            // escape type 3
-      this._writer.Write(scan == lastIndex ? 1 : 0, 1);  // last
+      this._writer.Write(3, 2);
+      this._writer.Write(scan == lastIndex ? 1 : 0, 1);
       this._writer.Write(run, 6);
-      this._writer.Write(1, 1);                            // marker_bit
+      this._writer.Write(1, 1);
       this._writer.Write(level & 0xFFF, 12);
-      this._writer.Write(1, 1);                            // marker_bit
+      this._writer.Write(1, 1);
     }
   }
 
@@ -768,28 +737,33 @@ internal sealed class Mpeg4PictureEncoder {
   // Planes, prediction and bit output
   // ============================================================================================
 
-  /// <summary>Predicts one block from the forward anchor at a stated vector.</summary>
   private void _PredictForward(Span<int> prediction, int address, int block, int vectorX, int vectorY)
     => this._PredictFrom(prediction, this._forwardReference!, address, block, vectorX, vectorY, this._roundingType);
 
-  /// <summary>Predicts one block from a stated anchor at a stated vector.</summary>
   private void _PredictFrom(
     Span<int> prediction, Mpeg4Frame reference, int address, int block, int vectorX, int vectorY, int rounding) {
     var (plane, stride, origin, width, height) = reference.PlaneOf(block);
     var (left, top) = this._BlockOrigin(address, block);
-    var border = block < 4 ? Mpeg4Frame.Border : Mpeg4Frame.Border / 2;
 
-    // 7.6.2 derives the chrominance vector from the sum of the macroblock's four luminance vectors
-    // through a rounding table, not by halving one of them. For a macroblock carrying a single
-    // vector the sum is four times it, and the table is what decides where the quarter-sample
-    // positions the sum can land are rounded to. Halving instead agrees with the table on only some
-    // vectors, and the disagreement is a colour fringe on moving edges that no luminance comparison
-    // sees -- so the derivation here is the decoder's own routine rather than a restatement of it.
-    var blockVectorX = block < 4 ? vectorX : Mpeg4MotionCompensation.ToChroma(4 * vectorX);
-    var blockVectorY = block < 4 ? vectorY : Mpeg4MotionCompensation.ToChroma(4 * vectorY);
+    if (block < 4) {
+      Span<int> macroblock = stackalloc int[16 * 16];
+      var macroblockLeft = address % this._macroblockWidth * 16;
+      var macroblockTop = address / this._macroblockWidth * 16;
+      Mpeg4QuarterSample.Predict(
+        macroblock, plane, stride, origin, width, height,
+        macroblockLeft, macroblockTop, 16, vectorX, vectorY, rounding);
 
+      var sourceLeft = (block & 1) * 8;
+      var sourceTop = (block >> 1) * 8;
+      for (var y = 0; y < 8; ++y)
+        macroblock.Slice((sourceTop + y) * 16 + sourceLeft, 8).CopyTo(prediction.Slice(y * 8, 8));
+      return;
+    }
+
+    var blockVectorX = Mpeg4QuarterSample.ToChroma(vectorX, vectorX, vectorX, vectorX);
+    var blockVectorY = Mpeg4QuarterSample.ToChroma(vectorY, vectorY, vectorY, vectorY);
     Mpeg4MotionCompensation.PredictHalfSample(
-      prediction, plane, stride, origin, border, width, height, left, top,
+      prediction, plane, stride, origin, Mpeg4Frame.Border / 2, width, height, left, top,
       blockVectorX, blockVectorY, rounding);
   }
 
@@ -890,7 +864,6 @@ internal sealed class Mpeg4PictureEncoder {
     this._writer.Write(code, 8);
   }
 
-  /// <summary>Writes the stuffing bit and ones that align the following start code.</summary>
   private void _NextStartCode() {
     this._writer.Write(0, 1);
     while ((this._writer.BitCount & 7) != 0)
