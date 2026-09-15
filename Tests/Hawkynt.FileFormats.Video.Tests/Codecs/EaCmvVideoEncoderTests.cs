@@ -165,15 +165,23 @@ public sealed class EaCmvVideoEncoderTests {
 
   [Test]
   [Category("Unit")]
-  public void OddDimensionsStayIntraAndFlushEndsTheRunOnce() {
+  public void OddDimensionsStayIntraAsSelfContainedKeyFramesAndFlushEndsTheRunOnce() {
     var picture = _Picture(5, 3, 7);
     var encoder = EaCmvVideoEncoder.Create(_Requested(5, 3));
     encoder.TryEncode(picture, 0, out _);
     encoder.TryEncode(picture, 1, out var packet);
+    var chunks = _Chunks(packet.Data.Span);
+    var header = chunks.Single(static c => c.FourCc == "MVIh");
+    var intra = chunks.Single(static c => c.FourCc == "MVIf");
+    var freshDecoder = EaCmvVideoDecoder.Create(encoder.DescribeStream());
 
     Assert.Multiple(() => {
-      Assert.That(BinaryPrimitives.ReadUInt16LittleEndian(_Chunks(packet.Data.Span).Single().Payload), Is.Zero);
+      Assert.That(BinaryPrimitives.ReadUInt16LittleEndian(intra.Payload), Is.Zero);
+      Assert.That(BinaryPrimitives.ReadUInt16LittleEndian(header.Payload.AsSpan(12)), Is.Zero);
+      Assert.That(BinaryPrimitives.ReadUInt16LittleEndian(header.Payload.AsSpan(14)), Is.EqualTo(256));
       Assert.That(packet.IsKeyFrame, Is.True);
+      Assert.That(freshDecoder.TryDecode(packet, out var decoded), Is.True);
+      Assert.That(decoded.PixelData, Is.EqualTo(picture.PixelData));
       Assert.That(_Chunks(encoder.Flush().Single().Data.Span).Single().FourCc, Is.EqualTo("MVIe"));
       Assert.That(encoder.Flush(), Is.Empty);
       Assert.Throws<InvalidOperationException>(() => encoder.TryEncode(picture, 2, out _));
@@ -182,8 +190,19 @@ public sealed class EaCmvVideoEncoderTests {
 
   [Test]
   [Category("Unit")]
-  public void UnsupportedInputsAreRefusedRatherThanQuantised() {
+  public void FlushWithoutPicturesStillFinishesTheEncoder() {
+    var picture = _Picture(4, 4, 1);
+    var encoder = EaCmvVideoEncoder.Create(_Requested(4, 4));
+
+    Assert.That(encoder.Flush(), Is.Empty);
+    Assert.Throws<InvalidOperationException>(() => encoder.TryEncode(picture, 0, out _));
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void UnsupportedInputsAreRefusedRatherThanQuantisedOrOverflowed() {
     Assert.Throws<NotSupportedException>(() => EaCmvVideoEncoder.Create(_Requested(0, 4)));
+    Assert.Throws<NotSupportedException>(() => EaCmvVideoEncoder.Create(_Requested(ushort.MaxValue, ushort.MaxValue)));
     Assert.Throws<NotSupportedException>(() => EaCmvVideoEncoder.Create(_Requested(4, 4, bitsPerPixel: 16)));
     Assert.Throws<NotSupportedException>(() => EaCmvVideoEncoder.Create(_Requested(4, 4, kind: MediaStreamKind.Audio)));
     Assert.Throws<NotSupportedException>(() => EaCmvVideoEncoder.Create(_Requested(4, 4, frameRate: new Rational(30000, 1001))));
@@ -218,13 +237,17 @@ public sealed class EaCmvVideoEncoderTests {
 
   [Test]
   [Category("Conformance")]
-  public void FFmpegReadsACmvWrittenHere() {
+  public void FFmpegDecodesTheGeneratedInterFrame() {
     FFmpegOracle.RequireAvailable();
 
     var encoder = EaCmvVideoEncoder.Create(_Requested(8, 8));
     var packets = new List<CodedPacket>();
     encoder.TryEncode(_Picture(8, 8, 3), 0, out var first);
     encoder.TryEncode(_Picture(8, 8, 3), 1, out var second);
+    var secondPicture = _Chunks(second.Data.Span).Single(static c => c.FourCc == "MVIf");
+    Assert.That(BinaryPrimitives.ReadUInt16LittleEndian(secondPicture.Payload), Is.EqualTo(1),
+      "the external oracle must reach a generated inter picture, not merely the opening intra picture");
+
     packets.Add(first);
     packets.Add(second);
     packets.AddRange(encoder.Flush());
@@ -233,7 +256,7 @@ public sealed class EaCmvVideoEncoderTests {
 
     try {
       File.WriteAllBytes(path, file);
-      var (decoded, detail) = FFmpegOracle.TryDecodeFirstFrame(path, 8, 8);
+      var (decoded, detail) = FFmpegOracle.TryDecodeFrameCount(path, 8, 8, expectedFrames: 2);
       Assert.That(decoded, Is.True, detail);
     } finally {
       try { File.Delete(path); } catch { /* best effort */ }
