@@ -130,9 +130,9 @@ public sealed class CineFormMultiViewTests {
     const int HEIGHT = 48;
     var encoder = CineFormMultiViewEncoder.Create(_Stream(WIDTH, HEIGHT));
     var source = new RawMultiViewImage([
-      new(_Flat(WIDTH, HEIGHT, 250), 0, qualityRank: 2),
-      new(_Flat(WIDTH, HEIGHT, 500), 1, qualityRank: 1),
-      new(_Flat(WIDTH, HEIGHT, 750), 2, qualityRank: 3),
+      new(_Flat(WIDTH, HEIGHT, 250), 0, QualityRank: 2),
+      new(_Flat(WIDTH, HEIGHT, 500), 1, QualityRank: 1),
+      new(_Flat(WIDTH, HEIGHT, 750), 2, QualityRank: 3),
     ]);
 
     Assert.That(encoder.TryEncode(source, null, out var packet), Is.True);
