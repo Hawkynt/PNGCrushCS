@@ -21,8 +21,10 @@ public static class Lz4Frame {
   /// exactly the input given.
   /// </summary>
   public static byte[] Unpack(ReadOnlySpan<byte> data, int unpackedLength) {
-    if (data.Length < 11 || !data[..Magic.Length].SequenceEqual(Magic) || (data[4] & 195) != 64)
-      throw new InvalidDataException("Not an LZ4 frame this reader accepts.");
+    // FLG: version 01, independent blocks required, reserved bit and dictionary id clear.
+    // Content size and checksums are permitted because this reader can skip them safely.
+    if (data.Length < 11 || !data[..Magic.Length].SequenceEqual(Magic) || (data[4] & 0xE3) != 0x60)
+      throw new InvalidDataException("Not an independent-block LZ4 frame this reader accepts.");
 
     var unpacked = new byte[unpackedLength];
     var at = 7;
