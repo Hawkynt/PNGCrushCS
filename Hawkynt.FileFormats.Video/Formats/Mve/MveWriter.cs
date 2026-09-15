@@ -7,13 +7,25 @@ using Hawkynt.FileFormats.Video;
 
 namespace FileFormat.InterplayMve;
 
-/// <summary>Writes Interplay MVE chunks around the opcode packets exposed by the demuxer.</summary>
+/// <summary>
+/// Writes Interplay MVE chunks around codec opcode streams, keeping every picture's decoding state
+/// in the same video chunk until <c>SEND_BUFFER</c> closes it.
+/// </summary>
+/// <remarks>
+/// This grouping is observable format semantics, not cosmetic muxing. FFmpeg, like Interplay's own
+/// player, remembers DECODING_MAP/VIDEO_DATA while walking a chunk and only learns whether the
+/// reconstructed back buffer is to be displayed when it reaches SEND_BUFFER. Emitting those opcodes
+/// as separate chunks lets the demuxer hand the coded picture to its decoder before the display flag
+/// exists, producing a perfectly parseable file with no displayed frame.
+/// </remarks>
 public sealed class MveWriter : IVideoContainerWriter<MveWriter> {
 
   private static ReadOnlySpan<byte> _Header => "Interplay MVE File\x1A\0\x1A\0\0\x01\x33\x11"u8;
 
   private readonly IReadOnlyList<MediaStreamInfo> _streams;
   private readonly MemoryStream _output = new();
+  private readonly MemoryStream _pendingVideo = new();
+  private bool _pendingHasVideoData;
   private bool _finished;
 
   private MveWriter(IReadOnlyList<MediaStreamInfo> streams, VideoMetadata metadata) {
@@ -24,6 +36,10 @@ public sealed class MveWriter : IVideoContainerWriter<MveWriter> {
       throw new NotSupportedException("MVE needs video stream 0 and optionally one Interplay audio stream at index 1.");
     if ((streams[0].Width & 7) != 0 || (streams[0].Height & 7) != 0 || streams[0].Width <= 0 || streams[0].Height <= 0)
       throw new NotSupportedException("MVE video dimensions are stated in 8-pixel blocks and must be positive multiples of eight.");
+    if (streams[0].Width / 8 > ushort.MaxValue || streams[0].Height / 8 > ushort.MaxValue)
+      throw new NotSupportedException("MVE video dimensions exceed INIT_VIDEO_BUFFERS' 16-bit block counts.");
+    if (streams[0].BitsPerPixel is not (0 or 8 or 16))
+      throw new NotSupportedException("Interplay MVE video is either 8-bit palettised or 16-bit RGB555.");
     if (streams.Count == 2 && (streams[1].Index != 1 || streams[1].Kind != MediaStreamKind.Audio))
       throw new NotSupportedException("MVE's optional second stream is audio at index 1.");
 
@@ -39,19 +55,71 @@ public sealed class MveWriter : IVideoContainerWriter<MveWriter> {
   public static MveWriter Create(IReadOnlyList<MediaStreamInfo> streams, VideoMetadata metadata) => new(streams, metadata);
 
   public void WritePacket(CodedPacket packet) {
-    if (this._finished) throw new InvalidOperationException("MVE writer has already been finished.");
-    if ((uint)packet.StreamIndex >= (uint)this._streams.Count) throw new ArgumentOutOfRangeException(nameof(packet));
-    _ValidateOpcode(packet.Data.Span);
-    var chunkType = packet.StreamIndex == 0 ? MveChunkType.VIDEO : MveChunkType.AUDIO_ONLY;
-    this._WriteChunk(chunkType, packet.Data.Span);
+    if (this._finished)
+      throw new InvalidOperationException("MVE writer has already been finished.");
+    if ((uint)packet.StreamIndex >= (uint)this._streams.Count)
+      throw new ArgumentOutOfRangeException(nameof(packet));
+
+    if (packet.StreamIndex != 0) {
+      _ValidateOpcodeSequence(packet.Data.Span);
+      this._WriteChunk(MveChunkType.AUDIO_ONLY, packet.Data.Span);
+      return;
+    }
+
+    foreach (var opcode in _Opcodes(packet.Data))
+      this._WriteVideoOpcode(opcode.Span);
   }
 
   public byte[] Finish() {
-    if (this._finished) throw new InvalidOperationException("MVE writer has already been finished.");
+    if (this._finished)
+      throw new InvalidOperationException("MVE writer has already been finished.");
     this._finished = true;
+
+    if (this._pendingVideo.Length != 0)
+      this._FlushVideoChunk();
+
     var end = _Opcode(MveOpcodeType.END_OF_STREAM, 0, ReadOnlySpan<byte>.Empty);
     this._WriteChunk(MveChunkType.END, end);
     return this._output.ToArray();
+  }
+
+  private void _WriteVideoOpcode(ReadOnlySpan<byte> opcode) {
+    var type = opcode[2];
+
+    if (type == MveOpcodeType.INIT_VIDEO_BUFFERS)
+      return;
+
+    if (_IsVideoData(type) && this._pendingHasVideoData)
+      this._FlushVideoChunk();
+
+    this._pendingVideo.Write(opcode);
+    if (_IsVideoData(type))
+      this._pendingHasVideoData = true;
+
+    if (type is MveOpcodeType.SEND_BUFFER or MveOpcodeType.END_OF_CHUNK)
+      this._FlushVideoChunk();
+  }
+
+  private void _FlushVideoChunk() {
+    if (this._pendingVideo.Length == 0)
+      return;
+
+    if (this._pendingVideo.Length + 4 > ushort.MaxValue)
+      throw new NotSupportedException(
+        $"The pending MVE video chunk is {this._pendingVideo.Length} bytes before END_OF_CHUNK; MVE chunks are limited to 65,535 bytes.");
+
+    var payload = this._pendingVideo.ToArray();
+    if (!_EndsWithEndOfChunk(payload)) {
+      var end = _Opcode(MveOpcodeType.END_OF_CHUNK, 0, ReadOnlySpan<byte>.Empty);
+      using var chunk = new MemoryStream(payload.Length + end.Length);
+      chunk.Write(payload);
+      chunk.Write(end);
+      payload = chunk.ToArray();
+    }
+
+    this._WriteChunk(MveChunkType.VIDEO, payload);
+    this._pendingVideo.SetLength(0);
+    this._pendingHasVideoData = false;
   }
 
   private void _WriteInitialVideo(MediaStreamInfo video) {
@@ -65,14 +133,20 @@ public sealed class MveWriter : IVideoContainerWriter<MveWriter> {
       ContainerWriterTools.WriteUInt32LittleEndian(payload, checked((uint)duration));
       ContainerWriterTools.WriteUInt16LittleEndian(payload, 1);
     });
+
+    var is16Bit = video.BitsPerPixel == 16;
     var buffers = ContainerWriterTools.Build(payload => {
       ContainerWriterTools.WriteUInt16LittleEndian(payload, checked((ushort)(video.Width / 8)));
       ContainerWriterTools.WriteUInt16LittleEndian(payload, checked((ushort)(video.Height / 8)));
+      if (is16Bit) {
+        ContainerWriterTools.WriteUInt16LittleEndian(payload, 2);
+        ContainerWriterTools.WriteUInt16LittleEndian(payload, 1);
+      }
     });
 
     using var chunk = new MemoryStream();
     chunk.Write(_Opcode(MveOpcodeType.CREATE_TIMER, 0, timer));
-    chunk.Write(_Opcode(MveOpcodeType.INIT_VIDEO_BUFFERS, 0, buffers));
+    chunk.Write(_Opcode(MveOpcodeType.INIT_VIDEO_BUFFERS, is16Bit ? (byte)2 : (byte)0, buffers));
     chunk.Write(_Opcode(MveOpcodeType.END_OF_CHUNK, 0, ReadOnlySpan<byte>.Empty));
     this._WriteChunk(MveChunkType.INIT_VIDEO, chunk.ToArray());
   }
@@ -117,11 +191,43 @@ public sealed class MveWriter : IVideoContainerWriter<MveWriter> {
     return opcode.ToArray();
   }
 
-  private static void _ValidateOpcode(ReadOnlySpan<byte> packet) {
-    if (packet.Length < 4)
-      throw new InvalidDataException("An MVE packet must include its four-byte opcode header.");
-    var length = BinaryPrimitives.ReadUInt16LittleEndian(packet);
-    if (packet.Length != length + 4)
-      throw new InvalidDataException($"MVE opcode says {length} payload bytes but packet carries {packet.Length - 4}.");
+  private static IReadOnlyList<ReadOnlyMemory<byte>> _Opcodes(ReadOnlyMemory<byte> packet) {
+    _ValidateOpcodeSequence(packet.Span);
+    var result = new List<ReadOnlyMemory<byte>>();
+    var at = 0;
+    while (at < packet.Length) {
+      var length = BinaryPrimitives.ReadUInt16LittleEndian(packet.Span[at..]);
+      var total = length + 4;
+      result.Add(packet.Slice(at, total));
+      at += total;
+    }
+    return result;
   }
+
+  private static void _ValidateOpcodeSequence(ReadOnlySpan<byte> packet) {
+    var at = 0;
+    while (at < packet.Length) {
+      if (packet.Length - at < 4)
+        throw new InvalidDataException("An MVE packet ends inside an opcode's four-byte header.");
+      var length = BinaryPrimitives.ReadUInt16LittleEndian(packet[at..]);
+      if (length > packet.Length - at - 4)
+        throw new InvalidDataException(
+          $"MVE opcode at byte {at} says {length} payload bytes but the packet has only {packet.Length - at - 4} left.");
+      at += length + 4;
+    }
+  }
+
+  private static bool _EndsWithEndOfChunk(ReadOnlySpan<byte> packet) {
+    var at = 0;
+    byte lastType = 0xFF;
+    while (at < packet.Length) {
+      var length = BinaryPrimitives.ReadUInt16LittleEndian(packet[at..]);
+      lastType = packet[at + 2];
+      at += length + 4;
+    }
+    return lastType == MveOpcodeType.END_OF_CHUNK;
+  }
+
+  private static bool _IsVideoData(byte type)
+    => type is MveOpcodeType.VIDEO_DATA_06 or MveOpcodeType.VIDEO_DATA_10 or MveOpcodeType.VIDEO_DATA_11;
 }

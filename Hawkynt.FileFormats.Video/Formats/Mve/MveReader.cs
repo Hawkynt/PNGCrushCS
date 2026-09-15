@@ -7,35 +7,31 @@ using FileFormat.Core;
 namespace FileFormat.InterplayMve;
 
 /// <summary>
-/// Splits an Interplay MVE file into the chunks and opcodes it is built from, without reading a
-/// single 8x8 block encoding or a single DPCM delta.
+/// Splits an Interplay MVE file into the chunks and opcodes it is built from, without decoding a
+/// single 8x8 block or audio delta.
 /// </summary>
 /// <remarks>
 /// A file is a twenty-six-byte header and then a flat run of chunks, each an outer four-byte header
-/// (a payload length and a chunk kind — audio, video, or the housekeeping around them) wrapping a
-/// stream of opcodes, each with its own four-byte header (a payload length, a one-byte opcode kind,
-/// and a version byte). Chunk kinds and opcode kinds are two different numbering spaces reusing small
-/// integers, which is why <see cref="MveChunkType"/> and <see cref="MveOpcodeType"/> are kept apart.
+/// wrapping an opcode stream. Chunk kinds and opcode kinds are two different numbering spaces reusing
+/// small integers, which is why <see cref="MveChunkType"/> and <see cref="MveOpcodeType"/> stay apart.
 /// <para/>
-/// A picture is never one opcode. <c>INIT_VIDEO_BUFFERS</c> states the picture size once, near the
-/// start of the file; <c>SET_PALETTE</c> restates the palette, in whole or in part, whenever it
-/// changes; <c>DECODING_MAP</c> states which of sixteen encodings each 8x8 block of the next picture
-/// uses; and only <c>VIDEO_DATA</c> ever produces one, reading the map <c>DECODING_MAP</c> most
-/// recently stated. What a demuxer can say without decoding any of that is which stream each opcode
-/// belongs to and, for <c>VIDEO_DATA</c>, that it is the first one — the rest is <see cref="MveVideoDecoder"/>'s.
+/// Interplay has three video-data opcodes. 0x06 carries its own 16-bit map, 0x10 consumes the most
+/// recent skip and decoding maps, and 0x11 is the normal four-bit-per-block Interplay Video stream.
+/// <c>SEND_BUFFER</c> is retained as codec state too: it is what the original player, FFmpeg and
+/// ScummVM use to distinguish a reconstructed back buffer from a picture actually sent to display.
 /// </remarks>
 internal static class MveReader {
 
   private static readonly byte[] _Signature = "Interplay MVE File\x1A\0"u8.ToArray();
-  private const int _HEADER_LENGTH = 26; // twenty-byte signature, three sixteen-bit parameters
+  private const int _HEADER_LENGTH = 26;
   private const int _CHUNK_HEADER_LENGTH = 4;
   private const int _OPCODE_HEADER_LENGTH = 4;
 
   internal readonly record struct OpcodeHeader(ushort Length, byte Type, byte Version, int PayloadOffset);
 
   internal readonly record struct Summary(
-    int Width, int Height, int VideoFrameCount, bool HasAudio, bool AudioIsStereo, bool AudioIs16Bit,
-    int AudioSampleRate, long FrameDurationMicroseconds);
+    int Width, int Height, int VideoBitsPerPixel, int VideoFrameCount, bool HasAudio,
+    bool AudioIsStereo, bool AudioIs16Bit, int AudioSampleRate, long FrameDurationMicroseconds);
 
   internal static MveContainer Open(ReadOnlyMemory<byte> data) {
     if (data.Length < _HEADER_LENGTH || !data.Span[.._Signature.Length].SequenceEqual(_Signature))
@@ -48,6 +44,7 @@ internal static class MveReader {
       Data = data,
       Width = summary.Width,
       Height = summary.Height,
+      VideoBitsPerPixel = summary.VideoBitsPerPixel,
       VideoFrameCount = summary.VideoFrameCount,
       HasAudio = summary.HasAudio,
       AudioIsStereo = summary.AudioIsStereo,
@@ -60,6 +57,7 @@ internal static class MveReader {
   private static Summary _Summarise(ReadOnlyMemory<byte> data) {
     var width = 0;
     var height = 0;
+    var videoBitsPerPixel = 8;
     var haveSize = false;
     var frames = 0;
     var hasAudio = false;
@@ -73,10 +71,10 @@ internal static class MveReader {
         switch (opcode.Type) {
           case MveOpcodeType.INIT_VIDEO_BUFFERS:
             if (!haveSize)
-              (width, height) = _ReadVideoBufferSize(data.Span, opcode);
+              (width, height, videoBitsPerPixel) = _ReadVideoBufferSize(data.Span, opcode);
             haveSize = true;
             break;
-          case MveOpcodeType.VIDEO_DATA:
+          case MveOpcodeType.SEND_BUFFER:
             ++frames;
             break;
           case MveOpcodeType.INIT_AUDIO_BUFFERS:
@@ -94,38 +92,25 @@ internal static class MveReader {
         "No INIT_VIDEO_BUFFERS opcode (0x05) was found anywhere in the file. Every picture states its "
         + "dimensions in that opcode's chunk and nowhere else, so a file without one cannot be sized.");
 
-    return new(width, height, frames, hasAudio, audioIsStereo, audioIs16Bit, audioSampleRate, frameDuration);
+    return new(width, height, videoBitsPerPixel, frames, hasAudio, audioIsStereo, audioIs16Bit, audioSampleRate, frameDuration);
   }
 
-  /// <summary>
-  /// Reads the picture size — in 8-pixel macroblocks, widened to pixels here — from an
-  /// <c>INIT_VIDEO_BUFFERS</c> opcode.
-  /// </summary>
-  /// <remarks>
-  /// Measured rather than trusted from the format's own published description, which states the two
-  /// fields as pixels: every sample here states them as macroblocks, confirmed by multiplying by eight
-  /// and comparing against ffmpeg's own reported picture size. A true-colour buffer — version 2 with
-  /// its fourth field set — is refused rather than guessed at, since nothing measured this against
-  /// carries one and the format's own documentation says the sixteen-bit block encodings differ in
-  /// ways it does not fully state.
-  /// </remarks>
-  private static (int Width, int Height) _ReadVideoBufferSize(ReadOnlySpan<byte> data, OpcodeHeader opcode) {
+  /// <summary>Reads the picture dimensions and whether version 2 selected the RGB555 true-colour path.</summary>
+  private static (int Width, int Height, int BitsPerPixel) _ReadVideoBufferSize(ReadOnlySpan<byte> data, OpcodeHeader opcode) {
     if (opcode.Length < 4)
       throw new InvalidDataException($"An INIT_VIDEO_BUFFERS opcode is {opcode.Length} bytes, short of the four a picture size needs.");
+    if (opcode.Version >= 2 && opcode.Length < 8)
+      throw new InvalidDataException(
+        $"A version-{opcode.Version} INIT_VIDEO_BUFFERS opcode is {opcode.Length} bytes, short of the eight fields version 2 needs.");
 
     var payload = data.Slice(opcode.PayloadOffset, opcode.Length);
     var widthBlocks = BinaryPrimitives.ReadUInt16LittleEndian(payload);
     var heightBlocks = BinaryPrimitives.ReadUInt16LittleEndian(payload[2..]);
-
-    if (opcode.Length >= 8 && BinaryPrimitives.ReadUInt16LittleEndian(payload[6..]) != 0)
-      throw new NotSupportedException(
-        "INIT_VIDEO_BUFFERS states a true-colour buffer (version 2's fourth field is nonzero). Only the "
-        + "8-bit palettised mode every sample this was built against uses is implemented.");
-
     if (widthBlocks == 0 || heightBlocks == 0)
       throw new InvalidDataException($"INIT_VIDEO_BUFFERS states a picture of {widthBlocks}x{heightBlocks} macroblocks, which has no pixels.");
 
-    return (widthBlocks * 8, heightBlocks * 8);
+    var trueColour = opcode.Version >= 2 && BinaryPrimitives.ReadUInt16LittleEndian(payload[6..]) != 0;
+    return (widthBlocks * 8, heightBlocks * 8, trueColour ? 16 : 8);
   }
 
   private static (bool Stereo, bool Is16Bit, int SampleRate) _ReadAudioInit(ReadOnlySpan<byte> data, OpcodeHeader opcode) {
@@ -138,8 +123,6 @@ internal static class MveReader {
     return ((flags & 1) != 0, (flags & 2) != 0, sampleRate);
   }
 
-  /// <summary>The rate and subdivision <c>CREATE_TIMER</c> states multiply out to a picture's duration
-  /// in microseconds, measured against ffmpeg's own reported frame rate.</summary>
   private static long _ReadTimer(ReadOnlySpan<byte> data, OpcodeHeader opcode) {
     if (opcode.Length < 6)
       throw new InvalidDataException($"A CREATE_TIMER opcode is {opcode.Length} bytes, short of the six its fields need.");
@@ -197,8 +180,7 @@ internal static class MveReader {
     }
   }
 
-  /// <summary>Walks the film's opcodes a second time, handing out the ones a caller can do anything
-  /// with as packets — pictures and palette/map state on stream 0, sound on stream 1.</summary>
+  /// <summary>Hands codec-owned opcodes out as packets without interpreting their block data.</summary>
   internal static IEnumerable<CodedPacket> ReadPackets(MveContainer container) {
     var data = container.Data;
     var audioStreamIndex = container.HasAudio ? 1 : -1;
@@ -212,11 +194,16 @@ internal static class MveReader {
         switch (opcode.Type) {
           case MveOpcodeType.INIT_VIDEO_BUFFERS:
           case MveOpcodeType.SET_PALETTE:
+          case MveOpcodeType.SET_PALETTE_COMPRESSED:
+          case MveOpcodeType.SKIP_MAP:
           case MveOpcodeType.DECODING_MAP:
+          case MveOpcodeType.VIDEO_DATA_06:
+          case MveOpcodeType.VIDEO_DATA_10:
+          case MveOpcodeType.VIDEO_DATA_11:
             yield return new(StreamIndex: 0, Data: _WithHeader(data, opcode));
             break;
 
-          case MveOpcodeType.VIDEO_DATA:
+          case MveOpcodeType.SEND_BUFFER:
             yield return new(
               StreamIndex: 0,
               Data: _WithHeader(data, opcode),
@@ -247,9 +234,6 @@ internal static class MveReader {
     return BinaryPrimitives.ReadUInt16LittleEndian(span.Slice(opcode.PayloadOffset + 4, 2));
   }
 
-  /// <summary>The opcode's own four-byte header, kept in front of the payload — the same reasoning as
-  /// RoQ's chunk header: a packet carries enough for the codec to tell which opcode it is without the
-  /// container saying so twice.</summary>
   private static ReadOnlyMemory<byte> _WithHeader(ReadOnlyMemory<byte> data, OpcodeHeader opcode)
     => data.Slice(opcode.PayloadOffset - _OPCODE_HEADER_LENGTH, _OPCODE_HEADER_LENGTH + opcode.Length);
 }
