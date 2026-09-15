@@ -25,14 +25,12 @@ public sealed class UtVideoT2Decoder : IVideoCodecDecoder<UtVideoT2Decoder> {
 
   private readonly int _width;
   private readonly int _height;
-  private readonly int _streamIndex;
   private readonly UtVideoT2Format _format;
   private byte[][]? _previous;
 
-  private UtVideoT2Decoder(int width, int height, int streamIndex, UtVideoT2Format format) {
+  private UtVideoT2Decoder(int width, int height, UtVideoT2Format format) {
     this._width = width;
     this._height = height;
-    this._streamIndex = streamIndex;
     this._format = format;
   }
 
@@ -62,7 +60,7 @@ public sealed class UtVideoT2Decoder : IVideoCodecDecoder<UtVideoT2Decoder> {
       throw new InvalidDataException(
         $"Video stream {stream.Index} states {format.SliceCount} T2 bands for only {stream.Height} picture rows.");
 
-    return new(stream.Width, stream.Height, stream.Index, format);
+    return new(stream.Width, stream.Height, format);
   }
 
   public bool TryDecode(CodedPacket packet, out RawImage frame) {
@@ -155,10 +153,13 @@ public sealed class UtVideoT2Decoder : IVideoCodecDecoder<UtVideoT2Decoder> {
         var lastRow = this._format.SliceStart(slice + 1, this._height);
         var expectedControl = UtVideoT2Packing.ControlLength(checked((lastRow - firstRow) * stride), delta);
         var storedControl = data.Slice(controlAt, controlSize);
-        ReadOnlySpan<byte> control = compressedControls
-          ? Lz4Block.Unpack(storedControl, expectedControl)
-          : storedControl;
-        if (!compressedControls && control.Length != expectedControl)
+        ReadOnlySpan<byte> control = storedControl;
+        byte[]? unpackedControl = null;
+        if (compressedControls) {
+          unpackedControl = Lz4Block.Unpack(storedControl, expectedControl);
+          control = unpackedControl;
+        }
+        else if (control.Length != expectedControl)
           throw new InvalidDataException(
             $"Ut Video T2 control stream {entry} is {control.Length} bytes where {expectedControl} are required.");
 
