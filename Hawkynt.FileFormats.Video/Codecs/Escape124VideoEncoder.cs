@@ -14,6 +14,7 @@ namespace FileFormat.Codecs;
 /// copied from the previous reconstruction; a wholly unchanged picture uses the eight-byte repeat form.
 /// Escape 124 has no forward reference or B-picture mode, so PTS and DTS are never reordered.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.FFmpeg)]
 public sealed class Escape124VideoEncoder : IVideoCodecEncoder<Escape124VideoEncoder> {
   private static readonly CodecTag _Tag = new(124);
   private const int _SuperblockSide = 8;
