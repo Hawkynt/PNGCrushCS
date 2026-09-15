@@ -4,77 +4,59 @@ using System.IO;
 namespace FileFormat.Codecs.H263;
 
 /// <summary>
-/// Decodes one coded picture: its groups of blocks, its macroblocks and their blocks (ITU-T H.263,
-/// clauses 5.2 through 5.4 and 6.1 through 6.2).
+/// Decodes one H.263-family coded picture: groups, macroblocks, motion prediction and blocks.
 /// </summary>
-/// <remarks>
-/// One of these exists for the length of one picture, because everything it holds is reset by the
-/// next one: the quantiser, the motion vectors every later macroblock's predictor is the median of,
-/// and the reference. A decoder that kept any of them across pictures would still produce a picture,
-/// and it would be wrong from its second frame onward.
-/// <para/>
-/// The group of blocks layer is not a slice layer and does not behave like one. A group's header is
-/// optional for every group but the first, whose header is the picture's, and whether it was present
-/// changes the prediction: the substitution rule of clause 6.1.1 treats the macroblocks above a group
-/// as unavailable only when the group carried a header. So whether each group had one is remembered
-/// rather than assumed, and prediction crosses a group boundary in a stream that omits the headers.
-/// </remarks>
 internal sealed class H263PictureDecoder {
 
-  /// <summary>INTER: predicted, one vector for the whole macroblock (ITU-T H.263, Table 9).</summary>
   private const int _INTER = 0;
-
-  /// <summary>INTER+Q: predicted, and carrying a change to the quantiser.</summary>
   private const int _INTER_WITH_QUANTISER = 1;
-
-  /// <summary>INTER4V: predicted with four vectors, which is the Advanced Prediction mode of Annex F.</summary>
   private const int _INTER_FOUR_VECTORS = 2;
-
-  /// <summary>INTRA: coded on its own.</summary>
   private const int _INTRA = 3;
-
-  /// <summary>INTRA+Q: coded on its own, and carrying a change to the quantiser.</summary>
   private const int _INTRA_WITH_QUANTISER = 4;
-
-  /// <summary>INTER4V+Q: four vectors and a change to the quantiser.</summary>
   private const int _INTER_FOUR_VECTORS_WITH_QUANTISER = 5;
 
-  /// <summary>The group number a picture start code carries (ITU-T H.263, 5.2.3).</summary>
   private const int _PICTURE_GROUP_NUMBER = 0;
-
-  /// <summary>The group number that marks the end of a bitstream rather than a group.</summary>
   private const int _END_OF_SEQUENCE = 31;
-
-  /// <summary>The group number that marks the end of a sub-bitstream (ITU-T H.263, 5.2.3).</summary>
   private const int _END_OF_SUB_BITSTREAM = 30;
+
+  private enum MacroblockKind : byte {
+    Unknown,
+    Skipped,
+    Intra,
+    Inter,
+  }
+
+  private readonly record struct MacroblockPreview(
+    MacroblockKind Kind,
+    int X0, int Y0, int X1, int Y1, int X2, int Y2, int X3, int Y3) {
+
+    internal (int X, int Y) Vector(int block) => block switch {
+      0 => (this.X0, this.Y0),
+      1 => (this.X1, this.Y1),
+      2 => (this.X2, this.Y2),
+      3 => (this.X3, this.Y3),
+      _ => throw new ArgumentOutOfRangeException(nameof(block)),
+    };
+  }
 
   private readonly H263PictureHeader _header;
   private readonly H263Frame _target;
   private readonly H263Frame? _reference;
   private readonly int _macroblockWidth;
   private readonly int _macroblockHeight;
+  private readonly int _motionWidth;
 
-  /// <summary>Each macroblock's vector, in half-pixel units, or zero where clause 6.1.1 says zero.</summary>
+  // One vector per 8x8 luminance block. A 16x16 macroblock simply repeats its one vector four times.
+  // Storing the actual Annex-F grid means the four-vector predictor and OBMC neighbour lookup share
+  // the same state instead of maintaining a second representation beside the baseline path.
   private readonly short[] _vectorX;
-
   private readonly short[] _vectorY;
+  private readonly MacroblockKind[] _macroblockKind;
 
-  /// <summary>Whether the group a macroblock row belongs to opened with a header of its own.</summary>
   private readonly bool[] _groupHasHeader;
-
   private int _quantiser;
-
-  /// <summary>
-  /// The first macroblock of the run being decoded, before which nothing may be predicted from.
-  /// </summary>
-  /// <remarks>
-  /// Zero for an H.263 picture, whose macroblocks are one run from the first to the last, so the
-  /// substitution rules of clause 6.1.1 behave exactly as they did before this existed. A RealVideo
-  /// picture arrives as several independently coded runs — it sends each in its own packet so that
-  /// losing one costs part of a picture rather than all of it — and a run that predicted from the run
-  /// before it would not be independent at all.
-  /// </remarks>
   private int _runStart;
+  private int _runEnd;
 
   private H263PictureDecoder(H263PictureHeader header, H263Frame target, H263Frame? reference) {
     this._header = header;
@@ -82,21 +64,16 @@ internal sealed class H263PictureDecoder {
     this._reference = reference;
     this._macroblockWidth = header.MacroblockWidth;
     this._macroblockHeight = header.MacroblockHeight;
-    this._vectorX = new short[this._macroblockWidth * this._macroblockHeight];
-    this._vectorY = new short[this._macroblockWidth * this._macroblockHeight];
+    this._motionWidth = this._macroblockWidth * 2;
+    this._vectorX = new short[this._motionWidth * this._macroblockHeight * 2];
+    this._vectorY = new short[this._vectorX.Length];
+    this._macroblockKind = new MacroblockKind[this._macroblockWidth * this._macroblockHeight];
     this._groupHasHeader = new bool[this._macroblockHeight];
     this._quantiser = header.Quantiser;
   }
 
-  /// <summary>The picture being reconstructed.</summary>
   internal H263Frame Target => this._target;
 
-  /// <summary>
-  /// Prepares to decode a picture whose header has been read.
-  /// </summary>
-  /// <exception cref="InvalidDataException">
-  /// The picture is predicted and the stream has supplied nothing to predict from.
-  /// </exception>
   internal static H263PictureDecoder BeginPicture(H263PictureHeader header, H263Frame target, H263Frame? reference) {
     ArgumentNullException.ThrowIfNull(header);
     ArgumentNullException.ThrowIfNull(target);
@@ -110,15 +87,14 @@ internal sealed class H263PictureDecoder {
   }
 
   // ============================================================================================
-  // Group of blocks layer — ITU-T H.263, 5.2
+  // Group / RealVideo run layer
   // ============================================================================================
 
-  /// <summary>
-  /// Decodes every macroblock of the picture, taking the group headers that appear between them.
-  /// </summary>
   internal void DecodePicture(ref H263BitReader reader) {
     var count = this._macroblockWidth * this._macroblockHeight;
     var groupRows = this._header.MacroblockRowsPerGroup;
+    this._runStart = 0;
+    this._runEnd = count;
 
     for (var address = 0; address < count; ++address) {
       var row = address / this._macroblockWidth;
@@ -131,21 +107,6 @@ internal sealed class H263PictureDecoder {
     }
   }
 
-  /// <summary>
-  /// Decodes one independently coded run of macroblocks, at a quantiser of its own.
-  /// </summary>
-  /// <remarks>
-  /// For RealVideo, whose pictures are cut into runs that each restate the picture's type and
-  /// quantiser and say which macroblock they begin at and how many they carry. There is no group of
-  /// blocks layer to look for between them: a run ends when its count is exhausted, and the next one
-  /// begins at the next byte of the picture.
-  /// <para/>
-  /// The reconstructed samples land in the same target as every other run of the picture, which is
-  /// what makes the runs pieces of one picture rather than pictures of their own. What does not carry
-  /// across is prediction: <see cref="_runStart"/> makes every macroblock before this run unavailable
-  /// to the vector predictor, so a run decodes to the same samples whether or not the runs before it
-  /// arrived.
-  /// </remarks>
   internal void DecodeRun(ref H263BitReader reader, int firstAddress, int count, int quantiser) {
     var total = this._macroblockWidth * this._macroblockHeight;
     if (firstAddress < 0 || count < 0 || firstAddress > total - count)
@@ -154,9 +115,9 @@ internal sealed class H263PictureDecoder {
 
     this._quantiser = quantiser;
     this._runStart = firstAddress;
+    this._runEnd = firstAddress + count;
 
-    var end = firstAddress + count;
-    for (var address = firstAddress; address < end; ++address)
+    for (var address = firstAddress; address < this._runEnd; ++address)
       this._DecodeMacroblock(ref reader, address);
   }
 
@@ -168,28 +129,22 @@ internal sealed class H263PictureDecoder {
       case _PICTURE_GROUP_NUMBER:
         throw new InvalidDataException(
           $"A picture start code was reached at macroblock row {row} of an H.263 picture that still has "
-          + $"{this._macroblockHeight - row} row(s) to decode. The picture's groups of blocks do not cover it.");
+          + $"{this._macroblockHeight - row} row(s) to decode.");
 
       case _END_OF_SEQUENCE:
       case _END_OF_SUB_BITSTREAM:
         throw new InvalidDataException(
           $"An end-of-sequence code (group number {groupNumber}) was reached at macroblock row {row} of an H.263 "
-          + $"picture that still has {this._macroblockHeight - row} row(s) to decode.");
+          + "picture that has not finished.");
 
       default:
         if (groupNumber != expectedGroupNumber)
           throw new InvalidDataException(
-            $"An H.263 group of blocks states group number {groupNumber} where {expectedGroupNumber} was due. "
-            + "ITU-T H.263 4.2.1 requires the groups of a picture in increasing order with none left out.");
-
+            $"An H.263 group of blocks states group number {groupNumber} where {expectedGroupNumber} was due.");
         break;
     }
 
-    // GFID: the same value in every group of one picture, so that a decoder joining a stream part way
-    // through can tell whether the picture header it missed was the one these groups belong to. This
-    // decoder is handed whole pictures and has the header, so there is nothing here for it to learn.
-    reader.ReadBits(2);
-
+    reader.ReadBits(2); // GFID
     this._quantiser = _ReadQuantiser(ref reader);
     this._groupHasHeader[row] = true;
   }
@@ -198,14 +153,13 @@ internal sealed class H263PictureDecoder {
     var quantiser = reader.ReadBits(5);
     if (quantiser == 0)
       throw new InvalidDataException(
-        "An H.263 group of blocks states GQUANT 0. ITU-T H.263 5.2.6 gives QUANT the range 1 to 31; zero is not a "
-        + "step size and would reconstruct every coefficient as zero.");
+        "An H.263 group of blocks states GQUANT 0. ITU-T H.263 gives QUANT the range 1 to 31.");
 
     return quantiser;
   }
 
   // ============================================================================================
-  // Macroblock layer — ITU-T H.263, 5.3
+  // Macroblock layer
   // ============================================================================================
 
   private void _DecodeMacroblock(ref H263BitReader reader, int address) {
@@ -213,10 +167,9 @@ internal sealed class H263PictureDecoder {
     int chromaPattern;
 
     for (; ; ) {
-      // COD is present in a predicted picture only. A set bit means the macroblock carries nothing at
-      // all: it is the co-located macroblock of the reference, and its vector is zero for the sake of
-      // every later macroblock's predictor (ITU-T H.263, 6.1.1).
       if (!this._header.IsIntra && reader.ReadBit() == 1) {
+        this._macroblockKind[address] = MacroblockKind.Skipped;
+        this._SetMacroblockVector(address, 0, 0);
         this._CopyFromReference(address);
         return;
       }
@@ -225,8 +178,6 @@ internal sealed class H263PictureDecoder {
         ? H263VlcTables.IntraMacroblockType
         : H263VlcTables.PredictedMacroblockType).Read(ref reader);
 
-      // The stuffing code carries no macroblock. Reading it puts the decoder back at the start of a
-      // macroblock, which in a predicted picture means back at a COD bit and not at another MCBPC.
       if (mcbpc == H263VlcTables.McbpcStuffing)
         continue;
 
@@ -235,148 +186,189 @@ internal sealed class H263PictureDecoder {
       break;
     }
 
-    if (macroblockType is _INTER_FOUR_VECTORS or _INTER_FOUR_VECTORS_WITH_QUANTISER)
-      throw new NotSupportedException(
-        $"Macroblock {address} of this H.263 picture states type {macroblockType} (INTER4V"
-        + (macroblockType == _INTER_FOUR_VECTORS_WITH_QUANTISER ? "+Q" : string.Empty)
-        + "), which carries one motion vector for each of the four luminance blocks. Four vectors per macroblock is "
-        + "the Advanced Prediction mode of ITU-T H.263 Annex F, which is not implemented.");
+    var fourVectors = macroblockType is _INTER_FOUR_VECTORS or _INTER_FOUR_VECTORS_WITH_QUANTISER;
+    if (fourVectors && !this._header.UsesAdvancedPrediction)
+      throw new InvalidDataException(
+        $"Macroblock {address} uses INTER4V although this picture did not enable H.263 Annex F Advanced Prediction.");
 
     var isIntra = macroblockType is _INTRA or _INTRA_WITH_QUANTISER;
-
-    // CBPY names the luminance blocks that carry coefficients. An inter macroblock means the
-    // complement of what the table's value states, and reading it uncomplemented leaves exactly the
-    // blocks that were coded as pure prediction — which is a picture, and is wrong.
     var luminancePattern = H263VlcTables.LuminancePattern.Read(ref reader);
     if (!isIntra)
       luminancePattern ^= 0xF;
 
-    if (macroblockType is _INTER_WITH_QUANTISER or _INTRA_WITH_QUANTISER)
+    if (macroblockType is _INTER_WITH_QUANTISER or _INTRA_WITH_QUANTISER or _INTER_FOUR_VECTORS_WITH_QUANTISER)
       this._ApplyQuantiserDifference(ref reader);
 
-    var vectorX = 0;
-    var vectorY = 0;
-    if (!isIntra) {
-      vectorX = this._ReadVector(ref reader, address, horizontal: true);
-      vectorY = this._ReadVector(ref reader, address, horizontal: false);
+    Span<int> vectorX = stackalloc int[4];
+    Span<int> vectorY = stackalloc int[4];
+
+    if (isIntra) {
+      this._macroblockKind[address] = MacroblockKind.Intra;
+      this._SetMacroblockVector(address, 0, 0);
+    } else if (fourVectors) {
+      this._macroblockKind[address] = MacroblockKind.Inter;
+      for (var block = 0; block < 4; ++block) {
+        vectorX[block] = this._ReadVector(ref reader, address, block, horizontal: true);
+        vectorY[block] = this._ReadVector(ref reader, address, block, horizontal: false);
+        this._SetBlockVector(address, block, vectorX[block], vectorY[block]);
+      }
+    } else {
+      this._macroblockKind[address] = MacroblockKind.Inter;
+      vectorX[0] = this._ReadVector(ref reader, address, 0, horizontal: true);
+      vectorY[0] = this._ReadVector(ref reader, address, 0, horizontal: false);
+      vectorX[1] = vectorX[2] = vectorX[3] = vectorX[0];
+      vectorY[1] = vectorY[2] = vectorY[3] = vectorY[0];
+      this._SetMacroblockVector(address, vectorX[0], vectorY[0]);
     }
 
-    // An intra macroblock predicts from nothing, so clause 6.1.1 has the macroblocks after it treat
-    // its vector as zero rather than carrying the last one across it.
-    this._vectorX[address] = (short)(isIntra ? 0 : vectorX);
-    this._vectorY[address] = (short)(isIntra ? 0 : vectorY);
-
     var pattern = (luminancePattern << 2) | chromaPattern;
-    if (isIntra)
+    if (isIntra) {
       this._ReconstructIntra(ref reader, address, pattern);
+      return;
+    }
+
+    if (this._header.UsesAdvancedPrediction)
+      this._ReconstructAdvancedInter(ref reader, address, pattern, vectorX, vectorY);
     else
-      this._ReconstructInter(ref reader, address, pattern, vectorX, vectorY);
+      this._ReconstructInter(ref reader, address, pattern, vectorX[0], vectorY[0]);
   }
 
-  /// <summary>
-  /// Applies DQUANT: a two-bit change to the quantiser (ITU-T H.263, 5.3.6 and Table 13).
-  /// </summary>
-  /// <remarks>
-  /// Clipped rather than refused, because the Recommendation says so in as many words: a value that
-  /// would leave the range one to thirty-one is clipped to the end it left. That makes a stream whose
-  /// encoder relied on the clipping decodable, and it is the only place in this decoder where an
-  /// out-of-range field is not an error.
-  /// </remarks>
   private void _ApplyQuantiserDifference(ref H263BitReader reader) {
     var difference = reader.ReadBits(2) switch { 0 => -1, 1 => -2, 2 => 1, _ => 2 };
-    var quantiser = this._quantiser + difference;
-    this._quantiser = quantiser < 1 ? 1 : quantiser > 31 ? 31 : quantiser;
+    this._quantiser = Math.Clamp(this._quantiser + difference, 1, 31);
   }
 
   // ============================================================================================
-  // Motion vectors — ITU-T H.263, 6.1.1
+  // Motion vectors — baseline, Annex D.2 and Annex F
   // ============================================================================================
 
+  private int _ReadVector(ref H263BitReader reader, int address, int block, bool horizontal) {
+    var predictor = this._PredictVector(address, block, horizontal);
+    var difference = H263VlcTables.MotionVectorDifference.Read(ref reader);
+    return ReconstructVectorComponent(predictor, difference, this._header.UsesExtendedMotionVectorRange);
+  }
+
   /// <summary>
-  /// Reconstructs one component of a macroblock's motion vector from its predictor and the coded
-  /// difference.
+  /// Chooses the member of an H.263 MVD pair for the active component range.
   /// </summary>
   /// <remarks>
-  /// Each code in Table 14 stands for two differences thirty-two whole pixels apart, and the one that
-  /// was meant is whichever puts the vector inside the permitted range of -16 to 15.5. So the
-  /// wraparound below is not a clamp and does not lose anything: it is how the second of the pair is
-  /// reached. Clamping instead would produce a vector nobody coded.
+  /// Baseline wraps every component into -32..31 half-pixels. Annex D.2 instead permits -63..63;
+  /// when the predictor itself is outside the baseline interval, only a result that crosses the far
+  /// extended boundary wraps by sixty-four. This is the asymmetric boundary rule in Annex D.2, not
+  /// a clamp and not a wider sign extension.
   /// </remarks>
-  private int _ReadVector(ref H263BitReader reader, int address, bool horizontal) {
-    var predictor = this._PredictVector(address, horizontal);
-    var vector = predictor + H263VlcTables.MotionVectorDifference.Read(ref reader);
+  internal static int ReconstructVectorComponent(int predictor, int difference, bool extendedRange) {
+    var vector = predictor + difference;
 
-    if (vector < -32)
+    if (!extendedRange) {
+      if (vector < -32)
+        vector += 64;
+      else if (vector > 31)
+        vector -= 64;
+      return vector;
+    }
+
+    if (predictor < -31 && vector < -63)
       vector += 64;
-    else if (vector > 31)
+    else if (predictor > 32 && vector > 63)
       vector -= 64;
 
     return vector;
   }
 
-  /// <summary>
-  /// The median of the three candidate predictors of ITU-T H.263 Figure 12, with the substitutions
-  /// clause 6.1.1 makes at the edges.
-  /// </summary>
-  /// <remarks>
-  /// The four substitution rules are applied in the order the Recommendation gives them, and the
-  /// order matters: the left candidate is zeroed first at the left edge, and only then do the two
-  /// above it take its value at the top edge — so the top-left macroblock predicts from zero rather
-  /// than from whatever the arrays happen to hold. Reversing the two leaves the first macroblock of
-  /// every picture reading vectors that were never coded.
-  /// </remarks>
-  private int _PredictVector(int address, bool horizontal) {
-    var vectors = horizontal ? this._vectorX : this._vectorY;
-    var column = address % this._macroblockWidth;
+  private int _PredictVector(int address, int block, bool horizontal) {
+    var mbX = address % this._macroblockWidth;
+    var mbY = address / this._macroblockWidth;
+    var gridX = mbX * 2 + (block & 1);
+    var gridY = mbY * 2 + (block >> 1);
+
+    var left = this._VectorAt(gridX - 1, gridY, horizontal);
+
+    // Annex F applies the same first-line substitution as 6.1.1 to the two top blocks. A RealVideo
+    // run is a resynchronisation boundary for exactly the same reason as a GOB header: vectors before
+    // it must not influence a run that can be decoded independently.
+    var topBoundary = block < 2 && this._AboveMacroblockUnavailable(address);
+    int above, diagonal;
+    if (topBoundary) {
+      above = left;
+      diagonal = left;
+    } else {
+      above = this._VectorAt(gridX, gridY - 1, horizontal);
+      var diagonalX = block switch {
+        0 => gridX + 2,
+        1 or 2 => gridX + 1,
+        _ => gridX - 1,
+      };
+      diagonal = this._VectorAt(diagonalX, gridY - 1, horizontal);
+    }
+
+    // The above-right candidate outside the right picture boundary is zero. Apply this after the
+    // first-line substitution, as clause 6.1.1 does for the 16x16 case.
+    if ((block is 0 or 1) && (block == 0 ? gridX + 2 : gridX + 1) >= this._motionWidth)
+      diagonal = 0;
+
+    return _Median(left, above, diagonal);
+  }
+
+  private bool _AboveMacroblockUnavailable(int address) {
     var row = address / this._macroblockWidth;
+    return row == 0
+           || (row % this._header.MacroblockRowsPerGroup == 0 && this._groupHasHeader[row])
+           || address - this._macroblockWidth < this._runStart;
+  }
 
-    var atLeftEdge = column == 0;
-    var atRightEdge = column == this._macroblockWidth - 1;
+  private int _VectorAt(int gridX, int gridY, bool horizontal) {
+    if ((uint)gridX >= (uint)this._motionWidth || (uint)gridY >= (uint)(this._macroblockHeight * 2))
+      return 0;
 
-    // The macroblocks above are unavailable at the top of the picture, and at the top of a group of
-    // blocks only when that group opened with a header of its own — an encoder that leaves the
-    // headers out is one whose prediction crosses the boundary.
-    var atTop = row == 0
-                || (row % this._header.MacroblockRowsPerGroup == 0 && this._groupHasHeader[row]);
+    var candidateAddress = (gridY >> 1) * this._macroblockWidth + (gridX >> 1);
+    if (candidateAddress < this._runStart)
+      return 0;
 
-    // A macroblock coded in an earlier run of this picture is not this run's to predict from. For an
-    // H.263 picture the run begins at nought and these tests can never fire, which is why the
-    // behaviour measured against ffmpeg for that codec is untouched.
-    atTop = atTop || address - this._macroblockWidth < this._runStart;
+    var vectors = horizontal ? this._vectorX : this._vectorY;
+    return vectors[gridY * this._motionWidth + gridX];
+  }
 
-    var left = atLeftEdge || address - 1 < this._runStart ? 0 : vectors[address - 1];
-    var above = atTop ? left : vectors[address - this._macroblockWidth];
-    var aboveRight = atTop
-      ? left
-      : atRightEdge ? 0 : vectors[address - this._macroblockWidth + 1];
+  private void _SetMacroblockVector(int address, int x, int y) {
+    for (var block = 0; block < 4; ++block)
+      this._SetBlockVector(address, block, x, y);
+  }
 
-    // Rule 4 comes after rule 3, so a macroblock in the top row at the right edge takes the left
-    // candidate for the one above it and zero for the one above and to the right.
-    if (atRightEdge)
-      aboveRight = 0;
+  private void _SetBlockVector(int address, int block, int x, int y) {
+    var mbX = address % this._macroblockWidth;
+    var mbY = address / this._macroblockWidth;
+    var gridX = mbX * 2 + (block & 1);
+    var gridY = mbY * 2 + (block >> 1);
+    var at = gridY * this._motionWidth + gridX;
+    this._vectorX[at] = checked((short)x);
+    this._vectorY[at] = checked((short)y);
+  }
 
-    return _Median(left, above, aboveRight);
+  private (int X, int Y) _BlockVector(int address, int block) {
+    var mbX = address % this._macroblockWidth;
+    var mbY = address / this._macroblockWidth;
+    var at = (mbY * 2 + (block >> 1)) * this._motionWidth + mbX * 2 + (block & 1);
+    return (this._vectorX[at], this._vectorY[at]);
   }
 
   private static int _Median(int a, int b, int c) {
     if (a > b)
       (a, b) = (b, a);
-
     if (b > c)
       b = c;
-
     return a > b ? a : b;
   }
 
   // ============================================================================================
-  // Reconstruction — ITU-T H.263, 6.2
+  // Reconstruction
   // ============================================================================================
 
   private void _ReconstructIntra(ref H263BitReader reader, int address, int pattern) {
     Span<int> block = stackalloc int[64];
 
     for (var index = 0; index < 6; ++index) {
-      H263BlockDecoder.ReadIntra(ref reader, block, this._quantiser, _IsCoded(pattern, index), this._header.HasWideEscapeLevel);
+      H263BlockDecoder.ReadIntra(
+        ref reader, block, this._quantiser, _IsCoded(pattern, index), this._header.HasWideEscapeLevel);
       this._Store(address, index, block);
     }
   }
@@ -400,17 +392,160 @@ internal sealed class H263PictureDecoder {
     }
   }
 
-  /// <summary>
-  /// Copies a macroblock nothing was coded for out of the reference picture.
-  /// </summary>
-  /// <remarks>
-  /// A macroblock whose COD bit is set is the co-located one of the reference with a zero vector —
-  /// there is no residual and nothing to interpolate, so this is a copy and not a prediction.
-  /// </remarks>
-  private void _CopyFromReference(int address) {
-    this._vectorX[address] = 0;
-    this._vectorY[address] = 0;
+  private void _ReconstructAdvancedInter(
+    ref H263BitReader reader, int address, int pattern, ReadOnlySpan<int> vectorX, ReadOnlySpan<int> vectorY) {
+    var reference = this._reference
+      ?? throw new InvalidDataException("An Advanced Prediction macroblock has no reference picture.");
 
+    Span<int> residual = stackalloc int[6 * 64];
+    residual.Clear();
+    for (var index = 0; index < 6; ++index)
+      if (_IsCoded(pattern, index))
+        H263BlockDecoder.ReadInter(
+          ref reader, residual.Slice(index * 64, 64), this._quantiser, this._header.HasWideEscapeLevel);
+
+    var right = this._PreviewRightMacroblock(reader, address);
+    Span<int> prediction = stackalloc int[64];
+
+    for (var block = 0; block < 4; ++block) {
+      var current = (X: vectorX[block], Y: vectorY[block]);
+      var top = block >= 2
+        ? (X: vectorX[block - 2], Y: vectorY[block - 2])
+        : this._RemoteVector(address - this._macroblockWidth, block + 2, current);
+      var left = (block & 1) != 0
+        ? (X: vectorX[block - 1], Y: vectorY[block - 1])
+        : this._RemoteVector(address - 1, block + 1, current);
+      var rightVector = (block & 1) == 0
+        ? (X: vectorX[block + 1], Y: vectorY[block + 1])
+        : this._RemoteRightVector(right, block - 1, current);
+      var bottom = block < 2
+        ? (X: vectorX[block + 2], Y: vectorY[block + 2])
+        : current;
+
+      var (originX, originY) = this._BlockOrigin(address, block);
+      if (!H263MotionCompensation.TryPredictOverlapped(
+            prediction, reference.Luma, reference.LumaWidth, originX, originY,
+            current.X, current.Y,
+            top.X, top.Y, left.X, left.Y, rightVector.X, rightVector.Y, bottom.X, bottom.Y,
+            this._header.AllowsVectorsOutsidePicture))
+        throw new InvalidDataException(
+          $"Advanced Prediction block {block} of macroblock {address} reaches outside its reference picture.");
+
+      var blockData = residual.Slice(block * 64, 64);
+      for (var i = 0; i < 64; ++i)
+        blockData[i] += prediction[i];
+      this._Store(address, block, blockData);
+    }
+
+    var sumX = vectorX[0] + vectorX[1] + vectorX[2] + vectorX[3];
+    var sumY = vectorY[0] + vectorY[1] + vectorY[2] + vectorY[3];
+    var chromaX = H263MotionCompensation.FourVectorChroma(sumX);
+    var chromaY = H263MotionCompensation.FourVectorChroma(sumY);
+
+    for (var index = 4; index < 6; ++index) {
+      var (plane, width, _) = index == 4
+        ? (reference.Cb, reference.ChromaWidth, reference.ChromaHeight)
+        : (reference.Cr, reference.ChromaWidth, reference.ChromaHeight);
+      var (originX, originY) = this._BlockOrigin(address, index);
+      if (!H263MotionCompensation.TryPredict(
+            prediction, plane, width, originX, originY, chromaX, chromaY,
+            this._header.AllowsVectorsOutsidePicture))
+        throw new InvalidDataException(
+          $"Advanced Prediction chroma block {index} of macroblock {address} reaches outside its reference picture.");
+
+      var blockData = residual.Slice(index * 64, 64);
+      for (var i = 0; i < 64; ++i)
+        blockData[i] += prediction[i];
+      this._Store(address, index, blockData);
+    }
+  }
+
+  /// <summary>
+  /// Peeks only the next macroblock's type and motion vectors. Annex F needs those right-neighbour
+  /// vectors while reconstructing the current block; coefficients remain untouched and the real
+  /// reader is not advanced. This is the bitstream-level reason OBMC cannot simply be bolted onto a
+  /// completed baseline prediction after the fact.
+  /// </summary>
+  private MacroblockPreview? _PreviewRightMacroblock(H263BitReader reader, int address) {
+    if (address + 1 >= this._runEnd || address % this._macroblockWidth + 1 >= this._macroblockWidth)
+      return null;
+
+    var next = address + 1;
+    Span<(int X, int Y)> saved = stackalloc (int X, int Y)[4];
+    for (var block = 0; block < 4; ++block)
+      saved[block] = this._BlockVector(next, block);
+
+    try {
+      int macroblockType;
+      for (; ; ) {
+        if (reader.ReadBit() == 1)
+          return new(MacroblockKind.Skipped, 0, 0, 0, 0, 0, 0, 0, 0);
+
+        var mcbpc = H263VlcTables.PredictedMacroblockType.Read(ref reader);
+        if (mcbpc == H263VlcTables.McbpcStuffing)
+          continue;
+
+        macroblockType = H263VlcTables.TypeOf(mcbpc);
+        break;
+      }
+
+      if (macroblockType is _INTRA or _INTRA_WITH_QUANTISER)
+        return new(MacroblockKind.Intra, 0, 0, 0, 0, 0, 0, 0, 0);
+
+      _ = H263VlcTables.LuminancePattern.Read(ref reader);
+      if (macroblockType is _INTER_WITH_QUANTISER or _INTER_FOUR_VECTORS_WITH_QUANTISER)
+        reader.ReadBits(2);
+
+      Span<int> x = stackalloc int[4];
+      Span<int> y = stackalloc int[4];
+      if (macroblockType is _INTER_FOUR_VECTORS or _INTER_FOUR_VECTORS_WITH_QUANTISER) {
+        for (var block = 0; block < 4; ++block) {
+          x[block] = this._ReadVector(ref reader, next, block, horizontal: true);
+          y[block] = this._ReadVector(ref reader, next, block, horizontal: false);
+          this._SetBlockVector(next, block, x[block], y[block]);
+        }
+      } else {
+        x[0] = this._ReadVector(ref reader, next, 0, horizontal: true);
+        y[0] = this._ReadVector(ref reader, next, 0, horizontal: false);
+        x[1] = x[2] = x[3] = x[0];
+        y[1] = y[2] = y[3] = y[0];
+        this._SetMacroblockVector(next, x[0], y[0]);
+      }
+
+      return new(MacroblockKind.Inter, x[0], y[0], x[1], y[1], x[2], y[2], x[3], y[3]);
+    } finally {
+      for (var block = 0; block < 4; ++block)
+        this._SetBlockVector(next, block, saved[block].X, saved[block].Y);
+    }
+  }
+
+  private (int X, int Y) _RemoteVector(int remoteAddress, int remoteBlock, (int X, int Y) current) {
+    if (remoteAddress < this._runStart || remoteAddress < 0 || remoteAddress >= this._macroblockKind.Length)
+      return current;
+
+    var currentRow = (remoteAddress + (remoteAddress < this._runStart ? 0 : this._macroblockWidth)) / this._macroblockWidth;
+    _ = currentRow;
+
+    return this._macroblockKind[remoteAddress] switch {
+      MacroblockKind.Skipped => (0, 0),
+      MacroblockKind.Inter => this._BlockVector(remoteAddress, remoteBlock),
+      _ => current,
+    };
+  }
+
+  private static (int X, int Y) _RemoteRightVector(
+    MacroblockPreview? preview, int block, (int X, int Y) current) {
+    if (preview is not { } remote)
+      return current;
+
+    return remote.Kind switch {
+      MacroblockKind.Skipped => (0, 0),
+      MacroblockKind.Inter => remote.Vector(block),
+      _ => current,
+    };
+  }
+
+  private void _CopyFromReference(int address) {
     Span<int> prediction = stackalloc int[64];
     for (var index = 0; index < 6; ++index) {
       this._Predict(prediction, address, index, 0, 0);
@@ -421,8 +556,7 @@ internal sealed class H263PictureDecoder {
   private void _Predict(Span<int> prediction, int address, int index, int vectorX, int vectorY) {
     var reference = this._reference
       ?? throw new InvalidDataException(
-        $"Macroblock {address} of this H.263 picture is predicted, but the picture holds no reference to predict "
-        + "from. Decoding must begin at an intra picture.");
+        $"Macroblock {address} is predicted, but the picture holds no reference to predict from.");
 
     var isChroma = index >= 4;
     if (isChroma) {
@@ -441,11 +575,8 @@ internal sealed class H263PictureDecoder {
       return;
 
     throw new InvalidDataException(
-      $"Block {index} of macroblock {address} (column {address % this._macroblockWidth}, row "
-      + $"{address / this._macroblockWidth}) of this H.263 picture has a motion vector of ({vectorX}, {vectorY}) "
-      + $"half-pixels from ({left}, {top}), which reads outside the {planeWidth}x"
-      + $"{referencePlane.Length / planeWidth} reference plane. ITU-T H.263 6.1.1 permits a vector outside the "
-      + "picture only in the Unrestricted Motion Vector mode of Annex D, which this picture does not use.");
+      $"Block {index} of macroblock {address} has a motion vector of ({vectorX}, {vectorY}) half-pixels that reads "
+      + "outside the reference picture.");
   }
 
   private void _Store(int address, int index, ReadOnlySpan<int> samples) {
@@ -456,24 +587,13 @@ internal sealed class H263PictureDecoder {
       var row = (top + y) * width + left;
       for (var x = 0; x < 8; ++x) {
         var value = samples[y * 8 + x];
-        plane[row + x] = (byte)(value < 0 ? 0 : value > 255 ? 255 : value);
+        plane[row + x] = (byte)Math.Clamp(value, 0, 255);
       }
     }
   }
 
-  /// <summary>
-  /// Whether one of a macroblock's six blocks carries coefficients.
-  /// </summary>
-  /// <remarks>
-  /// The pattern is CBPY's four bits above CBPC's two, and in both of them the leftmost bit is the
-  /// lowest-numbered block of ITU-T H.263 Figure 5 — the top-left luminance quadrant for CBPY, and Cb
-  /// for CBPC.
-  /// </remarks>
   private static bool _IsCoded(int pattern, int index) => (pattern & (1 << (5 - index))) != 0;
 
-  /// <summary>
-  /// Where one of a macroblock's six blocks sits in its plane (ITU-T H.263, Figure 5).
-  /// </summary>
   private (int Left, int Top) _BlockOrigin(int address, int index) {
     var column = address % this._macroblockWidth;
     var row = address / this._macroblockWidth;

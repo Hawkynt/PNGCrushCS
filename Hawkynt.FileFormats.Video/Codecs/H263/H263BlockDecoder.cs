@@ -21,19 +21,20 @@ namespace FileFormat.Codecs.H263;
 internal static class H263BlockDecoder {
 
   /// <summary>
-  /// Reads an intra-coded block: an eight-bit DC value and, when the pattern says so, the
-  /// coefficients after it.
+  /// Reads an intra-coded block: a DC value and, when the pattern says so, the coefficients after it.
   /// </summary>
   /// <remarks>
-  /// The DC is a value and not a difference. H.263 has no prediction between the DC coefficients of
-  /// neighbouring blocks — that is the Advanced Intra Coding mode of Annex I, and this decoder
-  /// refuses a picture that asks for it — so nothing has to be threaded from block to block here, and
-  /// a slice boundary resets nothing because there is nothing to reset.
+  /// Ordinary H.263 carries the DC as a literal eight-bit value and predicts nothing between blocks.
+  /// A non-zero RealVideo 1 micro revision instead lets the bit reader supply the first Y/Cb/Cr DC
+  /// values from the run header and the later ones from its predictive VLC. Keeping that syntax in the
+  /// reader leaves the transform, coefficient and macroblock reconstruction shared with H.263 rather
+  /// than cloning the block decoder for one derivative codec.
   /// </remarks>
   internal static void ReadIntra(
     ref H263BitReader reader, scoped Span<int> block, int quantiser, bool hasCoefficients, bool wideEscapeLevel) {
     block.Clear();
-    block[0] = H263Quantisation.DequantiseIntraDc(_ReadIntraDc(ref reader));
+    var dc = _ReadIntraDc(ref reader);
+    block[0] = reader.HasRealVideoPredictiveIntraDc ? dc * 8 : H263Quantisation.DequantiseIntraDc(dc);
 
     if (hasCoefficients)
       _ReadCoefficients(ref reader, block, 0, quantiser, wideEscapeLevel);
@@ -50,17 +51,18 @@ internal static class H263BlockDecoder {
   }
 
   /// <summary>
-  /// Reads INTRADC (ITU-T H.263, 5.4.1).
+  /// Reads the intra DC value selected by the surrounding bitstream.
   /// </summary>
   /// <remarks>
-  /// Two of the two hundred and fifty-six values are not codes. Zero and one hundred and twenty-eight
-  /// are left out because a block full of them would help the coded data look like a start code, and
-  /// the level the second of them would have carried is coded as two hundred and fifty-five instead —
-  /// which is why the dequantisation is not simply eight times the field.
+  /// In baseline H.263 two of the two hundred and fifty-six literal values are not codes. Zero and
+  /// one hundred and twenty-eight are left out because a block full of them would help the coded data
+  /// look like a start code, and the level the second would have carried is coded as 255 instead.
+  /// RealVideo's predictive syntax reconstructs an eight-bit value modulo 256, so those two numeric
+  /// results are valid there and so is 255 itself; none of H.263's literal-field aliases applies.
   /// </remarks>
   private static int _ReadIntraDc(ref H263BitReader reader) {
-    var value = reader.ReadBits(8);
-    if (value is 0 or 128)
+    var value = reader.ReadIntraDc();
+    if (!reader.HasRealVideoPredictiveIntraDc && value is 0 or 128)
       throw new InvalidDataException(
         $"An H.263 intra block states INTRADC {value}, which ITU-T H.263 5.4.1 leaves unused. The level of 1024 that "
         + "128 would have carried is coded as 255 instead.");
