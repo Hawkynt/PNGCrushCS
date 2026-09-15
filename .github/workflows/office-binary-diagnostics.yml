@@ -46,10 +46,24 @@ jobs:
           set -o pipefail
           dotnet build PngCrush.slnx --configuration Release --no-restore -p:EnableWindowsTargeting=true 2>&1 | tee office-binary-build.log
 
+      - name: Run focused legacy Office writer tests
+        working-directory: PNGCrushCS
+        run: >-
+          dotnet test Tests/Hawkynt.FileFormats.Images.Tests/Hawkynt.FileFormats.Images.Tests.csproj
+          --configuration Release
+          --no-build
+          --no-restore
+          -p:EnableWindowsTargeting=true
+          --filter "FullyQualifiedName~FileFormat.Excel.Tests.ExcelBinaryFileTests.Writer_CreatesCompoundBiffWorkbookAndRoundTrips|FullyQualifiedName~FileFormat.Word.Tests.WordBinaryFileTests.Writer_CreatesNativeWordBinaryDocumentAndRoundTrips|FullyQualifiedName~FileFormat.PowerPoint.Tests.PowerPointBinaryPresentationTests.Writer_CreatesCompleteBinaryPresentationAndRoundTrips"
+          --logger "trx;LogFileName=office-binary-focused.trx"
+          --results-directory TestResults
+
       - name: Upload diagnostics
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: office-binary-build-diagnostics
-          path: PNGCrushCS/office-binary-build.log
-          if-no-files-found: error
+          path: |
+            PNGCrushCS/office-binary-build.log
+            PNGCrushCS/TestResults/office-binary-focused.trx
+          if-no-files-found: warn
