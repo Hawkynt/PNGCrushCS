@@ -4,7 +4,8 @@ using System.IO;
 namespace FileFormat.Codecs.DnxHd;
 
 /// <summary>
-/// Decodes one coding unit — for a progressive frame, the whole picture.
+/// Decodes one coding unit — for a progressive or frame-encoded stream, the whole picture; for a
+/// classic interlaced stream, one field.
 /// </summary>
 /// <remarks>
 /// SMPTE ST 2019-1:2016, 7.3 and 8.1. The compressed payload is a run of macroblocks, grouped into
@@ -20,9 +21,6 @@ namespace FileFormat.Codecs.DnxHd;
 /// length of a frame cannot give.
 /// </remarks>
 internal static class DnxHdCodingUnitDecoder {
-
-  /// <summary>The macroblock header, 7.3.1.1: twelve bits, of which the top eleven are the scale.</summary>
-  private const int _MACROBLOCK_HEADER_BITS = 12;
 
   /// <summary>
   /// Which component each block of a 4:2:2 macroblock belongs to, and where it sits — Table 5.
@@ -43,7 +41,8 @@ internal static class DnxHdCodingUnitDecoder {
   /// </summary>
   /// <remarks>
   /// Twelve blocks, interleaved the same way: the three channels' top halves, then the three
-  /// channels' bottom halves.
+  /// channels' bottom halves. Under the RGB format rules these same component indices are R, G and B
+  /// when ACF is clear, or Y′, Cb and Cr when ACF requests the alternate BT.709 representation.
   /// </remarks>
   private static readonly (int Component, int X, int Y)[] _Blocks444 = [
     (0, 0, 0), (0, 8, 0), (1, 0, 0), (1, 8, 0), (2, 0, 0), (2, 8, 0),
@@ -51,7 +50,14 @@ internal static class DnxHdCodingUnitDecoder {
   ];
 
   /// <summary>Decodes the coding unit's macroblocks into the planes.</summary>
-  internal static void Decode(ReadOnlyMemory<byte> unit, DnxHdFrameHeader header, DnxHdPlanes planes) {
+  /// <param name="fieldOffset">First raster row of a classic field coding unit.</param>
+  /// <param name="fieldStep">One for frame coding, two when weaving a classic field coding unit.</param>
+  internal static void Decode(
+    ReadOnlyMemory<byte> unit,
+    DnxHdFrameHeader header,
+    DnxHdPlanes planes,
+    int fieldOffset = 0,
+    int fieldStep = 1) {
     var payload = unit[header.HeaderSize..];
     var bits = new DnxHdBitReader(payload);
     var blocks = header.SubSampling == 2 ? _Blocks444 : _Blocks422;
@@ -61,11 +67,13 @@ internal static class DnxHdCodingUnitDecoder {
     var width = header.WidthInMacroblocks;
     var height = header.HeightInMacroblocks;
 
-    // Table 11: only these two identifiers put a colour-mode flag in the macroblock header.
+    // Table 11: 1256/1270 use ACF in the low header bit; CID 1260 instead prefixes MFF and has a
+    // ten-bit quantisation scale. Every macroblock header remains exactly twelve bits.
     var colourModeFlagged = header.CompressionIdValue is 1256 or 1270;
+    var adaptiveFieldMacroblocks = header.CompressionIdValue == 1260 && header.AdaptiveMacroblocks;
 
-    // 8.2.4 keeps one prediction per component type; three here, since the alpha channel and the
-    // fourth channel of a 4:4:4:4 bitstream are refused before this is reached.
+    // 8.2.4 keeps one prediction per component type; three here, since alpha is refused before this
+    // is reached. Under direct RGB the three predictors simply belong to R, G and B instead.
     var predictions = new int[3];
 
     for (var scanLine = 0; scanLine < height; ++scanLine) {
@@ -73,21 +81,45 @@ internal static class DnxHdCodingUnitDecoder {
       Array.Clear(predictions);
 
       for (var macroblock = 0; macroblock < width; ++macroblock) {
-        var macroblockHeader = bits.Bits(_MACROBLOCK_HEADER_BITS);
+        bool fieldMacroblock;
+        int quantisationScale;
+        int lowBit;
 
-        // 7.3.1.1, Table 11 and Figures 30 and 31: the eleven high bits are always the quantisation
-        // scale factor. The low bit is reserved for most compression identifiers, but for 1256 and
-        // 1270 it is the colour mode of this macroblock — a bitstream flagged as RGB codes each
-        // macroblock either as red, green and blue or as luma and colour difference, and says which
-        // here rather than once for the frame.
-        var quantisationScale = macroblockHeader >> 1;
+        if (adaptiveFieldMacroblocks) {
+          // Figure 32: MFF, ten bits of qsf, one reserved zero bit.
+          fieldMacroblock = bits.Bit() != 0;
+          quantisationScale = bits.Bits(10);
+          lowBit = bits.Bit();
+        } else {
+          // Figures 30/31: eleven bits of qsf, then reserved zero or ACF respectively.
+          fieldMacroblock = false;
+          quantisationScale = bits.Bits(11);
+          lowBit = bits.Bit();
+        }
+
         if (quantisationScale == 0)
           throw new InvalidDataException(
             $"A VC-3 macroblock at scan line {scanLine}, column {macroblock} states a quantisation scale factor of zero, which would make every coefficient of it vanish.");
 
-        if (colourModeFlagged && (macroblockHeader & 1) == 0)
-          throw new NotSupportedException(
-            $"A VC-3 macroblock at scan line {scanLine}, column {macroblock} is coded in RGB mode (compression ID {header.CompressionIdValue}, macroblock colour flag clear). Only the luma and colour-difference mode is read here, and a macroblock of red, green and blue is refused rather than shown as though its channels were luma and chroma.");
+        if (adaptiveFieldMacroblocks && lowBit != 0)
+          throw new InvalidDataException(
+            $"A CID 1260 macroblock at scan line {scanLine}, column {macroblock} sets the reserved low bit of its Figure 32 header.");
+
+        if (colourModeFlagged) {
+          var alternateColour = lowBit != 0;
+
+          // Figure 31 permits ACF=1 only under the RGB format rules and only when the colour volume
+          // is not out-of-band. ACF=0 under CLF=1 is direct RGB; ACF=1 is BT.709 Y′CbCr transformed
+          // back to RGB during final packing. CLF=0/ACF=0 remains ordinary 4:4:4 Y′CbCr.
+          if (alternateColour && (!header.Rgb || header.ColorVolume == 3))
+            throw new InvalidDataException(
+              $"A VC-3 macroblock at scan line {scanLine}, column {macroblock} sets ACF where Coding Control B does not permit the alternate BT.709 colour transform.");
+
+          planes.SetDirectRgbMacroblock(macroblock, scanLine, header.Rgb && !alternateColour);
+        }
+
+        var scanLineY = fieldOffset + scanLine * 16 * fieldStep;
+        var rowStep = fieldStep * (fieldMacroblock ? 2 : 1);
 
         foreach (var (component, x, y) in blocks) {
           var plane = planes.Plane(component);
@@ -95,10 +127,15 @@ internal static class DnxHdCodingUnitDecoder {
           var planeHeight = component == 0 ? planes.Height : planes.ChromaHeight;
           var macroblockWidth = component == 0 ? 16 : chromaMacroblockWidth;
 
+          // An adaptive field macroblock puts the first eight-line block on one field and the second
+          // on the other: their first rows are therefore one raster line apart, with each block then
+          // stepping two rows. Classic field coding instead steps the whole coding unit by two.
+          var blockY = fieldMacroblock ? (y == 0 ? 0 : fieldStep) : y * fieldStep;
+
           decoder.Decode(
             bits, component != 0, quantisationScale, ref predictions[component],
             plane, planeWidth, planeHeight,
-            macroblock * macroblockWidth + x, scanLine * 16 + y);
+            macroblock * macroblockWidth + x, scanLineY + blockY, rowStep);
         }
       }
     }

@@ -4,9 +4,9 @@ namespace FileFormat.Codecs.DnxHd;
 
 /// <summary>The fixed geometry and coding-unit size of one classic DNxHD compression identifier.</summary>
 /// <remarks>
-/// These are the non-variable rows of SMPTE ST 2019-1:2016 Annex C. DNxHR identifiers 1270-1274
-/// deliberately are not represented here: their frame size is computed from the raster rather than
-/// fixed by the identifier.
+/// These are the non-variable rows of SMPTE ST 2019-1:2016 Annex C, including the CID 1260
+/// correction of Amendment 1:2023. DNxHR identifiers 1270-1274 deliberately are not represented
+/// here: their frame size is computed from the raster rather than fixed by the identifier.
 /// </remarks>
 internal sealed class DnxHdProfile {
 
@@ -40,7 +40,7 @@ internal sealed class DnxHdProfile {
     _Add(result, 1256, 1920, 1080, 10, 1_835_008, 1_835_008, is444: true, headerVersion: 2);
     _Add(result, 1258, 960, 720, 8, 212_992, 212_992, headerVersion: 2);
     _Add(result, 1259, 1440, 1080, 8, 417_792, 417_792, headerVersion: 2);
-    _Add(result, 1260, 1440, 1080, 8, 835_584, 417_792, interlaced: true, adaptive: true, headerVersion: 2);
+    _Add(result, 1260, 1440, 1080, 8, 417_792, 417_792, interlaced: true, adaptive: true, headerVersion: 2);
 
     return result;
   }

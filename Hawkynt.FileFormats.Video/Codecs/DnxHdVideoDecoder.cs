@@ -6,12 +6,12 @@ using FileFormat.Core;
 namespace FileFormat.Codecs;
 
 /// <summary>
-/// Decodes Avid DNxHD and DNxHR — SMPTE VC-3 — whose every frame is a whole picture.
+/// Decodes Avid DNxHD and DNxHR — SMPTE VC-3 — whose every frame is independently decodable.
 /// </summary>
 /// <remarks>
-/// Written from SMPTE ST 2019-1:2016, <i>VC-3 Picture Compression and Data Stream Format</i>; the
-/// clause, table and figure numbers cited throughout these files are that document's. Nothing here
-/// is derived from another decoder's source.
+/// Written from SMPTE ST 2019-1:2016, <i>VC-3 Picture Compression and Data Stream Format</i>, and
+/// Amendment 1:2023; the clause, table and figure numbers cited throughout these files are those
+/// documents'. Nothing here is derived from another decoder's source.
 /// <para/>
 /// <b>Intra only, and independently decodable a scan line at a time.</b> There is no reference
 /// handling, nothing held between packets, and within a frame the macroblock scan lines do not
@@ -32,6 +32,11 @@ namespace FileFormat.Codecs;
 /// grows with the picture, and the codec tag in the container is <c>AVdh</c> rather than
 /// <c>AVdn</c>. They differ in the frame header and not below it, so both are read here.
 /// <para/>
+/// <b>Interlaced HD is two forms, both decoded here.</b> Classic CIDs 1241 through 1244 carry one
+/// field per coding unit; FFC identifies the field and the two coding units are woven into one frame.
+/// CID 1260 is the exception corrected by Amendment 1:2023: one frame coding unit, with every
+/// macroblock independently selecting frame or field DCT placement through MFF.
+/// <para/>
 /// <b>Measured against ffmpeg, on the planes, at the coded depth.</b> Frame by frame, plane by
 /// plane, sample by sample, against <c>-pix_fmt yuv422p</c> and <c>yuv422p10le</c> before any
 /// reduction to eight bits — and on the planes rather than on packed colour, because this library
@@ -39,12 +44,10 @@ namespace FileFormat.Codecs;
 /// instead of the decode. What it comes to is in these remarks' closing paragraph.
 /// <para/>
 /// <b>What refuses.</b> A compression identifier Annex C does not define; a header version outside
-/// the three the standard defines; a sample depth code 7.2.3 does not define; an interlaced frame,
-/// whether field-encoded or the one identifier that codes an interlaced frame with adaptive
-/// macroblocks; 4:2:0 sampling; RGB-coded bitstreams; a bitstream carrying an alpha channel; a
-/// macroblock whose quantisation scale factor is zero; and any structure whose stated size does not
-/// fit inside the one containing it. There is no <c>catch</c> here returning a blank, a copied or a
-/// repeated frame.
+/// the three the standard defines; a sample depth code 7.2.3 does not define; 4:2:0 sampling;
+/// DNxHR CID 1270 RGB; a bitstream carrying an alpha channel; a macroblock whose quantisation scale
+/// factor is zero; and any structure whose stated size does not fit inside the one containing it.
+/// There is no <c>catch</c> here returning a blank, a copied or a repeated frame.
 /// </remarks>
 public sealed class DnxHdVideoDecoder : IVideoCodecDecoder<DnxHdVideoDecoder> {
 
@@ -115,15 +118,15 @@ public sealed class DnxHdVideoDecoder : IVideoCodecDecoder<DnxHdVideoDecoder> {
     return new(stream.Width, stream.Height);
   }
 
-  /// <summary>Decodes one frame, which for a progressive stream is one coding unit.</summary>
+  /// <summary>Decodes one frame; classic interlaced frames contain two field coding units.</summary>
   public bool TryDecode(CodedPacket packet, out RawImage frame) {
     var planes = this.DecodePlanes(packet.Data, out var header);
 
     frame = new() {
       Width = header.SamplesPerLine,
-      Height = header.ActiveLines,
+      Height = header.DisplayHeight,
       Format = PixelFormat.Rgb24,
-      PixelData = DnxHdColorConversion.ToRgb24(planes, header.SamplesPerLine, header.ActiveLines, header.ColorVolume),
+      PixelData = DnxHdColorConversion.ToRgb24(planes, header.SamplesPerLine, header.DisplayHeight, header.ColorVolume),
     };
 
     return true;
@@ -144,16 +147,47 @@ public sealed class DnxHdVideoDecoder : IVideoCodecDecoder<DnxHdVideoDecoder> {
     this._RefuseWhatIsNotRead(header);
     this._RefuseUnexpectedSize(header);
 
-    var chromaShift = header.SubSampling == 2 ? 0 : 1;
-    var planes = DnxHdPlanes.Allocate(
-      width: header.WidthInMacroblocks * 16,
-      height: header.HeightInMacroblocks * 16,
-      chromaShift: chromaShift,
-      bitDepth: header.BitDepth);
+    if (!header.FrameEncoded)
+      return this._DecodeFieldPair(unit, header);
 
+    var planes = this._AllocatePlanes(header, header.HeightInMacroblocks * 16);
     DnxHdCodingUnitDecoder.Decode(unit, header, planes);
 
     return planes;
+  }
+
+  /// <summary>Decodes the two coding units of a classic field-encoded DNxHD frame into one raster.</summary>
+  private DnxHdPlanes _DecodeFieldPair(ReadOnlyMemory<byte> packet, DnxHdFrameHeader first) {
+    var profile = DnxHdProfile.Find(first.CompressionIdValue)
+      ?? throw new NotSupportedException(
+        $"A field-encoded VC-3 packet uses compression ID {first.CompressionIdValue}, whose coding-unit size is not fixed by the DNxHD profile.");
+
+    var codingUnitSize = profile.CodingUnitSize;
+    if (packet.Length < codingUnitSize * 2)
+      throw new InvalidDataException(
+        $"A field-encoded VC-3 frame needs two {codingUnitSize}-byte coding units and this packet holds {packet.Length} bytes.");
+
+    var secondUnit = packet.Slice(codingUnitSize, codingUnitSize);
+    var second = DnxHdFrameHeader.Parse(secondUnit.Span);
+    this._RefuseWhatIsNotRead(second);
+    this._RequireMatchingFields(first, second);
+
+    var planes = this._AllocatePlanes(first, first.HeightInMacroblocks * 16 * 2);
+    DnxHdCodingUnitDecoder.Decode(packet[..codingUnitSize], first, planes, first.FieldFrameCount & 1, 2);
+    DnxHdCodingUnitDecoder.Decode(secondUnit, second, planes, second.FieldFrameCount & 1, 2);
+
+    return planes;
+  }
+
+  private DnxHdPlanes _AllocatePlanes(DnxHdFrameHeader header, int codedHeight) {
+    var chromaShift = header.SubSampling == 2 ? 0 : 1;
+
+    return DnxHdPlanes.Allocate(
+      width: header.WidthInMacroblocks * 16,
+      height: Math.Max(codedHeight, header.DisplayHeight),
+      chromaShift: chromaShift,
+      bitDepth: header.BitDepth,
+      rgbFormat: header.Rgb);
   }
 
   /// <summary>
@@ -161,19 +195,11 @@ public sealed class DnxHdVideoDecoder : IVideoCodecDecoder<DnxHdVideoDecoder> {
   /// </summary>
   /// <remarks>
   /// Every one of these is a real part of the standard rather than a defect, and every one of them
-  /// would decode to a picture if it were read as the nearest thing that is implemented — a
-  /// half-height frame for a field-encoded interlaced coding unit, colour planes at the wrong size
-  /// for 4:2:0, a colour cast for an RGB bitstream. Those are the pictures a decoder must not hand
-  /// back, so each is named instead.
+  /// would decode to a picture if it were read as the nearest thing that is implemented — colour
+  /// planes at the wrong size for 4:2:0, transparency silently discarded for alpha. Those are the
+  /// pictures a decoder must not hand back, so each is named instead.
   /// </remarks>
   private void _RefuseWhatIsNotRead(DnxHdFrameHeader header) {
-    // 7.2.5, FFE: a progressive frame is always frame-encoded. An interlaced source is field-encoded
-    // — two coding units to a frame, each half the height — except for compression ID 1260, which is
-    // frame-encoded with macroblocks that choose field or frame coding one at a time (7.2.2, MACF).
-    if (header.InterlacedSource || !header.FrameEncoded || header.AdaptiveMacroblocks)
-      throw new NotSupportedException(
-        $"This VC-3 frame is interlaced (compression ID {header.CompressionIdValue}). Field-encoded coding units and the adaptive macroblock mode of compression ID 1260 are not decoded here, and an interlaced frame is refused rather than returned as a half-height progressive one.");
-
     if (header.SubSampling == 1)
       throw new NotSupportedException(
         $"This VC-3 frame states 4:2:0 sampling (compression ID {header.CompressionIdValue}). Only 4:2:2 and 4:4:4 are decoded here.");
@@ -182,20 +208,52 @@ public sealed class DnxHdVideoDecoder : IVideoCodecDecoder<DnxHdVideoDecoder> {
       throw new InvalidDataException(
         "This VC-3 frame states a sub-sampling control value SMPTE ST 2019-1 7.2.5 does not define.");
 
-    // 7.2.5's colour format flag says a bitstream is coded "using the RGB format rules and tables",
-    // but for the two identifiers that may set it the choice is actually made a macroblock at a time
-    // — 6.3 and Table 6 put the mode in the macroblock header, so a flagged bitstream whose
-    // macroblocks all say luma and colour difference is Y′CbCr throughout. That is what ffmpeg's own
-    // DNxHR 4:4:4 encoder writes, and what a container reports as a Y′CbCr pixel format. So the flag
-    // alone is not grounds for refusing; the per-macroblock mode is checked where it is read, in
-    // <see cref="DnxHdCodingUnitDecoder"/>.
+    // CLF enables the RGB format rules only for 1256/1270; ACF then selects direct RGB or the
+    // alternate BT.709 Y′CbCr representation independently for every macroblock.
     if (header.Rgb && header.CompressionIdValue is not (1256 or 1270))
       throw new InvalidDataException(
         $"This VC-3 frame sets the RGB colour format flag under compression ID {header.CompressionIdValue}, which SMPTE ST 2019-1 7.2.5 permits only for 1256 and 1270.");
 
+    if (header.Rgb && header.CompressionIdValue == 1270)
+      throw new NotSupportedException(
+        "DNxHR RGB (compression ID 1270) is deferred to the DNxHR completion path; this DNxHD change implements CID 1256 RGB only.");
+
     if (header.Alpha)
       throw new NotSupportedException(
-        $"This VC-3 frame carries an alpha channel (compression ID {header.CompressionIdValue}). Its alpha macroblocks are not decoded, and a frame that has them is refused rather than returned with its transparency dropped.");
+        $"This VC-3 frame carries an alpha channel (compression ID {header.CompressionIdValue}). Amendment 1:2023 extends alpha to the HD profile too, so its VC-3-wide alpha decoding path is kept separate rather than silently dropping transparency.");
+
+    if (header.AdaptiveMacroblocks && header.CompressionIdValue != 1260)
+      throw new InvalidDataException(
+        $"This VC-3 frame sets MACF under compression ID {header.CompressionIdValue}, which only compression ID 1260 defines.");
+
+    if (header.CompressionIdValue == 1260 && (!header.FrameEncoded || !header.AdaptiveMacroblocks))
+      throw new InvalidDataException(
+        "Compression ID 1260 must be frame encoded with adaptive macroblock field/frame selection enabled.");
+
+    if (!header.FrameEncoded && !header.InterlacedSource)
+      throw new InvalidDataException(
+        "A field-encoded VC-3 coding unit does not mark its source as interlaced.");
+
+    if (!header.FrameEncoded && header.FieldFrameCount is not (2 or 3))
+      throw new InvalidDataException(
+        $"A field-encoded VC-3 coding unit states FFC={header.FieldFrameCount}; field coding requires FFC 2 or 3.");
+  }
+
+  private static void _RequireMatchingFields(DnxHdFrameHeader first, DnxHdFrameHeader second) {
+    if (second.FrameEncoded
+        || !second.InterlacedSource
+        || second.FieldFrameCount is not (2 or 3)
+        || second.FieldFrameCount == first.FieldFrameCount
+        || second.CompressionIdValue != first.CompressionIdValue
+        || second.SamplesPerLine != first.SamplesPerLine
+        || second.ActiveLines != first.ActiveLines
+        || second.BitDepth != first.BitDepth
+        || second.SubSampling != first.SubSampling
+        || second.Rgb != first.Rgb
+        || second.ColorVolume != first.ColorVolume
+        || second.Alpha != first.Alpha)
+      throw new InvalidDataException(
+        "The two coding units of an interlaced VC-3 frame do not describe complementary fields of the same picture.");
   }
 
   /// <summary>
@@ -207,10 +265,10 @@ public sealed class DnxHdVideoDecoder : IVideoCodecDecoder<DnxHdVideoDecoder> {
   /// A container saying one size and frames saying another is a file cut or repackaged wrongly.
   /// </remarks>
   private void _RefuseUnexpectedSize(DnxHdFrameHeader header) {
-    if (header.SamplesPerLine == this._width && header.ActiveLines == this._height)
+    if (header.SamplesPerLine == this._width && header.DisplayHeight == this._height)
       return;
 
     throw new InvalidDataException(
-      $"A VC-3 frame states a raster of {header.SamplesPerLine}x{header.ActiveLines} in a stream the container describes as {this._width}x{this._height}.");
+      $"A VC-3 frame states a raster of {header.SamplesPerLine}x{header.DisplayHeight} in a stream the container describes as {this._width}x{this._height}.");
   }
 }
