@@ -241,7 +241,9 @@ public sealed class MveVideoEncoder : IVideoCodecEncoder<MveVideoEncoder> {
       return (indices, palette);
     }
 
-    var bgra = frame.ToBgra32();
+    // RawImage conversion may return the caller's own BGRA array unchanged. The quantizer wants
+    // opaque alpha, so copy before normalising alpha rather than mutating caller-owned frame data.
+    var bgra = frame.ToBgra32().AsSpan().ToArray();
     for (var i = 3; i < bgra.Length; i += 4)
       bgra[i] = 255;
     var quantized = ColorQuantizer.Quantize(bgra, checked(this._width * this._height), 256);
