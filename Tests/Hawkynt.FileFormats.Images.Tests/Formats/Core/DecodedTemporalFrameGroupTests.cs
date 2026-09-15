@@ -34,6 +34,18 @@ public sealed class DecodedTemporalFrameGroupTests {
 
   [Test]
   [Category("Unit")]
+  public void RejectsNullRastersWithoutDereferencingThem() {
+    var valid = _Frame(1, 16, 16, PixelFormat.Gray8, 1);
+    var missing = new DecodedFrame(null!, 1, 0);
+
+    Assert.Multiple(() => {
+      Assert.Throws<ArgumentException>(() => new DecodedTemporalFrameGroup([missing, valid]));
+      Assert.Throws<ArgumentException>(() => new DecodedTemporalFrameGroup([valid, missing]));
+    });
+  }
+
+  [Test]
+  [Category("Unit")]
   public void RequiresOneStreamAndOneRasterRepresentationWithinTheTransformGroup() {
     var first = _Frame(1, 64, 48, PixelFormat.Rgb24, 10);
 
