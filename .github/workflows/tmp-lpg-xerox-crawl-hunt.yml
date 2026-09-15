@@ -1,0 +1,142 @@
+name: Temporary Paris distribution crawl hunt
+
+on:
+  push:
+    branches:
+      - research/lpg-paris-oracle
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Probe Xerox directories and historical crawl indexes
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf /tmp/lpg-crawl-hunt
+          mkdir -p /tmp/lpg-crawl-hunt
+          python3 - <<'PY'
+          from __future__ import annotations
+
+          from concurrent.futures import ThreadPoolExecutor, as_completed
+          import json
+          import pathlib
+          import re
+          import urllib.parse
+          import urllib.request
+
+          OUT = pathlib.Path('/tmp/lpg-crawl-hunt')
+          HEADERS = {
+              'User-Agent': 'Mozilla/5.0 LPG-format-research',
+              'Accept': 'text/html,application/json,text/plain;q=0.9,*/*;q=0.8',
+          }
+
+          def get(url: str, timeout: int = 15) -> tuple[int, str, str, bytes]:
+              req = urllib.request.Request(url, headers=HEADERS)
+              with urllib.request.urlopen(req, timeout=timeout) as response:
+                  return response.status, response.geturl(), response.headers.get('content-type', ''), response.read()
+
+          def probe(label: str, url: str) -> tuple[str, str]:
+              safe = re.sub(r'[^A-Za-z0-9_.-]+', '_', label)
+              try:
+                  status, final, ctype, body = get(url)
+                  (OUT / f'{safe}.body').write_bytes(body)
+                  (OUT / f'{safe}.meta.json').write_text(json.dumps({
+                      'url': url, 'status': status, 'final': final,
+                      'content_type': ctype, 'length': len(body),
+                  }, indent=2), encoding='utf-8')
+                  text = body.decode('utf-8', 'replace')
+                  hits = [line[:3000] for line in text.splitlines() if any(token in line.lower() for token in (
+                      'paris', 'xlprint', '.exe', '.zip', '.cab', '.msi', '.iso', '.img', '.pak', '.lpg',
+                      'designer', 'spooler', 'converter', 'install', 'setup', 'driver',
+                  ))]
+                  return label, f'{status} {ctype} {len(body)} -> {final}\n' + '\n'.join(hits[:120])
+              except Exception as exc:
+                  text = f'{type(exc).__name__}: {exc}'
+                  (OUT / f'{safe}.error.txt').write_text(text, encoding='utf-8')
+                  return label, text
+
+          requests: list[tuple[str, str]] = []
+
+          # Xerox's still-live Paris documentation hierarchy: probe plausible sibling trees only.
+          xerox_paths = [
+              'https://download.support.xerox.com/pub/docs/Paris/',
+              'https://download.support.xerox.com/pub/docs/Paris/userdocs/',
+              'https://download.support.xerox.com/pub/docs/Paris/userdocs/any-os/',
+              'https://download.support.xerox.com/pub/docs/Paris/userdocs/any-os/en/',
+              'https://download.support.xerox.com/pub/docs/Paris/drivers/',
+              'https://download.support.xerox.com/pub/docs/Paris/software/',
+              'https://download.support.xerox.com/pub/docs/Paris/utils/',
+              'https://download.support.xerox.com/pub/drivers/Paris/',
+              'https://download.support.xerox.com/pub/drivers/PARIS/',
+              'https://download.support.xerox.com/pub/drivers/paris/',
+              'https://download.support.xerox.com/pub/docs/Paris/README',
+              'https://download.support.xerox.com/pub/docs/Paris/index.html',
+          ]
+          requests.extend((f'xerox_{i:02d}', url) for i, url in enumerate(xerox_paths))
+
+          # Internet Archive CDX exact host prefixes, without the previously over-restrictive timestamp.
+          hosts = [
+              'ftp.XLPrintau.dynip.com', 'XLPrintau.dynip.com',
+              'www.xlprint.com', 'xlprint.com', 'www.paris-software.com', 'paris-software.com',
+          ]
+          for i, host in enumerate(hosts):
+              params = [
+                  ('url', host + '/*'), ('output', 'json'),
+                  ('fl', 'timestamp,original,mimetype,statuscode,digest,length'),
+                  ('filter', 'statuscode:200'), ('collapse', 'urlkey'), ('limit', '5000'),
+              ]
+              requests.append((f'wayback_{i:02d}', 'https://web.archive.org/cdx/search/cdx?' + urllib.parse.urlencode(params)))
+
+          with ThreadPoolExecutor(max_workers=16) as pool:
+              futures = [pool.submit(probe, label, url) for label, url in requests]
+              for future in as_completed(futures):
+                  label, result = future.result()
+                  print(f'\n=== {label} ===\n{result}')
+
+          # Common Crawl: query all available indexes, newest-to-oldest, for the distinctive historical hosts.
+          try:
+              _, _, _, body = get('https://index.commoncrawl.org/collinfo.json', timeout=20)
+              indexes = json.loads(body)
+          except Exception as exc:
+              print('Common Crawl index list failed:', type(exc).__name__, exc)
+              indexes = []
+
+          targets = [
+              'ftp.XLPrintau.dynip.com/*',
+              'XLPrintau.dynip.com/*',
+              'xlprint.com/*',
+          ]
+          cc_requests: list[tuple[str, str]] = []
+          for ii, index in enumerate(indexes):
+              api = index.get('cdx-api') or index.get('cdx_api')
+              if not api:
+                  continue
+              for ti, target in enumerate(targets):
+                  url = api + '?' + urllib.parse.urlencode({
+                      'url': target,
+                      'output': 'json',
+                      'filter': 'status:200',
+                      'collapse': 'urlkey',
+                      'pageSize': '1000',
+                  })
+                  cc_requests.append((f'cc_{ii:03d}_{ti}', url))
+
+          # Avoid hundreds of serial timeouts: parallel calls, short timeout in probe().
+          with ThreadPoolExecutor(max_workers=24) as pool:
+              futures = [pool.submit(probe, label, url) for label, url in cc_requests]
+              for future in as_completed(futures):
+                  label, result = future.result()
+                  if not result.startswith(('HTTPError: HTTP Error 404', 'HTTPError: HTTP Error 403')):
+                      # Only print nonempty or unusual responses; bodies are all preserved in the artifact.
+                      if any(token in result.lower() for token in ('paris', 'xlprint', '.exe', '.zip', '.cab', '.msi', '.iso', '.pak', '.lpg')):
+                          print(f'\n=== {label} ===\n{result}')
+          PY
+
+      - name: Upload crawl responses
+        uses: actions/upload-artifact@v4
+        with:
+          name: lpg-xerox-crawl-hunt
+          path: /tmp/lpg-crawl-hunt
+          if-no-files-found: error
