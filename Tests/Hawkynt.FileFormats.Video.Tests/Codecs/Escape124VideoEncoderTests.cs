@@ -1,9 +1,13 @@
 using System;
 using System.Buffers.Binary;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Security.Cryptography;
 using FileFormat.Core;
+using FileFormat.Rpl;
 using Hawkynt.FileFormats.Video;
+using Hawkynt.FileFormats.Video.Tests;
 
 namespace FileFormat.Codecs.Tests;
 
@@ -158,6 +162,31 @@ public sealed class Escape124VideoEncoderTests {
 
   [Test]
   [Category("Unit")]
+  public void RplOracleClipMatchesTheExternallyDecodedKnownAnswer() {
+    var file = _OracleClip();
+    var digest = Convert.ToHexString(SHA256.HashData(file)).ToLowerInvariant();
+
+    Assert.That(digest, Is.EqualTo("bb27e02f869645a5baea155925e93ef3bb81b5a81a97feca41c6f89b4727a166"));
+  }
+
+  [Test]
+  [Category("Conformance")]
+  public void FFmpegReadsTheKeyDeltaAndRepeatFramesWrittenHere() {
+    FFmpegOracle.RequireAvailable();
+
+    var file = _OracleClip();
+    var path = Path.Combine(Path.GetTempPath(), $"escape124-{Guid.NewGuid():N}.rpl");
+    try {
+      File.WriteAllBytes(path, file);
+      var (decoded, output) = FFmpegOracle.TryDecodeFrameCount(path, 16, 8, 3);
+      Assert.That(decoded, Is.True, output);
+    } finally {
+      try { File.Delete(path); } catch { /* best effort */ }
+    }
+  }
+
+  [Test]
+  [Category("Unit")]
   public void PartialEdgeSuperblocksAreRefusedByTheEncoderToo()
     => Assert.Throws<NotSupportedException>(() => Escape124VideoEncoder.Create(_Stream(10, 8)));
 
@@ -173,6 +202,23 @@ public sealed class Escape124VideoEncoderTests {
     };
 
     Assert.Throws<InvalidDataException>(() => encoder.TryEncode(frame, 0, out _));
+  }
+
+  private static byte[] _OracleClip() {
+    var stream = _Stream(16, 8);
+    var encoder = Escape124VideoEncoder.Create(stream);
+    var first = _Solid(16, 8, 255, 0, 0);
+    var changed = _Split(16, 8, (255, 0, 0), (0, 255, 0));
+    var packets = new List<CodedPacket>(3);
+
+    Assert.That(encoder.TryEncode(first, 0, out var keyFrame), Is.True);
+    Assert.That(encoder.TryEncode(changed, 1, out var deltaFrame), Is.True);
+    Assert.That(encoder.TryEncode(changed, 2, out var repeatFrame), Is.True);
+    packets.Add(keyFrame);
+    packets.Add(deltaFrame);
+    packets.Add(repeatFrame);
+
+    return VideoIO.Mux<RplWriter>([encoder.DescribeStream()], packets);
   }
 
   private static MediaStreamInfo _Stream(int width, int height) => new() {
