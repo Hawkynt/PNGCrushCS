@@ -1,0 +1,52 @@
+name: VMnc README sync
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    if: github.head_ref == 'feature/vmnc-read-write' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+          fetch-depth: 0
+
+      - name: Synchronize VMnc codec documentation
+        shell: python
+        run: |
+          from pathlib import Path
+
+          path = Path('Hawkynt.FileFormats.Video/README.md')
+          text = path.read_text(encoding='utf-8')
+          replacements = {
+              'builds, 70 of them.': 'builds, 71 of them.',
+              'Encoding is a smaller domain than decoding on purpose: 70 codecs of the 100 read can also be written.':
+                  'Encoding is a smaller domain than decoding on purpose: 71 codecs of the 100 read can also be written.',
+              "| VMware Screen Codec / VMware Video | ⚠️ | — | — | `VMnc`; RFB rectangles at 16 and 32 stored bits (a container stating 24 means 32), raw and Hextile, with the AND/XOR cursor sprite composited onto the returned picture and never into the reference canvas. 8-bit indexed screens refused — the codec packet carries no palette to draw them with. Adapted from FFmpeg's LGPL-2.1-or-later decoder | [FFmpeg `vmnc.c`](https://github.com/FFmpeg/FFmpeg/blob/master/libavcodec/vmnc.c) |":
+                  "| VMware Screen Codec / VMware Video | ⚠️ | ✅ | ffmpeg | `VMnc`; persistent RFB framebuffer updates with Raw, CopyRect, RRE, CoRRE and Hextile rectangles, VMware display-mode changes, and colour/alpha cursor state at 8/16/32 stored bits (a container stating 24 means 32). Generic RFB extensions such as TRLE/ZRLE and 8-bit indexed screens remain unsupported, hence partial decode status. The lossless encoder writes 32-bit little-endian true-colour VMnc with WMVi + full Raw keyframes and previous-frame bounding-rectangle Raw deltas; VMnc defines no B/future-reference picture syntax. Original Raw/Hextile decoder lineage adapted from FFmpeg's LGPL-2.1-or-later decoder; additional paths and the encoder are implemented from the published VMnc/RFB wire descriptions | [FFmpeg `vmnc.c`](https://github.com/FFmpeg/FFmpeg/blob/master/libavcodec/vmnc.c) |",
+          }
+
+          for old, new in replacements.items():
+              if old not in text and new not in text:
+                  raise SystemExit(f'Expected README text not found: {old[:80]}')
+              text = text.replace(old, new)
+
+          path.write_text(text, encoding='utf-8')
+
+      - name: Commit synchronized README
+        shell: bash
+        run: |
+          if git diff --quiet -- Hawkynt.FileFormats.Video/README.md; then
+            exit 0
+          fi
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add Hawkynt.FileFormats.Video/README.md
+          git commit -m "Synchronize VMnc video README"
+          git push origin HEAD:${GITHUB_HEAD_REF}
