@@ -213,7 +213,7 @@ public sealed class EaCmvVideoDecoder : IVideoCodecDecoder<EaCmvVideoDecoder> {
       for (var bx = 0; bx < blocksWide; ++bx) {
         var motion = motionBytes[by * blocksWide + bx];
 
-        EaCmvFrame? source;
+        EaCmvFrame source;
         int dx, dy;
 
         if (motion != 0xFF) {
@@ -230,7 +230,7 @@ public sealed class EaCmvVideoDecoder : IVideoCodecDecoder<EaCmvVideoDecoder> {
               "An inter MVIf block references the second-last picture before two previous pictures have been decoded.");
             (dx, dy) = _MotionVector(escape);
           } else {
-            if (escapeAt + _BLOCK * _BLOCK > escapeBytes.Length)
+            if (escapeBytes.Length - escapeAt < _BLOCK * _BLOCK)
               throw new InvalidDataException("An inter MVIf chunk's escape buffer ran out while a raw block still needed its sixteen pixels.");
 
             for (var yy = 0; yy < _BLOCK; ++yy)
