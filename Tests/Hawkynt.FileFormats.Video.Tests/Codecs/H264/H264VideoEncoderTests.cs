@@ -291,7 +291,7 @@ public sealed class H264VideoEncoderTests {
     return new(skipRun, skipRun == 0 ? reader.ReadUnsignedExpGolomb() : null);
   }
 
-  private readonly record struct FirstMacroblockSyntax(ulong SkipRun, ulong? MacroblockType);
+  private readonly record struct FirstMacroblockSyntax(int SkipRun, int? MacroblockType);
 
   private static MediaStreamInfo _Stream(int width, int height)
     => new() {
