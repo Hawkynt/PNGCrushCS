@@ -35,6 +35,7 @@ public sealed class Ffv1Encoder : IVideoCodecEncoder<Ffv1Encoder> {
   private const int _COLOUR_SPACE_RGB = 1;
   private const int _PICTURE_STRUCTURE_PROGRESSIVE = 3;
   private const int _MAX_SLICES_PER_AXIS = 256;
+  private const int _MAX_SLICES = 1024;
   private const int _LARGEST_DEFAULT_SLICE = 360 * 288;
 
   /// <summary>The first half of the standard eight-bit eleven-level quantiser, as runs of equal entries.</summary>
@@ -722,6 +723,9 @@ public sealed class Ffv1Encoder : IVideoCodecEncoder<Ffv1Encoder> {
 
     if (horizontal > _MAX_SLICES_PER_AXIS || vertical > _MAX_SLICES_PER_AXIS)
       throw new NotSupportedException($"A slice grid of {horizontal} by {vertical} is asked for, and {_MAX_SLICES_PER_AXIS} is the most in either direction written here.");
+
+    if ((long)horizontal * vertical > _MAX_SLICES)
+      throw new NotSupportedException($"A slice grid of {horizontal} by {vertical} is asked for, exceeding the {_MAX_SLICES}-slice interoperability limit.");
 
     if (horizontal > width || vertical > height)
       throw new NotSupportedException(
