@@ -10,9 +10,11 @@ namespace FileFormat.Codecs;
 /// SMPTE 370M DVCPRO HD.
 /// </summary>
 /// <remarks>
-/// DV is intra-frame only: every packet is independently decodable and therefore a key frame. The
-/// raster fixes the recording system and frame rate. Standard-definition pictures use the existing
-/// six-block encoder; 720/1080 DVCPRO HD pictures use the separate eight-block DV100 encoder.
+/// DV is intra-frame only: every packet is independently decodable and therefore a key frame.
+/// Standard-definition pictures use the existing six-block encoder; 720/1080 DVCPRO HD pictures use
+/// the separate eight-block DV100 encoder. The recording profile fixes the frame rate. The one raster
+/// that does not identify the rate by itself is 960x720, because SMPTE 370M defines both 60000/1001
+/// and 50 frames/s; callers must state which recording system they want there.
 /// <para/>
 /// Both block layers are cross-checked against FFmpeg's LGPL-2.1-or-later DV encoder. Attribution and
 /// licence details are in <c>Codecs/Dv/THIRD-PARTY-NOTICE.FFmpeg.txt</c>.
@@ -23,6 +25,7 @@ public sealed class DvVideoEncoder : IVideoCodecEncoder<DvVideoEncoder> {
   private static readonly CodecTag _Tag = CodecTag.FromCharacters("dvsd");
 
   private readonly MediaStreamInfo _stream;
+  private readonly DvProfile _rateProfile;
   private readonly int _width;
   private readonly int _height;
   private readonly RawImageColorInfo _colour;
@@ -32,7 +35,8 @@ public sealed class DvVideoEncoder : IVideoCodecEncoder<DvVideoEncoder> {
   private DvProfile? _profile;
   private DvGeometry.Segment[] _segments = [];
 
-  private DvVideoEncoder(MediaStreamInfo stream, Rational frameRate) {
+  private DvVideoEncoder(MediaStreamInfo stream, DvProfile rateProfile, Rational frameRate) {
+    this._rateProfile = rateProfile;
     this._width = stream.Width;
     this._height = stream.Height;
     this._colour = stream.Height > 576 ? RawImageColorInfo.Bt709Limited : RawImageColorInfo.Bt601Limited;
@@ -61,22 +65,53 @@ public sealed class DvVideoEncoder : IVideoCodecEncoder<DvVideoEncoder> {
     if (stream.Kind != MediaStreamKind.Video)
       throw new NotSupportedException("DV can only encode a video stream.");
 
-    var rateProfile = DvProfile.ForRaster(stream.Width, stream.Height)
-      ?? throw new NotSupportedException(
+    DvProfile? first = null;
+    DvProfile? selected = null;
+    var hasDifferentRate = false;
+
+    foreach (var profile in DvProfile.All) {
+      if (profile.Width != stream.Width || profile.Height != stream.Height)
+        continue;
+
+      first ??= profile;
+      if (first != profile
+          && !_SameRate(
+            new Rational(first.FrameRateNumerator, first.FrameRateDenominator),
+            new Rational(profile.FrameRateNumerator, profile.FrameRateDenominator)))
+        hasDifferentRate = true;
+
+      if (stream.FrameRate.IsKnown
+          && stream.FrameRate.Numerator > 0
+          && stream.FrameRate.Denominator > 0
+          && _SameRate(stream.FrameRate, new Rational(profile.FrameRateNumerator, profile.FrameRateDenominator)))
+        selected ??= profile;
+    }
+
+    if (first == null)
+      throw new NotSupportedException(
         $"Video stream {stream.Index} states a picture size of {stream.Width}x{stream.Height}. The implemented DV "
         + "profiles are 720x480, 720x576, DVCPRO HD 1280x1080, 1440x1080 and 960x720; a DV frame is a "
         + "fixed DIF layout, so an arbitrary raster cannot be padded into one.");
 
-    var frameRate = new Rational(rateProfile.FrameRateNumerator, rateProfile.FrameRateDenominator);
-    if (stream.FrameRate.IsKnown
-        && (stream.FrameRate.Numerator <= 0
-            || stream.FrameRate.Denominator <= 0
-            || !_SameRate(stream.FrameRate, frameRate)))
+    if (stream.FrameRate.IsKnown && (stream.FrameRate.Numerator <= 0 || stream.FrameRate.Denominator <= 0))
       throw new NotSupportedException(
-        $"The {rateProfile.Name} profile is fixed at {frameRate} frames/s; stream {stream.Index} requests "
-        + $"{stream.FrameRate} frames/s.");
+        $"DV frame rates must be positive; stream {stream.Index} requests {stream.FrameRate} frames/s.");
 
-    return new(stream, frameRate);
+    if (stream.FrameRate.IsKnown) {
+      if (selected == null)
+        throw new NotSupportedException(
+          $"No {stream.Width}x{stream.Height} DV profile runs at {stream.FrameRate} frames/s. "
+          + $"Supported rate{(hasDifferentRate ? "s" : string.Empty)} for that raster: {_RatesForRaster(stream.Width, stream.Height)}.");
+    } else {
+      if (hasDifferentRate)
+        throw new NotSupportedException(
+          $"The {stream.Width}x{stream.Height} DV raster has more than one recording rate "
+          + $"({_RatesForRaster(stream.Width, stream.Height)}); state FrameRate so the encoder can choose the profile.");
+      selected = first;
+    }
+
+    var frameRate = new Rational(selected.FrameRateNumerator, selected.FrameRateDenominator);
+    return new(stream, selected, frameRate);
   }
 
   public bool TryEncode(RawImage frame, long? presentationTimestamp, out CodedPacket packet) {
@@ -100,9 +135,10 @@ public sealed class DvVideoEncoder : IVideoCodecEncoder<DvVideoEncoder> {
   public MediaStreamInfo DescribeStream() => this._stream;
 
   internal byte[] EncodePlanes(DvPlanes planes, DvSampling sampling) {
-    var profile = DvProfile.ForPicture(planes.Width, planes.Height, sampling)
+    var profile = this._ProfileForPicture(planes.Width, planes.Height, sampling)
       ?? throw new NotSupportedException(
-        $"No implemented DV profile codes a {planes.Width}x{planes.Height} picture at {_SamplingName(sampling)}.");
+        $"No implemented DV profile codes a {planes.Width}x{planes.Height} picture at {_SamplingName(sampling)} "
+        + $"and {this._stream.FrameRate} frames/s.");
 
     if (this._profile != null && this._profile != profile)
       throw new NotSupportedException(
@@ -126,6 +162,18 @@ public sealed class DvVideoEncoder : IVideoCodecEncoder<DvVideoEncoder> {
     }
 
     return frame;
+  }
+
+  private DvProfile? _ProfileForPicture(int width, int height, DvSampling sampling) {
+    foreach (var profile in DvProfile.All)
+      if (profile.Width == width
+          && profile.Height == height
+          && profile.Sampling == sampling
+          && _SameRate(
+            new Rational(profile.FrameRateNumerator, profile.FrameRateDenominator),
+            new Rational(this._rateProfile.FrameRateNumerator, this._rateProfile.FrameRateDenominator)))
+        return profile;
+    return null;
   }
 
   private DvPlanes _Planes(RawImage frame, out DvSampling sampling) {
@@ -163,6 +211,19 @@ public sealed class DvVideoEncoder : IVideoCodecEncoder<DvVideoEncoder> {
       Cb = source.GetPlaneData(1).ToArray(),
       Cr = source.GetPlaneData(2).ToArray(),
     };
+  }
+
+  private static string _RatesForRaster(int width, int height) {
+    var result = string.Empty;
+    foreach (var profile in DvProfile.All) {
+      if (profile.Width != width || profile.Height != height)
+        continue;
+      var rate = new Rational(profile.FrameRateNumerator, profile.FrameRateDenominator).ToString();
+      if (result.Contains(rate, StringComparison.Ordinal))
+        continue;
+      result += result.Length == 0 ? rate : $" or {rate}";
+    }
+    return result;
   }
 
   private static bool _SameRate(Rational left, Rational right)
