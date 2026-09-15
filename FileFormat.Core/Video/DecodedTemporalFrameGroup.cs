@@ -30,6 +30,9 @@ public sealed class DecodedTemporalFrameGroup {
       throw new ArgumentException("A temporal frame group needs at least two presentation frames.", nameof(frames));
 
     var first = materialized[0];
+    if (first.Image is null)
+      throw new ArgumentException("A temporal frame group cannot contain a null raster.", nameof(frames));
+
     this.StreamIndex = first.StreamIndex;
     this.Width = first.Image.Width;
     this.Height = first.Image.Height;
@@ -37,7 +40,8 @@ public sealed class DecodedTemporalFrameGroup {
 
     for (var i = 0; i < materialized.Length; ++i) {
       var frame = materialized[i];
-      ArgumentNullException.ThrowIfNull(frame.Image);
+      if (frame.Image is null)
+        throw new ArgumentException($"Temporal frame {i} has no raster.", nameof(frames));
 
       if (frame.StreamIndex != this.StreamIndex)
         throw new ArgumentException(
