@@ -21,8 +21,10 @@ public sealed class JpegVerb : ICrushOptions {
   [Option("qualities", Default = "75,80,85,90,95", HelpText = "Quality levels to try (comma-separated)")]
   public string Qualities { get; set; } = "75,80,85,90,95";
 
+  // bool? and not bool: a plain bool option is a switch, so `Default = true` could never be
+  // declined — see the note in GifVerb.cs for the mechanism.
   [Option("strip", Default = true, HelpText = "Strip metadata (EXIF, ICC, comments)")]
-  public bool StripMetadata { get; set; } = true;
+  public bool? StripMetadata { get; set; }
 
   [Option("convert", Default = false, HelpText = "Also try other formats")]
   public bool AllowConversion { get; set; } = false;

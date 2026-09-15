@@ -15,7 +15,7 @@ namespace FileFormat.MiniPaint;
 /// order a redefined character set occupies memory. A separate bit inverts the two-colour cells,
 /// so the same bitmap can read either way round.
 /// </remarks>
-[VerifiedBy(ConformanceOracle.Recoil2Png)]
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.IrfanView)]
 public readonly record struct MiniPaintFile
   : IImageFormatReader<MiniPaintFile>, IImageToRawImage<MiniPaintFile>,
     IImageFromRawImage<MiniPaintFile>, IImageFormatWriter<MiniPaintFile> {

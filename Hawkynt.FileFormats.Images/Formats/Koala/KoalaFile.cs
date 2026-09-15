@@ -4,7 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.Koala;
 
 /// <summary>In-memory representation of a Commodore 64 Koala Painter image.</summary>
-[VerifiedBy(ConformanceOracle.Recoil2Png)]
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.IrfanView)]
 public readonly record struct KoalaFile : IImageFormatReader<KoalaFile>, IImageToRawImage<KoalaFile>, IImageFromRawImage<KoalaFile>, IImageFormatWriter<KoalaFile> {
 
   static string IImageFormatMetadata<KoalaFile>.PrimaryExtension => ".koa";

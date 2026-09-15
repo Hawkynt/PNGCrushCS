@@ -11,7 +11,7 @@ namespace FileFormat.VertiZontalInterlacing;
 /// the name refers to: averaged, the pair resolves edges the four-pixel nibbles cannot, and doubles
 /// the luminance steps at the same time.
 /// </remarks>
-[VerifiedBy(ConformanceOracle.Recoil2Png)]
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.IrfanView)]
 public readonly record struct VertiZontalInterlacingFile
   : IImageFormatReader<VertiZontalInterlacingFile>, IImageToRawImage<VertiZontalInterlacingFile>,
     IImageFromRawImage<VertiZontalInterlacingFile>, IImageFormatWriter<VertiZontalInterlacingFile> {

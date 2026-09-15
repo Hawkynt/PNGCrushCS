@@ -43,6 +43,7 @@ namespace FileFormat.Autologic;
 /// record length together and are as specific as a signature.
 /// </remarks>
 [FormatMagicBytes([0xFF, 0x04, 0x00, 0x07])]
+[VerifiedBy(ConformanceOracle.XnView)]
 public readonly record struct AutologicFile
   : IImageFormatReader<AutologicFile>, IImageToRawImage<AutologicFile>,
     IImageFromRawImage<AutologicFile>, IImageFormatWriter<AutologicFile> {

@@ -15,6 +15,7 @@ namespace FileFormat.Portrait;
 /// asking the converter for the pixels back: the first plane came out as red, the second as green and
 /// the third as blue, and the bytes were the ones that went in.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.XnView)]
 public readonly record struct PortraitFile
   : IImageFormatReader<PortraitFile>, IImageToRawImage<PortraitFile>, IImageFromRawImage<PortraitFile>, IImageFormatWriter<PortraitFile> {
 

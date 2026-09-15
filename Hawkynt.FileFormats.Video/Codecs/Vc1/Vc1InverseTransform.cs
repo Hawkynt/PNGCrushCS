@@ -19,8 +19,8 @@ namespace FileFormat.Codecs.Vc1;
 /// </remarks>
 internal static class Vc1InverseTransform {
 
-  /// <summary>The 8-point transform matrix of Figure 157.</summary>
-  private static ReadOnlySpan<int> _T8 => [
+  /// <summary>The 8-point transform matrix of Figure 157, shared with the encoder-side analytical inverse.</summary>
+  internal static ReadOnlySpan<int> Matrix8 => [
     12, 12, 12, 12, 12, 12, 12, 12,
     16, 15, 9, 4, -4, -9, -15, -16,
     16, 6, -6, -16, -16, -6, 6, 16,
@@ -41,6 +41,7 @@ internal static class Vc1InverseTransform {
   /// </remarks>
   internal static void Apply(Span<int> block) {
     Span<int> intermediate = stackalloc int[64];
+    var transform = Matrix8;
 
     // First stage, along the rows: E = (D . T8 + 4) >> 3, so the sum runs down a column of T8.
     for (var row = 0; row < 8; ++row) {
@@ -48,7 +49,7 @@ internal static class Vc1InverseTransform {
       for (var column = 0; column < 8; ++column) {
         var sum = 0;
         for (var k = 0; k < 8; ++k)
-          sum += block[from + k] * _T8[(k * 8) + column];
+          sum += block[from + k] * transform[(k * 8) + column];
 
         intermediate[from + column] = (sum + 4) >> 3;
       }
@@ -61,7 +62,7 @@ internal static class Vc1InverseTransform {
       for (var row = 0; row < 8; ++row) {
         var sum = 0;
         for (var k = 0; k < 8; ++k)
-          sum += intermediate[(k * 8) + column] * _T8[(k * 8) + row];
+          sum += intermediate[(k * 8) + column] * transform[(k * 8) + row];
 
         block[(row * 8) + column] = (sum + 64 + (row >= 4 ? 1 : 0)) >> 7;
       }

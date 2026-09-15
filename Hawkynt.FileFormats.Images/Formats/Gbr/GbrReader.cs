@@ -22,17 +22,7 @@ public static class GbrReader {
     return FromSpan(File.ReadAllBytes(file.FullName));
   }
 
-  public static GbrFile FromStream(Stream stream) {
-    ArgumentNullException.ThrowIfNull(stream);
-    if (stream.CanSeek) {
-      var data = new byte[stream.Length - stream.Position];
-      stream.ReadExactly(data);
-      return FromSpan(data);
-    }
-    using var ms = new MemoryStream();
-    stream.CopyTo(ms);
-    return FromSpan(ms.ToArray());
-  }
+  public static GbrFile FromStream(Stream stream) => FromSpan(StreamBytes.ReadAll(stream));
 
   public static GbrFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

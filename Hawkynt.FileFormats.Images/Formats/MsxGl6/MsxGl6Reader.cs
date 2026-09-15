@@ -16,18 +16,7 @@ public static class MsxGl6Reader {
     return FromSpan(File.ReadAllBytes(file.FullName), MsxGl6File.KindFromExtension(file.Extension));
   }
 
-  public static MsxGl6File FromStream(Stream stream) {
-    ArgumentNullException.ThrowIfNull(stream);
-    if (stream.CanSeek) {
-      var data = new byte[stream.Length - stream.Position];
-      stream.ReadExactly(data);
-      return FromBytes(data);
-    }
-
-    using var ms = new MemoryStream();
-    stream.CopyTo(ms);
-    return FromBytes(ms.ToArray());
-  }
+  public static MsxGl6File FromStream(Stream stream) => FromBytes(StreamBytes.ReadAll(stream));
 
   public static MsxGl6File FromSpan(ReadOnlySpan<byte> data) => FromSpan(data, MsxGl6Kind.Picture);
 

@@ -10,7 +10,7 @@ namespace FileFormat.BoogieDownPaint;
 /// saved. They are told apart by what the file starts with rather than by a version number, because
 /// the earliest of the three has no header at all.
 /// </remarks>
-[VerifiedBy(ConformanceOracle.Recoil2Png)]
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.IrfanView)]
 public readonly record struct BoogieDownPaintFile
   : IImageFormatReader<BoogieDownPaintFile>, IImageToRawImage<BoogieDownPaintFile>,
     IImageFromRawImage<BoogieDownPaintFile>, IImageFormatWriter<BoogieDownPaintFile> {

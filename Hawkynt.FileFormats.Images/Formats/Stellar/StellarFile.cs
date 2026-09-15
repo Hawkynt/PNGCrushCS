@@ -13,7 +13,7 @@ namespace FileFormat.Stellar;
 /// A byte holds two blocks' colours, three bits each, with the brightness bit shared between them.
 /// The two frames interleave at byte granularity rather than being stored one after the other.
 /// </remarks>
-[VerifiedBy(ConformanceOracle.Recoil2Png)]
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.IrfanView)]
 public readonly record struct StellarFile
   : IImageFormatReader<StellarFile>, IImageToRawImage<StellarFile>,
     IImageFromRawImage<StellarFile>, IImageFormatWriter<StellarFile> {

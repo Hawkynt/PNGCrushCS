@@ -12,6 +12,7 @@ namespace FileFormat.NokiaNlm;
 /// It used to be written here as a bare bitmap with no header, locked to 84 by 48. Neither is real:
 /// the header is what tells the size, and the size is whatever the header says.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.XnView)]
 public readonly record struct NokiaNlmFile
   : IImageFormatReader<NokiaNlmFile>, IImageToRawImage<NokiaNlmFile>,
     IImageFromRawImage<NokiaNlmFile>, IImageFormatWriter<NokiaNlmFile> {

@@ -24,6 +24,7 @@ namespace FileFormat.Arf;
 /// height has to be there behind it.
 /// </remarks>
 [FormatMagicBytes([0xBB, 0xBB, 0xBA, 0xAD])]
+[VerifiedBy(ConformanceOracle.XnView)]
 public readonly record struct ArfFile
   : IImageFormatReader<ArfFile>, IImageToRawImage<ArfFile>,
     IImageFromRawImage<ArfFile>, IImageFormatWriter<ArfFile> {

@@ -12,7 +12,7 @@ namespace FileFormat.CocoP11;
 /// Because a pixel is two scanlines tall, consecutive rows share a line of storage: the row index
 /// is rounded down to an even number before it reaches the bitmap.
 /// </remarks>
-[VerifiedBy(ConformanceOracle.Recoil2Png)]
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.IrfanView)]
 public readonly record struct CocoP11File
   : IImageFormatReader<CocoP11File>, IImageToRawImage<CocoP11File>,
     IImageFromRawImage<CocoP11File>, IImageFormatWriter<CocoP11File> {

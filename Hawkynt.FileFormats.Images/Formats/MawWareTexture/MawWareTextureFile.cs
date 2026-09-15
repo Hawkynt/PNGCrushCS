@@ -32,6 +32,7 @@ namespace FileFormat.MawWareTexture;
 /// try a second, and one byte with three zeros behind it is not enough to take a file away from
 /// whatever else it might be.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.XnView)]
 public readonly record struct MawWareTextureFile
   : IImageFormatReader<MawWareTextureFile>, IImageToRawImage<MawWareTextureFile>,
     IImageFromRawImage<MawWareTextureFile>, IImageFormatWriter<MawWareTextureFile> {

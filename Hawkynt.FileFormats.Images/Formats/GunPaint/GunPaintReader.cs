@@ -14,18 +14,7 @@ public static class GunPaintReader {
     return FromBytes(File.ReadAllBytes(file.FullName));
   }
 
-  public static GunPaintFile FromStream(Stream stream) {
-    ArgumentNullException.ThrowIfNull(stream);
-    if (stream.CanSeek) {
-      var data = new byte[stream.Length - stream.Position];
-      stream.ReadExactly(data);
-      return FromBytes(data);
-    }
-
-    using var ms = new MemoryStream();
-    stream.CopyTo(ms);
-    return FromBytes(ms.ToArray());
-  }
+  public static GunPaintFile FromStream(Stream stream) => FromBytes(StreamBytes.ReadAll(stream));
 
   public static GunPaintFile FromSpan(ReadOnlySpan<byte> data) {
     // Some files carry one trailing byte the picture does not use.

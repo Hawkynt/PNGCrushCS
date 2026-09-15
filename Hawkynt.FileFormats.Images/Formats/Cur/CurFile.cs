@@ -10,7 +10,7 @@ namespace FileFormat.Cur;
 /// <summary>In-memory representation of a CUR file.</summary>
 [FormatMagicBytes([0x00, 0x00, 0x02, 0x00])]
 [FormatMimeType("image/vnd.microsoft.icon", "image/x-win-bitmap")]
-[VerifiedBy(ConformanceOracle.ImageMagick)]
+[VerifiedBy(ConformanceOracle.ImageMagick, ConformanceOracle.IrfanView)]
 public sealed class CurFile : IImageFormatReader<CurFile>, IImageToRawImage<CurFile>, IImageFromRawImage<CurFile>, IImageFormatWriter<CurFile>, IMultiImageFileFormat<CurFile> {
 
   static string IImageFormatMetadata<CurFile>.PrimaryExtension => ".cur";

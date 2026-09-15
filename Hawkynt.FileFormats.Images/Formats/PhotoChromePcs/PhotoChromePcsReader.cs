@@ -18,18 +18,7 @@ public static class PhotoChromePcsReader {
     return FromBytes(File.ReadAllBytes(file.FullName));
   }
 
-  public static PhotoChromePcsFile FromStream(Stream stream) {
-    ArgumentNullException.ThrowIfNull(stream);
-    if (stream.CanSeek) {
-      var data = new byte[stream.Length - stream.Position];
-      stream.ReadExactly(data);
-      return FromBytes(data);
-    }
-
-    using var ms = new MemoryStream();
-    stream.CopyTo(ms);
-    return FromBytes(ms.ToArray());
-  }
+  public static PhotoChromePcsFile FromStream(Stream stream) => FromBytes(StreamBytes.ReadAll(stream));
 
   public static PhotoChromePcsFile FromSpan(ReadOnlySpan<byte> data) {
     if (data.Length < 18 || data[0] != 1 || data[1] != 64 || data[2] != 0 || data[3] != 200)

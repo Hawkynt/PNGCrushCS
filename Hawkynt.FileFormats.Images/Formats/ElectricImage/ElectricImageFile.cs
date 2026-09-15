@@ -42,6 +42,7 @@ namespace FileFormat.ElectricImage;
 /// 0x0108. Adobe's ElectricImage Photoshop plug-in was explicitly able to write this picture format,
 /// so authoring a raster here does not require inventing a renderer scene or camera record.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.XnView)]
 public sealed class ElectricImageFile
   : IImageFormatReader<ElectricImageFile>, IImageToRawImage<ElectricImageFile>,
     IImageFromRawImage<ElectricImageFile>, IImageFormatWriter<ElectricImageFile>,

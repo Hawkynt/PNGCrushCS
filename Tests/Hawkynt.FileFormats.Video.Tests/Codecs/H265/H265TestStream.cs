@@ -132,14 +132,15 @@ internal sealed class H265TestStream {
     bool dependentSliceSegments = false,
     bool rangeExtension = false,
     bool crossComponentPrediction = false,
-    int saoOffsetScale = 0) {
+    int saoOffsetScale = 0,
+    bool signDataHiding = true) {
     this._Begin();
     this.Unsigned(0);  // pps_pic_parameter_set_id
     this.Unsigned(0);  // pps_seq_parameter_set_id
     this.Flag(dependentSliceSegments);
     this.Flag(false);  // output_flag_present_flag
     this.Bits(3, 0);   // num_extra_slice_header_bits
-    this.Flag(true);   // sign_data_hiding_enabled_flag
+    this.Flag(signDataHiding); // sign_data_hiding_enabled_flag
     this.Flag(false);  // cabac_init_present_flag
     this.Unsigned(0);  // num_ref_idx_l0_default_active_minus1
     this.Unsigned(0);  // num_ref_idx_l1_default_active_minus1

@@ -24,7 +24,7 @@ namespace FileFormat.Codecs;
 /// A one bit reads a little-endian sixteen-bit word: its low eleven bits are the backward distance and
 /// its high five bits plus one are the number of four-byte groups to reproduce. Back-references may
 /// overlap their destination, so they are expanded byte by byte rather than with a single block copy.
-/// A zero backward distance produces zero bytes, matching the reference decoder's defined defensive
+/// A zero backward distance produces zero-valued bytes, matching the reference decoder's defensive
 /// behaviour.
 /// <para/>
 /// The original codec can mark a stream as compressed and still put a complete uncompressed RGB24

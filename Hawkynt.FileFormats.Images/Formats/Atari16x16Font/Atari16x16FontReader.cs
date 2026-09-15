@@ -14,18 +14,7 @@ public static class Atari16x16FontReader {
     return FromBytes(File.ReadAllBytes(file.FullName));
   }
 
-  public static Atari16x16FontFile FromStream(Stream stream) {
-    ArgumentNullException.ThrowIfNull(stream);
-    if (stream.CanSeek) {
-      var data = new byte[stream.Length - stream.Position];
-      stream.ReadExactly(data);
-      return FromBytes(data);
-    }
-
-    using var ms = new MemoryStream();
-    stream.CopyTo(ms);
-    return FromBytes(ms.ToArray());
-  }
+  public static Atari16x16FontFile FromStream(Stream stream) => FromBytes(StreamBytes.ReadAll(stream));
 
   public static Atari16x16FontFile FromSpan(ReadOnlySpan<byte> data) {
     if (data.Length != Atari16x16FontFile.FileSize)

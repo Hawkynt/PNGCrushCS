@@ -4,6 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.ZeissLsm;
 
 /// <summary>In-memory representation of a Zeiss LSM confocal microscopy image (simplified TIFF-based).</summary>
+[VerifiedBy(ConformanceOracle.XnView)]
 public readonly record struct ZeissLsmFile : IImageFormatReader<ZeissLsmFile>, IImageToRawImage<ZeissLsmFile>, IImageFromRawImage<ZeissLsmFile>, IImageFormatWriter<ZeissLsmFile> {
 
   /// <summary>TIFF magic number for little-endian.</summary>

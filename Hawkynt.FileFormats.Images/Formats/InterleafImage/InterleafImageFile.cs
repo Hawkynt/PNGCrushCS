@@ -18,6 +18,7 @@ namespace FileFormat.InterleafImage;
 /// and refuses anything the header does not account for exactly.
 /// </remarks>
 [FormatMagicBytes([0x89, 0x4F, 0x50, 0x53])]
+[VerifiedBy(ConformanceOracle.XnView)]
 public readonly record struct InterleafImageFile
   : IImageFormatReader<InterleafImageFile>, IImageToRawImage<InterleafImageFile>,
     IImageFromRawImage<InterleafImageFile>, IImageFormatWriter<InterleafImageFile> {

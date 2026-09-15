@@ -10,6 +10,7 @@ namespace FileFormat.Optocat;
 /// The rows are uncompressed. This writer uses the lossless three-sample RGB form at offset 2048.
 /// </remarks>
 [FormatDetectionPriority(999)]
+[VerifiedBy(ConformanceOracle.XnView)]
 public readonly record struct OptocatFile
   : IImageFormatReader<OptocatFile>, IImageToRawImage<OptocatFile>, IImageFromRawImage<OptocatFile>, IImageFormatWriter<OptocatFile> {
 

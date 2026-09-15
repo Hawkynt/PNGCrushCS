@@ -4,7 +4,7 @@ using System.Collections.Generic;
 namespace FileFormat.Codecs.CineForm;
 
 /// <summary>
-/// The single codebook a highpass codeblock's entropy-coded runs and coefficients are read through.
+/// The single codebook a highpass codeblock's entropy-coded runs and coefficients are read and written through.
 /// </summary>
 /// <remarks>
 /// SMPTE ST 2073-1:2017, Annex C.1 (Table C.1) and Annex C.2 (Table C.2), transcribed in full: 264
@@ -18,7 +18,8 @@ namespace FileFormat.Codecs.CineForm;
 /// Every codeword is a prefix code, so trying candidate lengths shortest first and testing the bits
 /// already read against every entry of that length finds the one that matches without ambiguity —
 /// which is what <see cref="TryDecodeRun"/> does, mirroring the sequential <c>getrun()</c> function
-/// Annex G.9 describes the format around.
+/// Annex G.9 describes the format around. The reverse lookup is built from the very same entries so
+/// the writer cannot silently acquire a second, drifting copy of Annex C.
 /// </remarks>
 internal static class CineFormCodebook {
 
@@ -128,14 +129,36 @@ internal static class CineFormCodebook {
   internal const int MinimumCodewordLength = 1;
   internal const int MaximumCodewordLength = 26;
 
-  private static readonly Dictionary<(int Length, uint Code), (int RunCount, int Value)> _Lookup = _Build();
+  private static readonly Dictionary<(int Length, uint Code), (int RunCount, int Value)> _Lookup = _BuildDecode();
+  private static readonly Dictionary<(int RunCount, int Value), (uint Code, int Length)> _EncodeLookup = _BuildEncode();
 
-  private static Dictionary<(int, uint), (int, int)> _Build() {
+  private static Dictionary<(int, uint), (int, int)> _BuildDecode() {
     var table = new Dictionary<(int, uint), (int, int)>(_Entries.Length);
     foreach (var entry in _Entries)
       table[(entry.Length, entry.Code)] = (entry.RunCount, entry.Value);
 
     return table;
+  }
+
+  private static Dictionary<(int, int), (uint, int)> _BuildEncode() {
+    var table = new Dictionary<(int, int), (uint, int)>(_Entries.Length);
+    foreach (var entry in _Entries)
+      table[(entry.RunCount, entry.Value)] = (entry.Code, entry.Length);
+
+    return table;
+  }
+
+  /// <summary>Gets the Annex C codeword for a zero run, a coefficient magnitude or the band-end marker.</summary>
+  internal static bool TryGetCodeword(int runCount, int value, out uint code, out int length) {
+    if (_EncodeLookup.TryGetValue((runCount, value), out var entry)) {
+      code = entry.Code;
+      length = entry.Length;
+      return true;
+    }
+
+    code = 0;
+    length = 0;
+    return false;
   }
 
   /// <summary>

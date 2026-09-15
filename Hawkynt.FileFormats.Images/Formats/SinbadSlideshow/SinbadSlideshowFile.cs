@@ -4,7 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.SinbadSlideshow;
 
 /// <summary>In-memory representation of an Atari ST Sinbad Slideshow image (320x200, 16 colors, 4 planes).</summary>
-[VerifiedBy(ConformanceOracle.Recoil2Png)]
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.IrfanView)]
 public readonly record struct SinbadSlideshowFile : IImageFormatReader<SinbadSlideshowFile>, IImageToRawImage<SinbadSlideshowFile>, IImageFromRawImage<SinbadSlideshowFile>, IImageFormatWriter<SinbadSlideshowFile> {
 
   /// <summary>Image width (always 320).</summary>

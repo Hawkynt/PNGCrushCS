@@ -17,18 +17,7 @@ public static class LViewProReader {
     return FromBytes(File.ReadAllBytes(file.FullName));
   }
 
-  public static LViewProFile FromStream(Stream stream) {
-    ArgumentNullException.ThrowIfNull(stream);
-    if (stream.CanSeek) {
-      var data = new byte[stream.Length - stream.Position];
-      stream.ReadExactly(data);
-      return FromBytes(data);
-    }
-
-    using var ms = new MemoryStream();
-    stream.CopyTo(ms);
-    return FromBytes(ms.ToArray());
-  }
+  public static LViewProFile FromStream(Stream stream) => FromBytes(StreamBytes.ReadAll(stream));
 
   public static LViewProFile FromSpan(ReadOnlySpan<byte> data) {
     if (data.Length <= LViewProFile.HeightAt + 4 || !data[..2].SequenceEqual(LViewProFile.Magic))

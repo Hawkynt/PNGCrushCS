@@ -4,7 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.Neochrome;
 
 /// <summary>In-memory representation of an Atari ST NEOchrome image.</summary>
-[VerifiedBy(ConformanceOracle.Recoil2Png)]
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.IrfanView)]
 public readonly record struct NeochromeFile : IImageFormatReader<NeochromeFile>, IImageToRawImage<NeochromeFile>, IImageFromRawImage<NeochromeFile>, IImageFormatWriter<NeochromeFile> {
 
   internal const ushort VirtualCanvasFlag = 0xBABE;

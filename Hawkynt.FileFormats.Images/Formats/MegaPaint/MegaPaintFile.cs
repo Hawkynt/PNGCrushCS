@@ -4,7 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.MegaPaint;
 
 /// <summary>In-memory representation of an Atari ST MegaPaint monochrome image.</summary>
-[VerifiedBy(ConformanceOracle.Recoil2Png)]
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.IrfanView)]
 public readonly record struct MegaPaintFile : IImageFormatReader<MegaPaintFile>, IImageToRawImage<MegaPaintFile>, IImageFromRawImage<MegaPaintFile>, IImageFormatWriter<MegaPaintFile> {
 
   /// <summary>Header size in bytes: 2 (width) + 2 (height) + 4 (reserved) = 8.</summary>

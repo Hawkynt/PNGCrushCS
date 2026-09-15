@@ -10,7 +10,7 @@ namespace FileFormat.SamCoupeMode4;
 /// line-interrupt records that let the palette change part-way down the screen, and a 0xFF
 /// terminator. We write no interrupt records, so the palette applies to the whole screen.
 /// </remarks>
-[VerifiedBy(ConformanceOracle.Recoil2Png)]
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.IrfanView)]
 public readonly record struct SamCoupeMode4File
   : IImageFormatReader<SamCoupeMode4File>, IImageToRawImage<SamCoupeMode4File>,
     IImageFromRawImage<SamCoupeMode4File>, IImageFormatWriter<SamCoupeMode4File> {

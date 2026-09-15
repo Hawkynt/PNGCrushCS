@@ -20,7 +20,7 @@ namespace FileFormat.AtariPi5;
 /// <c>.pi5</c> was claimed only by the TT reader, which takes 153634 bytes — this is a quarter of
 /// that and was refused for it.
 /// </remarks>
-[VerifiedBy(ConformanceOracle.Recoil2Png)]
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.IrfanView)]
 public readonly record struct AtariPi5File
   : IImageFormatReader<AtariPi5File>, IImageToRawImage<AtariPi5File>,
     IImageFromRawImage<AtariPi5File>, IImageFormatWriter<AtariPi5File> {

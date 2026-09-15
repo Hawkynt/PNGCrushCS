@@ -17,6 +17,7 @@ namespace FileFormat.PhotoSuiteProject;
 /// steps four bytes at a time, which is where a compound document puts the start of a stream and
 /// where XnView looks.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.XnView)]
 public readonly record struct PhotoSuiteProjectFile
   : IImageFormatReader<PhotoSuiteProjectFile>, IImageToRawImage<PhotoSuiteProjectFile>,
     IImageFromRawImage<PhotoSuiteProjectFile>, IImageFormatWriter<PhotoSuiteProjectFile> {

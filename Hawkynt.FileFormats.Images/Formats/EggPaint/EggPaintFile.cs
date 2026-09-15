@@ -13,7 +13,7 @@ namespace FileFormat.EggPaint;
 /// five bits of red, six of green and five of blue. Every sample is exactly its own stated size:
 /// 128 by 128, 320 by 120 and 256 by 256, each width times height times two plus eight.
 /// </remarks>
-[VerifiedBy(ConformanceOracle.Recoil2Png)]
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.IrfanView)]
 public readonly record struct EggPaintFile
   : IImageFormatReader<EggPaintFile>, IImageToRawImage<EggPaintFile>, IImageFromRawImage<EggPaintFile>, IImageFormatWriter<EggPaintFile> {
 

@@ -23,6 +23,7 @@ namespace FileFormat.Dwg;
 /// supplied <see cref="RawImage"/> losslessly as its PNG preview. The raster remains a preview,
 /// because that is the only image DWG itself defines and the only DWG content this package models.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.XnView)]
 public readonly record struct DwgFile :
   IImageFormatReader<DwgFile>, IImageToRawImage<DwgFile>, IImageFromRawImage<DwgFile>, IImageFormatWriter<DwgFile> {
 

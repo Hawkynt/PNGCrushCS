@@ -1,6 +1,7 @@
 using System;
 using System.Linq;
 using FileFormat.Core;
+using FileFormat.Gif;
 
 namespace Optimizer.Gif;
 
@@ -155,7 +156,7 @@ internal static class PaletteReorderer {
     foreach (var strategy in candidates) {
       var (candidatePalette, candidateRemap) = Reorder(palette, pixels, strategy);
       var remappedPixels = ApplyRemap(pixels, candidateRemap);
-      var compressed = LzwCompressor.Compress(remappedPixels, 8);
+      var compressed = GifLzwCodec.Encode(remappedPixels, 8);
 
       if (compressed.Length >= bestSize)
         continue;

@@ -28,7 +28,7 @@ namespace FileFormat.Mag;
 /// tool's rendering gives nonsense here, because entries 0 and 1 are both black in some files and the
 /// picture cannot tell them apart. Compare colours.
 /// </remarks>
-[VerifiedBy(ConformanceOracle.Recoil2Png)]
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.IrfanView)]
 public readonly record struct MagFile
   : IImageFormatReader<MagFile>, IImageToRawImage<MagFile>,
     IImageFromRawImage<MagFile>, IImageFormatWriter<MagFile> {

@@ -15,7 +15,7 @@ namespace FileFormat.Xld4;
 /// file length is only sixteen bits, therefore sufficiently high-entropy pictures cannot be
 /// represented even though their dimensions and colour count are otherwise valid.
 /// </remarks>
-[VerifiedBy(ConformanceOracle.Recoil2Png)]
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.IrfanView)]
 public readonly record struct Xld4File
   : IImageFormatReader<Xld4File>, IImageToRawImage<Xld4File>, IImageFromRawImage<Xld4File>, IImageFormatWriter<Xld4File> {
 

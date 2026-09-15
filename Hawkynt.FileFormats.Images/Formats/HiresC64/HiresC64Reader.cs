@@ -14,17 +14,7 @@ public static class HiresC64Reader {
     return FromBytes(File.ReadAllBytes(file.FullName));
   }
 
-  public static HiresC64File FromStream(Stream stream) {
-    ArgumentNullException.ThrowIfNull(stream);
-    if (stream.CanSeek) {
-      var data = new byte[stream.Length - stream.Position];
-      stream.ReadExactly(data);
-      return FromBytes(data);
-    }
-    using var ms = new MemoryStream();
-    stream.CopyTo(ms);
-    return FromBytes(ms.ToArray());
-  }
+  public static HiresC64File FromStream(Stream stream) => FromBytes(StreamBytes.ReadAll(stream));
 
   public static HiresC64File FromSpan(ReadOnlySpan<byte> data) {
     if (data.Length != HiresC64File.ExpectedFileSize)

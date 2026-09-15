@@ -4,6 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.BrooktroutFax;
 
 /// <summary>In-memory representation of a Brooktrout 301 fax image image.</summary>
+[VerifiedBy(ConformanceOracle.XnView)]
 public readonly record struct BrooktroutFaxFile : IImageFormatReader<BrooktroutFaxFile>, IImageToRawImage<BrooktroutFaxFile>, IImageFromRawImage<BrooktroutFaxFile>, IImageFormatWriter<BrooktroutFaxFile> {
 
   /// <summary>The two bytes every one of these begins with.</summary>

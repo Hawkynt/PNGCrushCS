@@ -17,18 +17,7 @@ public static class SonyPmpReader {
     return FromBytes(File.ReadAllBytes(file.FullName));
   }
 
-  public static SonyPmpFile FromStream(Stream stream) {
-    ArgumentNullException.ThrowIfNull(stream);
-    if (stream.CanSeek) {
-      var data = new byte[stream.Length - stream.Position];
-      stream.ReadExactly(data);
-      return FromBytes(data);
-    }
-
-    using var ms = new MemoryStream();
-    stream.CopyTo(ms);
-    return FromBytes(ms.ToArray());
-  }
+  public static SonyPmpFile FromStream(Stream stream) => FromBytes(StreamBytes.ReadAll(stream));
 
   public static SonyPmpFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

@@ -103,10 +103,11 @@ public sealed class AppleIIgsReaderTests {
   [Category("Unit")]
   public void FromBytes_PaletteValues_ParsedAsLittleEndian() {
     var data = new byte[32768];
-    // Palette starts at offset 32200 (32000 pixel + 200 SCB)
-    // First palette entry at offset 32200: 0x34 0x12 -> 0x1234 LE
-    data[32200] = 0x34;
-    data[32201] = 0x12;
+    // Palette starts at offset 32256 ($9E00 in the machine): 32000 pixel + the whole 256-byte scan
+    // control block, of which only the first 200 bytes are scanlines.
+    // First palette entry at offset 32256: 0x34 0x12 -> 0x1234 LE
+    data[32256] = 0x34;
+    data[32257] = 0x12;
 
     var result = AppleIIgsReader.FromBytes(data);
 
@@ -127,7 +128,7 @@ public sealed class AppleIIgsReaderTests {
 
     // Fill palette data with a pattern
     for (var i = 0; i < 512; ++i)
-      data[32200 + i] = (byte)(i % 256);
+      data[32256 + i] = (byte)(i % 256);
 
     return data;
   }

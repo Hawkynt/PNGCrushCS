@@ -17,7 +17,7 @@ namespace FileFormat.G9b;
 /// swapped.
 /// </remarks>
 [FormatMagicBytes([0x47, 0x39, 0x42])]
-[VerifiedBy(ConformanceOracle.Recoil2Png)]
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.IrfanView)]
 public readonly record struct G9bFile : IImageFormatReader<G9bFile>, IImageToRawImage<G9bFile>, IImageFromRawImage<G9bFile>, IImageFormatWriter<G9bFile> {
 
   /// <summary>The fixed part of the header, before the palette.</summary>

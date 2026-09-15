@@ -14,18 +14,7 @@ public static class SevenuPReader {
     return FromBytes(File.ReadAllBytes(file.FullName));
   }
 
-  public static SevenuPFile FromStream(Stream stream) {
-    ArgumentNullException.ThrowIfNull(stream);
-    if (stream.CanSeek) {
-      var data = new byte[stream.Length - stream.Position];
-      stream.ReadExactly(data);
-      return FromBytes(data);
-    }
-
-    using var ms = new MemoryStream();
-    stream.CopyTo(ms);
-    return FromBytes(ms.ToArray());
-  }
+  public static SevenuPFile FromStream(Stream stream) => FromBytes(StreamBytes.ReadAll(stream));
 
   public static SevenuPFile FromSpan(ReadOnlySpan<byte> data) {
     if (data.Length < 23 || !data[..SevenuPFile.Signature.Length].SequenceEqual(SevenuPFile.Signature)

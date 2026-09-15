@@ -16,6 +16,10 @@ namespace FileFormat.Vivid;
 /// and the same sum gives 30204 for the other. Read a row at a time in that order both agree with
 /// XnView on every pixel.
 /// </remarks>
+// Read back by XnView's `dkb` loader, the DKB Ray-Tracer path, rather than by the `vivid` loader it
+// also ships. The two formats are close enough that its byte sniffing lands on the neighbour, so this
+// says the picture survives a third-party decode and stops short of saying XnView agrees it is Vivid.
+[VerifiedBy(ConformanceOracle.XnView)]
 public readonly record struct VividFile
   : IImageFormatReader<VividFile>, IImageToRawImage<VividFile>,
     IImageFromRawImage<VividFile>, IImageFormatWriter<VividFile> {

@@ -3,6 +3,7 @@ using System.Buffers.Binary;
 using System.IO;
 using System.Reflection.PortableExecutable;
 using FileFormat.Core;
+using FileFormat.Ico;
 using FileFormat.IconLibrary;
 
 namespace FileFormat.IconLibrary.Tests;
@@ -37,32 +38,114 @@ public sealed class IconLibraryReaderTests {
 
   [Test]
   [Category("Unit")]
-  public void FromBytes_ValidData_Parses() {
-    var data = new byte[22];
-    data[0] = 0; data[1] = 0; // reserved
-    data[2] = 1; data[3] = 0; // type = 1 (icon)
-    data[4] = 1; data[5] = 0; // count = 1
-    data[6] = 16; // width
-    data[7] = 16; // height
-
-    var result = IconLibraryReader.FromBytes(data);
-
-    Assert.That(result.Width, Is.EqualTo(16));
-    Assert.That(result.Height, Is.EqualTo(16));
-    Assert.That(result.RawData.Length, Is.EqualTo(22));
+  public void FromBytes_IcoFile_ThrowsInvalidDataException() {
+    byte[] ico = [0, 0, 1, 0, 1, 0, 16, 16, 0, 0, 1, 0, 32, 0, 0, 0, 0, 0, 22, 0, 0, 0];
+    Assert.Throws<InvalidDataException>(() => IconLibraryReader.FromBytes(ico));
   }
 
   [Test]
   [Category("Unit")]
-  public void FromBytes_DefaultDimensions_WhenNoIcoHeader() {
-    var data = new byte[10];
-    data[0] = 0xFF; // not a valid ICO header
+  public void FromBytes_PeLibrary_ExtractsAndDecodesIcon() {
+    var source = _CreateSource();
+    var bytes = IconLibraryWriter.ToBytes(IconLibraryFile.FromRawImage(source));
 
-    var result = IconLibraryReader.FromBytes(data);
+    var file = IconLibraryReader.FromBytes(bytes);
+    var decoded = IconLibraryFile.ToRawImage(file);
 
-    Assert.That(result.Width, Is.EqualTo(32));
-    Assert.That(result.Height, Is.EqualTo(32));
+    Assert.Multiple(() => {
+      Assert.That(file.Width, Is.EqualTo(2));
+      Assert.That(file.Height, Is.EqualTo(2));
+      Assert.That(file.Icons, Has.Count.EqualTo(1));
+      Assert.That(file.Icons[0].Images, Has.Count.EqualTo(1));
+      Assert.That(file.RawData, Is.EqualTo(bytes));
+      Assert.That(IconLibraryFile.ImageCount(file), Is.EqualTo(1));
+      Assert.That(decoded.Width, Is.EqualTo(source.Width));
+      Assert.That(decoded.Height, Is.EqualTo(source.Height));
+      Assert.That(decoded.Format, Is.EqualTo(PixelFormat.Bgra32));
+      Assert.That(decoded.PixelData, Is.EqualTo(source.PixelData));
+    });
   }
+
+  [Test]
+  [Category("Unit")]
+  public void FromBytes_NeLibrary_ExtractsAndDecodesIcon() {
+    var source = _CreateSource();
+    var icon = IcoDib.FromRawImage(source);
+    var bytes = _BuildNeLibrary(icon);
+
+    var file = IconLibraryReader.FromBytes(bytes);
+    var decoded = IconLibraryFile.ToRawImage(file);
+
+    Assert.Multiple(() => {
+      Assert.That(file.Width, Is.EqualTo(2));
+      Assert.That(file.Height, Is.EqualTo(2));
+      Assert.That(file.Icons, Has.Count.EqualTo(1));
+      Assert.That(file.Icons[0].Images, Has.Count.EqualTo(1));
+      Assert.That(decoded.PixelData, Is.EqualTo(source.PixelData));
+    });
+  }
+
+  private static RawImage _CreateSource() => new() {
+    Width = 2,
+    Height = 2,
+    Format = PixelFormat.Bgra32,
+    PixelData = [
+      0x00, 0x00, 0xFF, 0xFF,  0x00, 0xFF, 0x00, 0xFF,
+      0xFF, 0x00, 0x00, 0x00,  0xFF, 0xFF, 0xFF, 0xFF,
+    ],
+  };
+
+  private static byte[] _BuildNeLibrary(IcoImage icon) {
+    const int neOffset = 0x40;
+    const int resourceTableOffset = 0x80;
+    const int alignmentShift = 4;
+    const int iconOffset = 0x100;
+    var iconStorageLength = _Align(icon.Data.Length, 1 << alignmentShift);
+    var groupOffset = checked(iconOffset + iconStorageLength);
+    const int groupLength = 20;
+    var groupStorageLength = _Align(groupLength, 1 << alignmentShift);
+    var result = new byte[checked(groupOffset + groupStorageLength)];
+
+    result[0] = (byte)'M';
+    result[1] = (byte)'Z';
+    BinaryPrimitives.WriteInt32LittleEndian(result.AsSpan(0x3C), neOffset);
+    result[neOffset] = (byte)'N';
+    result[neOffset + 1] = (byte)'E';
+    BinaryPrimitives.WriteUInt16LittleEndian(result.AsSpan(neOffset + 0x24), resourceTableOffset - neOffset);
+
+    var cursor = resourceTableOffset;
+    BinaryPrimitives.WriteUInt16LittleEndian(result.AsSpan(cursor), alignmentShift);
+    cursor += 2;
+    cursor = _WriteNeType(result, cursor, 3, iconOffset, iconStorageLength, 1, alignmentShift);
+    cursor = _WriteNeType(result, cursor, 14, groupOffset, groupStorageLength, 1, alignmentShift);
+    BinaryPrimitives.WriteUInt16LittleEndian(result.AsSpan(cursor), 0);
+
+    icon.Data.CopyTo(result.AsSpan(iconOffset));
+    var group = result.AsSpan(groupOffset, groupLength);
+    BinaryPrimitives.WriteUInt16LittleEndian(group, 0);
+    BinaryPrimitives.WriteUInt16LittleEndian(group[2..], 1);
+    BinaryPrimitives.WriteUInt16LittleEndian(group[4..], 1);
+    group[6] = checked((byte)icon.Width);
+    group[7] = checked((byte)icon.Height);
+    BinaryPrimitives.WriteUInt16LittleEndian(group[10..], 1);
+    BinaryPrimitives.WriteUInt16LittleEndian(group[12..], checked((ushort)icon.BitsPerPixel));
+    BinaryPrimitives.WriteUInt32LittleEndian(group[14..], checked((uint)icon.Data.Length));
+    BinaryPrimitives.WriteUInt16LittleEndian(group[18..], 1);
+    return result;
+  }
+
+  private static int _WriteNeType(byte[] data, int offset, int type, int resourceOffset, int resourceLength, int id, int shift) {
+    BinaryPrimitives.WriteUInt16LittleEndian(data.AsSpan(offset), checked((ushort)(0x8000 | type)));
+    BinaryPrimitives.WriteUInt16LittleEndian(data.AsSpan(offset + 2), 1);
+    offset += 8;
+    BinaryPrimitives.WriteUInt16LittleEndian(data.AsSpan(offset), checked((ushort)(resourceOffset >> shift)));
+    BinaryPrimitives.WriteUInt16LittleEndian(data.AsSpan(offset + 2), checked((ushort)(resourceLength >> shift)));
+    BinaryPrimitives.WriteUInt16LittleEndian(data.AsSpan(offset + 4), 0x0010);
+    BinaryPrimitives.WriteUInt16LittleEndian(data.AsSpan(offset + 6), checked((ushort)(0x8000 | id)));
+    return offset + 12;
+  }
+
+  private static int _Align(int value, int alignment) => (value + alignment - 1) / alignment * alignment;
 }
 
 [TestFixture]
@@ -125,6 +208,23 @@ public sealed class IconLibraryWriterTests {
       Assert.That(BinaryPrimitives.ReadUInt32LittleEndian(group.AsSpan(14)), Is.EqualTo((uint)icon.Length));
       Assert.That(BinaryPrimitives.ReadUInt16LittleEndian(group.AsSpan(18)), Is.EqualTo(1), "the group points at RT_ICON #1");
     });
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void FromRawImage_RoundTripsThroughRegisteredContracts() {
+    var source = new RawImage {
+      Width = 1,
+      Height = 1,
+      Format = PixelFormat.Bgra32,
+      PixelData = [0x21, 0x43, 0x65, 0xFF],
+    };
+
+    var encoded = FormatIO.Write(IconLibraryFile.FromRawImage(source));
+    var parsed = IconLibraryReader.FromBytes(encoded);
+    var decoded = IconLibraryFile.ToRawImage(parsed);
+
+    Assert.That(decoded.PixelData, Is.EqualTo(source.PixelData));
   }
 
   private static byte[] _ReadResource(byte[] file, int resourceType) {

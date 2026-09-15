@@ -22,13 +22,17 @@ namespace FileFormat.CartesMichelin;
 /// one column and only one tile occupied.
 /// </remarks>
 public readonly record struct CartesMichelinFile
-  : IImageFormatReader<CartesMichelinFile>, IImageToRawImage<CartesMichelinFile> {
+  : IImageFormatReader<CartesMichelinFile>, IImageToRawImage<CartesMichelinFile>,
+    IImageFromRawImage<CartesMichelinFile>, IImageFormatWriter<CartesMichelinFile> {
 
   /// <summary>The bounds the tile size has to fall in.</summary>
   public const int MinTileSize = 32, MaxTileSize = 512;
 
-  /// <summary>The bounds the grid counts have to fall in.</summary>
+  /// <summary>The bounds the directory's grid counts have to fall in.</summary>
   public const int MinGridCount = 2, MaxGridCount = 64;
+
+  /// <summary>The bounds one occupied image axis can have.</summary>
+  public const int MinImageSize = MinTileSize, MaxImageSize = MaxTileSize * MaxGridCount;
 
   /// <summary>How long the four longs are, which is where the tile directory begins.</summary>
   public const int HeaderSize = 16;
@@ -43,16 +47,22 @@ public readonly record struct CartesMichelinFile
   static string[] IImageFormatMetadata<CartesMichelinFile>.FileExtensions => [".big"];
   static CartesMichelinFile IImageFormatReader<CartesMichelinFile>.FromSpan(ReadOnlySpan<byte> data)
     => CartesMichelinReader.FromSpan(data);
+  static byte[] IImageFormatWriter<CartesMichelinFile>.ToBytes(CartesMichelinFile file)
+    => CartesMichelinWriter.ToBytes(file);
 
   static VideoMode[] IImageFormatMetadata<CartesMichelinFile>.VideoModes => [
-    new("Default", [(IntegerRange.Any, IntegerRange.Any)], [16777216])
+    new("Default", [(
+      new IntegerRange(MinImageSize, MaxImageSize),
+      new IntegerRange(MinImageSize, MaxImageSize)
+    )], [16777216])
   ];
 
   /// <summary>
-  /// Abstains: the four numbers at the front are a range check rather than a signature, and only
-  /// walking the directory to a tile that opens <c>GIF8</c> says the file is one of these.
+  /// Recognises the format once enough of the directory and at least one present tile's <c>GIF8</c>
+  /// signature are available; otherwise it abstains rather than guessing from four numbers in range.
   /// </summary>
-  static bool? IImageFormatMetadata<CartesMichelinFile>.MatchesSignature(ReadOnlySpan<byte> header) => null;
+  static bool? IImageFormatMetadata<CartesMichelinFile>.MatchesSignature(ReadOnlySpan<byte> header)
+    => CartesMichelinReader.MatchesSignature(header);
 
   /// <summary>Pixels across in the assembled sheet.</summary>
   public int Width { get; init; }
@@ -66,16 +76,81 @@ public readonly record struct CartesMichelinFile
   /// <summary>Rows in one tile.</summary>
   public int TileHeight { get; init; }
 
-  /// <summary>How many tiles the sheet was assembled from.</summary>
+  /// <summary>Columns in the file's tile directory.</summary>
+  public int GridColumns { get; init; }
+
+  /// <summary>Rows in the file's tile directory.</summary>
+  public int GridRows { get; init; }
+
+  /// <summary>How many directory positions actually carried a tile.</summary>
   public int TileCount { get; init; }
 
   /// <summary>Three bytes a pixel, top row first.</summary>
   public byte[] PixelData { get; init; }
 
-  public static RawImage ToRawImage(CartesMichelinFile file) => new() {
-    Width = file.Width,
-    Height = file.Height,
-    Format = PixelFormat.Rgb24,
-    PixelData = file.PixelData ?? [],
-  };
+  public static RawImage ToRawImage(CartesMichelinFile file) {
+    if (file.PixelData == null)
+      throw new InvalidOperationException("No Cartes Michelin picture was read.");
+    if (file.Width is < MinImageSize or > MaxImageSize || file.Height is < MinImageSize or > MaxImageSize)
+      throw new InvalidOperationException($"A Cartes Michelin picture of {file.Width}x{file.Height} is outside the format's supported bounds.");
+
+    var required = (long)file.Width * file.Height * 3;
+    if (required > file.PixelData.Length)
+      throw new InvalidOperationException("The Cartes Michelin picture does not contain enough RGB pixel data for its dimensions.");
+
+    return new() {
+      Width = file.Width,
+      Height = file.Height,
+      Format = PixelFormat.Rgb24,
+      PixelData = file.PixelData[..(int)required],
+    };
+  }
+
+  public static CartesMichelinFile FromRawImage(RawImage image) {
+    ArgumentNullException.ThrowIfNull(image);
+    image = image.EnsureFormat(PixelFormat.Rgb24);
+
+    if (!TryGetAxisLayout(image.Width, out var tileWidth, out var occupiedColumns)
+        || !TryGetAxisLayout(image.Height, out var tileHeight, out var occupiedRows))
+      throw new ArgumentOutOfRangeException(nameof(image),
+        $"Cartes Michelin dimensions must be exactly representable by 1..{MaxGridCount} tiles of {MinTileSize}..{MaxTileSize} pixels per axis.");
+
+    var required = (long)image.Width * image.Height * 3;
+    if (required > Array.MaxLength || image.PixelData == null || image.PixelData.Length < required)
+      throw new ArgumentException("The raw image does not contain enough RGB pixel data for its dimensions.", nameof(image));
+
+    return new() {
+      Width = image.Width,
+      Height = image.Height,
+      TileWidth = tileWidth,
+      TileHeight = tileHeight,
+      GridColumns = Math.Max(MinGridCount, occupiedColumns),
+      GridRows = Math.Max(MinGridCount, occupiedRows),
+      TileCount = checked(occupiedColumns * occupiedRows),
+      PixelData = image.PixelData[..(int)required],
+    };
+  }
+
+  /// <summary>
+  /// Finds an exact axis decomposition, preferring the fewest occupied tiles. The directory itself
+  /// still has at least two positions on an axis; a one-tile image simply leaves the extra positions absent.
+  /// </summary>
+  internal static bool TryGetAxisLayout(int length, out int tileSize, out int occupiedCount) {
+    tileSize = occupiedCount = 0;
+    if (length is < MinImageSize or > MaxImageSize)
+      return false;
+
+    var firstCount = Math.Max(1, (length + MaxTileSize - 1) / MaxTileSize);
+    var lastCount = Math.Min(MaxGridCount, length / MinTileSize);
+    for (var count = firstCount; count <= lastCount; ++count) {
+      if (length % count != 0)
+        continue;
+
+      tileSize = length / count;
+      occupiedCount = count;
+      return true;
+    }
+
+    return false;
+  }
 }

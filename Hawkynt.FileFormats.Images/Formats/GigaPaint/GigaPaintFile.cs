@@ -4,7 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.GigaPaint;
 
 /// <summary>In-memory representation of a GigaPaint hires image.</summary>
-[VerifiedBy(ConformanceOracle.Recoil2Png)]
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.IrfanView)]
 public readonly record struct GigaPaintFile : IImageFormatReader<GigaPaintFile>, IImageToRawImage<GigaPaintFile>, IImageFromRawImage<GigaPaintFile>, IImageFormatWriter<GigaPaintFile> {
 
   static string IImageFormatMetadata<GigaPaintFile>.PrimaryExtension => ".gih";

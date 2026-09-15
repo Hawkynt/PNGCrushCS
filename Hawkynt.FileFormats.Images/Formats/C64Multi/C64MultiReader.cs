@@ -14,17 +14,7 @@ public static class C64MultiReader {
     return FromBytes(File.ReadAllBytes(file.FullName));
   }
 
-  public static C64MultiFile FromStream(Stream stream) {
-    ArgumentNullException.ThrowIfNull(stream);
-    if (stream.CanSeek) {
-      var data = new byte[stream.Length - stream.Position];
-      stream.ReadExactly(data);
-      return FromBytes(data);
-    }
-    using var ms = new MemoryStream();
-    stream.CopyTo(ms);
-    return FromBytes(ms.ToArray());
-  }
+  public static C64MultiFile FromStream(Stream stream) => FromBytes(StreamBytes.ReadAll(stream));
 
   public static C64MultiFile FromSpan(ReadOnlySpan<byte> data) {
     var format = _DetectFormat(data.Length);

@@ -5,7 +5,7 @@ using FileFormat.Core;
 namespace FileFormat.RunPaint;
 
 /// <summary>In-memory representation of a Run Paint multicolor image (.rpm).</summary>
-[VerifiedBy(ConformanceOracle.Recoil2Png)]
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.IrfanView)]
 public readonly record struct RunPaintFile : IImageFormatReader<RunPaintFile>, IImageToRawImage<RunPaintFile>, IImageFromRawImage<RunPaintFile>, IImageFormatWriter<RunPaintFile> {
 
   static string IImageFormatMetadata<RunPaintFile>.PrimaryExtension => ".rpm";

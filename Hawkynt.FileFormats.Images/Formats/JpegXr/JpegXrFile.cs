@@ -4,6 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.JpegXr;
 
 /// <summary>In-memory representation of a JPEG XR (ITU-T T.832 / ISO 29199-2) image.</summary>
+[VerifiedBy(ConformanceOracle.XnView)]
 public readonly record struct JpegXrFile : IImageFormatReader<JpegXrFile>, IImageToRawImage<JpegXrFile>, IImageFromRawImage<JpegXrFile>, IImageFormatWriter<JpegXrFile> {
 
   static string IImageFormatMetadata<JpegXrFile>.PrimaryExtension => ".jxr";

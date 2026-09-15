@@ -14,6 +14,10 @@ namespace FileFormat.NokiaLogo;
 /// What was here before was the bare bitmap at one bit a pixel, fixed at 72 by 14, with no header at
 /// all — neither the layout nor the size restriction is real.
 /// </remarks>
+// XnView has one `nol` loader and both this format and the operator-logo variant resolve to it, so
+// the claim is that it decodes the bytes at the right size, not that it distinguishes the two. Where
+// the variants disagree, that is a distinction this oracle cannot make.
+[VerifiedBy(ConformanceOracle.XnView)]
 public readonly record struct NokiaLogoFile
   : IImageFormatReader<NokiaLogoFile>, IImageToRawImage<NokiaLogoFile>,
     IImageFromRawImage<NokiaLogoFile>, IImageFormatWriter<NokiaLogoFile> {

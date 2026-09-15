@@ -15,7 +15,7 @@ namespace FileFormat.IcDraw;
 /// suggest. Everything else in the header is carried through untouched.
 /// </para>
 /// </remarks>
-[VerifiedBy(ConformanceOracle.Recoil2Png)]
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.IrfanView)]
 public readonly record struct IcDrawFile
   : IImageFormatReader<IcDrawFile>, IImageToRawImage<IcDrawFile>,
     IImageFromRawImage<IcDrawFile>, IImageFormatWriter<IcDrawFile> {

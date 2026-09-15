@@ -22,6 +22,7 @@ namespace FileFormat.Ximage;
 /// with, and the pixels it hands back are the ones encoded, through the colour table where there is
 /// one.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.XnView)]
 public readonly record struct XimageFile
   : IImageFormatReader<XimageFile>, IImageToRawImage<XimageFile>, IImageFromRawImage<XimageFile>, IImageFormatWriter<XimageFile> {
 

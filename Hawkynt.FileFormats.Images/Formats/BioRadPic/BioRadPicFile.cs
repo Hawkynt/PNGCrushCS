@@ -5,6 +5,7 @@ namespace FileFormat.BioRadPic;
 
 /// <summary>In-memory representation of a Bio-Rad PIC (confocal microscopy) image.</summary>
 [FormatMagicBytes([0x39, 0x30], offset: 54)]
+[VerifiedBy(ConformanceOracle.XnView)]
 public readonly record struct BioRadPicFile : IImageFormatReader<BioRadPicFile>, IImageToRawImage<BioRadPicFile>, IImageFromRawImage<BioRadPicFile>, IImageFormatWriter<BioRadPicFile> {
 
   static string IImageFormatMetadata<BioRadPicFile>.PrimaryExtension => ".pic";

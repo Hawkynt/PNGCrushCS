@@ -15,18 +15,7 @@ public static class InterPainterReader {
     return FromBytes(File.ReadAllBytes(file.FullName));
   }
 
-  public static InterPainterFile FromStream(Stream stream) {
-    ArgumentNullException.ThrowIfNull(stream);
-    if (stream.CanSeek) {
-      var data = new byte[stream.Length - stream.Position];
-      stream.ReadExactly(data);
-      return FromBytes(data);
-    }
-
-    using var ms = new MemoryStream();
-    stream.CopyTo(ms);
-    return FromBytes(ms.ToArray());
-  }
+  public static InterPainterFile FromStream(Stream stream) => FromBytes(StreamBytes.ReadAll(stream));
 
   public static InterPainterFile FromSpan(ReadOnlySpan<byte> data) {
     // An .ins file is these same bytes under the SFDN packer; unpack and there is one format left.

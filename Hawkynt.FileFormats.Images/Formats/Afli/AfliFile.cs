@@ -19,6 +19,7 @@ namespace FileFormat.Afli;
 /// of every row are whatever the hardware was showing. They are not part of the picture and are not
 /// returned: the picture is 296 across, which is what RECOIL draws.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.XnView)]
 public readonly record struct AfliFile
   : IImageFormatReader<AfliFile>, IImageToRawImage<AfliFile>,
     IImageFromRawImage<AfliFile>, IImageFormatWriter<AfliFile> {
@@ -63,6 +64,16 @@ public readonly record struct AfliFile
 
   /// <summary>The least a whole AFLI takes; a file may run on to the end of its 16K block.</summary>
   public const int MinimumFileSize = BitmapOffset + BitmapDataSize;
+
+  /// <summary>The length a saved AFLI has: the whole block from the load address to its end.</summary>
+  /// <remarks>
+  /// The picture stops after the bitmap, 16194 bytes in, and the file does not: the editor saves the
+  /// memory it was given rather than the memory it filled, so every AFLI in existence runs on to
+  /// $7FFE and is 16385 bytes long. Writing the shorter file produced something only this package
+  /// could read — AFLI-editor's own reference decoder takes the length as the format's signature and
+  /// turns down anything else, there being no magic number to check instead.
+  /// </remarks>
+  public const int FileSize = 16385;
 
   /// <summary>Default load address, putting the eight matrices at the start of a 16K bank.</summary>
   internal const ushort DefaultLoadAddress = 0x4000;

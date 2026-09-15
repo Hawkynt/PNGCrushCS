@@ -13,7 +13,7 @@ namespace FileFormat.MapletownNl3;
 /// <para/>
 /// The picture is stored column by column, which is how the terminal drew it.
 /// </remarks>
-[VerifiedBy(ConformanceOracle.Recoil2Png)]
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.IrfanView)]
 public readonly record struct MapletownNl3File
   : IImageFormatReader<MapletownNl3File>, IImageToRawImage<MapletownNl3File>,
     IImageFromRawImage<MapletownNl3File>, IImageFormatWriter<MapletownNl3File> {

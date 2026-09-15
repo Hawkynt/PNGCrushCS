@@ -10,7 +10,7 @@ namespace FileFormat.ZxPaintyOne;
 /// the bulletin-board formats but without their alphabet: plain hexadecimal was enough because
 /// nothing was expected to carry it but a file.
 /// </remarks>
-[VerifiedBy(ConformanceOracle.Recoil2Png)]
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.IrfanView)]
 public readonly record struct ZxPaintyOneFile
   : IImageFormatReader<ZxPaintyOneFile>, IImageToRawImage<ZxPaintyOneFile>,
     IImageFromRawImage<ZxPaintyOneFile>, IImageFormatWriter<ZxPaintyOneFile> {

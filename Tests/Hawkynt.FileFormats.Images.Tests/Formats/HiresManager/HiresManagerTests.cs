@@ -1,119 +1,148 @@
 using System;
 using System.IO;
-using FileFormat.HiresManager;
 using FileFormat.Core;
 
 namespace FileFormat.HiresManager.Tests;
 
+/// <summary>
+/// The layout a Hires Manager file actually has, as opposed to the one it used to be written in.
+/// </summary>
+/// <remarks>
+/// The format is 16385 bytes — the whole bank the picture lived in — with the bitmap 320 bytes in
+/// and the eight video matrices 8232 bytes in, a page apart. It shows 192 rows of 296 pixels, and
+/// the fourth byte has to say $FF or the file is read as a run-length stream and refused.
+/// </remarks>
 [TestFixture]
-public sealed class HiresManagerReaderTests {
+public sealed class HiresManagerLayoutTests {
 
-  [Test]
-  [Category("Unit")]
-  public void FromFile_Null_ThrowsArgumentNullException() {
-    Assert.Throws<ArgumentNullException>(() => HiresManagerReader.FromFile(null!));
+  private static byte[] _Build() {
+    var data = new byte[HiresManagerFile.FileSize];
+    data[0] = 0x00;
+    data[1] = 0x40;
+    data[HiresManagerFile.PackingFlagOffset] = HiresManagerFile.NotPacked;
+
+    for (var line = 0; line < Commodore64Fli.MatrixCount; ++line)
+    for (var cell = 0; cell < HiresManagerFile.MatrixEntries; ++cell)
+      data[HiresManagerFile.MatricesOffset + line * Commodore64Fli.MatrixStride + cell] = (byte)(line << 4 | 1);
+
+    for (var i = 0; i < HiresManagerFile.BitmapSize; ++i)
+      data[HiresManagerFile.BitmapOffset + i] = 0xAA;
+
+    return data;
   }
 
   [Test]
   [Category("Unit")]
-  public void FromFile_Missing_ThrowsFileNotFoundException() {
-    var missing = new FileInfo(Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".him"));
-    Assert.Throws<FileNotFoundException>(() => HiresManagerReader.FromFile(missing));
+  public void FromFile_Null_Throws()
+    => Assert.Throws<ArgumentNullException>(() => HiresManagerReader.FromFile(null!));
+
+  [Test]
+  [Category("Unit")]
+  public void FromFile_Missing_Throws()
+    => Assert.Throws<FileNotFoundException>(
+      () => HiresManagerReader.FromFile(new FileInfo(Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".him"))));
+
+  [Test]
+  [Category("Unit")]
+  public void FromBytes_Null_Throws()
+    => Assert.Throws<ArgumentNullException>(() => HiresManagerReader.FromBytes(null!));
+
+  [Test]
+  [Category("Unit")]
+  public void AnythingShorterThanTheWholeBankIsRefused()
+    => Assert.Throws<InvalidDataException>(() => HiresManagerReader.FromBytes(new byte[16384]));
+
+  [Test]
+  [Category("Unit")]
+  public void ThePartsAreWhereTheMachineAddressesThem() {
+    Assert.Multiple(() => {
+      Assert.That(HiresManagerFile.FileSize, Is.EqualTo(16385));
+      Assert.That(HiresManagerFile.BitmapOffset, Is.EqualTo(322));
+      Assert.That(HiresManagerFile.MatricesOffset, Is.EqualTo(8234));
+      Assert.That(HiresManagerFile.MatrixEntries, Is.EqualTo(960));
+    });
   }
 
   [Test]
   [Category("Unit")]
-  public void FromBytes_Null_ThrowsArgumentNullException() {
-    Assert.Throws<ArgumentNullException>(() => HiresManagerReader.FromBytes(null!));
+  public void ThePictureIsTwoHundredAndNinetySixByOneHundredAndNinetyTwo() {
+    var picture = HiresManagerFile.ToRawImage(HiresManagerReader.FromBytes(_Build()));
+
+    Assert.Multiple(() => {
+      Assert.That(picture.Width, Is.EqualTo(296));
+      Assert.That(picture.Height, Is.EqualTo(192));
+    });
   }
 
   [Test]
   [Category("Unit")]
-  public void FromBytes_TooSmall_ThrowsInvalidDataException() {
-    Assert.Throws<InvalidDataException>(() => HiresManagerReader.FromBytes(new byte[100]));
+  public void EachRowOfACellTakesItsColoursFromItsOwnMatrix() {
+    var picture = HiresManagerFile.ToRawImage(HiresManagerReader.FromBytes(_Build()));
+
+    Assert.Multiple(() => {
+      for (var row = 0; row < Commodore64Fli.MatrixCount; ++row)
+        Assert.That(picture.PixelData[row * 296], Is.EqualTo(row), $"row {row} takes matrix {row}");
+    });
   }
-
-  [Test]
-  [Category("Unit")]
-  public void FromBytes_ValidData_ParsesDimensions() {
-    var data = TestHelpers._BuildValidHiresManagerData(0x2000);
-    var result = HiresManagerReader.FromBytes(data);
-
-    Assert.That(result.Width, Is.EqualTo(320));
-    Assert.That(result.Height, Is.EqualTo(200));
-    Assert.That(result.LoadAddress, Is.EqualTo(0x2000));
-    Assert.That(result.RawData.Length, Is.GreaterThanOrEqualTo(HiresManagerFile.MinPayloadSize));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void FromStream_Null_ThrowsArgumentNullException() {
-    Assert.Throws<ArgumentNullException>(() => HiresManagerReader.FromStream(null!));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void FromStream_ValidData_ParsesCorrectly() {
-    var data = TestHelpers._BuildValidHiresManagerData(0x4000);
-    using var ms = new MemoryStream(data);
-    var result = HiresManagerReader.FromStream(ms);
-
-    Assert.That(result.LoadAddress, Is.EqualTo(0x4000));
-    Assert.That(result.RawData.Length, Is.GreaterThanOrEqualTo(HiresManagerFile.MinPayloadSize));
-  }
-}
-
-[TestFixture]
-public sealed class HiresManagerRoundTripTests {
 
   [Test]
   [Category("Integration")]
-  public void RoundTrip_AllFieldsPreserved() {
-    var rawData = new byte[HiresManagerFile.MinPayloadSize + 200];
-    for (var i = 0; i < rawData.Length; ++i)
-      rawData[i] = (byte)(i * 13 % 256);
+  public void WhatIsWrittenSaysItIsNotPacked() {
+    var bytes = HiresManagerWriter.ToBytes(HiresManagerReader.FromBytes(_Build()));
 
-    var original = new HiresManagerFile { LoadAddress = 0x2000, RawData = rawData };
+    Assert.Multiple(() => {
+      Assert.That(bytes, Has.Length.EqualTo(HiresManagerFile.FileSize));
+      Assert.That(bytes[0], Is.EqualTo(0x00));
+      Assert.That(bytes[1], Is.EqualTo(0x40));
+      Assert.That(bytes[HiresManagerFile.PackingFlagOffset], Is.EqualTo(HiresManagerFile.NotPacked));
+    });
+  }
 
-    var bytes = HiresManagerWriter.ToBytes(original);
-    var restored = HiresManagerReader.FromBytes(bytes);
+  [Test]
+  [Category("Integration")]
+  public void WhatIsReadIsWhatIsWritten() {
+    var original = HiresManagerReader.FromBytes(_Build());
+    var restored = HiresManagerReader.FromBytes(HiresManagerWriter.ToBytes(original));
 
-    Assert.That(restored.LoadAddress, Is.EqualTo(original.LoadAddress));
-    Assert.That(restored.RawData, Is.EqualTo(original.RawData));
+    Assert.Multiple(() => {
+      Assert.That(restored.Matrices, Is.EqualTo(original.Matrices));
+      Assert.That(restored.BitmapData, Is.EqualTo(original.BitmapData));
+    });
   }
 
   [Test]
   [Category("Integration")]
   public void RoundTrip_ViaFile() {
-    var rawData = new byte[HiresManagerFile.MinPayloadSize];
-    for (var i = 0; i < rawData.Length; ++i)
-      rawData[i] = (byte)(i % 256);
-
-    var original = new HiresManagerFile { LoadAddress = 0x4000, RawData = rawData };
+    var original = HiresManagerReader.FromBytes(_Build());
     var path = Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".him");
+
     try {
       File.WriteAllBytes(path, HiresManagerWriter.ToBytes(original));
       var restored = HiresManagerReader.FromFile(new FileInfo(path));
 
-      Assert.That(restored.LoadAddress, Is.EqualTo(original.LoadAddress));
-      Assert.That(restored.RawData, Is.EqualTo(original.RawData));
+      Assert.That(restored.BitmapData, Is.EqualTo(original.BitmapData));
     } finally {
       if (File.Exists(path))
         File.Delete(path);
     }
   }
-}
 
-file static class TestHelpers {
-  internal static byte[] _BuildValidHiresManagerData(ushort loadAddress) {
-    var rawData = new byte[HiresManagerFile.MinPayloadSize];
-    for (var i = 0; i < rawData.Length; ++i)
-      rawData[i] = (byte)(i % 256);
+  [Test]
+  [Category("Unit")]
+  public void FromStream_Null_Throws()
+    => Assert.Throws<ArgumentNullException>(() => HiresManagerReader.FromStream(null!));
 
-    var data = new byte[HiresManagerFile.LoadAddressSize + rawData.Length];
-    data[0] = (byte)(loadAddress & 0xFF);
-    data[1] = (byte)(loadAddress >> 8);
-    Array.Copy(rawData, 0, data, HiresManagerFile.LoadAddressSize, rawData.Length);
-    return data;
+  [Test]
+  [Category("Unit")]
+  public void FromStream_ReadsWhatFromBytesReads() {
+    using var stream = new MemoryStream(_Build());
+    var fromStream = HiresManagerFile.ToRawImage(HiresManagerReader.FromStream(stream));
+    var fromBytes = HiresManagerFile.ToRawImage(HiresManagerReader.FromBytes(_Build()));
+
+    Assert.Multiple(() => {
+      Assert.That(fromStream.Width, Is.EqualTo(fromBytes.Width));
+      Assert.That(fromStream.Height, Is.EqualTo(fromBytes.Height));
+      Assert.That(fromStream.PixelData, Is.EqualTo(fromBytes.PixelData));
+    });
   }
 }

@@ -10,6 +10,7 @@ namespace FileFormat.X11Puzzle;
 /// palette of RGB triplets, and then one byte a pixel. Nine plus 768 plus the picture is the file to
 /// the byte, which is what identifies one — there is no signature.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.XnView)]
 public readonly record struct X11PuzzleFile
   : IImageFormatReader<X11PuzzleFile>, IImageToRawImage<X11PuzzleFile>,
     IImageFromRawImage<X11PuzzleFile>, IImageFormatWriter<X11PuzzleFile> {

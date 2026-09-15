@@ -9,7 +9,7 @@ namespace FileFormat.Imagic;
 /// the compressor settled on — followed by the run-length stream. Unlike DEGAS, the extension does
 /// not decide the resolution: it is a header field, so a mislabelled file still decodes correctly.
 /// </remarks>
-[VerifiedBy(ConformanceOracle.Recoil2Png)]
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.IrfanView)]
 public readonly record struct ImagicFile
   : IImageFormatReader<ImagicFile>, IImageToRawImage<ImagicFile>,
     IImageFromRawImage<ImagicFile>, IImageFormatWriter<ImagicFile> {

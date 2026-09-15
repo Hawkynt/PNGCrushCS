@@ -14,7 +14,7 @@ namespace FileFormat.HcbEditor;
 /// which is where the name comes from. The picture is 296 pixels wide rather than 320 because the
 /// interrupt costs the leftmost characters.
 /// </remarks>
-[VerifiedBy(ConformanceOracle.Recoil2Png)]
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.IrfanView)]
 public readonly record struct HcbEditorFile
   : IImageFormatReader<HcbEditorFile>, IImageToRawImage<HcbEditorFile>,
     IImageFromRawImage<HcbEditorFile>, IImageFormatWriter<HcbEditorFile> {

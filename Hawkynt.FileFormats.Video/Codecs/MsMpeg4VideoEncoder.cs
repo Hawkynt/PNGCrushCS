@@ -13,10 +13,9 @@ namespace FileFormat.Codecs;
 /// half-sample motion vector a macroblock.
 /// </summary>
 /// <remarks>
-/// The registry routes <c>MP43</c> here, which is the code the widest set of files carries, and
-/// <see cref="Create"/> takes any of the fourteen codes the three versions answer to — so a caller
-/// holding a stream description writes whichever version that description names, and a caller with no
-/// opinion gets version 3.
+/// The registry routes all sixteen four-character codes carried by the three versions here. A caller
+/// holding a stream description therefore writes whichever version and spelling that description
+/// names, while a caller invoking <see cref="Create"/> with no code gets version 3 under <c>MP43</c>.
 /// <para/>
 /// <b>What it writes.</b> An intra picture every <see cref="_KEY_FRAME_INTERVAL"/> frames and a
 /// predicted picture between them, one slice a picture, one motion vector a macroblock, the
@@ -48,8 +47,33 @@ namespace FileFormat.Codecs;
 [VerifiedBy(ConformanceOracle.FFmpeg)]
 public sealed class MsMpeg4VideoEncoder : IVideoCodecEncoder<MsMpeg4VideoEncoder> {
 
-  /// <summary>The code the registry routes to this encoder, and what it writes unless told otherwise.</summary>
+  /// <summary>The preferred code for version 3, and what a direct caller gets when it names none.</summary>
   private static readonly CodecTag _MP43 = CodecTag.FromCharacters("MP43");
+
+  private static readonly CodecTag[] _Version1Tags = [
+    CodecTag.FromCharacters("MPG4"),
+    CodecTag.FromCharacters("MP41"),
+    CodecTag.FromCharacters("DIV1"),
+  ];
+
+  private static readonly CodecTag[] _Version2Tags = [
+    CodecTag.FromCharacters("MP42"),
+    CodecTag.FromCharacters("DIV2"),
+  ];
+
+  private static readonly CodecTag[] _Version3Tags = [
+    _MP43,
+    CodecTag.FromCharacters("DIV3"),
+    CodecTag.FromCharacters("DIV4"),
+    CodecTag.FromCharacters("DIV5"),
+    CodecTag.FromCharacters("DIV6"),
+    CodecTag.FromCharacters("DVX3"),
+    CodecTag.FromCharacters("AP41"),
+    CodecTag.FromCharacters("AP42"),
+    CodecTag.FromCharacters("COL0"),
+    CodecTag.FromCharacters("COL1"),
+    CodecTag.FromCharacters("MPG3"),
+  ];
 
   /// <summary>
   /// How many pictures apart the intra ones are.
@@ -112,6 +136,12 @@ public sealed class MsMpeg4VideoEncoder : IVideoCodecEncoder<MsMpeg4VideoEncoder
 
   public static CodecTag Codec => _MP43;
 
+  /// <summary>Whether the stream asks for any FourCC carried by versions 1, 2 or 3.</summary>
+  static bool IVideoCodecEncoder<MsMpeg4VideoEncoder>.Accepts(MediaStreamInfo stream) {
+    ArgumentNullException.ThrowIfNull(stream);
+    return _TryVersionOf(stream.Codec, out _);
+  }
+
   /// <summary>
   /// Builds an encoder for the stream described, taking the version from the code it names.
   /// </summary>
@@ -126,8 +156,18 @@ public sealed class MsMpeg4VideoEncoder : IVideoCodecEncoder<MsMpeg4VideoEncoder
         $"A Microsoft MPEG-4 encoder needs the picture size up front; {stream.Width}x{stream.Height} was supplied. "
         + "The bitstream states it nowhere, so the container's is the only one there is.");
 
-    var version = _VersionOf(stream.Codec);
-    var tag = stream.Codec == CodecTag.None ? _MP43 : stream.Codec;
+    MsMpeg4Version version;
+    CodecTag tag;
+    if (stream.Codec == CodecTag.None) {
+      version = MsMpeg4Version.Version3;
+      tag = _MP43;
+    } else {
+      if (!_TryVersionOf(stream.Codec, out version))
+        throw new NotSupportedException(
+          $"Stream {stream.Index} asks Microsoft MPEG-4 to write '{stream.Codec}', which is not one of its version 1, 2 or 3 FourCCs.");
+
+      tag = stream.Codec;
+    }
 
     return new(stream, version, tag);
   }
@@ -208,17 +248,32 @@ public sealed class MsMpeg4VideoEncoder : IVideoCodecEncoder<MsMpeg4VideoEncoder
     };
   }
 
-  /// <summary>Which version a four-character code names, with version 3 for anything unstated.</summary>
-  private static MsMpeg4Version _VersionOf(CodecTag tag) {
-    foreach (var name in new[] { "MPG4", "MP41", "DIV1" })
-      if (tag.EqualsIgnoringCase(CodecTag.FromCharacters(name)))
-        return MsMpeg4Version.Version1;
+  private static bool _TryVersionOf(CodecTag tag, out MsMpeg4Version version) {
+    if (_Contains(_Version1Tags, tag)) {
+      version = MsMpeg4Version.Version1;
+      return true;
+    }
 
-    foreach (var name in new[] { "MP42", "DIV2" })
-      if (tag.EqualsIgnoringCase(CodecTag.FromCharacters(name)))
-        return MsMpeg4Version.Version2;
+    if (_Contains(_Version2Tags, tag)) {
+      version = MsMpeg4Version.Version2;
+      return true;
+    }
 
-    return MsMpeg4Version.Version3;
+    if (_Contains(_Version3Tags, tag)) {
+      version = MsMpeg4Version.Version3;
+      return true;
+    }
+
+    version = default;
+    return false;
+  }
+
+  private static bool _Contains(CodecTag[] tags, CodecTag candidate) {
+    foreach (var tag in tags)
+      if (candidate.EqualsIgnoringCase(tag))
+        return true;
+
+    return false;
   }
 
   /// <summary>

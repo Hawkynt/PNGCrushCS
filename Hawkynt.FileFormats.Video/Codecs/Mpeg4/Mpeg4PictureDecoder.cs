@@ -476,11 +476,11 @@ internal sealed class Mpeg4PictureDecoder {
   // ============================================================================================
 
   private void _DecodeBidirectionalMacroblock(ref Mpeg4BitReader reader, int address) {
-    // Both predictors start afresh on every macroblock row, which is what makes a bidirectionally
-    // coded picture decodable a row at a time and is not what a predicted picture does.
-    if (address % this._macroblockWidth == 0)
-      this._forwardPredictorX = this._forwardPredictorY = this._backwardPredictorX = this._backwardPredictorY = 0;
-
+    // The two predictors run from the start of the video packet -- or of the picture, where there
+    // are no resync markers -- and not from the start of a macroblock row. 7.6.2 gives no row rule,
+    // and resetting per row is invisible for as long as every B-VOP vector is zero, which is exactly
+    // how such a mistake survives: it costs nothing until an encoder puts real motion in a B-VOP,
+    // and then every macroblock after the first in a row reconstructs a vector nobody coded.
     this._isDecoded[address] = true;
 
     Span<int> forwardX = stackalloc int[4];

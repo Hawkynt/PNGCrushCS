@@ -14,7 +14,7 @@ namespace FileFormat.StarPainterFont;
 /// Shown as four rows of thirty-two, which is what fills the 256-pixel width the C64 draws in; the
 /// fifteen cells past the end of the set stay blank.
 /// </remarks>
-[VerifiedBy(ConformanceOracle.Recoil2Png)]
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.IrfanView)]
 public readonly record struct StarPainterFontFile
   : IImageFormatReader<StarPainterFontFile>, IImageToRawImage<StarPainterFontFile>,
     IImageFromRawImage<StarPainterFontFile>, IImageFormatWriter<StarPainterFontFile> {

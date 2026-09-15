@@ -14,7 +14,7 @@ namespace FileFormat.AtariChampionsInterlace;
 /// 256 bytes so that one register's values down the whole screen are contiguous — which is the
 /// order a display routine rewriting one register per line wants to read them in.
 /// </remarks>
-[VerifiedBy(ConformanceOracle.Recoil2Png)]
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.IrfanView)]
 public readonly record struct AtariChampionsInterlaceFile
   : IImageFormatReader<AtariChampionsInterlaceFile>, IImageToRawImage<AtariChampionsInterlaceFile>,
     IImageFromRawImage<AtariChampionsInterlaceFile>, IImageFormatWriter<AtariChampionsInterlaceFile> {

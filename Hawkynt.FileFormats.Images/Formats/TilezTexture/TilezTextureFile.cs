@@ -10,7 +10,7 @@ namespace FileFormat.TilezTexture;
 /// Four bytes of "QDB", four of length, and then an ordinary JPEG. Nothing here decodes anything
 /// itself; all three samples come out of the JPEG reader matching XnView exactly.
 /// </remarks>
-[VerifiedBy(ConformanceOracle.FFmpeg)]
+[VerifiedBy(ConformanceOracle.FFmpeg, ConformanceOracle.IrfanView)]
 public readonly record struct TilezTextureFile
   : IImageFormatReader<TilezTextureFile>, IImageToRawImage<TilezTextureFile>,
     IImageFromRawImage<TilezTextureFile>, IImageFormatWriter<TilezTextureFile> {

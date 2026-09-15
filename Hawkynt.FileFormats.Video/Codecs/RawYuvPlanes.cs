@@ -54,16 +54,26 @@ internal static class RawYuvPlanes {
 
   /// <summary>
   /// The picture's planes with its chroma brought onto a grid of <paramref name="chromaWidth"/> by
-  /// <paramref name="chromaHeight"/> samples, luma untouched.
+  /// <paramref name="chromaHeight"/> samples, preserving <paramref name="native"/> byte for byte.
   /// </summary>
-  public static byte[] Subsampled(RawImage frame, PixelFormat native, int chromaWidth, int chromaHeight) {
+  public static byte[] Subsampled(RawImage frame, PixelFormat native, int chromaWidth, int chromaHeight)
+    => _Subsampled(frame, native, chromaWidth, chromaHeight);
+
+  /// <summary>
+  /// The picture's planes with its chroma brought onto a grid of <paramref name="chromaWidth"/> by
+  /// <paramref name="chromaHeight"/> samples when that grid has no exact <see cref="PixelFormat"/>.
+  /// </summary>
+  public static byte[] Subsampled(RawImage frame, int chromaWidth, int chromaHeight)
+    => _Subsampled(frame, null, chromaWidth, chromaHeight);
+
+  private static byte[] _Subsampled(RawImage frame, PixelFormat? native, int chromaWidth, int chromaHeight) {
     ArgumentNullException.ThrowIfNull(frame);
     if (!frame.HasEnoughPixelData)
       throw new InvalidDataException("The source RawImage does not contain enough pixel data for its declared format and dimensions.");
 
     var lumaSamples = frame.Width * frame.Height;
     var chromaSamples = chromaWidth * chromaHeight;
-    if (frame.Format == native)
+    if (native is { } nativeFormat && frame.Format == nativeFormat)
       return Tight(frame, lumaSamples + chromaSamples * 2);
 
     var source = _IsEightBitPlanar(frame.Format)

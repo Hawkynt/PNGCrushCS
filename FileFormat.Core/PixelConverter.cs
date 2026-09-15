@@ -101,11 +101,21 @@ public static class PixelConverter {
     };
   }
 
+  /// <summary>
+  /// Converts through the BGRA32 hub, for a pair with no direct route between them.
+  /// </summary>
+  /// <remarks>
+  /// Both ends of the hub have to be refused rather than attempted, and for the same reason: arriving
+  /// here means the pair being asked for has no direct route, so asking again for a pair that still
+  /// has none is not progress. With a BGRA32 <em>source</em> the next question is BGRA32 to BGRA32;
+  /// with a BGRA32 <em>target</em> it is the very question that just failed. Either way the recursion
+  /// never terminates, and in .NET that is not an exception a caller can catch — a stack overflow
+  /// takes the whole process down, which in a test run looks like tests silently disappearing rather
+  /// than like a failure. Refusing turns it into something a caller can handle and a reader can read.
+  /// </remarks>
   private static byte[] _ConvertViaIntermediate(RawImage source, PixelFormat target) {
-    // Reaching the fallback with a BGRA32 source means the (Bgra32, target) pair has no direct route.
-    // Recursing would convert BGRA32 to itself forever and overflow the stack, so refuse instead.
-    if (source.Format == PixelFormat.Bgra32)
-      throw new NotSupportedException($"No conversion route from {PixelFormat.Bgra32} to {target}.");
+    if (source.Format == PixelFormat.Bgra32 || target == PixelFormat.Bgra32)
+      throw new NotSupportedException($"No conversion route from {source.Format} to {target}.");
 
     var bgra = Convert(source, PixelFormat.Bgra32);
     if (target == PixelFormat.Bgra32)

@@ -43,10 +43,7 @@ public sealed class FpxReaderTests {
   [Test]
   [Category("Unit")]
   public void FromBytes_TheOldInventedHeaderIsNotAFlashPixFile() {
-    // "FPX\0", a version, a width and a height, then raw RGB. That is what this reader used to
-    // accept and what the writer beside it used to produce, and no FlashPix file has ever looked
-    // like it — a FlashPix picture is a compound file.
-    var data = new byte[16 + 3];
+    var data = new byte[19];
     Encoding.ASCII.GetBytes("FPX\0").CopyTo(data, 0);
     BinaryPrimitives.WriteUInt32LittleEndian(data.AsSpan(8), 1);
     BinaryPrimitives.WriteUInt32LittleEndian(data.AsSpan(12), 1);
@@ -57,8 +54,6 @@ public sealed class FpxReaderTests {
   [Test]
   [Category("Unit")]
   public void FromBytes_ACompoundFileWithoutImageContentsIsRefused() {
-    // Renaming the stream leaves a compound file that is well formed and holds no picture, which is
-    // what a spreadsheet or a presentation under the same signature is.
     var data = FpxFixture.Document();
     FpxFixture.Rename(data, "Image Contents", "Workbook      ");
 
@@ -68,43 +63,54 @@ public sealed class FpxReaderTests {
   [Test]
   [Category("Unit")]
   public void FromBytes_ATileCountThatIsNotTheGridIsRefused() {
-    var data = FpxFixture.Document(tileCount: 2);
-
-    var thrown = Assert.Throws<InvalidDataException>(() => FpxReader.FromBytes(data));
+    var thrown = Assert.Throws<InvalidDataException>(() => FpxReader.FromBytes(FpxFixture.Document(tileCount: 2)));
     Assert.That(thrown!.Message, Does.Contain("tiles"));
   }
 
   [Test]
   [Category("Unit")]
-  public void FromBytes_ATileSideOtherThanSixtyFourIsRefused() {
-    Assert.Throws<InvalidDataException>(() => FpxReader.FromBytes(FpxFixture.Document(tileSide: 128)));
+  public void FromBytes_ATileWidthOtherThanSixtyFourIsRefused() {
+    Assert.Throws<InvalidDataException>(() => FpxReader.FromBytes(FpxFixture.Document(tileWidth: 128)));
   }
 
   [Test]
   [Category("Unit")]
-  public void FromBytes_ACompressionThatHasNotBeenCheckedIsRefused() {
+  public void FromBytes_ATileHeightOtherThanSixtyFourIsRefused() {
+    Assert.Throws<InvalidDataException>(() => FpxReader.FromBytes(FpxFixture.Document(tileHeight: 128)));
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void FromBytes_AnUndefinedCompressionIsRefused() {
     var thrown = Assert.Throws<InvalidDataException>(() => FpxReader.FromBytes(FpxFixture.Document(compression: 7)));
     Assert.That(thrown!.Message, Does.Contain("compression 7"));
   }
 
   [Test]
   [Category("Unit")]
-  public void FromBytes_ASingleColourTileFillsTheSubimage() {
-    // Luma at full with both chromas in the middle is white, which the conversion has to get right
-    // in both directions to produce.
-    var read = FpxReader.FromBytes(FpxFixture.Document());
+  public void FromBytes_AWrongSubimageClassIsRefused() {
+    var data = FpxFixture.Document();
+    FpxFixture.ReplaceGuid(data, new("00010000-C154-11CE-8553-00AA00A1F95B"), Guid.Empty);
+
+    var thrown = Assert.Throws<InvalidDataException>(() => FpxReader.FromBytes(data));
+    Assert.That(thrown!.Message, Does.Contain("class ID"));
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void FromBytes_ASingleNifRgbColourTileFillsTheSubimage() {
+    var read = FpxReader.FromBytes(FpxFixture.Document(subtype: 0x00112233));
 
     Assert.That(read.Width, Is.EqualTo(3));
     Assert.That(read.Height, Is.EqualTo(2));
-    Assert.That(read.PixelData.Length, Is.EqualTo(3 * 2 * 3));
-    Assert.That(read.PixelData[0], Is.EqualTo(255));
-    Assert.That(read.PixelData[1], Is.EqualTo(255));
-    Assert.That(read.PixelData[2], Is.EqualTo(255));
-    Assert.That(read.PixelData[^1], Is.EqualTo(255));
+    Assert.That(read.PixelData, Is.EqualTo(new byte[] {
+      0x33, 0x22, 0x11, 0x33, 0x22, 0x11, 0x33, 0x22, 0x11,
+      0x33, 0x22, 0x11, 0x33, 0x22, 0x11, 0x33, 0x22, 0x11,
+    }));
   }
 }
 
-/// <summary>Builds the smallest compound file that is a FlashPix picture.</summary>
+/// <summary>Builds focused synthetic FlashPix-in-CFB documents for malformed-reader cases.</summary>
 internal static class FpxFixture {
 
   private const int _SectorSize = 512;
@@ -113,33 +119,40 @@ internal static class FpxFixture {
   private const uint _FatSector = 0xFFFFFFFD;
   private const uint _Free = 0xFFFFFFFF;
 
-  internal static byte[] Document(int tileCount = 1, int tileSide = 64, int compression = 1) {
+  private static readonly Guid _ImageContentsClass = new("56616400-C154-11CE-8553-00AA00A1F95B");
+  private static readonly Guid _SubimageHeaderClass = new("00010000-C154-11CE-8553-00AA00A1F95B");
+  private static readonly Guid _SubimageDataClass = new("00010100-C154-11CE-8553-00AA00A1F95B");
 
-    var contents = new byte[56];
-    BinaryPrimitives.WriteUInt16LittleEndian(contents.AsSpan(0), 0xFFFE);
-    BinaryPrimitives.WriteUInt32LittleEndian(contents.AsSpan(24), 1);
-    BinaryPrimitives.WriteUInt32LittleEndian(contents.AsSpan(44), 48);
-    BinaryPrimitives.WriteUInt32LittleEndian(contents.AsSpan(48), 8);
-    BinaryPrimitives.WriteUInt32LittleEndian(contents.AsSpan(52), 0);
+  internal static byte[] Document(
+    int tileCount = 1,
+    int tileWidth = 64,
+    int tileHeight = 64,
+    int compression = 1,
+    uint subtype = 0x00FFFFFF) {
 
-    var header = new byte[64 + tileCount * 16];
-    BinaryPrimitives.WriteUInt32LittleEndian(header.AsSpan(32), 3);
-    BinaryPrimitives.WriteUInt32LittleEndian(header.AsSpan(36), 2);
-    BinaryPrimitives.WriteUInt32LittleEndian(header.AsSpan(40), (uint)tileCount);
-    BinaryPrimitives.WriteUInt32LittleEndian(header.AsSpan(44), (uint)tileSide);
+    var contents = _BuildImageContents();
+
+    var headerPayload = new byte[36 + tileCount * 16];
+    BinaryPrimitives.WriteUInt32LittleEndian(headerPayload.AsSpan(0), 36);
+    BinaryPrimitives.WriteUInt32LittleEndian(headerPayload.AsSpan(4), 3);
+    BinaryPrimitives.WriteUInt32LittleEndian(headerPayload.AsSpan(8), 2);
+    BinaryPrimitives.WriteUInt32LittleEndian(headerPayload.AsSpan(12), (uint)tileCount);
+    BinaryPrimitives.WriteUInt32LittleEndian(headerPayload.AsSpan(16), (uint)tileWidth);
+    BinaryPrimitives.WriteUInt32LittleEndian(headerPayload.AsSpan(20), (uint)tileHeight);
+    BinaryPrimitives.WriteUInt32LittleEndian(headerPayload.AsSpan(24), 3);
+    BinaryPrimitives.WriteUInt32LittleEndian(headerPayload.AsSpan(28), 36);
+    BinaryPrimitives.WriteUInt32LittleEndian(headerPayload.AsSpan(32), 16);
+
     for (var i = 0; i < tileCount; ++i) {
-      BinaryPrimitives.WriteUInt32LittleEndian(header.AsSpan(64 + i * 16), (uint)(i * 3));
-      BinaryPrimitives.WriteUInt32LittleEndian(header.AsSpan(68 + i * 16), 3);
-      BinaryPrimitives.WriteUInt32LittleEndian(header.AsSpan(72 + i * 16), (uint)compression);
-      BinaryPrimitives.WriteUInt32LittleEndian(header.AsSpan(76 + i * 16), 0);
+      var at = 36 + i * 16;
+      BinaryPrimitives.WriteUInt32LittleEndian(headerPayload.AsSpan(at), 0);
+      BinaryPrimitives.WriteUInt32LittleEndian(headerPayload.AsSpan(at + 4), 0);
+      BinaryPrimitives.WriteUInt32LittleEndian(headerPayload.AsSpan(at + 8), (uint)compression);
+      BinaryPrimitives.WriteUInt32LittleEndian(headerPayload.AsSpan(at + 12), subtype);
     }
 
-    var tiles = new byte[tileCount * 3];
-    for (var i = 0; i < tileCount; ++i) {
-      tiles[i * 3] = 255;
-      tiles[i * 3 + 1] = 128;
-      tiles[i * 3 + 2] = 128;
-    }
+    var header = _BuildFlashPixStream(_SubimageHeaderClass, headerPayload);
+    var tiles = _BuildFlashPixStream(_SubimageDataClass, []);
 
     return _Build([
       ("Data Object Store 000001", 1, []),
@@ -150,7 +163,6 @@ internal static class FpxFixture {
     ]);
   }
 
-  /// <summary>Overwrites a directory entry's name, leaving the rest of the file as it was.</summary>
   internal static void Rename(byte[] document, string from, string to) {
     var wanted = Encoding.Unicode.GetBytes(from);
     for (var at = _HeaderSize + _SectorSize; at + wanted.Length <= document.Length; at += 128) {
@@ -164,10 +176,69 @@ internal static class FpxFixture {
     throw new InvalidOperationException($"No directory entry named {from}.");
   }
 
-  private static byte[] _Build((string Name, byte Type, byte[] Data)[] entries) {
+  internal static void ReplaceGuid(byte[] document, Guid from, Guid to) {
+    Span<byte> wanted = stackalloc byte[16];
+    Span<byte> replacement = stackalloc byte[16];
+    from.TryWriteBytes(wanted);
+    to.TryWriteBytes(replacement);
 
-    // Sector 0 is the allocation table, sectors 1 and 2 the directory, and one sector each for the
-    // streams — enough that the reader has to walk every part of the structure.
+    for (var at = _HeaderSize; at + wanted.Length <= document.Length; ++at) {
+      if (!document.AsSpan(at, wanted.Length).SequenceEqual(wanted))
+        continue;
+
+      replacement.CopyTo(document.AsSpan(at));
+      return;
+    }
+
+    throw new InvalidOperationException($"No GUID {from:B} found in fixture.");
+  }
+
+  private static byte[] _BuildImageContents() {
+    const int sectionAt = 48;
+    const int propertyCount = 2;
+    const int tableSize = 8 + propertyCount * 8;
+    const int codePageSize = 8;
+    const int colorSize = 28;
+    var sectionSize = tableSize + codePageSize + colorSize;
+    var result = new byte[sectionAt + sectionSize];
+
+    BinaryPrimitives.WriteUInt16LittleEndian(result.AsSpan(0), 0xFFFE);
+    BinaryPrimitives.WriteUInt32LittleEndian(result.AsSpan(24), 1);
+    _ImageContentsClass.TryWriteBytes(result.AsSpan(28, 16));
+    BinaryPrimitives.WriteUInt32LittleEndian(result.AsSpan(44), sectionAt);
+    BinaryPrimitives.WriteUInt32LittleEndian(result.AsSpan(sectionAt), (uint)sectionSize);
+    BinaryPrimitives.WriteUInt32LittleEndian(result.AsSpan(sectionAt + 4), propertyCount);
+
+    var codePageAt = tableSize;
+    BinaryPrimitives.WriteUInt32LittleEndian(result.AsSpan(sectionAt + 8), 1);
+    BinaryPrimitives.WriteUInt32LittleEndian(result.AsSpan(sectionAt + 12), (uint)codePageAt);
+    BinaryPrimitives.WriteUInt32LittleEndian(result.AsSpan(sectionAt + codePageAt), 2);
+    BinaryPrimitives.WriteInt16LittleEndian(result.AsSpan(sectionAt + codePageAt + 4), 1200);
+
+    var colorAt = codePageAt + codePageSize;
+    BinaryPrimitives.WriteUInt32LittleEndian(result.AsSpan(sectionAt + 16), 0x02000002);
+    BinaryPrimitives.WriteUInt32LittleEndian(result.AsSpan(sectionAt + 20), (uint)colorAt);
+    BinaryPrimitives.WriteUInt32LittleEndian(result.AsSpan(sectionAt + colorAt), 65);
+    BinaryPrimitives.WriteUInt32LittleEndian(result.AsSpan(sectionAt + colorAt + 4), 20);
+    BinaryPrimitives.WriteUInt32LittleEndian(result.AsSpan(sectionAt + colorAt + 8), 1);
+    BinaryPrimitives.WriteUInt32LittleEndian(result.AsSpan(sectionAt + colorAt + 12), 3);
+    BinaryPrimitives.WriteUInt32LittleEndian(result.AsSpan(sectionAt + colorAt + 16), 0x00030000);
+    BinaryPrimitives.WriteUInt32LittleEndian(result.AsSpan(sectionAt + colorAt + 20), 0x00030001);
+    BinaryPrimitives.WriteUInt32LittleEndian(result.AsSpan(sectionAt + colorAt + 24), 0x00030002);
+    return result;
+  }
+
+  private static byte[] _BuildFlashPixStream(Guid classId, ReadOnlySpan<byte> payload) {
+    var result = new byte[28 + payload.Length];
+    BinaryPrimitives.WriteUInt16LittleEndian(result.AsSpan(0), 0xFFFE);
+    BinaryPrimitives.WriteUInt16LittleEndian(result.AsSpan(2), 0);
+    classId.TryWriteBytes(result.AsSpan(8, 16));
+    BinaryPrimitives.WriteUInt32LittleEndian(result.AsSpan(24), 1);
+    payload.CopyTo(result.AsSpan(28));
+    return result;
+  }
+
+  private static byte[] _Build((string Name, byte Type, byte[] Data)[] entries) {
     const int directorySectors = 2;
     var streamSectors = 0;
     foreach (var entry in entries)
@@ -185,8 +256,6 @@ internal static class FpxFixture {
     BinaryPrimitives.WriteUInt16LittleEndian(file.AsSpan(32), 6);
     BinaryPrimitives.WriteUInt32LittleEndian(file.AsSpan(44), 1);
     BinaryPrimitives.WriteUInt32LittleEndian(file.AsSpan(48), 1);
-    // A cutoff of nothing puts every stream in the ordinary allocation, so the fixture needs no
-    // short-sector table.
     BinaryPrimitives.WriteUInt32LittleEndian(file.AsSpan(56), 0);
     BinaryPrimitives.WriteUInt32LittleEndian(file.AsSpan(60), _EndOfChain);
     BinaryPrimitives.WriteUInt32LittleEndian(file.AsSpan(64), 0);
@@ -221,8 +290,6 @@ internal static class FpxFixture {
         ++nextSector;
       }
 
-      // Everything under one parent is threaded on the right, which an in-order walk reads as a
-      // list — a legal shape, and the one that keeps the fixture readable.
       var right = i + 1 < entries.Length && _ParentOf(entries, i) == _ParentOf(entries, i + 1)
         ? (uint)(i + 2)
         : _Free;
@@ -234,7 +301,6 @@ internal static class FpxFixture {
     return file;
   }
 
-  /// <summary>Which storage an entry sits under, by the order the fixture lists them in.</summary>
   private static int _ParentOf((string Name, byte Type, byte[] Data)[] entries, int index) {
     var parent = -1;
     for (var i = 0; i < index; ++i)
@@ -251,6 +317,7 @@ internal static class FpxFixture {
     bytes.CopyTo(file.AsSpan(at));
     BinaryPrimitives.WriteUInt16LittleEndian(file.AsSpan(at + 64), (ushort)(bytes.Length + 2));
     file[at + 66] = type;
+    file[at + 67] = 1;
     BinaryPrimitives.WriteUInt32LittleEndian(file.AsSpan(at + 68), left);
     BinaryPrimitives.WriteUInt32LittleEndian(file.AsSpan(at + 72), right);
     BinaryPrimitives.WriteUInt32LittleEndian(file.AsSpan(at + 76), child);

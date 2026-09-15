@@ -3,7 +3,18 @@ using FileFormat.Core;
 
 namespace FileFormat.HiresFliCrest;
 
-/// <summary>In-memory representation of a C64 Hires FLI by Crest (.hfc) image.</summary>
+/// <summary>In-memory representation of a Hires FLI Designer (.hfc) picture for the Commodore 64.</summary>
+/// <remarks>
+/// A high-resolution FLI screen: one bit a pixel choosing between the two colours the video matrix
+/// names, and eight matrices so every raster line of a cell names its own pair. The bitmap comes
+/// first here — given a whole eight kilobytes rather than the eight thousand it uses — and the eight
+/// matrices follow it a page apart, which is the granularity of the VIC-II's matrix pointer.
+/// <para/>
+/// It shows 112 rows and 296 columns. The rows are what the display routine has raster time for; the
+/// columns are the row less the three cells drawn before the switch that makes FLI work can happen.
+/// The old model said 320 by 200 and packed the matrices a thousand apart, which is neither.
+/// </remarks>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct HiresFliCrestFile
   : IImageFormatReader<HiresFliCrestFile>, IImageToRawImage<HiresFliCrestFile>,
     IImageFromRawImage<HiresFliCrestFile>, IImageFormatWriter<HiresFliCrestFile> {
@@ -12,109 +23,62 @@ public readonly record struct HiresFliCrestFile
   static string[] IImageFormatMetadata<HiresFliCrestFile>.FileExtensions => [".hfc", ".hfd"];
   static HiresFliCrestFile IImageFormatReader<HiresFliCrestFile>.FromSpan(ReadOnlySpan<byte> data) => HiresFliCrestReader.FromSpan(data);
   static byte[] IImageFormatWriter<HiresFliCrestFile>.ToBytes(HiresFliCrestFile file) => HiresFliCrestWriter.ToBytes(file);
+  static VideoMode[] IImageFormatMetadata<HiresFliCrestFile>.VideoModes => [
+    new("Hires FLI Designer", [(FixedWidth, FixedHeight)], [Commodore64Graphics.ColorCount])
+  ];
 
-  /// <summary>The fixed width of the image in pixels.</summary>
-  public const int FixedWidth = 320;
+  /// <summary>Pixels across the picture, the hardware being unable to colour the first 24 of a row.</summary>
+  public const int FixedWidth = Commodore64Fli.VisibleWidth;
 
-  /// <summary>The fixed height of the image in pixels.</summary>
-  public const int FixedHeight = 200;
+  /// <summary>Rows the display routine has time for.</summary>
+  public const int FixedHeight = 112;
 
   /// <summary>Size of the load address in bytes.</summary>
   internal const int LoadAddressSize = 2;
 
-  /// <summary>Size of the bitmap data section in bytes.</summary>
-  internal const int BitmapDataSize = 8000;
+  /// <summary>Where the bitmap starts: straight after the load address.</summary>
+  internal const int BitmapOffset = LoadAddressSize;
 
-  /// <summary>Size of a single screen RAM bank in bytes.</summary>
-  internal const int ScreenRamBankSize = 1000;
+  /// <summary>The bitmap is given a whole eight kilobytes, not the eight thousand it fills.</summary>
+  internal const int BitmapAreaSize = 8192;
 
-  /// <summary>Number of screen RAM banks (one per pixel row within a character cell).</summary>
-  internal const int ScreenRamBankCount = 8;
+  /// <summary>Where the video matrices start: after the bitmap's eight kilobytes.</summary>
+  internal const int MatricesOffset = BitmapOffset + BitmapAreaSize;
 
-  /// <summary>Total size of all screen RAM banks in bytes.</summary>
-  internal const int TotalScreenRamSize = ScreenRamBankSize * ScreenRamBankCount;
+  /// <summary>The length of a whole picture, which is also what identifies it.</summary>
+  public const int FileSize = MatricesOffset + Commodore64Fli.MatrixAreaSize;
 
-  /// <summary>Minimum payload size in bytes (bitmap + 8 x screenRAM).</summary>
-  internal const int MinPayloadSize = BitmapDataSize + TotalScreenRamSize;
-
-  /// <summary>Default load address, the one the program itself writes.</summary>
+  /// <summary>Default load address, which puts the bitmap at the foot of the bank at $4000.</summary>
   internal const ushort DefaultLoadAddress = 0x4000;
 
-  /// <summary>Image width, always 320.</summary>
+  /// <summary>Image width, always 296.</summary>
   public int Width => FixedWidth;
 
-  /// <summary>Image height, always 200.</summary>
+  /// <summary>Image height, always 112.</summary>
   public int Height => FixedHeight;
 
   /// <summary>C64 memory load address (2 bytes, little-endian).</summary>
   public ushort LoadAddress { get; init; }
 
-  /// <summary>Raw payload data (entire file content after load address).</summary>
-  public byte[] RawData { get; init; }
+  /// <summary>The bitmap, a cell at a time, in the eight kilobytes the format gives it.</summary>
+  public byte[] BitmapData { get; init; }
 
-  /// <summary>Converts this Hires FLI image to a platform-independent <see cref="RawImage"/> in Rgb24 format.</summary>
-  public static RawImage ToRawImage(HiresFliCrestFile file) {
+  /// <summary>The eight video matrices, one after another, a whole page apiece.</summary>
+  public byte[] Matrices { get; init; }
 
-    const int width = FixedWidth;
-    const int height = FixedHeight;
-    var rgb = new byte[width * height * 3];
+  /// <summary>Converts this picture to a platform-independent <see cref="RawImage"/>.</summary>
+  public static RawImage ToRawImage(HiresFliCrestFile file)
+    => Commodore64Fli.DecodeHires(
+      file.BitmapData ?? [], file.Matrices ?? [], Commodore64Fli.MatrixStride, FixedHeight);
 
-    var hasScreen = file.RawData.Length >= BitmapDataSize + TotalScreenRamSize;
-
-    for (var y = 0; y < height; ++y)
-      for (var x = 0; x < width; ++x) {
-        var cellX = x / 8;
-        var cellY = y / 8;
-        var cellIndex = cellY * 40 + cellX;
-        var byteInCell = y % 8;
-        var bitmapOffset = cellIndex * 8 + byteInCell;
-        var bitmapByte = bitmapOffset < file.RawData.Length ? file.RawData[bitmapOffset] : (byte)0;
-        var bitPosition = 7 - (x % 8);
-        var bitValue = (bitmapByte >> bitPosition) & 1;
-
-        int colorIndex;
-        if (hasScreen) {
-          var screenBank = byteInCell;
-          var screenOffset = BitmapDataSize + screenBank * ScreenRamBankSize + cellIndex;
-          var screenByte = screenOffset < file.RawData.Length ? file.RawData[screenOffset] : (byte)0;
-          colorIndex = bitValue == 1
-            ? (screenByte >> 4) & 0x0F
-            : screenByte & 0x0F;
-        } else
-          colorIndex = bitValue == 1 ? 1 : 0;
-
-        var color = Commodore64Graphics.HexColors[colorIndex];
-        var offset = (y * width + x) * 3;
-        rgb[offset] = (byte)((color >> 16) & 0xFF);
-        rgb[offset + 1] = (byte)((color >> 8) & 0xFF);
-        rgb[offset + 2] = (byte)(color & 0xFF);
-      }
-
-    return new() {
-      Width = width,
-      Height = height,
-      Format = PixelFormat.Rgb24,
-      PixelData = rgb,
-    };
-  }
-
-
-  /// <summary>Encodes a picture as a hires FLI screen, scaling it to 320x200 first.</summary>
-  /// <remarks>
-  /// FLI swaps the video matrix on every raster line, so each of the eight rows of a character cell
-  /// picks its own two colours. The encoder chooses them row by row, which is exactly how
-  /// <see cref="ToRawImage"/> reads them back with the bank selected by the row within the cell.
-  /// </remarks>
+  /// <summary>Encodes a picture as a Hires FLI screen, scaling it to 296x112 first.</summary>
   public static HiresFliCrestFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
 
-    var rgb = image.SampleTo(FixedWidth, FixedHeight).PixelData;
-    var raw = new byte[MinPayloadSize];
-    Commodore64Graphics.EncodeHiresFli(
-      rgb, FixedWidth, FixedHeight,
-      raw.AsSpan(0, BitmapDataSize), raw.AsSpan(BitmapDataSize, TotalScreenRamSize), ScreenRamBankSize);
+    var bitmap = new byte[BitmapAreaSize];
+    var matrices = new byte[Commodore64Fli.MatrixAreaSize];
+    Commodore64Fli.EncodeHires(image, FixedHeight, 0, bitmap, matrices, Commodore64Fli.MatrixStride);
 
-    return new() { LoadAddress = DefaultLoadAddress, RawData = raw };
+    return new() { LoadAddress = DefaultLoadAddress, BitmapData = bitmap, Matrices = matrices };
   }
-
 }

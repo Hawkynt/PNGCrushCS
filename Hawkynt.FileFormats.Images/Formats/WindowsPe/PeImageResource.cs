@@ -15,8 +15,15 @@ public enum PeImageResourceType {
 /// <summary>A single image resource extracted from a PE file.</summary>
 public sealed class PeImageResource {
 
-  /// <summary>The resource type.</summary>
+  /// <summary>The image-level interpretation of the resource.</summary>
   public PeImageResourceType ResourceType { get; init; }
+
+  /// <summary>
+  /// Numeric PE resource type that owns this image. Icons and cursors name their group resource
+  /// types (RT_GROUP_ICON=14, RT_GROUP_CURSOR=12); bitmaps use RT_BITMAP=2; embedded images retain
+  /// the custom or predefined type under which their payload was found.
+  /// </summary>
+  public int ResourceTypeId { get; init; }
 
   /// <summary>The resource ID within its type category.</summary>
   public int ResourceId { get; init; }

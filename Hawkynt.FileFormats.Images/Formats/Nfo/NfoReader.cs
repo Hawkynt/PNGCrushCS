@@ -13,12 +13,7 @@ public static class NfoReader {
     return FromBytes(File.ReadAllBytes(file.FullName));
   }
 
-  public static NfoFile FromStream(Stream stream) {
-    ArgumentNullException.ThrowIfNull(stream);
-    using var ms = new MemoryStream();
-    stream.CopyTo(ms);
-    return FromBytes(ms.ToArray());
-  }
+  public static NfoFile FromStream(Stream stream) => FromBytes(StreamBytes.ReadAll(stream));
 
   public static NfoFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

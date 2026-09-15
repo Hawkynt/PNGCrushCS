@@ -40,35 +40,37 @@ public sealed class GifOptimizer {
     IProgress<OptimizationProgress>? progress = null) {
     var combos = this._GenerateCombinations();
 
-    // Determine if two-phase optimization applies
-    var hasDeferred = this._options.EnableTwoPhaseOptimization &&
-                      combos.Any(c => c.LzwMode == LzwMode.DeferredClear);
+    // Two-phase screening: every combo is first tried on the screening LZW mode alone, and the other
+    // modes are then run only against the handful of combos that screened best. That keeps each extra
+    // LZW mode worth Phase2CandidateCount trials instead of multiplying the whole cartesian product,
+    // which is what lets a third mode be on by default.
+    var hasModesToScreen = this._options.EnableTwoPhaseOptimization &&
+                           combos.Any(c => c.LzwMode != _ScreeningLzwMode);
 
     List<(GifOptimizationCombo combo, GifOptimizationResult result)>? phase1Results = null;
     GifOptimizationCombo[] finalCombos;
-    if (hasDeferred) {
-      // Phase 1: test all combos with Standard only
-      var phase1Combos = combos.Select(c =>
-        c.LzwMode == LzwMode.DeferredClear ? c with { LzwMode = LzwMode.Standard } : c
-      ).Distinct().ToArray();
+    if (hasModesToScreen) {
+      // Phase 1: test every combo on the screening mode only.
+      var phase1Combos = combos
+        .Select(c => c.LzwMode == _ScreeningLzwMode ? c : c with { LzwMode = _ScreeningLzwMode })
+        .Distinct()
+        .ToArray();
 
       phase1Results = await this._RunCombos(phase1Combos, cancellationToken, progress, "Screening");
       cancellationToken.ThrowIfCancellationRequested();
       var topKeys = phase1Results
         .OrderBy(r => r.result.CompressedSize)
         .Take(this._options.Phase2CandidateCount)
-        .Select(r => (r.combo.PaletteStrategy, r.combo.UseGlobalColorTable, r.combo.OptimizeDisposal,
-          r.combo.TrimTransparentMargins, r.combo.ComputeFrameDiffs, r.combo.CompressionAwareDisposal))
+        .Select(r => _ComboKey(r.combo))
         .ToHashSet();
 
-      var standard = combos.Where(c => c.LzwMode == LzwMode.Standard).ToList();
-      var deferred = combos.Where(c =>
-        c.LzwMode == LzwMode.DeferredClear &&
-        topKeys.Contains((c.PaletteStrategy, c.UseGlobalColorTable, c.OptimizeDisposal,
-          c.TrimTransparentMargins, c.ComputeFrameDiffs, c.CompressionAwareDisposal))
-      ).ToList();
+      // Phase 2: every screening-mode combo, plus every other mode against the combos that screened best.
+      var screened = combos.Where(c => c.LzwMode == _ScreeningLzwMode).ToList();
+      var promoted = combos
+        .Where(c => c.LzwMode != _ScreeningLzwMode && topKeys.Contains(_ComboKey(c)))
+        .ToList();
 
-      finalCombos = [.. standard, .. deferred];
+      finalCombos = [.. screened, .. promoted];
     } else {
       finalCombos = combos;
     }
@@ -130,6 +132,28 @@ public sealed class GifOptimizer {
     return results;
   }
 
+  /// <summary>The LZW mode every combo is screened on. It has to be the mode that is never
+  /// catastrophic, so that a combo losing the screening round is genuinely unpromising rather than
+  /// just unlucky in its dictionary strategy.</summary>
+  private const LzwMode _ScreeningLzwMode = LzwMode.Standard;
+
+  /// <summary>Everything about a combo except its LZW mode — the identity phase 1 ranks and phase 2
+  /// promotes, so that screening a combo once covers every LZW mode of it.</summary>
+  private static (PaletteReorderStrategy PaletteStrategy, bool UseGlobalColorTable, bool OptimizeDisposal,
+    bool TrimTransparentMargins, bool ComputeFrameDiffs, bool CompressionAwareDisposal) _ComboKey(
+    GifOptimizationCombo combo)
+    => (combo.PaletteStrategy, combo.UseGlobalColorTable, combo.OptimizeDisposal,
+      combo.TrimTransparentMargins, combo.ComputeFrameDiffs, combo.CompressionAwareDisposal);
+
+  /// <summary>Maps a trial mode onto the codec's dictionary-full strategy. Internal rather than
+  /// private because it is the one place a new mode can be wired to the wrong strategy and still
+  /// produce plausible-looking output, so it is asserted directly rather than through file sizes.</summary>
+  internal static GifLzwCodec.ClearStrategy ToClearStrategy(LzwMode mode) => mode switch {
+    LzwMode.DeferredClear => GifLzwCodec.ClearStrategy.Adaptive,
+    LzwMode.FrozenDictionary => GifLzwCodec.ClearStrategy.Freeze,
+    _ => GifLzwCodec.ClearStrategy.Immediate,
+  };
+
   private GifOptimizationCombo[] _GenerateCombinations() {
     var combos = new List<GifOptimizationCombo>();
 
@@ -151,9 +175,11 @@ public sealed class GifOptimizer {
     if (this._options.TrimMargins && this._gif.Frames.Any(f => f.TransparentColorIndex.HasValue))
       trimModes.Add(true);
 
-    var lzwModes = new List<LzwMode> { LzwMode.Standard };
+    var lzwModes = new List<LzwMode> { _ScreeningLzwMode };
     if (this._options.TryDeferredClear)
       lzwModes.Add(LzwMode.DeferredClear);
+    if (this._options.TryFrozenDictionary)
+      lzwModes.Add(LzwMode.FrozenDictionary);
 
     var frameDiffModes = new List<bool> { false };
     if (this._options.TryFrameDifferencing && this._gif.Frames.Count > 1)
@@ -236,8 +262,10 @@ public sealed class GifOptimizer {
           localColorTable = palette;
         }
 
-        // LZW compress
-        var compressed = LzwCompressor.Compress(pixels, 8, combo.LzwMode == LzwMode.DeferredClear);
+        // LZW compress. The codec frames the bitstream into GIF sub-blocks and prefixes the LZW
+        // minimum code size, so what comes back is the complete image-data block.
+        var compressed = GifLzwCodec.Encode(pixels, 8,
+          GifLzwCodec.EncodeOptions.StandardCompression(ToClearStrategy(combo.LzwMode)));
 
         assembledFrames[i] = new AssembledFrame {
           CompressedData = compressed,
@@ -246,8 +274,7 @@ public sealed class GifOptimizer {
           LocalColorTable = localColorTable,
           Delay = frame.Delay,
           DisposalMethod = disposal,
-          TransparentColorIndex = transparentIndex,
-          BitsPerPixel = 8
+          TransparentColorIndex = transparentIndex
         };
       }
 

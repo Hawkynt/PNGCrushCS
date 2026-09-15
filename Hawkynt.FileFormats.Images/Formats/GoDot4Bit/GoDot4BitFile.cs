@@ -13,6 +13,7 @@ namespace FileFormat.GoDot4Bit;
 /// character cells — two bytes of where it was cut from, then the width and the height. Both are
 /// packed the same way and hold the same four bits a pixel, a character cell at a time.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.XnView)]
 public readonly record struct GoDot4BitFile
   : IImageFormatReader<GoDot4BitFile>, IImageToRawImage<GoDot4BitFile>,
     IImageFromRawImage<GoDot4BitFile>, IImageFormatWriter<GoDot4BitFile> {

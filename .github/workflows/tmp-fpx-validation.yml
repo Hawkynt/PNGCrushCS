@@ -1,0 +1,181 @@
+name: Temporary FlashPix validation
+
+on:
+  push:
+    branches: [images/fpx-read-write]
+
+permissions:
+  contents: write
+
+jobs:
+  validate:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: PNGCrushCS
+          fetch-depth: 0
+
+      - uses: actions/checkout@v4
+        with:
+          repository: Hawkynt/CompressionWorkbench
+          path: CompressionWorkbench
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.x
+            10.0.x
+
+      - name: Reconcile handwritten FlashPix state
+        working-directory: PNGCrushCS
+        shell: python
+        run: |
+          from pathlib import Path
+
+          detector = Path('Tests/Optimizer.Image.Tests/ImageFormatDetectorTests.cs')
+          text = detector.read_text(encoding='utf-8-sig')
+          old_name = '  public void DetectFromSignature_FpxMagic_ReturnsFpx() {'
+          new_name = '  public void DetectFromSignature_CompoundFileMagic_ReturnsUnknown() {'
+          if old_name in text:
+              start = text.rfind('  [Test]\n', 0, text.index(old_name))
+              end = text.find('\n  [Test]', text.index(old_name))
+              if start < 0 or end < 0:
+                  raise SystemExit('could not bound stale FPX detector test')
+              replacement = '''  [Test]
+          public void DetectFromSignature_CompoundFileMagic_ReturnsUnknown() {
+            // CFB is a container signature shared by Office and many unrelated formats. FlashPix identity
+            // lives in the structured-storage directory, which signature-only detection cannot inspect.
+            ReadOnlySpan<byte> header = [0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1, 0, 0, 0, 0, 0, 0, 0, 0];
+            Assert.That(ImageFormatDetector.DetectFromSignature(header), Is.EqualTo(ImageFormat.Unknown));
+          }
+
+          [Test]
+          public void DetectFromExtension_FpxExtension_ReturnsFpx()
+            => Assert.That(ImageFormatDetector.DetectFromExtension(new FileInfo("test.fpx")), Is.EqualTo(ImageFormat.Fpx));
+
+          [Test]
+          public void DetectFromExtension_MixExtension_ReturnsFpx()
+            => Assert.That(ImageFormatDetector.DetectFromExtension(new FileInfo("test.mix")), Is.EqualTo(ImageFormat.Fpx));
+          '''
+              text = text[:start] + replacement + text[end:]
+              detector.write_text(text, encoding='utf-8')
+          elif new_name not in text:
+              raise SystemExit('FPX detector test is in an unknown state')
+
+          reader = Path('Hawkynt.FileFormats.Images/Formats/Fpx/FpxReader.cs')
+          text = reader.read_text(encoding='utf-8-sig')
+          guard = '    if (imageContents.Color == ColorEncoding.Unknown)\n      throw new InvalidDataException("FlashPix Image Contents declares a colour encoding this reader does not recognize.");\n'
+          if guard not in text:
+              anchor = '    var canvas = new byte[checked(width * height * 3)];\n'
+              if text.count(anchor) != 1:
+                  raise SystemExit('FPX canvas anchor not unique')
+              reader.write_text(text.replace(anchor, guard + '\n' + anchor, 1), encoding='utf-8')
+
+          readme = Path('Hawkynt.FileFormats.Images/README.md')
+          text = readme.read_text(encoding='utf-8-sig')
+          if 'These 9 entries read but have no writer' in text:
+              text = text.replace('These 9 entries read but have no writer', 'These 8 entries read but have no writer', 1)
+          if 'PeResource, Fpx (executable, OLE and compound-document containers)' in text:
+              text = text.replace('PeResource, Fpx (executable, OLE and compound-document containers)', 'PeResource (executable container)', 1)
+          if 'These 8 entries read but have no writer' not in text or 'PeResource, Fpx' in text:
+              raise SystemExit('FPX read-only README paragraph is in an unknown state')
+          readme.write_text(text, encoding='utf-8')
+
+      - name: Build image package
+        working-directory: PNGCrushCS
+        run: >-
+          dotnet build Hawkynt.FileFormats.Images/Hawkynt.FileFormats.Images.csproj
+          -c Release -p:EnableWindowsTargeting=true
+
+      - name: Run focused FlashPix tests
+        working-directory: PNGCrushCS
+        run: >-
+          dotnet test Tests/Hawkynt.FileFormats.Images.Tests/Hawkynt.FileFormats.Images.Tests.csproj
+          -c Release -p:EnableWindowsTargeting=true
+          --filter "FullyQualifiedName~Fpx"
+
+      - name: Run detector tests
+        working-directory: PNGCrushCS
+        run: >-
+          dotnet test Tests/Optimizer.Image.Tests/Optimizer.Image.Tests.csproj
+          -c Release -p:EnableWindowsTargeting=true
+          --filter "FullyQualifiedName~DetectFromSignature_CompoundFileMagic_ReturnsUnknown|FullyQualifiedName~DetectFromExtension_FpxExtension_ReturnsFpx|FullyQualifiedName~DetectFromExtension_MixExtension_ReturnsFpx"
+
+      - name: Regenerate support matrix
+        working-directory: PNGCrushCS
+        env:
+          UPDATE_IMAGE_FORMAT_README: '1'
+        run: >-
+          dotnet test Tests/Hawkynt.FileFormats.Images.Tests/Hawkynt.FileFormats.Images.Tests.csproj
+          -c Release -p:EnableWindowsTargeting=true
+          --filter "FullyQualifiedName~FormatSupportReadmeTests"
+
+      - name: Regenerate package docs
+        uses: Hawkynt/RepositoryTemplate/package-readme@v1
+        with:
+          mode: write
+          root: PNGCrushCS
+          configuration: Release
+          project: PNGCrushCS/Hawkynt.FileFormats.Images/Hawkynt.FileFormats.Images.csproj
+
+      - name: Write external FPX probe
+        shell: bash
+        run: |
+          mkdir -p /tmp/fpxprobe
+          cat >/tmp/fpxprobe/fpxprobe.csproj <<EOF
+          <Project Sdk="Microsoft.NET.Sdk">
+            <PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net10.0</TargetFramework></PropertyGroup>
+            <ItemGroup><ProjectReference Include="$GITHUB_WORKSPACE/PNGCrushCS/Hawkynt.FileFormats.Images/Hawkynt.FileFormats.Images.csproj" /></ItemGroup>
+          </Project>
+          EOF
+          cat >/tmp/fpxprobe/Program.cs <<'EOF'
+          using System.IO;
+          using FileFormat.Fpx;
+          const int width = 65, height = 65;
+          var pixels = new byte[width * height * 3];
+          for (var y = 0; y < height; ++y)
+          for (var x = 0; x < width; ++x) {
+            var at = (y * width + x) * 3;
+            pixels[at] = (byte)(x * 3 + y);
+            pixels[at + 1] = (byte)(x + y * 5);
+            pixels[at + 2] = (byte)(x * 7 + y * 11);
+          }
+          File.WriteAllBytes("/tmp/probe.fpx", FpxWriter.ToBytes(new FpxFile { Width = width, Height = height, PixelData = pixels }));
+          EOF
+          dotnet run --project /tmp/fpxprobe/fpxprobe.csproj -c Release -p:EnableWindowsTargeting=true
+
+      - name: Decode written FPX with Pillow
+        shell: bash
+        run: |
+          python -m pip install --disable-pip-version-check pillow olefile
+          python - <<'PY'
+          from PIL import Image
+          im = Image.open('/tmp/probe.fpx')
+          im.load()
+          assert im.format == 'FPX', im.format
+          assert im.size == (65, 65), im.size
+          rgb = im.convert('RGB')
+          for y in range(65):
+              for x in range(65):
+                  expected = ((x * 3 + y) & 255, (x + y * 5) & 255, (x * 7 + y * 11) & 255)
+                  actual = rgb.getpixel((x, y))
+                  assert actual == expected, (x, y, actual, expected)
+          print('Pillow decoded all 4,225 FPX pixels exactly')
+          PY
+
+      - name: Commit reconciled and generated state
+        working-directory: PNGCrushCS
+        shell: bash
+        run: |
+          if git diff --quiet; then exit 0; fi
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add \
+            Hawkynt.FileFormats.Images/Formats/Fpx/FpxReader.cs \
+            Tests/Optimizer.Image.Tests/ImageFormatDetectorTests.cs \
+            Hawkynt.FileFormats.Images/README.md \
+            Hawkynt.FileFormats.Images/REFERENCE.md
+          git commit -m "* reconcile FlashPix detection and generated documentation"
+          git push origin HEAD:images/fpx-read-write

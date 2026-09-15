@@ -29,6 +29,7 @@ namespace FileFormat.Pixia;
 /// property table gives, and a layer whose visible flag is clear is left out — one sample has a
 /// hidden layer that puts a second outfit on the character if it is drawn.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.XnView)]
 public readonly record struct PixiaFile
   : IImageFormatReader<PixiaFile>, IImageToRawImage<PixiaFile>,
     IImageFromRawImage<PixiaFile>, IImageFormatWriter<PixiaFile> {

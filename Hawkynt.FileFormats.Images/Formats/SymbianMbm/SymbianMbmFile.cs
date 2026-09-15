@@ -7,6 +7,7 @@ namespace FileFormat.SymbianMbm;
 
 /// <summary>In-memory representation of a Symbian OS MBM (multi-bitmap) container.</summary>
 [FormatMagicBytes([0x37, 0x00, 0x00, 0x10])]
+[VerifiedBy(ConformanceOracle.XnView)]
 public readonly record struct SymbianMbmFile : IImageFormatReader<SymbianMbmFile>, IImageToRawImage<SymbianMbmFile>, IImageFromRawImage<SymbianMbmFile>, IImageFormatWriter<SymbianMbmFile> {
 
   static string IImageFormatMetadata<SymbianMbmFile>.PrimaryExtension => ".mbm";

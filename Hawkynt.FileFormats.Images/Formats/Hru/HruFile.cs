@@ -19,6 +19,7 @@ namespace FileFormat.Hru;
 /// size comes from the screen descriptor, and the check that it is the right size is that the coded
 /// data unpacks to exactly that many pixels and no more.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.XnView)]
 public readonly record struct HruFile
   : IImageFormatReader<HruFile>, IImageToRawImage<HruFile>,
     IImageFromRawImage<HruFile>, IImageFormatWriter<HruFile> {

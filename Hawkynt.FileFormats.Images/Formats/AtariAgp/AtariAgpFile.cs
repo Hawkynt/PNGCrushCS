@@ -11,7 +11,7 @@ namespace FileFormat.AtariAgp;
 /// lengths, with the registers nowhere at all — so every picture came out in the wrong colours if
 /// it could be opened, and no file another program wrote was the right length to open.
 /// </remarks>
-[VerifiedBy(ConformanceOracle.Recoil2Png)]
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.IrfanView)]
 public readonly record struct AtariAgpFile : IImageFormatReader<AtariAgpFile>, IImageToRawImage<AtariAgpFile>, IImageFromRawImage<AtariAgpFile>, IImageFormatWriter<AtariAgpFile> {
 
   /// <summary>Screen pixels across. Modes below 320 draw their pixels correspondingly wider.</summary>

@@ -20,7 +20,7 @@ namespace FileFormat.GraphSaurus7;
 /// The palette lives in a companion <c>.PL7</c>, sixteen two-byte entries and no header of its own.
 /// Without one the picture means the sixteen colours an MSX2 powers up with.
 /// </remarks>
-[VerifiedBy(ConformanceOracle.Recoil2Png)]
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.IrfanView)]
 public readonly record struct GraphSaurus7File
   : IImageFormatReader<GraphSaurus7File>, IImageToRawImage<GraphSaurus7File>,
     IImageFromRawImage<GraphSaurus7File>, IImageFormatWriter<GraphSaurus7File> {

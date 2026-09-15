@@ -15,7 +15,7 @@ namespace FileFormat.RagD;
 /// byte per pixel instead of spreading it across eight planes, which is the same picture in a
 /// layout a program can draw into without shifting bits.
 /// </remarks>
-[VerifiedBy(ConformanceOracle.Recoil2Png)]
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.IrfanView)]
 public readonly record struct RagDFile
   : IImageFormatReader<RagDFile>, IImageToRawImage<RagDFile>,
     IImageFromRawImage<RagDFile>, IImageFormatWriter<RagDFile> {

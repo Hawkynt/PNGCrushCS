@@ -4,7 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.Ptif;
 
 /// <summary>In-memory representation of a PTIF (Pyramid TIFF) image. Only the first (full-resolution) IFD is used.</summary>
-[VerifiedBy(ConformanceOracle.ImageMagick, ConformanceOracle.FFmpeg)]
+[VerifiedBy(ConformanceOracle.ImageMagick, ConformanceOracle.FFmpeg, ConformanceOracle.IrfanView)]
 public readonly record struct PtifFile : IImageFormatReader<PtifFile>, IImageToRawImage<PtifFile>, IImageFromRawImage<PtifFile>, IImageFormatWriter<PtifFile> {
 
   static string IImageFormatMetadata<PtifFile>.PrimaryExtension => ".ptif";

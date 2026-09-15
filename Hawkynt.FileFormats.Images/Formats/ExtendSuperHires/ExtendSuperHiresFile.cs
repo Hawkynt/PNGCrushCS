@@ -14,7 +14,7 @@ namespace FileFormat.ExtendSuperHires;
 /// eight sprites across and just under ten down, which is what a C64 can display without the
 /// multiplexing that would cost the processor.
 /// </remarks>
-[VerifiedBy(ConformanceOracle.Recoil2Png)]
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.IrfanView)]
 public readonly record struct ExtendSuperHiresFile
   : IImageFormatReader<ExtendSuperHiresFile>, IImageToRawImage<ExtendSuperHiresFile>,
     IImageFromRawImage<ExtendSuperHiresFile>, IImageFormatWriter<ExtendSuperHiresFile> {

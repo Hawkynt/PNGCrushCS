@@ -9,7 +9,7 @@ namespace FileFormat.Blazon;
 /// another, with the shared background register tucked into the gap behind the video matrix instead
 /// of following the colour RAM.
 /// </remarks>
-[VerifiedBy(ConformanceOracle.Recoil2Png)]
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.IrfanView)]
 public readonly record struct BlazonFile
   : IImageFormatReader<BlazonFile>, IImageToRawImage<BlazonFile>,
     IImageFromRawImage<BlazonFile>, IImageFormatWriter<BlazonFile> {

@@ -14,7 +14,7 @@ namespace FileFormat.AtariGfb;
 /// could be read by anything else. The name of the type is kept because that is what the extension
 /// is registered under.
 /// </remarks>
-[VerifiedBy(ConformanceOracle.Recoil2Png)]
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.IrfanView)]
 public readonly record struct AtariGfbFile : IImageFormatReader<AtariGfbFile>, IImageToRawImage<AtariGfbFile>, IImageFromRawImage<AtariGfbFile>, IImageFormatWriter<AtariGfbFile> {
 
   /// <summary>The four characters every one of these begins with.</summary>

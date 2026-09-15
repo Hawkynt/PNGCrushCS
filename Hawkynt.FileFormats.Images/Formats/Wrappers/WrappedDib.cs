@@ -39,12 +39,22 @@ internal static class WrappedDib {
     var planes = BinaryPrimitives.ReadUInt16LittleEndian(data[(at + 12)..]);
     var bits = BinaryPrimitives.ReadUInt16LittleEndian(data[(at + 14)..]);
     var compression = BinaryPrimitives.ReadInt32LittleEndian(data[(at + 16)..]);
-    if (planes != 1 || bits is not (1 or 4 or 8 or 16 or 24 or 32) || compression is not (0 or 1 or 2 or 3))
+    if (planes != 1 || bits is not (1 or 4 or 8 or 16 or 24 or 32))
       return -1;
 
-    // Height is signed: negative means the rows run top-down.
+    // RLE modes are defined only for their matching indexed depth; bit-field modes only for words.
+    if (compression switch {
+          0 => false,
+          1 => bits != 8,
+          2 => bits != 4,
+          3 or 6 => bits is not (16 or 32),
+          _ => true,
+        })
+      return -1;
+
+    // Height is signed: negative means the rows run top-down. RLE bitmaps cannot be top-down.
     var rows = Math.Abs((long)height);
-    if (width < 1 || width > maxDimension || rows < 1 || rows > maxDimension)
+    if (width < 1 || width > maxDimension || rows < 1 || rows > maxDimension || height < 0 && compression is 1 or 2)
       return -1;
 
     // A packed picture states its own length; an unpacked one is a stride times its rows.
@@ -62,9 +72,13 @@ internal static class WrappedDib {
     var bits = BinaryPrimitives.ReadUInt16LittleEndian(data[(at + 14)..]);
     var compression = BinaryPrimitives.ReadInt32LittleEndian(data[(at + 16)..]);
 
-    // A 40-byte BITMAPINFOHEADER keeps BI_BITFIELDS' RGB masks immediately after the header.
-    // V4/V5 headers carry the masks inside the header itself and therefore need no extra bytes here.
-    var offset = size + (size == 40 && compression == 3 ? 12 : 0);
+    // A 40-byte BITMAPINFOHEADER keeps bit-field masks immediately after the header. V2 and later
+    // headers carry those masks inside the header itself. BI_ALPHABITFIELDS adds a fourth mask.
+    var offset = size + (size == 40 ? compression switch {
+      3 => 12,
+      6 => 16,
+      _ => 0,
+    } : 0);
     if (bits > 8)
       return offset;
 

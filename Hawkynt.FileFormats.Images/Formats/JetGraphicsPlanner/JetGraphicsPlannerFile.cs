@@ -14,7 +14,7 @@ namespace FileFormat.JetGraphicsPlanner;
 /// what lets a mode 4 screen show five colours from four registers, and why the second half of the
 /// sheet looks different from the first even where the shapes repeat.
 /// </remarks>
-[VerifiedBy(ConformanceOracle.Recoil2Png)]
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.IrfanView)]
 public readonly record struct JetGraphicsPlannerFile
   : IImageFormatReader<JetGraphicsPlannerFile>, IImageToRawImage<JetGraphicsPlannerFile>,
     IImageFromRawImage<JetGraphicsPlannerFile>, IImageFormatWriter<JetGraphicsPlannerFile> {

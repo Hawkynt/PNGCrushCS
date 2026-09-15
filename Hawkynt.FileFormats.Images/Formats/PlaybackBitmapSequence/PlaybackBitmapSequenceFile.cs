@@ -22,6 +22,7 @@ namespace FileFormat.PlaybackBitmapSequence;
 /// the six bytes, is not known, so one picture is read — the one the format's own header leads to.
 /// </remarks>
 [FormatMagicBytes([0x42, 0x4D, 0x53, 0x57, 0x69, 0x6E, 0x50, 0x6C, 0x61, 0x79])]
+[VerifiedBy(ConformanceOracle.XnView)]
 public readonly record struct PlaybackBitmapSequenceFile
   : IImageFormatReader<PlaybackBitmapSequenceFile>, IImageToRawImage<PlaybackBitmapSequenceFile>, IImageFromRawImage<PlaybackBitmapSequenceFile>, IImageFormatWriter<PlaybackBitmapSequenceFile> {
 

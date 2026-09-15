@@ -16,17 +16,7 @@ public static class HdrReader {
     return FromBytes(File.ReadAllBytes(file.FullName));
   }
 
-  public static HdrFile FromStream(Stream stream) {
-    ArgumentNullException.ThrowIfNull(stream);
-    if (stream.CanSeek) {
-      var data = new byte[stream.Length - stream.Position];
-      stream.ReadExactly(data);
-      return FromBytes(data);
-    }
-    using var ms = new MemoryStream();
-    stream.CopyTo(ms);
-    return FromBytes(ms.ToArray());
-  }
+  public static HdrFile FromStream(Stream stream) => FromBytes(StreamBytes.ReadAll(stream));
 
   public static HdrFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

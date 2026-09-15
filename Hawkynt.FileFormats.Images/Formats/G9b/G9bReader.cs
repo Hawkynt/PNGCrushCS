@@ -16,17 +16,7 @@ public static class G9bReader {
     return FromBytes(File.ReadAllBytes(file.FullName));
   }
 
-  public static G9bFile FromStream(Stream stream) {
-    ArgumentNullException.ThrowIfNull(stream);
-    if (stream.CanSeek) {
-      var data = new byte[stream.Length - stream.Position];
-      stream.ReadExactly(data);
-      return FromBytes(data);
-    }
-    using var ms = new MemoryStream();
-    stream.CopyTo(ms);
-    return FromBytes(ms.ToArray());
-  }
+  public static G9bFile FromStream(Stream stream) => FromBytes(StreamBytes.ReadAll(stream));
 
   public static G9bFile FromSpan(ReadOnlySpan<byte> data) {
     if (data.Length < G9bFile.FixedHeaderSize + 1)

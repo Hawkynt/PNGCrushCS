@@ -81,6 +81,15 @@ public class AfliLayoutTests {
   }
 
   [Test]
+  public void Afli_IsWrittenAtTheLengthThatIdentifiesIt() {
+    // An AFLI has no signature, so its length is what says it is one: the whole sixteen-kilobyte
+    // block. Stopping at the last byte of the bitmap makes a file only our own reader can open.
+    var bytes = AfliWriter.ToBytes(AfliReader.FromBytes(_BuildAfli(191)));
+
+    Assert.That(bytes, Has.Length.EqualTo(16385));
+  }
+
+  [Test]
   public void Afli_RoundTripsThroughItsOwnWriter() {
     var original = AfliReader.FromBytes(_BuildAfli(191));
 

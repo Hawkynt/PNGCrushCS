@@ -13,7 +13,7 @@ namespace FileFormat.Uimg;
 /// The extension says the same thing as the header — b for bitplanes, c for chunky, and the digit
 /// for the bytes a pixel takes — which is how a program could pick a file without opening it.
 /// </remarks>
-[VerifiedBy(ConformanceOracle.Recoil2Png)]
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.IrfanView)]
 public readonly record struct UimgFile
   : IImageFormatReader<UimgFile>, IImageToRawImage<UimgFile>,
     IImageFromRawImage<UimgFile>, IImageFormatWriter<UimgFile> {

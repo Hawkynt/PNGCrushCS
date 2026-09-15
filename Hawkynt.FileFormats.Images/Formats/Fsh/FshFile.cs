@@ -7,6 +7,7 @@ namespace FileFormat.Fsh;
 
 /// <summary>In-memory representation of an FSH (EA Sports Shape/Texture) archive.</summary>
 [FormatMagicBytes([0x53, 0x48, 0x50, 0x49])]
+[VerifiedBy(ConformanceOracle.XnView)]
 public readonly record struct FshFile : IImageFormatReader<FshFile>, IImageToRawImage<FshFile>, IImageFromRawImage<FshFile>, IImageFormatWriter<FshFile> {
 
   static string IImageFormatMetadata<FshFile>.PrimaryExtension => ".fsh";

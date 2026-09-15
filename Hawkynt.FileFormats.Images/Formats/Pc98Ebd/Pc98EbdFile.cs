@@ -13,6 +13,7 @@ namespace FileFormat.Pc98Ebd;
 /// looking: a byte whose halves are equal is a widened four-bit value, and a file where that does
 /// not hold everywhere must have its high nibbles clear or it is not a palette at all.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct Pc98EbdFile
   : IImageFormatReader<Pc98EbdFile>, IImageToRawImage<Pc98EbdFile>,
     IImageFromRawImage<Pc98EbdFile>, IImageFormatWriter<Pc98EbdFile> {
@@ -40,8 +41,15 @@ public readonly record struct Pc98EbdFile
   static Pc98EbdFile IImageFormatReader<Pc98EbdFile>.FromSpan(ReadOnlySpan<byte> data)
     => Pc98EbdReader.FromSpan(data);
   static byte[] IImageFormatWriter<Pc98EbdFile>.ToBytes(Pc98EbdFile file) => Pc98EbdWriter.ToBytes(file);
+
+  /// <summary>The screen a picture written here takes: the machine's own 640 by 400.</summary>
+  /// <remarks>
+  /// A file read back may be shorter — the height comes from its length — but everything this
+  /// writes is the whole screen, and saying the height was unbounded meant nothing ever asked for
+  /// the one height it produces.
+  /// </remarks>
   static VideoMode[] IImageFormatMetadata<Pc98EbdFile>.VideoModes => [
-    new("EBD", [(Width, IntegerRange.Any)], [ColorCount])
+    new("EBD", [(Width, DefaultHeight)], [ColorCount])
   ];
 
   /// <summary>The whole file.</summary>

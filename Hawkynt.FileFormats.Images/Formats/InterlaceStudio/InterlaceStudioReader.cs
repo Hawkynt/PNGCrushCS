@@ -14,28 +14,20 @@ public static class InterlaceStudioReader {
     return FromBytes(File.ReadAllBytes(file.FullName));
   }
 
-  public static InterlaceStudioFile FromStream(Stream stream) {
-    ArgumentNullException.ThrowIfNull(stream);
-    if (stream.CanSeek) {
-      var data = new byte[stream.Length - stream.Position];
-      stream.ReadExactly(data);
-      return FromBytes(data);
-    }
-
-    using var ms = new MemoryStream();
-    stream.CopyTo(ms);
-    return FromBytes(ms.ToArray());
-  }
+  public static InterlaceStudioFile FromStream(Stream stream) => FromBytes(StreamBytes.ReadAll(stream));
 
   public static InterlaceStudioFile FromSpan(ReadOnlySpan<byte> data) {
-    if (data.Length < InterlaceStudioFile.MinimumFileSize)
+    if (data.Length < InterlaceStudioFile.FileSize)
       throw new InvalidDataException(
-        $"An Interlace Studio picture takes at least {InterlaceStudioFile.MinimumFileSize} bytes; this file is {data.Length}.");
+        $"An Interlace Studio picture takes {InterlaceStudioFile.FileSize} bytes; this file is {data.Length}.");
 
     return new() {
       Header = data[..InterlaceStudioFile.HeaderSize].ToArray(),
       FirstFrame = data.Slice(InterlaceStudioFile.FirstFrameOffset, InterlaceStudioFile.FrameSize).ToArray(),
       SecondFrame = data.Slice(InterlaceStudioFile.SecondFrameOffset, InterlaceStudioFile.FrameSize).ToArray(),
+      Registers = data.Slice(
+        InterlaceStudioFile.RegistersOffset,
+        InterlaceStudioFile.RegisterTableCount * InterlaceStudioFile.RegisterTableSize).ToArray(),
     };
   }
 

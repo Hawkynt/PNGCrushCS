@@ -6,7 +6,7 @@ using FileFormat.Core;
 namespace FileFormat.Codecs;
 
 /// <summary>
-/// Decodes MPEG-1 video, ISO/IEC 11172-2: I, P and B pictures.
+/// Decodes MPEG-1 video, ISO/IEC 11172-2: I, P, B and D pictures.
 /// </summary>
 /// <remarks>
 /// The first codec in this library that is a codec — everything before it either handed the packet to
@@ -17,17 +17,23 @@ namespace FileFormat.Codecs;
 /// (<see cref="MpegMotionCompensation"/>) and prediction from the pictures either side
 /// (<see cref="MpegPictureDecoder"/>).
 /// <para/>
-/// <b>What it does not do refuses by name.</b> A D picture, a forbidden picture type, a quantiser
-/// scale of zero, a motion vector that points off the reference, a picture whose slices leave
-/// macroblocks uncoded — each of those throws, naming the field and the clause. It does not have a
-/// <c>catch</c> that hands back a blank or a repeated frame anywhere, because a plausible wrong
-/// picture is worse than a refusal: nobody checks a picture that looks like a picture.
+/// D pictures take the separate syntax ISO/IEC 11172-2 defines for fast still-picture access: every
+/// macroblock is intra, each block stops after its differential DC coefficient, there is no End of
+/// Block code, and the macroblock ends with a one-bit marker. MPEG-2 deliberately removes that mode,
+/// so picture_coding_type 4 is rejected there rather than being interpreted as MPEG-1 syntax.
+/// <para/>
+/// <b>What it does not do refuses by name.</b> A forbidden picture type, a quantiser scale of zero, a
+/// motion vector that points off the reference, a picture whose slices leave macroblocks uncoded —
+/// each of those throws, naming the field and the clause. It does not have a <c>catch</c> that hands
+/// back a blank or a repeated frame anywhere, because a plausible wrong picture is worse than a
+/// refusal: nobody checks a picture that looks like a picture.
 /// <para/>
 /// <b>Measured.</b> Thirty-one encoded streams were decoded here and by ffmpeg and compared plane by
 /// plane, sample by sample, every frame — static and moving content, sizes that are and are not whole
 /// macroblocks, 16x16 to 704x480, quantiser scales from 1 to 31, loaded quantiser matrices, one slice
 /// per row and six, groups of pictures open and closed, and sequences with no B pictures and with
-/// four between anchors. Every stream produced the frame count ffprobe counts.
+/// four between anchors. Every stream produced the frame count ffprobe counts. D pictures are covered
+/// by bit-exact syntax fixtures because ffmpeg's MPEG-1 encoder does not emit them.
 /// <para/>
 /// Against ffmpeg's floating-point inverse transform (<c>-idct faani</c>) sixteen of the thirty-one
 /// are identical byte for byte on every frame, and the other fifteen differ in at most thirty-two

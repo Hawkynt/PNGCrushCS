@@ -14,18 +14,7 @@ public static class LastWordFontReader {
     return FromBytes(File.ReadAllBytes(file.FullName));
   }
 
-  public static LastWordFontFile FromStream(Stream stream) {
-    ArgumentNullException.ThrowIfNull(stream);
-    if (stream.CanSeek) {
-      var data = new byte[stream.Length - stream.Position];
-      stream.ReadExactly(data);
-      return FromBytes(data);
-    }
-
-    using var ms = new MemoryStream();
-    stream.CopyTo(ms);
-    return FromBytes(ms.ToArray());
-  }
+  public static LastWordFontFile FromStream(Stream stream) => FromBytes(StreamBytes.ReadAll(stream));
 
   public static LastWordFontFile FromSpan(ReadOnlySpan<byte> data) {
     // No header of any kind; the fixed size is the only thing identifying it.

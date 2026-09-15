@@ -14,18 +14,7 @@ public static class OptocatReader {
     return FromBytes(File.ReadAllBytes(file.FullName));
   }
 
-  public static OptocatFile FromStream(Stream stream) {
-    ArgumentNullException.ThrowIfNull(stream);
-    if (stream.CanSeek) {
-      var buffer = new byte[stream.Length - stream.Position];
-      stream.ReadExactly(buffer);
-      return FromBytes(buffer);
-    }
-
-    using var memory = new MemoryStream();
-    stream.CopyTo(memory);
-    return FromBytes(memory.ToArray());
-  }
+  public static OptocatFile FromStream(Stream stream) => FromBytes(StreamBytes.ReadAll(stream));
 
   public static OptocatFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

@@ -13,6 +13,7 @@ namespace FileFormat.AtariPi8;
 /// picture would load into. It is present only when the address range it declares accounts for the
 /// rest of the file exactly, so the picture is a row shorter when it is.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct AtariPi8File
   : IImageFormatReader<AtariPi8File>, IImageToRawImage<AtariPi8File>,
     IImageFromRawImage<AtariPi8File>, IImageFormatWriter<AtariPi8File> {
@@ -43,9 +44,14 @@ public readonly record struct AtariPi8File
   static AtariPi8File IImageFormatReader<AtariPi8File>.FromSpan(ReadOnlySpan<byte> data)
     => AtariPi8Reader.FromSpan(data);
   static byte[] IImageFormatWriter<AtariPi8File>.ToBytes(AtariPi8File file) => AtariPi8Writer.ToBytes(file);
+  /// <summary>Both forms fill the screen, which is 320 by 192.</summary>
+  /// <remarks>
+  /// The writer fills it whatever height it is handed — a picture of any other height is scaled into
+  /// it — so declaring the height unbounded meant nothing ever asked for the one it writes.
+  /// </remarks>
   static VideoMode[] IImageFormatMetadata<AtariPi8File>.VideoModes => [
-    new("Graphics 15", [(Width, IntegerRange.Any)], [4]),
-    new("Graphics 8", [(Width, IntegerRange.Any)], [2]),
+    new("Graphics 15", [(Width, FullHeight)], [4]),
+    new("Graphics 8", [(Width, FullHeight)], [2]),
   ];
 
   /// <summary>The whole file.</summary>

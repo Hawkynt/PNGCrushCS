@@ -33,13 +33,7 @@ public static class PixelPowerCollageReader {
     return _Parse(File.ReadAllBytes(file.FullName), file.Name);
   }
 
-  public static PixelPowerCollageFile FromStream(Stream stream) {
-    ArgumentNullException.ThrowIfNull(stream);
-
-    using var ms = new MemoryStream();
-    stream.CopyTo(ms);
-    return FromSpan(ms.ToArray());
-  }
+  public static PixelPowerCollageFile FromStream(Stream stream) => FromSpan(StreamBytes.ReadAll(stream));
 
   public static PixelPowerCollageFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

@@ -5,6 +5,7 @@ namespace FileFormat.SoftImage;
 
 /// <summary>In-memory representation of a Softimage PIC image.</summary>
 [FormatMagicBytes([0x53, 0x80, 0xF6, 0x34])]
+[VerifiedBy(ConformanceOracle.XnView)]
 public readonly record struct SoftImageFile : IImageFormatReader<SoftImageFile>, IImageToRawImage<SoftImageFile>, IImageFromRawImage<SoftImageFile>, IImageFormatWriter<SoftImageFile> {
 
   /// <summary>Magic number identifying a Softimage PIC file (0x5380F634).</summary>

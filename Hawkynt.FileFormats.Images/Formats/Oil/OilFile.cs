@@ -4,6 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.Oil;
 
 /// <summary>In-memory representation of an OIL (Open Image Library) picture.</summary>
+[VerifiedBy(ConformanceOracle.XnView)]
 public readonly record struct OilFile : IImageFormatReader<OilFile>, IImageToRawImage<OilFile>, IImageFromRawImage<OilFile>, IImageFormatWriter<OilFile> {
 
   public static ReadOnlySpan<byte> Signature => "OIL\0"u8;

@@ -20,7 +20,9 @@ namespace FileFormat.Codecs.Vp3;
 /// <para/>
 /// Decoding walks the tree one bit at a time rather than peeking a fixed width and indexing a flat
 /// table. The widest code VP3 has is fifteen bits, so a flat table would be thirty-two thousand cells
-/// per codebook and there are eighty codebooks; the tree is sixty-three nodes.
+/// per codebook and there are eighty codebooks; the tree is sixty-three nodes. Encoding keeps the
+/// inverse mapping beside that tree, so the writer uses the exact same transcribed codebooks rather
+/// than maintaining a second set of constants that could drift away from the reader.
 /// </remarks>
 internal sealed class Vp3VlcTable {
 
@@ -46,6 +48,9 @@ internal sealed class Vp3VlcTable {
   /// </remarks>
   private readonly int[] _values;
 
+  /// <summary>The bit pattern and width belonging to each value, used by the encoder.</summary>
+  private readonly Dictionary<int, (uint Bits, int Length)> _codes;
+
   /// <summary>
   /// Builds a table from entries written as <c>"code:value code:value …"</c>.
   /// </summary>
@@ -56,9 +61,20 @@ internal sealed class Vp3VlcTable {
 
     var children = new List<int> { _UNSET, _UNSET };
     var values = new List<int> { 0, 0 };
+    var codes = new Dictionary<int, (uint Bits, int Length)>();
     foreach (var (code, value) in entries) {
       if (code.Length is 0 or > 32)
         throw new ArgumentException($"{name}: the code '{code}' is not between one and thirty-two bits long.");
+
+      var encoded = 0U;
+      foreach (var bit in code) {
+        if (bit is not ('0' or '1'))
+          throw new ArgumentException($"{name}: the code '{code}' contains something other than zero or one.");
+        encoded = encoded << 1 | (uint)(bit - '0');
+      }
+
+      if (!codes.TryAdd(value, (encoded, code.Length)))
+        throw new ArgumentException($"{name}: value {value} has more than one code, so encoding it would be ambiguous.");
 
       var node = 0;
       for (var i = 0; i < code.Length; ++i) {
@@ -101,6 +117,7 @@ internal sealed class Vp3VlcTable {
 
     this._children = [.. children];
     this._values = [.. values];
+    this._codes = codes;
   }
 
   /// <summary>Reads one code and returns the value it names.</summary>
@@ -116,6 +133,14 @@ internal sealed class Vp3VlcTable {
     }
 
     throw new InvalidOperationException($"{this._name}: the tree is deeper than any code in it.");
+  }
+
+  /// <summary>Writes the code naming <paramref name="value"/>.</summary>
+  internal void Write(Vp3BitWriter writer, int value) {
+    if (!this._codes.TryGetValue(value, out var code))
+      throw new ArgumentOutOfRangeException(nameof(value), value, $"{this._name} has no code for this value.");
+
+    writer.WriteBits(code.Bits, code.Length);
   }
 
   private static (string Code, int Value)[] _Parse(string entries) {

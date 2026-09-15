@@ -28,17 +28,7 @@ public static class AnalyzeReader {
     return _Parse(hdrBytes, imgBytes);
   }
 
-  public static AnalyzeFile FromStream(Stream stream) {
-    ArgumentNullException.ThrowIfNull(stream);
-    if (stream.CanSeek) {
-      var data = new byte[stream.Length - stream.Position];
-      stream.ReadExactly(data);
-      return FromBytes(data);
-    }
-    using var ms = new MemoryStream();
-    stream.CopyTo(ms);
-    return FromBytes(ms.ToArray());
-  }
+  public static AnalyzeFile FromStream(Stream stream) => FromBytes(StreamBytes.ReadAll(stream));
 
   /// <summary>Parses concatenated header+pixel data bytes (348-byte header followed by pixel data).</summary>
   public static AnalyzeFile FromSpan(ReadOnlySpan<byte> data) {

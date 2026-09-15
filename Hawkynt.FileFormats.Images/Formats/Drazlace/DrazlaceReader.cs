@@ -14,17 +14,7 @@ public static class DrazlaceReader {
     return FromBytes(File.ReadAllBytes(file.FullName));
   }
 
-  public static DrazlaceFile FromStream(Stream stream) {
-    ArgumentNullException.ThrowIfNull(stream);
-    if (stream.CanSeek) {
-      var data = new byte[stream.Length - stream.Position];
-      stream.ReadExactly(data);
-      return FromBytes(data);
-    }
-    using var ms = new MemoryStream();
-    stream.CopyTo(ms);
-    return FromBytes(ms.ToArray());
-  }
+  public static DrazlaceFile FromStream(Stream stream) => FromBytes(StreamBytes.ReadAll(stream));
 
   /// <summary>
   /// KNOWN WRONG. Reads the file, but not as a real Drazlace picture is laid out.

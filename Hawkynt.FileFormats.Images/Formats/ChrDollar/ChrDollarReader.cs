@@ -14,18 +14,7 @@ public static class ChrDollarReader {
     return FromBytes(File.ReadAllBytes(file.FullName));
   }
 
-  public static ChrDollarFile FromStream(Stream stream) {
-    ArgumentNullException.ThrowIfNull(stream);
-    if (stream.CanSeek) {
-      var data = new byte[stream.Length - stream.Position];
-      stream.ReadExactly(data);
-      return FromBytes(data);
-    }
-
-    using var ms = new MemoryStream();
-    stream.CopyTo(ms);
-    return FromBytes(ms.ToArray());
-  }
+  public static ChrDollarFile FromStream(Stream stream) => FromBytes(StreamBytes.ReadAll(stream));
 
   public static ChrDollarFile FromSpan(ReadOnlySpan<byte> data) {
     if (data.Length < 15 || data[0] != 'c' || data[1] != 'h' || data[2] != 'r' || data[3] != '$')

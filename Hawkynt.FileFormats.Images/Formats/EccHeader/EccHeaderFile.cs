@@ -16,6 +16,7 @@ namespace FileFormat.EccHeader;
 /// reader looks for the signature and then refuses the file unless the picture it found is the size
 /// the header promised, so a coincidental match cannot be drawn as if it were the picture.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.IrfanView)]
 public readonly record struct EccHeaderFile
   : IImageFormatReader<EccHeaderFile>, IImageToRawImage<EccHeaderFile>,
     IImageFromRawImage<EccHeaderFile>, IImageFormatWriter<EccHeaderFile> {

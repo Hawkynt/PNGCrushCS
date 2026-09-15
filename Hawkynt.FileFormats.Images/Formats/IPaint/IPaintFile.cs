@@ -15,7 +15,7 @@ namespace FileFormat.IPaint;
 /// The colour is optional: a file may simply end after its bitmap, in which case the picture is
 /// black on white.
 /// </remarks>
-[VerifiedBy(ConformanceOracle.Recoil2Png)]
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.IrfanView)]
 public readonly record struct IPaintFile
   : IImageFormatReader<IPaintFile>, IImageToRawImage<IPaintFile>,
     IImageFromRawImage<IPaintFile>, IImageFormatWriter<IPaintFile> {

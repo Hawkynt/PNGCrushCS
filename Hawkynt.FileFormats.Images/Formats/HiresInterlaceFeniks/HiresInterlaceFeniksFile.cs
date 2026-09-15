@@ -3,7 +3,20 @@ using FileFormat.Core;
 
 namespace FileFormat.HiresInterlaceFeniks;
 
-/// <summary>In-memory representation of a C64 Hires Interlace by Feniks (.hlf) image.</summary>
+/// <summary>In-memory representation of a Hires Interlace (.hlf) picture for the Commodore 64.</summary>
+/// <remarks>
+/// Two ordinary high-resolution screens shown on alternate television fields and averaged by the
+/// eye, which is how sixteen colours become a hundred or so. Each is a bitmap and one video matrix;
+/// there is no FLI here and no colour memory.
+/// <para/>
+/// The four parts are not stored in the order a description would name them. Counted from the load
+/// address the first bitmap is at 0, the second screen's video matrix at $2400, the first's at
+/// $2800 and the second bitmap at $4000 — the two matrices in the other order from the two bitmaps,
+/// and each on a page boundary because that is what the VIC-II's matrix pointer can address. What
+/// was written instead was 18002 bytes of bitmap, screen, bitmap, screen, which is the order of the
+/// sentence and not of the machine.
+/// </remarks>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct HiresInterlaceFeniksFile
   : IImageFormatReader<HiresInterlaceFeniksFile>, IImageToRawImage<HiresInterlaceFeniksFile>,
     IImageFromRawImage<HiresInterlaceFeniksFile>, IImageFormatWriter<HiresInterlaceFeniksFile> {
@@ -12,6 +25,9 @@ public readonly record struct HiresInterlaceFeniksFile
   static string[] IImageFormatMetadata<HiresInterlaceFeniksFile>.FileExtensions => [".hlf", ".hie"];
   static HiresInterlaceFeniksFile IImageFormatReader<HiresInterlaceFeniksFile>.FromSpan(ReadOnlySpan<byte> data) => HiresInterlaceFeniksReader.FromSpan(data);
   static byte[] IImageFormatWriter<HiresInterlaceFeniksFile>.ToBytes(HiresInterlaceFeniksFile file) => HiresInterlaceFeniksWriter.ToBytes(file);
+  static VideoMode[] IImageFormatMetadata<HiresInterlaceFeniksFile>.VideoModes => [
+    new("Hires Interlace", [(FixedWidth, FixedHeight)], [Commodore64Graphics.ColorCount])
+  ];
 
   /// <summary>The fixed width of the image in pixels.</summary>
   public const int FixedWidth = 320;
@@ -22,19 +38,28 @@ public readonly record struct HiresInterlaceFeniksFile
   /// <summary>Size of the load address in bytes.</summary>
   internal const int LoadAddressSize = 2;
 
-  /// <summary>Size of a single bitmap data section in bytes.</summary>
+  /// <summary>Size of one bitmap in bytes.</summary>
   internal const int BitmapDataSize = 8000;
 
-  /// <summary>Size of a single screen RAM section in bytes.</summary>
+  /// <summary>Size of one video matrix in bytes.</summary>
   internal const int ScreenRamSize = 1000;
 
-  /// <summary>Size of a single hires frame (bitmap + screen) in bytes.</summary>
-  internal const int FrameSize = BitmapDataSize + ScreenRamSize;
+  /// <summary>Where the first field's bitmap starts.</summary>
+  internal const int FirstBitmapOffset = LoadAddressSize;
 
-  /// <summary>Minimum payload size in bytes (bitmap1 + screen1 + bitmap2 + screen2).</summary>
-  internal const int MinPayloadSize = FrameSize * 2;
+  /// <summary>Where the second field's video matrix starts, which comes before the first field's.</summary>
+  internal const int SecondScreenOffset = LoadAddressSize + 0x2400;
 
-  /// <summary>Default load address, the one the program itself writes.</summary>
+  /// <summary>Where the first field's video matrix starts.</summary>
+  internal const int FirstScreenOffset = LoadAddressSize + 0x2800;
+
+  /// <summary>Where the second field's bitmap starts.</summary>
+  internal const int SecondBitmapOffset = LoadAddressSize + 0x4000;
+
+  /// <summary>The length of a whole picture, which is also what identifies it.</summary>
+  public const int FileSize = 24578;
+
+  /// <summary>Default load address, which puts the second field's bitmap at $6000.</summary>
   internal const ushort DefaultLoadAddress = 0x2000;
 
   /// <summary>Image width, always 320.</summary>
@@ -46,93 +71,54 @@ public readonly record struct HiresInterlaceFeniksFile
   /// <summary>C64 memory load address (2 bytes, little-endian).</summary>
   public ushort LoadAddress { get; init; }
 
-  /// <summary>Raw payload data (entire file content after load address).</summary>
-  public byte[] RawData { get; init; }
+  /// <summary>The first field's bitmap.</summary>
+  public byte[] FirstBitmap { get; init; }
 
-  /// <summary>Converts this Hires Interlace image to a platform-independent <see cref="RawImage"/> in Rgb24 format by averaging both hires frames.</summary>
+  /// <summary>The first field's video matrix, two colours to a cell.</summary>
+  public byte[] FirstScreen { get; init; }
+
+  /// <summary>The second field's bitmap.</summary>
+  public byte[] SecondBitmap { get; init; }
+
+  /// <summary>The second field's video matrix, two colours to a cell.</summary>
+  public byte[] SecondScreen { get; init; }
+
+  /// <summary>Converts this picture to a platform-independent <see cref="RawImage"/>.</summary>
   public static RawImage ToRawImage(HiresInterlaceFeniksFile file) {
-
-    const int width = FixedWidth;
-    const int height = FixedHeight;
-    var rgb = new byte[width * height * 3];
-
-    var hasBothFrames = file.RawData.Length >= MinPayloadSize;
-
-    for (var y = 0; y < height; ++y)
-      for (var x = 0; x < width; ++x) {
-        var cellX = x / 8;
-        var cellY = y / 8;
-        var cellIndex = cellY * 40 + cellX;
-        var byteInCell = y % 8;
-        var bitPosition = 7 - (x % 8);
-
-        var color1 = _DecodeHiresPixel(file.RawData, 0, cellIndex, byteInCell, bitPosition);
-        int r, g, b;
-
-        if (hasBothFrames) {
-          var color2 = _DecodeHiresPixel(file.RawData, FrameSize, cellIndex, byteInCell, bitPosition);
-          r = ((color1 >> 16) & 0xFF) + ((color2 >> 16) & 0xFF);
-          g = ((color1 >> 8) & 0xFF) + ((color2 >> 8) & 0xFF);
-          b = (color1 & 0xFF) + (color2 & 0xFF);
-          r /= 2;
-          g /= 2;
-          b /= 2;
-        } else {
-          r = (color1 >> 16) & 0xFF;
-          g = (color1 >> 8) & 0xFF;
-          b = color1 & 0xFF;
-        }
-
-        var offset = (y * width + x) * 3;
-        rgb[offset] = (byte)r;
-        rgb[offset + 1] = (byte)g;
-        rgb[offset + 2] = (byte)b;
-      }
+    var first = _Field(file.FirstBitmap ?? [], file.FirstScreen ?? []);
+    var second = _Field(file.SecondBitmap ?? [], file.SecondScreen ?? []);
 
     return new() {
-      Width = width,
-      Height = height,
+      Width = FixedWidth,
+      Height = FixedHeight,
       Format = PixelFormat.Rgb24,
-      PixelData = rgb,
+      PixelData = FrameBlend.Average(first, second),
     };
   }
 
-  /// <summary>Decodes a single hires pixel from a frame at the given base offset.</summary>
-  private static int _DecodeHiresPixel(byte[] rawData, int frameOffset, int cellIndex, int byteInCell, int bitPosition) {
-    var bitmapOffset = frameOffset + cellIndex * 8 + byteInCell;
-    var bitmapByte = bitmapOffset < rawData.Length ? rawData[bitmapOffset] : (byte)0;
-    var bitValue = (bitmapByte >> bitPosition) & 1;
-
-    var screenOffset = frameOffset + BitmapDataSize + cellIndex;
-    int colorIndex;
-    if (screenOffset < rawData.Length) {
-      var screenByte = rawData[screenOffset];
-      colorIndex = bitValue == 1
-        ? (screenByte >> 4) & 0x0F
-        : screenByte & 0x0F;
-    } else
-      colorIndex = bitValue == 1 ? 1 : 0;
-
-    return Commodore64Graphics.HexColors[colorIndex];
-  }
-
+  private static byte[] _Field(ReadOnlySpan<byte> bitmap, ReadOnlySpan<byte> screen)
+    => Commodore64Graphics.DecodeHires(bitmap, screen, FixedWidth, FixedHeight).PixelData;
 
   /// <summary>Encodes a picture as a Hires Interlace pair, scaling it to 320x200 first.</summary>
   /// <remarks>
-  /// Both fields get identical contents. Interlacing exists to mix colours the machine cannot show
-  /// at once, but <see cref="ToRawImage"/> reports the average of the two, so only a matching
-  /// pair reproduces the picture rather than a blend of two different ones.
+  /// Both fields get identical contents, so the average of the two is the field itself. Solving for
+  /// two fields whose average is nearer the original is what the format is for and is a different
+  /// problem from encoding one.
   /// </remarks>
   public static HiresInterlaceFeniksFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
 
     var rgb = image.SampleTo(FixedWidth, FixedHeight).PixelData;
-    var raw = new byte[MinPayloadSize];
-    Commodore64Graphics.EncodeHires(
-      rgb, FixedWidth, FixedHeight, raw.AsSpan(0, BitmapDataSize), raw.AsSpan(BitmapDataSize, ScreenRamSize));
-    raw.AsSpan(0, FrameSize).CopyTo(raw.AsSpan(FrameSize));
+    var bitmap = new byte[BitmapDataSize];
+    var screen = new byte[ScreenRamSize];
+    Commodore64Graphics.EncodeHires(rgb, FixedWidth, FixedHeight, bitmap, screen);
 
-    return new() { LoadAddress = DefaultLoadAddress, RawData = raw };
+    return new() {
+      LoadAddress = DefaultLoadAddress,
+      FirstBitmap = bitmap,
+      FirstScreen = screen,
+      SecondBitmap = (byte[])bitmap.Clone(),
+      SecondScreen = (byte[])screen.Clone(),
+    };
   }
-
 }

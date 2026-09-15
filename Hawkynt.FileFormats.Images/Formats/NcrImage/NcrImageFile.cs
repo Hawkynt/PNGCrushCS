@@ -4,6 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.NcrImage;
 
 /// <summary>In-memory representation of an NCR Image (.ncr).</summary>
+[VerifiedBy(ConformanceOracle.XnView)]
 public readonly record struct NcrImageFile : IImageFormatReader<NcrImageFile>, IImageToRawImage<NcrImageFile>, IImageFromRawImage<NcrImageFile>, IImageFormatWriter<NcrImageFile> {
 
   public static ReadOnlySpan<byte> Signature => [0x6E, 0x6E, 0x0A, 0x00];

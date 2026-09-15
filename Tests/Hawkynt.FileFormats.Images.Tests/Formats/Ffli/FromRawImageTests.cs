@@ -7,21 +7,22 @@ namespace FileFormat.Ffli.Tests;
 public sealed class FfliFromRawImageTests {
 
   /// <summary>
-  /// Alternating columns of black and one other machine colour, the second changing every character
-  /// cell.
+  /// Alternating multicolour pixels of black and one other machine colour, the second changing every
+  /// character cell.
   /// </summary>
   /// <remarks>
-  /// Two colours to a cell and to every raster line of one, which is inside what a multicolour FLI screen can hold,
-  /// so a round trip through it has to come back byte for byte. Half the picture being black also
-  /// settles the shared background register on black wherever the format has one to choose.
+  /// A multicolour pixel is drawn two wide, so the pairs are the unit here. Two colours to every
+  /// raster line of a cell is inside what a multicolour FLI screen holds, so a round trip through it
+  /// has to come back byte for byte, and half the picture being black settles the background on
+  /// black — which is the only thing this format can show for pattern 00.
   /// </remarks>
-  private static RawImage _Stripes(int width, int height) {
+  internal static RawImage Stripes(int width, int height) {
     var rgb = new byte[width * height * 3];
     for (var y = 0; y < height; ++y)
     for (var x = 0; x < width; ++x) {
-      var colour = x % 2 == 0
+      var colour = x / 2 % 2 == 0
         ? 0
-        : Commodore64Graphics.HexColors[(x / 4 + y / 8 * 3) % Commodore64Graphics.ColorCount];
+        : Commodore64Graphics.HexColors[(x / 8 + y / 8 * 3) % Commodore64Graphics.ColorCount];
 
       var at = (y * width + x) * 3;
       rgb[at] = (byte)(colour >> 16);
@@ -37,11 +38,11 @@ public sealed class FfliFromRawImageTests {
   [Test]
   [Category("Unit")]
   public void EncodeThenDecode_ReproducesAPictureTheFormatCanHold() {
-    var source = _Stripes(160, 200);
+    var source = Stripes(296, 200);
     var decoded = FfliFile.ToRawImage(FfliFile.FromRawImage(source));
 
     Assert.Multiple(() => {
-      Assert.That(decoded.Width, Is.EqualTo(160));
+      Assert.That(decoded.Width, Is.EqualTo(296));
       Assert.That(decoded.Height, Is.EqualTo(200));
       Assert.That(_Rgb(decoded), Is.EqualTo(_Rgb(source)));
     });
@@ -50,12 +51,10 @@ public sealed class FfliFromRawImageTests {
   [Test]
   [Category("Unit")]
   public void ADifferentlySizedPictureIsScaledRatherThanRefused() {
-    // The screen is one size and callers have whatever they have; refusing them would make encoding
-    // useful only to those who already knew the size.
-    var decoded = FfliFile.ToRawImage(FfliFile.FromRawImage(_Stripes(96, 72)));
+    var decoded = FfliFile.ToRawImage(FfliFile.FromRawImage(Stripes(96, 72)));
 
     Assert.Multiple(() => {
-      Assert.That(decoded.Width, Is.EqualTo(160));
+      Assert.That(decoded.Width, Is.EqualTo(296));
       Assert.That(decoded.Height, Is.EqualTo(200));
     });
   }
@@ -68,7 +67,7 @@ public sealed class FfliFromRawImageTests {
   [Test]
   [Category("Unit")]
   public void WhatIsEncodedSurvivesTheWriterAndTheReader() {
-    var file = FfliFile.FromRawImage(_Stripes(160, 200));
+    var file = FfliFile.FromRawImage(Stripes(296, 200));
     var restored = FfliReader.FromBytes(FfliWriter.ToBytes(file));
 
     Assert.That(_Rgb(FfliFile.ToRawImage(restored)), Is.EqualTo(_Rgb(FfliFile.ToRawImage(file))));

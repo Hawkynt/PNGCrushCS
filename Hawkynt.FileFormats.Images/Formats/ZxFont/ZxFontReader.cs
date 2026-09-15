@@ -14,18 +14,7 @@ public static class ZxFontReader {
     return FromBytes(File.ReadAllBytes(file.FullName));
   }
 
-  public static ZxFontFile FromStream(Stream stream) {
-    ArgumentNullException.ThrowIfNull(stream);
-    if (stream.CanSeek) {
-      var data = new byte[stream.Length - stream.Position];
-      stream.ReadExactly(data);
-      return FromBytes(data);
-    }
-
-    using var ms = new MemoryStream();
-    stream.CopyTo(ms);
-    return FromBytes(ms.ToArray());
-  }
+  public static ZxFontFile FromStream(Stream stream) => FromBytes(StreamBytes.ReadAll(stream));
 
   public static ZxFontFile FromSpan(ReadOnlySpan<byte> data) {
     // No header of any kind; a whole number of eight-byte glyphs is the only constraint.

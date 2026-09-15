@@ -15,7 +15,7 @@ namespace FileFormat.GraphSaurus;
 /// red and green the wrong way round in the byte. Under <c>.sr5</c>, which is Screen 5's name, that
 /// is the wrong depth as well as the wrong layout.
 /// </remarks>
-[VerifiedBy(ConformanceOracle.Recoil2Png)]
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.IrfanView)]
 public readonly record struct GraphSaurusFile : IImageFormatReader<GraphSaurusFile>, IImageToRawImage<GraphSaurusFile>, IImageFromRawImage<GraphSaurusFile>, IImageFormatWriter<GraphSaurusFile> {
 
   static string IImageFormatMetadata<GraphSaurusFile>.PrimaryExtension => ".sr5";

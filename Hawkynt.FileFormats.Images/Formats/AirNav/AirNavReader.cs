@@ -25,18 +25,7 @@ public static class AirNavReader {
     return FromBytes(File.ReadAllBytes(file.FullName));
   }
 
-  public static AirNavFile FromStream(Stream stream) {
-    ArgumentNullException.ThrowIfNull(stream);
-    if (stream.CanSeek) {
-      var buffer = new byte[stream.Length - stream.Position];
-      stream.ReadExactly(buffer);
-      return FromBytes(buffer);
-    }
-
-    using var memory = new MemoryStream();
-    stream.CopyTo(memory);
-    return FromBytes(memory.ToArray());
-  }
+  public static AirNavFile FromStream(Stream stream) => FromBytes(StreamBytes.ReadAll(stream));
 
   public static AirNavFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

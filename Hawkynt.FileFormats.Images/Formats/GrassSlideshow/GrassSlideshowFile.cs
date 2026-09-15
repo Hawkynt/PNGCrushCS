@@ -12,7 +12,7 @@ namespace FileFormat.GrassSlideshow;
 /// One of the sets means two different things depending on how long the file is, which is the kind
 /// of thing that only makes sense in a program that shipped with its own pictures.
 /// </remarks>
-[VerifiedBy(ConformanceOracle.Recoil2Png)]
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.IrfanView)]
 public readonly record struct GrassSlideshowFile
   : IImageFormatReader<GrassSlideshowFile>, IImageToRawImage<GrassSlideshowFile>,
     IImageFromRawImage<GrassSlideshowFile>, IImageFormatWriter<GrassSlideshowFile> {

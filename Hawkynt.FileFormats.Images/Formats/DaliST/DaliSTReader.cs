@@ -15,18 +15,7 @@ public static class DaliSTReader {
     return _Parse(File.ReadAllBytes(file.FullName), DaliSTFile.ResolutionFromExtension(file.Extension));
   }
 
-  public static DaliSTFile FromStream(Stream stream) {
-    ArgumentNullException.ThrowIfNull(stream);
-    if (stream.CanSeek) {
-      var data = new byte[stream.Length - stream.Position];
-      stream.ReadExactly(data);
-      return FromSpan(data);
-    }
-
-    using var ms = new MemoryStream();
-    stream.CopyTo(ms);
-    return FromSpan(ms.ToArray());
-  }
+  public static DaliSTFile FromStream(Stream stream) => FromSpan(StreamBytes.ReadAll(stream));
 
   /// <summary>Reads bytes using the primary .SD0 interpretation because resolution is not stored in the file.</summary>
   public static DaliSTFile FromSpan(ReadOnlySpan<byte> data) => _Parse(data, DaliSTResolution.Low);

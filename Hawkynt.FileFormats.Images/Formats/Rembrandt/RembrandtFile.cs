@@ -6,7 +6,7 @@ namespace FileFormat.Rembrandt;
 /// <summary>In-memory representation of an Atari Falcon Rembrandt (.tcp) true-color image.</summary>
 // "TRUECOLR" — the ASCII signature at offset 0.
 [FormatMagicBytes([0x54, 0x52, 0x55, 0x45, 0x43, 0x4F, 0x4C, 0x52])]
-[VerifiedBy(ConformanceOracle.Recoil2Png)]
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.IrfanView)]
 public readonly record struct RembrandtFile : IImageFormatReader<RembrandtFile>, IImageToRawImage<RembrandtFile>, IImageFromRawImage<RembrandtFile>, IImageFormatWriter<RembrandtFile> {
 
   /// <summary>Minimum valid file size (header + at least one 2-byte pixel).</summary>

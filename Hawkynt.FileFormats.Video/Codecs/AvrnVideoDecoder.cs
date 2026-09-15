@@ -1,59 +1,97 @@
 using System;
+using System.Buffers.Binary;
 using System.IO;
 using FileFormat.Core;
-using FileFormat.Jpeg;
 
 namespace FileFormat.Codecs;
 
 /// <summary>
-/// Decodes Avid AVRn: ordinary baseline JPEG, marker for marker, one packet one whole picture — the
-/// one place this codec departs from a plain Motion JPEG stream is which of the JPEG's own stated size
-/// and the container's is trusted, and here it is the other way round.
+/// Decodes Avid AVRn, whose <c>AVRn</c> four-character code names two historical payloads: Motion
+/// JPEG and Avid's lossless Resolution 1:1 UYVY packing.
 /// </summary>
 /// <remarks>
-/// There is no published bitstream description of this one either, so what follows was recovered
-/// directly from four real captures at samples.ffmpeg.org — two broadcast recordings at 720x486
-/// (NTSC) and 720x576 (PAL) and two small test clips at 160x120 — by reading a packet on its own as a
-/// standalone JPEG and comparing that against ffmpeg's own decode of the whole file.
+/// The distinction is carried by the Video-for-Windows codec data, not by the four-character code.
+/// FFmpeg's AVI demuxer makes the same split: an <c>AVRn</c> stream whose codec extra data has
+/// <c>1:1</c> at byte 28 remains AVRn, while every other <c>AVRn</c> stream is handed to its Motion
+/// JPEG decoder. AVI and Matroska/VFW hand this package the complete <c>BITMAPINFOHEADER</c> plus those
+/// extra bytes, so this decoder peels off the forty-byte base header before applying that test.
 /// <para/>
-/// <b>Every packet is a real, complete, marker-delimited JPEG</b> — <c>FF D8</c>, a JFIF <c>APP0</c>,
-/// a comment naming <c>AVID</c>, a restart interval, the quantisation and Huffman tables, the frame
-/// and scan headers, entropy data, <c>FF D9</c> — decoded here by the same <see cref="JpegReader"/>
-/// <see cref="MotionJpegDecoder"/> already uses, because it genuinely is the same coding underneath a
-/// different fourcc.
+/// <b>Resolution 1:1.</b> The coded picture is uncompressed UYVY 4:2:2 — Cb, Y0, Cr, Y1 — and is
+/// therefore lossless. A progressive packet may carry whole unused rows ahead of the picture; its
+/// byte length divided by the two-byte pixel stride states the coded height, and the final
+/// container-height rows are the picture. Interlaced packets store the two fields consecutively with
+/// a four-byte separator and use the codec data to say which output row parity receives the first
+/// field. Those are the rules used by FFmpeg's <c>avrndec.c</c>, expressed here through the package's
+/// shared <see cref="PackedYuv422Packing"/> rather than through a second UYVY implementation.
 /// <para/>
-/// <b>Where it differs is the one thing <see cref="MotionJpegDecoder"/>'s own remarks call out by
-/// name.</b> That decoder trusts the JPEG's own stated size over the container's, on the reasoning
-/// that the JPEG is the thing that was actually coded. The NTSC broadcast capture measured here is the
-/// case that reasoning gets wrong for this codec: its packets code a frame header stating 720x496,
-/// sixteen lines taller than the 720x486 the container's own <c>BITMAPINFOHEADER</c> states, and
-/// ffmpeg's own decode of the file is 486 lines — the container's figure, not the frame header's.
-/// Four hundred and ninety-six is 486 rounded up to the next multiple of sixteen, so what is happening
-/// is an encoder padding its coded frame out to a whole number of macroblock rows and never trimming
-/// the frame header back down to say so, leaving the true height nowhere but the container. The other
-/// three captures' frame headers already state their real size exactly — the PAL one because 576 is
-/// already a multiple of sixteen and needs no padding, the two small ones because their encoder simply
-/// wrote the true height regardless — so the difference is invisible on three of the four files and
-/// would still be a defect for the fourth if unhandled: a picture with sixteen rows of undefined
-/// content at the bottom that nothing tells you not to trust.
+/// <b>The older subtype is Motion JPEG with one Avid-specific display crop.</b> Its coded bytes are
+/// delegated to <see cref="MotionJpegDecoder"/>, then a smaller container geometry keeps the bottom
+/// rows and left columns of that decoded JPEG. That crop is deliberate: FFmpeg's old AVRn wrapper did
+/// it before the subtype split, and when AVRn-MJPEG was moved into the general MJPEG path in 2021 the
+/// same rule was recreated there as a top crop for <c>AVRn</c> and <c>AVDJ</c>. A coded JPEG may thus
+/// be taller than the displayed Avid frame without those extra top rows becoming part of the picture.
 /// <para/>
-/// <b>Verified.</b> All four captures — 46, 200, 50 and 50 pictures — were compared against ffmpeg's
-/// own decode of the same file, plane by plane, sampling every frame: 4:2:2 and 4:2:0 both, every one
-/// identical, including the padded NTSC capture whose every frame needs the crop this decoder applies
-/// and the exact-height PAL one whose every frame needs none.
+/// The implementation was derived clean-room from the observable stream rules in FFmpeg's
+/// LGPL-2.1-or-later AVRn decoder, AVI demuxer and AVRn/MJPEG compatibility handling; no
+/// implementation code is reproduced here.
 /// </remarks>
 public sealed class AvrnVideoDecoder : IVideoCodecDecoder<AvrnVideoDecoder> {
 
   private static readonly CodecTag _Tag = CodecTag.FromCharacters("AVRn");
 
+  private const int _BITMAP_INFO_HEADER_SIZE = 40;
+  private const int _ONE_TO_ONE_MARKER_OFFSET = 28;
+  private const int _INTERLACE_OFFSET_BIAS = 4;
+  private const int _FIELD_ORDER_OFFSET = 24;
+
+  private readonly MotionJpegDecoder? _motionJpeg;
+  private readonly PackedYuv422Packing? _packing;
   private readonly int _streamIndex;
   private readonly int _width;
   private readonly int _height;
+  private readonly int _rowStride;
+  private readonly int _frameBytes;
+  private readonly bool _interlaced;
+  private readonly bool _firstFieldOnOddRows;
 
-  private AvrnVideoDecoder(int streamIndex, int width, int height) {
-    this._streamIndex = streamIndex;
-    this._width = width;
-    this._height = height;
+  private AvrnVideoDecoder(MediaStreamInfo stream, MotionJpegDecoder motionJpeg) {
+    this._motionJpeg = motionJpeg;
+    this._streamIndex = stream.Index;
+    this._width = stream.Width;
+    this._height = stream.Height;
+  }
+
+  private AvrnVideoDecoder(MediaStreamInfo stream, ReadOnlySpan<byte> extraData) {
+    this._streamIndex = stream.Index;
+    this._width = stream.Width;
+    this._height = stream.Height;
+
+    try {
+      this._rowStride = checked(stream.Width * 2);
+      this._frameBytes = checked(this._rowStride * stream.Height);
+    } catch (OverflowException exception) {
+      throw new InvalidDataException(
+        $"Video stream {stream.Index} states a picture size of {stream.Width}x{stream.Height}, whose AVRn frame size does not fit in memory.",
+        exception);
+    }
+
+    this._packing = PackedYuv422Packing.For(stream, PackedYuv422Order.CbLumaCrLuma, "AVRn Resolution 1:1");
+
+    if (extraData.Length < 9)
+      return;
+
+    var descriptorOffset = extraData[4] + _INTERLACE_OFFSET_BIAS;
+    if (descriptorOffset + _FIELD_ORDER_OFFSET >= extraData.Length
+        || !extraData.Slice(descriptorOffset, 4).SequenceEqual("1:1("u8))
+      return;
+
+    this._interlaced = true;
+    this._firstFieldOnOddRows = extraData[descriptorOffset + _FIELD_ORDER_OFFSET] == 1;
+
+    if ((stream.Height & 1) != 0)
+      throw new NotSupportedException(
+        $"Video stream {stream.Index} is an interlaced AVRn Resolution 1:1 stream with odd height {stream.Height}; "
+        + "its two fields cannot contribute the same number of rows.");
   }
 
   public static string CodecName => "Avid AVRn";
@@ -67,25 +105,39 @@ public sealed class AvrnVideoDecoder : IVideoCodecDecoder<AvrnVideoDecoder> {
   public static AvrnVideoDecoder Create(MediaStreamInfo stream) {
     ArgumentNullException.ThrowIfNull(stream);
 
-    return new(stream.Index, stream.Width, stream.Height);
+    var extraData = _AvidExtraData(stream.CodecPrivateData.Span);
+    return _IsOneToOne(extraData)
+      ? new(stream, extraData)
+      : new(stream, MotionJpegDecoder.Create(stream));
   }
 
-  /// <summary>
-  /// Decodes one packet, then crops it to the container's own declared size when that size is smaller
-  /// than what the JPEG's own frame header states — the padding <see cref="AvrnVideoDecoder"/>'s own
-  /// remarks describe. A container that states no size of its own, or one no smaller than the JPEG's,
-  /// leaves the picture exactly as the JPEG reader produced it.
-  /// </summary>
   public bool TryDecode(CodedPacket packet, out RawImage frame) {
-    var decoded = JpegFile.ToRawImage(JpegReader.FromSpan(packet.Data.Span));
+    if (this._motionJpeg != null)
+      return this._TryDecodeMotionJpeg(packet, out frame);
 
-    if (this._width > decoded.Width || this._height > decoded.Height)
-      throw new InvalidDataException(
-        $"Video stream {this._streamIndex} states a picture size of {this._width}x{this._height}, larger than the "
-        + $"{decoded.Width}x{decoded.Height} its own JPEG frame header codes.");
+    var data = packet.Data.Span;
+    this._ValidateRawPacket(data);
+
+    var packed = this._interlaced
+      ? this._Deinterlace(data)
+      : this._ProgressivePicture(data).ToArray();
+
+    frame = this._packing!.ToImage(this._packing.Unpack(packed));
+    return true;
+  }
+
+  private bool _TryDecodeMotionJpeg(CodedPacket packet, out RawImage frame) {
+    if (!this._motionJpeg!.TryDecode(packet, out var decoded)) {
+      frame = decoded;
+      return false;
+    }
 
     var width = this._width > 0 ? this._width : decoded.Width;
     var height = this._height > 0 ? this._height : decoded.Height;
+    if (width > decoded.Width || height > decoded.Height)
+      throw new InvalidDataException(
+        $"Video stream {this._streamIndex} states a picture size of {width}x{height}, larger than the "
+        + $"{decoded.Width}x{decoded.Height} its AVRn Motion JPEG packet codes.");
 
     if (width == decoded.Width && height == decoded.Height) {
       frame = decoded;
@@ -96,28 +148,104 @@ public sealed class AvrnVideoDecoder : IVideoCodecDecoder<AvrnVideoDecoder> {
       Width = width,
       Height = height,
       Format = decoded.Format,
-      PixelData = _Crop(decoded, width, height),
+      PixelData = _CropBottomLeft(decoded, width, height),
+      ColorInfo = decoded.ColorInfo,
+      Palette = decoded.Palette,
+      PaletteCount = decoded.PaletteCount,
+      AlphaTable = decoded.AlphaTable,
+      Metadata = decoded.Metadata,
     };
     return true;
   }
 
   /// <summary>
-  /// Keeps the bottom <paramref name="height"/> rows of <paramref name="source"/>, not the top — the
-  /// padding a coded frame carries beyond the container's own declared height sits above the real
-  /// picture rather than below it, measured directly against ffmpeg's decode of the one capture where
-  /// the two disagree by a whole macroblock row (720x496 coded, 720x486 declared): keeping the top 486
-  /// rows disagreed with ffmpeg on every sample, and keeping the bottom 486 matched exactly.
+  /// Keeps the bottom rows and left columns of an AVRn Motion JPEG picture. The vertical choice is
+  /// the Avid-specific part: coded macroblock padding is above the displayed picture, not below it.
   /// </summary>
-  private static byte[] _Crop(RawImage source, int width, int height) {
+  private static byte[] _CropBottomLeft(RawImage source, int width, int height) {
     var bytesPerPixel = RawImage.BytesPerPixel(source.Format);
-    var sourceStride = source.Width * bytesPerPixel;
-    var targetStride = width * bytesPerPixel;
-    var target = new byte[targetStride * height];
-    var rowOffset = source.Height - height;
+    var sourceStride = checked(source.Width * bytesPerPixel);
+    var targetStride = checked(width * bytesPerPixel);
+    var target = new byte[checked(targetStride * height)];
+    var firstRow = source.Height - height;
 
-    for (var y = 0; y < height; ++y)
-      source.PixelData.AsSpan((rowOffset + y) * sourceStride, targetStride).CopyTo(target.AsSpan(y * targetStride, targetStride));
+    for (var row = 0; row < height; ++row)
+      source.PixelData.AsSpan((firstRow + row) * sourceStride, targetStride)
+        .CopyTo(target.AsSpan(row * targetStride, targetStride));
 
     return target;
+  }
+
+  /// <summary>
+  /// Returns FFmpeg-style AVRn codec extra data whether the caller supplied those bytes alone or the
+  /// complete Video-for-Windows <c>BITMAPINFOHEADER</c> that AVI and Matroska carry.
+  /// </summary>
+  private static ReadOnlySpan<byte> _AvidExtraData(ReadOnlySpan<byte> privateData) {
+    if (privateData.Length < _BITMAP_INFO_HEADER_SIZE)
+      return privateData;
+
+    var headerSize = BinaryPrimitives.ReadUInt32LittleEndian(privateData);
+    return headerSize >= _BITMAP_INFO_HEADER_SIZE && headerSize <= privateData.Length
+      ? privateData[_BITMAP_INFO_HEADER_SIZE..]
+      : privateData;
+  }
+
+  private static bool _IsOneToOne(ReadOnlySpan<byte> extraData)
+    => extraData.Length >= _ONE_TO_ONE_MARKER_OFFSET + 3
+       && extraData.Slice(_ONE_TO_ONE_MARKER_OFFSET, 3).SequenceEqual("1:1"u8);
+
+  private void _ValidateRawPacket(ReadOnlySpan<byte> data) {
+    if (data.Length >= this._frameBytes)
+      return;
+
+    throw new InvalidDataException(
+      $"Video stream {this._streamIndex} carries an AVRn Resolution 1:1 packet of {data.Length} byte(s), where a "
+      + $"{this._width}x{this._height} UYVY frame needs at least {this._frameBytes}.");
+  }
+
+  /// <summary>
+  /// A progressive packet may prefix whole coded rows. Integer division deliberately ignores a
+  /// trailing partial row, matching the way the reference decoder derives its coded height.
+  /// </summary>
+  private ReadOnlySpan<byte> _ProgressivePicture(ReadOnlySpan<byte> data) {
+    var codedHeight = data.Length / this._rowStride;
+    var skippedRows = codedHeight - this._height;
+    var start = checked(skippedRows * this._rowStride);
+    return data.Slice(start, this._frameBytes);
+  }
+
+  /// <summary>
+  /// Interlaced Resolution 1:1 stores the first field, four separator bytes, then the second field.
+  /// The field-order byte controls output row parity exactly as the reference decoder interprets it.
+  /// </summary>
+  private byte[] _Deinterlace(ReadOnlySpan<byte> data) {
+    var codedHeight = data.Length / this._rowStride;
+    var firstFieldStart = (long)(codedHeight - this._height) * this._width;
+    var secondFieldDelta = (long)this._width * codedHeight + 4;
+    var fieldRows = this._height / 2;
+    var lastFirstFieldRow = firstFieldStart + (long)(fieldRows - 1) * this._rowStride;
+    var required = lastFirstFieldRow + secondFieldDelta + this._rowStride;
+
+    if (required > data.Length)
+      throw new InvalidDataException(
+        $"Video stream {this._streamIndex} carries an interlaced AVRn Resolution 1:1 packet of {data.Length} byte(s), "
+        + $"but its two {this._width}x{this._height / 2} fields and four-byte separator require at least {required}.");
+
+    var packed = new byte[this._frameBytes];
+    var firstParity = this._firstFieldOnOddRows ? 1 : 0;
+    var secondParity = 1 - firstParity;
+
+    for (var fieldRow = 0; fieldRow < fieldRows; ++fieldRow) {
+      var firstSource = checked((int)(firstFieldStart + (long)fieldRow * this._rowStride));
+      var secondSource = checked((int)(firstSource + secondFieldDelta));
+      var outputPair = fieldRow * 2;
+
+      data.Slice(firstSource, this._rowStride)
+        .CopyTo(packed.AsSpan((outputPair + firstParity) * this._rowStride, this._rowStride));
+      data.Slice(secondSource, this._rowStride)
+        .CopyTo(packed.AsSpan((outputPair + secondParity) * this._rowStride, this._rowStride));
+    }
+
+    return packed;
   }
 }

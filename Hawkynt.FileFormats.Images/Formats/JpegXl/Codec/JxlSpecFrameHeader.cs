@@ -49,6 +49,28 @@ internal sealed class JxlSpecFrameHeader {
   public uint XQmScale { get; init; } = 3;
   public uint BQmScale { get; init; } = 2;
   public uint NumPasses { get; init; } = 1;
+
+  /// <summary>
+  /// Quantized-coefficient left shift for each progressive AC pass. The last
+  /// pass always has shift zero; a non-progressive frame therefore exposes
+  /// exactly <c>[0]</c>.
+  /// </summary>
+  public uint[] PassShifts { get; init; } = [0];
+
+  /// <summary>Progressive preview downsampling factors, in the order stated by
+  /// the frame header.</summary>
+  public uint[] PassDownsample { get; init; } = [];
+
+  /// <summary>Last AC pass included in each progressive preview bracket.</summary>
+  public uint[] PassLastPass { get; init; } = [];
+
+  /// <summary>
+  /// Recursive low-frequency level of a hidden <see cref="JxlFrameType.DcFrame"/>.
+  /// Level one is the 1:8 DC image, level two is 1:64, and so on. Regular
+  /// frames expose zero and may consume level one through <c>kUseDcFrame</c>.
+  /// </summary>
+  public uint DcLevel { get; init; }
+
   public bool IsLast { get; init; } = true;
 
   /// <summary>Where the frame sits in the picture, and how much of it the frame
@@ -106,6 +128,10 @@ internal sealed class JxlSpecFrameHeader {
 
   /// <summary>libjxl <c>LoopFilter::epf_iters</c> default.</summary>
   private const int _DefaultEpfIters = 2;
+
+  private readonly record struct _Passes(uint Count, uint[] Shifts, uint[] Downsample, uint[] LastPass) {
+    public static _Passes Default => new(1, [0], [], []);
+  }
 
   /// <summary>
   /// Decode a FrameHeader. Mirrors libjxl <c>FrameHeader::VisitFields</c>
@@ -199,13 +225,14 @@ internal sealed class JxlSpecFrameHeader {
     }
 
     // 9. Passes (libjxl Passes::VisitFields) when !ReferenceOnly.
-    var numPasses = 1u;
+    var passes = _Passes.Default;
     if (frameType != JxlFrameType.ReferenceOnly)
-      numPasses = _ReadPasses(r);
+      passes = _ReadPasses(r);
 
     // 10. dc_level for DCFrame: U32(Val(1), Val(2), Val(3), Val(4)).
+    var dcLevel = 0u;
     if (frameType == JxlFrameType.DcFrame)
-      r.ReadU32(1, 0, 2, 0, 3, 0, 4, 0);
+      dcLevel = r.ReadU32(1, 0, 2, 0, 3, 0, 4, 0);
 
     // 11. custom_size_or_origin and conditional crop fields when !DCFrame.
     var customSizeOrOrigin = false;
@@ -318,7 +345,11 @@ internal sealed class JxlSpecFrameHeader {
       GroupSizeShift = groupSizeShift,
       XQmScale = xqm,
       BQmScale = bqm,
-      NumPasses = numPasses,
+      NumPasses = passes.Count,
+      PassShifts = passes.Shifts,
+      PassDownsample = passes.Downsample,
+      PassLastPass = passes.LastPass,
+      DcLevel = dcLevel,
       IsLast = isLast,
       OriginX = originX,
       OriginY = originY,
@@ -341,23 +372,45 @@ internal sealed class JxlSpecFrameHeader {
   /// <summary>Read libjxl <c>Passes::VisitFields</c>: num_passes plus, when
   /// num_passes > 1, num_downsample, shift array, downsample array, last_pass
   /// array.</summary>
-  private static uint _ReadPasses(JxlBitReader r) {
+  private static _Passes _ReadPasses(JxlBitReader r) {
     // num_passes: U32(Val(1), Val(2), Val(3), BitsOffset(3, 4))
     var n = r.ReadU32(1, 0, 2, 0, 3, 0, 4, 3);
-    if (n != 1) {
-      // num_downsample: U32(Val(0), Val(1), Val(2), BitsOffset(1, 3))
-      var numDownsample = r.ReadU32(0, 0, 1, 0, 2, 0, 3, 1);
-      // shift[i] for i = 0..num_passes-2 (last shift is implicit 0).
-      for (var i = 0u; i < n - 1; ++i)
-        r.ReadBits(2);
-      // downsample[i] for i = 0..num_downsample-1: U32(Val(1), Val(2), Val(4), Val(8))
-      for (var i = 0u; i < numDownsample; ++i)
-        r.ReadU32(1, 0, 2, 0, 4, 0, 8, 0);
-      // last_pass[i]: U32(Val(0), Val(1), Val(2), Bits(3))
-      for (var i = 0u; i < numDownsample; ++i)
-        r.ReadU32(0, 0, 1, 0, 2, 0, 0, 3);
+    if (n == 0 || n > 11)
+      throw new System.IO.InvalidDataException($"A frame states {n} AC passes; JPEG XL allows at most 11.");
+    if (n == 1)
+      return _Passes.Default;
+
+    // num_downsample: U32(Val(0), Val(1), Val(2), BitsOffset(1, 3))
+    var numDownsample = r.ReadU32(0, 0, 1, 0, 2, 0, 3, 1);
+    if (numDownsample > n)
+      throw new System.IO.InvalidDataException(
+        $"A frame states {numDownsample} progressive downsampling brackets for only {n} AC passes.");
+
+    var shifts = new uint[checked((int)n)];
+    // shift[i] for i = 0..num_passes-2 (last shift is implicit 0).
+    for (var i = 0; i < shifts.Length - 1; ++i)
+      shifts[i] = r.ReadBits(2);
+
+    var downsample = new uint[checked((int)numDownsample)];
+    // downsample[i] for i = 0..num_downsample-1: U32(Val(1), Val(2), Val(4), Val(8))
+    for (var i = 0; i < downsample.Length; ++i) {
+      downsample[i] = r.ReadU32(1, 0, 2, 0, 4, 0, 8, 0);
+      if (i > 0 && downsample[i] >= downsample[i - 1])
+        throw new System.IO.InvalidDataException("Progressive downsampling factors must be strictly decreasing.");
     }
-    return n;
+
+    var lastPass = new uint[downsample.Length];
+    // last_pass[i]: U32(Val(0), Val(1), Val(2), Bits(3))
+    for (var i = 0; i < lastPass.Length; ++i) {
+      lastPass[i] = r.ReadU32(0, 0, 1, 0, 2, 0, 0, 3);
+      if (lastPass[i] >= n)
+        throw new System.IO.InvalidDataException(
+          $"Progressive bracket {i} ends at pass {lastPass[i]}, beyond the {n} passes in the frame.");
+      if (i > 0 && lastPass[i] <= lastPass[i - 1])
+        throw new System.IO.InvalidDataException("Progressive bracket last-pass indices must be strictly increasing.");
+    }
+
+    return new _Passes(n, shifts, downsample, lastPass);
   }
 
   /// <summary>Read libjxl <c>BlendingInfo::VisitFields</c>: mode + conditional

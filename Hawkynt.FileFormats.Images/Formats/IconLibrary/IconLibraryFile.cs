@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using FileFormat.Core;
 using FileFormat.Ico;
 
@@ -6,65 +7,78 @@ namespace FileFormat.IconLibrary;
 
 /// <summary>In-memory representation of a Windows Icon Library (ICL) container.</summary>
 /// <remarks>
-/// Read and not written, and the reason is what the reader below says: the icons inside one of these
-/// are not pulled out here, so nothing — this package included — could read back a library this
-/// package wrote. A registered writer would put a tick in the support matrix for a format that can
-/// neither be read nor be checked, which is the one thing the matrix must never say.
-/// <para/>
-/// <see cref="IconLibraryWriter"/> still builds one for a caller who wants the bytes, in the same
-/// way <c>PesWriter</c> does for embroidery: it simply stays off the registry's writer contract,
-/// because that contract promises a picture can go out and come back.
+/// An ICL is a resource-only Windows library. Each logical icon is an <c>RT_GROUP_ICON</c> resource
+/// whose entries point at one or more <c>RT_ICON</c> image resources. Both PE (Win32) and legacy NE
+/// (Win16) libraries are accepted; newly encoded libraries are PE resource-only DLLs.
 /// </remarks>
 public readonly record struct IconLibraryFile
-  : IImageFormatReader<IconLibraryFile>, IImageToRawImage<IconLibraryFile> {
+  : IImageFormatReader<IconLibraryFile>, IImageToRawImage<IconLibraryFile>, IImageFromRawImage<IconLibraryFile>,
+    IImageFormatWriter<IconLibraryFile>, IMultiImageFileFormat<IconLibraryFile> {
 
-  /// <summary>Default icon dimensions when not detectable.</summary>
+  /// <summary>Default icon dimensions when no image is available.</summary>
   internal const int DefaultSize = 32;
 
   /// <summary>
-  /// Present because <see cref="RawData"/> carries a field initializer, which a record struct may
-  /// only have alongside an explicitly declared constructor.
+  /// Present because collection fields carry initializers, which a record struct may only have
+  /// alongside an explicitly declared constructor.
   /// </summary>
   public IconLibraryFile() { }
 
   static string IImageFormatMetadata<IconLibraryFile>.PrimaryExtension => ".icl";
   static string[] IImageFormatMetadata<IconLibraryFile>.FileExtensions => [".icl"];
+  static FormatCapability IImageFormatMetadata<IconLibraryFile>.Capabilities => FormatCapability.MultiImage;
   static IconLibraryFile IImageFormatReader<IconLibraryFile>.FromSpan(ReadOnlySpan<byte> data) => IconLibraryReader.FromSpan(data);
+  static byte[] IImageFormatWriter<IconLibraryFile>.ToBytes(IconLibraryFile file) => IconLibraryWriter.ToBytes(file);
 
-  /// <summary>Icon width (default 32).</summary>
+  /// <summary>Width of the preferred image in the first logical icon.</summary>
   public int Width { get; init; }
 
-  /// <summary>Icon height (default 32).</summary>
+  /// <summary>Height of the preferred image in the first logical icon.</summary>
   public int Height { get; init; }
 
-  /// <summary>Raw file data, retained when a library was read rather than created.</summary>
+  /// <summary>
+  /// Logical icons in resource-directory order. Each <see cref="IcoFile"/> contains that icon's
+  /// size/colour-depth variants.
+  /// </summary>
+  public IReadOnlyList<IcoFile> Icons { get; init; } = [];
+
+  /// <summary>
+  /// Original library bytes. Parsed files retain these so writing an untouched file preserves
+  /// resource identifiers, names, languages, and unrelated executable metadata exactly.
+  /// </summary>
   public byte[] RawData { get; init; } = [];
 
-  /// <summary>The icon to place in a newly created resource-only PE library.</summary>
+  /// <summary>The image used when this library was created from a <see cref="RawImage"/>.</summary>
   internal IcoImage? EncodedImage { get; init; }
 
   /// <summary>Builds a one-icon Windows icon library from an arbitrary image.</summary>
   public static IconLibraryFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
-    var icon = IcoDib.FromRawImage(image);
+    var iconImage = IcoDib.FromRawImage(image);
     return new() {
-      Width = icon.Width,
-      Height = icon.Height,
-      EncodedImage = icon,
+      Width = iconImage.Width,
+      Height = iconImage.Height,
+      Icons = [new IcoFile { Images = [iconImage] }],
+      EncodedImage = iconImage,
     };
   }
 
-  /// <summary>
-  /// Refuses the file, the icons inside one of these not being read here.
-  /// </summary>
-  /// <remarks>
-  /// An icon library is an executable carrying icons as resources, and pulling them out means
-  /// walking its resource tables. That is not done here; what was returned instead was a picture of
-  /// the right size with every pixel black, which counts as a decode and cannot be told from one.
-  /// A picture that is the right shape and entirely wrong is worse than none, because nothing
-  /// downstream has any way to notice.
-  /// </remarks>
-  public static RawImage ToRawImage(IconLibraryFile file)
-    => throw new NotSupportedException("The icons inside an icon library are not read here; only the file itself is recognised.");
+  /// <summary>Returns the number of logical icons in the library.</summary>
+  public static int ImageCount(IconLibraryFile file) => file.Icons.Count;
 
+  /// <summary>Returns the preferred representation of the first logical icon.</summary>
+  public static RawImage ToRawImage(IconLibraryFile file) {
+    if (file.Icons.Count == 0)
+      throw new ArgumentException("Icon Library contains no icon groups.", nameof(file));
+
+    return IcoFile.ToRawImage(file.Icons[0]);
+  }
+
+  /// <summary>Returns the preferred representation of the logical icon at <paramref name="index"/>.</summary>
+  public static RawImage ToRawImage(IconLibraryFile file, int index) {
+    if ((uint)index >= (uint)file.Icons.Count)
+      throw new ArgumentOutOfRangeException(nameof(index));
+
+    return IcoFile.ToRawImage(file.Icons[index]);
+  }
 }

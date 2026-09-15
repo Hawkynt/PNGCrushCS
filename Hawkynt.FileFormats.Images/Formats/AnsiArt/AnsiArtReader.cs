@@ -17,12 +17,7 @@ public static class AnsiArtReader {
     return FromBytes(File.ReadAllBytes(file.FullName));
   }
 
-  public static AnsiArtFile FromStream(Stream stream) {
-    ArgumentNullException.ThrowIfNull(stream);
-    using var ms = new MemoryStream();
-    stream.CopyTo(ms);
-    return FromBytes(ms.ToArray());
-  }
+  public static AnsiArtFile FromStream(Stream stream) => FromBytes(StreamBytes.ReadAll(stream));
 
   public static AnsiArtFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

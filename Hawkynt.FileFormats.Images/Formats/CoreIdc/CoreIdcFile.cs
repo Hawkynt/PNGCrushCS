@@ -24,6 +24,7 @@ namespace FileFormat.CoreIdc;
 /// grey as they stand, and twenty-four are red, green and blue in that order inside the row.
 /// </remarks>
 [FormatDetectionPriority(999)]
+[VerifiedBy(ConformanceOracle.XnView)]
 public readonly record struct CoreIdcFile
   : IImageFormatReader<CoreIdcFile>, IImageToRawImage<CoreIdcFile>, IImageFromRawImage<CoreIdcFile>, IImageFormatWriter<CoreIdcFile> {
 

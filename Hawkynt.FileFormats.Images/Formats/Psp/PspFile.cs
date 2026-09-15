@@ -5,6 +5,7 @@ namespace FileFormat.Psp;
 
 /// <summary>In-memory representation of a Paint Shop Pro image.</summary>
 [FormatMagicBytes([0x50, 0x61, 0x69, 0x6E, 0x74, 0x20, 0x53, 0x68])]
+[VerifiedBy(ConformanceOracle.XnView)]
 public readonly record struct PspFile : IImageFormatReader<PspFile>, IImageToRawImage<PspFile>, IImageFromRawImage<PspFile>, IImageFormatWriter<PspFile> {
 
   static string IImageFormatMetadata<PspFile>.PrimaryExtension => ".psp";

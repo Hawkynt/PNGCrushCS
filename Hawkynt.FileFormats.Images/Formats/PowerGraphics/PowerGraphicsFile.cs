@@ -14,7 +14,7 @@ namespace FileFormat.PowerGraphics;
 /// anywhere as data. The only way to know what the picture shows is to run the program against the
 /// hardware's timing, which is what makes this the format the renderer exists for.
 /// </remarks>
-[VerifiedBy(ConformanceOracle.Recoil2Png)]
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.IrfanView)]
 public readonly record struct PowerGraphicsFile
   : IImageFormatReader<PowerGraphicsFile>, IImageToRawImage<PowerGraphicsFile>,
     IImageFromRawImage<PowerGraphicsFile>, IImageFormatWriter<PowerGraphicsFile> {

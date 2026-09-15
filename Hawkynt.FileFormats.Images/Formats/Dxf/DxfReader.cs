@@ -39,18 +39,7 @@ public static class DxfReader {
     return FromBytes(File.ReadAllBytes(file.FullName));
   }
 
-  public static DxfFile FromStream(Stream stream) {
-    ArgumentNullException.ThrowIfNull(stream);
-    if (stream.CanSeek) {
-      var data = new byte[stream.Length - stream.Position];
-      stream.ReadExactly(data);
-      return FromBytes(data);
-    }
-
-    using var memory = new MemoryStream();
-    stream.CopyTo(memory);
-    return FromBytes(memory.ToArray());
-  }
+  public static DxfFile FromStream(Stream stream) => FromBytes(StreamBytes.ReadAll(stream));
 
   public static DxfFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

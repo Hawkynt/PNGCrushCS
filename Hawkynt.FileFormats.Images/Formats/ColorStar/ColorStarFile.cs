@@ -9,7 +9,7 @@ namespace FileFormat.ColorStar;
 /// itself. Some files carry two leading zero bytes before it — a length field the format never
 /// grew into — which is the only thing distinguishing the two sizes it comes in.
 /// </remarks>
-[VerifiedBy(ConformanceOracle.Recoil2Png)]
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.IrfanView)]
 public readonly record struct ColorStarFile
   : IImageFormatReader<ColorStarFile>, IImageToRawImage<ColorStarFile>,
     IImageFromRawImage<ColorStarFile>, IImageFormatWriter<ColorStarFile> {

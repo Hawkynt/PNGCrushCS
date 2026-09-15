@@ -43,18 +43,7 @@ public static class PowerPointReader {
     return FromBytes(File.ReadAllBytes(file.FullName));
   }
 
-  public static PowerPointFile FromStream(Stream stream) {
-    ArgumentNullException.ThrowIfNull(stream);
-    if (stream.CanSeek) {
-      var data = new byte[stream.Length - stream.Position];
-      stream.ReadExactly(data);
-      return FromSpan(data);
-    }
-
-    using var memory = new MemoryStream();
-    stream.CopyTo(memory);
-    return FromSpan(memory.ToArray());
-  }
+  public static PowerPointFile FromStream(Stream stream) => FromSpan(StreamBytes.ReadAll(stream));
 
   public static PowerPointFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

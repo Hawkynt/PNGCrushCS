@@ -6,7 +6,7 @@ namespace FileFormat.Pdf;
 
 /// <summary>In-memory representation of a PDF file's extracted raster images.</summary>
 [FormatMagicBytes([0x25, 0x50, 0x44, 0x46])] // %PDF
-[VerifiedBy(ConformanceOracle.ImageMagick)]
+[VerifiedBy(ConformanceOracle.ImageMagick, ConformanceOracle.Ghostscript)]
 public sealed class PdfFile : IImageFormatReader<PdfFile>, IImageToRawImage<PdfFile>, IImageFromRawImage<PdfFile>, IImageFormatWriter<PdfFile>, IMultiImageFileFormat<PdfFile> {
 
   static string IImageFormatMetadata<PdfFile>.PrimaryExtension => ".pdf";

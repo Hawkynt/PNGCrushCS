@@ -22,19 +22,7 @@ public static class TinyReader {
   }
 
   /// <summary>Reads a Tiny Stuff picture from the current stream position through end-of-stream.</summary>
-  public static TinyFile FromStream(Stream stream) {
-    ArgumentNullException.ThrowIfNull(stream);
-    if (stream.CanSeek) {
-      var length = checked((int)(stream.Length - stream.Position));
-      var data = new byte[length];
-      stream.ReadExactly(data);
-      return FromSpan(data);
-    }
-
-    using var ms = new MemoryStream();
-    stream.CopyTo(ms);
-    return FromSpan(ms.ToArray());
-  }
+  public static TinyFile FromStream(Stream stream) => FromSpan(StreamBytes.ReadAll(stream));
 
   /// <summary>Parses one complete Tiny Stuff file and rejects truncation or trailing bytes.</summary>
   public static TinyFile FromSpan(ReadOnlySpan<byte> data) {

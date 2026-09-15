@@ -4,7 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.KoalaCompressed;
 
 /// <summary>In-memory representation of a Commodore 64 compressed Koala multicolor image.</summary>
-[VerifiedBy(ConformanceOracle.Recoil2Png)]
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.IrfanView)]
 public readonly record struct KoalaCompressedFile : IImageFormatReader<KoalaCompressedFile>, IImageToRawImage<KoalaCompressedFile>, IImageFromRawImage<KoalaCompressedFile>, IImageFormatWriter<KoalaCompressedFile> {
 
   static string IImageFormatMetadata<KoalaCompressedFile>.PrimaryExtension => ".gg";

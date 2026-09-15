@@ -14,7 +14,7 @@ namespace FileFormat.InShape;
 /// to four bytes and puts the padding first, so the colours start one byte later than the header
 /// ends.
 /// </remarks>
-[VerifiedBy(ConformanceOracle.Recoil2Png)]
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.IrfanView)]
 public readonly record struct InShapeFile
   : IImageFormatReader<InShapeFile>, IImageToRawImage<InShapeFile>,
     IImageFromRawImage<InShapeFile>, IImageFormatWriter<InShapeFile> {

@@ -169,7 +169,11 @@ internal sealed class Indeo2FrameDecoder {
 
         var code = bits.ReadSymbol();
         if (code >= Indeo2Tables.FIRST_RUN_SYMBOL) {
-          at += (code - _RUN_BASE) * 2;
+          var run = (code - _RUN_BASE) * 2;
+          if (at + run > width)
+            throw new InvalidDataException($"An Indeo 2 run of {run} samples overruns the {width}-sample line it starts on.");
+
+          at += run;
         } else {
           plane[row + at] = _Clamp(plane[row + at] + (((table[code * 2] - 128) * 3) >> 2));
           ++at;

@@ -34,14 +34,43 @@ public sealed class ElementaryStreamWriterTests {
 
   [Test]
   [Category("Unit")]
-  public void H264MuxRefusesLengthPrefixedPacketsAndCodecPrivateData() {
+  public void H264MuxConvertsLengthPrefixedPacketsAndOutOfBandParameterSetsToAnnexB() {
+    var configuration = new byte[] {
+      1, 66, 0, 30, 0xFF, 0xE1,
+      0, 2, 0x67, 0x80,
+      1,
+      0, 2, 0x68, 0x80,
+    };
+    var packet = new byte[] { 0, 0, 0, 2, 0x65, 0x80 };
+
+    var result = VideoIO.Mux<H264VideoWriter>(
+      [_Video("avc1", configuration)],
+      [new(0, packet)]);
+
+    Assert.That(result, Is.EqualTo(new byte[] {
+      0, 0, 0, 1, 0x67, 0x80,
+      0, 0, 0, 1, 0x68, 0x80,
+      0, 0, 0, 1, 0x65, 0x80,
+    }));
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void H264MuxRefusesMalformedLengthPrefixAndPrivateData() {
+    var configuration = new byte[] {
+      1, 66, 0, 30, 0xFF, 0xE1,
+      0, 2, 0x67, 0x80,
+      1,
+      0, 2, 0x68, 0x80,
+    };
+
     Assert.That(
-      () => VideoIO.Mux<H264VideoWriter>([_Video("avc1")], [new(0, new byte[] { 0, 0, 0, 2, 0x65, 0x80 })]),
-      Throws.TypeOf<System.IO.InvalidDataException>().With.Message.Contains("Annex B"));
+      () => VideoIO.Mux<H264VideoWriter>([_Video("avc1", configuration)], [new(0, new byte[] { 0, 0, 0, 4, 0x65, 0x80 })]),
+      Throws.TypeOf<System.IO.InvalidDataException>().With.Message.Contains("only 2 remain"));
 
     Assert.That(
       () => H264VideoWriter.Create([_Video("avc1", new byte[] { 1, 2, 3 })], VideoMetadata.Empty),
-      Throws.TypeOf<NotSupportedException>());
+      Throws.TypeOf<NotSupportedException>().With.Message.Contains("AVCDecoderConfigurationRecord"));
   }
 
   [Test]

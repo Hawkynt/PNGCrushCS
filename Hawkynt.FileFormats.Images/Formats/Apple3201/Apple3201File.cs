@@ -12,7 +12,7 @@ namespace FileFormat.Apple3201;
 /// The palettes come first, all two hundred of them, and the bitmap is packed afterwards. Each
 /// palette is stored in reverse order, which is how the hardware's registers are addressed.
 /// </remarks>
-[VerifiedBy(ConformanceOracle.Recoil2Png)]
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.IrfanView)]
 public readonly record struct Apple3201File
   : IImageFormatReader<Apple3201File>, IImageToRawImage<Apple3201File>,
     IImageFromRawImage<Apple3201File>, IImageFormatWriter<Apple3201File> {

@@ -5,7 +5,7 @@ using FileFormat.Core;
 namespace FileFormat.FullscreenKit;
 
 /// <summary>In-memory representation of an Atari ST Fullscreen Construction Kit overscan image (416x274 or 448x272, 16 colors, 4 planes).</summary>
-[VerifiedBy(ConformanceOracle.Recoil2Png)]
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.IrfanView)]
 public readonly record struct FullscreenKitFile : IImageFormatReader<FullscreenKitFile>, IImageToRawImage<FullscreenKitFile>, IImageFromRawImage<FullscreenKitFile>, IImageFormatWriter<FullscreenKitFile> {
 
   /// <summary>Number of bitplanes (always 4 for low resolution).</summary>

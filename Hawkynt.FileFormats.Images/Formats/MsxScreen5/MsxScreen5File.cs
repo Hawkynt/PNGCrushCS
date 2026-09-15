@@ -12,12 +12,18 @@ namespace FileFormat.MsxScreen5;
 // as their magic, and the registry consults magic before extension — so whichever it happened to
 // reach first took every MSX picture. A Screen 5 file, 256 by 212, was being opened as a Screen 6
 // one and drawn 512 by 424. The extension is what tells these apart, and it is what decides now.
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct MsxScreen5File : IImageFormatReader<MsxScreen5File>, IImageToRawImage<MsxScreen5File>, IImageFromRawImage<MsxScreen5File>, IImageFormatWriter<MsxScreen5File> {
 
   static string IImageFormatMetadata<MsxScreen5File>.PrimaryExtension => ".sc5";
   static string[] IImageFormatMetadata<MsxScreen5File>.FileExtensions => [".sc5", ".ge5"];
   static MsxScreen5File IImageFormatReader<MsxScreen5File>.FromSpan(ReadOnlySpan<byte> data) => MsxScreen5Reader.FromSpan(data);
   static byte[] IImageFormatWriter<MsxScreen5File>.ToBytes(MsxScreen5File file) => MsxScreen5Writer.ToBytes(file);
+
+  /// <summary>The one picture the mode holds: 256 by 212 in sixteen colours.</summary>
+  static VideoMode[] IImageFormatMetadata<MsxScreen5File>.VideoModes => [
+    new("Screen 5", [(FixedWidth, FixedHeight)], [16])
+  ];
 
   /// <summary>Fixed width of an MSX Screen 5 image.</summary>
   public const int FixedWidth = 256;

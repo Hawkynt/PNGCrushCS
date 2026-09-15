@@ -13,7 +13,7 @@ namespace FileFormat.ColorStarObject;
 /// The extension is shared with MonoSTar's objects, which are a different format, so content
 /// decides.
 /// </remarks>
-[VerifiedBy(ConformanceOracle.Recoil2Png)]
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.IrfanView)]
 public readonly record struct ColorStarObjectFile
   : IImageFormatReader<ColorStarObjectFile>, IImageToRawImage<ColorStarObjectFile>,
     IImageFromRawImage<ColorStarObjectFile>, IImageFormatWriter<ColorStarObjectFile> {

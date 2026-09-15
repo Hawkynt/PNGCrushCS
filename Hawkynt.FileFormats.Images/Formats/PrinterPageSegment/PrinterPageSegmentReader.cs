@@ -58,13 +58,7 @@ public static class PrinterPageSegmentReader {
     return FromBytes(File.ReadAllBytes(file.FullName));
   }
 
-  public static PrinterPageSegmentFile FromStream(Stream stream) {
-    ArgumentNullException.ThrowIfNull(stream);
-
-    using var ms = new MemoryStream();
-    stream.CopyTo(ms);
-    return FromSpan(ms.ToArray());
-  }
+  public static PrinterPageSegmentFile FromStream(Stream stream) => FromSpan(StreamBytes.ReadAll(stream));
 
   public static PrinterPageSegmentFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

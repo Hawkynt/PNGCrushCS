@@ -13,7 +13,7 @@ namespace FileFormat.MonoStar;
 /// written as ASCII decimals and then four bitplanes; those are not written or read here.
 /// </para>
 /// </remarks>
-[VerifiedBy(ConformanceOracle.Recoil2Png)]
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.IrfanView)]
 public readonly record struct MonoStarFile
   : IImageFormatReader<MonoStarFile>, IImageToRawImage<MonoStarFile>,
     IImageFromRawImage<MonoStarFile>, IImageFormatWriter<MonoStarFile> {

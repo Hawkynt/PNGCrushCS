@@ -15,18 +15,7 @@ public static class BbcMicroScreenReader {
     return FromBytes(File.ReadAllBytes(file.FullName), ModeFromExtension(file.Extension));
   }
 
-  public static BbcMicroScreenFile FromStream(Stream stream) {
-    ArgumentNullException.ThrowIfNull(stream);
-    if (stream.CanSeek) {
-      var data = new byte[stream.Length - stream.Position];
-      stream.ReadExactly(data);
-      return FromBytes(data);
-    }
-
-    using var ms = new MemoryStream();
-    stream.CopyTo(ms);
-    return FromBytes(ms.ToArray());
-  }
+  public static BbcMicroScreenFile FromStream(Stream stream) => FromBytes(StreamBytes.ReadAll(stream));
 
   /// <summary>Reads a dump, inferring the mode from its length.</summary>
   /// <remarks>10240 bytes is unambiguously mode 4 or 5 and 20480 bytes mode 0, 1 or 2; without an

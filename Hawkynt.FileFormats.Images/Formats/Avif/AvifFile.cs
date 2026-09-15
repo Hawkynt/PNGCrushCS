@@ -13,7 +13,7 @@ namespace FileFormat.Avif;
 /// is refused by name rather than approximated.
 /// </remarks>
 [FormatMimeType("image/avif", "image/avif-sequence")]
-[VerifiedBy(ConformanceOracle.ImageMagick, ConformanceOracle.AvifDec, ConformanceOracle.FFmpeg)]
+[VerifiedBy(ConformanceOracle.ImageMagick, ConformanceOracle.AvifDec, ConformanceOracle.FFmpeg, ConformanceOracle.IrfanView)]
 public readonly record struct AvifFile
   : IImageFormatReader<AvifFile>, IImageToRawImage<AvifFile>, IImageFromRawImage<AvifFile>, IImageFormatWriter<AvifFile> {
 

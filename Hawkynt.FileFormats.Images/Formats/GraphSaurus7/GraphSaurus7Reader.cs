@@ -28,18 +28,7 @@ public static class GraphSaurus7Reader {
       : parsed with { Palette = palette };
   }
 
-  public static GraphSaurus7File FromStream(Stream stream) {
-    ArgumentNullException.ThrowIfNull(stream);
-    if (stream.CanSeek) {
-      var data = new byte[stream.Length - stream.Position];
-      stream.ReadExactly(data);
-      return FromBytes(data);
-    }
-
-    using var ms = new MemoryStream();
-    stream.CopyTo(ms);
-    return FromBytes(ms.ToArray());
-  }
+  public static GraphSaurus7File FromStream(Stream stream) => FromBytes(StreamBytes.ReadAll(stream));
 
   public static GraphSaurus7File FromSpan(ReadOnlySpan<byte> data) {
     if (data.Length < GraphSaurus7File.MinimumFileSize || data[0] != MsxGraphics.BsaveMagic)

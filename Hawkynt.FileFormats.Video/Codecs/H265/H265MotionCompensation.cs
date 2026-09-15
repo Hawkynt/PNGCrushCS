@@ -51,7 +51,7 @@ internal static class H265MotionCompensation {
 
   /// <summary>Predicts one block from one or two reference pictures and writes it into the picture.</summary>
   internal static void Predict(
-    H265FrameDecoder frame, int x, int y, int width, int height, in H265MotionInfo motion) {
+    IH265MotionContext frame, int x, int y, int width, int height, in H265MotionInfo motion) {
     ArgumentNullException.ThrowIfNull(frame);
 
     if (!motion.PredictL0 && !motion.PredictL1)
@@ -283,7 +283,7 @@ internal static class H265MotionCompensation {
   /// </summary>
   /// <param name="component">-1 for luma, 0 for Cb, 1 for Cr — which set of weights applies.</param>
   private static void _Combine(
-    H265FrameDecoder frame, in H265MotionInfo motion, int[][] predictions, ushort[] plane, int stride,
+    IH265MotionContext frame, in H265MotionInfo motion, int[][] predictions, ushort[] plane, int stride,
     int x, int y, int width, int height, int bitDepth, int component) {
     var maximum = (1 << bitDepth) - 1;
     var weights = frame.Header.PredictionWeights;

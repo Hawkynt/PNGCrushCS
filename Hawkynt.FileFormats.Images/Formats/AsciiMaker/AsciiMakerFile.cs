@@ -15,7 +15,7 @@ namespace FileFormat.AsciiMaker;
 /// different colour from its background, only a different brightness. Here that is black paper and
 /// luminance 14.
 /// </remarks>
-[VerifiedBy(ConformanceOracle.Recoil2Png)]
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.IrfanView)]
 public readonly record struct AsciiMakerFile
   : IImageFormatReader<AsciiMakerFile>, IImageToRawImage<AsciiMakerFile>,
     IImageFromRawImage<AsciiMakerFile>, IImageFormatWriter<AsciiMakerFile> {

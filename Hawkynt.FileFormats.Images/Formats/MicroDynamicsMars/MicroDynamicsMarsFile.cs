@@ -19,6 +19,7 @@ namespace FileFormat.MicroDynamicsMars;
 /// <para/>
 /// The converter reads no other coding for this name, so no other is offered here.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.XnView)]
 public readonly record struct MicroDynamicsMarsFile
   : IImageFormatReader<MicroDynamicsMarsFile>, IImageToRawImage<MicroDynamicsMarsFile>, IImageFromRawImage<MicroDynamicsMarsFile>, IImageFormatWriter<MicroDynamicsMarsFile> {
 

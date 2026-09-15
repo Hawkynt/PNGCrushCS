@@ -24,6 +24,7 @@ namespace FileFormat.TiPicture;
 /// The <c>**TI92**</c> files are a different container — a folder of named entries rather than a run
 /// of them — and their picture data is compressed, so they are not read here.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.XnView)]
 public readonly record struct TiPictureFile
   : IImageFormatReader<TiPictureFile>, IImageToRawImage<TiPictureFile>,
     IImageFromRawImage<TiPictureFile>, IImageFormatWriter<TiPictureFile> {

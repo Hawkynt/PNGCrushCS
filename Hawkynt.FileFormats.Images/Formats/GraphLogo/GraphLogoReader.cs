@@ -14,18 +14,7 @@ public static class GraphLogoReader {
     return FromBytes(File.ReadAllBytes(file.FullName));
   }
 
-  public static GraphLogoFile FromStream(Stream stream) {
-    ArgumentNullException.ThrowIfNull(stream);
-    if (stream.CanSeek) {
-      var data = new byte[stream.Length - stream.Position];
-      stream.ReadExactly(data);
-      return FromBytes(data);
-    }
-
-    using var ms = new MemoryStream();
-    stream.CopyTo(ms);
-    return FromBytes(ms.ToArray());
-  }
+  public static GraphLogoFile FromStream(Stream stream) => FromBytes(StreamBytes.ReadAll(stream));
 
   public static GraphLogoFile FromSpan(ReadOnlySpan<byte> data) {
     // The character sets are the only variable part, so a valid file is always a whole number of

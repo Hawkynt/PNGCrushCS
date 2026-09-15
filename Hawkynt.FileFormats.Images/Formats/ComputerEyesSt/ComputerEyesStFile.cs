@@ -27,7 +27,7 @@ public enum ComputerEyesStKind {
 /// <para/>
 /// It is not the Atari 8-bit ComputerEyes format, which shares the name and most of an extension.
 /// </remarks>
-[VerifiedBy(ConformanceOracle.Recoil2Png)]
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.IrfanView)]
 public readonly record struct ComputerEyesStFile
   : IImageFormatReader<ComputerEyesStFile>, IImageToRawImage<ComputerEyesStFile>,
     IImageFromRawImage<ComputerEyesStFile>, IImageFormatWriter<ComputerEyesStFile> {

@@ -13,7 +13,7 @@ namespace FileFormat.XlPaint;
 /// Later files carry a marker and a header; earlier ones carry neither, and the only way to tell a
 /// 200-row picture from a 192-row one is to unpack it and see which length the stream fills.
 /// </remarks>
-[VerifiedBy(ConformanceOracle.Recoil2Png)]
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.IrfanView)]
 public readonly record struct XlPaintFile
   : IImageFormatReader<XlPaintFile>, IImageToRawImage<XlPaintFile>,
     IImageFromRawImage<XlPaintFile>, IImageFormatWriter<XlPaintFile> {

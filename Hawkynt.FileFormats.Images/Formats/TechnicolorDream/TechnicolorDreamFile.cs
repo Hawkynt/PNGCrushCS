@@ -15,7 +15,7 @@ namespace FileFormat.TechnicolorDream;
 /// shown twice to fill the 238 the pair would occupy. Reading the file from disk picks the .col
 /// up automatically; reading it from bytes cannot, because there is nowhere to look.
 /// </remarks>
-[VerifiedBy(ConformanceOracle.Recoil2Png)]
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.IrfanView)]
 public readonly record struct TechnicolorDreamFile
   : IImageFormatReader<TechnicolorDreamFile>, IImageToRawImage<TechnicolorDreamFile>,
     IImageFromRawImage<TechnicolorDreamFile>, IImageFormatWriter<TechnicolorDreamFile> {

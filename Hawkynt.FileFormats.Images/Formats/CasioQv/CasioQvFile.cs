@@ -34,7 +34,7 @@ namespace FileFormat.CasioQv;
 /// coding three separate scans on the camera's own sampling grid, and the picture is no better
 /// recorded for it than by the whole stream the same reader accepts.
 /// </remarks>
-[VerifiedBy(ConformanceOracle.FFmpeg)]
+[VerifiedBy(ConformanceOracle.FFmpeg, ConformanceOracle.IrfanView)]
 public readonly record struct CasioQvFile
   : IImageFormatReader<CasioQvFile>, IImageToRawImage<CasioQvFile>,
     IImageFromRawImage<CasioQvFile>, IImageFormatWriter<CasioQvFile> {

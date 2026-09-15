@@ -15,8 +15,10 @@ public sealed class BmpVerb : ICrushOptions {
   [Option('c', "compression", Default = "None,Rle8,Rle4", HelpText = "Compression methods (comma-separated)")]
   public string Compressions { get; set; } = "None,Rle8,Rle4";
 
+  // bool? and not bool: a plain bool option is a switch, so `Default = true` could never be
+  // declined — see the note in GifVerb.cs for the mechanism.
   [Option('a', "auto-color-mode", Default = true, HelpText = "Automatically select best color mode")]
-  public bool AutoColorMode { get; set; } = true;
+  public bool? AutoColorMode { get; set; }
 
   [Option("convert", Default = false, HelpText = "Also try other formats")]
   public bool AllowConversion { get; set; } = false;

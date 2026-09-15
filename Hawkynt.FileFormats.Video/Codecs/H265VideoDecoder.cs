@@ -20,6 +20,12 @@ namespace FileFormat.Codecs;
 /// layout the sequence's own chroma format and depth name. RGB conversion remains a consumer-side
 /// operation through <see cref="RawImageConverter"/>. Unsupported profile extensions still fail
 /// explicitly rather than returning plausible partial pictures.
+/// <para/>
+/// The one deliberately narrow exception is the uniform 8-bit 4:2:0 PCM shape emitted by the managed
+/// HEVC writer. That syntax leaves CABAC for each coding unit, carries raw samples and starts the
+/// arithmetic registers again without resetting the probability contexts. The still-image HEVC core
+/// already implements that standards-defined handoff and is reused here until the streaming frame
+/// decoder exposes the same raw-sample handoff generically.
 /// </remarks>
 public sealed class H265VideoDecoder : IVideoCodecDecoder<H265VideoDecoder> {
 
@@ -40,6 +46,7 @@ public sealed class H265VideoDecoder : IVideoCodecDecoder<H265VideoDecoder> {
   private readonly Dictionary<int, H265SequenceParameterSet> _sequenceSets = [];
   private readonly Dictionary<int, H265PictureParameterSet> _pictureSets = [];
   private readonly H265ReferencePictures _references = new();
+  private readonly ReadOnlyMemory<byte> _configurationData;
   private readonly H265DecoderConfiguration? _configuration;
   private readonly Queue<RawImage> _ready = [];
 
@@ -49,10 +56,11 @@ public sealed class H265VideoDecoder : IVideoCodecDecoder<H265VideoDecoder> {
   private H265SequenceParameterSet? _pictureSequence;
   private bool _skippingPicture;
 
-  private H265VideoDecoder(H265DecoderConfiguration? configuration) {
-    this._configuration = configuration;
+  private H265VideoDecoder(ReadOnlyMemory<byte> configurationData) {
+    this._configurationData = configurationData;
+    this._configuration = H265DecoderConfiguration.TryParse(configurationData);
 
-    foreach (var set in configuration?.ParameterSets ?? [])
+    foreach (var set in this._configuration?.ParameterSets ?? [])
       this._AcceptParameterSet(H265NalReader.Parse(set));
   }
 
@@ -78,10 +86,25 @@ public sealed class H265VideoDecoder : IVideoCodecDecoder<H265VideoDecoder> {
 
   public static H265VideoDecoder Create(MediaStreamInfo stream) {
     ArgumentNullException.ThrowIfNull(stream);
-    return new(H265DecoderConfiguration.TryParse(stream.CodecPrivateData));
+    return new(stream.CodecPrivateData);
   }
 
   public bool TryDecode(CodedPacket packet, out RawImage frame) {
+    // The managed writer uses the exact uniform PCM subset the HEIF path already decodes. Keep this
+    // before the general frame decoder: once that decoder has consumed pcm_flag its arithmetic state
+    // has deliberately ended, so discovering afterwards that the raw handoff is unsupported is too
+    // late to retry the access unit from a clean state.
+    if (!this._configurationData.IsEmpty
+        && H265PcmStillCodec.TryDecode(packet.Data, this._configurationData, out var pcm)) {
+      this._FinishPicture();
+      foreach (var picture in this._references.Flush())
+        this._ready.Enqueue(this._ToImage(picture));
+      this._ready.Enqueue(pcm);
+
+      frame = this._ready.Dequeue();
+      return true;
+    }
+
     foreach (var nal in this._Split(packet.Data)) {
       if (nal.LayerId != 0)
         throw new NotSupportedException(

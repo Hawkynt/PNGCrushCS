@@ -17,12 +17,7 @@ public static class AiReader {
     return FromBytes(File.ReadAllBytes(file.FullName));
   }
 
-  public static AiFile FromStream(Stream stream) {
-    ArgumentNullException.ThrowIfNull(stream);
-    using var memory = new MemoryStream();
-    stream.CopyTo(memory);
-    return FromBytes(memory.ToArray());
-  }
+  public static AiFile FromStream(Stream stream) => FromBytes(StreamBytes.ReadAll(stream));
 
   public static AiFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

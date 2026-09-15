@@ -10,7 +10,7 @@ namespace FileFormat.Paradox;
 /// scanlines. The display alternates between them fast enough that the eye mixes adjacent rows —
 /// so the file is two 4000-byte fields plus two four-byte colour sets, 8008 bytes in all.
 /// </remarks>
-[VerifiedBy(ConformanceOracle.Recoil2Png)]
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.IrfanView)]
 public readonly record struct ParadoxFile
   : IImageFormatReader<ParadoxFile>, IImageToRawImage<ParadoxFile>,
     IImageFromRawImage<ParadoxFile>, IImageFormatWriter<ParadoxFile> {

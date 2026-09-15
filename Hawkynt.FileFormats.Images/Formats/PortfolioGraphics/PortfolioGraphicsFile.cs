@@ -5,7 +5,7 @@ using FileFormat.Core;
 namespace FileFormat.PortfolioGraphics;
 
 /// <summary>In-memory representation of an Atari Portfolio Graphics image (PGF/PGC).</summary>
-[VerifiedBy(ConformanceOracle.Recoil2Png)]
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.IrfanView)]
 public readonly record struct PortfolioGraphicsFile : IImageFormatReader<PortfolioGraphicsFile>, IImageToRawImage<PortfolioGraphicsFile>, IImageFromRawImage<PortfolioGraphicsFile>, IImageFormatWriter<PortfolioGraphicsFile> {
 
   /// <summary>Fixed pixel width.</summary>

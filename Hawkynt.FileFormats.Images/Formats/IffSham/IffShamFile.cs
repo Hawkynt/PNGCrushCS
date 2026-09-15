@@ -5,7 +5,7 @@ using FileFormat.Ilbm;
 namespace FileFormat.IffSham;
 
 /// <summary>In-memory representation of an IFF SHAM (Sliced HAM) image.</summary>
-[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.FFmpeg)]
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.FFmpeg, ConformanceOracle.IrfanView)]
 public readonly record struct IffShamFile : IImageFormatReader<IffShamFile>, IImageToRawImage<IffShamFile>, IImageFromRawImage<IffShamFile>, IImageFormatWriter<IffShamFile> {
 
   /// <summary>Minimum valid file size (FORM header = 12 bytes).</summary>

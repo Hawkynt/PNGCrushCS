@@ -10,7 +10,7 @@ namespace FileFormat.CreateWithGarfield;
 /// The picture is 160 pixels across rather than 320: multicolour spends two bits a pixel and buys
 /// the third colour per cell with half the horizontal resolution.
 /// </remarks>
-[VerifiedBy(ConformanceOracle.Recoil2Png)]
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.IrfanView)]
 public readonly record struct CreateWithGarfieldFile : IImageFormatReader<CreateWithGarfieldFile>, IImageToRawImage<CreateWithGarfieldFile>, IImageFromRawImage<CreateWithGarfieldFile>, IImageFormatWriter<CreateWithGarfieldFile> {
 
   static string IImageFormatMetadata<CreateWithGarfieldFile>.PrimaryExtension => ".cwg";

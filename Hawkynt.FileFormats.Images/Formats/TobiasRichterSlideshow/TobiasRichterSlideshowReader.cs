@@ -14,18 +14,7 @@ public static class TobiasRichterSlideshowReader {
     return FromBytes(File.ReadAllBytes(file.FullName));
   }
 
-  public static TobiasRichterSlideshowFile FromStream(Stream stream) {
-    ArgumentNullException.ThrowIfNull(stream);
-    if (stream.CanSeek) {
-      var data = new byte[stream.Length - stream.Position];
-      stream.ReadExactly(data);
-      return FromBytes(data);
-    }
-
-    using var ms = new MemoryStream();
-    stream.CopyTo(ms);
-    return FromBytes(ms.ToArray());
-  }
+  public static TobiasRichterSlideshowFile FromStream(Stream stream) => FromBytes(StreamBytes.ReadAll(stream));
 
   public static TobiasRichterSlideshowFile FromSpan(ReadOnlySpan<byte> data) {
     // Everything is at a fixed offset and nothing identifies the format, so the length is all there

@@ -15,6 +15,7 @@ namespace FileFormat.JovianVi;
 /// which is what lets a file carry something between them.
 /// </remarks>
 [FormatMagicBytes([0x56, 0x49])]
+[VerifiedBy(ConformanceOracle.XnView)]
 public readonly record struct JovianViFile
   : IImageFormatReader<JovianViFile>, IImageToRawImage<JovianViFile>,
     IImageFromRawImage<JovianViFile>, IImageFormatWriter<JovianViFile> {

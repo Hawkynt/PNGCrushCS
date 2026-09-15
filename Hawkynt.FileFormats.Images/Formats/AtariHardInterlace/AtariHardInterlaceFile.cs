@@ -15,7 +15,7 @@ namespace FileFormat.AtariHardInterlace;
 /// a pixel to the left of the other — a consequence of how the mode is timed, and something the
 /// picture is drawn to expect rather than something to correct.
 /// </remarks>
-[VerifiedBy(ConformanceOracle.Recoil2Png)]
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.IrfanView)]
 public readonly record struct AtariHardInterlaceFile
   : IImageFormatReader<AtariHardInterlaceFile>, IImageToRawImage<AtariHardInterlaceFile>,
     IImageFromRawImage<AtariHardInterlaceFile>, IImageFormatWriter<AtariHardInterlaceFile> {

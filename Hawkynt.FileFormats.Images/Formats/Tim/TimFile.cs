@@ -5,7 +5,7 @@ namespace FileFormat.Tim;
 
 /// <summary>In-memory representation of a PlayStation 1 TIM texture.</summary>
 [FormatMagicBytes([0x10, 0x00, 0x00, 0x00])]
-[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.ImageMagick)]
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.ImageMagick, ConformanceOracle.IrfanView)]
 public readonly record struct TimFile : IImageFormatReader<TimFile>, IImageToRawImage<TimFile>, IImageFromRawImage<TimFile>, IImageFormatWriter<TimFile> {
 
   static string IImageFormatMetadata<TimFile>.PrimaryExtension => ".tim";

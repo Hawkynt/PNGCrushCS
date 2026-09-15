@@ -5,6 +5,7 @@ namespace FileFormat.Lss16;
 
 /// <summary>In-memory representation of a Syslinux LSS16 splash screen image.</summary>
 [FormatMagicBytes([0x3D, 0xF3, 0x13, 0x14])]
+[VerifiedBy(ConformanceOracle.XnView)]
 public readonly record struct Lss16File : IImageFormatReader<Lss16File>, IImageToRawImage<Lss16File>, IImageFromRawImage<Lss16File>, IImageFormatWriter<Lss16File> {
 
   /// <summary>Magic bytes identifying an LSS16 file: 0x3D 0xF3 0x13 0x14.</summary>

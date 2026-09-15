@@ -96,13 +96,20 @@ public static class CdrReader {
   }
 
   private static bool _IsCdrForm(FourCC form)
-    => form.A == (byte)'C' && form.B == (byte)'D' && form.C == (byte)'R';
+    => form is { A: (byte)'C', B: (byte)'D', C: (byte)'R' }
+      or { A: (byte)'c', B: (byte)'d', C: (byte)'r', D: (byte)'8' };
 
-  private static int _VersionFromForm(FourCC form)
-    => form.D switch {
+  private static int _VersionFromForm(FourCC form) {
+    if (form is { A: (byte)'c', B: (byte)'d', C: (byte)'r', D: (byte)'8' })
+      return 801;
+
+    return form.D switch {
       (byte)' ' => 300,
       >= (byte)'1' and <= (byte)'9' => (form.D - (byte)'0') * 100,
-      >= (byte)'A' and <= (byte)'Z' => (10 + form.D - (byte)'A') * 100,
+      >= (byte)'A' and <= (byte)'H' => (form.D - 0x37) * 100,
+      (byte)'I' => 0,
+      >= (byte)'J' and <= (byte)'Z' => (form.D - 0x38) * 100,
       _ => 0,
     };
+  }
 }

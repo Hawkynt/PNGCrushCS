@@ -83,10 +83,14 @@ public sealed class VideoFormatRegistryTests {
   [Test]
   [Category("Unit")]
   public void ACodeNothingWritesIsRefusedByName() {
+    // The code is one nothing claims, rather than a real codec that happens to have no encoder yet.
+    // This test used to name avc1, which meant it went red the day H.264 gained a writer -- the day it
+    // should have been celebrating. What it is actually about is the refusal: an unwritable code comes
+    // back named, with the encoders that do exist listed beside it.
     var stream = new MediaStreamInfo {
       Index = 3,
       Kind = MediaStreamKind.Video,
-      Codec = CodecTag.FromCharacters("avc1"),
+      Codec = CodecTag.FromCharacters("zzzz"),
       Width = 176,
       Height = 144,
     };
@@ -94,7 +98,7 @@ public sealed class VideoFormatRegistryTests {
     Assert.That(VideoFormatRegistry.CanEncode(stream), Is.False);
     var failure = Assert.Throws<NotSupportedException>(() => VideoFormatRegistry.CreateEncoder(stream));
     Assert.Multiple(() => {
-      Assert.That(failure!.Message, Does.Contain("avc1"));
+      Assert.That(failure!.Message, Does.Contain("zzzz"));
       Assert.That(failure.Message, Does.Contain("Encoders present"));
     });
   }

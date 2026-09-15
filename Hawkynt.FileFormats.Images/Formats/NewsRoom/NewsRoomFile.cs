@@ -22,6 +22,7 @@ namespace FileFormat.NewsRoom;
 /// <para/>
 /// A set bit is paper and a clear bit is ink, which is the way round XnView draws it.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.XnView)]
 public readonly record struct NewsRoomFile
   : IImageFormatReader<NewsRoomFile>, IImageToRawImage<NewsRoomFile>, IImageFromRawImage<NewsRoomFile>,
     IImageFormatWriter<NewsRoomFile> {

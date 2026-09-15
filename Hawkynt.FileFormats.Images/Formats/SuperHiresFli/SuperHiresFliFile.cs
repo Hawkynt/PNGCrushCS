@@ -13,7 +13,7 @@ namespace FileFormat.SuperHiresFli;
 /// Which sprite covers which cell is a fixed table rather than anything the file stores — the
 /// pattern comes from how the sprites had to be reused down the screen, and it is not regular.
 /// </remarks>
-[VerifiedBy(ConformanceOracle.Recoil2Png)]
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.IrfanView)]
 public readonly record struct SuperHiresFliFile
   : IImageFormatReader<SuperHiresFliFile>, IImageToRawImage<SuperHiresFliFile>,
     IImageFromRawImage<SuperHiresFliFile>, IImageFormatWriter<SuperHiresFliFile> {

@@ -14,6 +14,7 @@ namespace FileFormat.ChinonEs1000;
 /// bounded residual refinement through that same decoder.
 /// </remarks>
 [FormatMagicBytes([(byte)'C', (byte)'O', (byte)'M', (byte)'E', (byte)'T'])]
+[VerifiedBy(ConformanceOracle.XnView)]
 public readonly record struct ChinonEs1000File :
   IImageFormatReader<ChinonEs1000File>, IImageToRawImage<ChinonEs1000File>,
   IImageFromRawImage<ChinonEs1000File>, IImageFormatWriter<ChinonEs1000File> {

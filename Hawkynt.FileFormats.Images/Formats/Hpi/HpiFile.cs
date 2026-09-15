@@ -12,7 +12,7 @@ namespace FileFormat.Hpi;
 /// JPEG, so that is what is read here; what the PNG beside it is for — a mask, or an overlay — is not
 /// established, and none of the three samples settles it.
 /// </remarks>
-[VerifiedBy(ConformanceOracle.FFmpeg)]
+[VerifiedBy(ConformanceOracle.FFmpeg, ConformanceOracle.IrfanView)]
 public readonly record struct HpiFile
   : IImageFormatReader<HpiFile>, IImageToRawImage<HpiFile>,
     IImageFromRawImage<HpiFile>, IImageFormatWriter<HpiFile> {

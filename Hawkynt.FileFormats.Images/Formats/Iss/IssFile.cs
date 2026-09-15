@@ -21,6 +21,7 @@ namespace FileFormat.Iss;
 /// of 255 is black, and in the one-bit kind a set bit is black.
 /// </remarks>
 [FormatMagicBytes([0x33, 0x4B, 0x43, 0x42, 0x49, 0x4D, 0x53, 0x50])]
+[VerifiedBy(ConformanceOracle.XnView)]
 public readonly record struct IssFile
   : IImageFormatReader<IssFile>, IImageToRawImage<IssFile>, IImageFromRawImage<IssFile>, IImageFormatWriter<IssFile> {
 

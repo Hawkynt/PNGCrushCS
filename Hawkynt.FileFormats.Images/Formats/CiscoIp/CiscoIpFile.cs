@@ -12,6 +12,7 @@ namespace FileFormat.CiscoIp;
 /// This used to be written as eighty bytes of binary header followed by 24-bit pixels — a shape
 /// nothing on a phone or anywhere else would open.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.XnView)]
 public readonly record struct CiscoIpFile
   : IImageFormatReader<CiscoIpFile>, IImageToRawImage<CiscoIpFile>,
     IImageFromRawImage<CiscoIpFile>, IImageFormatWriter<CiscoIpFile> {

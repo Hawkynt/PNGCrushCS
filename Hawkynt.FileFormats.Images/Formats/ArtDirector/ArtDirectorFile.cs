@@ -4,7 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.ArtDirector;
 
 /// <summary>In-memory representation of an Atari ST Art Director low-resolution picture.</summary>
-[VerifiedBy(ConformanceOracle.Recoil2Png)]
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.IrfanView)]
 public readonly record struct ArtDirectorFile() : IImageFormatReader<ArtDirectorFile>, IImageToRawImage<ArtDirectorFile>, IImageFromRawImage<ArtDirectorFile>, IImageFormatWriter<ArtDirectorFile> {
 
   /// <summary>Fixed image width in pixels.</summary>

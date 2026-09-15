@@ -6,6 +6,7 @@ namespace FileFormat.PicturePublisher4;
 
 /// <summary>In-memory representation of a Micrografx Picture Publisher 4 document (.pp4).</summary>
 /// <remarks>The verified readable form is a short wrapper whose pointer at 0x2A leads to one complete TIFF.</remarks>
+[VerifiedBy(ConformanceOracle.XnView)]
 public readonly record struct PicturePublisher4File
   : IImageFormatReader<PicturePublisher4File>, IImageToRawImage<PicturePublisher4File>, IImageFromRawImage<PicturePublisher4File>, IImageFormatWriter<PicturePublisher4File> {
 

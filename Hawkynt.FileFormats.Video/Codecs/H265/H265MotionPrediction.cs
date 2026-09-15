@@ -46,7 +46,7 @@ internal static class H265MotionPrediction {
   /// Builds the merge candidate list and takes one entry — clause 8.5.3.2.2.
   /// </summary>
   internal static H265MotionInfo DeriveMerge(
-    H265FrameDecoder frame, int xPb, int yPb, int nPbW, int nPbH, int partIdx, int mergeIndex) {
+    IH265MotionContext frame, int xPb, int yPb, int nPbW, int nPbH, int partIdx, int mergeIndex) {
     ArgumentNullException.ThrowIfNull(frame);
 
     var xCb = frame.CodingBlockX;
@@ -114,7 +114,7 @@ internal static class H265MotionPrediction {
   /// bitstream stores an index into this list, not the motion vector itself.
   /// </remarks>
   private static void _AddSpatialCandidates(
-    H265FrameDecoder frame, List<H265MotionInfo> candidates, int xCb, int yCb, int nCbS,
+    IH265MotionContext frame, List<H265MotionInfo> candidates, int xCb, int yCb, int nCbS,
     int xPb, int yPb, int nPbW, int nPbH, int partIdx, H265PartitionMode partitionMode) {
     var splitVertically = partitionMode is H265PartitionMode.VerticalHalves
       or H265PartitionMode.VerticalQuarterLeft or H265PartitionMode.VerticalQuarterRight;
@@ -194,7 +194,7 @@ internal static class H265MotionPrediction {
   /// decoded — the z-scan alone would allow it, because the two are at the same depth.
   /// </remarks>
   private static bool _IsPredictionBlockAvailable(
-    H265FrameDecoder frame, int xCb, int yCb, int nCbS, int xPb, int yPb, int nPbW, int nPbH,
+    IH265MotionContext frame, int xCb, int yCb, int nCbS, int xPb, int yPb, int nPbW, int nPbH,
     int partIdx, int xNb, int yNb) {
     if (nPbW << 1 == nCbS && nPbH << 1 == nCbS && partIdx == 1
         && yCb + nPbH <= yNb && xCb + nPbW > xNb)
@@ -217,7 +217,7 @@ internal static class H265MotionPrediction {
   /// it is no longer decoding.
   /// </remarks>
   private static bool _TemporalCandidate(
-    H265FrameDecoder frame, int xPb, int yPb, int nPbW, int nPbH, out H265MotionInfo motion) {
+    IH265MotionContext frame, int xPb, int yPb, int nPbW, int nPbH, out H265MotionInfo motion) {
     motion = H265MotionInfo.None;
 
     if (!frame.Header.TemporalMvpEnabled)
@@ -239,7 +239,7 @@ internal static class H265MotionPrediction {
 
   /// <summary>Reads and scales one vector out of the collocated picture — clause 8.5.3.2.9.</summary>
   private static bool _CollocatedVector(
-    H265FrameDecoder frame, int xPb, int yPb, int nPbW, int nPbH, int list, int refIdx,
+    IH265MotionContext frame, int xPb, int yPb, int nPbW, int nPbH, int list, int refIdx,
     out int mvX, out int mvY) {
     mvX = 0;
     mvY = 0;
@@ -267,7 +267,7 @@ internal static class H265MotionPrediction {
   }
 
   private static bool _ReadCollocated(
-    H265FrameDecoder frame, H265Picture collocated, int x, int y, int list, int refIdx,
+    IH265MotionContext frame, H265Picture collocated, int x, int y, int list, int refIdx,
     out int mvX, out int mvY) {
     mvX = 0;
     mvY = 0;
@@ -333,7 +333,7 @@ internal static class H265MotionPrediction {
   }
 
   /// <summary>Whether every picture this slice may refer to comes before it — the low-delay case.</summary>
-  private static bool _AllReferencesArePast(H265FrameDecoder frame) {
+  private static bool _AllReferencesArePast(IH265MotionContext frame) {
     var current = frame.Picture.PictureOrderCount;
 
     for (var list = 0; list < 2; ++list)
@@ -374,7 +374,7 @@ internal static class H265MotionPrediction {
   /// clause 8.5.3.2.4.
   /// </summary>
   private static void _AddCombinedCandidates(
-    H265FrameDecoder frame, List<H265MotionInfo> candidates, int original, int maximum) {
+    IH265MotionContext frame, List<H265MotionInfo> candidates, int original, int maximum) {
     if (original <= 1 || candidates.Count >= maximum)
       return;
 
@@ -414,7 +414,7 @@ internal static class H265MotionPrediction {
   }
 
   /// <summary>Fills the rest of the list with motionless candidates — clause 8.5.3.2.5.</summary>
-  private static void _AddZeroCandidates(H265FrameDecoder frame, List<H265MotionInfo> candidates, int maximum) {
+  private static void _AddZeroCandidates(IH265MotionContext frame, List<H265MotionInfo> candidates, int maximum) {
     var bidirectional = frame.Header.SliceType == H265SliceType.B;
     var references = bidirectional
       ? Math.Min(frame.Header.NumRefIdxL0Active, frame.Header.NumRefIdxL1Active)
@@ -441,7 +441,7 @@ internal static class H265MotionPrediction {
 
   /// <summary>Builds the two-entry predictor list and takes one — clause 8.5.3.2.6.</summary>
   internal static (short X, short Y) DerivePredictor(
-    H265FrameDecoder frame, int xPb, int yPb, int nPbW, int nPbH, int partIdx, int list, int refIdx,
+    IH265MotionContext frame, int xPb, int yPb, int nPbW, int nPbH, int partIdx, int list, int refIdx,
     int predictorFlag) {
     ArgumentNullException.ThrowIfNull(frame);
 
@@ -479,7 +479,7 @@ internal static class H265MotionPrediction {
 
   /// <summary>The predictor from the left, from the two neighbours below it — clause 8.5.3.2.7.</summary>
   private static bool _DeriveLeftPredictor(
-    H265FrameDecoder frame, int xCb, int yCb, int nCbS, int xPb, int yPb, int nPbW, int nPbH,
+    IH265MotionContext frame, int xCb, int yCb, int nCbS, int xPb, int yPb, int nPbW, int nPbH,
     int partIdx, int list, int refIdx, out int mvX, out int mvY, out bool anyNeighbour) {
     mvX = 0;
     mvY = 0;
@@ -510,7 +510,7 @@ internal static class H265MotionPrediction {
 
   /// <summary>The predictor from above, from the three neighbours across its top — clause 8.5.3.2.7.</summary>
   private static bool _DeriveAbovePredictor(
-    H265FrameDecoder frame, int xCb, int yCb, int nCbS, int xPb, int yPb, int nPbW, int nPbH,
+    IH265MotionContext frame, int xCb, int yCb, int nCbS, int xPb, int yPb, int nPbW, int nPbH,
     int partIdx, int list, int refIdx, bool anyLeftNeighbour,
     ref bool haveLeft, ref int leftX, ref int leftY, out int mvX, out int mvY) {
     mvX = 0;
@@ -546,7 +546,7 @@ internal static class H265MotionPrediction {
 
   /// <summary>A neighbour whose vector already points at the wanted picture.</summary>
   private static bool _TryExactPredictor(
-    H265FrameDecoder frame, int xCb, int yCb, int nCbS, int xPb, int yPb, int nPbW, int nPbH,
+    IH265MotionContext frame, int xCb, int yCb, int nCbS, int xPb, int yPb, int nPbW, int nPbH,
     int partIdx, int xNb, int yNb, int list, int refIdx, out int mvX, out int mvY) {
     mvX = 0;
     mvY = 0;
@@ -578,7 +578,7 @@ internal static class H265MotionPrediction {
 
   /// <summary>A neighbour whose vector has to be scaled onto the wanted picture's distance.</summary>
   private static bool _TryScaledPredictor(
-    H265FrameDecoder frame, int xCb, int yCb, int nCbS, int xPb, int yPb, int nPbW, int nPbH,
+    IH265MotionContext frame, int xCb, int yCb, int nCbS, int xPb, int yPb, int nPbW, int nPbH,
     int partIdx, int xNb, int yNb, int list, int refIdx, out int mvX, out int mvY) {
     mvX = 0;
     mvY = 0;
@@ -623,7 +623,7 @@ internal static class H265MotionPrediction {
     return false;
   }
 
-  private static int? _ReferencePoc(H265FrameDecoder frame, int list, int index) {
+  private static int? _ReferencePoc(IH265MotionContext frame, int list, int index) {
     var pictures = frame.ReferenceList(list);
     return index >= 0 && index < pictures.Count ? pictures[index].PictureOrderCount : null;
   }

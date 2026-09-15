@@ -15,17 +15,7 @@ public static class AtariGr7Reader {
     return FromBytes(File.ReadAllBytes(file.FullName));
   }
 
-  public static AtariGr7File FromStream(Stream stream) {
-    ArgumentNullException.ThrowIfNull(stream);
-    if (stream.CanSeek) {
-      var data = new byte[stream.Length - stream.Position];
-      stream.ReadExactly(data);
-      return FromSpan(data);
-    }
-    using var ms = new MemoryStream();
-    stream.CopyTo(ms);
-    return FromSpan(ms.ToArray());
-  }
+  public static AtariGr7File FromStream(Stream stream) => FromSpan(StreamBytes.ReadAll(stream));
 
   public static AtariGr7File FromSpan(ReadOnlySpan<byte> data) {
     // A whole number of rows and then the four colour registers, which is why the length leaves a

@@ -6,6 +6,7 @@ namespace FileFormat.Wad3;
 
 /// <summary>In-memory representation of a Half-Life WAD3 texture package.</summary>
 [FormatMagicBytes([0x57, 0x41, 0x44, 0x33])]
+[VerifiedBy(ConformanceOracle.XnView)]
 public readonly record struct Wad3File : IImageFormatReader<Wad3File>, IImageToRawImage<Wad3File>, IImageFromRawImage<Wad3File>, IImageFormatWriter<Wad3File> {
 
   static string IImageFormatMetadata<Wad3File>.PrimaryExtension => ".wad";

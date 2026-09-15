@@ -5,7 +5,7 @@ namespace FileFormat.IffPbm;
 
 /// <summary>In-memory representation of an IFF PBM (Packed Bitmap) image.</summary>
 [FormatMagicBytes([0x46, 0x4F, 0x52, 0x4D])]
-[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.FFmpeg)]
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.FFmpeg, ConformanceOracle.IrfanView)]
 public readonly record struct IffPbmFile : IImageFormatReader<IffPbmFile>, IImageToRawImage<IffPbmFile>, IImageFromRawImage<IffPbmFile>, IImageFormatWriter<IffPbmFile> {
 
   static string IImageFormatMetadata<IffPbmFile>.PrimaryExtension => ".lbm";

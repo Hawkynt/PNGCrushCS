@@ -45,6 +45,7 @@ namespace FileFormat.FlashImage;
 /// the same reason XnView refuses it, the first four bytes.
 /// </remarks>
 [FormatMagicBytes([0x09, 0x43, 0x22, 0x13])]
+[VerifiedBy(ConformanceOracle.XnView)]
 public readonly record struct FlashImageFile
   : IImageFormatReader<FlashImageFile>, IImageToRawImage<FlashImageFile>,
     IImageFromRawImage<FlashImageFile>, IImageFormatWriter<FlashImageFile> {

@@ -10,7 +10,7 @@ namespace FileFormat.AtariGraphics3;
 /// screen alone and takes the operating system's default colours, while Mad Studio's variant
 /// (.gr3) appends four GTIA colour bytes.
 /// </remarks>
-[VerifiedBy(ConformanceOracle.Recoil2Png)]
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.IrfanView)]
 public readonly record struct AtariGraphics3File
   : IImageFormatReader<AtariGraphics3File>, IImageToRawImage<AtariGraphics3File>,
     IImageFromRawImage<AtariGraphics3File>, IImageFormatWriter<AtariGraphics3File> {

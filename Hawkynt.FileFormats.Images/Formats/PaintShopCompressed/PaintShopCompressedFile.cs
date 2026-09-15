@@ -14,7 +14,7 @@ namespace FileFormat.PaintShopCompressed;
 /// and it is why a two-byte alternating fill earns a command of its own: a dither pattern is one
 /// line repeated, and a repeated line is already free.
 /// </remarks>
-[VerifiedBy(ConformanceOracle.Recoil2Png)]
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.IrfanView)]
 public readonly record struct PaintShopCompressedFile
   : IImageFormatReader<PaintShopCompressedFile>, IImageToRawImage<PaintShopCompressedFile>,
     IImageFromRawImage<PaintShopCompressedFile>, IImageFormatWriter<PaintShopCompressedFile> {

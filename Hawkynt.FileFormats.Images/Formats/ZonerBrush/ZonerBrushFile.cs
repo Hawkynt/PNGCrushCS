@@ -16,6 +16,7 @@ namespace FileFormat.ZonerBrush;
 /// The drawing behind it is not read. A vector file is not a picture, and the preview is what the
 /// tool draws.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.XnView)]
 public readonly record struct ZonerBrushFile
   : IImageFormatReader<ZonerBrushFile>, IImageToRawImage<ZonerBrushFile>, IImageFromRawImage<ZonerBrushFile>, IImageFormatWriter<ZonerBrushFile> {
 

@@ -1,0 +1,45 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!-- net10.0, not Crush.Image's own net10.0-windows. `dotnet test` silently skips a
+         windows-flavoured test assembly on a non-Windows host, so the three net10.0-windows test
+         projects in this folder contribute nothing to the ubuntu leg of the CI matrix. The verb
+         declarations under test are plain attribute metadata and need no Windows API, so this
+         project stays platform-neutral and runs on both legs. -->
+    <TargetFramework>net10.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+    <Description>Command line parsing tests for the crush CLI verbs.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="coverlet.collector" Version="6.0.4" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.0" />
+    <PackageReference Include="NUnit" Version="4.3.2" />
+    <PackageReference Include="NUnit.Analyzers" Version="4.7.0" />
+    <PackageReference Include="NUnit3TestAdapter" Version="5.0.0" />
+    <!-- Same version Crush.Image itself pins: these tests exist to pin down how *that* parser
+         treats a bool option, so a different version would be testing a different parser. -->
+    <PackageReference Include="CommandLineParser" Version="2.9.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\Crush.Core\Crush.Core.csproj" />
+  </ItemGroup>
+
+  <!-- The verb declarations are compiled in from source rather than reached through a
+       ProjectReference to Crush.Image. Crush.Image is an Exe whose build/SingleFileBundle.targets
+       post-build step deletes the multi-file output (crush.dll included) and leaves only the
+       bundled crush.exe behind on Windows Release builds, which is exactly the configuration CI
+       uses - a copy-local of crush.dll from here would look for a file that target has just
+       removed. The option metadata is what these tests assert on, and it lives entirely in
+       Verbs/*.cs. -->
+  <ItemGroup>
+    <Compile Include="..\..\Crush.Image\Verbs\*.cs" LinkBase="Verbs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="NUnit.Framework" />
+  </ItemGroup>
+
+</Project>

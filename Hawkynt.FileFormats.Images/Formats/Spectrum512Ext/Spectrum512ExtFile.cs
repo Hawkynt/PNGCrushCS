@@ -5,7 +5,7 @@ using FileFormat.Core;
 namespace FileFormat.Spectrum512Ext;
 
 /// <summary>In-memory representation of a Spectrum 512 Extended (.spx) image (Atari ST, 320x199, up to 4096 colors).</summary>
-[VerifiedBy(ConformanceOracle.Recoil2Png)]
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.IrfanView)]
 public readonly record struct Spectrum512ExtFile : IImageFormatReader<Spectrum512ExtFile>, IImageToRawImage<Spectrum512ExtFile>, IImageFromRawImage<Spectrum512ExtFile>, IImageFormatWriter<Spectrum512ExtFile> {
 
   /// <summary>Expected file size: 32000 bytes pixel data + 199 lines * 48 entries * 2 bytes = 51104 bytes.</summary>

@@ -16,18 +16,7 @@ public static class MsxGl16Reader {
     return FromSpan(File.ReadAllBytes(file.FullName), MsxGl16File.ModeFromExtension(file.Extension));
   }
 
-  public static MsxGl16File FromStream(Stream stream) {
-    ArgumentNullException.ThrowIfNull(stream);
-    if (stream.CanSeek) {
-      var data = new byte[stream.Length - stream.Position];
-      stream.ReadExactly(data);
-      return FromBytes(data);
-    }
-
-    using var ms = new MemoryStream();
-    stream.CopyTo(ms);
-    return FromBytes(ms.ToArray());
-  }
+  public static MsxGl16File FromStream(Stream stream) => FromBytes(StreamBytes.ReadAll(stream));
 
   /// <summary>Reads a picture, assuming Screen 5 — the reading that draws it as stored.</summary>
   public static MsxGl16File FromSpan(ReadOnlySpan<byte> data) => FromSpan(data, MsxGl16Mode.Screen5);

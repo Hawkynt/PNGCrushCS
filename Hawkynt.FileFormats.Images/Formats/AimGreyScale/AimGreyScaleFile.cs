@@ -22,6 +22,7 @@ namespace FileFormat.AimGreyScale;
 /// of the fallback — not a table, one entry — and it is why reading by bytes alone works for that one
 /// size and nothing else.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.XnView)]
 public readonly record struct AimGreyScaleFile : IImageFormatReader<AimGreyScaleFile>, IImageToRawImage<AimGreyScaleFile>, IImageFromRawImage<AimGreyScaleFile>, IImageFormatWriter<AimGreyScaleFile> {
 
   static string IImageFormatMetadata<AimGreyScaleFile>.PrimaryExtension => ".ima";

@@ -4,7 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.FacePainter;
 
 /// <summary>In-memory representation of a Commodore 64 Face Painter multicolor image.</summary>
-[VerifiedBy(ConformanceOracle.Recoil2Png)]
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.IrfanView)]
 public readonly record struct FacePainterFile : IImageFormatReader<FacePainterFile>, IImageToRawImage<FacePainterFile>, IImageFromRawImage<FacePainterFile>, IImageFormatWriter<FacePainterFile> {
 
   static string IImageFormatMetadata<FacePainterFile>.PrimaryExtension => ".fpt";

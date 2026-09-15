@@ -36,6 +36,18 @@ internal sealed class MpegVideoDecoder {
   private MpegSequenceHeader? _anchorGeometry;
 
   /// <summary>
+  /// The most recently reconstructed anchor, which is what the next P picture predicts from.
+  /// </summary>
+  /// <remarks>
+  /// Exposed for the encoder. An encoder must predict from the picture its decoder will hold, not
+  /// from the source it was given, or the two drift apart a little with every predicted picture
+  /// until the error is visible. Reading the anchor back out of this decoder makes the reference
+  /// identical by construction rather than by a second implementation of dequantisation and the
+  /// inverse transform that would have to be kept in step.
+  /// </remarks>
+  internal MpegFrame? CurrentAnchor => this._currentAnchor;
+
+  /// <summary>
   /// Decodes one packet and queues whichever pictures became due for display.
   /// </summary>
   internal void DecodePacket(ReadOnlySpan<byte> data) {

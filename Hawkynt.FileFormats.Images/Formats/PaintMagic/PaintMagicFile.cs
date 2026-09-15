@@ -12,7 +12,7 @@ namespace FileFormat.PaintMagic;
 /// The bitmap does not start at the head of the file: a 116-byte preamble comes first, and the two
 /// shared registers sit in the gap between the bitmap and the video matrix.
 /// </remarks>
-[VerifiedBy(ConformanceOracle.Recoil2Png)]
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.IrfanView)]
 public readonly record struct PaintMagicFile
   : IImageFormatReader<PaintMagicFile>, IImageToRawImage<PaintMagicFile>,
     IImageFromRawImage<PaintMagicFile>, IImageFormatWriter<PaintMagicFile> {

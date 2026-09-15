@@ -14,6 +14,7 @@ namespace FileFormat.SyberiaTexture;
 /// <para/>
 /// Putting the ten bytes back makes every sample an ordinary JPEG, and all three then match XnView.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.XnView)]
 public readonly record struct SyberiaTextureFile
   : IImageFormatReader<SyberiaTextureFile>, IImageToRawImage<SyberiaTextureFile>,
     IImageFromRawImage<SyberiaTextureFile>, IImageFormatWriter<SyberiaTextureFile> {

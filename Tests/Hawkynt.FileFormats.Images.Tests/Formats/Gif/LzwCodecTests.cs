@@ -80,13 +80,35 @@ public sealed class LzwCodecTests {
     rng.NextBytes(input);
 
     var standard = GifLzwCodec.Encode(input, 8);
-    var deferred = GifLzwCodec.Encode(input, 8, new GifLzwCodec.EncodeOptions(DeferClear: true));
+    var frozen = GifLzwCodec.Encode(input, 8, new GifLzwCodec.EncodeOptions(Clear: GifLzwCodec.ClearStrategy.Freeze));
+    var adaptive = GifLzwCodec.Encode(input, 8, new GifLzwCodec.EncodeOptions(Clear: GifLzwCodec.ClearStrategy.Adaptive));
 
-    // Both decode back to the same input — deferred-clear is a writer-only optimisation.
+    // All three decode back to the same input — the clear strategy is a writer-only optimisation.
     using var msA = new MemoryStream(standard);
-    using var msB = new MemoryStream(deferred);
+    using var msB = new MemoryStream(frozen);
+    using var msC = new MemoryStream(adaptive);
     Assert.That(GifLzwCodec.Decode(msA, input.Length), Is.EqualTo(input));
     Assert.That(GifLzwCodec.Decode(msB, input.Length), Is.EqualTo(input));
+    Assert.That(GifLzwCodec.Decode(msC, input.Length), Is.EqualTo(input));
+  }
+
+  [Test]
+  public void Encode_AdaptiveClear_BeatsFreezeWhenTheFrameChangesCharacter() {
+    // A frozen dictionary built on the smooth first half goes on being used for the noisy second
+    // half, which is exactly the case the ratio monitor exists to catch.
+    var rng = new Random(31337);
+    var input = new byte[1 << 17];
+    for (var i = 0; i < input.Length; ++i)
+      input[i] = i < input.Length / 2 ? (byte)(i % 37) : (byte)rng.Next(256);
+
+    var frozen = GifLzwCodec.Encode(input, 8, new GifLzwCodec.EncodeOptions(Clear: GifLzwCodec.ClearStrategy.Freeze));
+    var adaptive = GifLzwCodec.Encode(input, 8, new GifLzwCodec.EncodeOptions(Clear: GifLzwCodec.ClearStrategy.Adaptive));
+
+    Assert.That(adaptive.Length, Is.LessThan(frozen.Length),
+      $"adaptive={adaptive.Length} frozen={frozen.Length}");
+
+    using var ms = new MemoryStream(adaptive);
+    Assert.That(GifLzwCodec.Decode(ms, input.Length), Is.EqualTo(input));
   }
 
   // ============================================================
@@ -175,8 +197,77 @@ public sealed class LzwCodecTests {
   public void EncodeOptions_FactoryMethods_ProduceExpectedLevels() {
     Assert.That(GifLzwCodec.EncodeOptions.NoCompression().Level, Is.EqualTo(GifLzwCodec.CompressionLevel.None));
     Assert.That(GifLzwCodec.EncodeOptions.StandardCompression().Level, Is.EqualTo(GifLzwCodec.CompressionLevel.Standard));
-    Assert.That(GifLzwCodec.EncodeOptions.StandardCompression(deferClear: true).DeferClear, Is.True);
+    Assert.That(GifLzwCodec.EncodeOptions.StandardCompression(GifLzwCodec.ClearStrategy.Freeze).Clear,
+      Is.EqualTo(GifLzwCodec.ClearStrategy.Freeze));
+    Assert.That(GifLzwCodec.EncodeOptions.StandardCompression().Clear,
+      Is.EqualTo(GifLzwCodec.ClearStrategy.Immediate));
     Assert.That(GifLzwCodec.EncodeOptions.BestEffort().Level, Is.EqualTo(GifLzwCodec.CompressionLevel.Best));
     Assert.That(GifLzwCodec.EncodeOptions.Default.Level, Is.EqualTo(GifLzwCodec.CompressionLevel.Standard));
+  }
+
+  // ============================================================
+  // Store mode pins the code width
+  // ============================================================
+
+  [Test]
+  public void CompressionLevel_None_RoundTripsAtEveryMinimumCodeSize() {
+    var rng = new Random(4242);
+    for (var minCodeSize = 2; minCodeSize <= 8; ++minCodeSize) {
+      var alphabet = 1 << minCodeSize;
+      var input = new byte[4096];
+      for (var i = 0; i < input.Length; ++i) input[i] = (byte)rng.Next(alphabet);
+
+      var encoded = GifLzwCodec.Encode(input, minCodeSize, GifLzwCodec.EncodeOptions.NoCompression());
+      using var ms = new MemoryStream(encoded);
+      Assert.That(GifLzwCodec.Decode(ms, input.Length), Is.EqualTo(input), $"minCodeSize {minCodeSize}");
+    }
+  }
+
+  [Test]
+  public void CompressionLevel_None_StaysAtTheStartingCodeWidth() {
+    // The point of clearing periodically instead of following the decoder's dictionary growth is
+    // that every pixel keeps costing minCodeSize+1 bits instead of drifting towards twelve. For
+    // 65536 pixels at 9 bits that is ~74 KB rather than ~93 KB.
+    const int Pixels = 65536;
+    var input = new byte[Pixels];
+    for (var i = 0; i < input.Length; ++i) input[i] = (byte)(i % 256);
+
+    var encoded = GifLzwCodec.Encode(input, 8, GifLzwCodec.EncodeOptions.NoCompression());
+
+    // Pixel payload alone is Pixels * 9 bits; allow 3% for clear codes and sub-block length bytes.
+    var floor = Pixels * 9 / 8;
+    Assert.That(encoded.Length, Is.GreaterThan(floor));
+    Assert.That(encoded.Length, Is.LessThan((int)(floor * 1.03)),
+      "store mode must not let the code width grow past minCodeSize + 1");
+  }
+
+  [Test]
+  public void CompressionLevel_None_EmptyInput_StillOpensWithAClear() {
+    var encoded = GifLzwCodec.Encode([], 8, GifLzwCodec.EncodeOptions.NoCompression());
+    Assert.That(encoded[0], Is.EqualTo((byte)8));
+    using var ms = new MemoryStream(encoded);
+    Assert.That(GifLzwCodec.Decode(ms, 0), Is.Empty);
+  }
+
+  [Test]
+  public void EveryEncoder_OpensWithAClearCode() {
+    // The spec has an LZW stream begin with a Clear Code, and decoders that check will reject one
+    // that does not. Read the first minCodeSize+1 bits of the framed output and compare.
+    var input = new byte[2048];
+    for (var i = 0; i < input.Length; ++i) input[i] = (byte)(i % 17);
+
+    foreach (var options in new[] {
+      GifLzwCodec.EncodeOptions.Default,
+      GifLzwCodec.EncodeOptions.StandardCompression(GifLzwCodec.ClearStrategy.Freeze),
+      GifLzwCodec.EncodeOptions.StandardCompression(GifLzwCodec.ClearStrategy.Adaptive),
+      GifLzwCodec.EncodeOptions.NoCompression(),
+      GifLzwCodec.EncodeOptions.BestEffort(),
+    }) {
+      var encoded = GifLzwCodec.Encode(input, 8, options);
+      Assert.That(encoded[0], Is.EqualTo((byte)8));
+      // First sub-block starts at [2]; the first 9 bits little-endian must be 256.
+      var first = encoded[2] | (encoded[3] << 8);
+      Assert.That(first & 0x1FF, Is.EqualTo(256), $"{options.Level}/clear={options.Clear}");
+    }
   }
 }

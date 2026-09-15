@@ -5,6 +5,7 @@ using FileFormat.Core;
 namespace FileFormat.AppleIIgs;
 
 /// <summary>In-memory representation of an Apple IIGS Super Hi-Res ($C1) image (32768 bytes total).</summary>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public sealed class AppleIIgsFile :
   IImageFormatReader<AppleIIgsFile>, IImageToRawImage<AppleIIgsFile>,
   IImageFromRawImage<AppleIIgsFile>, IImageFormatWriter<AppleIIgsFile> {

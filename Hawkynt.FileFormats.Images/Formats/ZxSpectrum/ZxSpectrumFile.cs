@@ -4,12 +4,30 @@ using FileFormat.Core;
 namespace FileFormat.ZxSpectrum;
 
 /// <summary>In-memory representation of a ZX Spectrum screen (6912 bytes: 6144 bitmap + 768 attributes).</summary>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct ZxSpectrumFile : IImageFormatReader<ZxSpectrumFile>, IImageToRawImage<ZxSpectrumFile>, IImageFromRawImage<ZxSpectrumFile>, IImageFormatWriter<ZxSpectrumFile> {
 
   static string IImageFormatMetadata<ZxSpectrumFile>.PrimaryExtension => ".scr";
   static string[] IImageFormatMetadata<ZxSpectrumFile>.FileExtensions => [".scr", ".$s", ".$c", ".!s"];
   static ZxSpectrumFile IImageFormatReader<ZxSpectrumFile>.FromSpan(ReadOnlySpan<byte> data) => ZxSpectrumReader.FromSpan(data);
   static byte[] IImageFormatWriter<ZxSpectrumFile>.ToBytes(ZxSpectrumFile file) => ZxSpectrumWriter.ToBytes(file);
+
+  /// <summary>The one screen the machine has: 256 by 192 in fifteen colours.</summary>
+  /// <remarks>
+  /// Declaring it matters beyond the mode picker. A screen file is 6912 bytes whatever picture goes
+  /// into it, so the writer took any size it was handed and quietly produced this one; nothing that
+  /// asked the format what it accepts was ever told, and so nothing ever handed it a picture of the
+  /// size it writes.
+  /// </remarks>
+  static VideoMode[] IImageFormatMetadata<ZxSpectrumFile>.VideoModes => [
+    new("ZX Spectrum", [(ScreenWidth, ScreenHeight)], [15])
+  ];
+
+  /// <summary>Pixels across the screen.</summary>
+  public const int ScreenWidth = 256;
+
+  /// <summary>Pixel rows on the screen.</summary>
+  public const int ScreenHeight = 192;
 
   /// <summary>ZX Spectrum normal palette (bright=0): Black, Blue, Red, Magenta, Green, Cyan, Yellow, White.</summary>
   private static readonly int[] _NormalPalette = [

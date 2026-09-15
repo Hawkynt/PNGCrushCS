@@ -20,6 +20,7 @@ namespace FileFormat.Arn;
 /// pixels, which is what fixes both roundings.
 /// </remarks>
 [FormatDetectionPriority(50)]
+[VerifiedBy(ConformanceOracle.XnView)]
 public readonly record struct ArnFile
   : IImageFormatReader<ArnFile>, IImageToRawImage<ArnFile>, IImageFromRawImage<ArnFile>, IImageFormatWriter<ArnFile> {
 

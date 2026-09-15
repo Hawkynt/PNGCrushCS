@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.FliDesigner2.Tests;
@@ -6,12 +7,18 @@ namespace FileFormat.FliDesigner2.Tests;
 [TestFixture]
 public sealed class FliDesigner2FileFromRawImageTests {
 
-  /// <summary>Alternating columns of black and one other machine colour, two to a raster line, which is what an FLI cell row can hold.</summary>
+  /// <summary>
+  /// Alternating multicolour pixels of black and one other machine colour, two colours to a raster
+  /// line of a cell, which is what a multicolour FLI screen holds.
+  /// </summary>
   private static RawImage _Source(int width, int height) {
     var rgb = new byte[width * height * 3];
     for (var y = 0; y < height; ++y)
     for (var x = 0; x < width; ++x) {
-      var colour = Commodore64Graphics.HexColors[x % 2 == 0 ? 0 : (x / 4 + y / 8 * 3) % Commodore64Graphics.ColorCount];
+      var colour = x / 2 % 2 == 0
+        ? 0
+        : Commodore64Graphics.HexColors[(x / 8 + y / 8 * 3) % Commodore64Graphics.ColorCount];
+
       var at = (y * width + x) * 3;
       rgb[at] = (byte)(colour >> 16);
       rgb[at + 1] = (byte)(colour >> 8);
@@ -26,11 +33,11 @@ public sealed class FliDesigner2FileFromRawImageTests {
   [Test]
   [Category("Unit")]
   public void EncodeThenDecode_ReproducesAPictureTheFormatCanHold() {
-    var source = _Source(160, 200);
+    var source = _Source(296, 200);
     var decoded = FliDesigner2File.ToRawImage(FliDesigner2File.FromRawImage(source));
 
     Assert.Multiple(() => {
-      Assert.That(decoded.Width, Is.EqualTo(160));
+      Assert.That(decoded.Width, Is.EqualTo(296));
       Assert.That(decoded.Height, Is.EqualTo(200));
       Assert.That(_Rgb(decoded), Is.EqualTo(_Rgb(source)));
     });
@@ -44,7 +51,7 @@ public sealed class FliDesigner2FileFromRawImageTests {
     var decoded = FliDesigner2File.ToRawImage(FliDesigner2File.FromRawImage(_Source(96, 72)));
 
     Assert.Multiple(() => {
-      Assert.That(decoded.Width, Is.EqualTo(160));
+      Assert.That(decoded.Width, Is.EqualTo(296));
       Assert.That(decoded.Height, Is.EqualTo(200));
     });
   }
@@ -56,8 +63,25 @@ public sealed class FliDesigner2FileFromRawImageTests {
 
   [Test]
   [Category("Unit")]
+  public void ItIsWrittenAtTheLengthThatIdentifiesIt() {
+    var bytes = FliDesigner2Writer.ToBytes(FliDesigner2File.FromRawImage(_Source(296, 200)));
+
+    Assert.Multiple(() => {
+      Assert.That(bytes, Has.Length.EqualTo(17409));
+      Assert.That(FliDesigner2File.MatricesOffset, Is.EqualTo(0x402));
+      Assert.That(FliDesigner2File.BitmapOffset, Is.EqualTo(0x2402));
+    });
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void TheOldFabricatedLength_IsNoLongerWhatItWants()
+    => Assert.Throws<InvalidDataException>(() => FliDesigner2Reader.FromBytes(new byte[17216]));
+
+  [Test]
+  [Category("Unit")]
   public void WhatIsEncodedSurvivesTheWriterAndTheReader() {
-    var file = FliDesigner2File.FromRawImage(_Source(160, 200));
+    var file = FliDesigner2File.FromRawImage(_Source(296, 200));
     var restored = FliDesigner2Reader.FromBytes(FliDesigner2Writer.ToBytes(file));
 
     Assert.That(_Rgb(FliDesigner2File.ToRawImage(restored)), Is.EqualTo(_Rgb(FliDesigner2File.ToRawImage(file))));

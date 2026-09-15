@@ -27,18 +27,7 @@ public static class VitecReader {
     return FromBytes(File.ReadAllBytes(file.FullName));
   }
 
-  public static VitecFile FromStream(Stream stream) {
-    ArgumentNullException.ThrowIfNull(stream);
-    if (stream.CanSeek) {
-      var data = new byte[stream.Length - stream.Position];
-      stream.ReadExactly(data);
-      return FromBytes(data);
-    }
-
-    using var ms = new MemoryStream();
-    stream.CopyTo(ms);
-    return FromBytes(ms.ToArray());
-  }
+  public static VitecFile FromStream(Stream stream) => FromBytes(StreamBytes.ReadAll(stream));
 
   public static VitecFile FromSpan(ReadOnlySpan<byte> data) {
     if (data.Length < VitecFile.NameOffset + 5 || !data[..4].SequenceEqual(VitecFile.Magic)

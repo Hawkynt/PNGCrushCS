@@ -16,6 +16,7 @@ namespace FileFormat.ZxSnapshot;
 /// banks; the screen is in the same place either way, because the bank the display reads from is
 /// the one the file stores first.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.XnView)]
 public readonly record struct ZxSnapshotFile
   : IImageFormatReader<ZxSnapshotFile>, IImageToRawImage<ZxSnapshotFile>,
     IImageFromRawImage<ZxSnapshotFile>, IImageFormatWriter<ZxSnapshotFile> {

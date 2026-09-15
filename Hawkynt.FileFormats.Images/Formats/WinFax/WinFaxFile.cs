@@ -4,6 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.WinFax;
 
 /// <summary>In-memory representation of a WinFAX fax image image.</summary>
+[VerifiedBy(ConformanceOracle.XnView)]
 public readonly record struct WinFaxFile : IImageFormatReader<WinFaxFile>, IImageToRawImage<WinFaxFile>, IImageFromRawImage<WinFaxFile>, IImageFormatWriter<WinFaxFile> {
 
   /// <summary>The two bytes every one of these begins with.</summary>

@@ -4,58 +4,86 @@ using FileFormat.Core;
 namespace FileFormat.MultiLaceEditor.Tests;
 
 [TestFixture]
-public sealed class FromRawImageTests {
+public sealed class MultiLaceEditorFromRawImageTests {
 
-  /// <summary>Every 4x8 cell is one flat colour of the machine's own sixteen, which any multicolour
-  /// cell can hold — so nothing is approximated and the blend of the two frames is exact.</summary>
-  private static RawImage _SolidCells() {
-    const int width = MultiLaceEditorFile.FixedWidth, height = MultiLaceEditorFile.FixedHeight;
+  /// <summary>
+  /// Bands of the editor's own colours down the screen, black over the rows the fields cannot reach.
+  /// </summary>
+  /// <remarks>
+  /// Bands rather than a pattern, because the two fields are half a colour-clock out of step with
+  /// each other: field one pairs the pixels at 0 and 1, field two the ones at 1 and 2, so a picture
+  /// that changes colour anywhere across a row cannot be held by both at once. That is the format
+  /// and not the encoder — the displacement is there to resolve edges the pair can place between the
+  /// two fields rather than in either.
+  /// <para/>
+  /// The bottom eight rows are black because a field is 256 character cells and seven rows of forty
+  /// is 280, so the last 24 have nothing behind them.
+  /// </remarks>
+  private static RawImage _Source(int width, int height) {
     var rgb = new byte[width * height * 3];
 
-    for (var y = 0; y < height; ++y)
-    for (var x = 0; x < width; ++x) {
-      var cell = (y / 8) * (width / 4) + x / 4;
-      var color = Commodore64Graphics.HexColors[cell % 16];
-      var at = (y * width + x) * 3;
-      rgb[at] = (byte)(color >> 16);
-      rgb[at + 1] = (byte)(color >> 8);
-      rgb[at + 2] = (byte)color;
+    for (var y = 0; y < height; ++y) {
+      var index = y >= 48 ? 0 : MultiLaceEditorFile.ColorIndices[y / 8 % MultiLaceEditorFile.ColorCount];
+      var colour = Commodore64Graphics.HexColors[index];
+
+      for (var x = 0; x < width; ++x) {
+        var at = (y * width + x) * 3;
+        rgb[at] = (byte)(colour >> 16);
+        rgb[at + 1] = (byte)(colour >> 8);
+        rgb[at + 2] = (byte)colour;
+      }
     }
 
     return new() { Width = width, Height = height, Format = PixelFormat.Rgb24, PixelData = rgb };
   }
 
+  private static byte[] _Rgb(RawImage image) => PixelConverter.Convert(image, PixelFormat.Rgb24).PixelData;
+
   [Test]
-  [Category("Integration")]
-  public void RoundTrip_SolidCells_ReproducesExactly() {
-    var source = _SolidCells();
-    var file = MultiLaceEditorFile.FromRawImage(source);
+  [Category("Unit")]
+  public void EncodeThenDecode_ReproducesAPictureTheFormatCanHold() {
+    var source = _Source(320, 56);
+    var decoded = MultiLaceEditorFile.ToRawImage(MultiLaceEditorFile.FromRawImage(source));
+    var mine = _Rgb(decoded);
+    var theirs = _Rgb(source);
+
+    Assert.Multiple(() => {
+      Assert.That(decoded.Width, Is.EqualTo(320));
+      Assert.That(decoded.Height, Is.EqualTo(56));
+
+      // From the second column on: the displaced field has nothing to show in the first, so half of
+      // what the eye averages there is black whatever the picture says.
+      for (var y = 0; y < 56; ++y)
+      for (var x = 1; x < 320; ++x) {
+        var at = (y * 320 + x) * 3;
+        Assert.That(mine[at], Is.EqualTo(theirs[at]), $"{x},{y}");
+      }
+    });
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void ADifferentlySizedPictureIsScaledRatherThanRefused() {
+    var decoded = MultiLaceEditorFile.ToRawImage(MultiLaceEditorFile.FromRawImage(_Source(96, 72)));
+
+    Assert.Multiple(() => {
+      Assert.That(decoded.Width, Is.EqualTo(320));
+      Assert.That(decoded.Height, Is.EqualTo(56));
+    });
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void FromRawImage_Null_Throws()
+    => Assert.Throws<ArgumentNullException>(() => MultiLaceEditorFile.FromRawImage(null!));
+
+  [Test]
+  [Category("Unit")]
+  public void WhatIsEncodedSurvivesTheWriterAndTheReader() {
+    var file = MultiLaceEditorFile.FromRawImage(_Source(320, 56));
     var restored = MultiLaceEditorReader.FromBytes(MultiLaceEditorWriter.ToBytes(file));
-    var decoded = MultiLaceEditorFile.ToRawImage(restored);
 
-    Assert.That(decoded.PixelData, Is.EqualTo(source.PixelData));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void FromRawImage_WritesTheSameScreenIntoBothFrames() {
-    // What reaches the eye is the average of the two frames; equal frames average to themselves,
-    // which is what makes a still picture come back unchanged.
-    var file = MultiLaceEditorFile.FromRawImage(_SolidCells());
-
-    const int frame = MultiLaceEditorFile.BitmapSize + MultiLaceEditorFile.ScreenRamSize;
-    Assert.That(file.RawData[frame..(frame * 2)], Is.EqualTo(file.RawData[..frame]));
-  }
-
-  [Test]
-  [Category("Unit")]
-  public void FromRawImage_ScalesAPictureOfAnyOtherSize() {
-    static RawImage Raw(int width, int height)
-      => new() { Width = width, Height = height, Format = PixelFormat.Rgb24, PixelData = new byte[width * height * 3] };
-
-    var small = MultiLaceEditorFile.ToRawImage(MultiLaceEditorFile.FromRawImage(Raw(64, 64)));
-    var large = MultiLaceEditorFile.ToRawImage(MultiLaceEditorFile.FromRawImage(Raw(800, 600)));
-
-    Assert.That((small.Width, small.Height), Is.EqualTo((large.Width, large.Height)));
+    Assert.That(
+      _Rgb(MultiLaceEditorFile.ToRawImage(restored)), Is.EqualTo(_Rgb(MultiLaceEditorFile.ToRawImage(file))));
   }
 }

@@ -4,7 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.ZxMulticolor;
 
 /// <summary>In-memory representation of a ZX Spectrum Multicolor file (12288 bytes: 6144 bitmap + 6144 per-scanline attributes).</summary>
-[VerifiedBy(ConformanceOracle.Recoil2Png)]
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.IrfanView)]
 public readonly record struct ZxMulticolorFile : IImageFormatReader<ZxMulticolorFile>, IImageToRawImage<ZxMulticolorFile>, IImageFromRawImage<ZxMulticolorFile>, IImageFormatWriter<ZxMulticolorFile> {
 
   static string IImageFormatMetadata<ZxMulticolorFile>.PrimaryExtension => ".mlt";

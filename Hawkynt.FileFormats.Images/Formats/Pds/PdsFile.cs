@@ -6,6 +6,7 @@ namespace FileFormat.Pds;
 
 /// <summary>In-memory representation of a NASA Planetary Data System (PDS3) image.</summary>
 [FormatMagicBytes([0x50, 0x44, 0x53, 0x5F])]
+[VerifiedBy(ConformanceOracle.XnView)]
 public readonly record struct PdsFile : IImageFormatReader<PdsFile>, IImageToRawImage<PdsFile>, IImageFromRawImage<PdsFile>, IImageFormatWriter<PdsFile> {
 
   static string IImageFormatMetadata<PdsFile>.PrimaryExtension => ".pds";

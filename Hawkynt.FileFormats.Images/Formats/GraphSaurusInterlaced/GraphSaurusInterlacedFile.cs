@@ -12,7 +12,7 @@ namespace FileFormat.GraphSaurusInterlaced;
 /// The palette lives in a companion <c>.PL7</c>. Read on its own the picture means what the machine
 /// starts up showing, which is the sixteen colours an MSX2 boots with.
 /// </remarks>
-[VerifiedBy(ConformanceOracle.Recoil2Png)]
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.IrfanView)]
 public readonly record struct GraphSaurusInterlacedFile
   : IImageFormatReader<GraphSaurusInterlacedFile>, IImageToRawImage<GraphSaurusInterlacedFile>,
     IImageFromRawImage<GraphSaurusInterlacedFile>, IImageFormatWriter<GraphSaurusInterlacedFile> {

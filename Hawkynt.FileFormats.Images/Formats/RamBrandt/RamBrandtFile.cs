@@ -12,7 +12,7 @@ namespace FileFormat.RamBrandt;
 /// changes; the other two say which register is reloaded there and with what. That is how a
 /// four-colour mode ends up showing up to 99 colours down the screen.
 /// </remarks>
-[VerifiedBy(ConformanceOracle.Recoil2Png)]
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.IrfanView)]
 public readonly record struct RamBrandtFile : IImageFormatReader<RamBrandtFile>, IImageToRawImage<RamBrandtFile>, IImageFromRawImage<RamBrandtFile>, IImageFormatWriter<RamBrandtFile> {
 
   /// <summary>Size of the bitmap section.</summary>

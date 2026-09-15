@@ -19,6 +19,7 @@ namespace FileFormat.SriSun;
 /// twenty-four is red, green and blue in that order. Each of those five was checked by handing
 /// XnView a picture built here and comparing the pixels it returned against the ones encoded.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.XnView)]
 public readonly record struct SriSunFile
   : IImageFormatReader<SriSunFile>, IImageToRawImage<SriSunFile>, IImageFromRawImage<SriSunFile>, IImageFormatWriter<SriSunFile> {
 

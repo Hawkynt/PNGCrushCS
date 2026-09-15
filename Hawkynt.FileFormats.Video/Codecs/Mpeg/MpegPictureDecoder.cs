@@ -5,7 +5,7 @@ namespace FileFormat.Codecs.Mpeg;
 
 /// <summary>
 /// Decodes one coded picture: its header, its extensions, its slices, its macroblocks and their
-/// blocks (ISO/IEC 11172-2, 2.4.2.5 through 2.4.2.7 and 2.4.4; ISO/IEC 13818-2, 6.2.3 through 6.2.6
+/// blocks (ISO/IEC 11172-2, 2.4.2.5 through 2.4.2.8 and 2.4.4; ISO/IEC 13818-2, 6.2.3 through 6.2.6
 /// and 7.2 through 7.6).
 /// </summary>
 /// <remarks>
@@ -139,7 +139,7 @@ internal sealed class MpegPictureDecoder {
     this._scratch = [new int[256], new int[chromaSamples], new int[chromaSamples]];
   }
 
-  /// <summary>Which of I, P, B this picture is.</summary>
+  /// <summary>Which of I, P, B or D this picture is.</summary>
   internal int CodingType { get; }
 
   /// <summary>The picture being reconstructed.</summary>
@@ -154,8 +154,7 @@ internal sealed class MpegPictureDecoder {
   /// later and replaces most of it. So the picture cannot be begun until both have been seen, and a
   /// method that read the header itself could not be handed one to test it with either.
   /// </remarks>
-  /// <exception cref="NotSupportedException">The picture is DC coded, which this decoder does not read.</exception>
-  /// <exception cref="InvalidDataException">The picture predicts from a reference the stream has not supplied.</exception>
+  /// <exception cref="InvalidDataException">The picture type is invalid or predicts from a reference the stream has not supplied.</exception>
   internal static MpegPictureDecoder BeginPicture(
     MpegSequenceHeader sequence, MpegFrame target,
     MpegFrame? previousAnchor, MpegFrame? currentAnchor, MpegPictureHeader header) {
@@ -182,15 +181,18 @@ internal sealed class MpegPictureDecoder {
 
         return new(sequence, target, previousAnchor, currentAnchor, codingType, header);
 
+      case DcCoded when sequence.IsMpeg2:
+        throw new InvalidDataException(
+          "An MPEG-2 picture states picture_coding_type 4. ISO/IEC 13818-2 6.3.9 permits only 1 (I), 2 (P) and 3 (B); "
+          + "type 4 is the D-picture syntax of MPEG-1 and is not permitted in MPEG-2.");
+
       case DcCoded:
-        throw new NotSupportedException(
-          "This MPEG-1 stream holds a D picture (picture_coding_type 4), the DC-only still-picture mode of "
-          + "ISO/IEC 11172-2 2.4.2.8. This decoder reads I, P and B pictures; D pictures are not implemented.");
+        return new(sequence, target, null, null, codingType, header);
 
       default:
         throw new InvalidDataException(
           $"The MPEG picture header states picture_coding_type {codingType}, which the standard leaves forbidden or "
-          + "reserved. Only 1 (I), 2 (P), 3 (B) and 4 (D) are defined.");
+          + "reserved. Only 1 (I), 2 (P), 3 (B) and, in MPEG-1, 4 (D) are defined.");
     }
   }
 
@@ -320,7 +322,7 @@ internal sealed class MpegPictureDecoder {
         $"An MPEG macroblock address reached {address}, past the {this._decoded.Length} macroblocks of a "
         + $"{this._sequence.Width}x{this._sequence.Height} picture.");
 
-    var type = this._TypeTable().Read(ref reader);
+    var type = this.CodingType == DcCoded ? this._ReadDcMacroblockType(ref reader, address) : this._TypeTable().Read(ref reader);
     var isIntra = (type & MpegVlcTables.TypeIntra) != 0;
     var usesForward = (type & MpegVlcTables.TypeMotionForward) != 0;
     var usesBackward = (type & MpegVlcTables.TypeMotionBackward) != 0;
@@ -367,7 +369,10 @@ internal sealed class MpegPictureDecoder {
       if (!readsConcealmentVector)
         this._ResetMotionVectorPredictors();
 
-      this._DecodeIntraMacroblock(ref reader, address, pattern, isFieldDct);
+      if (this.CodingType == DcCoded)
+        this._DecodeDcMacroblock(ref reader, address, pattern);
+      else
+        this._DecodeIntraMacroblock(ref reader, address, pattern, isFieldDct);
     } else {
       // A predicted macroblock has no intra DC to be a predictor, so the chain is broken here.
       this._ResetDcPredictors();
@@ -385,9 +390,24 @@ internal sealed class MpegPictureDecoder {
       this._DecodePredictedMacroblock(ref reader, address, pattern, usesForward, usesBackward, motionType, isFieldDct);
     }
 
+    if (this.CodingType == DcCoded && reader.ReadBit() != 1)
+      throw new InvalidDataException(
+        $"Macroblock {address} of an MPEG-1 D picture has end_of_macroblock 0. ISO/IEC 11172-2 2.4.2.7 requires the "
+        + "one-bit marker after the six DC-only blocks to be 1.");
+
     this._previousUsedForward = usesForward;
     this._previousUsedBackward = usesBackward;
     this._decoded[address] = true;
+  }
+
+  /// <summary>Reads Table B.2d, whose entire VLC table is the one-bit code <c>1</c> for an intra macroblock.</summary>
+  private int _ReadDcMacroblockType(ref MpegBitReader reader, int address) {
+    if (reader.ReadBit() != 1)
+      throw new InvalidDataException(
+        $"Macroblock {address} of an MPEG-1 D picture has macroblock_type code 0. Table B.2d defines only the "
+        + "one-bit code 1, meaning an intra macroblock with no quantiser, motion or pattern fields.");
+
+    return MpegVlcTables.TypeIntra;
   }
 
   /// <summary>
@@ -591,6 +611,45 @@ internal sealed class MpegPictureDecoder {
 
       this._WriteBlock(block, address, component, tileX, tileY, rowStep, prediction: null);
     }
+  }
+
+  /// <summary>Decodes the six DC-only blocks of an MPEG-1 D-picture macroblock.</summary>
+  /// <remarks>
+  /// A D picture is an I picture stopped immediately after each block's intra DC differential. There
+  /// are no AC run-level symbols and consequently no End of Block. The one-bit end_of_macroblock
+  /// marker is consumed by the macroblock layer after all six blocks have been reconstructed.
+  /// </remarks>
+  private void _DecodeDcMacroblock(ref MpegBitReader reader, int address, int pattern) {
+    Span<int> block = stackalloc int[64];
+
+    for (var index = 0; index < this._blockCount; ++index) {
+      if ((pattern & (1 << (this._blockCount - 1 - index))) == 0)
+        throw new InvalidDataException(
+          $"Block {index} of D-picture macroblock {address} is not coded. Every block of a D-picture macroblock carries its intra DC.");
+
+      var (component, tileX, tileY, rowStep) = this._BlockLayout(index, isFieldDct: false);
+      var isChroma = component != 0;
+      this._dcPredictor[component] = this._ReadDcOnlyBlock(
+        ref reader, block, isChroma, this._dcPredictor[component]);
+      this._WriteBlock(block, address, component, tileX, tileY, rowStep, prediction: null);
+    }
+  }
+
+  private int _ReadDcOnlyBlock(
+    ref MpegBitReader reader, scoped Span<int> block, bool isChroma, int dcPredictor) {
+    block.Clear();
+
+    var size = this._rules.DcSizeTable(isChroma).Read(ref reader);
+    var differential = 0;
+    if (size > 0) {
+      var bits = reader.ReadBits(size);
+      differential = (bits & (1 << (size - 1))) != 0 ? bits : bits - (1 << size) + 1;
+    }
+
+    var dc = dcPredictor + differential;
+    block[0] = Math.Clamp(dc * this._rules.IntraDcMultiplier, -2048, 2047);
+    MpegInverseDct.Transform(block);
+    return dc;
   }
 
   private void _DecodePredictedMacroblock(
@@ -803,9 +862,11 @@ internal sealed class MpegPictureDecoder {
 
     switch (this.CodingType) {
       case IntraCoded:
+      case DcCoded:
         throw new InvalidDataException(
-          $"Macroblock {address} of an MPEG intra picture was skipped. Every macroblock of an I picture is coded; "
-          + "neither standard gives a skipped macroblock of an I picture a meaning.");
+          $"Macroblock {address} of an MPEG {(this.CodingType == DcCoded ? "D" : "intra")} picture was skipped. Every "
+          + $"macroblock of an {(this.CodingType == DcCoded ? "D" : "I")} picture is coded; the standard gives a skipped "
+          + "macroblock there no meaning.");
 
       case PredictiveCoded:
         this._ResetDcPredictors();
