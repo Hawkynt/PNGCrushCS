@@ -191,15 +191,17 @@ public sealed class MveWriter : IVideoContainerWriter<MveWriter> {
     return opcode.ToArray();
   }
 
-  private static IEnumerable<ReadOnlyMemory<byte>> _Opcodes(ReadOnlyMemory<byte> packet) {
+  private static IReadOnlyList<ReadOnlyMemory<byte>> _Opcodes(ReadOnlyMemory<byte> packet) {
     _ValidateOpcodeSequence(packet.Span);
+    var result = new List<ReadOnlyMemory<byte>>();
     var at = 0;
     while (at < packet.Length) {
       var length = BinaryPrimitives.ReadUInt16LittleEndian(packet.Span[at..]);
       var total = length + 4;
-      yield return packet.Slice(at, total);
+      result.Add(packet.Slice(at, total));
       at += total;
     }
+    return result;
   }
 
   private static void _ValidateOpcodeSequence(ReadOnlySpan<byte> packet) {
