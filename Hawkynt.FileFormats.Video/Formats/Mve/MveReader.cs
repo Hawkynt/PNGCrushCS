@@ -17,8 +17,8 @@ namespace FileFormat.InterplayMve;
 /// <para/>
 /// Interplay has three video-data opcodes. 0x06 carries its own 16-bit map, 0x10 consumes the most
 /// recent skip and decoding maps, and 0x11 is the normal four-bit-per-block Interplay Video stream.
-/// <c>SEND_BUFFER</c> is retained as codec state too: it is what the original player and FFmpeg use
-/// to distinguish a reconstructed back buffer from a picture actually sent to the display.
+/// <c>SEND_BUFFER</c> is retained as codec state too: it is what the original player, FFmpeg and
+/// ScummVM use to distinguish a reconstructed back buffer from a picture actually sent to display.
 /// </remarks>
 internal static class MveReader {
 
@@ -74,9 +74,7 @@ internal static class MveReader {
               (width, height, videoBitsPerPixel) = _ReadVideoBufferSize(data.Span, opcode);
             haveSize = true;
             break;
-          case MveOpcodeType.VIDEO_DATA_06:
-          case MveOpcodeType.VIDEO_DATA_10:
-          case MveOpcodeType.VIDEO_DATA_11:
+          case MveOpcodeType.SEND_BUFFER:
             ++frames;
             break;
           case MveOpcodeType.INIT_AUDIO_BUFFERS:
@@ -199,13 +197,13 @@ internal static class MveReader {
           case MveOpcodeType.SET_PALETTE_COMPRESSED:
           case MveOpcodeType.SKIP_MAP:
           case MveOpcodeType.DECODING_MAP:
-          case MveOpcodeType.SEND_BUFFER:
-            yield return new(StreamIndex: 0, Data: _WithHeader(data, opcode));
-            break;
-
           case MveOpcodeType.VIDEO_DATA_06:
           case MveOpcodeType.VIDEO_DATA_10:
           case MveOpcodeType.VIDEO_DATA_11:
+            yield return new(StreamIndex: 0, Data: _WithHeader(data, opcode));
+            break;
+
+          case MveOpcodeType.SEND_BUFFER:
             yield return new(
               StreamIndex: 0,
               Data: _WithHeader(data, opcode),
