@@ -1,0 +1,63 @@
+name: Temporary H.261 main oracle validation
+
+on:
+  push:
+    branches: [validate/h261-main-oracle]
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out PNGCrushCS
+        uses: actions/checkout@v4
+        with:
+          path: PNGCrushCS
+
+      - name: Check out CompressionWorkbench sibling
+        uses: actions/checkout@v4
+        with:
+          repository: Hawkynt/CompressionWorkbench
+          path: CompressionWorkbench
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.x
+            10.0.x
+
+      - name: Show FFmpeg version
+        run: |
+          if ! command -v ffmpeg >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y ffmpeg
+          fi
+          ffmpeg -version | head -n 3
+
+      - name: Check whitespace
+        working-directory: PNGCrushCS
+        run: git diff --check origin/main...HEAD
+
+      - name: Restore video tests
+        working-directory: PNGCrushCS
+        run: dotnet restore Tests/Hawkynt.FileFormats.Video.Tests/Hawkynt.FileFormats.Video.Tests.csproj
+
+      - name: Run encoder registry oracle suite with unchanged main implementation
+        working-directory: PNGCrushCS
+        run: >-
+          dotnet test Tests/Hawkynt.FileFormats.Video.Tests/Hawkynt.FileFormats.Video.Tests.csproj
+          --configuration Release
+          --no-restore
+          --filter "FullyQualifiedName~EncoderOracleTests.TheOracleAnEncoderClaims_ReadsBackWhatItWrites"
+          --logger "console;verbosity=detailed"
+
+      - name: Run complete video test project
+        working-directory: PNGCrushCS
+        run: >-
+          dotnet test Tests/Hawkynt.FileFormats.Video.Tests/Hawkynt.FileFormats.Video.Tests.csproj
+          --configuration Release
+          --no-restore
+          --logger "console;verbosity=normal"
