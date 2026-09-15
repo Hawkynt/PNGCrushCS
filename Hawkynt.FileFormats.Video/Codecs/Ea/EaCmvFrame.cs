@@ -1,5 +1,3 @@
-using System;
-
 namespace FileFormat.Codecs.Ea;
 
 /// <summary>One reconstructed Electronic Arts CMV picture: eight-bit palette indices, one byte a pixel.</summary>
