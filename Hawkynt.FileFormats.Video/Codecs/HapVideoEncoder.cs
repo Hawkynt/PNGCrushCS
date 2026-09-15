@@ -33,6 +33,7 @@ namespace FileFormat.Codecs;
 /// matching the reference encoder. Each resulting chunk independently chooses Snappy or raw storage.
 /// <c>HapM</c> applies the same chunk count independently to its colour and alpha textures.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.FFmpeg, ConformanceOracle.VidvoxHap)]
 public sealed class HapVideoEncoder : IVideoCodecEncoder<HapVideoEncoder> {
 
   private static readonly CodecTag _Hap1 = CodecTag.FromCharacters("Hap1");
