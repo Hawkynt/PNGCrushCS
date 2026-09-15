@@ -79,7 +79,7 @@ public sealed class EaCmvVideoEncoder : IVideoCodecEncoder<EaCmvVideoEncoder> {
 
     var pixelCount = (long)stream.Width * stream.Height;
     var firstPacketLength = pixelCount + _FULL_HEADER_CHUNK_LENGTH + _CHUNK_HEADER_LENGTH + _PICTURE_TYPE_LENGTH;
-    if (firstPacketLength > int.MaxValue)
+    if (firstPacketLength > Array.MaxLength)
       throw new NotSupportedException(
         $"A {stream.Width}x{stream.Height} CMV key frame plus its complete state header cannot fit in one managed packet.");
     if (stream.BitsPerPixel is not (0 or 8))
@@ -253,7 +253,7 @@ public sealed class EaCmvVideoEncoder : IVideoCodecEncoder<EaCmvVideoEncoder> {
   private bool _InterCanFit() {
     var blocks = (long)(this._width / _BLOCK) * (this._height / _BLOCK);
     var maximumChunkLength = _CHUNK_HEADER_LENGTH + _PICTURE_TYPE_LENGTH + 18L * blocks;
-    return maximumChunkLength <= int.MaxValue;
+    return maximumChunkLength + _FULL_HEADER_CHUNK_LENGTH <= Array.MaxLength;
   }
 
   private static byte[] _Intra(EaCmvFrame current) {
@@ -355,8 +355,11 @@ public sealed class EaCmvVideoEncoder : IVideoCodecEncoder<EaCmvVideoEncoder> {
   }
 
   private static byte[] _Chunk(uint fourCc, ReadOnlySpan<byte> payload) {
-    var length = checked(_CHUNK_HEADER_LENGTH + payload.Length);
-    var result = new byte[length];
+    var length = (long)_CHUNK_HEADER_LENGTH + payload.Length;
+    if (length > Array.MaxLength)
+      throw new InvalidOperationException("An Electronic Arts CMV chunk is too large for one managed byte array.");
+
+    var result = new byte[(int)length];
     BinaryPrimitives.WriteUInt32LittleEndian(result, fourCc);
     BinaryPrimitives.WriteUInt32LittleEndian(result.AsSpan(4), checked((uint)length));
     payload.CopyTo(result.AsSpan(_CHUNK_HEADER_LENGTH));
@@ -367,7 +370,11 @@ public sealed class EaCmvVideoEncoder : IVideoCodecEncoder<EaCmvVideoEncoder> {
     if (first == null)
       return second;
 
-    var result = new byte[checked(first.Length + second.Length)];
+    var length = (long)first.Length + second.Length;
+    if (length > Array.MaxLength)
+      throw new InvalidOperationException("An Electronic Arts CMV packet is too large for one managed byte array.");
+
+    var result = new byte[(int)length];
     first.CopyTo(result, 0);
     second.CopyTo(result, first.Length);
     return result;
