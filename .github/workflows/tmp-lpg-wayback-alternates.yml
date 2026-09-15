@@ -8,54 +8,74 @@ on:
 jobs:
   probe:
     runs-on: ubuntu-latest
-    timeout-minutes: 8
+    timeout-minutes: 4
     steps:
       - name: Probe archive availability and indexes
         shell: bash
         run: |
           set -euo pipefail
+          rm -rf /tmp/lpg-archive-alt
           mkdir -p /tmp/lpg-archive-alt
           python3 - <<'PY'
           from __future__ import annotations
-          import json, pathlib, urllib.parse, urllib.request
 
-          out=pathlib.Path('/tmp/lpg-archive-alt')
-          headers={'User-Agent':'Mozilla/5.0 LPG-format-research'}
-          hosts=[
-            'http://ftp.XLPrintau.dynip.com/',
-            'http://XLPrintau.dynip.com/',
-            'http://www.xlprint.com/',
-            'http://xlprint.com/',
+          from concurrent.futures import ThreadPoolExecutor, as_completed
+          import json
+          import pathlib
+          import urllib.parse
+          import urllib.request
+
+          out = pathlib.Path('/tmp/lpg-archive-alt')
+          headers = {'User-Agent': 'Mozilla/5.0 LPG-format-research'}
+          hosts = [
+              'http://ftp.XLPrintau.dynip.com/',
+              'http://XLPrintau.dynip.com/',
+              'http://www.xlprint.com/',
+              'http://xlprint.com/',
+          ]
+          paths = [
+              'setup.exe', 'Setup.exe', 'paris.exe', 'Paris.exe',
+              'readme.txt', 'README.TXT', 'download/', 'downloads/',
+              'pub/', 'Paris/', 'paris/',
           ]
 
-          def get(url, timeout=40):
-            req=urllib.request.Request(url,headers=headers)
-            with urllib.request.urlopen(req,timeout=timeout) as r:
-              return r.status,r.geturl(),r.headers.get('content-type',''),r.read()
+          requests: list[tuple[str, str]] = []
+          for index, host in enumerate(hosts):
+              requests.extend([
+                  (f'availability_{index}', 'https://archive.org/wayback/available?' + urllib.parse.urlencode({'url': host, 'timestamp': '20010201'})),
+                  (f'arquivo_cdx_{index}', 'https://arquivo.pt/wayback/cdx?' + urllib.parse.urlencode({'url': host + '*', 'output': 'json', 'limit': '10000'})),
+                  (f'memento_{index}', 'https://timetravel.mementoweb.org/api/json/20010201/' + host),
+              ])
+              requests.extend(
+                  (f'exact_{index}_{path_index}', 'https://archive.org/wayback/available?' + urllib.parse.urlencode({'url': host + path, 'timestamp': '20010201'}))
+                  for path_index, path in enumerate(paths)
+              )
 
-          def save(label,url):
-            print('\n===',label,'===\n',url)
-            try:
-              status,final,ctype,body=get(url)
-              (out/(label+'.body')).write_bytes(body)
-              (out/(label+'.meta.json')).write_text(json.dumps({'status':status,'final':final,'content_type':ctype,'length':len(body)},indent=2),encoding='utf-8')
-              print(status,ctype,len(body),final)
-              print(body.decode('utf-8','replace')[:50000])
-            except Exception as e:
-              text=f'{type(e).__name__}: {e}'
-              (out/(label+'.error.txt')).write_text(text,encoding='utf-8')
-              print(text)
+          def probe(label: str, url: str) -> tuple[str, str]:
+              try:
+                  req = urllib.request.Request(url, headers=headers)
+                  with urllib.request.urlopen(req, timeout=8) as response:
+                      body = response.read()
+                      meta = {
+                          'request': url,
+                          'status': response.status,
+                          'final': response.geturl(),
+                          'content_type': response.headers.get('content-type', ''),
+                          'length': len(body),
+                      }
+                      (out / f'{label}.body').write_bytes(body)
+                      (out / f'{label}.meta.json').write_text(json.dumps(meta, indent=2), encoding='utf-8')
+                      return label, f"{response.status} {len(body)} {response.geturl()}\n{body.decode('utf-8', 'replace')[:12000]}"
+              except Exception as exc:
+                  text = f'{type(exc).__name__}: {exc}'
+                  (out / f'{label}.error.txt').write_text(text, encoding='utf-8')
+                  return label, text
 
-          for i,host in enumerate(hosts):
-            save(f'availability_{i}','https://archive.org/wayback/available?'+urllib.parse.urlencode({'url':host,'timestamp':'20010201'}))
-            save(f'arquivo_cdx_{i}','https://arquivo.pt/wayback/cdx?'+urllib.parse.urlencode({'url':host+'*','output':'json','limit':'10000'}))
-            save(f'memento_{i}','https://timetravel.mementoweb.org/api/json/20010201/'+host)
-
-          # Common installer/resource names worth checking as exact archived URLs.
-          paths=['setup.exe','Setup.exe','paris.exe','Paris.exe','readme.txt','README.TXT','download/','downloads/','pub/','Paris/','paris/']
-          for hi,host in enumerate(hosts):
-            for pi,path in enumerate(paths):
-              save(f'exact_{hi}_{pi}','https://archive.org/wayback/available?'+urllib.parse.urlencode({'url':host+path,'timestamp':'20010201'}))
+          with ThreadPoolExecutor(max_workers=16) as executor:
+              futures = [executor.submit(probe, label, url) for label, url in requests]
+              for future in as_completed(futures):
+                  label, text = future.result()
+                  print(f'\n=== {label} ===\n{text}')
           PY
       - name: Upload responses
         uses: actions/upload-artifact@v4
