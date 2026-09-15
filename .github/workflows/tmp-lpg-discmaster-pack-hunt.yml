@@ -1,0 +1,123 @@
+name: Temporary Paris LPG pack hunt
+
+on:
+  push:
+    branches:
+      - research/lpg-paris-oracle
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - name: Search DiscMaster for Paris packs and embedded resource names
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf /tmp/lpg-pack-hunt
+          mkdir -p /tmp/lpg-pack-hunt
+          python3 - <<'PY'
+          from __future__ import annotations
+
+          import hashlib
+          import html
+          import json
+          import pathlib
+          import re
+          import urllib.parse
+          import urllib.request
+
+          OUT = pathlib.Path('/tmp/lpg-pack-hunt')
+          BASE = 'https://discmaster.textfiles.com'
+          HEADERS = {
+              'User-Agent': 'Mozilla/5.0 LPG-format-research',
+              'Accept': 'text/html,application/json;q=0.9,*/*;q=0.8',
+          }
+
+          queries = [
+              ('name', 'PACK1.PAK'), ('name', 'PACK2.PAK'), ('name', 'PACK3.PAK'),
+              ('all', 'MS-LOGO'), ('all', 'MS-LOGO.LPG'),
+              ('all', 'GREYSCAL.PAL'), ('all', 'GREYSCAL.FRM'),
+              ('all', 'PHONEP.LGO'), ('all', 'RainDay.pcx'), ('all', 'Robsig.pcx'),
+              ('all', 'PARISPM.DLL'), ('all', 'PMCONFIG.EXE'), ('all', 'STOCKSET.XPI'),
+              ('all', 'XPDManageFonts'), ('all', 'XLEng0'), ('all', 'XLSp10'),
+              ('all', 'Resource Manager'), ('all', 'Paris Spooler'), ('all', 'Paris Designer'),
+          ]
+
+          def fetch(url: str) -> tuple[str, bytes]:
+              req = urllib.request.Request(url, headers=HEADERS)
+              with urllib.request.urlopen(req, timeout=25) as response:
+                  return response.geturl(), response.read()
+
+          def save(label: str, body: bytes, request_url: str, final_url: str) -> None:
+              (OUT / f'{label}.body').write_bytes(body)
+              (OUT / f'{label}.meta.json').write_text(json.dumps({
+                  'request_url': request_url,
+                  'final_url': final_url,
+                  'length': len(body),
+                  'sha256': hashlib.sha256(body).hexdigest(),
+              }, indent=2), encoding='utf-8')
+
+          candidate_paths: set[str] = set()
+          for index, (kind, query) in enumerate(queries):
+              params = {
+                  'q': query,
+                  'mode': 'deep',
+                  'dedup': 'dedup',
+                  'limit': '500',
+              }
+              if kind == 'name':
+                  params['qfields'] = 'name'
+              url = BASE + '/search?' + urllib.parse.urlencode(params)
+              try:
+                  final_url, body = fetch(url)
+              except Exception as exc:
+                  print(query, type(exc).__name__, exc)
+                  continue
+              safe = re.sub(r'[^A-Za-z0-9_.-]+', '_', f'{index:02d}_{kind}_{query}')
+              save(safe, body, url, final_url)
+              text = body.decode('utf-8', 'replace')
+              count = re.search(r'<font size="\+1">([0-9,]+) results', text)
+              print(f'\n=== {kind}: {query} === {count.group(1) if count else "?"} results')
+              for match in re.findall(r'href="(/(?:view|browse)/[^"]+)"', text, re.I):
+                  path = html.unescape(match)
+                  candidate_paths.add(path)
+                  print(path)
+
+          # Fetch result pages/directories that are plausibly Paris-related based on path tokens.
+          interesting = [
+              p for p in sorted(candidate_paths)
+              if any(token in p.lower() for token in (
+                  'paris', 'xlprint', 'laser', 'pack1.pak', 'pack2.pak', 'pack3.pak',
+                  'pmconfig', 'greyscal', 'ms-logo', 'stockset', 'phonep', 'robsig',
+              ))
+          ]
+          print(f'\ninteresting candidate paths: {len(interesting)}')
+          for index, path in enumerate(interesting[:150]):
+              url = urllib.parse.urljoin(BASE, path)
+              try:
+                  final_url, body = fetch(url)
+              except Exception as exc:
+                  print('candidate error', path, type(exc).__name__, exc)
+                  continue
+              safe = re.sub(r'[^A-Za-z0-9_.-]+', '_', f'candidate_{index:03d}')
+              save(safe, body, url, final_url)
+              text = body.decode('utf-8', 'replace')
+              print('\nCANDIDATE', path)
+              for line in text.splitlines():
+                  if any(token in line.lower() for token in (
+                      '.lpg', '.pak', 'paris', 'xlprint', 'laser image', 'greyscal',
+                      'ms-logo', 'stockset', 'pmconfig', 'parispm', 'phonep',
+                  )):
+                      print(line[:3000])
+
+          (OUT / 'candidate_paths.txt').write_text('\n'.join(sorted(candidate_paths)), encoding='utf-8')
+          (OUT / 'interesting_paths.txt').write_text('\n'.join(interesting), encoding='utf-8')
+          PY
+
+      - name: Upload search responses
+        uses: actions/upload-artifact@v4
+        with:
+          name: lpg-discmaster-pack-hunt
+          path: /tmp/lpg-pack-hunt
+          if-no-files-found: error
