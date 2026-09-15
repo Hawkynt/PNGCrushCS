@@ -1,36 +1,56 @@
-name: Temporary PE reference EOL cleanup
+name: Temporary DXF README regeneration
 
 on:
   push:
-    branches: [fix/peresource-metadata-safety]
+    branches: [feature/dxf-writer]
 
 permissions:
   contents: write
 
 jobs:
-  normalize:
+  regenerate:
     if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Check out PNGCrushCS
+        uses: actions/checkout@v4
         with:
+          path: PNGCrushCS
           fetch-depth: 0
 
-      - name: Normalize generated reference to repository LF convention
-        shell: python
-        run: |
-          from pathlib import Path
-          path = Path('Hawkynt.FileFormats.Images/REFERENCE.md')
-          data = path.read_bytes()
-          path.write_bytes(data.replace(b'\r\n', b'\n'))
+      - name: Check out CompressionWorkbench sibling
+        uses: actions/checkout@v4
+        with:
+          repository: Hawkynt/CompressionWorkbench
+          path: CompressionWorkbench
 
-      - name: Commit normalized reference
+      - name: Set up .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.x
+
+      - name: Set up .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Regenerate image format README
+        working-directory: PNGCrushCS
+        env:
+          UPDATE_IMAGE_FORMAT_README: '1'
+        run: >-
+          dotnet test Tests/Hawkynt.FileFormats.Images.Tests/Hawkynt.FileFormats.Images.Tests.csproj
+          -p:EnableWindowsTargeting=true
+          --filter "FullyQualifiedName~FormatSupportReadmeTests"
+
+      - name: Commit generated README
+        working-directory: PNGCrushCS
+        shell: pwsh
         run: |
-          if git diff --quiet -- Hawkynt.FileFormats.Images/REFERENCE.md; then
-            exit 0
-          fi
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add Hawkynt.FileFormats.Images/REFERENCE.md
-          git commit -m "* normalize generated image reference"
-          git push origin HEAD:fix/peresource-metadata-safety
+          if (-not (git diff --quiet -- Hawkynt.FileFormats.Images/README.md)) {
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add Hawkynt.FileFormats.Images/README.md
+            git commit -m "* regenerate image format support"
+            git push origin HEAD:feature/dxf-writer
+          }
