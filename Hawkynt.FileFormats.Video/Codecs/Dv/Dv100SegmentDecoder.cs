@@ -30,10 +30,11 @@ internal static class Dv100SegmentDecoder {
   /// <summary>Reusable storage for one segment decode.</summary>
   internal sealed class Scratch {
     internal readonly short[] Coefficients = new short[_BlocksPerSegment * 64];
-    internal readonly BlockState[] States = new BlockState[_BlocksPerSegment];
     internal readonly byte[] MacroblockOverflow = new byte[_MacroblockOverflowBytes];
     internal readonly byte[] SegmentOverflow = new byte[_SegmentOverflowBytes];
-    internal readonly byte[] BlockPixels = new byte[64];
+    internal readonly byte[] BlockPixels = new byte[_BlocksPerMacroblock * 64];
+    private readonly BlockState[] _states = new BlockState[_BlocksPerSegment];
+    private readonly bool[] _fieldModes = new bool[DvProfile.MacroblocksPerSegment];
   }
 
   internal static void Decode(
@@ -44,9 +45,10 @@ internal static class Dv100SegmentDecoder {
       throw new ArgumentException("The DV100 segment decoder only accepts SMPTE 370M profiles.", nameof(profile));
 
     var factors = profile.Height == 720 ? _Factors720 : _Factors1080;
-    var states = scratch.States;
+    var states = scratch._states;
     var coefficients = scratch.Coefficients;
     Array.Clear(states);
+    Array.Clear(scratch._fieldModes);
     Array.Clear(coefficients);
 
     var segmentOverflow = new DvBitWriter(scratch.SegmentOverflow, 0, _SegmentOverflowBytes);
@@ -71,8 +73,10 @@ internal static class Dv100SegmentDecoder {
         position += bytes;
         var index = 0;
         var dc = reader.ReadSigned(ref index, 9);
-        _ = reader.ReadBits(ref index, 1); // DCT mode belongs to the macroblock placement, read from block zero below.
+        var dctMode = reader.ReadBits(ref index, 1) != 0;
         var classNumber = (int)reader.ReadBits(ref index, 2);
+        if (b == 0)
+          scratch._fieldModes[macroblock] = dctMode;
 
         ref var state = ref states[first + b];
         state.FactorBase =
@@ -82,7 +86,6 @@ internal static class Dv100SegmentDecoder {
 
         coefficients[(first + b) * 64] = (short)(dc * 4 + 1024);
         index = _DecodeCoefficients(reader, ref state, coefficients, (first + b) * 64, factors, index);
-
         if (state.Position >= 64)
           macroblockOverflow.CopyFrom(reader, index);
       }
@@ -118,7 +121,7 @@ internal static class Dv100SegmentDecoder {
     }
 
     for (var macroblock = 0; macroblock < DvProfile.MacroblocksPerSegment; ++macroblock)
-      _Place(frame, profile, segment, macroblock, coefficients, planes, scratch);
+      _Place(frame, profile, segment, macroblock, scratch._fieldModes[macroblock], coefficients, planes, scratch);
   }
 
   private static uint[] _BuildFactors(ReadOnlySpan<ushort> luma, ReadOnlySpan<ushort> chroma) {
@@ -183,15 +186,13 @@ internal static class Dv100SegmentDecoder {
   }
 
   private static void _Place(
-    ReadOnlySpan<byte> frame, DvProfile profile, in DvGeometry.Segment segment, int macroblock,
+    ReadOnlySpan<byte> frame, DvProfile profile, in DvGeometry.Segment segment, int macroblock, bool fieldMode,
     short[] coefficients, DvPlanes planes, Scratch scratch) {
 
     var first = macroblock * _BlocksPerMacroblock;
     var (mbX, mbY) = DvGeometry.MacroblockForFrame(profile, segment, macroblock, frame);
-    var fieldMode = _FieldMode(frame, segment, macroblock);
-    var lumaLeft = mbX * 8;
     var lumaTop = mbY * 8;
-    var lumaOffset = lumaTop * planes.Width + lumaLeft;
+    var lumaOffset = lumaTop * planes.Width + mbX * 8;
 
     if (mbY == 134) {
       _PlaceLast1080Row(first, fieldMode, coefficients, planes, lumaOffset, mbX, scratch);
@@ -215,11 +216,6 @@ internal static class Dv100SegmentDecoder {
     var chromaOffset = lumaTop * chromaStride + (mbX >> 1) * 8;
     _PlaceChroma(first + 4, fieldMode, coefficients, planes.Cr, chromaOffset, chromaStride);
     _PlaceChroma(first + 6, fieldMode, coefficients, planes.Cb, chromaOffset, chromaStride);
-  }
-
-  private static bool _FieldMode(ReadOnlySpan<byte> frame, in DvGeometry.Segment segment, int macroblock) {
-    var position = (segment.BlockOffset + macroblock) * DvProfile.DifBlockSize + 4;
-    return position < frame.Length && (frame[position] & 0x40) != 0;
   }
 
   private static void _PlaceChroma(
@@ -248,34 +244,37 @@ internal static class Dv100SegmentDecoder {
       return;
     }
 
-    _PutFourRows(coefficients, first + 0, planes.Luma, lumaOffset, planes.Width * 2, 0, scratch.BlockPixels);
-    _PutFourRows(coefficients, first + 0, planes.Luma, lumaOffset + 16, planes.Width * 2, 4, scratch.BlockPixels);
-    _PutFourRows(coefficients, first + 1, planes.Luma, lumaOffset + 8, planes.Width * 2, 0, scratch.BlockPixels);
-    _PutFourRows(coefficients, first + 1, planes.Luma, lumaOffset + 24, planes.Width * 2, 4, scratch.BlockPixels);
-    _PutFourRows(coefficients, first + 2, planes.Luma, lumaOffset + planes.Width, planes.Width * 2, 0, scratch.BlockPixels);
-    _PutFourRows(coefficients, first + 2, planes.Luma, lumaOffset + planes.Width + 16, planes.Width * 2, 4, scratch.BlockPixels);
-    _PutFourRows(coefficients, first + 3, planes.Luma, lumaOffset + planes.Width + 8, planes.Width * 2, 0, scratch.BlockPixels);
-    _PutFourRows(coefficients, first + 3, planes.Luma, lumaOffset + planes.Width + 24, planes.Width * 2, 4, scratch.BlockPixels);
+    Array.Clear(scratch.BlockPixels);
+    for (var b = 0; b < _BlocksPerMacroblock; ++b)
+      DvInverseDct.Put(coefficients.AsSpan((first + b) * 64, 64), scratch.BlockPixels, b * 64, 8);
+
+    _CopyFourRows(scratch.BlockPixels, 0, 0, planes.Luma, lumaOffset, planes.Width * 2);
+    _CopyFourRows(scratch.BlockPixels, 0, 4, planes.Luma, lumaOffset + 16, planes.Width * 2);
+    _CopyFourRows(scratch.BlockPixels, 1, 0, planes.Luma, lumaOffset + 8, planes.Width * 2);
+    _CopyFourRows(scratch.BlockPixels, 1, 4, planes.Luma, lumaOffset + 24, planes.Width * 2);
+    _CopyFourRows(scratch.BlockPixels, 2, 0, planes.Luma, lumaOffset + planes.Width, planes.Width * 2);
+    _CopyFourRows(scratch.BlockPixels, 2, 4, planes.Luma, lumaOffset + planes.Width + 16, planes.Width * 2);
+    _CopyFourRows(scratch.BlockPixels, 3, 0, planes.Luma, lumaOffset + planes.Width + 8, planes.Width * 2);
+    _CopyFourRows(scratch.BlockPixels, 3, 4, planes.Luma, lumaOffset + planes.Width + 24, planes.Width * 2);
 
     var chromaOffset = 134 * 8 * planes.ChromaWidth + (mbX >> 1) * 8;
-    _PutFourRows(coefficients, first + 4, planes.Cr, chromaOffset, planes.ChromaWidth * 2, 0, scratch.BlockPixels);
-    _PutFourRows(coefficients, first + 4, planes.Cr, chromaOffset + 8, planes.ChromaWidth * 2, 4, scratch.BlockPixels);
-    _PutFourRows(coefficients, first + 5, planes.Cr, chromaOffset + planes.ChromaWidth, planes.ChromaWidth * 2, 0, scratch.BlockPixels);
-    _PutFourRows(coefficients, first + 5, planes.Cr, chromaOffset + planes.ChromaWidth + 8, planes.ChromaWidth * 2, 4, scratch.BlockPixels);
-    _PutFourRows(coefficients, first + 6, planes.Cb, chromaOffset, planes.ChromaWidth * 2, 0, scratch.BlockPixels);
-    _PutFourRows(coefficients, first + 6, planes.Cb, chromaOffset + 8, planes.ChromaWidth * 2, 4, scratch.BlockPixels);
-    _PutFourRows(coefficients, first + 7, planes.Cb, chromaOffset + planes.ChromaWidth, planes.ChromaWidth * 2, 0, scratch.BlockPixels);
-    _PutFourRows(coefficients, first + 7, planes.Cb, chromaOffset + planes.ChromaWidth + 8, planes.ChromaWidth * 2, 4, scratch.BlockPixels);
+    _CopyFourRows(scratch.BlockPixels, 4, 0, planes.Cr, chromaOffset, planes.ChromaWidth * 2);
+    _CopyFourRows(scratch.BlockPixels, 4, 4, planes.Cr, chromaOffset + 8, planes.ChromaWidth * 2);
+    _CopyFourRows(scratch.BlockPixels, 5, 0, planes.Cr, chromaOffset + planes.ChromaWidth, planes.ChromaWidth * 2);
+    _CopyFourRows(scratch.BlockPixels, 5, 4, planes.Cr, chromaOffset + planes.ChromaWidth + 8, planes.ChromaWidth * 2);
+    _CopyFourRows(scratch.BlockPixels, 6, 0, planes.Cb, chromaOffset, planes.ChromaWidth * 2);
+    _CopyFourRows(scratch.BlockPixels, 6, 4, planes.Cb, chromaOffset + 8, planes.ChromaWidth * 2);
+    _CopyFourRows(scratch.BlockPixels, 7, 0, planes.Cb, chromaOffset + planes.ChromaWidth, planes.ChromaWidth * 2);
+    _CopyFourRows(scratch.BlockPixels, 7, 4, planes.Cb, chromaOffset + planes.ChromaWidth + 8, planes.ChromaWidth * 2);
   }
 
   private static void _Put(short[] coefficients, int block, byte[] plane, int offset, int stride)
     => DvInverseDct.Put(coefficients.AsSpan(block * 64, 64), plane, offset, stride);
 
-  private static void _PutFourRows(
-    short[] coefficients, int block, byte[] plane, int offset, int stride, int sourceRow, byte[] pixels) {
-    Array.Clear(pixels);
-    DvInverseDct.Put(coefficients.AsSpan(block * 64, 64), pixels, 0, 8);
+  private static void _CopyFourRows(
+    byte[] pixels, int block, int sourceRow, byte[] plane, int offset, int stride) {
+    var source = block * 64 + sourceRow * 8;
     for (var row = 0; row < 4; ++row)
-      pixels.AsSpan((sourceRow + row) * 8, 8).CopyTo(plane.AsSpan(offset + row * stride, 8));
+      pixels.AsSpan(source + row * 8, 8).CopyTo(plane.AsSpan(offset + row * stride, 8));
   }
 }
