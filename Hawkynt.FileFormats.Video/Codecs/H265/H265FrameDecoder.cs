@@ -667,11 +667,71 @@ internal sealed class H265FrameDecoder : IH265MotionContext {
   }
 
   private void _DecodePulseCodeModulatedBlock(int x0, int y0, int log2CbSize) {
-    throw new NotSupportedException(
-      "This H.265 stream carries a coding unit whose samples were sent uncompressed (pcm_flag, clause 7.3.8.7). "
-      + "Reading one means leaving the arithmetic decoder, taking the samples as raw bits at the sequence's own "
-      + $"depth and restarting the decoder afterwards; that is not implemented. The block is at ({x0}, {y0}), "
-      + $"{1 << log2CbSize} samples across.");
+    var data = this._header.Nal.Payload;
+    var bitPosition = ((this._cabac.BitPosition + 7) >> 3) << 3;
+    var size = 1 << log2CbSize;
+
+    int ReadSample(int bits) {
+      if (bits <= 0 || bits > 16)
+        throw new InvalidDataException($"An H.265 PCM sample declares an unsupported depth of {bits} bits.");
+      if (bitPosition > (data.Length << 3) - bits)
+        throw new InvalidDataException(
+          $"An H.265 PCM coding unit at ({x0}, {y0}) ends inside its raw sample payload.");
+
+      var value = 0;
+      for (var i = 0; i < bits; ++i) {
+        var at = bitPosition++;
+        value = (value << 1) | ((data[at >> 3] >> (7 - (at & 7))) & 1);
+      }
+
+      return value;
+    }
+
+    static void ReadPlane(
+      ushort[] plane, int stride, int x, int y, int width, int height,
+      int pcmDepth, int reconstructedDepth, Func<int, int> readSample) {
+      var shift = reconstructedDepth - pcmDepth;
+      if (shift < 0)
+        throw new InvalidDataException(
+          $"An H.265 PCM sample depth of {pcmDepth} exceeds its reconstructed depth of {reconstructedDepth}.");
+
+      for (var row = 0; row < height; ++row) {
+        var target = (y + row) * stride + x;
+        for (var column = 0; column < width; ++column)
+          plane[target + column] = (ushort)(readSample(pcmDepth) << shift);
+      }
+    }
+
+    ReadPlane(
+      this._picture.Luma, this._sps.Width, x0, y0, size, size,
+      this._sps.PcmBitDepthLuma, this._sps.BitDepthLuma, ReadSample);
+
+    if (this._chromaArrayType != 0) {
+      var chromaX = x0 >> this._chromaShiftX;
+      var chromaY = y0 >> this._chromaShiftY;
+      var chromaWidth = size >> this._chromaShiftX;
+      var chromaHeight = size >> this._chromaShiftY;
+
+      ReadPlane(
+        this._picture.Cb, this._picture.ChromaWidth, chromaX, chromaY, chromaWidth, chromaHeight,
+        this._sps.PcmBitDepthChroma, this._sps.BitDepthChroma, ReadSample);
+      ReadPlane(
+        this._picture.Cr, this._picture.ChromaWidth, chromaX, chromaY, chromaWidth, chromaHeight,
+        this._sps.PcmBitDepthChroma, this._sps.BitDepthChroma, ReadSample);
+    }
+
+    if ((bitPosition & 7) != 0)
+      throw new InvalidDataException(
+        $"An H.265 PCM coding unit at ({x0}, {y0}) does not end on the byte boundary required before CABAC restarts.");
+
+    this._FillBlocks(this._pulseCodeModulated, x0, y0, size, size, true);
+    this._FillBlocks(this._hasCodedResidual, x0, y0, size, size, false);
+    this._MarkPredictionEdges(x0, y0, size, size);
+    this._MarkTransformEdges(x0, y0, size, size);
+
+    // pcm() restarts the arithmetic registers but deliberately keeps the adapted probability
+    // contexts. Start() resets only the registers and continues to use this decoder's context array.
+    this._cabac.Start(bitPosition >> 3);
   }
 
   private void _DecodeInterCodingUnit(int x0, int y0, int log2CbSize) {
