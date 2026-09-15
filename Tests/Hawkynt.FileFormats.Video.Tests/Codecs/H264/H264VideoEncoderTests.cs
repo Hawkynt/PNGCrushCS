@@ -17,12 +17,7 @@ public sealed class H264VideoEncoderTests {
 
   [Test]
   [Category("Oracle")]
-  public void FFmpegReadsEveryPictureBackAsTheFrameThatWentIn() {
-    // Every picture here is an independent IDR made of I_PCM macroblocks, so what a multi-picture clip
-    // tests that a single picture does not is the packaging: the parameter sets, the length-prefixed
-    // samples, and that picture two is where the container says it is. I_PCM stores samples verbatim,
-    // so the only difference a correct decode can show is the 4:2:0 conversion the source went
-    // through -- which makes the comparison tight rather than nominal.
+  public void FFmpegReadsReorderedIPBClipBackAsTheFramesThatWentIn() {
     FFmpegOracle.RequireAvailable();
 
     const int width = 64;
@@ -39,8 +34,16 @@ public sealed class H264VideoEncoderTests {
       if (encoder.TryEncode(picture, index, out var packet))
         packets.Add(packet);
     }
+    packets.AddRange(encoder.Flush());
 
-    Assert.That(packets, Has.Count.EqualTo(frames));
+    Assert.Multiple(() => {
+      Assert.That(packets, Has.Count.EqualTo(frames));
+      Assert.That(packets.Select(packet => packet.PresentationTimestamp),
+        Is.EqualTo(new long?[] { 0, 2, 1, 4, 3, 5 }),
+        "B pictures must be emitted after their future reference rather than in display order");
+      Assert.That(packets.Select(packet => packet.DecodeTimestamp),
+        Is.EqualTo(new long?[] { 0, 1, 2, 3, 4, 5 }));
+    });
 
     var directory = Directory.CreateTempSubdirectory("h264-oracle");
     try {
@@ -80,6 +83,83 @@ public sealed class H264VideoEncoderTests {
     }
   }
 
+  [Test]
+  [Category("Unit")]
+  public void RepeatedPicturesUsePSkipAndBidirectionalBPredictionAndRoundTripExactly() {
+    const int width = 32;
+    const int height = 32;
+    const int frames = 5;
+    var source = _Random420(width, height, 0x264);
+    var encoder = H264VideoEncoder.Create(_Stream(width, height));
+    var packets = new List<CodedPacket>();
+
+    for (var index = 0; index < frames; ++index)
+      if (encoder.TryEncode(source, index, out var packet))
+        packets.Add(packet);
+    packets.AddRange(encoder.Flush());
+
+    Assert.Multiple(() => {
+      Assert.That(packets, Has.Count.EqualTo(frames));
+      Assert.That(packets.Select(_SliceType), Is.EqualTo(new[] { 7, 5, 6, 5, 6 }));
+      Assert.That(packets.Select(packet => packet.IsKeyFrame),
+        Is.EqualTo(new[] { true, false, false, false, false }));
+      Assert.That(packets.Select(packet => packet.PresentationTimestamp),
+        Is.EqualTo(new long?[] { 0, 2, 1, 4, 3 }));
+      Assert.That(packets.Select(packet => packet.DecodeTimestamp),
+        Is.EqualTo(new long?[] { 0, 1, 2, 3, 4 }));
+    });
+
+    var pSyntax = _FirstMacroblockSyntax(packets[1], expectedSliceType: 5, referencePicture: true, bPicture: false);
+    Assert.That(pSyntax.SkipRun, Is.EqualTo(4),
+      "the 32x32 repeated P picture should be four P_Skip macroblocks, not four intra fallbacks");
+
+    var bSyntax = _FirstMacroblockSyntax(packets[2], expectedSliceType: 6, referencePicture: false, bPicture: true);
+    Assert.Multiple(() => {
+      Assert.That(bSyntax.SkipRun, Is.Zero, "the first B macroblock is explicitly coded, not direct-skip");
+      Assert.That(bSyntax.MacroblockType, Is.EqualTo(3),
+        "the repeated B picture should use B_Bi_16x16 and therefore both reference lists");
+    });
+
+    var decoder = H264VideoDecoder.Create(encoder.DescribeStream());
+    var decoded = new List<RawImage>();
+    foreach (var packet in packets)
+      if (decoder.TryDecode(packet, out var frame))
+        decoded.Add(frame);
+    decoded.AddRange(decoder.Flush());
+
+    Assert.That(decoded, Has.Count.EqualTo(frames));
+    for (var index = 0; index < frames; ++index)
+      Assert.Multiple(() => {
+        Assert.That(decoded[index].Format, Is.EqualTo(PixelFormat.Yuv420P8));
+        Assert.That(decoded[index].PixelData, Is.EqualTo(source.PixelData), $"display picture {index}");
+      });
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void TrailingPictureWithoutFutureAnchorFlushesAsP() {
+    var first = _Random420(32, 16, 11);
+    var second = _Random420(32, 16, 12);
+    var encoder = H264VideoEncoder.Create(_Stream(32, 16));
+
+    Assert.That(encoder.TryEncode(first, 0, out var idr), Is.True);
+    Assert.That(encoder.TryEncode(second, 1, out _), Is.False);
+    var trailing = encoder.Flush().Single();
+
+    Assert.Multiple(() => {
+      Assert.That(_SliceType(idr), Is.EqualTo(7));
+      Assert.That(_SliceType(trailing), Is.EqualTo(5));
+      Assert.That(trailing.PresentationTimestamp, Is.EqualTo(1));
+      Assert.That(trailing.DecodeTimestamp, Is.EqualTo(1));
+    });
+
+    var decoder = H264VideoDecoder.Create(encoder.DescribeStream());
+    decoder.TryDecode(idr, out _);
+    decoder.TryDecode(trailing, out _);
+    var decoded = decoder.Flush().ToArray();
+    Assert.That(decoded.Select(frame => frame.PixelData), Is.EqualTo(new[] { first.PixelData, second.PixelData }));
+  }
+
   /// <summary>A bright square crossing a fixed background.</summary>
   private static RawImage _MovingSquare(int width, int height, int phase) {
     var data = new byte[width * height * 3];
@@ -105,7 +185,6 @@ public sealed class H264VideoEncoderTests {
     return new() { Width = width, Height = height, Format = PixelFormat.Rgb24, PixelData = data };
   }
 
-
   [Test]
   [Category("Unit")]
   public void EncoderWritesLengthPrefixedIdrThatOwnDecoderReadsExactly() {
@@ -124,7 +203,9 @@ public sealed class H264VideoEncoderTests {
     });
 
     var decoder = H264VideoDecoder.Create(encoder.DescribeStream());
-    Assert.That(decoder.TryDecode(packet, out var decoded), Is.True);
+    Assert.That(decoder.TryDecode(packet, out _), Is.False,
+      "Main-profile pictures are held for POC presentation ordering until the stream is flushed");
+    var decoded = decoder.Flush().Single();
     Assert.Multiple(() => {
       Assert.That(decoded.Width, Is.EqualTo(width));
       Assert.That(decoded.Height, Is.EqualTo(height));
@@ -150,7 +231,8 @@ public sealed class H264VideoEncoderTests {
     }));
 
     var decoder = H264VideoDecoder.Create(_Stream(frame.Width, frame.Height));
-    Assert.That(decoder.TryDecode(new(0, annexB), out var decoded), Is.True);
+    Assert.That(decoder.TryDecode(new(0, annexB), out _), Is.False);
+    var decoded = decoder.Flush().Single();
     Assert.That(decoded.PixelData, Is.EqualTo(frame.PixelData));
   }
 
@@ -168,6 +250,48 @@ public sealed class H264VideoEncoderTests {
     var encoder = VideoFormatRegistry.CreateEncoder(_Stream(16, 16));
     Assert.That(encoder, Is.TypeOf<H264VideoEncoder>());
   }
+
+  private static int _SliceType(CodedPacket packet) {
+    var nal = H264NalReader.SplitLengthPrefixed(packet.Data, 4).Single();
+    var reader = new H264BitReader(nal.Payload);
+    reader.ReadUnsignedExpGolomb();
+    return reader.ReadUnsignedExpGolomb();
+  }
+
+  private static FirstMacroblockSyntax _FirstMacroblockSyntax(
+    CodedPacket packet,
+    int expectedSliceType,
+    bool referencePicture,
+    bool bPicture) {
+    var nal = H264NalReader.SplitLengthPrefixed(packet.Data, 4).Single();
+    var reader = new H264BitReader(nal.Payload);
+    Assert.That(reader.ReadUnsignedExpGolomb(), Is.Zero); // first_mb_in_slice
+    Assert.That(reader.ReadUnsignedExpGolomb(), Is.EqualTo(expectedSliceType));
+    Assert.That(reader.ReadUnsignedExpGolomb(), Is.Zero); // pps id
+    reader.Skip(16); // frame_num
+    if (nal.IsIdr)
+      reader.ReadUnsignedExpGolomb();
+    reader.Skip(16); // pic_order_cnt_lsb
+    if (bPicture)
+      Assert.That(reader.ReadBit(), Is.EqualTo(1)); // direct_spatial_mv_pred_flag
+    if (expectedSliceType % 5 is 0 or 1) {
+      Assert.That(reader.ReadBit(), Is.Zero); // active-reference override
+      Assert.That(reader.ReadBit(), Is.Zero); // list0 modification
+      if (bPicture)
+        Assert.That(reader.ReadBit(), Is.Zero); // list1 modification
+    }
+    if (nal.IsIdr) {
+      reader.Skip(2);
+    } else if (referencePicture)
+      Assert.That(reader.ReadBit(), Is.Zero); // adaptive reference marking
+    Assert.That(reader.ReadSignedExpGolomb(), Is.Zero); // slice_qp_delta
+    Assert.That(reader.ReadUnsignedExpGolomb(), Is.EqualTo(1)); // deblocking disabled
+
+    var skipRun = reader.ReadUnsignedExpGolomb();
+    return new(skipRun, skipRun == 0 ? reader.ReadUnsignedExpGolomb() : null);
+  }
+
+  private readonly record struct FirstMacroblockSyntax(int SkipRun, int? MacroblockType);
 
   private static MediaStreamInfo _Stream(int width, int height)
     => new() {

@@ -8,28 +8,34 @@ using FileFormat.Core;
 namespace FileFormat.Codecs;
 
 /// <summary>
-/// Encodes progressive eight-bit 4:2:0 H.264 / AVC as Baseline-profile IDR pictures made from
-/// <c>I_PCM</c> macroblocks.
+/// Encodes progressive eight-bit 4:2:0 H.264 / AVC as Main-profile CAVLC I/P/B pictures.
 /// </summary>
 /// <remarks>
-/// This is deliberately the smallest conforming write path rather than a pretend x264. Every picture
-/// is independently decodable, every coded sample is carried verbatim by <c>I_PCM</c>, and the only
-/// loss a non-YUV source can incur is the conversion to H.264's 4:2:0 sample grid before coding.
-/// Pictures already in <see cref="PixelFormat.Yuv420P8"/> round-trip sample for sample.
+/// The write path is deliberately exact before it is clever. The first picture is an IDR made from
+/// <c>I_PCM</c> macroblocks. Reference pictures use <c>P_Skip</c> wherever the macroblock equals the
+/// previous reconstructed reference and <c>I_PCM</c> otherwise. One non-reference B picture is placed
+/// between reference anchors; a macroblock that is exactly the rounded average of the two zero-motion
+/// references is coded as <c>B_Bi_16x16</c>, with <c>I_PCM</c> as its exact fallback. This exercises the
+/// real decoded-picture buffer, both reference lists and display/decode reordering without allowing a
+/// lossy transform/quantizer to contaminate later reference pictures.
 /// <para/>
 /// Samples are emitted in the length-prefixed representation used by MP4, Matroska and FLV, with the
-/// SPS/PPS in an <c>AVCDecoderConfigurationRecord</c>. <c>H264VideoWriter</c> converts that same
-/// stream description and those packets to Annex B when a raw <c>.264</c> stream is requested.
+/// SPS/PPS in an <c>AVCDecoderConfigurationRecord</c>. <c>H264VideoWriter</c> converts that same stream
+/// description and those packets to Annex B when a raw <c>.264</c> stream is requested.
 /// </remarks>
 [VerifiedBy(ConformanceOracle.FFmpeg)]
 public sealed class H264VideoEncoder : IVideoCodecEncoder<H264VideoEncoder> {
 
-  private const int _PROFILE_IDC = 66; // Baseline
-  private const int _PROFILE_COMPATIBILITY = 0xC0; // constraint_set0_flag + constraint_set1_flag
+  private const int _PROFILE_IDC = 77; // Main
+  private const int _PROFILE_COMPATIBILITY = 0;
   private const int _LEVEL_IDC = 62;
   private const int _MAX_LEVEL_62_MACROBLOCKS = 139_264;
   private const int _MAX_LEVEL_62_DIMENSION_MBS = 1_055;
   private const int _NAL_LENGTH_SIZE = 4;
+  private const int _FRAME_NUM_BITS = 16;
+  private const int _POC_BITS = 16;
+  private const int _FRAME_NUM_MASK = (1 << _FRAME_NUM_BITS) - 1;
+  private const int _POC_MASK = (1 << _POC_BITS) - 1;
 
   private static readonly CodecTag _Tag = CodecTag.FromCharacters("avc1");
 
@@ -44,8 +50,13 @@ public sealed class H264VideoEncoder : IVideoCodecEncoder<H264VideoEncoder> {
   private readonly byte[] _pictureParameterSet;
   private readonly byte[] _configuration;
   private readonly byte[] _sampleEntry;
+  private readonly Queue<CodedPacket> _readyPackets = [];
 
   private MediaStreamInfo? _stream;
+  private Frame420? _previousReference;
+  private PendingFrame? _pendingB;
+  private int _displayIndex;
+  private int _lastReferenceFrameNum;
 
   private H264VideoEncoder(MediaStreamInfo stream) {
     this._requested = stream;
@@ -98,43 +109,53 @@ public sealed class H264VideoEncoder : IVideoCodecEncoder<H264VideoEncoder> {
 
   public bool TryEncode(RawImage frame, long? presentationTimestamp, out CodedPacket packet) {
     ArgumentNullException.ThrowIfNull(frame);
+    this._ValidateGeometry(frame);
 
-    if (frame.Width != this._width || frame.Height != this._height)
-      throw new InvalidDataException(
-        $"This H.264 stream is {this._width}x{this._height}; a picture of {frame.Width}x{frame.Height} arrived.");
+    var current = new PendingFrame(this._To420(frame), presentationTimestamp, this._displayIndex++);
+    if (this._previousReference == null) {
+      this._readyPackets.Enqueue(this._EncodeIdr(current));
+      this._previousReference = current.Samples;
+      this._lastReferenceFrameNum = 0;
+    } else if (this._pendingB == null) {
+      this._pendingB = current;
+    } else {
+      var b = this._pendingB;
+      var referenceFrameNum = (this._lastReferenceFrameNum + 1) & _FRAME_NUM_MASK;
+      this._readyPackets.Enqueue(this._EncodeP(current, referenceFrameNum, b.PresentationTimestamp));
+      this._readyPackets.Enqueue(this._EncodeB(
+        b,
+        this._previousReference,
+        current.Samples,
+        (referenceFrameNum + 1) & _FRAME_NUM_MASK,
+        current.PresentationTimestamp));
+      this._previousReference = current.Samples;
+      this._lastReferenceFrameNum = referenceFrameNum;
+      this._pendingB = null;
+    }
 
-    var planes = RawYuvPlanes.Subsampled(frame, PixelFormat.Yuv420P8, this._width / 2, this._height / 2);
-    var rbsp = new H264BitWriter();
+    if (this._readyPackets.Count == 0) {
+      packet = default;
+      return false;
+    }
 
-    rbsp.WriteUnsignedExpGolomb(0); // first_mb_in_slice
-    rbsp.WriteUnsignedExpGolomb(7); // slice_type: I, all slices in the picture are I
-    rbsp.WriteUnsignedExpGolomb(0); // pic_parameter_set_id
-    rbsp.WriteBits(0, 4); // frame_num
-    rbsp.WriteUnsignedExpGolomb(0); // idr_pic_id
-    rbsp.WriteBit(false); // no_output_of_prior_pics_flag
-    rbsp.WriteBit(false); // long_term_reference_flag
-    rbsp.WriteSignedExpGolomb(0); // slice_qp_delta
-
-    for (var mbY = 0; mbY < this._macroblockHeight; ++mbY)
-      for (var mbX = 0; mbX < this._macroblockWidth; ++mbX)
-        this._WritePcmMacroblock(rbsp, planes, mbX, mbY);
-
-    var slice = _NalUnit(0x65, rbsp.FinishRbsp()); // nal_ref_idc 3, IDR slice
-    var sample = new byte[_NAL_LENGTH_SIZE + slice.Length];
-    BinaryPrimitives.WriteUInt32BigEndian(sample, checked((uint)slice.Length));
-    slice.CopyTo(sample, _NAL_LENGTH_SIZE);
-
-    packet = new(
-      this._requested.Index,
-      sample,
-      PresentationTimestamp: presentationTimestamp,
-      DecodeTimestamp: presentationTimestamp,
-      Duration: 1,
-      IsKeyFrame: true);
+    packet = this._readyPackets.Dequeue();
     return true;
   }
 
-  public IEnumerable<CodedPacket> Flush() => [];
+  public IEnumerable<CodedPacket> Flush() {
+    while (this._readyPackets.Count > 0)
+      yield return this._readyPackets.Dequeue();
+
+    if (this._pendingB == null)
+      yield break;
+
+    var trailing = this._pendingB;
+    this._pendingB = null;
+    var frameNum = (this._lastReferenceFrameNum + 1) & _FRAME_NUM_MASK;
+    yield return this._EncodeP(trailing, frameNum, trailing.PresentationTimestamp);
+    this._previousReference = trailing.Samples;
+    this._lastReferenceFrameNum = frameNum;
+  }
 
   public MediaStreamInfo DescribeStream()
     => this._stream ??= new() {
@@ -153,15 +174,216 @@ public sealed class H264VideoEncoder : IVideoCodecEncoder<H264VideoEncoder> {
       CodecPrivateData = this._sampleEntry,
     };
 
+  private void _ValidateGeometry(RawImage frame) {
+    if (frame.Width != this._width || frame.Height != this._height)
+      throw new InvalidDataException(
+        $"This H.264 stream is {this._width}x{this._height}; a picture of {frame.Width}x{frame.Height} arrived.");
+  }
+
+  private CodedPacket _EncodeIdr(PendingFrame frame) {
+    var rbsp = new H264BitWriter();
+    this._WriteSliceHeader(rbsp, SliceKind.I, frame.DisplayIndex, frameNum: 0, idr: true);
+
+    for (var mbY = 0; mbY < this._macroblockHeight; ++mbY)
+      for (var mbX = 0; mbX < this._macroblockWidth; ++mbX)
+        this._WritePcmMacroblock(rbsp, frame.Samples, mbX, mbY, 25);
+
+    return this._Packet(0x65, rbsp, frame, frame.PresentationTimestamp, keyFrame: true);
+  }
+
+  private CodedPacket _EncodeP(PendingFrame frame, int frameNum, long? decodeTimestamp) {
+    var reference = this._previousReference!;
+    var rbsp = new H264BitWriter();
+    this._WriteSliceHeader(rbsp, SliceKind.P, frame.DisplayIndex, frameNum, idr: false);
+
+    var mbAddr = 0;
+    while (mbAddr < this._macroblockWidth * this._macroblockHeight) {
+      var skipRun = 0;
+      while (mbAddr + skipRun < this._macroblockWidth * this._macroblockHeight) {
+        var address = mbAddr + skipRun;
+        if (!this._MacroblockEquals(frame.Samples, reference, address))
+          break;
+        ++skipRun;
+      }
+
+      rbsp.WriteUnsignedExpGolomb(skipRun); // mb_skip_run; each skipped P macroblock predicts ref0 at MV (0,0)
+      mbAddr += skipRun;
+      if (mbAddr >= this._macroblockWidth * this._macroblockHeight)
+        break;
+
+      this._WritePcmMacroblock(
+        rbsp,
+        frame.Samples,
+        mbAddr % this._macroblockWidth,
+        mbAddr / this._macroblockWidth,
+        30); // P slice: I_PCM is I mb_type 25 plus Table 7-13's intra offset 5
+      ++mbAddr;
+    }
+
+    return this._Packet(0x41, rbsp, frame, decodeTimestamp, keyFrame: false);
+  }
+
+  private CodedPacket _EncodeB(
+    PendingFrame frame,
+    Frame420 previous,
+    Frame420 future,
+    int frameNum,
+    long? decodeTimestamp) {
+    var rbsp = new H264BitWriter();
+    this._WriteSliceHeader(rbsp, SliceKind.B, frame.DisplayIndex, frameNum, idr: false);
+
+    for (var mbAddr = 0; mbAddr < this._macroblockWidth * this._macroblockHeight; ++mbAddr) {
+      rbsp.WriteUnsignedExpGolomb(0); // mb_skip_run: direct mode is deliberately not used here
+      var mbX = mbAddr % this._macroblockWidth;
+      var mbY = mbAddr / this._macroblockWidth;
+      if (this._MacroblockEqualsBiPrediction(frame.Samples, previous, future, mbAddr)) {
+        rbsp.WriteUnsignedExpGolomb(3); // B_Bi_16x16, Table 7-14
+        rbsp.WriteSignedExpGolomb(0); // mvd_l0[0][0]
+        rbsp.WriteSignedExpGolomb(0); // mvd_l0[0][1]
+        rbsp.WriteSignedExpGolomb(0); // mvd_l1[0][0]
+        rbsp.WriteSignedExpGolomb(0); // mvd_l1[0][1]
+        rbsp.WriteUnsignedExpGolomb(0); // coded_block_pattern = 0 in Table 9-4's inter column
+      } else
+        this._WritePcmMacroblock(rbsp, frame.Samples, mbX, mbY, 48); // B I_PCM = 23 + 25
+    }
+
+    return this._Packet(0x01, rbsp, frame, decodeTimestamp, keyFrame: false);
+  }
+
+  private void _WriteSliceHeader(H264BitWriter writer, SliceKind kind, int displayIndex, int frameNum, bool idr) {
+    writer.WriteUnsignedExpGolomb(0); // first_mb_in_slice
+    writer.WriteUnsignedExpGolomb(kind switch {
+      SliceKind.P => 5, // all slices of this picture are P
+      SliceKind.B => 6, // all slices of this picture are B
+      _ => 7, // all slices of this picture are I
+    });
+    writer.WriteUnsignedExpGolomb(0); // pic_parameter_set_id
+    writer.WriteBits(frameNum, _FRAME_NUM_BITS);
+    if (idr)
+      writer.WriteUnsignedExpGolomb(0); // idr_pic_id
+    writer.WriteBits((displayIndex << 1) & _POC_MASK, _POC_BITS); // pic_order_cnt_lsb
+
+    if (kind == SliceKind.B)
+      writer.WriteBit(true); // direct_spatial_mv_pred_flag (required syntax, explicit Bi is used below)
+
+    if (kind is SliceKind.P or SliceKind.B) {
+      writer.WriteBit(false); // num_ref_idx_active_override_flag: one active entry from each used list
+      writer.WriteBit(false); // ref_pic_list_modification_flag_l0
+      if (kind == SliceKind.B)
+        writer.WriteBit(false); // ref_pic_list_modification_flag_l1
+    }
+
+    if (idr) {
+      writer.WriteBit(false); // no_output_of_prior_pics_flag
+      writer.WriteBit(false); // long_term_reference_flag
+    } else if (kind == SliceKind.P)
+      writer.WriteBit(false); // adaptive_ref_pic_marking_mode_flag; sliding-window DPB
+
+    writer.WriteSignedExpGolomb(0); // slice_qp_delta
+    writer.WriteUnsignedExpGolomb(1); // disable_deblocking_filter_idc: exact reference samples stay exact
+  }
+
+  private CodedPacket _Packet(
+    byte nalHeader,
+    H264BitWriter rbsp,
+    PendingFrame frame,
+    long? decodeTimestamp,
+    bool keyFrame) {
+    var slice = _NalUnit(nalHeader, rbsp.FinishRbsp());
+    var sample = new byte[_NAL_LENGTH_SIZE + slice.Length];
+    BinaryPrimitives.WriteUInt32BigEndian(sample, checked((uint)slice.Length));
+    slice.CopyTo(sample, _NAL_LENGTH_SIZE);
+
+    return new(
+      this._requested.Index,
+      sample,
+      PresentationTimestamp: frame.PresentationTimestamp,
+      DecodeTimestamp: decodeTimestamp,
+      Duration: 1,
+      IsKeyFrame: keyFrame);
+  }
+
+  private bool _MacroblockEquals(Frame420 current, Frame420 reference, int mbAddr) {
+    var mbX = mbAddr % this._macroblockWidth;
+    var mbY = mbAddr / this._macroblockWidth;
+    return _BlockEquals(current.Y, reference.Y, this._codedWidth, mbX * 16, mbY * 16, 16, 16)
+      && _BlockEquals(current.Cb, reference.Cb, this._codedWidth / 2, mbX * 8, mbY * 8, 8, 8)
+      && _BlockEquals(current.Cr, reference.Cr, this._codedWidth / 2, mbX * 8, mbY * 8, 8, 8);
+  }
+
+  private bool _MacroblockEqualsBiPrediction(Frame420 current, Frame420 previous, Frame420 future, int mbAddr) {
+    var mbX = mbAddr % this._macroblockWidth;
+    var mbY = mbAddr / this._macroblockWidth;
+    return _BlockEqualsAverage(current.Y, previous.Y, future.Y, this._codedWidth, mbX * 16, mbY * 16, 16, 16)
+      && _BlockEqualsAverage(current.Cb, previous.Cb, future.Cb, this._codedWidth / 2, mbX * 8, mbY * 8, 8, 8)
+      && _BlockEqualsAverage(current.Cr, previous.Cr, future.Cr, this._codedWidth / 2, mbX * 8, mbY * 8, 8, 8);
+  }
+
+  private static bool _BlockEquals(
+    byte[] first, byte[] second, int stride, int x, int y, int width, int height) {
+    for (var row = 0; row < height; ++row) {
+      var offset = (y + row) * stride + x;
+      if (!first.AsSpan(offset, width).SequenceEqual(second.AsSpan(offset, width)))
+        return false;
+    }
+    return true;
+  }
+
+  private static bool _BlockEqualsAverage(
+    byte[] current, byte[] first, byte[] second, int stride, int x, int y, int width, int height) {
+    for (var row = 0; row < height; ++row) {
+      var offset = (y + row) * stride + x;
+      for (var column = 0; column < width; ++column) {
+        var at = offset + column;
+        if (current[at] != (byte)((first[at] + second[at] + 1) >> 1))
+          return false;
+      }
+    }
+    return true;
+  }
+
+  private Frame420 _To420(RawImage frame) {
+    var source = RawYuvPlanes.Subsampled(frame, PixelFormat.Yuv420P8, this._width / 2, this._height / 2);
+    var sourceLumaSamples = this._width * this._height;
+    var sourceChromaWidth = this._width / 2;
+    var sourceChromaHeight = this._height / 2;
+    var sourceChromaSamples = sourceChromaWidth * sourceChromaHeight;
+    var luma = new byte[this._codedWidth * this._codedHeight];
+    var chromaWidth = this._codedWidth / 2;
+    var chromaHeight = this._codedHeight / 2;
+    var cb = new byte[chromaWidth * chromaHeight];
+    var cr = new byte[chromaWidth * chromaHeight];
+
+    _PadPlane(source.AsSpan(0, sourceLumaSamples), this._width, this._height, luma, this._codedWidth, this._codedHeight);
+    _PadPlane(source.AsSpan(sourceLumaSamples, sourceChromaSamples), sourceChromaWidth, sourceChromaHeight, cb, chromaWidth, chromaHeight);
+    _PadPlane(source.AsSpan(sourceLumaSamples + sourceChromaSamples, sourceChromaSamples), sourceChromaWidth, sourceChromaHeight, cr, chromaWidth, chromaHeight);
+    return new(luma, cb, cr);
+  }
+
+  private static void _PadPlane(
+    ReadOnlySpan<byte> source,
+    int sourceWidth,
+    int sourceHeight,
+    Span<byte> target,
+    int targetWidth,
+    int targetHeight) {
+    for (var y = 0; y < targetHeight; ++y) {
+      var sourceY = Math.Min(y, sourceHeight - 1);
+      for (var x = 0; x < targetWidth; ++x)
+        target[y * targetWidth + x] = source[sourceY * sourceWidth + Math.Min(x, sourceWidth - 1)];
+    }
+  }
+
   private byte[] _SequenceParameterSet() {
     var rbsp = new H264BitWriter();
     rbsp.WriteBits(_PROFILE_IDC, 8);
     rbsp.WriteBits(_PROFILE_COMPATIBILITY, 8);
     rbsp.WriteBits(_LEVEL_IDC, 8);
     rbsp.WriteUnsignedExpGolomb(0); // seq_parameter_set_id
-    rbsp.WriteUnsignedExpGolomb(0); // log2_max_frame_num_minus4
-    rbsp.WriteUnsignedExpGolomb(2); // pic_order_cnt_type
-    rbsp.WriteUnsignedExpGolomb(1); // max_num_ref_frames
+    rbsp.WriteUnsignedExpGolomb(_FRAME_NUM_BITS - 4); // log2_max_frame_num_minus4
+    rbsp.WriteUnsignedExpGolomb(0); // pic_order_cnt_type
+    rbsp.WriteUnsignedExpGolomb(_POC_BITS - 4); // log2_max_pic_order_cnt_lsb_minus4
+    rbsp.WriteUnsignedExpGolomb(2); // max_num_ref_frames: previous and future anchor around a B picture
     rbsp.WriteBit(false); // gaps_in_frame_num_value_allowed_flag
     rbsp.WriteUnsignedExpGolomb(this._macroblockWidth - 1);
     rbsp.WriteUnsignedExpGolomb(this._macroblockHeight - 1);
@@ -193,47 +415,35 @@ public sealed class H264VideoEncoder : IVideoCodecEncoder<H264VideoEncoder> {
     rbsp.WriteUnsignedExpGolomb(0); // num_ref_idx_l0_default_active_minus1
     rbsp.WriteUnsignedExpGolomb(0); // num_ref_idx_l1_default_active_minus1
     rbsp.WriteBit(false); // weighted_pred_flag
-    rbsp.WriteBits(0, 2); // weighted_bipred_idc
+    rbsp.WriteBits(0, 2); // weighted_bipred_idc: ordinary rounded average
     rbsp.WriteSignedExpGolomb(0); // pic_init_qp_minus26
     rbsp.WriteSignedExpGolomb(0); // pic_init_qs_minus26
     rbsp.WriteSignedExpGolomb(0); // chroma_qp_index_offset
-    rbsp.WriteBit(false); // deblocking_filter_control_present_flag
+    rbsp.WriteBit(true); // deblocking_filter_control_present_flag
     rbsp.WriteBit(false); // constrained_intra_pred_flag
     rbsp.WriteBit(false); // redundant_pic_cnt_present_flag
     return _NalUnit(0x68, rbsp.FinishRbsp());
   }
 
-  private void _WritePcmMacroblock(H264BitWriter writer, byte[] planes, int mbX, int mbY) {
-    writer.WriteUnsignedExpGolomb(25); // I_PCM in an I slice
+  private void _WritePcmMacroblock(H264BitWriter writer, Frame420 frame, int mbX, int mbY, int mbType) {
+    writer.WriteUnsignedExpGolomb(mbType);
     writer.AlignWithZeroBits();
 
-    var lumaSamples = this._width * this._height;
-    var chromaWidth = this._width / 2;
-    var chromaHeight = this._height / 2;
-    var chromaSamples = chromaWidth * chromaHeight;
-
     for (var y = 0; y < 16; ++y) {
-      var sourceY = Math.Min(mbY * 16 + y, this._height - 1);
-      var row = sourceY * this._width;
-      for (var x = 0; x < 16; ++x) {
-        var sourceX = Math.Min(mbX * 16 + x, this._width - 1);
-        writer.WriteAlignedByte(planes[row + sourceX]);
-      }
+      var row = (mbY * 16 + y) * this._codedWidth + mbX * 16;
+      for (var x = 0; x < 16; ++x)
+        writer.WriteAlignedByte(frame.Y[row + x]);
     }
 
-    var chromaX = mbX * 8;
-    var chromaY = mbY * 8;
-    _WriteChroma(lumaSamples);
-    _WriteChroma(lumaSamples + chromaSamples);
+    var chromaWidth = this._codedWidth / 2;
+    _WriteChroma(frame.Cb);
+    _WriteChroma(frame.Cr);
 
-    void _WriteChroma(int planeOffset) {
+    void _WriteChroma(byte[] plane) {
       for (var y = 0; y < 8; ++y) {
-        var sourceY = Math.Min(chromaY + y, chromaHeight - 1);
-        var row = planeOffset + sourceY * chromaWidth;
-        for (var x = 0; x < 8; ++x) {
-          var sourceX = Math.Min(chromaX + x, chromaWidth - 1);
-          writer.WriteAlignedByte(planes[row + sourceX]);
-        }
+        var row = (mbY * 8 + y) * chromaWidth + mbX * 8;
+        for (var x = 0; x < 8; ++x)
+          writer.WriteAlignedByte(plane[row + x]);
       }
     }
   }
@@ -301,6 +511,12 @@ public sealed class H264VideoEncoder : IVideoCodecEncoder<H264VideoEncoder> {
 
     return [.. escaped];
   }
+
+  private enum SliceKind : byte { P, B, I }
+
+  private sealed record Frame420(byte[] Y, byte[] Cb, byte[] Cr);
+
+  private sealed record PendingFrame(Frame420 Samples, long? PresentationTimestamp, int DisplayIndex);
 
   /// <summary>MSB-first bit writer for the H.264 syntax elements this encoder emits.</summary>
   private sealed class H264BitWriter {
