@@ -132,7 +132,9 @@ internal sealed class UtVideoT2Format {
       _ => default,
     };
 
-    return name.Length == 4 && name[0] is 'U' or 'u' && name[1] is 'M' or 'm'
+    return name.Length == 4
+      && (name[0] is 'U' or 'u')
+      && (name[1] is 'M' or 'm')
       && layout.Planes != 0;
   }
 }
