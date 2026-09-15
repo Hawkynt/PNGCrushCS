@@ -33,6 +33,8 @@ public sealed class UtVideoT2Tests {
       Assert.That(UtVideoT2Decoder.Accepts(stream), Is.True);
       Assert.That(VideoFormatRegistry.CanDecode(stream), Is.True);
       Assert.That(VideoFormatRegistry.CreateDecoder(stream), Is.TypeOf<UtVideoT2Decoder>());
+      Assert.That(VideoFormatRegistry.CanEncode(stream), Is.True);
+      Assert.That(VideoFormatRegistry.CreateEncoder(stream), Is.TypeOf<UtVideoT2Encoder>());
     });
   }
 
@@ -135,6 +137,16 @@ public sealed class UtVideoT2Tests {
 
     Assert.That(Lz4Block.Unpack(packed, source.Length), Is.EqualTo(source));
     Assert.Throws<InvalidDataException>(() => Lz4Block.Unpack([0, 1, 0], 4));
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void Lz4FrameRejectsLinkedBlocksBecauseItsDecoderHasNoCrossBlockDictionary() {
+    byte[] independent = [4, 34, 77, 24, 0x60, 0x40, 0, 0, 0, 0, 0];
+    byte[] linked = [4, 34, 77, 24, 0x40, 0x40, 0, 0, 0, 0, 0];
+
+    Assert.That(Lz4Frame.Unpack(independent, 0), Is.Empty);
+    Assert.Throws<InvalidDataException>(() => Lz4Frame.Unpack(linked, 0));
   }
 
   [Test]
