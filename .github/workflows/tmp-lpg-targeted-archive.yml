@@ -1,0 +1,105 @@
+name: Temporary targeted LPG archive probe
+
+on:
+  push:
+    branches:
+      - research/lpg-paris-oracle
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Probe historical Paris distribution sources
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/lpg-targeted
+          python3 - <<'PY'
+          from __future__ import annotations
+
+          import json
+          import pathlib
+          import urllib.parse
+          import urllib.request
+
+          OUT = pathlib.Path('/tmp/lpg-targeted')
+          UA = {'User-Agent': 'Mozilla/5.0 LPG-format-research'}
+
+          def fetch(url: str, timeout: int = 45) -> bytes:
+              request = urllib.request.Request(url, headers=UA)
+              with urllib.request.urlopen(request, timeout=timeout) as response:
+                  return response.read()
+
+          def record(name: str, url: str, timeout: int = 45) -> None:
+              print(f'\n=== {name} ===')
+              print(url)
+              try:
+                  body = fetch(url, timeout)
+                  (OUT / f'{name}.body').write_bytes(body)
+                  print(body.decode('utf-8', 'replace')[:100000])
+              except Exception as exc:
+                  text = f'{type(exc).__name__}: {exc}'
+                  (OUT / f'{name}.error.txt').write_text(text, encoding='utf-8')
+                  print(text)
+
+          # Exact Paris resource names from vendor manuals / release material.
+          for filename in (
+              'MS-LOGO.LPG', 'GREYSCAL.PAL', 'GREYSCAL.FRM', 'PHONEP.LGO',
+              'RainDay.pcx', 'mercury1.pcx', 'petesigl.pcx', 'Robsig.pcx',
+              'Robsig1.pcx', 'ENVCHG.SYS', 'STOCKSET.XPI',
+          ):
+              params = {
+                  'q': filename,
+                  'qfields': 'name',
+                  'mode': 'deep',
+                  'dedup': 'dedup',
+                  'limit': '200',
+              }
+              record('dm_' + filename.replace('.', '_'), 'https://discmaster.textfiles.com/search?' + urllib.parse.urlencode(params), 30)
+
+          # The Version 3 launch document names this as XLPrint's public build host.
+          for index, host in enumerate((
+              'ftp.XLPrintau.dynip.com',
+              'xlprint.com',
+              'www.xlprint.com',
+          )):
+              params = [
+                  ('url', host + '/*'),
+                  ('output', 'json'),
+                  ('filter', 'statuscode:200'),
+                  ('collapse', 'urlkey'),
+                  ('fl', 'timestamp,original,mimetype,statuscode,digest,length'),
+                  ('limit', '10000'),
+              ]
+              record(f'wayback_{index}', 'https://web.archive.org/cdx/search/cdx?' + urllib.parse.urlencode(params), 60)
+
+          # Search Archive.org item metadata for distributions/manual CDs that might contain Paris.
+          queries = (
+              '"XLPrint"',
+              '"Laser Image Technologies" AND Paris',
+              '"Paris Document System"',
+              '"Paris32" AND XLPrint',
+              '"ftp.XLPrintau.dynip.com"',
+          )
+          for index, query in enumerate(queries):
+              params = [
+                  ('q', query),
+                  ('fl[]', 'identifier'),
+                  ('fl[]', 'title'),
+                  ('fl[]', 'description'),
+                  ('fl[]', 'creator'),
+                  ('fl[]', 'date'),
+                  ('rows', '200'),
+                  ('page', '1'),
+                  ('output', 'json'),
+              ]
+              record(f'ia_{index}', 'https://archive.org/advancedsearch.php?' + urllib.parse.urlencode(params), 45)
+          PY
+
+      - name: Upload targeted responses
+        uses: actions/upload-artifact@v4
+        with:
+          name: lpg-targeted-archive-probe
+          path: /tmp/lpg-targeted
+          if-no-files-found: error
