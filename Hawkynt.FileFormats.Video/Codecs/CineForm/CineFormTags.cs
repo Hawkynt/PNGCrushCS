@@ -15,6 +15,7 @@ internal static class CineFormTags {
   internal const int Index = 2;
   internal const int ChannelCount = 12;
   internal const int SubbandCount = 14;
+  internal const int GroupTrailer = 18;
   internal const int ImageWidth = 20;
   internal const int ImageHeight = 21;
   internal const int LowpassPrecision = 35;
@@ -27,6 +28,18 @@ internal static class CineFormTags {
 
   /// <summary>Optional older CineForm tag 85. Its optional form is encoded as the negative tag.</summary>
   internal const int DisplayHeight = 85;
+
+  /// <summary>Total independently coded views/samples in one legacy CineForm stereo/multicam packet.</summary>
+  /// <remarks>GoPro names this legacy codec tag <c>CODEC_TAG_ENCODED_CHANNELS</c> (92).</remarks>
+  internal const int EncodedViewCount = 92;
+
+  /// <summary>Zero-based native view/sample identifier inside a legacy stereo/multicam packet.</summary>
+  /// <remarks>GoPro names this legacy codec tag <c>CODEC_TAG_ENCODED_CHANNEL_NUMBER</c> (93).</remarks>
+  internal const int EncodedViewNumber = 93;
+
+  /// <summary>Optional one-based quality/preference rank for the view; zero means unspecified.</summary>
+  /// <remarks>GoPro names this legacy codec tag <c>CODEC_TAG_ENCODED_CHANNEL_QUALITY</c> (94).</remarks>
+  internal const int EncodedViewQuality = 94;
 
   /// <summary>
   /// The last of a highpass subband's own header tags — not in Table B.2 — immediately after which its
