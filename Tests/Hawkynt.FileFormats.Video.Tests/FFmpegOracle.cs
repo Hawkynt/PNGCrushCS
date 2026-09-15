@@ -17,9 +17,12 @@ namespace Hawkynt.FileFormats.Video.Tests;
 /// that went in. Where FFmpeg is absent the check reports inconclusive, exactly as the image
 /// package's oracles do, and the rest of the suite runs untouched.
 /// <para/>
-/// A decode into a picture rather than <c>-f null</c>. FFmpeg will happily walk a container it
+/// A decode into real RGB bytes rather than <c>-f null</c>. FFmpeg will happily walk a container it
 /// cannot decode a frame of and exit zero, so "it did not complain" is not evidence that anything
-/// was decoded; a PNG of the right geometry is.
+/// was decoded. Raw video also keeps the oracle about the input codec rather than an output muxer:
+/// notably, H.261 has no ordinary I-picture flag and FFmpeg correctly treats Freeze Picture Release
+/// as its key-frame analogue, while the image2 muxer warns when its first output frame is not marked
+/// key even though the H.261 picture decoded successfully.
 /// </remarks>
 internal static class FFmpegOracle {
 
@@ -38,7 +41,7 @@ internal static class FFmpegOracle {
 
   /// <summary>Decodes the first frame and says whether it came back at the size it went in at.</summary>
   public static (bool Decoded, string Output) TryDecodeFirstFrame(string path, int width, int height) {
-    var png = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName() + ".png");
+    var raw = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName() + ".rgb");
 
     try {
       var startInfo = new ProcessStartInfo(ExecutablePath!) {
@@ -47,7 +50,10 @@ internal static class FFmpegOracle {
         UseShellExecute = false,
       };
 
-      foreach (var argument in new[] { "-hide_banner", "-loglevel", "error", "-y", "-i", path, "-frames:v", "1", png })
+      foreach (var argument in new[] {
+        "-hide_banner", "-loglevel", "error", "-y", "-i", path,
+        "-frames:v", "1", "-f", "rawvideo", "-pix_fmt", "rgb24", raw,
+      })
         startInfo.ArgumentList.Add(argument);
 
       using var process = Process.Start(startInfo);
@@ -63,22 +69,24 @@ internal static class FFmpegOracle {
       }
 
       var diagnostics = string.Concat(stdout.Result, stderr.Result).Trim();
-      var size = _PngSize(png);
-
-      // At -loglevel error FFmpeg says nothing at all about a stream it read cleanly, so anything on
-      // the error channel is it telling us it patched over something. A picture of the right size
-      // that came with a complaint is not the picture that went in.
       if (diagnostics.Length != 0)
         return (false, diagnostics);
 
-      return (size == (width, height),
-        size == null ? "it produced no picture" : $"it decoded {size.Value.Width}x{size.Value.Height}");
+      if (!File.Exists(raw))
+        return (false, "it produced no decoded video bytes");
+
+      var expectedBytes = checked((long)width * height * 3);
+      var actualBytes = new FileInfo(raw).Length;
+      return (actualBytes == expectedBytes,
+        actualBytes == expectedBytes
+          ? $"it decoded one {width}x{height} RGB24 frame"
+          : $"it produced {actualBytes} bytes instead of one {width}x{height} RGB24 frame ({expectedBytes} bytes)");
     } catch (Win32Exception) {
       return (false, "no ffmpeg on this machine");
     } catch (Exception exception) {
       return (false, $"{exception.GetType().Name}: {exception.Message}");
     } finally {
-      try { File.Delete(png); } catch { /* best effort */ }
+      try { File.Delete(raw); } catch { /* best effort */ }
     }
   }
 
@@ -140,29 +148,6 @@ internal static class FFmpegOracle {
       return (false, $"{exception.GetType().Name}: {exception.Message}");
     } finally {
       try { File.Delete(raw); } catch { /* best effort */ }
-    }
-  }
-
-  private static (int Width, int Height)? _PngSize(string path) {
-    try {
-      if (!File.Exists(path))
-        return null;
-
-      using var stream = File.OpenRead(path);
-      Span<byte> header = stackalloc byte[24];
-      if (stream.Read(header) != header.Length)
-        return null;
-
-      ReadOnlySpan<byte> signature = [0x89, (byte)'P', (byte)'N', (byte)'G', 0x0D, 0x0A, 0x1A, 0x0A];
-      if (!header[..8].SequenceEqual(signature))
-        return null;
-
-      var width = (header[16] << 24) | (header[17] << 16) | (header[18] << 8) | header[19];
-      var height = (header[20] << 24) | (header[21] << 16) | (header[22] << 8) | header[23];
-
-      return width > 0 && height > 0 ? (width, height) : null;
-    } catch (IOException) {
-      return null;
     }
   }
 
