@@ -112,10 +112,15 @@ jobs:
             -p:EnableWindowsTargeting=true \
             --filter "FullyQualifiedName~HapReferenceOracleTests"
 
-      - name: Upload Hap oracle frames and extracted textures
+      - name: Upload Hap oracle frames, textures, and synchronization snapshot
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: hap-reference-oracle
-          path: ${{ runner.temp }}/hap-reference-artifacts
+          path: |
+            ${{ runner.temp }}/hap-reference-artifacts
+            FileFormat.Core/ConformanceOracle.cs
+            Tests/Hawkynt.FileFormats.Video.Tests/EncoderOracleTests.cs
+            Hawkynt.FileFormats.Video/Codecs/HapVideoEncoder.cs
+            Hawkynt.FileFormats.Video/README.md
           if-no-files-found: warn
