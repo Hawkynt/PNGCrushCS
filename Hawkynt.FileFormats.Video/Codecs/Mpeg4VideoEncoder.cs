@@ -280,8 +280,7 @@ public sealed class Mpeg4VideoEncoder : IVideoCodecEncoder<Mpeg4VideoEncoder> {
         this._timeIncrementResolution,
         increment,
         moduloSeconds: checked((int)(seconds - oldAnchorSeconds)),
-        roundingType: 0,
-        anchorMotion: anchorEncoder.Motion);
+        roundingType: 0);
 
       var bytes = bEncoder.Encode();
       this._ready.Enqueue(this._Packet(bytes, between.PresentationTimestamp, isKeyFrame: false));
