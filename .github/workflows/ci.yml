@@ -20,63 +20,7 @@ on:
         required: false
         default: false
 
-permissions:
-  contents: write
-
 jobs:
-  h265-branch-patch:
-    if: github.event_name == 'pull_request' && github.head_ref == 'feat/h265-fractional-motion'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: feat/h265-fractional-motion
-          fetch-depth: 0
-      - name: Apply standards guard
-        shell: python
-        run: |
-          from pathlib import Path
-
-          path = Path('Hawkynt.FileFormats.Video/Codecs/H265/H265InterPictureEncoder.cs')
-          text = path.read_text()
-          old = '''    var size = 1 << log2CbSize;
-    var best = _Build(H265PartitionMode.Square);
-
-    foreach (var mode in new[] { H265PartitionMode.HorizontalHalves, H265PartitionMode.VerticalHalves }) {
-      var candidate = _Build(mode);
-      if (candidate.Cost < best.Cost)
-        best = candidate;
-    }
-'''
-          new = '''    var size = 1 << log2CbSize;
-    var best = _Build(H265PartitionMode.Square);
-
-    // Clause 7.4.9.8 infers a transform split at depth zero for an inter coding unit whose
-    // partition is not 2Nx2N when max_transform_hierarchy_depth_inter is zero. This writer's
-    // residual path deliberately uses one transform tree leaf per coding unit, so do not select
-    // a prediction shape whose required transform syntax that path cannot represent. Production
-    // video sequences advertise one level of inter transform hierarchy and therefore still compete
-    // square, horizontal-half and vertical-half prediction units normally.
-    if (this._sps.MaxTransformHierarchyDepthInter > 0)
-      foreach (var mode in new[] { H265PartitionMode.HorizontalHalves, H265PartitionMode.VerticalHalves }) {
-        var candidate = _Build(mode);
-        if (candidate.Cost < best.Cost)
-          best = candidate;
-      }
-'''
-          if text.count(old) != 1:
-            raise SystemExit('Expected H265 partition-search block was not found exactly once.')
-          path.write_text(text.replace(old, new, 1))
-      - name: Commit source fix and restore CI
-        shell: bash
-        run: |
-          git checkout origin/main -- .github/workflows/ci.yml
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add Hawkynt.FileFormats.Video/Codecs/H265/H265InterPictureEncoder.cs .github/workflows/ci.yml
-          git commit -m "Guard HEVC half partitions by transform hierarchy"
-          git push origin HEAD:feat/h265-fractional-motion
-
   ci:
     uses: Hawkynt/RepositoryTemplate/.github/workflows/dotnet-ci.yml@v1
     with:
