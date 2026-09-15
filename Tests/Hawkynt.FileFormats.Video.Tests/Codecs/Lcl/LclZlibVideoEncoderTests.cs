@@ -116,12 +116,12 @@ public class LclZlibVideoEncoderTests {
       LclZlibVideoEncoder.ImageType.Yuv420,
       pngFiltered: true,
       multithreaded: true).DescribeStream();
-    var format = stream.CodecPrivateData.Span;
+    var format = stream.CodecPrivateData.ToArray();
 
     Assert.Multiple(() => {
       Assert.That(format[44], Is.EqualTo((byte)LclZlibVideoEncoder.ImageType.Yuv420));
       Assert.That(format[46], Is.EqualTo(0x05), "multithread + predictor");
-      Assert.That(BinaryPrimitives.ReadInt32LittleEndian(format[20..]), Is.EqualTo(8 * 6 * 3 / 2));
+      Assert.That(BinaryPrimitives.ReadInt32LittleEndian(format.AsSpan(20)), Is.EqualTo(8 * 6 * 3 / 2));
       Assert.That(() => LclZlibVideoDecoder.Create(stream), Throws.Nothing);
     });
   }
@@ -357,7 +357,6 @@ public class LclZlibVideoEncoderTests {
       Assert.That(decoded.PixelData, Is.EqualTo(picture.PixelData));
     });
   }
-
   [Test]
   [Category("Unit")]
   public void RefusesAnAudioStream() {
