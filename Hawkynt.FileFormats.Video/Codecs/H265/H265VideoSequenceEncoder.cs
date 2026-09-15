@@ -185,7 +185,7 @@ internal sealed class H265VideoSequenceEncoder {
   private H265Picture _EncodeAnchor(Pending anchor) {
     var slice = this._EncodePredictedPicture(anchor.Planes, anchor.DisplayIndex);
     this._ready.Enqueue(this._Wrap(slice, keyFrame: false, anchor.Timestamp));
-    return this._reference!;
+    return this._references[0].Picture;
   }
 
   private Coded _Wrap(byte[] slice, bool keyFrame, long? presentationTimestamp) {
