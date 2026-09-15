@@ -22,6 +22,7 @@ internal static class CineFormTags {
   internal const int Quantization = 53;
   internal const int ChannelNumber = 62;
   internal const int Precision = 70;
+  internal const int InputFormat = 71;
   internal const int PrescaleTable = 83;
   internal const int EncodedFormat = 84;
 
