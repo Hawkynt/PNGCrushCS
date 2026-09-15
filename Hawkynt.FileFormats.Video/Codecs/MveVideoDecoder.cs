@@ -13,11 +13,15 @@ namespace FileFormat.Codecs;
 /// </summary>
 /// <remarks>
 /// Interplay Video is temporal but not MPEG-shaped. There are no independently signalled I/P/B
-/// picture types and no future-picture references. Prediction happens per 8x8 block: from the
-/// previous displayed picture, from two pictures back, or from an already reconstructed region of
-/// the picture currently being built. The 8-bit 0x11 form naturally alternates two backing buffers;
-/// the RGB555 form additionally has a separate motion-byte stream and gives block 0x6 a defined
+/// picture types and no future-picture references. Prediction happens per 8x8 block: from an earlier
+/// reconstructed page, from two decode pages back, or from an already reconstructed region of the
+/// picture currently being built. The 8-bit 0x11 form naturally alternates two backing buffers; the
+/// RGB555 form additionally has a separate motion-byte stream and gives block 0x6 a defined
 /// second-previous signed-vector meaning.
+/// <para/>
+/// VIDEO_DATA reconstructs a page but does not by itself present a frame. Opcode 0x07 SEND_BUFFER is
+/// the display boundary used by the public MVE description, FFmpeg and ScummVM, so <see cref="TryDecode"/>
+/// returns a picture only when that opcode arrives.
 /// <para/>
 /// The public Interplay descriptions define the 8-bit block modes and compressed palette. FFmpeg's
 /// LGPL-2.1-or-later decoder is used as the reference for the true-colour and legacy 0x06/0x10 rules
@@ -42,7 +46,7 @@ public sealed class MveVideoDecoder : IVideoCodecDecoder<MveVideoDecoder> {
   private bool _nextTargetIsA = true;
   private bool _hasDecodedFirstPicture;
 
-  // Immutable display history is also retained for the older frame formats.
+  // Immutable decode history is also retained for the older frame formats.
   private MveFrame? _last8;
   private MveFrame? _secondLast8;
   private MveFrame? _legacyCurrent;
@@ -54,6 +58,7 @@ public sealed class MveVideoDecoder : IVideoCodecDecoder<MveVideoDecoder> {
 
   private byte[]? _decodingMap;
   private byte[]? _skipMap;
+  private RawImage? _displayCandidate;
 
   private MveVideoDecoder(MediaStreamInfo stream) {
     if (stream.Width == 0 && stream.Height == 0)
@@ -102,7 +107,7 @@ public sealed class MveVideoDecoder : IVideoCodecDecoder<MveVideoDecoder> {
       var produced = this._ProcessOpcode(type, version, payload);
       if (produced != null) {
         if (result != null)
-          throw new InvalidDataException("One Interplay codec packet contains more than one reconstructed picture.");
+          throw new InvalidDataException("One Interplay codec packet contains more than one displayed picture.");
         result = produced;
       }
 
@@ -131,12 +136,16 @@ public sealed class MveVideoDecoder : IVideoCodecDecoder<MveVideoDecoder> {
         this._decodingMap = payload.ToArray();
         return null;
       case MveOpcodeType.VIDEO_DATA_06:
-        return this._Decode06(payload);
+        this._displayCandidate = this._Decode06(payload);
+        return null;
       case MveOpcodeType.VIDEO_DATA_10:
-        return this._Decode10(payload);
+        this._displayCandidate = this._Decode10(payload);
+        return null;
       case MveOpcodeType.VIDEO_DATA_11:
-        return this._Decode11(payload);
+        this._displayCandidate = this._Decode11(payload);
+        return null;
       case MveOpcodeType.SEND_BUFFER:
+        return this._displayCandidate;
       case MveOpcodeType.END_OF_CHUNK:
       case MveOpcodeType.END_OF_STREAM:
         return null;
@@ -157,12 +166,8 @@ public sealed class MveVideoDecoder : IVideoCodecDecoder<MveVideoDecoder> {
     if (width == 0 || height == 0)
       throw new InvalidDataException($"INIT_VIDEO_BUFFERS states a picture of {width}x{height}, which has no pixels.");
 
-    if (this._width != 0) {
-      if (width != this._width || height != this._height || bitsPerPixel != this._bitsPerPixel)
-        throw new NotSupportedException(
-          $"This Interplay stream changes from {this._width}x{this._height}/{this._bitsPerPixel}bpp to {width}x{height}/{bitsPerPixel}bpp mid-stream.");
+    if (width == this._width && height == this._height && bitsPerPixel == this._bitsPerPixel)
       return;
-    }
 
     this._Initialize(width, height, bitsPerPixel);
   }
@@ -174,6 +179,8 @@ public sealed class MveVideoDecoder : IVideoCodecDecoder<MveVideoDecoder> {
     this._decodedPictures = 0;
     this._decodingMap = null;
     this._skipMap = null;
+    this._displayCandidate = null;
+    this._last8 = this._secondLast8 = null;
 
     if (bitsPerPixel == 8) {
       this._bufferA = new(width, height);
@@ -186,7 +193,6 @@ public sealed class MveVideoDecoder : IVideoCodecDecoder<MveVideoDecoder> {
     } else {
       this._bufferA = this._bufferB = null;
       this._legacyCurrent = this._legacyPrevious = null;
-      this._last8 = this._secondLast8 = null;
       this._last16 = this._secondLast16 = null;
     }
   }
