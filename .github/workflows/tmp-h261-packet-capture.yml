@@ -1,0 +1,49 @@
+name: Temporary H.261 packet capture
+
+on:
+  push:
+    branches: [fix/h261-oracle-keyframe-warning]
+
+permissions:
+  contents: read
+
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out PNGCrushCS
+        uses: actions/checkout@v4
+        with:
+          path: PNGCrushCS
+
+      - name: Check out CompressionWorkbench sibling
+        uses: actions/checkout@v4
+        with:
+          repository: Hawkynt/CompressionWorkbench
+          path: CompressionWorkbench
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.x
+            10.0.x
+
+      - name: Restore
+        working-directory: PNGCrushCS
+        run: dotnet restore Tests/Hawkynt.FileFormats.Video.Tests/Hawkynt.FileFormats.Video.Tests.csproj
+
+      - name: Capture registry H.261 packet
+        working-directory: PNGCrushCS
+        run: >-
+          dotnet test Tests/Hawkynt.FileFormats.Video.Tests/Hawkynt.FileFormats.Video.Tests.csproj
+          --configuration Release
+          --filter "FullyQualifiedName~H261DiagnosticDumpTests"
+          --logger "console;verbosity=detailed"
+
+      - name: Upload H.261 packet
+        uses: actions/upload-artifact@v4
+        with:
+          name: h261-registry-first
+          path: /tmp/h261-registry-first.h261
+          if-no-files-found: error
