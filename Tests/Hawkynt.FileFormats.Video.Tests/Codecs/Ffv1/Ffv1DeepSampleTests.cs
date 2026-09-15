@@ -1,5 +1,6 @@
 using System;
 using System.Buffers.Binary;
+using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.Codecs.Ffv1.Tests;
@@ -196,9 +197,13 @@ public class Ffv1DeepSampleTests {
     var data = new byte[count * 2];
     var mask = (1 << bits) - 1;
     var random = new Random(seed);
+    var littleEndian = format == PixelFormat.Gray10;
     for (var i = 0; i < count; ++i) {
-      var value = random.Next(mask + 1);
-      BinaryPrimitives.WriteUInt16BigEndian(data.AsSpan(i * 2, 2), (ushort)value);
+      var value = (ushort)random.Next(mask + 1);
+      if (littleEndian)
+        BinaryPrimitives.WriteUInt16LittleEndian(data.AsSpan(i * 2, 2), value);
+      else
+        BinaryPrimitives.WriteUInt16BigEndian(data.AsSpan(i * 2, 2), value);
     }
 
     return new() { Width = width, Height = height, Format = format, PixelData = data };
