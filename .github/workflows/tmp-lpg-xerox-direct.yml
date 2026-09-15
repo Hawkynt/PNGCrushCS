@@ -1,0 +1,74 @@
+name: Temporary Xerox Paris direct probe
+
+on:
+  push:
+    branches:
+      - research/lpg-paris-oracle
+
+jobs:
+  xerox:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Probe Xerox Paris download tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf /tmp/lpg-xerox-direct
+          mkdir -p /tmp/lpg-xerox-direct
+          python3 - <<'PY'
+          from __future__ import annotations
+          from concurrent.futures import ThreadPoolExecutor, as_completed
+          import json, pathlib, re, urllib.request
+
+          OUT=pathlib.Path('/tmp/lpg-xerox-direct')
+          H={'User-Agent':'Mozilla/5.0 LPG-format-research','Accept':'text/html,*/*'}
+          urls=[
+            'https://download.support.xerox.com/pub/docs/Paris/',
+            'https://download.support.xerox.com/pub/docs/Paris/userdocs/',
+            'https://download.support.xerox.com/pub/docs/Paris/userdocs/any-os/',
+            'https://download.support.xerox.com/pub/docs/Paris/userdocs/any-os/en/',
+            'https://download.support.xerox.com/pub/docs/Paris/drivers/',
+            'https://download.support.xerox.com/pub/docs/Paris/software/',
+            'https://download.support.xerox.com/pub/docs/Paris/utils/',
+            'https://download.support.xerox.com/pub/docs/Paris/firmware/',
+            'https://download.support.xerox.com/pub/drivers/Paris/',
+            'https://download.support.xerox.com/pub/drivers/paris/',
+            'https://download.support.xerox.com/pub/drivers/PARIS/',
+            'https://download.support.xerox.com/pub/docs/Paris/userdocs/any-os/en/Paris_Converter_TM.pdf',
+            'https://download.support.xerox.com/pub/docs/Paris/userdocs/any-os/en/Paris_Designer_UM.pdf',
+            'https://download.support.xerox.com/pub/docs/Paris/userdocs/any-os/en/Paris_Spooler32_TM.pdf',
+          ]
+          def one(i,u):
+            label=f'{i:02d}'
+            try:
+              req=urllib.request.Request(u,headers=H)
+              with urllib.request.urlopen(req,timeout=12) as r:
+                b=r.read(2_000_000)
+                m={'url':u,'status':r.status,'final':r.geturl(),'type':r.headers.get('content-type',''),'length_header':r.headers.get('content-length'),'read':len(b),'headers':dict(r.headers.items())}
+                (OUT/(label+'.meta.json')).write_text(json.dumps(m,indent=2),encoding='utf-8')
+                (OUT/(label+'.body')).write_bytes(b)
+                text=b.decode('utf-8','replace')
+                links=re.findall(r'(?:href|src)=["\']([^"\']+)',text,re.I)
+                return label,m,links[:500],text[:12000]
+            except Exception as e:
+              (OUT/(label+'.error.txt')).write_text(f'{type(e).__name__}: {e}',encoding='utf-8')
+              return label,{'url':u,'error':f'{type(e).__name__}: {e}'},[],''
+          with ThreadPoolExecutor(max_workers=14) as ex:
+            futs=[ex.submit(one,i,u) for i,u in enumerate(urls)]
+            for f in as_completed(futs):
+              label,m,links,text=f.result()
+              print('\n===',label,'===')
+              print(json.dumps(m,indent=2))
+              if links:
+                print('LINKS')
+                for x in links: print(x)
+              if text and ('Index of' in text or '<html' in text.lower()):
+                print('BODY',text)
+          PY
+      - name: Upload responses
+        uses: actions/upload-artifact@v4
+        with:
+          name: lpg-xerox-direct
+          path: /tmp/lpg-xerox-direct
+          if-no-files-found: error
