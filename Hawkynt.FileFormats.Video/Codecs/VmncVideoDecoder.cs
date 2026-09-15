@@ -344,7 +344,13 @@ public sealed class VmncVideoDecoder : IVideoCodecDecoder<VmncVideoDecoder> {
   }
 
   private void _DecodeServerInitialization(ref BigEndianReader reader, int width, int height) {
-    if (width <= 0 || height <= 0)
+    // The recovered VMnc stream uses WMVi both as a display-mode record and as a keyframe marker.
+    // FFmpeg accepts 0x0 WMVi rectangles and keeps the container dimensions; preserve that behavior
+    // while still honoring non-zero dimensions as the published display-resize extension specifies.
+    if (width == 0 && height == 0) {
+      width = this._width;
+      height = this._height;
+    } else if (width <= 0 || height <= 0)
       throw new InvalidDataException($"VMnc stream {this._streamIndex} changes to invalid display size {width}x{height}.");
     if ((long)width * height > int.MaxValue)
       throw new InvalidDataException($"VMnc stream {this._streamIndex}'s changed display is too large to hold in memory.");
