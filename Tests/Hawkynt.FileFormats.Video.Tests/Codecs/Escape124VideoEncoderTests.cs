@@ -178,8 +178,11 @@ public sealed class Escape124VideoEncoderTests {
     var path = Path.Combine(Path.GetTempPath(), $"escape124-{Guid.NewGuid():N}.rpl");
     try {
       File.WriteAllBytes(path, file);
-      var (decoded, output) = FFmpegOracle.TryDecodeFrameCount(path, 16, 8, 3);
-      Assert.That(decoded, Is.True, output);
+      var (pixels, output) = FFmpegOracle.TryDecodeRgb24(path, 16, 8, 3);
+      Assert.That(pixels, Is.Not.Null, output);
+
+      var digest = Convert.ToHexString(SHA256.HashData(pixels!)).ToLowerInvariant();
+      Assert.That(digest, Is.EqualTo("b11a06eff7b35b1ab370d7656139872d5c6b92382f93ad37eedf6f94f3d37e20"));
     } finally {
       try { File.Delete(path); } catch { /* best effort */ }
     }
