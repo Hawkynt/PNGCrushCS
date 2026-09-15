@@ -799,11 +799,17 @@ internal sealed class H265InterPictureEncoder : IH265MotionContext {
     var size = 1 << log2CbSize;
     var best = _Build(H265PartitionMode.Square);
 
-    foreach (var mode in new[] { H265PartitionMode.HorizontalHalves, H265PartitionMode.VerticalHalves }) {
-      var candidate = _Build(mode);
-      if (candidate.Cost < best.Cost)
-        best = candidate;
-    }
+    // H.265 clause 7.4.9.8 infers a root transform split for an inter coding unit whose partition
+    // is not 2Nx2N when max_transform_hierarchy_depth_inter is zero. This writer deliberately emits
+    // one transform-tree leaf per coding unit, so only consider half-PU layouts when the active SPS
+    // permits the root transform to remain unsplit. Production video sequences advertise one level
+    // of inter transform hierarchy and therefore still evaluate all three layouts.
+    if (this._sps.MaxTransformHierarchyDepthInter > 0)
+      foreach (var mode in new[] { H265PartitionMode.HorizontalHalves, H265PartitionMode.VerticalHalves }) {
+        var candidate = _Build(mode);
+        if (candidate.Cost < best.Cost)
+          best = candidate;
+      }
 
     this._partitionDecisions[key] = best;
     return best;
