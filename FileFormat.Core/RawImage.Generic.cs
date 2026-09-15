@@ -17,11 +17,11 @@ public sealed class RawImage<TPixel> where TPixel : IRawPixelFormat<TPixel> {
     int height,
     byte[] pixelData,
     RawImageColorInfo? colorInfo = null,
-    RawCfaInfo? cfaInfo = null,
     byte[]? palette = null,
     int paletteCount = 0,
     byte[]? alphaTable = null,
-    ImageMetadata? metadata = null
+    ImageMetadata? metadata = null,
+    RawCfaInfo? cfaInfo = null
   ) {
     ArgumentNullException.ThrowIfNull(pixelData);
 
