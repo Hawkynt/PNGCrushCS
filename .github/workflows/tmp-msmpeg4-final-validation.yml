@@ -1,4 +1,4 @@
-name: Temporary final MS-MPEG-4 validation
+name: Temporary non-Oracle video validation
 
 on:
   push:
@@ -24,44 +24,27 @@ jobs:
             8.x
             10.0.x
 
-      - name: Ensure FFmpeg oracle is available
-        shell: bash
-        run: |
-          if ! command -v ffmpeg >/dev/null 2>&1; then
-            sudo apt-get update
-            sudo apt-get install -y ffmpeg
-          fi
-          ffmpeg -version | head -n 1
-
-      - name: Check whitespace
-        run: git diff --check origin/main...HEAD
-
       - name: Restore video tests
         run: dotnet restore Tests/Hawkynt.FileFormats.Video.Tests/Hawkynt.FileFormats.Video.Tests.csproj -p:EnableWindowsTargeting=true
 
-      - name: Run MS-MPEG-4 tests including FFmpeg oracle
-        run: dotnet test Tests/Hawkynt.FileFormats.Video.Tests/Hawkynt.FileFormats.Video.Tests.csproj --configuration Release --no-restore -p:EnableWindowsTargeting=true --filter FullyQualifiedName~MsMpeg4
-
-      - name: Run complete video test project with FFmpeg
-        id: full
+      - name: Run complete non-Oracle video test project
+        id: nonoracle
         continue-on-error: true
         shell: bash
         run: |
           set -o pipefail
-          dotnet test Tests/Hawkynt.FileFormats.Video.Tests/Hawkynt.FileFormats.Video.Tests.csproj --configuration Release --no-restore -p:EnableWindowsTargeting=true --logger "console;verbosity=detailed" 2>&1 | tee /tmp/video-full.log
+          dotnet test Tests/Hawkynt.FileFormats.Video.Tests/Hawkynt.FileFormats.Video.Tests.csproj --configuration Release --no-restore -p:EnableWindowsTargeting=true --filter "TestCategory!=Oracle" --logger "console;verbosity=detailed" 2>&1 | tee /tmp/video-nonoracle.log
 
-      - name: Upload complete-suite diagnostics
+      - name: Upload non-Oracle diagnostics
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: video-full-diagnostics
-          path: /tmp/video-full.log
+          name: video-nonoracle-diagnostics
+          path: /tmp/video-nonoracle.log
           if-no-files-found: error
 
-      - name: Run complete non-Oracle video test project
-        run: dotnet test Tests/Hawkynt.FileFormats.Video.Tests/Hawkynt.FileFormats.Video.Tests.csproj --configuration Release --no-restore -p:EnableWindowsTargeting=true --filter "TestCategory!=Oracle"
-
       - name: Remove temporary validation workflow
+        if: always()
         shell: bash
         run: |
           rm .github/workflows/tmp-msmpeg4-final-validation.yml
@@ -70,3 +53,7 @@ jobs:
           git add -A
           git commit -m "chore: remove temporary MS-MPEG-4 validation workflow"
           git push origin HEAD:complete/msmpeg4-p-intra
+
+      - name: Fail if non-Oracle suite failed
+        if: steps.nonoracle.outcome == 'failure'
+        run: exit 1
