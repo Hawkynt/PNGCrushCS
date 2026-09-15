@@ -132,9 +132,7 @@ internal static class HapBc6Encoding {
     Span<int> g = stackalloc int[4];
     Span<int> b = stackalloc int[4];
     Span<int> unquantized = stackalloc int[12];
-
-    var endpointPixels = (E0: subset0First, E1: subset0Second, E2: subset1First, E3: subset1Second);
-    Span<int> pixels = stackalloc int[4] [endpointPixels.E0, endpointPixels.E1, endpointPixels.E2, endpointPixels.E3];
+    Span<int> pixels = [subset0First, subset0Second, subset1First, subset1Second];
 
     r[0] = _QuantizeEndpoint(samples[pixels[0] * 3], isSigned);
     g[0] = _QuantizeEndpoint(samples[pixels[0] * 3 + 1], isSigned);
