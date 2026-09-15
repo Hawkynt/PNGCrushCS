@@ -1,0 +1,95 @@
+name: Temporary MSZH flagged-sample native oracle
+
+on:
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  native:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.x
+      - name: Install FFmpeg
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+      - name: Fetch samples
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/mszh-special
+          base=https://samples.ffmpeg.org/V-codecs/mszh-zlib/mszh
+          curl --fail --location --silent --show-error "$base/mszh_yuv411_multithread.avi" -o /tmp/mszh-special/mszh_yuv411_multithread.avi
+          curl --fail --location --silent --show-error "$base/mszh_yuv411_nocomp_nullframe.avi" -o /tmp/mszh-special/mszh_yuv411_nocomp_nullframe.avi
+          echo 'b747fab63cf20d28ff941e340f9da94f  /tmp/mszh-special/mszh_yuv411_multithread.avi' | md5sum -c -
+          echo '03a7c154b765466c75802ac23f6b2a7e  /tmp/mszh-special/mszh_yuv411_nocomp_nullframe.avi' | md5sum -c -
+      - name: Inject native frame dumper
+        shell: python
+        run: |
+          from pathlib import Path
+          program = Path('Tools/parity/Decode/Program.cs')
+          text = program.read_text()
+          marker = '// Every frame of an animation, rather than the one a still viewer would draw.'
+          block = r'''
+          if (args[0] == "--native-frames") {
+            var animation = new FileInfo(args[1]);
+            var into = args[2];
+            Directory.CreateDirectory(into);
+            var containers = VideoParity.ContainersClaiming(animation);
+            return containers.Count == 0 ? 2 : VideoParity.WriteNativeFrames(animation, into, containers[0]);
+          }
+
+          '''
+          program.write_text(text.replace(marker, block + marker, 1))
+          parity = Path('Tools/parity/Decode/VideoParity.cs')
+          text = parity.read_text()
+          method = r'''
+
+            internal static int WriteNativeFrames(FileInfo source, string into, VideoFormatEntry entry) {
+              var bytes = File.ReadAllBytes(source.FullName);
+              var video = entry.ReadStreams(bytes).First(s => s.Kind == MediaStreamKind.Video);
+              var frame = 0;
+              foreach (var decoded in _Frames(entry, bytes, video)) {
+                var picture = decoded.Image;
+                var wanted = checked((int)picture.MinimumPixelDataLength);
+                File.WriteAllBytes(Path.Combine(into, $"{source.Name}.{frame:D4}.{picture.Format}.raw"), picture.PixelData.AsSpan(0, wanted).ToArray());
+                ++frame;
+              }
+              return frame == 0 ? 1 : 0;
+            }
+          '''
+          at = text.rfind('\n}')
+          parity.write_text(text[:at] + method + text[at:])
+      - name: Build parity decoder
+        run: dotnet build Tools/parity/Decode/Decode.csproj -c Release --nologo
+      - name: Compare native bytes
+        shell: bash
+        run: |
+          set -euo pipefail
+          : > /tmp/mszh-special-report.txt
+          for path in /tmp/mszh-special/*.avi; do
+            file=$(basename "$path")
+            ours=/tmp/ours-$file
+            mkdir -p "$ours"
+            dotnet run --project Tools/parity/Decode/Decode.csproj -c Release --no-build -- --native-frames "$path" "$ours"
+            ffmpeg -hide_banner -loglevel error -y -i "$path" -map 0:v:0 -an -sn -dn -vsync 0 -f rawvideo "/tmp/ff-$file.raw"
+            ff_fmt=$(ffprobe -v error -select_streams v:0 -show_frames -show_entries frame=pix_fmt -of csv=p=0 "$path" | head -1)
+            ours_file=$(find "$ours" -name '*.raw' -type f | head -1)
+            ours_fmt=$(basename "$ours_file" | sed -E 's/^.*\.([^.]+)\.raw$/\1/')
+            ours_hash=$(sha256sum "$ours_file" | cut -d' ' -f1)
+            ff_hash=$(sha256sum "/tmp/ff-$file.raw" | cut -d' ' -f1)
+            ours_size=$(stat -c%s "$ours_file")
+            ff_size=$(stat -c%s "/tmp/ff-$file.raw")
+            exact=false
+            cmp -s "$ours_file" "/tmp/ff-$file.raw" && exact=true
+            echo "$file ours_format=$ours_fmt ffmpeg_format=$ff_fmt ours_size=$ours_size ffmpeg_size=$ff_size exact=$exact ours_sha256=$ours_hash ffmpeg_sha256=$ff_hash" | tee -a /tmp/mszh-special-report.txt
+            test "$exact" = true
+          done
+      - name: Upload report
+        uses: actions/upload-artifact@v4
+        with:
+          name: mszh-special-native
+          path: /tmp/mszh-special-report.txt
