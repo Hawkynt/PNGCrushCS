@@ -1,8 +1,8 @@
 name: H265 branch patch
 
 on:
-  push:
-    branches: [feat/h265-fractional-motion]
+  pull_request:
+    branches: [main, master]
 
 permissions:
   contents: write
@@ -47,10 +47,8 @@ jobs:
           best = candidate;
       }
 '''
-          if old not in text:
-            raise SystemExit('Expected H265 partition-search block was not found exactly once.')
           if text.count(old) != 1:
-            raise SystemExit('Expected H265 partition-search block was not unique.')
+            raise SystemExit('Expected H265 partition-search block was not found exactly once.')
           path.write_text(text.replace(old, new, 1))
       - name: Commit branch patch and remove helper workflow
         shell: bash
