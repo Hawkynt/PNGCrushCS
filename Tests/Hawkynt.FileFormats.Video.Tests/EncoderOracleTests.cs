@@ -13,6 +13,7 @@ using FileFormat.Mjpeg;
 using FileFormat.Ogg;
 using FileFormat.RealMedia;
 using FileFormat.Mp4;
+using FileFormat.Rpl;
 using FileFormat.RoqVideo;
 using FileFormat.Vqa;
 using FileFormat.Yuv4Mpeg;
@@ -264,6 +265,7 @@ public sealed class EncoderOracleTests {
     ("Roq", ".roq", static (streams, packets) => VideoIO.Mux<RoqWriter>(streams, packets)),
     ("Ea", ".cmv", static (streams, packets) => VideoIO.Mux<EaWriter>(streams, packets)),
     ("Vqa", ".vqa", static (streams, packets) => VideoIO.Mux<VqaWriter>(streams, packets)),
+    ("Rpl", ".rpl", static (streams, packets) => VideoIO.Mux<RplWriter>(streams, packets)),
     ("Mjpeg", ".mjpg", static (streams, packets) => VideoIO.Mux<MjpegWriter>(streams, packets)),
     ("Ogg", ".ogv", static (streams, packets) => VideoIO.Mux<OggWriter>(streams, packets)),
   ];
