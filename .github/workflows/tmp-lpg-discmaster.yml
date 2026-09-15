@@ -1,0 +1,105 @@
+name: Temporary LPG DiscMaster oracle probe
+
+on:
+  push:
+    branches:
+      - research/lpg-paris-oracle
+
+jobs:
+  discmaster:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Probe DiscMaster
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/lpg-probe
+          python3 - <<'PY'
+          from __future__ import annotations
+
+          import hashlib
+          import html
+          import json
+          import pathlib
+          import re
+          import urllib.parse
+          import urllib.request
+
+          OUT = pathlib.Path('/tmp/lpg-probe')
+          BASE = 'https://discmaster.textfiles.com'
+          NAMES = ('MS-LOGO.LPG', 'RainDay.pcx', 'mercury1.pcx', 'Robsig.pcx', 'Robsig1.pcx')
+
+          def fetch(url: str) -> tuple[int, str, str, bytes]:
+              req = urllib.request.Request(url, headers={
+                  'User-Agent': 'Mozilla/5.0 LPG-format-research',
+                  'Accept': 'application/json,text/html;q=0.9,*/*;q=0.8',
+              })
+              with urllib.request.urlopen(req, timeout=30) as response:
+                  return response.status, response.geturl(), response.headers.get('content-type', ''), response.read()
+
+          def save(label: str, url: str) -> tuple[str, bytes]:
+              status, final_url, content_type, body = fetch(url)
+              safe = re.sub(r'[^A-Za-z0-9_.-]+', '_', label)
+              (OUT / f'{safe}.body').write_bytes(body)
+              (OUT / f'{safe}.meta.json').write_text(json.dumps({
+                  'request_url': url,
+                  'status': status,
+                  'final_url': final_url,
+                  'content_type': content_type,
+                  'length': len(body),
+                  'sha256': hashlib.sha256(body).hexdigest(),
+              }, indent=2), encoding='utf-8')
+              print(f'{label}: {status} {content_type} {len(body)} bytes -> {final_url}')
+              return final_url, body
+
+          candidates: set[str] = set()
+          for name in NAMES:
+              params = {
+                  'q': name,
+                  'qfields': 'name',
+                  'mode': 'deep',
+                  'dedup': 'dedup',
+                  'limit': '200',
+                  'output': 'json',
+              }
+              url = BASE + '/search?' + urllib.parse.urlencode(params)
+              final_url, body = save('search_' + name, url)
+              text = body.decode('utf-8', 'replace')
+              for raw in re.findall(r'''(?:href|src)=["']([^"']+)|(?:"(?:url|href|path)"\s*:\s*")([^"]+)''', text, re.I):
+                  value = next((x for x in raw if x), '')
+                  value = html.unescape(value).replace('\\/', '/')
+                  if not value:
+                      continue
+                  absolute = urllib.parse.urljoin(BASE, value)
+                  if absolute.startswith(BASE + '/') and any(token in absolute for token in ('/view/', '/file/', '/browse/', '/item/', '/disk/')):
+                      candidates.add(absolute)
+
+          for suffix, params in (
+              ('extension_lpg', {'extension':'lpg','mode':'deep','dedup':'dedup','limit':'500','output':'json'}),
+              ('wildcard_lpg', {'q':'*.LPG','qfields':'name','mode':'deep','dedup':'dedup','limit':'500','output':'json'}),
+          ):
+              url = BASE + '/search?' + urllib.parse.urlencode(params)
+              _, body = save(suffix, url)
+              text = body.decode('utf-8', 'replace')
+              for match in re.findall(r'https?://discmaster\.textfiles\.com/[^\s"<>]+|/(?:view|file|browse|item|disk)/[^\s"<>]+', text, re.I):
+                  candidates.add(urllib.parse.urljoin(BASE, html.unescape(match)))
+
+          (OUT / 'candidates.txt').write_text('\n'.join(sorted(candidates)), encoding='utf-8')
+          print('candidate links:', len(candidates))
+          for index, url in enumerate(sorted(candidates)[:100]):
+              try:
+                  save(f'candidate_{index:03d}', url)
+              except Exception as exc:
+                  print('candidate error:', url, type(exc).__name__, exc)
+
+          print('=== candidate URLs ===')
+          print((OUT / 'candidates.txt').read_text(encoding='utf-8'))
+          PY
+
+      - name: Upload probe responses
+        uses: actions/upload-artifact@v4
+        with:
+          name: lpg-discmaster-probe
+          path: /tmp/lpg-probe
+          if-no-files-found: error
