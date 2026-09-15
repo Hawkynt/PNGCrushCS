@@ -10,6 +10,8 @@ namespace FileFormat.Word.Tests;
 [TestFixture]
 public sealed class WordBinaryFileTests {
 
+  private static readonly byte[] _PngSignature = [137, 80, 78, 71, 13, 10, 26, 10];
+
   [TestCase(".doc", false)]
   [TestCase(".dot", true)]
   [Category("Integration")]
@@ -27,7 +29,7 @@ public sealed class WordBinaryFileTests {
       Assert.That(BinaryPrimitives.ReadUInt16LittleEndian(word), Is.EqualTo(0xA5EC), "FIB magic");
       Assert.That(streams.Any(pair => pair.Key.Equals("/1Table", StringComparison.OrdinalIgnoreCase)), Is.True, "FIB-selected table stream");
       Assert.That((BinaryPrimitives.ReadUInt16LittleEndian(word.AsSpan(10)) & 1) != 0, Is.EqualTo(template), "FIB fDot");
-      Assert.That(data.AsSpan().IndexOf([137, 80, 78, 71, 13, 10, 26, 10]), Is.GreaterThanOrEqualTo(0), "OfficeArt PNG");
+      Assert.That(data.AsSpan().IndexOf(_PngSignature), Is.GreaterThanOrEqualTo(0), "OfficeArt PNG");
     });
 
     _AssertSame(source, WordFile.ToRawImage(WordReader.FromSpan(bytes)));
