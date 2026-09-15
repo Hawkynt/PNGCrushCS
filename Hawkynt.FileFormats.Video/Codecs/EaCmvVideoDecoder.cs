@@ -126,7 +126,7 @@ public sealed class EaCmvVideoDecoder : IVideoCodecDecoder<EaCmvVideoDecoder> {
     var height = BinaryPrimitives.ReadUInt16LittleEndian(payload[6..]);
     if (width == 0 || height == 0)
       throw new InvalidDataException($"MVIh states a picture of {width}x{height}, which has no pixels.");
-    if ((long)width * height > int.MaxValue)
+    if ((long)width * height > Array.MaxLength)
       throw new InvalidDataException(
         $"MVIh states a {width}x{height} picture whose palette-index raster cannot fit in one managed CMV frame.");
 
