@@ -186,6 +186,17 @@ public sealed class EaCmvVideoDecoderTests {
 
   [Test]
   [Category("Unit")]
+  public void OversizedGeometryIsRejectedBeforeFrameAllocation() {
+    var decoder = EaCmvVideoDecoder.Create(_Stream());
+
+    var failure = Assert.Throws<InvalidDataException>(
+      () => decoder.TryDecode(new(0, _Header(ushort.MaxValue, ushort.MaxValue)), out _));
+
+    Assert.That(failure!.Message, Does.Contain("cannot fit"));
+  }
+
+  [Test]
+  [Category("Unit")]
   public void ASizeChangeDropsMotionHistoryAndTheNewIntraPictureDecodes() {
     var decoder = EaCmvVideoDecoder.Create(_Stream());
     decoder.TryDecode(new(0, _Header(4, 4)), out _);
