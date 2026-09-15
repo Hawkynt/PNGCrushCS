@@ -14,6 +14,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          rm -rf /tmp/lpg-probe
           mkdir -p /tmp/lpg-probe
           python3 - <<'PY'
           from __future__ import annotations
@@ -28,17 +29,19 @@ jobs:
 
           OUT = pathlib.Path('/tmp/lpg-probe')
           BASE = 'https://discmaster.textfiles.com'
-          NAMES = ('MS-LOGO.LPG', 'RainDay.pcx', 'mercury1.pcx', 'Robsig.pcx', 'Robsig1.pcx')
+          NAME_QUERIES = ('MS-LOGO.LPG', 'RainDay.pcx', 'mercury1.pcx', 'Robsig.pcx', 'Robsig1.pcx', 'PMCONFIG.EXE', 'PARISPM.DLL', 'STOCKSET.XPI')
+          TRACE_QUERIES = ('XLPrint', 'Laser Image Technologies', 'Paris Document System', 'Lapres', 'PMCONFIG.EXE', 'PARISPM.DLL', 'STOCKSET.XPI')
 
           def fetch(url: str) -> tuple[int, str, str, bytes]:
-              req = urllib.request.Request(url, headers={
+              request = urllib.request.Request(url, headers={
                   'User-Agent': 'Mozilla/5.0 LPG-format-research',
-                  'Accept': 'application/json,text/html;q=0.9,*/*;q=0.8',
+                  'Accept': 'text/html,application/json;q=0.9,*/*;q=0.8',
               })
-              with urllib.request.urlopen(req, timeout=30) as response:
+              with urllib.request.urlopen(request, timeout=25) as response:
                   return response.status, response.geturl(), response.headers.get('content-type', ''), response.read()
 
-          def save(label: str, url: str) -> tuple[str, bytes]:
+          def save(label: str, params: dict[str, str]) -> bytes:
+              url = BASE + '/search?' + urllib.parse.urlencode(params)
               status, final_url, content_type, body = fetch(url)
               safe = re.sub(r'[^A-Za-z0-9_.-]+', '_', label)
               (OUT / f'{safe}.body').write_bytes(body)
@@ -50,56 +53,25 @@ jobs:
                   'length': len(body),
                   'sha256': hashlib.sha256(body).hexdigest(),
               }, indent=2), encoding='utf-8')
-              print(f'{label}: {status} {content_type} {len(body)} bytes -> {final_url}')
-              return final_url, body
-
-          candidates: set[str] = set()
-          for name in NAMES:
-              params = {
-                  'q': name,
-                  'qfields': 'name',
-                  'mode': 'deep',
-                  'dedup': 'dedup',
-                  'limit': '200',
-                  'output': 'json',
-              }
-              url = BASE + '/search?' + urllib.parse.urlencode(params)
-              final_url, body = save('search_' + name, url)
               text = body.decode('utf-8', 'replace')
-              for raw in re.findall(r'''(?:href|src)=["']([^"']+)|(?:"(?:url|href|path)"\s*:\s*")([^"]+)''', text, re.I):
-                  value = next((x for x in raw if x), '')
-                  value = html.unescape(value).replace('\\/', '/')
-                  if not value:
-                      continue
-                  absolute = urllib.parse.urljoin(BASE, value)
-                  if absolute.startswith(BASE + '/') and any(token in absolute for token in ('/view/', '/file/', '/browse/', '/item/', '/disk/')):
-                      candidates.add(absolute)
+              count = re.search(r'<font size="\+1">([0-9,]+) results', text)
+              print(f'{label}: {count.group(1) if count else "?"} results, {len(body)} bytes')
+              for match in re.findall(r'href="(/view/[^"]+)"', text, re.I)[:30]:
+                  print(' ', html.unescape(match))
+              return body
 
-          for suffix, params in (
-              ('extension_lpg', {'extension':'lpg','mode':'deep','dedup':'dedup','limit':'500','output':'json'}),
-              ('wildcard_lpg', {'q':'*.LPG','qfields':'name','mode':'deep','dedup':'dedup','limit':'500','output':'json'}),
-          ):
-              url = BASE + '/search?' + urllib.parse.urlencode(params)
-              _, body = save(suffix, url)
-              text = body.decode('utf-8', 'replace')
-              for match in re.findall(r'https?://discmaster\.textfiles\.com/[^\s"<>]+|/(?:view|file|browse|item|disk)/[^\s"<>]+', text, re.I):
-                  candidates.add(urllib.parse.urljoin(BASE, html.unescape(match)))
+          for query in NAME_QUERIES:
+              save('name_' + query, {'q': query, 'qfields': 'name', 'mode': 'deep', 'dedup': 'dedup', 'limit': '200'})
 
-          (OUT / 'candidates.txt').write_text('\n'.join(sorted(candidates)), encoding='utf-8')
-          print('candidate links:', len(candidates))
-          for index, url in enumerate(sorted(candidates)[:100]):
-              try:
-                  save(f'candidate_{index:03d}', url)
-              except Exception as exc:
-                  print('candidate error:', url, type(exc).__name__, exc)
+          for query in TRACE_QUERIES:
+              save('trace_' + query, {'q': query, 'mode': 'deep', 'dedup': 'dedup', 'limit': '200'})
 
-          print('=== candidate URLs ===')
-          print((OUT / 'candidates.txt').read_text(encoding='utf-8'))
+          save('extension_lpg', {'extension': 'lpg', 'mode': 'deep', 'dedup': 'dedup', 'limit': '500'})
           PY
 
       - name: Upload probe responses
         uses: actions/upload-artifact@v4
         with:
-          name: lpg-discmaster-probe
+          name: lpg-discmaster-trace-probe
           path: /tmp/lpg-probe
           if-no-files-found: error
