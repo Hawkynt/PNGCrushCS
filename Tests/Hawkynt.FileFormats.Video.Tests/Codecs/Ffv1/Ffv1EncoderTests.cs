@@ -368,11 +368,11 @@ public class Ffv1EncoderTests {
   [Test]
   [Category("Unit")]
   public void AFormatFfv1IsNotWrittenInHereIsRefusedByName() {
-    var failure = Assert.Throws<NotSupportedException>(() => Ffv1Encoder.Create(_Stream(8, 8), PixelFormat.Yuv420P10));
-    Assert.That(failure!.Message, Does.Contain("Yuv420P10"));
+    var failure = Assert.Throws<NotSupportedException>(() => Ffv1Encoder.Create(_Stream(8, 8), PixelFormat.Rgb565));
+    Assert.That(failure!.Message, Does.Contain("Rgb565"));
 
-    var deep = Assert.Throws<NotSupportedException>(() => Ffv1Encoder.Create(_Stream(8, 8, bitsPerPixel: 48)));
-    Assert.That(deep!.Message, Does.Contain("48 bits"));
+    var ambiguous = Assert.Throws<NotSupportedException>(() => Ffv1Encoder.Create(_Stream(8, 8, bitsPerPixel: 48)));
+    Assert.That(ambiguous!.Message, Does.Contain("48 bits"));
   }
 
   [Test]
