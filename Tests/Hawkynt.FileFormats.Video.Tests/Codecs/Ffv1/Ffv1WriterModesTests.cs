@@ -109,6 +109,12 @@ public class Ffv1WriterModesTests {
       EntropyCoder = Ffv1EntropyCoder.Range,
       StateTransitionDelta = new int[256],
     }));
+
+    var tooManySlices = Assert.Throws<NotSupportedException>(() => Ffv1Encoder.Create(_Stream(64, 64), PixelFormat.Gray8, new() {
+      HorizontalSlices = 33,
+      VerticalSlices = 33,
+    }));
+    Assert.That(tooManySlices!.Message, Does.Contain("1024"));
   }
 
   private static int[] _CustomTransitions() {
