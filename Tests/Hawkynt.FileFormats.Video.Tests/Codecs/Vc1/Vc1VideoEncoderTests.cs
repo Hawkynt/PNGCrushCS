@@ -7,7 +7,7 @@ using Hawkynt.FileFormats.Video;
 
 namespace FileFormat.Codecs.Vc1.Tests;
 
-/// <summary>The VC-1 writer: Main-profile, progressive, all-intra with transformed DC and AC coefficients.</summary>
+/// <summary>The VC-1 writer: progressive Main-profile I/P/B pictures with reconstructed references.</summary>
 [TestFixture]
 public sealed class Vc1VideoEncoderTests {
 
@@ -40,7 +40,7 @@ public sealed class Vc1VideoEncoderTests {
     Assert.Multiple(() => {
       Assert.That(sequence.Profile, Is.EqualTo(Vc1Profile.Main));
       Assert.That(sequence.Quantiser, Is.EqualTo(3));
-      Assert.That(sequence.MaxBFrames, Is.Zero);
+      Assert.That(sequence.MaxBFrames, Is.EqualTo(1));
       Assert.That(sequence.LoopFilter, Is.False);
       Assert.That(sequence.MultiResolution, Is.False);
       Assert.That(sequence.Overlap, Is.False);
@@ -109,12 +109,6 @@ public sealed class Vc1VideoEncoderTests {
     }
 
     Assert.Multiple(() => {
-      // The direct-current step at quantiser three is eight -- 8.1.1.1's own table, and the decoder
-      // beside this reads it the same way -- so rounding the DC term alone can move a whole block by
-      // four before a single alternating-current coefficient is considered. Any AC error then adds to
-      // that, which puts the worst sample of a detailed block at six and makes a bound of four
-      // unreachable by construction rather than by imprecision. The mean is what carries the meaning
-      // here: it is what separates real AC coding from reconstructing each block at its average.
       Assert.That(maximumError, Is.LessThanOrEqualTo(7), "uniform quantiser 3 should preserve greyscale detail closely");
       Assert.That((double)totalError / source.PixelData.Length, Is.LessThan(1.5), "AC coding must beat block-average reconstruction");
     });
@@ -122,23 +116,77 @@ public sealed class Vc1VideoEncoderTests {
 
   [Test]
   [Category("Unit")]
-  public void EveryPictureCanBeDecodedWithoutTheOneBeforeIt() {
+  public void PicturesAreCodedInAnchorOrderAndDisplayedInPresentationOrder() {
     var encoder = Vc1VideoEncoder.Create(_Requested(16, 16));
-    Assert.That(encoder.TryEncode(_Flat(16, 16, 32), 0, out _), Is.True);
-    Assert.That(encoder.TryEncode(_Flat(16, 16, 192), 1, out var second), Is.True);
 
-    var freshDecoder = Vc1VideoDecoder.Create(encoder.DescribeStream());
-    Assert.That(freshDecoder.TryDecode(second, out var decoded), Is.True);
+    Assert.That(encoder.TryEncode(_Flat(16, 16, 128), 0, out var intra), Is.True);
+    Assert.That(encoder.TryEncode(_Flat(16, 16, 160), 1, out _), Is.False, "the B picture needs its future anchor first");
+    Assert.That(encoder.TryEncode(_Flat(16, 16, 192), 2, out var predicted), Is.True);
+    var bidirectional = encoder.Flush().Single();
+
+    var sequence = Vc1SequenceHeader.ReadFrom(encoder.DescribeStream().CodecPrivateData.Span[40..]);
+    var pReader = new Vc1BitReader(predicted.Data.Span);
+    var bReader = new Vc1BitReader(bidirectional.Data.Span);
+    var pHeader = Vc1PictureHeader.ReadFrom(ref pReader, sequence);
+    var bHeader = Vc1PictureHeader.ReadFrom(ref bReader, sequence);
+
     Assert.Multiple(() => {
-      Assert.That(second.IsKeyFrame, Is.True);
-      Assert.That(decoded.Width, Is.EqualTo(16));
-      Assert.That(decoded.Height, Is.EqualTo(16));
+      Assert.That(intra.PresentationTimestamp, Is.EqualTo(0));
+      Assert.That(predicted.PresentationTimestamp, Is.EqualTo(2));
+      Assert.That(bidirectional.PresentationTimestamp, Is.EqualTo(1));
+      Assert.That(intra.DecodeTimestamp, Is.EqualTo(0));
+      Assert.That(predicted.DecodeTimestamp, Is.EqualTo(1));
+      Assert.That(bidirectional.DecodeTimestamp, Is.EqualTo(2));
+      Assert.That(intra.IsKeyFrame, Is.True);
+      Assert.That(predicted.IsKeyFrame, Is.False);
+      Assert.That(bidirectional.IsKeyFrame, Is.False);
+      Assert.That(pHeader.PictureType, Is.EqualTo(Vc1PictureType.Predicted));
+      Assert.That(bHeader.PictureType, Is.EqualTo(Vc1PictureType.Bidirectional));
+      Assert.That(bHeader.BFractionNumerator, Is.EqualTo(1));
+      Assert.That(bHeader.BFractionDenominator, Is.EqualTo(2));
+    });
+
+    var decoder = Vc1VideoDecoder.Create(encoder.DescribeStream());
+    Assert.That(decoder.TryDecode(intra, out var first), Is.True);
+    Assert.That(decoder.TryDecode(predicted, out _), Is.False, "the future anchor is held until the B picture is displayed");
+    Assert.That(decoder.TryDecode(bidirectional, out var second), Is.True);
+    var third = decoder.Flush().Single();
+
+    Assert.Multiple(() => {
+      Assert.That(_Mean(first), Is.EqualTo(128).Within(8));
+      Assert.That(_Mean(second), Is.EqualTo(160).Within(8));
+      Assert.That(_Mean(third), Is.EqualTo(192).Within(8));
     });
   }
 
   [Test]
   [Category("Unit")]
-  public void ASkippedPictureRepeatsThePreviousDecodedPicture() {
+  public void AFinalUnpairedPictureFlushesAsAPredictedAnchor() {
+    var encoder = Vc1VideoEncoder.Create(_Requested(16, 16));
+
+    Assert.That(encoder.TryEncode(_Flat(16, 16, 128), 0, out var intra), Is.True);
+    Assert.That(encoder.TryEncode(_Flat(16, 16, 176), 1, out _), Is.False);
+    var predicted = encoder.Flush().Single();
+
+    var sequence = Vc1SequenceHeader.ReadFrom(encoder.DescribeStream().CodecPrivateData.Span[40..]);
+    var reader = new Vc1BitReader(predicted.Data.Span);
+    var header = Vc1PictureHeader.ReadFrom(ref reader, sequence);
+    Assert.Multiple(() => {
+      Assert.That(header.PictureType, Is.EqualTo(Vc1PictureType.Predicted));
+      Assert.That(predicted.PresentationTimestamp, Is.EqualTo(1));
+      Assert.That(predicted.IsKeyFrame, Is.False);
+    });
+
+    var decoder = Vc1VideoDecoder.Create(encoder.DescribeStream());
+    Assert.That(decoder.TryDecode(intra, out _), Is.True);
+    Assert.That(decoder.TryDecode(predicted, out _), Is.False);
+    var decoded = decoder.Flush().Single();
+    Assert.That(_Mean(decoded), Is.EqualTo(176).Within(8));
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void ASkippedPictureRepeatsThePreviousDecodedPictureWithoutAliasingCallerData() {
     var encoder = Vc1VideoEncoder.Create(_Requested(16, 16));
     Assert.That(encoder.TryEncode(_Flat(16, 16, 128), 0, out var coded), Is.True);
 
@@ -146,9 +194,9 @@ public sealed class Vc1VideoEncoderTests {
     Assert.That(decoder.TryDecode(coded, out var first), Is.True);
     var expected = (byte[])first.PixelData.Clone();
 
-    // Returned images belong to the caller. Mutating one must not alter the decoder's retained picture.
     Array.Fill(first.PixelData, (byte)0);
-    Assert.That(decoder.TryDecode(new(0, new byte[1]), out var repeated), Is.True);
+    Assert.That(decoder.TryDecode(new(0, new byte[1]), out _), Is.False, "with B pictures enabled an anchor is delayed");
+    var repeated = decoder.Flush().Single();
 
     Assert.Multiple(() => {
       Assert.That(repeated.PixelData, Is.EqualTo(expected));
@@ -176,6 +224,8 @@ public sealed class Vc1VideoEncoderTests {
     var failure = Assert.Throws<NotSupportedException>(() => Vc1VideoEncoder.Create(_Requested(0, 16)));
     Assert.That(failure!.Message, Does.Contain("0x16"));
   }
+
+  private static double _Mean(RawImage image) => image.PixelData.Average(static value => (double)value);
 
   private static RawImage _Flat(int width, int height, byte value) {
     var pixels = new byte[width * height * 3];
