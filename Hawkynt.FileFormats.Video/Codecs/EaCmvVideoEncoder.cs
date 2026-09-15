@@ -4,7 +4,7 @@ using System.Collections.Generic;
 using System.IO;
 using FileFormat.Codecs.Ea;
 using FileFormat.Core;
-using FileFormat.Ea;
+using EaChunks = FileFormat.Ea.EaChunkType;
 
 namespace FileFormat.Codecs;
 
@@ -21,8 +21,9 @@ namespace FileFormat.Codecs;
 /// <para/>
 /// The codec itself is eight-bit indexed. True-colour input is refused rather than quantised because
 /// choosing which 256 colours survive would make a nominally lossless writer lossy. Palette changes
-/// are carried by <c>MVIh</c> immediately before the affected <c>MVIf</c>; after the first complete
-/// palette only the smallest contiguous span containing changed entries is restated.
+/// are carried by <c>MVIh</c> immediately before the affected <c>MVIf</c>; every intra packet carries a
+/// complete palette header so its key-frame flag really means decoding can begin there, while inter
+/// packets carry only the smallest contiguous palette span containing changed entries.
 /// <para/>
 /// CMV's inter syntax has only backward references to the previous two decoded pictures. It defines
 /// no B-picture or forward-reference mode, so decode and presentation order are identical.
@@ -36,6 +37,9 @@ public sealed class EaCmvVideoEncoder : IVideoCodecEncoder<EaCmvVideoEncoder> {
   private const int _BLOCK = 4;
   private const int _PALETTE_ENTRIES = 256;
   private const int _PALETTE_BYTES = _PALETTE_ENTRIES * 3;
+  private const int _CHUNK_HEADER_LENGTH = 8;
+  private const int _PICTURE_TYPE_LENGTH = 2;
+  private const int _FULL_HEADER_CHUNK_LENGTH = _CHUNK_HEADER_LENGTH + 0x10 + _PALETTE_BYTES;
 
   private readonly MediaStreamInfo _requested;
   private readonly int _width;
@@ -72,9 +76,12 @@ public sealed class EaCmvVideoEncoder : IVideoCodecEncoder<EaCmvVideoEncoder> {
     if (stream.Width is <= 0 or > ushort.MaxValue || stream.Height is <= 0 or > ushort.MaxValue)
       throw new NotSupportedException(
         $"Electronic Arts CMV stores width and height as unsigned 16-bit values; {stream.Width}x{stream.Height} was supplied.");
-    if ((long)stream.Width * stream.Height > int.MaxValue)
+
+    var pixelCount = (long)stream.Width * stream.Height;
+    var firstPacketLength = pixelCount + _FULL_HEADER_CHUNK_LENGTH + _CHUNK_HEADER_LENGTH + _PICTURE_TYPE_LENGTH;
+    if (firstPacketLength > int.MaxValue)
       throw new NotSupportedException(
-        $"A picture of {stream.Width}x{stream.Height} contains more palette indices than one managed CMV frame can hold.");
+        $"A {stream.Width}x{stream.Height} CMV key frame plus its complete state header cannot fit in one managed packet.");
     if (stream.BitsPerPixel is not (0 or 8))
       throw new NotSupportedException(
         $"Electronic Arts CMV is an eight-bit palettised codec; the requested stream states {stream.BitsPerPixel} bits per pixel.");
@@ -106,8 +113,8 @@ public sealed class EaCmvVideoEncoder : IVideoCodecEncoder<EaCmvVideoEncoder> {
     var current = new EaCmvFrame(this._width, this._height);
     pixels.CopyTo(current.Indices);
 
-    var header = this._PaletteHeader(palette);
     var (picture, isKeyFrame) = this._Picture(current);
+    var header = this._PaletteHeader(palette, forceComplete: isKeyFrame);
     var data = _Join(header, picture);
 
     palette.CopyTo(this._previousPalette, 0);
@@ -126,11 +133,14 @@ public sealed class EaCmvVideoEncoder : IVideoCodecEncoder<EaCmvVideoEncoder> {
   }
 
   public IEnumerable<CodedPacket> Flush() {
-    if (this._finished || this._lastFrame == null)
+    if (this._finished)
       return [];
 
     this._finished = true;
-    return [new CodedPacket(StreamIndex: this._requested.Index, Data: _Chunk(EaChunkType.MVIe, []))];
+    if (this._lastFrame == null)
+      return [];
+
+    return [new CodedPacket(StreamIndex: this._requested.Index, Data: _Chunk(EaChunks.MVIe, []))];
   }
 
   public MediaStreamInfo DescribeStream() => new() {
@@ -200,11 +210,11 @@ public sealed class EaCmvVideoEncoder : IVideoCodecEncoder<EaCmvVideoEncoder> {
           $"Pixel {i % this._width},{i / this._width} is palette index {pixels[i]} while the picture declares only {paletteCount} entries.");
   }
 
-  private byte[]? _PaletteHeader(ReadOnlySpan<byte> palette) {
+  private byte[]? _PaletteHeader(ReadOnlySpan<byte> palette, bool forceComplete) {
     var first = 0;
     var last = _PALETTE_ENTRIES - 1;
 
-    if (this._headerWritten) {
+    if (this._headerWritten && !forceComplete) {
       first = -1;
       last = -1;
       for (var entry = 0; entry < _PALETTE_ENTRIES; ++entry) {
@@ -228,22 +238,28 @@ public sealed class EaCmvVideoEncoder : IVideoCodecEncoder<EaCmvVideoEncoder> {
     BinaryPrimitives.WriteUInt16LittleEndian(payload.AsSpan(12), checked((ushort)first));
     BinaryPrimitives.WriteUInt16LittleEndian(payload.AsSpan(14), checked((ushort)count));
     palette.Slice(first * 3, count * 3).CopyTo(payload.AsSpan(0x10));
-    return _Chunk(EaChunkType.MVIh, payload);
+    return _Chunk(EaChunks.MVIh, payload);
   }
 
   private (byte[] Data, bool IsKeyFrame) _Picture(EaCmvFrame current) {
     var intra = this._Intra(current);
-    if (this._lastFrame == null || this._width % _BLOCK != 0 || this._height % _BLOCK != 0)
+    if (this._lastFrame == null || this._width % _BLOCK != 0 || this._height % _BLOCK != 0 || !this._InterCanFit())
       return (intra, true);
 
     var inter = this._Inter(current);
     return inter.Length < intra.Length ? (inter, false) : (intra, true);
   }
 
+  private bool _InterCanFit() {
+    var blocks = (long)(this._width / _BLOCK) * (this._height / _BLOCK);
+    var maximumChunkLength = _CHUNK_HEADER_LENGTH + _PICTURE_TYPE_LENGTH + 18L * blocks;
+    return maximumChunkLength <= int.MaxValue;
+  }
+
   private static byte[] _Intra(EaCmvFrame current) {
-    var payload = new byte[2 + current.Indices.Length];
-    current.Indices.CopyTo(payload, 2);
-    return _Chunk(EaChunkType.MVIf, payload);
+    var payload = new byte[checked(_PICTURE_TYPE_LENGTH + current.Indices.Length)];
+    current.Indices.CopyTo(payload, _PICTURE_TYPE_LENGTH);
+    return _Chunk(EaChunks.MVIf, payload);
   }
 
   private byte[] _Inter(EaCmvFrame current) {
@@ -274,11 +290,12 @@ public sealed class EaCmvVideoEncoder : IVideoCodecEncoder<EaCmvVideoEncoder> {
     }
 
     var escapeBytes = escapes.ToArray();
-    var payload = new byte[2 + primary.Length + escapeBytes.Length];
+    var payloadLength = checked(_PICTURE_TYPE_LENGTH + primary.Length + escapeBytes.Length);
+    var payload = new byte[payloadLength];
     BinaryPrimitives.WriteUInt16LittleEndian(payload, 1);
-    primary.CopyTo(payload, 2);
-    escapeBytes.CopyTo(payload, 2 + primary.Length);
-    return _Chunk(EaChunkType.MVIf, payload);
+    primary.CopyTo(payload, _PICTURE_TYPE_LENGTH);
+    escapeBytes.CopyTo(payload, _PICTURE_TYPE_LENGTH + primary.Length);
+    return _Chunk(EaChunks.MVIf, payload);
   }
 
   private static bool _TryMotion(EaCmvFrame current, EaCmvFrame source, int blockX, int blockY, out byte motion) {
@@ -338,10 +355,11 @@ public sealed class EaCmvVideoEncoder : IVideoCodecEncoder<EaCmvVideoEncoder> {
   }
 
   private static byte[] _Chunk(uint fourCc, ReadOnlySpan<byte> payload) {
-    var result = new byte[8 + payload.Length];
+    var length = checked(_CHUNK_HEADER_LENGTH + payload.Length);
+    var result = new byte[length];
     BinaryPrimitives.WriteUInt32LittleEndian(result, fourCc);
-    BinaryPrimitives.WriteUInt32LittleEndian(result.AsSpan(4), checked((uint)result.Length));
-    payload.CopyTo(result.AsSpan(8));
+    BinaryPrimitives.WriteUInt32LittleEndian(result.AsSpan(4), checked((uint)length));
+    payload.CopyTo(result.AsSpan(_CHUNK_HEADER_LENGTH));
     return result;
   }
 
@@ -349,7 +367,7 @@ public sealed class EaCmvVideoEncoder : IVideoCodecEncoder<EaCmvVideoEncoder> {
     if (first == null)
       return second;
 
-    var result = new byte[first.Length + second.Length];
+    var result = new byte[checked(first.Length + second.Length)];
     first.CopyTo(result, 0);
     second.CopyTo(result, first.Length);
     return result;
