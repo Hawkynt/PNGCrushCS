@@ -52,7 +52,7 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | AdTechFax | `.adt` | ✅ | ✅ | — | — | — | none |
 | AdvancedArtStudio | `.ocp`, `.mpi`, `.mpic` | ✅ | ✅ | — | — | — | recoil2png, IrfanView |
 | Afli | `.afl` | ✅ | ✅ | — | — | — | recoil2png, XnView |
-| Ai | `.ai` | ✅ | ✅ | — | — | — | none |
+| Ai | `.ai` | ✅ | ✅ | — | — | — | Ghostscript |
 | AimGreyScale | `.ima` | ✅ | ✅ | — | — | — | XnView |
 | AirNav | `.anv` | ✅ | ✅ | — | — | — | XnView |
 | AladdinPaint | `.alp` | ✅ | ✅ | — | — | — | none |
@@ -309,7 +309,7 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | Enterprise128 | `.ep`, `.elan` | ✅ | ✅ | — | — | — | none |
 | Envi | `.hdr` | ✅ | ✅ | — | — | — | none |
 | EpaBios | `.epa` | ✅ | ✅ | — | — | — | recoil2png, IrfanView |
-| Eps | `.eps`, `.epsf`, `.epsi`, `.epi`, `.ept` | ✅ | ✅ | — | — | — | ImageMagick |
+| Eps | `.eps`, `.epsf`, `.epsi`, `.epi`, `.ept` | ✅ | ✅ | — | — | — | ImageMagick, Ghostscript |
 | Eroiica | `.eif` | ✅ | ✅ | — | ✅ | — | none |
 | EscapePaint | `.esp` | ✅ | ✅ | — | — | — | none |
 | EsmSoftwarePix | `.pix` | ✅ | ✅ | — | — | — | IrfanView |
@@ -687,7 +687,7 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | PocketPcTheme | `.tsk` | ✅ | ✅ | — | — | — | XnView, IrfanView |
 | PortfolioGraphics | `.pgf`, `.pgc` | ✅ | ✅ | — | — | — | recoil2png, IrfanView |
 | Portrait | `.cvp` | ✅ | ✅ | — | — | — | XnView |
-| PostScript | `.ps`, `.ps1`, `.ps2`, `.ps3`, `.eps`, `.epsf`, `.epsi`, `.epi`, `.prn`, `.pdx` | ✅ | ✅ | — | — | — | none |
+| PostScript | `.ps`, `.ps1`, `.ps2`, `.ps3`, `.eps`, `.epsf`, `.epsi`, `.epi`, `.prn`, `.pdx` | ✅ | ✅ | — | — | — | Ghostscript |
 | PowerGraphics | `.pgr` | ✅ | ✅ | — | — | — | recoil2png, IrfanView |
 | PowerPoint | `.ppt`, `.pps`, `.pot`, `.pptx`, `.ppsx`, `.potx`, `.pptm`, `.ppsm`, `.potm` | ✅ | ✅ | — | ✅ | — | XnView, IrfanView |
 | PrinterPageSegment | `.pse`, `.psg` | ✅ | ✅ | — | — | — | XnView |

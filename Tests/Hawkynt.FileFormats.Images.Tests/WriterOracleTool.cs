@@ -273,11 +273,11 @@ internal static class WriterOracleTool {
       // so the size that comes back is the size the file claims and not the size of a sheet of A4.
       "-dEPSCrop", "-dUseCropBox",
       "-dFirstPage=1", "-dLastPage=1",
-      // One point to the pixel, which is what the PDF and EPS writers mean: both state a box the
-      // size of the picture in points. The other two do not — the PostScript and Illustrator
-      // writers scale the picture by three quarters, as though a point were a pixel at ninety-six
-      // to the inch — so rendering at any one resolution can only match one convention, and this is
-      // the one the file says outright rather than the one that has to be inferred from a scale.
+      // One point to the pixel, which is what all four writers in this family mean: each states a
+      // box the size of the picture in points, and each stretches the picture over exactly that box.
+      // The PostScript and Illustrator writers used to scale by three quarters instead, as though a
+      // point were a pixel at ninety-six to the inch, so that no single resolution could match both
+      // conventions; they now say the same thing as the EPS and PDF writers beside them.
       "-r72",
       "-sOutputFile=" + output,
       // A page painted black before the file gets to it. Ghostscript's default sheet is white, and
