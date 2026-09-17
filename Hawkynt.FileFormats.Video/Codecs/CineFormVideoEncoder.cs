@@ -7,7 +7,7 @@ using FileFormat.Core;
 
 namespace FileFormat.Codecs;
 
-/// <summary>The progressive CineForm layouts this encoder can write.</summary>
+/// <summary>The CineForm component layouts this encoder can write.</summary>
 public enum CineFormEncodingFormat {
   /// <summary>Ten-bit YUV 4:2:2, encoded as Y, V, U.</summary>
   Yuv422,
@@ -17,22 +17,23 @@ public enum CineFormEncodingFormat {
   Rgba4444,
 }
 
-/// <summary>Encodes progressive GoPro CineForm I-frames.</summary>
+/// <summary>How scan lines are organized in a CineForm sample.</summary>
+public enum CineFormScanMode {
+  /// <summary>Adjacent rows are adjacent in time and space.</summary>
+  Progressive,
+  /// <summary>Interlaced YUV, with the upper/even field displayed first.</summary>
+  InterlacedUpperFieldFirst,
+  /// <summary>Interlaced YUV, with the lower/odd field displayed first.</summary>
+  InterlacedLowerFieldFirst,
+}
+
+/// <summary>Encodes GoPro CineForm I-frames.</summary>
 /// <remarks>
-/// CineForm is spatial-wavelet and intra-frame in this path: every input picture becomes one complete
-/// key-frame packet and there are no P/B pictures or temporal forward/backward references to maintain.
-/// The default <see cref="Create(MediaStreamInfo)"/> remains the historical ten-bit 4:2:2 writer;
-/// <see cref="Create(MediaStreamInfo,CineFormEncodingFormat)"/> additionally exposes the twelve-bit
-/// RGB and RGBA layouts emitted by contemporary CFHD encoders.
-/// <para/>
-/// Source pictures are converted through the repository's raw-image converter to canonical planar
-/// ten-bit 4:2:2 or packed sixteen-bit RGB[A], then narrowed to CineForm's coded precision. RGB[A]
-/// therefore preserves high-bit-depth sources instead of needlessly routing them through eight-bit
-/// display colour. No native SDK, P/Invoke or third-party package is involved.
-/// <para/>
-/// Packet framing and the alpha transfer were cross-checked against GoPro's MIT/Apache-2.0 reference
-/// SDK and FFmpeg's LGPL encoder. The transforms, companding codebook and prescale schedules remain the
-/// same managed implementation shared with the decoder.
+/// CineForm remains intra-frame here: every input picture becomes one complete key-frame packet and
+/// there are no MPEG-style P/B pictures or forward/backward motion references. Progressive YUV/RGB
+/// uses the ordinary three-level spatial transform. Legacy interlaced YUV uses CineForm's documented
+/// non-progressive first level, which combines adjacent field rows before the two coarser spatial
+/// levels; it still has ten subbands and one independently decodable picture per packet.
 /// </remarks>
 [VerifiedBy(ConformanceOracle.FFmpeg)]
 public sealed class CineFormVideoEncoder : IVideoCodecEncoder<CineFormVideoEncoder> {
@@ -41,28 +42,32 @@ public sealed class CineFormVideoEncoder : IVideoCodecEncoder<CineFormVideoEncod
   private readonly MediaStreamInfo _stream;
   private readonly RawImageColorInfo _colour;
   private readonly CineFormEncodingFormat _encodingFormat;
+  private readonly CineFormScanMode _scanMode;
   private readonly int _encodedHeight;
   private uint _frameNumber;
 
-  private CineFormVideoEncoder(MediaStreamInfo stream, CineFormEncodingFormat encodingFormat) {
+  private CineFormVideoEncoder(MediaStreamInfo stream, CineFormEncodingFormat encodingFormat, CineFormScanMode scanMode) {
     ArgumentNullException.ThrowIfNull(stream);
 
     if (stream.Kind != MediaStreamKind.Video)
       throw new NotSupportedException("GoPro CineForm can only encode a video stream.");
-
     if (!Enum.IsDefined(encodingFormat))
       throw new ArgumentOutOfRangeException(nameof(encodingFormat));
+    if (!Enum.IsDefined(scanMode))
+      throw new ArgumentOutOfRangeException(nameof(scanMode));
+    if (scanMode != CineFormScanMode.Progressive && encodingFormat != CineFormEncodingFormat.Yuv422)
+      throw new NotSupportedException("CineForm's legacy interlaced transform is supported only for YUV 4:2:2.");
 
     if (stream.Width < 48 || (stream.Width & 15) != 0)
       throw new NotSupportedException(
         $"This CineForm encoder needs a width of at least 48 pixels and a multiple of 16 for its three 2/6 wavelet levels; {stream.Width} was supplied.");
-
     if (stream.Height <= 0)
       throw new NotSupportedException($"A CineForm encoder needs a positive picture height; {stream.Height} was supplied.");
-
+    if (scanMode != CineFormScanMode.Progressive && (stream.Height & 1) != 0)
+      throw new NotSupportedException($"An interlaced CineForm picture needs an even height; {stream.Height} was supplied.");
     if (stream.Width > 65_520 || stream.Height > 65_528)
       throw new NotSupportedException(
-        $"CineForm's picture dimensions are sixteen-bit values after padding; {stream.Width}x{stream.Height} does not fit this writer's progressive frame header.");
+        $"CineForm's picture dimensions are sixteen-bit values after padding; {stream.Width}x{stream.Height} does not fit this writer's frame header.");
 
     this._encodedHeight = Math.Max(32, (stream.Height + 7) & ~7);
     if ((long)stream.Width * this._encodedHeight > Array.MaxLength)
@@ -70,6 +75,7 @@ public sealed class CineFormVideoEncoder : IVideoCodecEncoder<CineFormVideoEncod
         $"A padded CineForm frame of {stream.Width}x{this._encodedHeight} samples is too large for a managed plane.");
 
     this._encodingFormat = encodingFormat;
+    this._scanMode = scanMode;
     this._colour = stream.Height > 576 ? RawImageColorInfo.Bt709Limited : RawImageColorInfo.Bt601Limited;
     this._stream = new() {
       Index = stream.Index,
@@ -94,15 +100,22 @@ public sealed class CineFormVideoEncoder : IVideoCodecEncoder<CineFormVideoEncod
   }
 
   public static string CodecName => "GoPro CineForm";
-
   public static CodecTag Codec => _codec;
 
-  /// <summary>Creates the interoperable ten-bit 4:2:2 writer retained as the default.</summary>
-  public static CineFormVideoEncoder Create(MediaStreamInfo stream) => new(stream, CineFormEncodingFormat.Yuv422);
+  /// <summary>Creates the interoperable progressive ten-bit 4:2:2 writer retained as the default.</summary>
+  public static CineFormVideoEncoder Create(MediaStreamInfo stream)
+    => new(stream, CineFormEncodingFormat.Yuv422, CineFormScanMode.Progressive);
 
-  /// <summary>Creates a CineForm writer for one of its progressive YUV, RGB or RGBA layouts.</summary>
+  /// <summary>Creates a progressive CineForm writer for the requested component layout.</summary>
   public static CineFormVideoEncoder Create(MediaStreamInfo stream, CineFormEncodingFormat encodingFormat)
-    => new(stream, encodingFormat);
+    => new(stream, encodingFormat, CineFormScanMode.Progressive);
+
+  /// <summary>Creates a CineForm writer with an explicit scan mode.</summary>
+  public static CineFormVideoEncoder Create(
+    MediaStreamInfo stream,
+    CineFormEncodingFormat encodingFormat,
+    CineFormScanMode scanMode)
+    => new(stream, encodingFormat, scanMode);
 
   public bool TryEncode(RawImage frame, long? presentationTimestamp, out CodedPacket packet) {
     ArgumentNullException.ThrowIfNull(frame);
@@ -110,7 +123,6 @@ public sealed class CineFormVideoEncoder : IVideoCodecEncoder<CineFormVideoEncod
     if (frame.Width != this._stream.Width || frame.Height != this._stream.Height)
       throw new InvalidDataException(
         $"This CineForm stream is {this._stream.Width}x{this._stream.Height}; a {frame.Width}x{frame.Height} picture arrived.");
-
     if (!frame.HasEnoughPixelData)
       throw new InvalidDataException(
         $"A {frame.Width}x{frame.Height} {frame.Format} picture needs {frame.MinimumPixelDataLength} bytes and carries {frame.PixelData.Length}.");
@@ -133,7 +145,6 @@ public sealed class CineFormVideoEncoder : IVideoCodecEncoder<CineFormVideoEncod
   }
 
   public IEnumerable<CodedPacket> Flush() => [];
-
   public MediaStreamInfo DescribeStream() => this._stream;
 
   internal byte[] EncodeFrame(RawImage frame, ushort frameNumber = 0)
@@ -156,17 +167,20 @@ public sealed class CineFormVideoEncoder : IVideoCodecEncoder<CineFormVideoEncod
     var width = this._stream.Width;
     var height = this._stream.Height;
     var chromaWidth = width >> 1;
+    var interlaced = this._scanMode != CineFormScanMode.Progressive;
 
     var y = new int[width * this._encodedHeight];
     var u = new int[chromaWidth * this._encodedHeight];
     var v = new int[chromaWidth * this._encodedHeight];
 
-    _FillTenBitPlane(source.GetPlaneData(0), width, height, y, width, this._encodedHeight, "luma");
-    _FillTenBitPlane(source.GetPlaneData(1), chromaWidth, height, u, chromaWidth, this._encodedHeight, "blue difference");
-    _FillTenBitPlane(source.GetPlaneData(2), chromaWidth, height, v, chromaWidth, this._encodedHeight, "red difference");
+    _FillTenBitPlane(source.GetPlaneData(0), width, height, y, width, this._encodedHeight, "luma", interlaced);
+    _FillTenBitPlane(source.GetPlaneData(1), chromaWidth, height, u, chromaWidth, this._encodedHeight, "blue difference", interlaced);
+    _FillTenBitPlane(source.GetPlaneData(2), chromaWidth, height, v, chromaWidth, this._encodedHeight, "red difference", interlaced);
 
-    // CineForm's measured 4:2:2 channel order is Y, V, U rather than conventional planar Y,U,V.
-    return CineFormPictureEncoder.Encode(y, v, u, width, chromaWidth, this._encodedHeight, height, frameNumber);
+    return CineFormPictureEncoder.Encode(
+      y, v, u, width, chromaWidth, this._encodedHeight, height, frameNumber,
+      interlaced,
+      upperFieldFirst: this._scanMode != CineFormScanMode.InterlacedLowerFieldFirst);
   }
 
   private byte[] _EncodeRgb(RawImage frame, bool withAlpha, ushort frameNumber) {
@@ -185,7 +199,6 @@ public sealed class CineFormVideoEncoder : IVideoCodecEncoder<CineFormVideoEncod
 
     _FillRgbPlanes(source.PixelData, width, height, planes, this._encodedHeight, withAlpha);
 
-    // CineForm's encoded RGB order is G,R,B[,A], not the packed source's R,G,B[,A].
     var encodedPlanes = withAlpha
       ? new[] { planes[1], planes[0], planes[2], planes[3] }
       : new[] { planes[1], planes[0], planes[2] };
@@ -209,7 +222,7 @@ public sealed class CineFormVideoEncoder : IVideoCodecEncoder<CineFormVideoEncod
 
   private static void _FillTenBitPlane(
     ReadOnlySpan<byte> source, int width, int height,
-    int[] target, int targetWidth, int targetHeight, string component) {
+    int[] target, int targetWidth, int targetHeight, string component, bool interlaced) {
 
     for (var y = 0; y < height; ++y) {
       var sourceRow = y * width * 2;
@@ -222,7 +235,7 @@ public sealed class CineFormVideoEncoder : IVideoCodecEncoder<CineFormVideoEncod
       }
     }
 
-    _PadRows(target, targetWidth, height, targetHeight);
+    _PadRows(target, targetWidth, height, targetHeight, interlaced);
   }
 
   private static void _FillRgbPlanes(
@@ -248,7 +261,7 @@ public sealed class CineFormVideoEncoder : IVideoCodecEncoder<CineFormVideoEncod
     }
 
     foreach (var plane in planes)
-      _PadRows(plane, width, height, targetHeight);
+      _PadRows(plane, width, height, targetHeight, interlaced: false);
   }
 
   private static int _Scale16To12(ushort value)
@@ -263,8 +276,16 @@ public sealed class CineFormVideoEncoder : IVideoCodecEncoder<CineFormVideoEncod
     }
   }
 
-  private static void _PadRows(int[] target, int width, int height, int targetHeight) {
-    for (var y = height; y < targetHeight; ++y)
-      Array.Copy(target, (height - 1) * width, target, y * width, width);
+  private static void _PadRows(int[] target, int width, int height, int targetHeight, bool interlaced) {
+    if (!interlaced) {
+      for (var y = height; y < targetHeight; ++y)
+        Array.Copy(target, (height - 1) * width, target, y * width, width);
+      return;
+    }
+
+    for (var y = height; y < targetHeight; ++y) {
+      var sourceRow = height - 2 + (y & 1);
+      Array.Copy(target, sourceRow * width, target, y * width, width);
+    }
   }
 }
