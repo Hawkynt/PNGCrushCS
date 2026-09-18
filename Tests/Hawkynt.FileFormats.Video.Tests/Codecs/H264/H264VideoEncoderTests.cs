@@ -85,12 +85,95 @@ public sealed class H264VideoEncoderTests {
 
   [Test]
   [Category("Unit")]
-  public void RepeatedPicturesUsePSkipAndBidirectionalBPredictionAndRoundTripExactly() {
+  public void ChangedReferencePictureUsesInterCavlcInsteadOfPcm() {
+    var first = _Random420(32, 32, 101);
+    var between = _Random420(32, 32, 102);
+    var future = _Random420(32, 32, 103);
+    var encoder = H264VideoEncoder.Create(_Stream(32, 32));
+    var packets = new List<CodedPacket>();
+
+    Assert.That(encoder.TryEncode(first, 0, out var idr), Is.True);
+    packets.Add(idr);
+    Assert.That(encoder.TryEncode(between, 1, out _), Is.False);
+    Assert.That(encoder.TryEncode(future, 2, out var p), Is.True);
+    packets.Add(p);
+    packets.AddRange(encoder.Flush());
+
+    var syntax = _FirstMacroblockSyntax(p, expectedSliceType: 5, referencePicture: true, bPicture: false);
+    Assert.Multiple(() => {
+      Assert.That(syntax.SkipRun, Is.Zero);
+      Assert.That(syntax.MacroblockType, Is.Zero, "P_L0_16x16 must be used rather than P-slice I_PCM (mb_type 30)");
+      Assert.That(syntax.CodedBlockPatternCodeNum, Is.Not.Null);
+      Assert.That(syntax.CodedBlockPatternCodeNum, Is.Not.Zero,
+        "a random changed macroblock must carry transform coefficients rather than falling back to PCM");
+    });
+
+    var decoded = _DecodeAll(encoder, packets);
+    Assert.That(decoded, Has.Count.EqualTo(3));
+    Assert.Multiple(() => {
+      Assert.That(decoded[0].PixelData, Is.EqualTo(first.PixelData), "the IDR is lossless I_PCM");
+      Assert.That(_AverageAbsoluteError(future.PixelData, decoded[2].PixelData), Is.LessThan(12d),
+        "QP 18 inter reconstruction should stay close to the source while using CAVLC");
+    });
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void QuarterPelMotionSearchWritesExplicitPVector() {
     const int width = 32;
     const int height = 32;
-    const int frames = 5;
-    var source = _Random420(width, height, 0x264);
+    var reference = _Random420(width, height, 0x264);
+    var shifted = _MotionPredicted420(reference, mvX: 3, mvY: -1);
     var encoder = H264VideoEncoder.Create(_Stream(width, height));
+
+    Assert.That(encoder.TryEncode(reference, 0, out _), Is.True);
+    Assert.That(encoder.TryEncode(reference, 1, out _), Is.False);
+    Assert.That(encoder.TryEncode(shifted, 2, out var p), Is.True);
+
+    var syntax = _FirstMacroblockSyntax(p, expectedSliceType: 5, referencePicture: true, bPicture: false);
+    Assert.Multiple(() => {
+      Assert.That(syntax.MacroblockType, Is.Zero);
+      Assert.That(syntax.MvdL0X, Is.EqualTo(3), "the first macroblock predictor is zero, so MVD is the quarter-pel MV");
+      Assert.That(syntax.MvdL0Y, Is.EqualTo(-1));
+      Assert.That(syntax.CodedBlockPatternCodeNum, Is.Zero,
+        "the constructed picture is exactly the normative fractional prediction and needs no residual");
+    });
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void BidirectionalPictureChoosesExplicitBiPredictionWhenItIsExact() {
+    var past = _Solid420(16, 16, 0);
+    var middle = _Solid420(16, 16, 128);
+    var future = _Solid420(16, 16, 255);
+    var encoder = H264VideoEncoder.Create(_Stream(16, 16));
+    var packets = new List<CodedPacket>();
+
+    Assert.That(encoder.TryEncode(past, 0, out var idr), Is.True);
+    packets.Add(idr);
+    Assert.That(encoder.TryEncode(middle, 1, out _), Is.False);
+    Assert.That(encoder.TryEncode(future, 2, out var p), Is.True);
+    packets.Add(p);
+    packets.AddRange(encoder.Flush());
+    var b = packets.Single(packet => packet.PresentationTimestamp == 1);
+
+    var syntax = _FirstMacroblockSyntax(b, expectedSliceType: 6, referencePicture: false, bPicture: true);
+    Assert.Multiple(() => {
+      Assert.That(syntax.MacroblockType, Is.EqualTo(3), "B_Bi_16x16 should beat either single-list predictor");
+      Assert.That(syntax.MvdL0X, Is.Zero);
+      Assert.That(syntax.MvdL0Y, Is.Zero);
+      Assert.That(syntax.MvdL1X, Is.Zero);
+      Assert.That(syntax.MvdL1Y, Is.Zero);
+      Assert.That(syntax.CodedBlockPatternCodeNum, Is.Zero);
+    });
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void PeriodicGopBoundaryEmitsFreshIdrWithResetNumbering() {
+    const int frames = 121;
+    var source = _Solid420(16, 16, 90);
+    var encoder = H264VideoEncoder.Create(_Stream(16, 16));
     var packets = new List<CodedPacket>();
 
     for (var index = 0; index < frames; ++index)
@@ -98,41 +181,46 @@ public sealed class H264VideoEncoderTests {
         packets.Add(packet);
     packets.AddRange(encoder.Flush());
 
+    Assert.That(packets, Has.Count.EqualTo(frames));
+    var keys = packets.Where(packet => packet.IsKeyFrame).ToArray();
+    Assert.That(keys.Select(packet => packet.PresentationTimestamp), Is.EqualTo(new long?[] { 0, 120 }));
+
+    var reset = _SliceHeader(keys[1]);
     Assert.Multiple(() => {
-      Assert.That(packets, Has.Count.EqualTo(frames));
-      Assert.That(packets.Select(_SliceType), Is.EqualTo(new[] { 7, 5, 6, 5, 6 }));
-      Assert.That(packets.Select(packet => packet.IsKeyFrame),
-        Is.EqualTo(new[] { true, false, false, false, false }));
-      Assert.That(packets.Select(packet => packet.PresentationTimestamp),
-        Is.EqualTo(new long?[] { 0, 2, 1, 4, 3 }));
-      Assert.That(packets.Select(packet => packet.DecodeTimestamp),
-        Is.EqualTo(new long?[] { 0, 1, 2, 3, 4 }));
+      Assert.That(reset.FrameNum, Is.Zero);
+      Assert.That(reset.PocLsb, Is.Zero);
+      Assert.That(_SliceType(keys[1]), Is.EqualTo(7));
     });
+  }
 
-    var pSyntax = _FirstMacroblockSyntax(packets[1], expectedSliceType: 5, referencePicture: true, bPicture: false);
-    Assert.That(pSyntax.SkipRun, Is.EqualTo(4),
-      "the 32x32 repeated P picture should be four P_Skip macroblocks, not four intra fallbacks");
+  [Test]
+  [Category("Unit")]
+  public void CavlcResidualWriterRoundTripsTheDecoder() {
+    var cases = new[] {
+      new int[16],
+      new[] { 2, 0, -1, 0, 0, 3, 0, 0, 0, 0, -2, 1, 0, 0, 0, 0 },
+      new[] { 1, -1, 2, -3, 1, 0, 0, 1, -1, 2, 0, 0, 0, 0, 1, -1 },
+    };
 
-    var bSyntax = _FirstMacroblockSyntax(packets[2], expectedSliceType: 6, referencePicture: false, bPicture: true);
-    Assert.Multiple(() => {
-      Assert.That(bSyntax.SkipRun, Is.Zero, "the first B macroblock is explicitly coded, not direct-skip");
-      Assert.That(bSyntax.MacroblockType, Is.EqualTo(3),
-        "the repeated B picture should use B_Bi_16x16 and therefore both reference lists");
-    });
+    foreach (var nC in new[] { 0, 3, 6, 8 })
+      foreach (var source in cases) {
+        var writer = new H264BitWriter();
+        var expectedCount = source.Count(value => value != 0);
+        Assert.That(H264CavlcEncoding.WriteBlock(writer, source, nC, chromaDc: false), Is.EqualTo(expectedCount));
 
-    var decoder = H264VideoDecoder.Create(encoder.DescribeStream());
-    var decoded = new List<RawImage>();
-    foreach (var packet in packets)
-      if (decoder.TryDecode(packet, out var frame))
-        decoded.Add(frame);
-    decoded.AddRange(decoder.Flush());
+        var reader = new H264BitReader(writer.FinishRbsp());
+        var decoded = new int[16];
+        Assert.That(H264Residual.ReadBlock(ref reader, decoded, nC, chromaDc: false), Is.EqualTo(expectedCount));
+        Assert.That(decoded, Is.EqualTo(source), $"nC={nC}");
+      }
 
-    Assert.That(decoded, Has.Count.EqualTo(frames));
-    for (var index = 0; index < frames; ++index)
-      Assert.Multiple(() => {
-        Assert.That(decoded[index].Format, Is.EqualTo(PixelFormat.Yuv420P8));
-        Assert.That(decoded[index].PixelData, Is.EqualTo(source.PixelData), $"display picture {index}");
-      });
+    var chromaSource = new[] { 2, -1, 0, 3 };
+    var chromaWriter = new H264BitWriter();
+    H264CavlcEncoding.WriteBlock(chromaWriter, chromaSource, -1, chromaDc: true);
+    var chromaReader = new H264BitReader(chromaWriter.FinishRbsp());
+    var chromaDecoded = new int[4];
+    H264Residual.ReadBlock(ref chromaReader, chromaDecoded, -1, chromaDc: true);
+    Assert.That(chromaDecoded, Is.EqualTo(chromaSource));
   }
 
   [Test]
