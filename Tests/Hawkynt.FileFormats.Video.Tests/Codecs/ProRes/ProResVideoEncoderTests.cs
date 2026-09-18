@@ -198,10 +198,10 @@ public class ProResVideoEncoderTests {
 
   [Test]
   [Category("Unit")]
-  public void EveryProfileCodesAPictureThisPackagesOwnDecoderReadsBack() {
+  public void EveryFourTwoTwoProfileCodesAPictureThisPackagesOwnDecoderReadsBack() {
     // Not proof the bytes are right — that is ffmpeg's job and it was done outside this fixture —
     // but it is what catches a geometry the encoder lays out one way and the decoder reads another.
-    foreach (var profile in ProResProfile.All)
+    foreach (var profile in ProResProfile.FourTwoTwo)
       foreach (var (width, height) in new[] { (16, 16), (41, 25), (64, 48), (160, 82) }) {
         var planes = _RoundTrip(_Ramp(width, height), width, height, profile.Tag.ToString());
 
@@ -220,7 +220,7 @@ public class ProResVideoEncoderTests {
     var (width, height) = (128, 96);
     var source = _Ramp(width, height);
 
-    var worst = ProResProfile.All
+    var worst = ProResProfile.FourTwoTwo
       .Select(profile => _WorstLumaError(source, width, height, profile.Tag.ToString()))
       .ToArray();
 
@@ -243,7 +243,7 @@ public class ProResVideoEncoderTests {
     var chroma = new ushort[WIDTH / 2 * HEIGHT];
     Array.Fill(chroma, (ushort)512);
 
-    foreach (var profile in ProResProfile.All) {
+    foreach (var profile in ProResProfile.FourTwoTwo) {
       var planes = _RoundTrip(_Planes(WIDTH, HEIGHT, flat, chroma, chroma), WIDTH, HEIGHT, profile.Tag.ToString());
 
       Assert.Multiple(() => {
@@ -293,10 +293,11 @@ public class ProResVideoEncoderTests {
 
   [Test]
   [Category("Unit")]
-  public void TheFourFourFourProfilesAreRefusedByName() {
-    foreach (var tag in new[] { "ap4h", "ap4x" }) {
-      var refusal = Assert.Throws<NotSupportedException>(() => ProResVideoEncoder.Create(_Stream(64, 64, tag)));
-      Assert.That(refusal!.Message, Does.Contain(tag).And.Contain("4:4:4"));
+  public void AllSixProfilesAreAcceptedByTheEncoderRegistryPredicate() {
+    foreach (var profile in ProResProfile.All) {
+      var stream = _Stream(64, 64, profile.Tag.ToString());
+      Assert.That(ProResVideoEncoder.Accepts(stream), Is.True, profile.Name);
+      Assert.That(ProResVideoEncoder.Create(stream).DescribeStream().Codec, Is.EqualTo(profile.Tag), profile.Name);
     }
   }
 
