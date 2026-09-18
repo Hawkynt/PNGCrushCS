@@ -2,6 +2,7 @@ using System;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 
 namespace Hawkynt.FileFormats.Video.Tests;
 
@@ -62,12 +63,10 @@ internal static class FFmpegOracle {
         return (false, "ffmpeg timed out");
       }
 
-      var diagnostics = string.Concat(stdout.Result, stderr.Result).Trim();
+      var diagnostics = SignificantDiagnostics(string.Concat(stdout.Result, stderr.Result));
       var size = _PngSize(png);
 
-      // At -loglevel error FFmpeg says nothing at all about a stream it read cleanly, so anything on
-      // the error channel is it telling us it patched over something. A picture of the right size
-      // that came with a complaint is not the picture that went in.
+      // A picture of the right size that came with a complaint is not the picture that went in.
       if (diagnostics.Length != 0)
         return (false, diagnostics);
 
@@ -117,7 +116,7 @@ internal static class FFmpegOracle {
         return (false, "ffmpeg timed out");
       }
 
-      var diagnostics = string.Concat(stdout.Result, stderr.Result).Trim();
+      var diagnostics = SignificantDiagnostics(string.Concat(stdout.Result, stderr.Result));
       if (diagnostics.Length != 0)
         return (false, diagnostics);
 
@@ -142,6 +141,41 @@ internal static class FFmpegOracle {
       try { File.Delete(raw); } catch { /* best effort */ }
     }
   }
+
+  /// <summary>
+  /// What FFmpeg said that is about the file, with the one line that is about FFmpeg's own version
+  /// dropped.
+  /// </summary>
+  /// <remarks>
+  /// At <c>-loglevel error</c> FFmpeg says nothing at all about a stream it read cleanly, so anything
+  /// on the error channel is it telling us it patched over something — which is the whole worth of
+  /// this oracle, and the reason the list of lines that do not count is one line long, is keyed to the
+  /// decoder that printed it as well as to its text, and grows only against measurement.
+  /// <para/>
+  /// <b><c>[h261 @ …] warning: first frame is no keyframe</c>.</b> H.261 has no I picture. Clause 3.2
+  /// puts the intra/inter choice on every macroblock's own MTYPE and leaves the picture header with no
+  /// intra/inter flag to set, so FFmpeg's H.261 decoder enters every picture as
+  /// <c>AV_PICTURE_TYPE_P</c> and mpegvideo's "the first picture is not an I picture" complaint fires
+  /// on the opening picture of every H.261 stream there has ever been. Measured rather than reasoned
+  /// about: FFmpeg 4.2.2 prints it twice for a clip <b>FFmpeg's own H.261 encoder</b> wrote, exactly as
+  /// it does for one written here, and FFmpeg 8.1 prints it for neither, because FFmpeg silenced it
+  /// itself — <c>s->codec_id != AV_CODEC_ID_H261 /* H.261 has no keyframes */</c> guards the log call
+  /// in <c>ff_mpv_alloc_dummy_frames</c>. The line therefore reports which FFmpeg is on the machine and
+  /// nothing whatever about the bytes handed to it, and a check that fails on it fails by calendar.
+  /// <para/>
+  /// Nothing else is tolerated. The same words from any other decoder are kept, because in a format
+  /// that does have an I picture they mean the encoder did not write one; so is every other line H.261
+  /// can produce; and so is a picture that never arrived, which no complaint is needed to fail.
+  /// </remarks>
+  internal static string SignificantDiagnostics(string diagnostics) => string.Join('\n',
+    diagnostics
+      .Split('\n')
+      .Select(static line => line.Trim())
+      .Where(static line => line.Length != 0 && !_IsAboutFFmpegsOwnVersion(line)));
+
+  private static bool _IsAboutFFmpegsOwnVersion(string line)
+    => line.StartsWith("[h261 @ ", StringComparison.Ordinal)
+       && line.EndsWith("warning: first frame is no keyframe", StringComparison.Ordinal);
 
   private static (int Width, int Height)? _PngSize(string path) {
     try {
