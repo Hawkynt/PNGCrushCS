@@ -125,20 +125,33 @@ internal static class WriterOracleComparison {
   }
 
   /// <summary>
-  /// The tool's picture back at the scale the file stores, where the tool gave it at a whole
-  /// multiple of that.
+  /// The tool's picture back at the scale the file stores, where the tool gave it at a scale this
+  /// package can account for.
   /// </summary>
   /// <remarks>
-  /// A C64 multicolour picture is 160 pixels across and was always shown on 320, because the chip
-  /// doubles them; the same is true of the Atari, the Amstrad and the Spectrum's wider modes. RECOIL,
-  /// XnView and IrfanView all hand such a picture back at its display size, and this package stores
-  /// it at the size it is actually coded. Holding the three of them to the stored size called
-  /// twenty-six C64 formats wrong on a question none of the four disagree about, so a whole multiple
-  /// up to four in each axis is undone here by taking one sample per block.
+  /// Two tools may put a different number of pixels on the same picture and both be right, and there
+  /// are two separate reasons for it here. Neither is a disagreement about what the file holds, so
+  /// both are undone before the pixels are judged.
+  /// <list type="number">
+  /// <item><b>A pixel that is not square.</b> A C64 multicolour picture is 160 pixels across and was
+  /// always shown on 320, because the chip doubles them horizontally and leaves the 200 lines alone;
+  /// the same is true of the Atari, the Amstrad and the Spectrum's wider modes. RECOIL, XnView and
+  /// IrfanView all hand such a picture back at its display size and this package stores it at the
+  /// size it is actually coded, so the two differ in one axis only. Holding the three of them to the
+  /// stored size called twenty-six C64 formats wrong on a question none of the four disagree
+  /// about.</item>
+  /// <item><b>A different idea of how big a point is.</b> A PostScript interpreter rasterises points
+  /// at 72 to the inch where this package uses 96, so it returns three pixels for every four of ours
+  /// in both axes at once — a scale that is not a whole number and not an upscale either.</item>
+  /// </list>
+  /// So a whole multiple up to four in each axis is undone, and so is a single fractional scale that
+  /// serves both axes alike. What is not undone is an arbitrary stretch in one axis and something
+  /// unrelated in the other: that is a change of shape, and it falls through to be judged at its own
+  /// size, which rejects it.
   /// <para/>
-  /// Nothing is conceded by doing it. The comparison that follows is the same one, and a decode that
-  /// is doubled and also wrong still fails it; all this removes is the scale, which is a convention
-  /// about how the picture is shown rather than a claim about what it holds.
+  /// Nothing is conceded by any of this. The comparison that follows is the same one, and a decode
+  /// that is rescaled and also wrong still fails it; all this removes is the scale, which is a
+  /// convention about how the picture is shown rather than a claim about what it holds.
   /// </remarks>
   private static RawImage _AtStoredScale(RawImage rebuilt, int width, int height) {
     if (width <= 0 || height <= 0 || rebuilt.Width <= 0 || rebuilt.Height <= 0)
@@ -146,16 +159,10 @@ internal static class WriterOracleComparison {
 
     var scaleX = (double)rebuilt.Width / width;
     var scaleY = (double)rebuilt.Height / height;
-
-    // Two tools may put a different number of pixels on the same picture and both be right. A C64
-    // chip draws a 160-wide screen 320 pixels across, so three decoders return twice our width; a
-    // PostScript interpreter rasterises points at 72 to the inch where this package uses 96, so it
-    // returns three pixels for every four of ours. Neither is a disagreement about the file — what
-    // would be is a different shape, so the test is that one scale serves both axes. Anything else
-    // falls through and is judged at its own size, which rejects it.
-    if (Math.Abs(scaleX - scaleY) > 0.02 * Math.Max(scaleX, scaleY))
+    if (Math.Abs(scaleX - 1.0) < 1e-9 && Math.Abs(scaleY - 1.0) < 1e-9)
       return rebuilt;
-    if (scaleX is < 0.2 or > 4.0 || (Math.Abs(scaleX - 1.0) < 1e-9 && Math.Abs(scaleY - 1.0) < 1e-9))
+
+    if (!_IsOneScaleOverBothAxes(scaleX, scaleY) && !_IsWholeMultiplePerAxis(rebuilt, width, height))
       return rebuilt;
 
     byte[] source;
@@ -182,6 +189,24 @@ internal static class WriterOracleComparison {
 
     return new() { Width = width, Height = height, Format = PixelFormat.Rgb24, PixelData = reduced };
   }
+
+  /// <summary>One scale, whole or not, serving both axes alike.</summary>
+  /// <remarks>
+  /// The two axes are allowed to differ by a fiftieth because a renderer working in points arrives
+  /// at whole pixels by rounding, and 4:3 of an odd number does not land on one. The range stops the
+  /// predicate from explaining away a thumbnail or a poster, neither of which is a convention about
+  /// how the picture is shown.
+  /// </remarks>
+  private static bool _IsOneScaleOverBothAxes(double scaleX, double scaleY)
+    => Math.Abs(scaleX - scaleY) <= 0.02 * Math.Max(scaleX, scaleY) && scaleX is >= 0.2 and <= 4.0;
+
+  /// <summary>
+  /// A whole multiple in each axis, the two not having to agree — which is how a non-square pixel
+  /// reaches a square-pixel picture.
+  /// </summary>
+  private static bool _IsWholeMultiplePerAxis(RawImage rebuilt, int width, int height)
+    => rebuilt.Width % width == 0 && rebuilt.Height % height == 0
+       && rebuilt.Width / width <= 4 && rebuilt.Height / height <= 4;
 
   /// <summary>What this package reads back out of the file it just wrote.</summary>
   /// <remarks>
