@@ -1267,7 +1267,7 @@ Implements `IVideoCodecDecoder<Indeo3VideoDecoder>`, `IVideoFrameDecoder`.
 
 #### `Indeo3VideoEncoder`
 
-Encodes Intel Indeo 3 as independently decodable `IV32` intra frames.
+Encodes Intel Indeo 3 `IV32` intra and forward-predicted pictures.
 
 Implements `IVideoCodecEncoder<Indeo3VideoEncoder>`, `IVideoPacketEncoder`.
 
@@ -1277,7 +1277,7 @@ Implements `IVideoCodecEncoder<Indeo3VideoEncoder>`, `IVideoPacketEncoder`.
 | `Codec` | `static CodecTag Codec { get; }` |  |
 | `Create` | `static Indeo3VideoEncoder Create(MediaStreamInfo stream)` | Creates an IV32 writer for a picture size the format can divide into 4x4 cells. |
 | `DescribeStream` | `MediaStreamInfo DescribeStream()` |  |
-| `TryEncode` | `bool TryEncode(RawImage frame, long? presentationTimestamp, out CodedPacket packet)` | Encodes one picture immediately; the encoder buffers no frames. |
+| `TryEncode` | `bool TryEncode(RawImage frame, long? presentationTimestamp, out CodedPacket packet)` | Encodes one picture immediately; no display-order reordering is required by Indeo 3. |
 
 #### `Indeo4VideoDecoder`
 
