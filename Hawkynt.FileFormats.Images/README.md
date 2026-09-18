@@ -1572,6 +1572,7 @@ What is left is a shorter list than it was. The edge-preserving filter is parsed
 - **Bundle size** — `~4.9 MB`, four assemblies. There is no way to take only the formats you need; if that matters, per-format NuGet packages may be published in future.
 - **TFM** — targets `net8.0`. Older runtimes are not supported.
 - Coverage breadth is larger than conformance depth. Some historical formats have scarce or no public samples; registry presence is not a promise that every obscure producer variant has been verified.
+- **Investigated and not implemented** — a format chased and left unread is recorded rather than passed over in silence. Where each one stopped, and what would change the answer, is in [`format-investigations.md`](https://github.com/Hawkynt/PNGCrushCS/blob/main/Hawkynt.FileFormats.Images/format-investigations.md).
 - The JPEG XL pixel path is measured against libjxl on 104 files plus the fixtures, not against every `.jxl` that exists. Do not treat its internal round-trip as proof of arbitrary `.jxl` compatibility.
 
 ## 📚 References
