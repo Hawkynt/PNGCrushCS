@@ -978,7 +978,7 @@ Implements `IVideoCodecEncoder<FlashSvVideoEncoder>`, `IVideoPacketEncoder`.
 
 #### `FlicVideoDecoder`
 
-Decodes Autodesk FLIC (`FLIC`): palette updates, delta-coded frames and whole frames over a paletted eight-bit canvas that is never cleared between packets.
+Decodes Autodesk/DTA FLIC: palettised eight-bit FLI/FLC/FLX plus RGB555, RGB565 and BGR24 extended FLIC, including whole pictures and previous-frame delta updates.
 
 Implements `IVideoCodecDecoder<FlicVideoDecoder>`, `IVideoFrameDecoder`.
 
@@ -987,11 +987,11 @@ Implements `IVideoCodecDecoder<FlicVideoDecoder>`, `IVideoFrameDecoder`.
 | `CodecName` | `static string CodecName { get; }` |  |
 | `Accepts` | `static bool Accepts(MediaStreamInfo stream)` |  |
 | `Create` | `static FlicVideoDecoder Create(MediaStreamInfo stream)` |  |
-| `TryDecode` | `bool TryDecode(CodedPacket packet, out RawImage frame)` | Decodes one packet, which for this codec is always exactly one whole frame. |
+| `TryDecode` | `bool TryDecode(CodedPacket packet, out RawImage frame)` |  |
 
 #### `FlicVideoEncoder`
 
-Encodes Autodesk FLIC (`FLIC`): eight-bit palette updates and whole palettised pictures over the same persistent canvas `FlicVideoDecoder` reads.
+Encodes Autodesk/DTA FLIC at 8, 15, 16 and 24 bits per pixel, using whole-image key frames and previous-frame delta updates.
 
 Implements `IVideoCodecEncoder<FlicVideoEncoder>`, `IVideoPacketEncoder`.
 
@@ -1000,8 +1000,8 @@ Implements `IVideoCodecEncoder<FlicVideoEncoder>`, `IVideoPacketEncoder`.
 | `CodecName` | `static string CodecName { get; }` |  |
 | `Codec` | `static CodecTag Codec { get; }` |  |
 | `Create` | `static FlicVideoEncoder Create(MediaStreamInfo stream)` |  |
-| `DescribeStream` | `MediaStreamInfo DescribeStream()` | The one eight-bit FLIC stream a `FliWriter` needs described. |
-| `TryEncode` | `bool TryEncode(RawImage frame, long? presentationTimestamp, out CodedPacket packet)` | Codes one picture, preserving both its palette and its palette indices exactly. |
+| `DescribeStream` | `MediaStreamInfo DescribeStream()` |  |
+| `TryEncode` | `bool TryEncode(RawImage frame, long? presentationTimestamp, out CodedPacket packet)` |  |
 
 #### `H261VideoDecoder`
 
@@ -5910,33 +5910,34 @@ Implements `IVideoContainerWriter<EaWriter>`, `IVideoFormatMetadata<EaWriter>`.
 
 #### `FliContainer`
 
-An Autodesk FLIC file (`.fli`, `.flc`, an eight-bit `.flx`) taken apart into the one stream it declares and the frame chunks it holds — and nothing else.
+An Autodesk/DTA FLIC file (`.fli`, `.flc`, `.flx`, `.flh`, `.flt`) split into its one video stream and frame chunks.
 
 Implements `IVideoContainerReader<FliContainer>`, `IVideoFormatMetadata<FliContainer>`.
 
 | Member | Signature | Summary |
 | --- | --- | --- |
 | `FliContainer` | `FliContainer()` |  |
-| `Data` | `ReadOnlyMemory<byte> Data { get; init; }` | The whole file, which every packet is a window onto. |
+| `Data` | `ReadOnlyMemory<byte> Data { get; init; }` |  |
+| `Depth` | `ushort Depth { get; init; }` | Effective coded depth. Autodesk FLX's stored 16 is normalized to its actual RGB555 15. |
 | `FileExtensions` | `static string[] FileExtensions { get; }` |  |
-| `FirstFrameOffset` | `int FirstFrameOffset { get; init; }` | Where the first `FRAME_TYPE` chunk begins. |
-| `FrameCount` | `ushort FrameCount { get; init; }` | The number of frames the header declares, which excludes the ring frame. See `FliReader` for why that exclusion is deliberate rather than an oversight. |
-| `Height` | `int Height { get; init; }` | Picture height in pixels, as the header states it. |
-| `Magic` | `ushort Magic { get; init; }` | The header's magic — `0xAF11` for `.fli`, `0xAF12` for `.flc`/`.flx`. |
+| `FirstFrameOffset` | `int FirstFrameOffset { get; init; }` |  |
+| `FrameCount` | `ushort FrameCount { get; init; }` |  |
+| `Height` | `int Height { get; init; }` |  |
+| `Magic` | `ushort Magic { get; init; }` |  |
 | `PrimaryExtension` | `static string PrimaryExtension { get; }` |  |
-| `Speed` | `uint Speed { get; init; }` | The header's own delay between frames, in the stream's time base — 1/70-second ticks for `.fli`, milliseconds for `.flc`. |
-| `Width` | `int Width { get; init; }` | Picture width in pixels, as the header states it. |
-| `FromBytes` | `static FliContainer FromBytes(byte[] data)` | Opens a file over the caller's array, keeping it rather than copying it. |
+| `Speed` | `uint Speed { get; init; }` |  |
+| `Width` | `int Width { get; init; }` |  |
+| `FromBytes` | `static FliContainer FromBytes(byte[] data)` |  |
 | `FromFile` | `static FliContainer FromFile(FileInfo file)` |  |
 | `FromSpan` | `static FliContainer FromSpan(ReadOnlySpan<byte> data)` |  |
-| `Metadata` | `static VideoMetadata Metadata(FliContainer container)` | Nothing beyond the one stream. A FLIC header has no field for a title, an author or a creation date — `created`/`creator`/`updated`/`updater` exist but name a serial number and an MS-DOS timestamp with no text anywhere near them, not a work's metadata. |
-| `ReadPackets` | `static IEnumerable<CodedPacket> ReadPackets(FliContainer container)` | Walks the film's frames, one packet a frame, stopping before the ring frame. |
-| `ReadPackets` | `static IEnumerable<CodedPacket> ReadPackets(FliContainer container, int streamIndex)` | The file has one stream, so anything but index zero walks nothing. |
-| `Streams` | `static IReadOnlyList<MediaStreamInfo> Streams(FliContainer container)` | The one stream a FLIC file holds — it carries no sound and no second picture stream. |
+| `Metadata` | `static VideoMetadata Metadata(FliContainer container)` |  |
+| `ReadPackets` | `static IEnumerable<CodedPacket> ReadPackets(FliContainer container)` |  |
+| `ReadPackets` | `static IEnumerable<CodedPacket> ReadPackets(FliContainer container, int streamIndex)` |  |
+| `Streams` | `static IReadOnlyList<MediaStreamInfo> Streams(FliContainer container)` |  |
 
 #### `FliWriter`
 
-Writes an Autodesk Animator Pro FLC file from already-coded FLIC frame sub-chunks.
+Writes Autodesk FLC or DTA extended FLIC from already-coded FLIC frame sub-chunks.
 
 Implements `IVideoContainerWriter<FliWriter>`, `IVideoFormatMetadata<FliWriter>`.
 
