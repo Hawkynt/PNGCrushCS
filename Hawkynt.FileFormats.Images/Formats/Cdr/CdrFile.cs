@@ -20,7 +20,6 @@ namespace FileFormat.Cdr;
 /// </remarks>
 [FormatMagicBytes([(byte)'C', (byte)'D', (byte)'R'], 8)]
 [FormatMagicBytes([(byte)'c', (byte)'d', (byte)'r', (byte)'8'], 8)]
-[VerifiedBy(ConformanceOracle.LibreOffice)]
 public sealed class CdrFile :
   IImageFormatReader<CdrFile>, IImageToRawImage<CdrFile>, IImageFromRawImage<CdrFile>, IImageFormatWriter<CdrFile> {
 
