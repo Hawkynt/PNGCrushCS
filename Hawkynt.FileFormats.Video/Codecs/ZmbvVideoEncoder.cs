@@ -18,14 +18,15 @@ namespace FileFormat.Codecs;
 /// <b>Which pixel layout is written</b> is decided once, from the <see cref="MediaStreamInfo.BitsPerPixel"/>
 /// the stream was requested with, because the layout is stated in every intraframe and cannot change
 /// between them: 8 codes format 4, palettised, and takes <see cref="PixelFormat.Indexed8"/> pictures
-/// only; 16 codes format 6, 5-6-5, and takes <see cref="PixelFormat.Rgb565"/> pictures only; 32 — or
-/// nothing stated — codes format 8, four bytes B, G, R and one the format leaves undefined, and
-/// takes any picture that converts to eight-bit colour without changing a sample, with the fourth
-/// byte carried through verbatim where the source had one and every other decoder free to ignore it.
-/// Any other bit count, and any picture that would have to be quantised or palettised to fit the
-/// stream's layout, is refused by name rather than approximated: this is a lossless codec. The
-/// format's 15-bit layout is not offered because no <see cref="RawImage"/> layout holds 5-5-5 samples
-/// without widening them first, and 24-bit is not because no decoder in existence reads it.
+/// only; 15 codes format 5, 5-5-5, and takes any eight-bit RGB picture whose three channels are
+/// exactly representable by the format's five-bit samples; 16 codes format 6, 5-6-5, and takes
+/// <see cref="PixelFormat.Rgb565"/> pictures only; 32 — or nothing stated — codes format 8, BGR0,
+/// four bytes B, G, R and one explicitly unused byte. Alpha therefore is not coded by the 32-bit
+/// layout; its padding byte is normalised to opaque on input instead of being mistaken for a fourth
+/// colour channel. Any picture that would have to be quantised or palettised to fit the stream's
+/// layout is refused by name rather than approximated: this is a lossless codec. The format's 24-bit
+/// layout is not offered because the reference implementation leaves it disabled and ordinary ZMBV
+/// decoders do not accept it.
 /// <para/>
 /// <b>What a packet holds.</b> The first frame and every twenty-fifth after it — FFmpeg's default
 /// minimum key interval — is an intraframe: a seven-byte header naming version 0.1, zlib, the
@@ -34,6 +35,8 @@ namespace FileFormat.Codecs;
 /// XOR of the palette against the last one where it changed, a two-byte entry per block in raster
 /// order — the motion vector doubled with the XOR bit in the low bit of the first byte — padded to
 /// a multiple of four, and then the XOR correction of every block whose entry says it has one.
+/// ZMBV has no B-picture syntax and no future-frame reference: every interframe predicts only from
+/// the picture immediately before it.
 /// <para/>
 /// <b>The motion search is FFmpeg's</b>, scored the way FFmpeg scores it: the zero vector first,
 /// the previous block's vector next, then every offset within eight pixels, each candidate's XOR
@@ -62,6 +65,7 @@ public sealed class ZmbvVideoEncoder : IVideoCodecEncoder<ZmbvVideoEncoder> {
   private const byte _FLAG_KEY_FRAME = 1;
   private const byte _FLAG_PALETTE_DELTA = 2;
   private const byte _FORMAT_8BPP = 4;
+  private const byte _FORMAT_15BPP = 5;
   private const byte _FORMAT_16BPP = 6;
   private const byte _FORMAT_32BPP = 8;
 
@@ -103,7 +107,7 @@ public sealed class ZmbvVideoEncoder : IVideoCodecEncoder<ZmbvVideoEncoder> {
       DeclaredFrameCount = stream.DeclaredFrameCount,
       Width = stream.Width,
       Height = stream.Height,
-      BitsPerPixel = bytesPerPixel * 8,
+      BitsPerPixel = format == _FORMAT_15BPP ? 15 : bytesPerPixel * 8,
       Language = stream.Language,
       Name = stream.Name,
     };
@@ -123,11 +127,12 @@ public sealed class ZmbvVideoEncoder : IVideoCodecEncoder<ZmbvVideoEncoder> {
 
     return stream.BitsPerPixel switch {
       8 => new(stream, _FORMAT_8BPP, 1, PixelFormat.Indexed8),
+      15 => new(stream, _FORMAT_15BPP, 2, PixelFormat.Rgb24),
       16 => new(stream, _FORMAT_16BPP, 2, PixelFormat.Rgb565),
       0 or 32 => new(stream, _FORMAT_32BPP, 4, PixelFormat.Bgra32),
       var bits => throw new NotSupportedException(
-        $"Zip Motion Blocks Video is asked for {bits} bits a pixel. The layouts written here are 8 (palettised), 16 "
-        + "(5-6-5) and 32; 15 has no RawImage layout to take losslessly and 24 has no decoder to read it."),
+        $"Zip Motion Blocks Video is asked for {bits} bits a pixel. The layouts written here are 8 (palettised), "
+        + "15 (5-5-5), 16 (5-6-5) and 32 (BGR0); 24 is not enabled by the reference decoder."),
     };
   }
 
@@ -220,6 +225,8 @@ public sealed class ZmbvVideoEncoder : IVideoCodecEncoder<ZmbvVideoEncoder> {
         palette = new byte[_PALETTE_BYTES];
         Array.Copy(frame.Palette, palette, frame.PaletteCount * 3);
         break;
+      case _FORMAT_15BPP:
+        return this._PackRgb555(frame);
       case _FORMAT_16BPP:
         if (frame.Format != PixelFormat.Rgb565)
           throw new NotSupportedException(
@@ -229,10 +236,49 @@ public sealed class ZmbvVideoEncoder : IVideoCodecEncoder<ZmbvVideoEncoder> {
     }
 
     var picture = LosslessEncoderInput.Prepare(frame, this._codedFormat, this._width, this._height, CodecName);
-    var frameBytes = this._width * this._height * this._bytesPerPixel;
+    var frameBytes = checked(this._width * this._height * this._bytesPerPixel);
     var pixels = new byte[frameBytes];
     Array.Copy(picture.PixelData, pixels, frameBytes);
+
+    if (this._format == _FORMAT_32BPP)
+      for (var i = 3; i < pixels.Length; i += 4)
+        pixels[i] = byte.MaxValue;
+
     return pixels;
+  }
+
+  /// <summary>
+  /// Packs RGB into the reference implementation's little-endian 1X:5R:5G:5B layout. Because the
+  /// public RawImage model has no RGB555 format, only channel values that are exactly the result of
+  /// widening a five-bit sample are accepted; anything else would be quantisation and is refused.
+  /// </summary>
+  private byte[] _PackRgb555(RawImage frame) {
+    var picture = LosslessEncoderInput.Prepare(frame, PixelFormat.Rgb24, this._width, this._height, CodecName);
+    var pixelCount = checked(this._width * this._height);
+    var packed = new byte[checked(pixelCount * 2)];
+
+    for (var i = 0; i < pixelCount; ++i) {
+      var at = i * 3;
+      var red = _NarrowFiveBits(picture.PixelData[at], i, 'R');
+      var green = _NarrowFiveBits(picture.PixelData[at + 1], i, 'G');
+      var blue = _NarrowFiveBits(picture.PixelData[at + 2], i, 'B');
+      var colour = (ushort)((red << 10) | (green << 5) | blue);
+      packed[i * 2] = (byte)colour;
+      packed[i * 2 + 1] = (byte)(colour >> 8);
+    }
+
+    return packed;
+  }
+
+  private static int _NarrowFiveBits(byte channel, int pixel, char component) {
+    var sample = channel >> 3;
+    var widened = (sample << 3) | (sample >> 2);
+    if (widened != channel)
+      throw new NotSupportedException(
+        $"Zip Motion Blocks Video 15-bit RGB cannot represent {component}={channel} at pixel {pixel} exactly; "
+        + "the picture is refused rather than quantised to five bits.");
+
+    return sample;
   }
 
   // ============================================================================================

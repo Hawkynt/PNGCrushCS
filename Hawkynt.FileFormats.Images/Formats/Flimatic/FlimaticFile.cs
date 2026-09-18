@@ -17,7 +17,7 @@ namespace FileFormat.Flimatic;
 /// picture rather than an error. The apparent success was that accident. At the length the format
 /// actually has, the direct path runs.
 /// </remarks>
-[VerifiedBy(ConformanceOracle.Recoil2Png)]
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.IrfanView)]
 public readonly record struct FlimaticFile
   : IImageFormatReader<FlimaticFile>, IImageToRawImage<FlimaticFile>,
     IImageFromRawImage<FlimaticFile>, IImageFormatWriter<FlimaticFile> {
