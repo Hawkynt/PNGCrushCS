@@ -21,6 +21,7 @@ namespace FileFormat.CartesMichelin;
 /// was confirmed by construction against the converter, both for a full grid and for grids with only
 /// one column and only one tile occupied.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.XnView)]
 public readonly record struct CartesMichelinFile
   : IImageFormatReader<CartesMichelinFile>, IImageToRawImage<CartesMichelinFile>,
     IImageFromRawImage<CartesMichelinFile>, IImageFormatWriter<CartesMichelinFile> {

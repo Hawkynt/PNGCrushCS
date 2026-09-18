@@ -4,7 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.ZxSpectrum;
 
 /// <summary>In-memory representation of a ZX Spectrum screen (6912 bytes: 6144 bitmap + 768 attributes).</summary>
-[VerifiedBy(ConformanceOracle.Recoil2Png)]
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.ImageMagick, ConformanceOracle.XnView, ConformanceOracle.IrfanView)]
 public readonly record struct ZxSpectrumFile : IImageFormatReader<ZxSpectrumFile>, IImageToRawImage<ZxSpectrumFile>, IImageFromRawImage<ZxSpectrumFile>, IImageFormatWriter<ZxSpectrumFile> {
 
   static string IImageFormatMetadata<ZxSpectrumFile>.PrimaryExtension => ".scr";

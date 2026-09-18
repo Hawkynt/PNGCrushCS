@@ -17,7 +17,7 @@ namespace FileFormat.SuperHiresEditor;
 /// What was written before was 18002 bytes of two whole 320 by 200 high-resolution screens, which is
 /// not this format's size, geometry or structure. Nothing in it was sprite at all.
 /// </remarks>
-[VerifiedBy(ConformanceOracle.Recoil2Png)]
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.IrfanView)]
 public readonly record struct SuperHiresEditorFile
   : IImageFormatReader<SuperHiresEditorFile>, IImageToRawImage<SuperHiresEditorFile>,
     IImageFromRawImage<SuperHiresEditorFile>, IImageFormatWriter<SuperHiresEditorFile> {

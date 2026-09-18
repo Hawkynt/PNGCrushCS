@@ -788,6 +788,81 @@ frame, so a miscounted coded-block run, a mode written for a macro block that ca
 in the wrong units would pass it and fail in a real player on frame two. A still scene is also required
 to converge, which is what demonstrates the coded-block flags firing at all.
 
+### On2 VP5
+
+VP5 (`VP50`) is the step between VP3 and VP6: VP3's 4:2:0 block structure and VP3's 8x8 integer
+inverse transform, with an arithmetic coder and a context-conditioned coefficient model where VP3 had
+Huffman tables. All of it is decoded — intra and predicted pictures, all ten macroblock modes across
+the previous and the golden reference, one vector or four, half-sample luminance and quarter-sample
+chrominance motion, the prediction-time edge filter, direct-current prediction from up to four
+neighbours, and interlaced field-coded macroblocks. There is no encoder.
+
+**Where the implementation came from, and why that rung.** It is a conversion of FFmpeg's `vp5.c`,
+`vp56.c`, `vp5dsp.c`, `vp3dsp.c`, `vp56data.c`, `vp5data.h` and `vpx_rac.h`, which are
+LGPL-2.1-or-later and so absorbable by this package's LGPL-3.0-or-later; the notice beside the source
+records it. That is the first rung of the sourcing ladder and there is no rung above it to take here.
+On2 published a VP6 bitstream specification and never published a VP5 one, and the community
+description of VP5 covers its range coder and its frame header and stops. FFmpeg's decoder is
+therefore not a convenient second opinion about VP5 — it is the only complete account of the format
+that exists, and every VP5 file in circulation has been checked against it and against nothing else.
+
+That is worth saying plainly beside [the investigation of VP6](codec-investigations.md), which failed.
+That attempt was a clean-room reimplementation from On2's own document and it desynchronised inside
+the first coefficient block; the note it left says VP5 is behind the same wall. It is behind the same
+wall only for that method. Nothing about the wall moved: the ladder's first rung was taken instead of
+its third, which is what the ladder says to do when the first rung is available, and VP5's is.
+
+**Two things the reference does that look like mistakes and are not.** The transform here is not the
+one in `Vp3InverseDct`, which is the Theora specification's normative form and truncates a sum to
+sixteen bits before each multiplication by the C4 constant. FFmpeg's does not, and the two differ
+wherever an intermediate overflows. Since VP5 has no normative text, what real files decode as is
+FFmpeg's arithmetic, and that is what is implemented. Separately, a field-coded macroblock's
+chrominance blocks are read out of the prediction window at a different depth from its luminance
+blocks — four rows in rather than two — which has no evident reason behind it and is kept because
+removing it makes real interlaced files decode wrongly. Both are stated in the source at the point
+they bite.
+
+**What it was measured against.** ffmpeg has a VP5 decoder and no VP5 encoder, so the comparison is
+over real files rather than over a round trip: `potter512-400.avi` (512x304, 2,084 frames, thirty-four key
+frames) and `vp5_interlace.avi` (352x576, 2,395 frames, thirty-nine key frames, interlaced) from
+`samples.mplayerhq.hu/V-codecs/VP5/`, which between them are every VP5 file published in a container
+this package reads — the rest of that directory is six raw `.vp5` elementary streams and one Nullsoft
+NSV file, neither of which has a reader here. Both were decoded here and by ffmpeg and compared plane by plane, sample by
+sample. **Every plane of every frame of both files is identical** — not close, not on average, the
+same bytes, on the 2,000th frame of a run as on the first. That is the only acceptable result, because
+the loss happened in an encoder neither decoder has, and because an error of one anywhere in the
+transform, the prediction or the edge filter is added to the next frame's error and the one after
+that until the next key frame.
+
+Counting what those two files contain says how much of the format that measurement actually reached.
+Between them they use **all ten macroblock modes** — including the four-vector mode and all four that
+predict from the golden picture, the rarest of which occurs 1,776 times — both ways of starting the
+macroblock-type statistics, all six coefficient magnitude classes, quantisers from 7 to 63, and
+792,335 field-coded macroblocks. Nothing in the decoder is reached only by a path no file takes.
+
+Three cuts of those two files are committed beside the tests with ffmpeg's own `framemd5` output, so
+the claim runs on a machine that has no ffmpeg and no network: sixty frames off one key frame, which
+is the shape that catches a prediction loop drifting; twenty-five frames carrying three key frames,
+which exercises the entropy-model reset and the golden-picture replacement; and ten interlaced frames,
+which is the only way the field-coded path can be measured at all. Where ffmpeg is present the tool
+is also asked directly, so the committed digests cannot quietly become a record of this decoder
+agreeing with its own past mistake. The comparison is on the sample planes and never on RGB: the RGB
+is a display convention this package chose — it interpolates chrominance where ffmpeg repeats it — so
+an RGB difference measures the convention and not the decode.
+
+The interlaced path was checked the same way a reviewer would want it checked: disabling it makes
+every frame of the interlaced file wrong, and moving the chrominance window depth from four to two
+makes 2,400 samples a frame wrong. Neither is a path that quietly does nothing.
+
+**What is refused, by name, rather than guessed at.** A packet with no bytes; a stream that begins at
+an inter frame, since there is nothing to predict from; a key frame stating a picture with no area; a
+key frame stating a display size that does not fit inside its coded size; a bitstream version outside
+the defined zero to five; and a frame whose coefficient data runs out before its macroblocks do. That
+last one matters more than it looks. A range coder answers every question it is asked whether or not
+anything is left to answer with, so a truncated VP5 frame does not announce itself — it produces a
+picture. Nothing separates that picture from a real one except the count of how far past the end the
+coder has read, which is why the count is kept and why it is checked once a macroblock.
+
 ### Apple Video (RPZA)
 
 A vector quantizer over 4x4 blocks of 15-bit RGB colour, also called Road Pizza, and QuickTime's own
@@ -2696,6 +2771,35 @@ since there is no rate control here for a mid-group quantiser change to serve an
 makes the same picture code to the same bytes; the bit-stuffing codeword of 4.2.3.1, which exists to
 fill a channel this encoder is not driving; and Annex D, which the decoder beside it will not read.
 
+**Freeze Picture Release is the only entry point a stream has, and a warning about entry points that
+means nothing.** Two things about H.261 and key frames that cost an investigation each and are easy to
+run into again in the same hour, because one looks like evidence for the other and is not.
+
+The first: with no picture-level intra/inter flag anywhere in the syntax, the nearest thing to "you may
+start decoding here" is PTYPE bit 3, Freeze Picture Release — nominally an encoder's answer to a fast
+update request, telling a decoder it may leave freeze picture mode and show what it decodes from now
+on. ffmpeg's own encoder writes it for exactly its intra pictures, and ffmpeg's decoder reads it back
+as the decoded frame's key-frame flag; nothing else in the picture layer can carry that. Written clear
+on every picture, as this encoder did until it was measured, a clip is well-formed, decodes sample for
+sample, and reports **no key frame at all** — `ffprobe -show_entries frame=key_frame` answers `0` for
+every picture of it against `1,I` for the first picture of ffmpeg's own — so anything that seeks, or
+selects on `AVDISCARD_NONKEY`, discards the whole clip. The packet's own `IsKeyFrame` said one thing
+and the bytes it carried said another, which is the kind of disagreement no round trip through this
+library can see, both halves ignoring the bit.
+
+The second, and it is *not* the first showing itself: ffmpeg before 8.1 prints `[h261 @ …] warning:
+first frame is no keyframe` — twice, once per decoder it opened — for **every H.261 stream in
+existence**, its own encoder's output included, with or without Freeze Picture Release set. H.261 has
+no I picture for ffmpeg's decoder to report, so it enters every picture as `AV_PICTURE_TYPE_P` and
+mpegvideo's complaint fires on the first one. ffmpeg silenced it itself in 8.1
+(`s->codec_id != AV_CODEC_ID_H261 /* H.261 has no keyframes */` in `ff_mpv_alloc_dummy_frames`), which
+is why the line appears and disappears with the ffmpeg on the machine rather than with the bytes handed
+to it. Measured on 4.2.2 and 8.1 in both directions before either half of this was touched. The
+executable Oracle column treats any line on ffmpeg's error channel as a failure, correctly, and this one
+line is exempted there by decoder tag as well as by text; the exemption is in `FFmpegOracle` with the
+measurement beside it. Setting Freeze Picture Release does not silence it and was never going to — the
+warning is about a picture type H.261 does not have, not about a bit it does.
+
 ### id RoQ
 
 The FMV format Graeme Devine wrote for The 11th Hour, carried into Quake III and Return to Castle
@@ -4154,6 +4258,75 @@ which is not a defect in either.
 
 What refuses, by name: a container stating a picture size larger than the one its own JPEG frame
 header codes, which nothing here has bytes to fill in.
+
+### Avid Meridien Compressed
+
+The `AVDJ` half of Avid's Meridien pair — the compressed one, against the uncompressed `AVUI` already in
+this package. The payload is Avid JFIF, which is baseline Motion JPEG and decoded by the same reader, and
+everything interesting about the codec is in the two layout rules the JPEG does not carry: whether a
+packet is one frame or two fields, and which output rows each of two fields belongs on.
+
+**A packet holds two fields when its coded picture is under three quarters of the frame height.** Not
+half exactly, because two things move the coded height off half: an encoder padding its field out to a
+whole macroblock row, and a container stating a display height a few rows shorter than what was coded.
+The three-quarter margin absorbs both and is the reference decoder's own. Measured against ffmpeg 8.1.2
+with hand-built QuickTime files at a stated 486 lines: coded field heights of 240, 243 and 248 all weave
+into a frame, and a coded 486 is read as one whole picture with anything after it in the packet ignored.
+
+**The padding is above the picture.** A coded 720x496 against a stated 720x486 loses its top ten rows,
+not its bottom ten: a fixture whose top ten rows are red over a blue remainder came back from ffmpeg
+entirely blue. That is the same crop AVRn needs, and both codecs now take it from one place.
+
+**Which field goes on which row is the part the fourcc cannot answer**, and three things can. In order:
+
+- *QuickTime's `fiel` image-description extension.* Apple's four two-field values say both which field
+  is stored first and which is displayed first — 1 is top stored/top shown, 6 bottom/bottom, 9 top
+  stored/bottom shown, 14 bottom stored/top shown. Weaving needs the stored half, so 1 and 9 put the
+  first coded field on the top row and 6 and 14 put it on the second.
+- *The Video-for-Windows Avid discriminator.* `2C 00 00 00 18 00 00 00` and a television standard at byte
+  twelve: 1 NTSC puts the first coded field on odd rows, 2 PAL on even. Read either on its own or behind
+  a complete `BITMAPINFOHEADER`, which is how AVI and VfW Matroska hand it over. Measured against ffmpeg
+  with hand-built AVI files: 1 and 2 weave opposite ways and no discriminator weaves as 2 does.
+- *The geometry.* The two D1 rasters Meridien switched between have a field order Avid fixes — 486-line
+  NTSC stores its lower field first, 576-line PAL its upper.
+
+A two-field packet at a geometry none of those covers is **refused**, not woven one way and hoped for.
+
+**One deliberate disagreement with the oracle.** ffmpeg's MJPEG decoder reverses the weave for `fiel` 6
+alone; 14 it treats like 1 and 9, which for a bottom-stored stream is upside down. Apple's own
+description of the value is unambiguous about which field is stored first, so 14 is read here the way
+Apple documents it rather than the way ffmpeg reads it. This costs nothing in either direction for what
+this package writes, because the writer never emits 9 or 14 — see below.
+
+**The writer.** Baseline 4:2:2 JPEG at one fixed IJG quality, since the encoder contract carries no
+quality setting. 720x486 and 720x576 are written as two complete JPEG fields per packet in temporal
+order and every other geometry as one progressive JPEG; interlace follows the geometry because a stream
+description carries no field order to ask for one, and inferring interlace from a height alone would
+mis-code progressive standard-definition material. The sample description states `fiel` 2/6 for the
+525-line raster and 2/1 for the 625-line one — the stored-order forms, deliberately, since the
+display-only forms make ffmpeg weave both rasters the same way round and one of them is then upside
+down. Only the progressive case claims Matroska's `V_MJPEG`: a two-field packet under that CodecID reads
+back through any Motion JPEG decoder as its first field alone, a picture of half the height with nothing
+reporting a problem, so the interlaced case names no CodecID and a Matroska muxer refuses it instead.
+
+**Alpha is not claimed.** Avid documentation describes an alpha-bearing Meridien Compressed variant and
+no public bitstream description found says how that alpha is represented. Nothing here reinterprets a
+second JPEG or a four-component JPEG as alpha, which would silently turn ordinary CMYK/YCCK JPEG syntax
+into a different colour model, and the writer refuses a picture carrying non-opaque alpha rather than
+flattening it. An all-opaque alpha channel is accepted, because discarding it loses nothing.
+
+**Verified.** Three five-frame clips written here — 720x486, 720x576 and a progressive 320x240 — were
+muxed into QuickTime files, handed to ffmpeg 8.1.2 and decoded to RGB24. Every frame of every clip came
+back, with nothing on ffmpeg's error channel, at a mean absolute error of 1.1 against the pictures that
+went in for the two interlaced clips and 1.9 for the progressive one, which is the JPEG quantisation and
+the chroma round trip and nothing else. The comparison is per frame rather than averaged over the clip,
+and it bites: writing `fiel` 14 instead of 6 leaves frame 0 of the 525-line clip at 134, and comparing
+any frame against its neighbour instead of itself leaves 25.
+
+What refuses, by name: a packet whose first bytes are not a complete JPEG picture; a two-field packet
+whose second JPEG is missing or truncated; two fields whose decoded pictures disagree on width, height
+or pixel format; a two-field packet whose row parity nothing states; and a container stating a picture
+size larger than the one its own JPEG codes.
 
 ## 📜 License
 

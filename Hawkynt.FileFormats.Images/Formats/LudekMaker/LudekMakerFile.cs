@@ -10,6 +10,7 @@ namespace FileFormat.LudekMaker;
 /// and shows three colours where a single player shows one. The two colours are fixed for the whole
 /// sheet, which is what makes it a sheet of one character's poses rather than of unrelated sprites.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.IrfanView)]
 public readonly record struct LudekMakerFile
   : IImageFormatReader<LudekMakerFile>, IImageToRawImage<LudekMakerFile>,
     IImageFromRawImage<LudekMakerFile>, IImageFormatWriter<LudekMakerFile> {
