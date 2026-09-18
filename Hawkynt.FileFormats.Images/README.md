@@ -52,7 +52,7 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | AdTechFax | `.adt` | ✅ | ✅ | — | — | — | none |
 | AdvancedArtStudio | `.ocp`, `.mpi`, `.mpic` | ✅ | ✅ | — | — | — | recoil2png, IrfanView |
 | Afli | `.afl` | ✅ | ✅ | — | — | — | recoil2png, XnView |
-| Ai | `.ai` | ✅ | ✅ | — | — | — | none |
+| Ai | `.ai` | ✅ | ✅ | — | — | — | Ghostscript |
 | AimGreyScale | `.ima` | ✅ | ✅ | — | — | — | XnView |
 | AirNav | `.anv` | ✅ | ✅ | — | — | — | XnView |
 | AladdinPaint | `.alp` | ✅ | ✅ | — | — | — | none |
@@ -196,7 +196,7 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | CartesMichelin | `.big` | ✅ | ✅ | — | — | — | none |
 | CasioQv | `.cam` | ✅ | ✅ | — | — | — | ffmpeg, IrfanView |
 | Ccitt | `.g3`, `.g4`, `.ccitt`, `.fax` | ✅ | ✅ | — | — | — | none |
-| Cdr | `.cdr` | ✅ | ✅ | — | — | — | LibreOffice |
+| Cdr | `.cdr` | ✅ | ✅ | — | — | — | none |
 | CDUPaint | `.cdu` | ✅ | ✅ | — | — | — | recoil2png, IrfanView |
 | Cdxl | `.cdxl` | ✅ | ✅ | — | — | — | none |
 | Cel | `.cel` | ✅ | ✅ | — | — | — | none |
@@ -309,7 +309,7 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | Enterprise128 | `.ep`, `.elan` | ✅ | ✅ | — | — | — | none |
 | Envi | `.hdr` | ✅ | ✅ | — | — | — | none |
 | EpaBios | `.epa` | ✅ | ✅ | — | — | — | recoil2png, IrfanView |
-| Eps | `.eps`, `.epsf`, `.epsi`, `.epi`, `.ept` | ✅ | ✅ | — | — | — | ImageMagick |
+| Eps | `.eps`, `.epsf`, `.epsi`, `.epi`, `.ept` | ✅ | ✅ | — | — | — | ImageMagick, Ghostscript |
 | Eroiica | `.eif` | ✅ | ✅ | — | ✅ | — | none |
 | EscapePaint | `.esp` | ✅ | ✅ | — | — | — | none |
 | EsmSoftwarePix | `.pix` | ✅ | ✅ | — | — | — | IrfanView |
@@ -687,7 +687,7 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | PocketPcTheme | `.tsk` | ✅ | ✅ | — | — | — | XnView, IrfanView |
 | PortfolioGraphics | `.pgf`, `.pgc` | ✅ | ✅ | — | — | — | recoil2png, IrfanView |
 | Portrait | `.cvp` | ✅ | ✅ | — | — | — | XnView |
-| PostScript | `.ps`, `.ps1`, `.ps2`, `.ps3`, `.eps`, `.epsf`, `.epsi`, `.epi`, `.prn`, `.pdx` | ✅ | ✅ | — | — | — | none |
+| PostScript | `.ps`, `.ps1`, `.ps2`, `.ps3`, `.eps`, `.epsf`, `.epsi`, `.epi`, `.prn`, `.pdx` | ✅ | ✅ | — | — | — | Ghostscript |
 | PowerGraphics | `.pgr` | ✅ | ✅ | — | — | — | recoil2png, IrfanView |
 | PowerPoint | `.ppt`, `.pps`, `.pot`, `.pptx`, `.ppsx`, `.potx`, `.pptm`, `.ppsm`, `.potm` | ✅ | ✅ | — | ✅ | — | XnView, IrfanView |
 | PrinterPageSegment | `.pse`, `.psg` | ✅ | ✅ | — | — | — | XnView |
@@ -939,7 +939,7 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | ZxUlaPlus | `.ulp`, `.scr` | ✅ | ✅ | — | — | — | recoil2png, ImageMagick |
 | ZzRough | `.rgh` | ✅ | ✅ | — | — | — | recoil2png, IrfanView |
 
-**Oracle** — the tool outside this repository that has read what the writer produces. `none` means nothing but this package's own reader ever has, and a reader agreeing with the writer beside it proves only that the two share one reading of the format; `—` means there is no writer, so there is nothing for anything to have read. What a name in this column states exactly: handed a file this writer produced, under one of the format's own extensions and at one of the sizes the format declares, that tool decoded it back to a picture of the same size which is not a blank canvas. That is weaker than the pixel-for-pixel comparisons in `Tests/Conformance.Recoil.Tests` and in the codec evidence below, and it is the one thing that could be asked of every writer here rather than of a chosen few. It does not prove the pixels agree, and where two unrelated formats share an extension and a geometry it can be a tool reading the other one. The tools: [avifdec](https://github.com/AOMediaCodec/libavif) · [djxl](https://github.com/libjxl/libjxl) · [dwebp](https://developers.google.com/speed/webp/docs/dwebp) · [ffmpeg](https://ffmpeg.org/) · [Ghostscript](https://www.ghostscript.com/) · [heif-dec](https://github.com/strukturag/libheif) · [ImageMagick](https://imagemagick.org/) · [IrfanView](https://www.irfanview.com/) · [LibreOffice](https://www.libreoffice.org/) · [opj_decompress](https://www.openjpeg.org/) · [recoil2png](https://recoil.sourceforge.net/) · [XnView](https://www.xnview.com/en/nconvert/).
+**Oracle** — the tool outside this repository that has read what the writer produces. `none` means nothing but this package's own reader ever has, and a reader agreeing with the writer beside it proves only that the two share one reading of the format; `—` means there is no writer, so there is nothing for anything to have read. What a name in this column states exactly: handed a file this writer produced, under one of the format's own extensions and at one of the sizes the format declares, that tool decoded it back to a picture of the same size which is not a blank canvas. That is weaker than the pixel-for-pixel comparisons in `Tests/Conformance.Recoil.Tests` and in the codec evidence below, and it is the one thing that could be asked of every writer here rather than of a chosen few. It does not prove the pixels agree, and where two unrelated formats share an extension and a geometry it can be a tool reading the other one. The tools: [avifdec](https://github.com/AOMediaCodec/libavif) · [djxl](https://github.com/libjxl/libjxl) · [dwebp](https://developers.google.com/speed/webp/docs/dwebp) · [ffmpeg](https://ffmpeg.org/) · [Ghostscript](https://www.ghostscript.com/) · [heif-dec](https://github.com/strukturag/libheif) · [ImageMagick](https://imagemagick.org/) · [IrfanView](https://www.irfanview.com/) · [opj_decompress](https://www.openjpeg.org/) · [recoil2png](https://recoil.sourceforge.net/) · [XnView](https://www.xnview.com/en/nconvert/).
 <!-- IMAGE-FORMATS:END -->
 
 ### Optimizers
