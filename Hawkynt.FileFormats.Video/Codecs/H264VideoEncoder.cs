@@ -654,7 +654,7 @@ public sealed class H264VideoEncoder : IVideoCodecEncoder<H264VideoEncoder> {
     int mbWidth,
     int mbHeight) {
     if (mbX < 0 || mbY < 0 || mbX >= mbWidth || mbY >= mbHeight)
-      return default;
+      return new(false, default, -1);
     var address = mbY * mbWidth + mbX;
     return new(true, usesList[address] ? vectors[address] : default, usesList[address] ? 0 : -1);
   }
