@@ -47,6 +47,108 @@ internal static class H264CavlcEncoding {
       : throw new ArgumentOutOfRangeException(nameof(codedBlockPattern));
   }
 
+
+  /// <summary>Writes one <c>residual_block_cavlc</c> in scan order.</summary>
+  internal static int WriteBlock(
+    H264BitWriter writer,
+    ReadOnlySpan<int> coeffLevel,
+    int nC,
+    bool chromaDc) {
+    ArgumentNullException.ThrowIfNull(writer);
+    if (coeffLevel.Length is <= 0 or > 16)
+      throw new ArgumentOutOfRangeException(nameof(coeffLevel));
+
+    Span<int> positions = stackalloc int[16];
+    var totalCoeff = 0;
+    for (var position = 0; position < coeffLevel.Length; ++position)
+      if (coeffLevel[position] != 0)
+        positions[totalCoeff++] = position;
+
+    Span<int> levels = stackalloc int[16];
+    Span<int> runs = stackalloc int[16];
+    for (var i = 0; i < totalCoeff; ++i) {
+      var source = totalCoeff - 1 - i;
+      var position = positions[source];
+      levels[i] = coeffLevel[position];
+      runs[i] = source == 0 ? position : position - positions[source - 1] - 1;
+    }
+
+    var trailingOnes = 0;
+    while (trailingOnes < totalCoeff && trailingOnes < 3 && Math.Abs(levels[trailingOnes]) == 1)
+      ++trailingOnes;
+
+    _WriteCode(writer, CoeffToken(nC, totalCoeff, trailingOnes));
+    if (totalCoeff == 0)
+      return 0;
+
+    for (var i = 0; i < trailingOnes; ++i)
+      writer.WriteBit(levels[i] < 0);
+
+    var suffixLength = totalCoeff > 10 && trailingOnes < 3 ? 1 : 0;
+    for (var i = trailingOnes; i < totalCoeff; ++i) {
+      var level = levels[i];
+      var levelCode = level > 0 ? checked(2L * level - 2) : checked(-2L * level - 1);
+      if (i == trailingOnes && trailingOnes < 3)
+        levelCode -= 2;
+
+      _WriteLevel(writer, levelCode, suffixLength);
+      if (suffixLength == 0)
+        suffixLength = 1;
+      if (Math.Abs(level) > 3 << (suffixLength - 1) && suffixLength < 6)
+        ++suffixLength;
+    }
+
+    var totalZeros = 0;
+    for (var i = 0; i < totalCoeff; ++i)
+      totalZeros += runs[i];
+
+    if (totalCoeff < coeffLevel.Length)
+      _WriteCode(writer, TotalZeros(totalCoeff, totalZeros, chromaDc));
+
+    var zerosLeft = totalZeros;
+    for (var i = 0; i < totalCoeff - 1; ++i) {
+      if (zerosLeft == 0)
+        break;
+      _WriteCode(writer, RunBefore(zerosLeft, runs[i]));
+      zerosLeft -= runs[i];
+    }
+
+    return totalCoeff;
+  }
+
+  private static void _WriteLevel(H264BitWriter writer, long levelCode, int suffixLength) {
+    if (levelCode < 0)
+      throw new InvalidOperationException("CAVLC level coding reached a negative levelCode.");
+
+    for (var prefix = 0; prefix <= 31; ++prefix) {
+      var suffixSize = prefix == 14 && suffixLength == 0 ? 4
+        : prefix >= 15 ? prefix - 3
+        : suffixLength;
+      var baseCode = (long)Math.Min(15, prefix) << suffixLength;
+      if (prefix >= 15 && suffixLength == 0)
+        baseCode += 15;
+      if (prefix >= 16)
+        baseCode += (1L << (prefix - 3)) - 4096;
+
+      var suffix = levelCode - baseCode;
+      var limit = 1L << suffixSize;
+      if (suffix < 0 || suffix >= limit)
+        continue;
+
+      for (var i = 0; i < prefix; ++i)
+        writer.WriteBit(false);
+      writer.WriteBit(true);
+      if (suffixSize > 0)
+        writer.WriteBits((uint)suffix, suffixSize);
+      return;
+    }
+
+    throw new InvalidOperationException($"CAVLC cannot represent levelCode {levelCode} with suffixLength {suffixLength}.");
+  }
+
+  private static void _WriteCode(H264BitWriter writer, Code code)
+    => writer.WriteBits(code.Bits, code.Length);
+
   private static Code _Find(int tableIndex, int value) {
     var currentIndex = 0;
     foreach (var table in H264CavlcTables.AllTables) {
