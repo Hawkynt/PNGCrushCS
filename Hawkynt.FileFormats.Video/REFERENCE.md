@@ -1078,7 +1078,7 @@ Implements `IVideoCodecDecoder<H264VideoDecoder>`, `IVideoFrameDecoder`.
 
 #### `H264VideoEncoder`
 
-Encodes progressive eight-bit 4:2:0 H.264 / AVC as Baseline-profile IDR pictures made from `I_PCM` macroblocks.
+Encodes progressive eight-bit 4:2:0 H.264 / AVC as Main-profile CAVLC I/P/B pictures.
 
 Implements `IVideoCodecEncoder<H264VideoEncoder>`, `IVideoPacketEncoder`.
 
