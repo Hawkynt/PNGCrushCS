@@ -15,7 +15,8 @@ namespace FileFormat.Codecs;
 /// <para/>
 /// CLLC bitstreams are read MSB-first after byte-swapping every 16-bit word. Each frame carries its
 /// own canonical Huffman tables and stores byte-valued predictive deltas. Coding types 0, 1/2 and 3
-/// reconstruct YUV 4:2:2, RGB24 and ARGB respectively.
+/// reconstruct YUV 4:2:2, RGB24 and ARGB respectively. YUV is returned on its native planar sample
+/// grid rather than converted through a colour matrix, so the lossless coded values remain exact.
 /// </remarks>
 public sealed class CanopusLosslessVideoDecoder : IVideoCodecDecoder<CanopusLosslessVideoDecoder> {
 
@@ -171,11 +172,16 @@ public sealed class CanopusLosslessVideoDecoder : IVideoCodecDecoder<CanopusLoss
       vTopLeft = _DecodeLine(ref bits, chromaTable, vPlane.AsSpan(row * chromaWidth, chromaWidth), vTopLeft);
     }
 
+    var output = new byte[checked(yPlane.Length + uPlane.Length + vPlane.Length)];
+    yPlane.CopyTo(output, 0);
+    uPlane.CopyTo(output, yPlane.Length);
+    vPlane.CopyTo(output, yPlane.Length + uPlane.Length);
+
     return new() {
       Width = this._width,
       Height = this._height,
-      Format = PixelFormat.Rgb24,
-      PixelData = _Yuv422ToRgb(yPlane, uPlane, vPlane, this._width, this._height),
+      Format = PixelFormat.Yuv422P8,
+      PixelData = output,
     };
   }
 
@@ -230,34 +236,6 @@ public sealed class CanopusLosslessVideoDecoder : IVideoCodecDecoder<CanopusLoss
 
     return new(codes, maximumLength);
   }
-
-  private static byte[] _Yuv422ToRgb(
-    ReadOnlySpan<byte> y,
-    ReadOnlySpan<byte> u,
-    ReadOnlySpan<byte> v,
-    int width,
-    int height
-  ) {
-    var output = new byte[checked(width * height * 3)];
-    var chromaWidth = width / 2;
-    var at = 0;
-    for (var row = 0; row < height; ++row)
-      for (var column = 0; column < width; ++column) {
-        var yy = y[row * width + column];
-        var chromaAt = row * chromaWidth + (column >> 1);
-        var cb = u[chromaAt];
-        var cr = v[chromaAt];
-        var c = yy - 16;
-        var d = cb - 128;
-        var e = cr - 128;
-        output[at++] = _Clamp((298 * c + 409 * e + 128) >> 8);
-        output[at++] = _Clamp((298 * c - 100 * d - 208 * e + 128) >> 8);
-        output[at++] = _Clamp((298 * c + 516 * d + 128) >> 8);
-      }
-    return output;
-  }
-
-  private static byte _Clamp(int value) => (byte)(value < 0 ? 0 : value > 255 ? 255 : value);
 
   private sealed class HuffmanTable {
     private readonly Dictionary<int, byte> _codes;
