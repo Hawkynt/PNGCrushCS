@@ -19,7 +19,7 @@ namespace FileFormat.FliProfi;
 /// What was written instead was 17002 bytes of bitmap, eight video matrices packed a thousand apart
 /// and colour memory, with nothing for the border at all.
 /// </remarks>
-[VerifiedBy(ConformanceOracle.Recoil2Png)]
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.IrfanView)]
 public readonly record struct FliProfiFile
   : IImageFormatReader<FliProfiFile>, IImageToRawImage<FliProfiFile>,
     IImageFromRawImage<FliProfiFile>, IImageFormatWriter<FliProfiFile> {

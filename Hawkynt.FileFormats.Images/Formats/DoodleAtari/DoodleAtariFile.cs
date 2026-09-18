@@ -4,7 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.DoodleAtari;
 
 /// <summary>In-memory representation of an Atari ST Doodle monochrome image (640x400, 1 bitplane).</summary>
-[VerifiedBy(ConformanceOracle.Recoil2Png)]
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.IrfanView)]
 public readonly record struct DoodleAtariFile : IImageFormatReader<DoodleAtariFile>, IImageToRawImage<DoodleAtariFile>, IImageFromRawImage<DoodleAtariFile>, IImageFormatWriter<DoodleAtariFile> {
 
   /// <summary>The exact file size: 80 bytes/line x 400 lines = 32000 bytes.</summary>
