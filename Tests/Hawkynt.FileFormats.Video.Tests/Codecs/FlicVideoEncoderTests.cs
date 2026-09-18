@@ -180,7 +180,7 @@ public sealed class FlicVideoEncoderTests {
     Assert.Throws<NotSupportedException>(() => FlicVideoEncoder.Create(_Requested(4, 4, kind: MediaStreamKind.Audio)));
     Assert.Throws<NotSupportedException>(() => FlicVideoEncoder.Create(_Requested(0, 4)));
     Assert.Throws<NotSupportedException>(() => FlicVideoEncoder.Create(_Requested(65536, 4)));
-    Assert.Throws<NotSupportedException>(() => FlicVideoEncoder.Create(_Requested(4, 4, bitsPerPixel: 16)));
+    Assert.Throws<NotSupportedException>(() => FlicVideoEncoder.Create(_Requested(4, 4, bitsPerPixel: 32)));
 
     var encoder = FlicVideoEncoder.Create(_Requested(4, 4));
     var rgb = LosslessEncoderPictures.Noise(4, 4, PixelFormat.Rgb24, seed: 60);
