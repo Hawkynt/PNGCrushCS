@@ -4184,6 +4184,75 @@ which is not a defect in either.
 What refuses, by name: a container stating a picture size larger than the one its own JPEG frame
 header codes, which nothing here has bytes to fill in.
 
+### Avid Meridien Compressed
+
+The `AVDJ` half of Avid's Meridien pair — the compressed one, against the uncompressed `AVUI` already in
+this package. The payload is Avid JFIF, which is baseline Motion JPEG and decoded by the same reader, and
+everything interesting about the codec is in the two layout rules the JPEG does not carry: whether a
+packet is one frame or two fields, and which output rows each of two fields belongs on.
+
+**A packet holds two fields when its coded picture is under three quarters of the frame height.** Not
+half exactly, because two things move the coded height off half: an encoder padding its field out to a
+whole macroblock row, and a container stating a display height a few rows shorter than what was coded.
+The three-quarter margin absorbs both and is the reference decoder's own. Measured against ffmpeg 8.1.2
+with hand-built QuickTime files at a stated 486 lines: coded field heights of 240, 243 and 248 all weave
+into a frame, and a coded 486 is read as one whole picture with anything after it in the packet ignored.
+
+**The padding is above the picture.** A coded 720x496 against a stated 720x486 loses its top ten rows,
+not its bottom ten: a fixture whose top ten rows are red over a blue remainder came back from ffmpeg
+entirely blue. That is the same crop AVRn needs, and both codecs now take it from one place.
+
+**Which field goes on which row is the part the fourcc cannot answer**, and three things can. In order:
+
+- *QuickTime's `fiel` image-description extension.* Apple's four two-field values say both which field
+  is stored first and which is displayed first — 1 is top stored/top shown, 6 bottom/bottom, 9 top
+  stored/bottom shown, 14 bottom stored/top shown. Weaving needs the stored half, so 1 and 9 put the
+  first coded field on the top row and 6 and 14 put it on the second.
+- *The Video-for-Windows Avid discriminator.* `2C 00 00 00 18 00 00 00` and a television standard at byte
+  twelve: 1 NTSC puts the first coded field on odd rows, 2 PAL on even. Read either on its own or behind
+  a complete `BITMAPINFOHEADER`, which is how AVI and VfW Matroska hand it over. Measured against ffmpeg
+  with hand-built AVI files: 1 and 2 weave opposite ways and no discriminator weaves as 2 does.
+- *The geometry.* The two D1 rasters Meridien switched between have a field order Avid fixes — 486-line
+  NTSC stores its lower field first, 576-line PAL its upper.
+
+A two-field packet at a geometry none of those covers is **refused**, not woven one way and hoped for.
+
+**One deliberate disagreement with the oracle.** ffmpeg's MJPEG decoder reverses the weave for `fiel` 6
+alone; 14 it treats like 1 and 9, which for a bottom-stored stream is upside down. Apple's own
+description of the value is unambiguous about which field is stored first, so 14 is read here the way
+Apple documents it rather than the way ffmpeg reads it. This costs nothing in either direction for what
+this package writes, because the writer never emits 9 or 14 — see below.
+
+**The writer.** Baseline 4:2:2 JPEG at one fixed IJG quality, since the encoder contract carries no
+quality setting. 720x486 and 720x576 are written as two complete JPEG fields per packet in temporal
+order and every other geometry as one progressive JPEG; interlace follows the geometry because a stream
+description carries no field order to ask for one, and inferring interlace from a height alone would
+mis-code progressive standard-definition material. The sample description states `fiel` 2/6 for the
+525-line raster and 2/1 for the 625-line one — the stored-order forms, deliberately, since the
+display-only forms make ffmpeg weave both rasters the same way round and one of them is then upside
+down. Only the progressive case claims Matroska's `V_MJPEG`: a two-field packet under that CodecID reads
+back through any Motion JPEG decoder as its first field alone, a picture of half the height with nothing
+reporting a problem, so the interlaced case names no CodecID and a Matroska muxer refuses it instead.
+
+**Alpha is not claimed.** Avid documentation describes an alpha-bearing Meridien Compressed variant and
+no public bitstream description found says how that alpha is represented. Nothing here reinterprets a
+second JPEG or a four-component JPEG as alpha, which would silently turn ordinary CMYK/YCCK JPEG syntax
+into a different colour model, and the writer refuses a picture carrying non-opaque alpha rather than
+flattening it. An all-opaque alpha channel is accepted, because discarding it loses nothing.
+
+**Verified.** Three five-frame clips written here — 720x486, 720x576 and a progressive 320x240 — were
+muxed into QuickTime files, handed to ffmpeg 8.1.2 and decoded to RGB24. Every frame of every clip came
+back, with nothing on ffmpeg's error channel, at a mean absolute error of 1.1 against the pictures that
+went in for the two interlaced clips and 1.9 for the progressive one, which is the JPEG quantisation and
+the chroma round trip and nothing else. The comparison is per frame rather than averaged over the clip,
+and it bites: writing `fiel` 14 instead of 6 leaves frame 0 of the 525-line clip at 134, and comparing
+any frame against its neighbour instead of itself leaves 25.
+
+What refuses, by name: a packet whose first bytes are not a complete JPEG picture; a two-field packet
+whose second JPEG is missing or truncated; two fields whose decoded pictures disagree on width, height
+or pixel format; a two-field packet whose row parity nothing states; and a container stating a picture
+size larger than the one its own JPEG codes.
+
 ## 📜 License
 
 LGPL-3.0-or-later.
