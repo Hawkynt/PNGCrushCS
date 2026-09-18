@@ -4,7 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.InterPaintMc;
 
 /// <summary>In-memory representation of a Commodore 64 InterPaint Multicolor image.</summary>
-[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.IrfanView)]
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.XnView, ConformanceOracle.IrfanView)]
 public readonly record struct InterPaintMcFile : IImageFormatReader<InterPaintMcFile>, IImageToRawImage<InterPaintMcFile>, IImageFromRawImage<InterPaintMcFile>, IImageFormatWriter<InterPaintMcFile> {
 
   static string IImageFormatMetadata<InterPaintMcFile>.PrimaryExtension => ".ipt";

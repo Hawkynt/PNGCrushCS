@@ -11,6 +11,7 @@ namespace FileFormat.ScreenMaker;
 /// a reader whose header happens to fall where ours does. That is a coincidence of layout, not a
 /// third party understanding the file, so it is not recorded as one.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.XnView)]
 public readonly record struct ScreenMakerFile : IImageFormatReader<ScreenMakerFile>, IImageToRawImage<ScreenMakerFile>, IImageFromRawImage<ScreenMakerFile>, IImageFormatWriter<ScreenMakerFile> {
 
   static string IImageFormatMetadata<ScreenMakerFile>.PrimaryExtension => ".smk";
