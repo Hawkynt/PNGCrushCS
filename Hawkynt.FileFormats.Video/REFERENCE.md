@@ -1295,7 +1295,7 @@ Implements `IVideoCodecDecoder<Indeo4VideoDecoder>`, `IVideoFrameDecoder`.
 
 #### `Indeo4VideoEncoder`
 
-Encodes Intel Indeo Video Interactive 4 (`IV41`) as self-contained intra pictures.
+Encodes Intel Indeo Video Interactive 4 (`IV41`) with intra, forward-predicted and bidirectionally predicted pictures.
 
 Implements `IVideoCodecEncoder<Indeo4VideoEncoder>`, `IVideoPacketEncoder`.
 
@@ -1305,7 +1305,8 @@ Implements `IVideoCodecEncoder<Indeo4VideoEncoder>`, `IVideoPacketEncoder`.
 | `Codec` | `static CodecTag Codec { get; }` |  |
 | `Create` | `static Indeo4VideoEncoder Create(MediaStreamInfo stream)` |  |
 | `DescribeStream` | `MediaStreamInfo DescribeStream()` | Describes an `IV41` VFW stream suitable for AVI or Matroska. |
-| `TryEncode` | `bool TryEncode(RawImage frame, long? presentationTimestamp, out CodedPacket packet)` | Encodes one self-contained intra picture. |
+| `Flush` | `IEnumerable<CodedPacket> Flush()` | Emits delayed packets, then turns a short tail with no future anchor into an I-picture followed by ordinary P-pictures so no input picture is discarded. |
+| `TryEncode` | `bool TryEncode(RawImage frame, long? presentationTimestamp, out CodedPacket packet)` | Accepts one display-order picture and returns the next display-order packet when a complete IV4 prediction group makes one available. |
 
 #### `Indeo5VideoDecoder`
 
