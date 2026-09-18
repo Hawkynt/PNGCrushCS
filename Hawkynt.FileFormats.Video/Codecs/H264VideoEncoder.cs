@@ -218,33 +218,41 @@ public sealed class H264VideoEncoder : IVideoCodecEncoder<H264VideoEncoder> {
     return this._Packet(0x65, rbsp, frame, frame.PresentationTimestamp, keyFrame: true);
   }
 
-  private CodedPacket _EncodeP(PendingFrame frame, int frameNum, long? decodeTimestamp) {
+  private CodedPacket _EncodeP(
+    PendingFrame frame,
+    int frameNum,
+    long? decodeTimestamp,
+    out Frame420 reconstructed) {
     var reference = this._previousReference!;
     var rbsp = new H264BitWriter();
     this._WriteSliceHeader(rbsp, SliceKind.P, frame.DisplayIndex, frameNum, idr: false);
 
-    var mbAddr = 0;
-    while (mbAddr < this._macroblockWidth * this._macroblockHeight) {
-      var skipRun = 0;
-      while (mbAddr + skipRun < this._macroblockWidth * this._macroblockHeight) {
-        var address = mbAddr + skipRun;
-        if (!this._MacroblockEquals(frame.Samples, reference, address))
-          break;
-        ++skipRun;
-      }
+    reconstructed = this._EmptyFrame();
+    var residualContext = new ResidualContext(this._macroblockWidth, this._macroblockHeight);
+    var vectors = new MotionVector[this._macroblockWidth * this._macroblockHeight];
+    var usesList0 = new bool[vectors.Length];
 
-      rbsp.WriteUnsignedExpGolomb(skipRun); // mb_skip_run; each skipped P macroblock predicts ref0 at MV (0,0)
-      mbAddr += skipRun;
-      if (mbAddr >= this._macroblockWidth * this._macroblockHeight)
-        break;
+    for (var mbAddr = 0; mbAddr < vectors.Length; ++mbAddr) {
+      rbsp.WriteUnsignedExpGolomb(0); // mb_skip_run: explicitly code every P macroblock.
+      rbsp.WriteUnsignedExpGolomb(0); // P_L0_16x16
 
-      this._WritePcmMacroblock(
-        rbsp,
-        frame.Samples,
-        mbAddr % this._macroblockWidth,
-        mbAddr / this._macroblockWidth,
-        30); // P slice: I_PCM is I mb_type 25 plus Table 7-13's intra offset 5
-      ++mbAddr;
+      var mbX = mbAddr % this._macroblockWidth;
+      var mbY = mbAddr / this._macroblockWidth;
+      var predictor = _PredictMotion(vectors, usesList0, mbAddr, this._macroblockWidth, this._macroblockHeight);
+      var motion = this._SearchMotion(frame.Samples, reference, mbX, mbY, predictor);
+      rbsp.WriteSignedExpGolomb(motion.X - predictor.X);
+      rbsp.WriteSignedExpGolomb(motion.Y - predictor.Y);
+
+      Span<byte> predY = stackalloc byte[16 * 16];
+      Span<byte> predCb = stackalloc byte[8 * 8];
+      Span<byte> predCr = stackalloc byte[8 * 8];
+      this._PredictMacroblock(reference, mbX, mbY, motion, predY, predCb, predCr);
+      var residual = this._QuantizeMacroblock(
+        frame.Samples, predY, predCb, predCr, mbX, mbY, reconstructed);
+      this._WriteInterResidual(rbsp, residual, residualContext, mbX, mbY);
+
+      vectors[mbAddr] = motion;
+      usesList0[mbAddr] = true;
     }
 
     return this._Packet(0x41, rbsp, frame, decodeTimestamp, keyFrame: false);
@@ -259,22 +267,420 @@ public sealed class H264VideoEncoder : IVideoCodecEncoder<H264VideoEncoder> {
     var rbsp = new H264BitWriter();
     this._WriteSliceHeader(rbsp, SliceKind.B, frame.DisplayIndex, frameNum, idr: false);
 
-    for (var mbAddr = 0; mbAddr < this._macroblockWidth * this._macroblockHeight; ++mbAddr) {
-      rbsp.WriteUnsignedExpGolomb(0); // mb_skip_run: direct mode is deliberately not used here
+    var count = this._macroblockWidth * this._macroblockHeight;
+    var vectors0 = new MotionVector[count];
+    var vectors1 = new MotionVector[count];
+    var usesList0 = new bool[count];
+    var usesList1 = new bool[count];
+    var residualContext = new ResidualContext(this._macroblockWidth, this._macroblockHeight);
+    var reconstructed = this._EmptyFrame();
+
+    for (var mbAddr = 0; mbAddr < count; ++mbAddr) {
+      rbsp.WriteUnsignedExpGolomb(0); // mb_skip_run: explicit L0/L1/Bi motion follows.
       var mbX = mbAddr % this._macroblockWidth;
       var mbY = mbAddr / this._macroblockWidth;
-      if (this._MacroblockEqualsBiPrediction(frame.Samples, previous, future, mbAddr)) {
-        rbsp.WriteUnsignedExpGolomb(3); // B_Bi_16x16, Table 7-14
-        rbsp.WriteSignedExpGolomb(0); // mvd_l0[0][0]
-        rbsp.WriteSignedExpGolomb(0); // mvd_l0[0][1]
-        rbsp.WriteSignedExpGolomb(0); // mvd_l1[0][0]
-        rbsp.WriteSignedExpGolomb(0); // mvd_l1[0][1]
-        rbsp.WriteUnsignedExpGolomb(0); // coded_block_pattern = 0 in Table 9-4's inter column
-      } else
-        this._WritePcmMacroblock(rbsp, frame.Samples, mbX, mbY, 48); // B I_PCM = 23 + 25
+      var predictor0 = _PredictMotion(vectors0, usesList0, mbAddr, this._macroblockWidth, this._macroblockHeight);
+      var predictor1 = _PredictMotion(vectors1, usesList1, mbAddr, this._macroblockWidth, this._macroblockHeight);
+      var motion0 = this._SearchMotion(frame.Samples, previous, mbX, mbY, predictor0);
+      var motion1 = this._SearchMotion(frame.Samples, future, mbX, mbY, predictor1);
+
+      Span<byte> y0 = stackalloc byte[16 * 16];
+      Span<byte> cb0 = stackalloc byte[8 * 8];
+      Span<byte> cr0 = stackalloc byte[8 * 8];
+      Span<byte> y1 = stackalloc byte[16 * 16];
+      Span<byte> cb1 = stackalloc byte[8 * 8];
+      Span<byte> cr1 = stackalloc byte[8 * 8];
+      this._PredictMacroblock(previous, mbX, mbY, motion0, y0, cb0, cr0);
+      this._PredictMacroblock(future, mbX, mbY, motion1, y1, cb1, cr1);
+
+      Span<byte> biY = stackalloc byte[16 * 16];
+      _Average(y0, y1, biY);
+      var cost0 = this._PredictionSad(frame.Samples.Y, mbX * 16, mbY * 16, this._codedWidth, y0, 16, 16);
+      var cost1 = this._PredictionSad(frame.Samples.Y, mbX * 16, mbY * 16, this._codedWidth, y1, 16, 16);
+      var costBi = this._PredictionSad(frame.Samples.Y, mbX * 16, mbY * 16, this._codedWidth, biY, 16, 16);
+      var mode = cost0 <= cost1 && cost0 <= costBi ? BPredictionMode.L0
+        : cost1 <= costBi ? BPredictionMode.L1
+        : BPredictionMode.Bi;
+      rbsp.WriteUnsignedExpGolomb((int)mode);
+
+      if (mode is BPredictionMode.L0 or BPredictionMode.Bi) {
+        rbsp.WriteSignedExpGolomb(motion0.X - predictor0.X);
+        rbsp.WriteSignedExpGolomb(motion0.Y - predictor0.Y);
+      }
+      if (mode is BPredictionMode.L1 or BPredictionMode.Bi) {
+        rbsp.WriteSignedExpGolomb(motion1.X - predictor1.X);
+        rbsp.WriteSignedExpGolomb(motion1.Y - predictor1.Y);
+      }
+
+      Span<byte> predY = stackalloc byte[16 * 16];
+      Span<byte> predCb = stackalloc byte[8 * 8];
+      Span<byte> predCr = stackalloc byte[8 * 8];
+      switch (mode) {
+        case BPredictionMode.L0:
+          y0.CopyTo(predY);
+          cb0.CopyTo(predCb);
+          cr0.CopyTo(predCr);
+          break;
+        case BPredictionMode.L1:
+          y1.CopyTo(predY);
+          cb1.CopyTo(predCb);
+          cr1.CopyTo(predCr);
+          break;
+        default:
+          _Average(y0, y1, predY);
+          _Average(cb0, cb1, predCb);
+          _Average(cr0, cr1, predCr);
+          break;
+      }
+
+      var residual = this._QuantizeMacroblock(
+        frame.Samples, predY, predCb, predCr, mbX, mbY, reconstructed);
+      this._WriteInterResidual(rbsp, residual, residualContext, mbX, mbY);
+
+      if (mode is BPredictionMode.L0 or BPredictionMode.Bi) {
+        vectors0[mbAddr] = motion0;
+        usesList0[mbAddr] = true;
+      }
+      if (mode is BPredictionMode.L1 or BPredictionMode.Bi) {
+        vectors1[mbAddr] = motion1;
+        usesList1[mbAddr] = true;
+      }
     }
 
     return this._Packet(0x01, rbsp, frame, decodeTimestamp, keyFrame: false);
+  }
+
+  private Frame420 _EmptyFrame() {
+    var chromaSamples = this._codedWidth / 2 * (this._codedHeight / 2);
+    return new(
+      new byte[this._codedWidth * this._codedHeight],
+      new byte[chromaSamples],
+      new byte[chromaSamples]);
+  }
+
+  private MotionVector _SearchMotion(
+    Frame420 source,
+    Frame420 reference,
+    int mbX,
+    int mbY,
+    MotionVector predictor) {
+    var centreX = _RoundToFullSample(predictor.X);
+    var centreY = _RoundToFullSample(predictor.Y);
+    var best = new MotionVector(centreX, centreY);
+    var bestCost = long.MaxValue;
+    Span<byte> prediction = stackalloc byte[16 * 16];
+
+    for (var dy = -_INTEGER_SEARCH_RANGE; dy <= _INTEGER_SEARCH_RANGE; ++dy)
+      for (var dx = -_INTEGER_SEARCH_RANGE; dx <= _INTEGER_SEARCH_RANGE; ++dx) {
+        var candidate = new MotionVector(centreX + dx * 4, centreY + dy * 4);
+        var cost = this._MotionCost(source, reference, mbX, mbY, candidate, prediction);
+        if (cost < bestCost) {
+          best = candidate;
+          bestCost = cost;
+        }
+      }
+
+    best = this._RefineMotion(source, reference, mbX, mbY, best, step: 2, prediction, ref bestCost);
+    best = this._RefineMotion(source, reference, mbX, mbY, best, step: 1, prediction, ref bestCost);
+    return best;
+  }
+
+  private MotionVector _RefineMotion(
+    Frame420 source,
+    Frame420 reference,
+    int mbX,
+    int mbY,
+    MotionVector centre,
+    int step,
+    Span<byte> prediction,
+    ref long bestCost) {
+    var best = centre;
+    for (var dy = -step; dy <= step; dy += step)
+      for (var dx = -step; dx <= step; dx += step) {
+        var candidate = new MotionVector(centre.X + dx, centre.Y + dy);
+        var cost = this._MotionCost(source, reference, mbX, mbY, candidate, prediction);
+        if (cost < bestCost) {
+          best = candidate;
+          bestCost = cost;
+        }
+      }
+    return best;
+  }
+
+  private long _MotionCost(
+    Frame420 source,
+    Frame420 reference,
+    int mbX,
+    int mbY,
+    MotionVector motion,
+    Span<byte> prediction) {
+    H264MotionCompensation.PredictLuma(
+      reference.Y, this._codedWidth, this._codedHeight,
+      mbX * 16, mbY * 16, motion.X, motion.Y, 16, 16, prediction);
+    return this._PredictionSad(
+      source.Y, mbX * 16, mbY * 16, this._codedWidth, prediction, 16, 16);
+  }
+
+  private long _PredictionSad(
+    byte[] source,
+    int sourceX,
+    int sourceY,
+    int sourceStride,
+    ReadOnlySpan<byte> prediction,
+    int width,
+    int height) {
+    var result = 0L;
+    for (var row = 0; row < height; ++row) {
+      var sourceAt = (sourceY + row) * sourceStride + sourceX;
+      var predAt = row * width;
+      for (var column = 0; column < width; ++column)
+        result += Math.Abs(source[sourceAt + column] - prediction[predAt + column]);
+    }
+    return result;
+  }
+
+  private void _PredictMacroblock(
+    Frame420 reference,
+    int mbX,
+    int mbY,
+    MotionVector motion,
+    Span<byte> y,
+    Span<byte> cb,
+    Span<byte> cr) {
+    H264MotionCompensation.PredictLuma(
+      reference.Y, this._codedWidth, this._codedHeight,
+      mbX * 16, mbY * 16, motion.X, motion.Y, 16, 16, y);
+    var chromaWidth = this._codedWidth / 2;
+    var chromaHeight = this._codedHeight / 2;
+    H264MotionCompensation.PredictChroma(
+      reference.Cb, chromaWidth, chromaHeight,
+      mbX * 8, mbY * 8, motion.X, motion.Y, 8, 8, cb);
+    H264MotionCompensation.PredictChroma(
+      reference.Cr, chromaWidth, chromaHeight,
+      mbX * 8, mbY * 8, motion.X, motion.Y, 8, 8, cr);
+  }
+
+  private ResidualMacroblock _QuantizeMacroblock(
+    Frame420 source,
+    ReadOnlySpan<byte> predY,
+    ReadOnlySpan<byte> predCb,
+    ReadOnlySpan<byte> predCr,
+    int mbX,
+    int mbY,
+    Frame420 reconstructed) {
+    var result = new ResidualMacroblock();
+    Span<int> residual = stackalloc int[16];
+    Span<int> reconstructedResidual = stackalloc int[16];
+
+    for (var blkIdx = 0; blkIdx < 16; ++blkIdx) {
+      var (bx, by) = _BlockPosition(blkIdx);
+      for (var row = 0; row < 4; ++row)
+        for (var column = 0; column < 4; ++column) {
+          var local = (by + row) * 16 + bx + column;
+          var sourceAt = (mbY * 16 + by + row) * this._codedWidth + mbX * 16 + bx + column;
+          residual[(row << 2) + column] = source.Y[sourceAt] - predY[local];
+        }
+
+      var levels = result.Luma.AsSpan(blkIdx * 16, 16);
+      H264ForwardTransform.Quantize4x4(residual, _QP, levels);
+      if (_HasNonZero(levels))
+        result.CbpLuma |= 1 << (blkIdx >> 2);
+
+      H264Transform.DecodeBlock(levels, _QP, hasSeparateDc: false, 0, reconstructedResidual);
+      this._StoreBlock(
+        reconstructed.Y, this._codedWidth, mbX * 16 + bx, mbY * 16 + by,
+        predY, 16, bx, by, reconstructedResidual);
+    }
+
+    var chromaQp = H264Transform.ChromaQp(_QP);
+    this._QuantizeChroma(
+      source.Cb, predCb, reconstructed.Cb, component: 0, mbX, mbY, chromaQp, result, residual, reconstructedResidual);
+    this._QuantizeChroma(
+      source.Cr, predCr, reconstructed.Cr, component: 1, mbX, mbY, chromaQp, result, residual, reconstructedResidual);
+    return result;
+  }
+
+  private void _QuantizeChroma(
+    byte[] source,
+    ReadOnlySpan<byte> prediction,
+    byte[] reconstructed,
+    int component,
+    int mbX,
+    int mbY,
+    int qp,
+    ResidualMacroblock result,
+    Span<int> residual,
+    Span<int> reconstructedResidual) {
+    var chromaWidth = this._codedWidth / 2;
+    Span<int> dc = stackalloc int[4];
+    Span<int> transformed = stackalloc int[16];
+
+    for (var blkIdx = 0; blkIdx < 4; ++blkIdx) {
+      var bx = (blkIdx & 1) * 4;
+      var by = (blkIdx >> 1) * 4;
+      for (var row = 0; row < 4; ++row)
+        for (var column = 0; column < 4; ++column) {
+          var local = (by + row) * 8 + bx + column;
+          var sourceAt = (mbY * 8 + by + row) * chromaWidth + mbX * 8 + bx + column;
+          residual[(row << 2) + column] = source[sourceAt] - prediction[local];
+        }
+
+      H264ForwardTransform.Forward4x4(residual, transformed);
+      dc[blkIdx] = transformed[0];
+      H264ForwardTransform.Quantize4x4(
+        residual, qp, result.Chroma.AsSpan((component * 4 + blkIdx) * 16, 16), omitDc: true);
+    }
+
+    var dcLevels = result.ChromaDc.AsSpan(component * 4, 4);
+    H264ForwardTransform.QuantizeChromaDc(dc, qp, dcLevels);
+    var anyDc = _HasNonZero(dcLevels);
+    var anyAc = false;
+    for (var blkIdx = 0; blkIdx < 4; ++blkIdx)
+      anyAc |= _HasNonZero(result.Chroma.AsSpan((component * 4 + blkIdx) * 16 + 1, 15));
+    if (anyAc)
+      result.CbpChroma = 2;
+    else if (anyDc && result.CbpChroma == 0)
+      result.CbpChroma = 1;
+
+    Span<int> decodedDc = stackalloc int[4];
+    H264Transform.DecodeChromaDc(dcLevels, qp, decodedDc);
+    for (var blkIdx = 0; blkIdx < 4; ++blkIdx) {
+      var bx = (blkIdx & 1) * 4;
+      var by = (blkIdx >> 1) * 4;
+      H264Transform.DecodeBlock(
+        result.Chroma.AsSpan((component * 4 + blkIdx) * 16, 16),
+        qp, hasSeparateDc: true, decodedDc[blkIdx], reconstructedResidual);
+      this._StoreBlock(
+        reconstructed, chromaWidth, mbX * 8 + bx, mbY * 8 + by,
+        prediction, 8, bx, by, reconstructedResidual);
+    }
+  }
+
+  private void _StoreBlock(
+    byte[] target,
+    int targetStride,
+    int targetX,
+    int targetY,
+    ReadOnlySpan<byte> prediction,
+    int predictionStride,
+    int predictionX,
+    int predictionY,
+    ReadOnlySpan<int> residual) {
+    for (var row = 0; row < 4; ++row)
+      for (var column = 0; column < 4; ++column) {
+        var pred = prediction[(predictionY + row) * predictionStride + predictionX + column];
+        target[(targetY + row) * targetStride + targetX + column] =
+          (byte)Math.Clamp(pred + residual[(row << 2) + column], 0, 255);
+      }
+  }
+
+  private void _WriteInterResidual(
+    H264BitWriter writer,
+    ResidualMacroblock residual,
+    ResidualContext context,
+    int mbX,
+    int mbY) {
+    var codedBlockPattern = residual.CbpLuma | (residual.CbpChroma << 4);
+    writer.WriteUnsignedExpGolomb(H264CavlcEncoding.InterCodedBlockPatternCodeNum(codedBlockPattern));
+    if (codedBlockPattern == 0)
+      return;
+
+    writer.WriteSignedExpGolomb(0); // mb_qp_delta: this encoder holds QP constant within a picture.
+    for (var i8x8 = 0; i8x8 < 4; ++i8x8) {
+      if ((residual.CbpLuma & (1 << i8x8)) == 0)
+        continue;
+      for (var i4x4 = 0; i4x4 < 4; ++i4x4) {
+        var blkIdx = i8x8 * 4 + i4x4;
+        var (bx, by) = _BlockPosition(blkIdx);
+        var blockX = mbX * 4 + (bx >> 2);
+        var blockY = mbY * 4 + (by >> 2);
+        var nC = context.LumaNc(blockX, blockY);
+        var count = H264CavlcEncoding.WriteBlock(
+          writer, residual.Luma.AsSpan(blkIdx * 16, 16), nC, chromaDc: false);
+        context.SetLuma(blockX, blockY, count);
+      }
+    }
+
+    if (residual.CbpChroma == 0)
+      return;
+    for (var component = 0; component < 2; ++component)
+      H264CavlcEncoding.WriteBlock(
+        writer, residual.ChromaDc.AsSpan(component * 4, 4), -1, chromaDc: true);
+    if (residual.CbpChroma < 2)
+      return;
+
+    for (var component = 0; component < 2; ++component)
+      for (var blkIdx = 0; blkIdx < 4; ++blkIdx) {
+        var blockX = mbX * 2 + (blkIdx & 1);
+        var blockY = mbY * 2 + (blkIdx >> 1);
+        var nC = context.ChromaNc(component, blockX, blockY);
+        var count = H264CavlcEncoding.WriteBlock(
+          writer, residual.Chroma.AsSpan((component * 4 + blkIdx) * 16 + 1, 15), nC, chromaDc: false);
+        context.SetChroma(component, blockX, blockY, count);
+      }
+  }
+
+  private static MotionVector _PredictMotion(
+    MotionVector[] vectors,
+    bool[] usesList,
+    int mbAddr,
+    int mbWidth,
+    int mbHeight) {
+    var mbX = mbAddr % mbWidth;
+    var mbY = mbAddr / mbWidth;
+    var a = _MotionNeighbour(vectors, usesList, mbX - 1, mbY, mbWidth, mbHeight);
+    var b = _MotionNeighbour(vectors, usesList, mbX, mbY - 1, mbWidth, mbHeight);
+    var c = _MotionNeighbour(vectors, usesList, mbX + 1, mbY - 1, mbWidth, mbHeight);
+    if (!c.Available)
+      c = _MotionNeighbour(vectors, usesList, mbX - 1, mbY - 1, mbWidth, mbHeight);
+    if (!b.Available && !c.Available && a.Available) {
+      b = a;
+      c = a;
+    }
+
+    var matches = (a.RefIdx == 0 ? 1 : 0) + (b.RefIdx == 0 ? 1 : 0) + (c.RefIdx == 0 ? 1 : 0);
+    if (matches == 1)
+      return a.RefIdx == 0 ? a.Vector : b.RefIdx == 0 ? b.Vector : c.Vector;
+    return new(_MedianOf(a.Vector.X, b.Vector.X, c.Vector.X), _MedianOf(a.Vector.Y, b.Vector.Y, c.Vector.Y));
+  }
+
+  private static MotionNeighbour _MotionNeighbour(
+    MotionVector[] vectors,
+    bool[] usesList,
+    int mbX,
+    int mbY,
+    int mbWidth,
+    int mbHeight) {
+    if (mbX < 0 || mbY < 0 || mbX >= mbWidth || mbY >= mbHeight)
+      return default;
+    var address = mbY * mbWidth + mbX;
+    return new(true, usesList[address] ? vectors[address] : default, usesList[address] ? 0 : -1);
+  }
+
+  private static int _MedianOf(int first, int second, int third)
+    => first + second + third - Math.Min(first, Math.Min(second, third)) - Math.Max(first, Math.Max(second, third));
+
+  private static int _RoundToFullSample(int quarterSample)
+    => quarterSample >= 0
+      ? ((quarterSample + 2) >> 2) << 2
+      : -(((-quarterSample + 2) >> 2) << 2);
+
+  private static bool _HasNonZero(ReadOnlySpan<int> values) {
+    foreach (var value in values)
+      if (value != 0)
+        return true;
+    return false;
+  }
+
+  private static void _Average(ReadOnlySpan<byte> first, ReadOnlySpan<byte> second, Span<byte> output) {
+    for (var i = 0; i < output.Length; ++i)
+      output[i] = (byte)((first[i] + second[i] + 1) >> 1);
+  }
+
+  private static (int X, int Y) _BlockPosition(int blkIdx) {
+    var quadrant = blkIdx >> 2;
+    var within = blkIdx & 3;
+    return (((quadrant & 1) << 3) + ((within & 1) << 2), ((quadrant >> 1) << 3) + ((within >> 1) << 2));
   }
 
   private void _WriteSliceHeader(H264BitWriter writer, SliceKind kind, int displayIndex, int frameNum, bool idr) {
