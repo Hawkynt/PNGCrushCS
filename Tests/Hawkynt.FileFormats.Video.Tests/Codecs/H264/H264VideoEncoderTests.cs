@@ -239,13 +239,16 @@ public sealed class H264VideoEncoderTests {
       Assert.That(_SliceType(trailing), Is.EqualTo(5));
       Assert.That(trailing.PresentationTimestamp, Is.EqualTo(1));
       Assert.That(trailing.DecodeTimestamp, Is.EqualTo(1));
+      Assert.That(_FirstMacroblockSyntax(
+        trailing, expectedSliceType: 5, referencePicture: true, bPicture: false).MacroblockType, Is.Zero);
     });
 
-    var decoder = H264VideoDecoder.Create(encoder.DescribeStream());
-    decoder.TryDecode(idr, out _);
-    decoder.TryDecode(trailing, out _);
-    var decoded = decoder.Flush().ToArray();
-    Assert.That(decoded.Select(frame => frame.PixelData), Is.EqualTo(new[] { first.PixelData, second.PixelData }));
+    var decoded = _DecodeAll(encoder, [idr, trailing]);
+    Assert.Multiple(() => {
+      Assert.That(decoded, Has.Count.EqualTo(2));
+      Assert.That(decoded[0].PixelData, Is.EqualTo(first.PixelData));
+      Assert.That(_AverageAbsoluteError(second.PixelData, decoded[1].PixelData), Is.LessThan(12d));
+    });
   }
 
   /// <summary>A bright square crossing a fixed background.</summary>
@@ -356,10 +359,10 @@ public sealed class H264VideoEncoderTests {
     Assert.That(reader.ReadUnsignedExpGolomb(), Is.Zero); // first_mb_in_slice
     Assert.That(reader.ReadUnsignedExpGolomb(), Is.EqualTo(expectedSliceType));
     Assert.That(reader.ReadUnsignedExpGolomb(), Is.Zero); // pps id
-    reader.Skip(16); // frame_num
+    var frameNum = reader.ReadBits(16);
     if (nal.IsIdr)
       reader.ReadUnsignedExpGolomb();
-    reader.Skip(16); // pic_order_cnt_lsb
+    var pocLsb = reader.ReadBits(16);
     if (bPicture)
       Assert.That(reader.ReadBit(), Is.EqualTo(1)); // direct_spatial_mv_pred_flag
     if (expectedSliceType % 5 is 0 or 1) {
@@ -376,10 +379,123 @@ public sealed class H264VideoEncoderTests {
     Assert.That(reader.ReadUnsignedExpGolomb(), Is.EqualTo(1)); // deblocking disabled
 
     var skipRun = reader.ReadUnsignedExpGolomb();
-    return new(skipRun, skipRun == 0 ? reader.ReadUnsignedExpGolomb() : null);
+    if (skipRun != 0)
+      return new(frameNum, pocLsb, skipRun, null, null, null, null, null, null);
+
+    var mbType = reader.ReadUnsignedExpGolomb();
+    int? mvdL0X = null;
+    int? mvdL0Y = null;
+    int? mvdL1X = null;
+    int? mvdL1Y = null;
+    int? codedBlockPatternCodeNum = null;
+
+    if (!bPicture && mbType == 0) {
+      mvdL0X = reader.ReadSignedExpGolomb();
+      mvdL0Y = reader.ReadSignedExpGolomb();
+      codedBlockPatternCodeNum = reader.ReadUnsignedExpGolomb();
+    } else if (bPicture && mbType is >= 1 and <= 3) {
+      if (mbType is 1 or 3) {
+        mvdL0X = reader.ReadSignedExpGolomb();
+        mvdL0Y = reader.ReadSignedExpGolomb();
+      }
+      if (mbType is 2 or 3) {
+        mvdL1X = reader.ReadSignedExpGolomb();
+        mvdL1Y = reader.ReadSignedExpGolomb();
+      }
+      codedBlockPatternCodeNum = reader.ReadUnsignedExpGolomb();
+    }
+
+    return new(
+      frameNum, pocLsb, skipRun, mbType,
+      mvdL0X, mvdL0Y, mvdL1X, mvdL1Y, codedBlockPatternCodeNum);
   }
 
-  private readonly record struct FirstMacroblockSyntax(int SkipRun, int? MacroblockType);
+  private static SliceHeaderSyntax _SliceHeader(CodedPacket packet) {
+    var nal = H264NalReader.SplitLengthPrefixed(packet.Data, 4).Single();
+    var reader = new H264BitReader(nal.Payload);
+    reader.ReadUnsignedExpGolomb();
+    var sliceType = reader.ReadUnsignedExpGolomb();
+    reader.ReadUnsignedExpGolomb();
+    var frameNum = reader.ReadBits(16);
+    if (nal.IsIdr)
+      reader.ReadUnsignedExpGolomb();
+    var pocLsb = reader.ReadBits(16);
+    return new(sliceType, frameNum, pocLsb);
+  }
+
+  private static List<RawImage> _DecodeAll(H264VideoEncoder encoder, IEnumerable<CodedPacket> packets) {
+    var decoder = H264VideoDecoder.Create(encoder.DescribeStream());
+    var decoded = new List<RawImage>();
+    foreach (var packet in packets)
+      if (decoder.TryDecode(packet, out var frame))
+        decoded.Add(frame);
+    decoded.AddRange(decoder.Flush());
+    return decoded;
+  }
+
+  private static double _AverageAbsoluteError(byte[] expected, byte[] actual) {
+    Assert.That(actual, Has.Length.EqualTo(expected.Length));
+    var total = 0L;
+    for (var i = 0; i < expected.Length; ++i)
+      total += Math.Abs(expected[i] - actual[i]);
+    return total / (double)expected.Length;
+  }
+
+  private static RawImage _MotionPredicted420(RawImage reference, int mvX, int mvY) {
+    var width = reference.Width;
+    var height = reference.Height;
+    var lumaSamples = width * height;
+    var chromaWidth = width / 2;
+    var chromaHeight = height / 2;
+    var chromaSamples = chromaWidth * chromaHeight;
+    var source = reference.PixelData;
+    var y = source.AsSpan(0, lumaSamples).ToArray();
+    var cb = source.AsSpan(lumaSamples, chromaSamples).ToArray();
+    var cr = source.AsSpan(lumaSamples + chromaSamples, chromaSamples).ToArray();
+    var result = new byte[source.Length];
+
+    H264MotionCompensation.PredictLuma(
+      y, width, height, 0, 0, mvX, mvY, width, height, result.AsSpan(0, lumaSamples));
+    H264MotionCompensation.PredictChroma(
+      cb, chromaWidth, chromaHeight, 0, 0, mvX, mvY, chromaWidth, chromaHeight,
+      result.AsSpan(lumaSamples, chromaSamples));
+    H264MotionCompensation.PredictChroma(
+      cr, chromaWidth, chromaHeight, 0, 0, mvX, mvY, chromaWidth, chromaHeight,
+      result.AsSpan(lumaSamples + chromaSamples, chromaSamples));
+
+    return new() {
+      Width = width,
+      Height = height,
+      Format = PixelFormat.Yuv420P8,
+      PixelData = result,
+      ColorInfo = RawImageColorInfo.Bt601Limited,
+    };
+  }
+
+  private static RawImage _Solid420(int width, int height, byte value) {
+    var pixels = new byte[width * height * 3 / 2];
+    pixels.AsSpan().Fill(value);
+    return new() {
+      Width = width,
+      Height = height,
+      Format = PixelFormat.Yuv420P8,
+      PixelData = pixels,
+      ColorInfo = RawImageColorInfo.Bt601Limited,
+    };
+  }
+
+  private readonly record struct FirstMacroblockSyntax(
+    int FrameNum,
+    int PocLsb,
+    int SkipRun,
+    int? MacroblockType,
+    int? MvdL0X,
+    int? MvdL0Y,
+    int? MvdL1X,
+    int? MvdL1Y,
+    int? CodedBlockPatternCodeNum);
+
+  private readonly record struct SliceHeaderSyntax(int SliceType, int FrameNum, int PocLsb);
 
   private static MediaStreamInfo _Stream(int width, int height)
     => new() {
