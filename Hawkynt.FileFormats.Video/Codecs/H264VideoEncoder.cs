@@ -36,6 +36,9 @@ public sealed class H264VideoEncoder : IVideoCodecEncoder<H264VideoEncoder> {
   private const int _POC_BITS = 16;
   private const int _FRAME_NUM_MASK = (1 << _FRAME_NUM_BITS) - 1;
   private const int _POC_MASK = (1 << _POC_BITS) - 1;
+  private const int _QP = 18;
+  private const int _IDR_INTERVAL = 120;
+  private const int _INTEGER_SEARCH_RANGE = 16;
 
   private static readonly CodecTag _Tag = CodecTag.FromCharacters("avc1");
 
@@ -56,6 +59,7 @@ public sealed class H264VideoEncoder : IVideoCodecEncoder<H264VideoEncoder> {
   private Frame420? _previousReference;
   private PendingFrame? _pendingB;
   private int _displayIndex;
+  private int _gopBaseDisplayIndex;
   private int _lastReferenceFrameNum;
 
   private H264VideoEncoder(MediaStreamInfo stream) {
@@ -113,22 +117,35 @@ public sealed class H264VideoEncoder : IVideoCodecEncoder<H264VideoEncoder> {
 
     var current = new PendingFrame(this._To420(frame), presentationTimestamp, this._displayIndex++);
     if (this._previousReference == null) {
-      this._readyPackets.Enqueue(this._EncodeIdr(current));
-      this._previousReference = current.Samples;
-      this._lastReferenceFrameNum = 0;
+      this._StartIdr(current);
+    } else if (current.DisplayIndex - this._gopBaseDisplayIndex >= _IDR_INTERVAL) {
+      // Do not let a B picture depend across an IDR boundary. If one display picture is waiting for
+      // a future anchor, promote it to P first, then close the old GOP before the new IDR.
+      if (this._pendingB != null) {
+        var trailingFrameNum = _NextFrameNum(this._lastReferenceFrameNum);
+        var trailingPacket = this._EncodeP(
+          this._pendingB, trailingFrameNum, this._pendingB.PresentationTimestamp, out var trailingReference);
+        this._readyPackets.Enqueue(trailingPacket);
+        this._previousReference = trailingReference;
+        this._lastReferenceFrameNum = trailingFrameNum;
+        this._pendingB = null;
+      }
+
+      this._StartIdr(current);
     } else if (this._pendingB == null) {
       this._pendingB = current;
     } else {
       var b = this._pendingB;
-      var referenceFrameNum = (this._lastReferenceFrameNum + 1) & _FRAME_NUM_MASK;
-      this._readyPackets.Enqueue(this._EncodeP(current, referenceFrameNum, b.PresentationTimestamp));
+      var referenceFrameNum = _NextFrameNum(this._lastReferenceFrameNum);
+      var pPacket = this._EncodeP(current, referenceFrameNum, b.PresentationTimestamp, out var futureReference);
+      this._readyPackets.Enqueue(pPacket);
       this._readyPackets.Enqueue(this._EncodeB(
         b,
         this._previousReference,
-        current.Samples,
-        (referenceFrameNum + 1) & _FRAME_NUM_MASK,
+        futureReference,
+        _NextFrameNum(referenceFrameNum),
         current.PresentationTimestamp));
-      this._previousReference = current.Samples;
+      this._previousReference = futureReference;
       this._lastReferenceFrameNum = referenceFrameNum;
       this._pendingB = null;
     }
@@ -151,11 +168,21 @@ public sealed class H264VideoEncoder : IVideoCodecEncoder<H264VideoEncoder> {
 
     var trailing = this._pendingB;
     this._pendingB = null;
-    var frameNum = (this._lastReferenceFrameNum + 1) & _FRAME_NUM_MASK;
-    yield return this._EncodeP(trailing, frameNum, trailing.PresentationTimestamp);
-    this._previousReference = trailing.Samples;
+    var frameNum = _NextFrameNum(this._lastReferenceFrameNum);
+    yield return this._EncodeP(trailing, frameNum, trailing.PresentationTimestamp, out var reference);
+    this._previousReference = reference;
     this._lastReferenceFrameNum = frameNum;
   }
+
+  private void _StartIdr(PendingFrame frame) {
+    this._gopBaseDisplayIndex = frame.DisplayIndex;
+    this._readyPackets.Enqueue(this._EncodeIdr(frame));
+    this._previousReference = frame.Samples;
+    this._lastReferenceFrameNum = 0;
+    this._pendingB = null;
+  }
+
+  private static int _NextFrameNum(int previousReferenceFrameNum) => (previousReferenceFrameNum + 1) & _FRAME_NUM_MASK;
 
   public MediaStreamInfo DescribeStream()
     => this._stream ??= new() {
