@@ -4,6 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.AppleIIDhr;
 
 /// <summary>In-memory representation of an Apple II Double High-Resolution graphics screen dump.</summary>
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.IrfanView)]
 public readonly record struct AppleIIDhrFile : IImageFormatReader<AppleIIDhrFile>, IImageToRawImage<AppleIIDhrFile>, IImageFromRawImage<AppleIIDhrFile>, IImageFormatWriter<AppleIIDhrFile> {
 
   /// <summary>Exact file size in bytes (16384 = two banks of 8192 each: aux + main).</summary>

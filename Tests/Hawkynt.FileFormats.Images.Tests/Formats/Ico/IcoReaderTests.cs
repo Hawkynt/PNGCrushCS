@@ -1,4 +1,5 @@
 using System;
+using System.Buffers.Binary;
 using System.IO;
 using System.Linq;
 using FileFormat.Ico;
@@ -39,10 +40,22 @@ public sealed class IcoReaderTests {
   [Category("Unit")]
   public void FromBytes_InvalidType_ThrowsInvalidDataException() {
     var data = new byte[6];
-    data[0] = 0; data[1] = 0; // reserved = 0
-    data[2] = 99; data[3] = 0; // type = 99 (invalid, should be 1)
-    data[4] = 0; data[5] = 0; // count = 0
+    data[0] = 0; data[1] = 0;
+    data[2] = 99; data[3] = 0;
+    data[4] = 0; data[5] = 0;
     Assert.Throws<InvalidDataException>(() => IcoReader.FromBytes(data));
+  }
+
+  [Test]
+  [Category("Exceptional")]
+  public void ReadBundle_OffsetPlusSizeOverflow_ThrowsInvalidDataException() {
+    var data = new byte[22];
+    BinaryPrimitives.WriteUInt16LittleEndian(data.AsSpan(2), 1);
+    BinaryPrimitives.WriteUInt16LittleEndian(data.AsSpan(4), 1);
+    BinaryPrimitives.WriteInt32LittleEndian(data.AsSpan(14), 32);
+    BinaryPrimitives.WriteInt32LittleEndian(data.AsSpan(18), int.MaxValue - 16);
+
+    Assert.Throws<InvalidDataException>(() => IcoReader.ReadBundle(data));
   }
 
   [Test]

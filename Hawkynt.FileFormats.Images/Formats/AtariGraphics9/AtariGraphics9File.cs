@@ -4,6 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.AtariGraphics9;
 
 /// <summary>In-memory representation of an Atari Graphics 9 (GTIA 16-shade grayscale) image. 80x192.</summary>
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.IrfanView)]
 public readonly record struct AtariGraphics9File : IImageFormatReader<AtariGraphics9File>, IImageToRawImage<AtariGraphics9File>, IImageFromRawImage<AtariGraphics9File>, IImageFormatWriter<AtariGraphics9File> {
 
   /// <summary>Image width in pixels.</summary>
