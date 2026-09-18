@@ -23,30 +23,20 @@ public static class TruePaintReader {
 
     var loadAddress = (ushort)(data[0] | (data[1] << 8));
 
-    var offset = TruePaintFile.LoadAddressSize;
-
     var bitmapData1 = new byte[TruePaintFile.BitmapDataSize];
-    data.Slice(offset, TruePaintFile.BitmapDataSize).CopyTo(bitmapData1);
-    offset += TruePaintFile.BitmapDataSize;
+    data.Slice(TruePaintFile.BitmapData1Offset, TruePaintFile.BitmapDataSize).CopyTo(bitmapData1);
 
     var screenRam1 = new byte[TruePaintFile.ScreenRamSize];
-    data.Slice(offset, TruePaintFile.ScreenRamSize).CopyTo(screenRam1);
-    offset += TruePaintFile.ScreenRamSize;
+    data.Slice(TruePaintFile.ScreenRam1Offset, TruePaintFile.ScreenRamSize).CopyTo(screenRam1);
 
     var bitmapData2 = new byte[TruePaintFile.BitmapDataSize];
-    data.Slice(offset, TruePaintFile.BitmapDataSize).CopyTo(bitmapData2);
-    offset += TruePaintFile.BitmapDataSize;
+    data.Slice(TruePaintFile.BitmapData2Offset, TruePaintFile.BitmapDataSize).CopyTo(bitmapData2);
 
     var screenRam2 = new byte[TruePaintFile.ScreenRamSize];
-    data.Slice(offset, TruePaintFile.ScreenRamSize).CopyTo(screenRam2);
-    offset += TruePaintFile.ScreenRamSize;
+    data.Slice(TruePaintFile.ScreenRam2Offset, TruePaintFile.ScreenRamSize).CopyTo(screenRam2);
 
     var colorRam = new byte[TruePaintFile.ColorRamSize];
-    data.Slice(offset, TruePaintFile.ColorRamSize).CopyTo(colorRam);
-    offset += TruePaintFile.ColorRamSize;
-
-    var backgroundColor = data[offset];
-    var borderColor = data[offset + 1];
+    data.Slice(TruePaintFile.ColorRamOffset, TruePaintFile.ColorRamSize).CopyTo(colorRam);
 
     return new() {
       LoadAddress = loadAddress,
@@ -55,10 +45,10 @@ public static class TruePaintReader {
       BitmapData2 = bitmapData2,
       ScreenRam2 = screenRam2,
       ColorRam = colorRam,
-      BackgroundColor = backgroundColor,
-      BorderColor = borderColor,
+      BackgroundColor = data[TruePaintFile.BackgroundOffset],
+      BorderColor = data[TruePaintFile.BorderOffset],
     };
-    }
+  }
 
   public static TruePaintFile FromBytes(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);

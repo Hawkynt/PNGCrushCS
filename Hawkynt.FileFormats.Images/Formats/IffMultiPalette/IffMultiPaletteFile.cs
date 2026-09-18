@@ -5,6 +5,14 @@ using FileFormat.Ilbm;
 namespace FileFormat.IffMultiPalette;
 
 /// <summary>In-memory representation of an IFF ILBM image with PCHG line-by-line palette changes.</summary>
+/// <remarks>
+/// ImageMagick is the oracle here because it reads ILBM through netpbm's <c>ilbmtoppm</c>, which
+/// implements PCHG. XnView and ffmpeg read the file too and are not named: both return the same
+/// picture whether the PCHG chunk is in the file or deleted from it, so what they decode is the
+/// CMAP palette on every line and their opinion is about plain ILBM rather than about this format.
+/// ffmpeg was claimed here before and that is the claim this replaces.
+/// </remarks>
+[VerifiedBy(ConformanceOracle.ImageMagick)]
 public readonly record struct IffMultiPaletteFile : IImageFormatReader<IffMultiPaletteFile>, IImageToRawImage<IffMultiPaletteFile>, IImageFromRawImage<IffMultiPaletteFile>, IImageFormatWriter<IffMultiPaletteFile> {
 
   /// <summary>Minimum valid file size (FORM header plus form type).</summary>

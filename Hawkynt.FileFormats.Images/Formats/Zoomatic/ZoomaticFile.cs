@@ -4,6 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.Zoomatic;
 
 /// <summary>In-memory representation of a C64 Zoomatic (.zom) multicolor art image.</summary>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct ZoomaticFile
   : IImageFormatReader<ZoomaticFile>, IImageToRawImage<ZoomaticFile>,
     IImageFromRawImage<ZoomaticFile>, IImageFormatWriter<ZoomaticFile> {
@@ -28,8 +29,20 @@ public readonly record struct ZoomaticFile
   /// <summary>Default load address, putting the bitmap at $2000.</summary>
   internal const ushort DefaultLoadAddress = 0x2000;
 
-  /// <summary>Minimum raw payload size: bitmap + screen + color.</summary>
-  internal const int MinPayloadSize = BitmapDataSize + ScreenDataSize + ColorDataSize; // 10000
+  /// <summary>Where the bitmap starts in the depacked screen.</summary>
+  internal const int BitmapOffset = 0;
+
+  /// <summary>Where the video matrix starts in the depacked screen.</summary>
+  internal const int ScreenOffset = BitmapOffset + BitmapDataSize; // 8000
+
+  /// <summary>Where colour RAM starts in the depacked screen.</summary>
+  internal const int ColorOffset = ScreenOffset + ScreenDataSize; // 9000
+
+  /// <summary>Where the shared background register sits in the depacked screen.</summary>
+  internal const int BackgroundOffset = ColorOffset + ColorDataSize; // 10000
+
+  /// <summary>How many bytes the depacked screen takes: bitmap, video matrix, colour RAM, background.</summary>
+  internal const int UnpackedSize = BackgroundOffset + 1; // 10001
 
   /// <summary>Image width in pixels, always 160 (multicolor).</summary>
   public const int ImageWidth = 160;
@@ -51,9 +64,6 @@ public readonly record struct ZoomaticFile
 
   /// <summary>Background color index (0-15). Bit-pair 0 maps to this color.</summary>
   public byte BackgroundColor { get; init; }
-
-  /// <summary>Any trailing bytes beyond the minimum payload.</summary>
-  public byte[] TrailingData { get; init; }
 
   /// <summary>Converts this Zoomatic image to a platform-independent <see cref="RawImage"/> in Rgb24 format.</summary>
   public static RawImage ToRawImage(ZoomaticFile file) {
@@ -116,7 +126,6 @@ public readonly record struct ZoomaticFile
       ScreenData = screen,
       ColorData = color,
       BackgroundColor = background,
-      TrailingData = [],
     };
   }
 
