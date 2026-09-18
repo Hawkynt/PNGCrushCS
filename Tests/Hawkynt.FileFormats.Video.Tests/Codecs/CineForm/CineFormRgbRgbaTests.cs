@@ -144,7 +144,9 @@ public sealed class CineFormRgbRgbaTests {
   }
 
   private static MediaStreamInfo _Stream(int width, int height) => new() {
-    Index = 9,
+    // Zero, because these go through the AVI writer and an AVI's stream index is not a label: it is
+    // written into every chunk identifier, so the streams have to run densely from nought.
+    Index = 0,
     Kind = MediaStreamKind.Video,
     Codec = _Cfhd,
     Handler = _Cfhd,
