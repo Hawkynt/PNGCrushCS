@@ -80,8 +80,8 @@ public static class Lss16Writer {
               WriteNybble(previousPixel);
               WriteNybble(0);
               var encoded = chunk - 16;
-              WriteNybble((encoded >> 4) & 0x0F);
               WriteNybble(encoded & 0x0F);
+              WriteNybble((encoded >> 4) & 0x0F);
               runCount -= chunk;
             }
           }

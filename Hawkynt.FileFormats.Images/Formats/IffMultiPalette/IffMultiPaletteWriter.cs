@@ -70,6 +70,17 @@ public static class IffMultiPaletteWriter {
   }
 
   /// <summary>Builds an uncompressed PCHGF_4BIT change stream, enforcing the seven-write Copper limit.</summary>
+  /// <remarks>
+  /// The five fields after <c>LineCount</c> are not decoration. <c>ChangedLines</c> is the budget
+  /// netpbm's <c>ilbmtoppm</c> spends walking the line mask and <c>TotalChanges</c> is the budget it
+  /// spends reading records, so a header that puts something else in either of them is a header that
+  /// stops the reader before it has read anything: this wrote <c>MinReg</c> where
+  /// <c>ChangedLines</c> belongs, which for a picture that ever changes register zero is a budget of
+  /// nought, and <c>ilbmtoppm</c> duly said <c>got 0 change structures</c> and painted all two
+  /// hundred lines in the CMAP palette. ImageMagick reads ILBM through that program; XnView and
+  /// ffmpeg landed on the same picture for the same reason, which is what three tools agreeing at
+  /// 53.9 levels from our own decode meant.
+  /// </remarks>
   private static byte[] _BuildPchg(ReadOnlySpan<byte> palettes, int height) {
     var lineCount = Math.Max(0, height - 1);
     var maskBytes = ((lineCount + 31) / 32) * 4;
@@ -78,6 +89,9 @@ public static class IffMultiPaletteWriter {
 
     var minRegister = IffMultiPaletteFile.PaletteEntries;
     var maxRegister = -1;
+    var changedLines = 0;
+    var maxChanges = 0;
+    var totalChanges = 0L;
     Span<int> changed = stackalloc int[IffMultiPaletteFile.PaletteEntries];
     Span<byte> encoded = stackalloc byte[2];
 
@@ -99,6 +113,9 @@ public static class IffMultiPaletteWriter {
         continue;
 
       mask[line >> 3] |= (byte)(0x80 >> (line & 7));
+      ++changedLines;
+      maxChanges = Math.Max(maxChanges, count);
+      totalChanges += count;
       records.WriteByte((byte)count);
       records.WriteByte(0); // no changes to registers 16..31
 
@@ -119,18 +136,17 @@ public static class IffMultiPaletteWriter {
     }
 
     var recordBytes = records.ToArray();
-    var originalSize = checked(maskBytes + recordBytes.Length);
-    var result = new byte[checked(_PCHG_HEADER_SIZE + originalSize)];
+    var result = new byte[checked(_PCHG_HEADER_SIZE + maskBytes + recordBytes.Length)];
 
     BinaryPrimitives.WriteUInt16BigEndian(result, 0); // PCHG_COMP_NONE
     BinaryPrimitives.WriteUInt16BigEndian(result.AsSpan(2), _PCHGF_4BIT);
     BinaryPrimitives.WriteInt16BigEndian(result.AsSpan(4), 1); // CMAP is line 0; changes begin at line 1
     BinaryPrimitives.WriteUInt16BigEndian(result.AsSpan(6), (ushort)lineCount);
-    BinaryPrimitives.WriteUInt16BigEndian(result.AsSpan(8), (ushort)(maxRegister < 0 ? 0 : minRegister));
-    BinaryPrimitives.WriteUInt16BigEndian(result.AsSpan(10), (ushort)Math.Max(0, maxRegister));
-    BinaryPrimitives.WriteUInt16BigEndian(result.AsSpan(12), 0); // no Huffman tree
-    BinaryPrimitives.WriteUInt16BigEndian(result.AsSpan(14), 0);
-    BinaryPrimitives.WriteUInt32BigEndian(result.AsSpan(16), (uint)originalSize);
+    BinaryPrimitives.WriteUInt16BigEndian(result.AsSpan(8), (ushort)changedLines);
+    BinaryPrimitives.WriteUInt16BigEndian(result.AsSpan(10), (ushort)(maxRegister < 0 ? 0 : minRegister));
+    BinaryPrimitives.WriteUInt16BigEndian(result.AsSpan(12), (ushort)Math.Max(0, maxRegister));
+    BinaryPrimitives.WriteUInt16BigEndian(result.AsSpan(14), (ushort)maxChanges);
+    BinaryPrimitives.WriteUInt32BigEndian(result.AsSpan(16), (uint)totalChanges);
     mask.CopyTo(result, _PCHG_HEADER_SIZE);
     recordBytes.CopyTo(result, _PCHG_HEADER_SIZE + maskBytes);
 

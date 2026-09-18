@@ -105,6 +105,52 @@ public sealed class Lss16ReaderTests {
     Assert.That(result.PixelData.Length, Is.EqualTo(4 * 2));
   }
 
+  /// <summary>
+  /// A run of sixteen or more states its length as a nybble pair, low half first like every other
+  /// value in the stream.
+  /// </summary>
+  /// <remarks>
+  /// The bytes below are written out rather than generated, because a helper that builds them the
+  /// way the writer does cannot disagree with the writer. This row is one pixel of colour 5 followed
+  /// by a run of 39 more and then five of colour 9: the run's length reaches the stream as 23, which
+  /// is the nybbles 7 and 1 in that order, and reading them the other way round gives 129 — long
+  /// enough to swallow the rest of the row, which is what it used to do and what no other reader of
+  /// this format does.
+  /// </remarks>
+  [Test]
+  [Category("Unit")]
+  public void FromBytes_RunLongerThanFifteen_TakesItsLengthLowNybbleFirst() {
+    var header = _BuildHeader(45, 1);
+    var data = new byte[header.Length + 4];
+    Array.Copy(header, data, header.Length);
+    data[header.Length] = 0x55;     // colour 5, then colour 5 again, which opens a run
+    data[header.Length + 1] = 0x70; // run length escape 0, low nybble of 23
+    data[header.Length + 2] = 0x91; // high nybble of 23, then colour 9
+    data[header.Length + 3] = 0x49; // colour 9 again, opening a run of 4
+
+    var result = Lss16Reader.FromBytes(data);
+
+    Assert.Multiple(() => {
+      for (var x = 0; x < 40; ++x)
+        Assert.That(result.PixelData[x], Is.EqualTo(5), $"pixel {x}");
+
+      for (var x = 40; x < 45; ++x)
+        Assert.That(result.PixelData[x], Is.EqualTo(9), $"pixel {x}");
+    });
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void ARowOfRunsLongerThanFifteen_SurvivesTheWriterAndTheReader() {
+    var pixels = new byte[300];
+    for (var x = 0; x < pixels.Length; ++x)
+      pixels[x] = (byte)(x / 100 + 1);
+
+    var written = Lss16Writer.Assemble(300, 1, new byte[Lss16File.PaletteSize], pixels);
+
+    Assert.That(Lss16Reader.FromBytes(written).PixelData, Is.EqualTo(pixels));
+  }
+
   [Test]
   [Category("Unit")]
   public void FromStream_Valid() {
@@ -156,8 +202,8 @@ public sealed class Lss16ReaderTests {
             nybbles.Add(colorIndex);
             nybbles.Add(0);
             var encoded = chunk - 16;
-            nybbles.Add((encoded >> 4) & 0x0F);
             nybbles.Add(encoded & 0x0F);
+            nybbles.Add((encoded >> 4) & 0x0F);
             remaining -= chunk;
           }
         }
@@ -179,8 +225,8 @@ public sealed class Lss16ReaderTests {
             nybbles.Add(0);
             nybbles.Add(0);
             var encoded = chunk - 16;
-            nybbles.Add((encoded >> 4) & 0x0F);
             nybbles.Add(encoded & 0x0F);
+            nybbles.Add((encoded >> 4) & 0x0F);
             remaining -= chunk;
           }
         }

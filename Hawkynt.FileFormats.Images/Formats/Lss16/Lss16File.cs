@@ -5,6 +5,7 @@ namespace FileFormat.Lss16;
 
 /// <summary>In-memory representation of a Syslinux LSS16 splash screen image.</summary>
 [FormatMagicBytes([0x3D, 0xF3, 0x13, 0x14])]
+[VerifiedBy(ConformanceOracle.XnView)]
 public readonly record struct Lss16File : IImageFormatReader<Lss16File>, IImageToRawImage<Lss16File>, IImageFromRawImage<Lss16File>, IImageFormatWriter<Lss16File> {
 
   /// <summary>Magic bytes identifying an LSS16 file: 0x3D 0xF3 0x13 0x14.</summary>
@@ -22,7 +23,7 @@ public readonly record struct Lss16File : IImageFormatReader<Lss16File>, IImageT
   /// <summary>Total palette size in bytes.</summary>
   internal const int PaletteSize = PaletteEntryCount * BytesPerPaletteEntry;
 
-  /// <summary>Default 16-entry grayscale ramp (6-bit VGA scale, 0-63) used when the source palette is missing or short.</summary>
+  /// <summary>Default 16-entry grayscale ramp (6-bit VGA scale, 0-63) used when the file carries no palette.</summary>
   private static readonly byte[] _DefaultPalette = _MakeGrayRamp(PaletteEntryCount);
 
   private static byte[] _MakeGrayRamp(int entries) {
@@ -58,7 +59,9 @@ public readonly record struct Lss16File : IImageFormatReader<Lss16File>, IImageT
     var expandedPalette = new byte[PaletteSize];
     var copyLen = Math.Min(PaletteSize, srcPalette.Length);
     for (var i = 0; i < copyLen; ++i) {
-      var val = srcPalette[i] * 4;
+      // The full six-bit value is full intensity, so the scale is 255/63 and not a shift by two —
+      // the latter stops three levels short of white, which is where XnView puts it.
+      var val = srcPalette[i] * 255 / 63;
       expandedPalette[i] = (byte)(val > 255 ? 255 : val);
     }
 
@@ -72,18 +75,31 @@ public readonly record struct Lss16File : IImageFormatReader<Lss16File>, IImageT
     };
   }
 
+  /// <summary>Encodes a picture as an LSS16 splash screen, reducing it to sixteen colours first.</summary>
+  /// <remarks>
+  /// The colour table lives in the file, so the sixteen colours are the picture's own rather than a
+  /// fixed ramp. Quantising against <see cref="_DefaultPalette"/> is what used to happen here and it
+  /// was wrong twice over: that ramp is stated in the six-bit scale the file stores, so as an
+  /// eight-bit palette it is sixteen shades of near-black, and every picture handed to it came out
+  /// as the one entry nearest white — which the file then halved again on its way to six bits.
+  /// </remarks>
   public static Lss16File FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
-    image = image.EnsureIndexed(PixelFormat.Indexed8, _DefaultPalette);
+    image = image.EnsureIndexedAtMost(PaletteEntryCount);
     if (image.PaletteCount > PaletteEntryCount)
       throw new ArgumentException($"LSS16 supports at most {PaletteEntryCount} palette entries, got {image.PaletteCount}.", nameof(image));
-    if (image.Palette == null)
-      throw new ArgumentException("Palette is required for indexed image.", nameof(image));
 
     var palette = new byte[PaletteSize];
-    var srcPaletteBytes = Math.Min(image.Palette.Length, image.PaletteCount * BytesPerPaletteEntry);
-    for (var i = 0; i < srcPaletteBytes; ++i)
-      palette[i] = (byte)(image.Palette[i] / 4);
+    if (image.Palette is not { Length: > 0 }) {
+      // Indices with no table to read them by. The ramp is already on the file's scale.
+      _DefaultPalette.CopyTo(palette, 0);
+    } else {
+      // The file states its colours on the VGA's six-bit scale, so the eight-bit ones are scaled
+      // down here and back up in ToRawImage.
+      var srcPaletteBytes = Math.Min(image.Palette.Length, image.PaletteCount * BytesPerPaletteEntry);
+      for (var i = 0; i < srcPaletteBytes; ++i)
+        palette[i] = (byte)(image.Palette[i] * 63 / 255);
+    }
 
     var pixelData = image.PixelData[..];
     for (var i = 0; i < pixelData.Length; ++i)

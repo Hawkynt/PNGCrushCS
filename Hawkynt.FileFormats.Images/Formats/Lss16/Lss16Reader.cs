@@ -88,8 +88,10 @@ public static class Lss16Reader {
           int runLength = ReadNybble();
 
           if (runLength == 0) {
-            var highPart = ReadNybble();
+            // The byte that carries a run of sixteen or more is a nybble pair like every other
+            // value in this stream, and it is stored the same way round: low half first.
             var lowPart = ReadNybble();
+            var highPart = ReadNybble();
             runLength = ((highPart << 4) | lowPart) + 16;
           }
 
