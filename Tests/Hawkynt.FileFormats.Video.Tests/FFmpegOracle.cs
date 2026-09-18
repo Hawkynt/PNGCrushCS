@@ -89,6 +89,23 @@ internal static class FFmpegOracle {
   /// </summary>
   public static (bool Decoded, string Output) TryDecodeFrameCount(
     string path, int width, int height, int expectedFrames) {
+    var (decoded, output, _) = TryDecodePictures(path, width, height, expectedFrames);
+    return (decoded, output);
+  }
+
+  /// <summary>
+  /// Decodes the complete first video stream to unframed RGB24 and hands back the pictures
+  /// themselves, so a caller can compare what came out against what it encoded rather than only
+  /// counting frames.
+  /// </summary>
+  /// <remarks>
+  /// Counting says a decoder walked the file; only the samples say it read it. A codec whose frames
+  /// are laid out wrongly — fields on the wrong rows, a picture cropped at the wrong end — produces
+  /// exactly the right number of frames of exactly the right size while being wrong in every one of
+  /// them.
+  /// </remarks>
+  public static (bool Decoded, string Output, byte[] Pictures) TryDecodePictures(
+    string path, int width, int height, int expectedFrames) {
     var raw = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName() + ".rgb");
 
     try {
@@ -107,37 +124,37 @@ internal static class FFmpegOracle {
 
       using var process = Process.Start(startInfo);
       if (process == null)
-        return (false, "ffmpeg would not start");
+        return (false, "ffmpeg would not start", []);
 
       var stdout = process.StandardOutput.ReadToEndAsync();
       var stderr = process.StandardError.ReadToEndAsync();
 
       if (!process.WaitForExit(_TIMEOUT_MILLISECONDS)) {
         try { process.Kill(entireProcessTree: true); } catch { /* already gone */ }
-        return (false, "ffmpeg timed out");
+        return (false, "ffmpeg timed out", []);
       }
 
       var diagnostics = string.Concat(stdout.Result, stderr.Result).Trim();
       if (diagnostics.Length != 0)
-        return (false, diagnostics);
+        return (false, diagnostics, []);
 
       if (!File.Exists(raw))
-        return (false, "it produced no decoded video bytes");
+        return (false, "it produced no decoded video bytes", []);
 
-      var frameBytes = checked((long)width * height * 3);
-      var actualBytes = new FileInfo(raw).Length;
-      var expectedBytes = checked(frameBytes * expectedFrames);
-      if (actualBytes != expectedBytes)
+      var pictures = File.ReadAllBytes(raw);
+      var frameBytes = checked(width * height * 3);
+      if (pictures.Length != checked(frameBytes * expectedFrames))
         return (false,
-          actualBytes % frameBytes == 0
-            ? $"it decoded {actualBytes / frameBytes} frames instead of {expectedFrames}"
-            : $"it produced {actualBytes} bytes, which is not a whole number of {width}x{height} RGB24 frames");
+          pictures.Length % frameBytes == 0
+            ? $"it decoded {pictures.Length / frameBytes} frames instead of {expectedFrames}"
+            : $"it produced {pictures.Length} bytes, which is not a whole number of {width}x{height} RGB24 frames",
+          []);
 
-      return (true, $"it decoded all {expectedFrames} {width}x{height} frames");
+      return (true, $"it decoded all {expectedFrames} {width}x{height} frames", pictures);
     } catch (Win32Exception) {
-      return (false, "no ffmpeg on this machine");
+      return (false, "no ffmpeg on this machine", []);
     } catch (Exception exception) {
-      return (false, $"{exception.GetType().Name}: {exception.Message}");
+      return (false, $"{exception.GetType().Name}: {exception.Message}", []);
     } finally {
       try { File.Delete(raw); } catch { /* best effort */ }
     }
