@@ -141,12 +141,21 @@ internal static class WriterOracleComparison {
   /// about how the picture is shown rather than a claim about what it holds.
   /// </remarks>
   private static RawImage _AtStoredScale(RawImage rebuilt, int width, int height) {
-    if (width <= 0 || height <= 0 || rebuilt.Width % width != 0 || rebuilt.Height % height != 0)
+    if (width <= 0 || height <= 0 || rebuilt.Width <= 0 || rebuilt.Height <= 0)
       return rebuilt;
 
-    var across = rebuilt.Width / width;
-    var down = rebuilt.Height / height;
-    if (across == 1 && down == 1 || across > 4 || down > 4)
+    var scaleX = (double)rebuilt.Width / width;
+    var scaleY = (double)rebuilt.Height / height;
+
+    // Two tools may put a different number of pixels on the same picture and both be right. A C64
+    // chip draws a 160-wide screen 320 pixels across, so three decoders return twice our width; a
+    // PostScript interpreter rasterises points at 72 to the inch where this package uses 96, so it
+    // returns three pixels for every four of ours. Neither is a disagreement about the file — what
+    // would be is a different shape, so the test is that one scale serves both axes. Anything else
+    // falls through and is judged at its own size, which rejects it.
+    if (Math.Abs(scaleX - scaleY) > 0.02 * Math.Max(scaleX, scaleY))
+      return rebuilt;
+    if (scaleX is < 0.2 or > 4.0 || (Math.Abs(scaleX - 1.0) < 1e-9 && Math.Abs(scaleY - 1.0) < 1e-9))
       return rebuilt;
 
     byte[] source;
@@ -162,7 +171,9 @@ internal static class WriterOracleComparison {
     var reduced = new byte[width * height * 3];
     for (var y = 0; y < height; ++y)
     for (var x = 0; x < width; ++x) {
-      var from = ((y * down) * rebuilt.Width + x * across) * 3;
+      var sy = Math.Min(rebuilt.Height - 1, (int)(y * scaleY));
+      var sx = Math.Min(rebuilt.Width - 1, (int)(x * scaleX));
+      var from = (sy * rebuilt.Width + sx) * 3;
       var to = (y * width + x) * 3;
       reduced[to] = source[from];
       reduced[to + 1] = source[from + 1];

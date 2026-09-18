@@ -52,7 +52,7 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | AdTechFax | `.adt` | ✅ | ✅ | — | — | — | none |
 | AdvancedArtStudio | `.ocp`, `.mpi`, `.mpic` | ✅ | ✅ | — | — | — | recoil2png, XnView, IrfanView |
 | Afli | `.afl` | ✅ | ✅ | — | — | — | recoil2png, IrfanView |
-| Ai | `.ai` | ✅ | ✅ | — | — | — | none |
+| Ai | `.ai` | ✅ | ✅ | — | — | — | Ghostscript |
 | AimGreyScale | `.ima` | ✅ | ✅ | — | — | — | XnView |
 | AirNav | `.anv` | ✅ | ✅ | — | — | — | XnView |
 | AladdinPaint | `.alp` | ✅ | ✅ | — | — | — | none |
@@ -309,12 +309,12 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | Enterprise128 | `.ep`, `.elan` | ✅ | ✅ | — | — | — | none |
 | Envi | `.hdr` | ✅ | ✅ | — | — | — | none |
 | EpaBios | `.epa` | ✅ | ✅ | — | — | — | recoil2png, IrfanView |
-| Eps | `.eps`, `.epsf`, `.epsi`, `.epi`, `.ept` | ✅ | ✅ | — | — | — | XnView |
+| Eps | `.eps`, `.epsf`, `.epsi`, `.epi`, `.ept` | ✅ | ✅ | — | — | — | Ghostscript |
 | Eroiica | `.eif` | ✅ | ✅ | — | ✅ | — | none |
 | EscapePaint | `.esp` | ✅ | ✅ | — | — | — | none |
 | EsmSoftwarePix | `.pix` | ✅ | ✅ | — | — | — | IrfanView |
 | EverexFax | `.efx`, `.ef3` | ✅ | ✅ | — | — | — | none |
-| Excel | `.xlsx`, `.xlsm`, `.xltx`, `.xltm` | ✅ | ✅ | — | ✅ | — | none |
+| Excel | `.xls`, `.xlt`, `.xlsx`, `.xlsm`, `.xltx`, `.xltm` | ✅ | ✅ | — | ✅ | — | none |
 | Exr | `.exr` | ✅ | ✅ | — | — | — | ImageMagick, XnView, ffmpeg |
 | ExtendedGemImg | `.ximg` | ✅ | ✅ | — | — | — | none |
 | ExtendSuperHires | `.esh` | ✅ | ✅ | — | — | — | recoil2png, IrfanView |
@@ -881,7 +881,7 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | WizSolitaireDeck | `.dec` | ✅ | ✅ | — | — | — | IrfanView |
 | Wmf | `.wmf` | ✅ | ✅ | — | — | — | none |
 | WonderSwanTile | `.wst`, `.ws` | ✅ | ✅ | — | — | — | none |
-| Word | `.docx`, `.docm`, `.dotx`, `.dotm` | ✅ | ✅ | — | ✅ | — | none |
+| Word | `.doc`, `.dot`, `.docx`, `.docm`, `.dotx`, `.dotm` | ✅ | ✅ | — | ✅ | — | none |
 | WorldportFax | `.wpf`, `.wfx` | ✅ | ✅ | — | — | — | none |
 | Wpg | `.wpg` | ✅ | ✅ | — | — | — | ImageMagick, XnView |
 | Wsq | `.wsq` | ✅ | ✅ | — | — | — | none |
