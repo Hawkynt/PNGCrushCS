@@ -12,6 +12,20 @@ namespace FileFormat.Fpx;
 /// have class IDs, small streams live in the MiniFAT, and each storage owns a red/black sibling tree.
 /// This writer implements that container machinery here rather than depending on COM or a native OLE
 /// implementation.
+/// <para/>
+/// It is not FlashPix's alone. The legacy binary forms of Word, Excel and PowerPoint are the same
+/// container, and all three hand their streams to this class; it stays here because FlashPix is what
+/// it was written for and moving it would rename a type four formats compile against for no gain.
+/// <para/>
+/// What has been checked, and what has not. The container is held against <c>ole32.dll</c> —
+/// Microsoft's own structured storage, the implementation the Office applications sit on — at every
+/// size where a compound file changes shape: either side of the mini-stream cutoff, chains spanning
+/// several FAT sectors, and files large enough to need DIFAT sectors. Structured storage opens all
+/// of them, finds every name and returns every byte. That is the container and only the container:
+/// what is <em>inside</em> those streams — a Word FIB, a BIFF record stream, a persisted PowerPoint
+/// object graph — means nothing to it, and no office application has yet been asked whether it will
+/// open one of these files. The Oracle column says <c>none</c> for the legacy Office formats for
+/// that reason and should keep saying it until one has.
 /// </remarks>
 internal sealed class CompoundFileWriter {
 
