@@ -1389,7 +1389,7 @@ Implements `IVideoCodecDecoder<LocoVideoDecoder>`, `IVideoFrameDecoder`.
 
 #### `LocoVideoEncoder`
 
-Encodes LOCO lossless RGB and RGBA video frames.
+Encodes LOCO lossless and near-lossless RGB, RGBA, YUV 4:2:2 and YUV 4:2:0 video frames.
 
 Implements `IVideoCodecEncoder<LocoVideoEncoder>`, `IVideoPacketEncoder`.
 
