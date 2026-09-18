@@ -694,7 +694,7 @@ public sealed class H264VideoEncoder : IVideoCodecEncoder<H264VideoEncoder> {
     writer.WriteBits(frameNum, _FRAME_NUM_BITS);
     if (idr)
       writer.WriteUnsignedExpGolomb(0); // idr_pic_id
-    writer.WriteBits((displayIndex << 1) & _POC_MASK, _POC_BITS); // pic_order_cnt_lsb
+    writer.WriteBits(((displayIndex - this._gopBaseDisplayIndex) << 1) & _POC_MASK, _POC_BITS); // pic_order_cnt_lsb
 
     if (kind == SliceKind.B)
       writer.WriteBit(true); // direct_spatial_mv_pred_flag (required syntax, explicit Bi is used below)
@@ -849,7 +849,7 @@ public sealed class H264VideoEncoder : IVideoCodecEncoder<H264VideoEncoder> {
     rbsp.WriteUnsignedExpGolomb(0); // num_ref_idx_l1_default_active_minus1
     rbsp.WriteBit(false); // weighted_pred_flag
     rbsp.WriteBits(0, 2); // weighted_bipred_idc: ordinary rounded average
-    rbsp.WriteSignedExpGolomb(0); // pic_init_qp_minus26
+    rbsp.WriteSignedExpGolomb(_QP - 26); // pic_init_qp_minus26
     rbsp.WriteSignedExpGolomb(0); // pic_init_qs_minus26
     rbsp.WriteSignedExpGolomb(0); // chroma_qp_index_offset
     rbsp.WriteBit(true); // deblocking_filter_control_present_flag
@@ -946,6 +946,73 @@ public sealed class H264VideoEncoder : IVideoCodecEncoder<H264VideoEncoder> {
   }
 
   private enum SliceKind : byte { P, B, I }
+
+  private enum BPredictionMode : byte {
+    L0 = 1,
+    L1 = 2,
+    Bi = 3,
+  }
+
+  private readonly record struct MotionVector(int X, int Y);
+
+  private readonly record struct MotionNeighbour(bool Available, MotionVector Vector, int RefIdx);
+
+  private sealed class ResidualMacroblock {
+    internal readonly int[] Luma = new int[16 * 16];
+    internal readonly int[] Chroma = new int[2 * 4 * 16];
+    internal readonly int[] ChromaDc = new int[2 * 4];
+    internal int CbpLuma;
+    internal int CbpChroma;
+  }
+
+  private sealed class ResidualContext {
+    private readonly int _lumaWidth;
+    private readonly int _lumaHeight;
+    private readonly int _chromaWidth;
+    private readonly int _chromaHeight;
+    private readonly byte[] _luma;
+    private readonly byte[] _chroma;
+
+    internal ResidualContext(int mbWidth, int mbHeight) {
+      this._lumaWidth = mbWidth * 4;
+      this._lumaHeight = mbHeight * 4;
+      this._chromaWidth = mbWidth * 2;
+      this._chromaHeight = mbHeight * 2;
+      this._luma = new byte[this._lumaWidth * this._lumaHeight];
+      this._chroma = new byte[2 * this._chromaWidth * this._chromaHeight];
+    }
+
+    internal int LumaNc(int x, int y) {
+      var a = this._LumaCount(x - 1, y, out var haveA);
+      var b = this._LumaCount(x, y - 1, out var haveB);
+      return haveA && haveB ? (a + b + 1) >> 1 : haveA ? a : haveB ? b : 0;
+    }
+
+    internal void SetLuma(int x, int y, int value)
+      => this._luma[y * this._lumaWidth + x] = checked((byte)value);
+
+    internal int ChromaNc(int component, int x, int y) {
+      var a = this._ChromaCount(component, x - 1, y, out var haveA);
+      var b = this._ChromaCount(component, x, y - 1, out var haveB);
+      return haveA && haveB ? (a + b + 1) >> 1 : haveA ? a : haveB ? b : 0;
+    }
+
+    internal void SetChroma(int component, int x, int y, int value)
+      => this._chroma[this._ChromaOffset(component, x, y)] = checked((byte)value);
+
+    private int _LumaCount(int x, int y, out bool available) {
+      available = x >= 0 && y >= 0 && x < this._lumaWidth && y < this._lumaHeight;
+      return available ? this._luma[y * this._lumaWidth + x] : 0;
+    }
+
+    private int _ChromaCount(int component, int x, int y, out bool available) {
+      available = x >= 0 && y >= 0 && x < this._chromaWidth && y < this._chromaHeight;
+      return available ? this._chroma[this._ChromaOffset(component, x, y)] : 0;
+    }
+
+    private int _ChromaOffset(int component, int x, int y)
+      => component * this._chromaWidth * this._chromaHeight + y * this._chromaWidth + x;
+  }
 
   private sealed record Frame420(byte[] Y, byte[] Cb, byte[] Cr);
 
