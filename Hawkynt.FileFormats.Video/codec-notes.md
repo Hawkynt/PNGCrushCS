@@ -788,6 +788,81 @@ frame, so a miscounted coded-block run, a mode written for a macro block that ca
 in the wrong units would pass it and fail in a real player on frame two. A still scene is also required
 to converge, which is what demonstrates the coded-block flags firing at all.
 
+### On2 VP5
+
+VP5 (`VP50`) is the step between VP3 and VP6: VP3's 4:2:0 block structure and VP3's 8x8 integer
+inverse transform, with an arithmetic coder and a context-conditioned coefficient model where VP3 had
+Huffman tables. All of it is decoded — intra and predicted pictures, all ten macroblock modes across
+the previous and the golden reference, one vector or four, half-sample luminance and quarter-sample
+chrominance motion, the prediction-time edge filter, direct-current prediction from up to four
+neighbours, and interlaced field-coded macroblocks. There is no encoder.
+
+**Where the implementation came from, and why that rung.** It is a conversion of FFmpeg's `vp5.c`,
+`vp56.c`, `vp5dsp.c`, `vp3dsp.c`, `vp56data.c`, `vp5data.h` and `vpx_rac.h`, which are
+LGPL-2.1-or-later and so absorbable by this package's LGPL-3.0-or-later; the notice beside the source
+records it. That is the first rung of the sourcing ladder and there is no rung above it to take here.
+On2 published a VP6 bitstream specification and never published a VP5 one, and the community
+description of VP5 covers its range coder and its frame header and stops. FFmpeg's decoder is
+therefore not a convenient second opinion about VP5 — it is the only complete account of the format
+that exists, and every VP5 file in circulation has been checked against it and against nothing else.
+
+That is worth saying plainly beside [the investigation of VP6](codec-investigations.md), which failed.
+That attempt was a clean-room reimplementation from On2's own document and it desynchronised inside
+the first coefficient block; the note it left says VP5 is behind the same wall. It is behind the same
+wall only for that method. Nothing about the wall moved: the ladder's first rung was taken instead of
+its third, which is what the ladder says to do when the first rung is available, and VP5's is.
+
+**Two things the reference does that look like mistakes and are not.** The transform here is not the
+one in `Vp3InverseDct`, which is the Theora specification's normative form and truncates a sum to
+sixteen bits before each multiplication by the C4 constant. FFmpeg's does not, and the two differ
+wherever an intermediate overflows. Since VP5 has no normative text, what real files decode as is
+FFmpeg's arithmetic, and that is what is implemented. Separately, a field-coded macroblock's
+chrominance blocks are read out of the prediction window at a different depth from its luminance
+blocks — four rows in rather than two — which has no evident reason behind it and is kept because
+removing it makes real interlaced files decode wrongly. Both are stated in the source at the point
+they bite.
+
+**What it was measured against.** ffmpeg has a VP5 decoder and no VP5 encoder, so the comparison is
+over real files rather than over a round trip: `potter512-400.avi` (512x304, 2,084 frames, thirty-four key
+frames) and `vp5_interlace.avi` (352x576, 2,395 frames, thirty-nine key frames, interlaced) from
+`samples.mplayerhq.hu/V-codecs/VP5/`, which between them are every VP5 file published in a container
+this package reads — the rest of that directory is six raw `.vp5` elementary streams and one Nullsoft
+NSV file, neither of which has a reader here. Both were decoded here and by ffmpeg and compared plane by plane, sample by
+sample. **Every plane of every frame of both files is identical** — not close, not on average, the
+same bytes, on the 2,000th frame of a run as on the first. That is the only acceptable result, because
+the loss happened in an encoder neither decoder has, and because an error of one anywhere in the
+transform, the prediction or the edge filter is added to the next frame's error and the one after
+that until the next key frame.
+
+Counting what those two files contain says how much of the format that measurement actually reached.
+Between them they use **all ten macroblock modes** — including the four-vector mode and all four that
+predict from the golden picture, the rarest of which occurs 1,776 times — both ways of starting the
+macroblock-type statistics, all six coefficient magnitude classes, quantisers from 7 to 63, and
+792,335 field-coded macroblocks. Nothing in the decoder is reached only by a path no file takes.
+
+Three cuts of those two files are committed beside the tests with ffmpeg's own `framemd5` output, so
+the claim runs on a machine that has no ffmpeg and no network: sixty frames off one key frame, which
+is the shape that catches a prediction loop drifting; twenty-five frames carrying three key frames,
+which exercises the entropy-model reset and the golden-picture replacement; and ten interlaced frames,
+which is the only way the field-coded path can be measured at all. Where ffmpeg is present the tool
+is also asked directly, so the committed digests cannot quietly become a record of this decoder
+agreeing with its own past mistake. The comparison is on the sample planes and never on RGB: the RGB
+is a display convention this package chose — it interpolates chrominance where ffmpeg repeats it — so
+an RGB difference measures the convention and not the decode.
+
+The interlaced path was checked the same way a reviewer would want it checked: disabling it makes
+every frame of the interlaced file wrong, and moving the chrominance window depth from four to two
+makes 2,400 samples a frame wrong. Neither is a path that quietly does nothing.
+
+**What is refused, by name, rather than guessed at.** A packet with no bytes; a stream that begins at
+an inter frame, since there is nothing to predict from; a key frame stating a picture with no area; a
+key frame stating a display size that does not fit inside its coded size; a bitstream version outside
+the defined zero to five; and a frame whose coefficient data runs out before its macroblocks do. That
+last one matters more than it looks. A range coder answers every question it is asked whether or not
+anything is left to answer with, so a truncated VP5 frame does not announce itself — it produces a
+picture. Nothing separates that picture from a real one except the count of how far past the end the
+coder has read, which is why the count is kept and why it is checked once a macroblock.
+
 ### Apple Video (RPZA)
 
 A vector quantizer over 4x4 blocks of 15-bit RGB colour, also called Road Pizza, and QuickTime's own
