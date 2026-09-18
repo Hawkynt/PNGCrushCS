@@ -1708,7 +1708,7 @@ Implements `IVideoCodecDecoder<Mss1VideoDecoder>`, `IVideoFrameDecoder`.
 
 #### `MszhVideoDecoder`
 
-Decodes the MSZH variant of the Lossless Codec Library (LCL): groups of eight commands selected by one mask byte, with each command either copying four literal bytes or repeating a four-byte aligned run from data already reconstructed in the same independently coded section.
+Decodes the MSZH variant of the Lossless Codec Library (LCL): one independently coded intra picture whose four-byte groups are either literals or backward copies from bytes already rebuilt in the same section.
 
 Implements `IVideoCodecDecoder<MszhVideoDecoder>`, `IVideoFrameDecoder`.
 
@@ -1721,7 +1721,7 @@ Implements `IVideoCodecDecoder<MszhVideoDecoder>`, `IVideoFrameDecoder`.
 
 #### `MszhVideoEncoder`
 
-Encodes the MSZH variant of the Lossless Codec Library (LCL): RGB24 pictures are stored bottom row first, padded to four-byte row alignment, then represented as groups of four-byte literals or backward copies selected by one mask byte for every eight commands.
+Encodes LCL MSZH as independently decodable intra pictures using four-byte literals and backward copies selected by one mask byte for every eight commands.
 
 Implements `IVideoCodecEncoder<MszhVideoEncoder>`, `IVideoPacketEncoder`.
 
