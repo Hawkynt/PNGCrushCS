@@ -20,7 +20,11 @@ namespace FileFormat.Cdr;
 /// </remarks>
 [FormatMagicBytes([(byte)'C', (byte)'D', (byte)'R'], 8)]
 [FormatMagicBytes([(byte)'c', (byte)'d', (byte)'r', (byte)'8'], 8)]
-[VerifiedBy(ConformanceOracle.LibreOffice)]
+// No oracle. LibreOffice was read for this format's version and `DISP` semantics — libcdr is where
+// they are written down — but it does not read what this writer produces: handed one of these it
+// imports the file as a Writer document, which is the fallback for bytes nothing claimed, and
+// renders an empty page. It was recorded here as a verifying oracle and that was wrong; reading a
+// library to learn a format is not the same as that library reading the result.
 public sealed class CdrFile :
   IImageFormatReader<CdrFile>, IImageToRawImage<CdrFile>, IImageFromRawImage<CdrFile>, IImageFormatWriter<CdrFile> {
 

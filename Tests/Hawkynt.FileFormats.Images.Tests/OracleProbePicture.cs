@@ -19,18 +19,33 @@ namespace Hawkynt.FileFormats.Images.Tests;
 internal static class OracleProbePicture {
 
   /// <summary>The pictures this format says it takes, most likely first.</summary>
+  /// <remarks>
+  /// A format that states its geometry is asked only at the geometry it states. Adding the general
+  /// sizes to those was measuring the probe rather than the writer: a Spectrum screen is 256 by 192
+  /// whatever it is handed, so every one of those writers answered a 320 by 200 request with a file
+  /// of its own size, and a fixture holding the tool to the size it had asked for called that a
+  /// wrong picture. Well over a hundred results across the registry were that mistake and not a
+  /// defect.
+  /// </remarks>
   public static IEnumerable<(int Width, int Height, VideoMode? Mode)> CasesFor(FormatEntry entry) {
     var seen = new HashSet<(int, int)>();
+    var statesItsOwnGeometry = false;
 
     foreach (var mode in entry.VideoModes ?? [])
-    foreach (var (widths, heights) in mode.Dimensions)
-    foreach (var width in _Candidates(widths, 320))
-    foreach (var height in _Candidates(heights, 200)) {
-      if ((long)width * height is <= 0 or > 4096L * 4096L || !seen.Add((width, height)))
-        continue;
+    foreach (var (widths, heights) in mode.Dimensions) {
+      statesItsOwnGeometry |= _IsBounded(widths) || _IsBounded(heights);
 
-      yield return (width, height, mode);
+      foreach (var width in _Candidates(widths, 320))
+      foreach (var height in _Candidates(heights, 200)) {
+        if ((long)width * height is <= 0 or > 4096L * 4096L || !seen.Add((width, height)))
+          continue;
+
+        yield return (width, height, mode);
+      }
     }
+
+    if (statesItsOwnGeometry)
+      yield break;
 
     if (seen.Add((320, 200)))
       yield return (320, 200, null);
@@ -42,6 +57,9 @@ internal static class OracleProbePicture {
     if (seen.Add((8, 8)))
       yield return (8, 8, null);
   }
+
+  /// <summary>Whether the format has anything to say about this dimension.</summary>
+  private static bool _IsBounded(IntegerRange range) => range.Min != 1 || range.Max != int.MaxValue;
 
   /// <summary>A picture the mode can hold: full colour, or indexed within its colour count.</summary>
   public static RawImage Sample(int width, int height, VideoMode? mode) {

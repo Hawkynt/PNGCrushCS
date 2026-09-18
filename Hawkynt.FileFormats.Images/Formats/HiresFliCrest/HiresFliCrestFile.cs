@@ -14,7 +14,7 @@ namespace FileFormat.HiresFliCrest;
 /// columns are the row less the three cells drawn before the switch that makes FLI work can happen.
 /// The old model said 320 by 200 and packed the matrices a thousand apart, which is neither.
 /// </remarks>
-[VerifiedBy(ConformanceOracle.Recoil2Png)]
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.IrfanView)]
 public readonly record struct HiresFliCrestFile
   : IImageFormatReader<HiresFliCrestFile>, IImageToRawImage<HiresFliCrestFile>,
     IImageFromRawImage<HiresFliCrestFile>, IImageFormatWriter<HiresFliCrestFile> {
