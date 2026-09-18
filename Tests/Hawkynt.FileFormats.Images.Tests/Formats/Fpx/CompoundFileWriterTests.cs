@@ -285,6 +285,75 @@ public sealed class CompoundFileWriterTests {
     return result;
   }
 
+  /// <summary>
+  /// Two entries of one storage that the format cannot tell apart are refused rather than written.
+  /// </summary>
+  /// <remarks>
+  /// A storage holds its children in a tree ordered by length and then without case, and a reader
+  /// finds a stream by walking that ordering rather than by reading every entry. So a second entry
+  /// that compares equal to the first is written, is reachable by nothing, and produces a file that
+  /// is quietly short of a stream rather than one that fails to parse. Refusing it at the point of
+  /// the mistake is the only place the caller can still be told which name it was.
+  /// </remarks>
+  [TestCase("Contents", "Contents", TestName = "TwoEntriesOfOneStorageWithTheSameName_AreRefused")]
+  [TestCase("Contents", "CONTENTS", TestName = "TwoEntriesOfOneStorageDifferingOnlyInCase_AreRefused")]
+  [TestCase("Contents", "coNTenTS", TestName = "TwoEntriesOfOneStorageDifferingOnlyInMixedCase_AreRefused")]
+  [Category("ExceptionalCase")]
+  public void CollidingSiblingNames_AreRefused(string first, string second) {
+    var writer = new CompoundFileWriter(Guid.Empty);
+    writer.AddStream(0, first, [1, 2, 3]);
+
+    Assert.That(
+      () => writer.AddStream(0, second, [4, 5, 6]),
+      Throws.ArgumentException.With.Message.Contains(second));
+  }
+
+  [Test]
+  [Category("EdgeCase")]
+  public void TheSameNameUnderTwoDifferentStorages_IsAccepted() {
+    // The rule is per storage, not per file: two storages may each hold their own "Contents", and
+    // every real compound file does exactly that.
+    var writer = new CompoundFileWriter(Guid.Empty);
+    var left = writer.AddStorage(0, "Left", Guid.Empty);
+    var right = writer.AddStorage(0, "Right", Guid.Empty);
+
+    writer.AddStream(left, "Contents", [1, 2, 3]);
+    writer.AddStream(right, "Contents", [4, 5, 6]);
+
+    var container = writer.Build();
+    var read = new CompoundFile(container);
+    var found = read.Streams().ToDictionary(pair => pair.Key, pair => pair.Value);
+
+    Assert.Multiple(() => {
+      Assert.That(read.Read(found["/Left/Contents"]), Is.EqualTo(new byte[] { 1, 2, 3 }));
+      Assert.That(read.Read(found["/Right/Contents"]), Is.EqualTo(new byte[] { 4, 5, 6 }));
+    });
+  }
+
+  /// <summary>A name carrying one of the four characters MS-CFB 2.6.1 reserves is refused.</summary>
+  [TestCase("Ole/Stream")]
+  [TestCase(@"Ole\Stream")]
+  [TestCase("Ole:Stream")]
+  [TestCase("Ole!Stream")]
+  [Category("ExceptionalCase")]
+  public void AReservedCharacterInAName_IsRefused(string name) {
+    var writer = new CompoundFileWriter(Guid.Empty);
+
+    Assert.That(() => writer.AddStream(0, name, [1]), Throws.ArgumentException);
+  }
+
+  [Test]
+  [Category("Boundary")]
+  public void ANameOfEveryOtherPunctuation_IsAccepted() {
+    // Only four characters are reserved. A leading 0x05 is conventional for summary-information
+    // streams and must keep working, and the rest of punctuation is not the container's business.
+    var writer = new CompoundFileWriter(Guid.Empty);
+    writer.AddStream(0, "\u0005SummaryInformation", [1]);
+    writer.AddStream(0, "Name-With.Punctuation_And Space", [2]);
+
+    Assert.That(() => writer.Build(), Throws.Nothing);
+  }
+
   private static void _AssertRoundTrips(byte[] container, params (string Name, byte[] Data)[] expected) {
     var read = new CompoundFile(container);
     var found = read.Streams().ToDictionary(pair => pair.Key, pair => pair.Value);

@@ -46,6 +46,10 @@ internal sealed class CompoundFileWriter {
   private const byte _Red = 0;
   private const byte _Black = 1;
 
+  /// <summary>The characters MS-CFB 2.6.1 reserves, which a directory entry name may not contain.</summary>
+  private static readonly System.Buffers.SearchValues<char> _ForbiddenNameCharacters =
+    System.Buffers.SearchValues.Create("/\\:!");
+
   private readonly List<Node> _nodes = [];
 
   internal CompoundFileWriter(Guid rootClassId) {
@@ -65,6 +69,21 @@ internal sealed class CompoundFileWriter {
       throw new ArgumentOutOfRangeException(nameof(parent));
     if (string.IsNullOrEmpty(name) || name.Length > 31)
       throw new ArgumentException("CFB directory names must contain 1 to 31 UTF-16 code units.", nameof(name));
+    if (name.AsSpan().IndexOfAny(_ForbiddenNameCharacters) >= 0)
+      throw new ArgumentException(
+        $"A CFB directory name may not contain any of / \\ : ! — MS-CFB 2.6.1 reserves them — and '{name}' does.",
+        nameof(name));
+
+    // Siblings are held in a tree ordered by _CompareNames, and a reader looks a name up by walking
+    // that ordering rather than by reading every entry. Two siblings that compare equal therefore
+    // both get written and only the first is ever found: the second is addressable by nothing,
+    // which is a file that is quietly missing a stream rather than a file that is malformed.
+    foreach (var sibling in _nodes)
+      if (sibling.Parent == parent && _CompareNames(sibling.Name, name) == 0)
+        throw new ArgumentException(
+          $"A CFB storage may hold only one entry named '{name}': names are compared by length and then "
+          + $"without case, so it collides with the existing '{sibling.Name}' and would be unreachable.",
+          nameof(name));
 
     var index = _nodes.Count;
     _nodes.Add(new(name, type, classId, parent, data));
