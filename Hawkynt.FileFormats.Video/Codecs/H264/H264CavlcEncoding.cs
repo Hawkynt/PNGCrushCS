@@ -48,19 +48,27 @@ internal static class H264CavlcEncoding {
   }
 
   private static Code _Find(int tableIndex, int value) {
-    foreach (var (text, candidate) in H264CavlcTables.AllTables[tableIndex].Entries) {
-      if (candidate != value)
+    var currentIndex = 0;
+    foreach (var table in H264CavlcTables.AllTables) {
+      if (currentIndex++ != tableIndex)
         continue;
 
-      var bits = 0u;
-      var length = 0;
-      foreach (var symbol in text) {
-        if (symbol is ' ' or '_' or '\t')
+      foreach (var (text, candidate) in table.Entries) {
+        if (candidate != value)
           continue;
-        bits = (bits << 1) | (symbol == '1' ? 1u : 0u);
-        ++length;
+
+        var bits = 0u;
+        var length = 0;
+        foreach (var symbol in text) {
+          if (symbol is ' ' or '_' or '\t')
+            continue;
+          bits = (bits << 1) | (symbol == '1' ? 1u : 0u);
+          ++length;
+        }
+        return new(bits, length);
       }
-      return new(bits, length);
+
+      break;
     }
 
     throw new InvalidOperationException($"CAVLC table {tableIndex} has no code for value {value}.");
