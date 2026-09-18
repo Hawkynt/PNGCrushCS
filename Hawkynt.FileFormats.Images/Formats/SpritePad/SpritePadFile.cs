@@ -4,6 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.SpritePad;
 
 /// <summary>In-memory representation of a SpritePad (.spd) sprite collection file for the C64.</summary>
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.IrfanView)]
 public readonly record struct SpritePadFile
   : IImageFormatReader<SpritePadFile>, IImageToRawImage<SpritePadFile>,
     IImageFromRawImage<SpritePadFile>, IImageFormatWriter<SpritePadFile> {

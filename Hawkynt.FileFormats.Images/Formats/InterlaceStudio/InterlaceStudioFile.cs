@@ -18,7 +18,7 @@ namespace FileFormat.InterlaceStudio;
 /// 19003 bytes — and then as a pair of grey ramps of 16208, neither of which is the format nor its
 /// length. The registers are what it colours by, and they were not being written at all.
 /// </remarks>
-[VerifiedBy(ConformanceOracle.Recoil2Png)]
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.IrfanView)]
 public readonly record struct InterlaceStudioFile
   : IImageFormatReader<InterlaceStudioFile>, IImageToRawImage<InterlaceStudioFile>,
     IImageFromRawImage<InterlaceStudioFile>, IImageFormatWriter<InterlaceStudioFile> {
