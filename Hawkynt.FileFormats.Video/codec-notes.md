@@ -2696,6 +2696,35 @@ since there is no rate control here for a mid-group quantiser change to serve an
 makes the same picture code to the same bytes; the bit-stuffing codeword of 4.2.3.1, which exists to
 fill a channel this encoder is not driving; and Annex D, which the decoder beside it will not read.
 
+**Freeze Picture Release is the only entry point a stream has, and a warning about entry points that
+means nothing.** Two things about H.261 and key frames that cost an investigation each and are easy to
+run into again in the same hour, because one looks like evidence for the other and is not.
+
+The first: with no picture-level intra/inter flag anywhere in the syntax, the nearest thing to "you may
+start decoding here" is PTYPE bit 3, Freeze Picture Release — nominally an encoder's answer to a fast
+update request, telling a decoder it may leave freeze picture mode and show what it decodes from now
+on. ffmpeg's own encoder writes it for exactly its intra pictures, and ffmpeg's decoder reads it back
+as the decoded frame's key-frame flag; nothing else in the picture layer can carry that. Written clear
+on every picture, as this encoder did until it was measured, a clip is well-formed, decodes sample for
+sample, and reports **no key frame at all** — `ffprobe -show_entries frame=key_frame` answers `0` for
+every picture of it against `1,I` for the first picture of ffmpeg's own — so anything that seeks, or
+selects on `AVDISCARD_NONKEY`, discards the whole clip. The packet's own `IsKeyFrame` said one thing
+and the bytes it carried said another, which is the kind of disagreement no round trip through this
+library can see, both halves ignoring the bit.
+
+The second, and it is *not* the first showing itself: ffmpeg before 8.1 prints `[h261 @ …] warning:
+first frame is no keyframe` — twice, once per decoder it opened — for **every H.261 stream in
+existence**, its own encoder's output included, with or without Freeze Picture Release set. H.261 has
+no I picture for ffmpeg's decoder to report, so it enters every picture as `AV_PICTURE_TYPE_P` and
+mpegvideo's complaint fires on the first one. ffmpeg silenced it itself in 8.1
+(`s->codec_id != AV_CODEC_ID_H261 /* H.261 has no keyframes */` in `ff_mpv_alloc_dummy_frames`), which
+is why the line appears and disappears with the ffmpeg on the machine rather than with the bytes handed
+to it. Measured on 4.2.2 and 8.1 in both directions before either half of this was touched. The
+executable Oracle column treats any line on ffmpeg's error channel as a failure, correctly, and this one
+line is exempted there by decoder tag as well as by text; the exemption is in `FFmpegOracle` with the
+measurement beside it. Setting Freeze Picture Release does not silence it and was never going to — the
+warning is about a picture type H.261 does not have, not about a bit it does.
+
 ### id RoQ
 
 The FMV format Graeme Devine wrote for The 11th Hour, carried into Quake III and Return to Castle
