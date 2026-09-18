@@ -29,15 +29,17 @@ namespace FileFormat.Codecs;
 /// arrangement; anything else becomes 4:1:1 at 525/60 and 4:2:0 at 625/50, which is what a DV
 /// recorder of each system wrote. That is why a caller wanting DVCPRO50 hands over 4:2:2 planes
 /// rather than setting a flag: there is nothing else in the description that could carry the choice,
-/// and inventing one would put the same fact in two places.
+/// and inventing one would put the same fact in two places. A caller-supplied frame rate must therefore
+/// agree with the raster; an unstated or merely unreduced equivalent rate is described canonically.
 /// <para/>
 /// <b>Measured by having FFmpeg decode it back.</b> The measurement is in
 /// <c>codec-notes.md</c>; the summary is that FFmpeg accepts every frame, agrees about the geometry
 /// and the profile, and the round trip through DV's own quantiser costs what DV costs.
 /// <para/>
-/// <b>What refuses.</b> A raster that is not one of the two DV defines; a picture whose size is not
-/// the stream's; and a stream that changes sampling part way through, since that would change the
-/// frame size and no container describes a stream whose frames are two different lengths.
+/// <b>What refuses.</b> A raster that is not one of the two DV defines; a frame rate that contradicts
+/// that raster's 525/60 or 625/50 system; a picture whose size is not the stream's; and a stream that
+/// changes sampling part way through, since that would change the frame size and no container
+/// describes a stream whose frames are two different lengths.
 /// </remarks>
 [VerifiedBy(ConformanceOracle.FFmpeg)]
 public sealed class DvVideoEncoder : IVideoCodecEncoder<DvVideoEncoder> {
@@ -60,7 +62,7 @@ public sealed class DvVideoEncoder : IVideoCodecEncoder<DvVideoEncoder> {
   private DvProfile? _profile;
   private DvGeometry.Segment[] _segments = [];
 
-  private DvVideoEncoder(MediaStreamInfo stream) {
+  private DvVideoEncoder(MediaStreamInfo stream, Rational frameRate) {
     this._width = stream.Width;
     this._height = stream.Height;
     this._stream = new() {
@@ -69,7 +71,7 @@ public sealed class DvVideoEncoder : IVideoCodecEncoder<DvVideoEncoder> {
       Codec = _Tag,
       Handler = _Tag,
       TimeBase = stream.TimeBase,
-      FrameRate = stream.FrameRate,
+      FrameRate = frameRate,
       DeclaredFrameCount = stream.DeclaredFrameCount,
       Width = stream.Width,
       Height = stream.Height,
@@ -89,15 +91,25 @@ public sealed class DvVideoEncoder : IVideoCodecEncoder<DvVideoEncoder> {
     if (stream.Kind != MediaStreamKind.Video)
       throw new NotSupportedException("DV can only encode a video stream.");
 
-    if (DvProfile.ForPicture(stream.Width, stream.Height, DvSampling.FourOneOne) == null
-        && DvProfile.ForPicture(stream.Width, stream.Height, DvSampling.FourTwoZero) == null)
-      throw new NotSupportedException(
+    var rateProfile = DvProfile.ForPicture(stream.Width, stream.Height, DvSampling.FourOneOne)
+      ?? DvProfile.ForPicture(stream.Width, stream.Height, DvSampling.FourTwoZero)
+      ?? throw new NotSupportedException(
         $"Video stream {stream.Index} states a picture size of {stream.Width}x{stream.Height}. DV defines two "
         + "standard-definition rasters and no others — 720x480 for 525/60 and 720x576 for 625/50 — and a frame is a "
         + "fixed number of DIF blocks laid out for one of them, so there is nothing to scale or pad a different "
         + "raster into.");
 
-    return new(stream);
+    var frameRate = new Rational(rateProfile.FrameRateNumerator, rateProfile.FrameRateDenominator);
+    if (stream.FrameRate.IsKnown
+        && (stream.FrameRate.Numerator <= 0
+            || stream.FrameRate.Denominator <= 0
+            || !_SameRate(stream.FrameRate, frameRate)))
+      throw new NotSupportedException(
+        $"A {stream.Width}x{stream.Height} DV stream is fixed at {frameRate} frames/s by its "
+        + $"{(stream.Height == 480 ? "525/60" : "625/50")} system; stream {stream.Index} requests "
+        + $"{stream.FrameRate} frames/s, which IEC 61834 cannot represent for that raster.");
+
+    return new(stream, frameRate);
   }
 
   public bool TryEncode(RawImage frame, long? presentationTimestamp, out CodedPacket packet) {
@@ -201,6 +213,10 @@ public sealed class DvVideoEncoder : IVideoCodecEncoder<DvVideoEncoder> {
       Cr = source.GetPlaneData(2).ToArray(),
     };
   }
+
+  /// <summary>Whether two positive frame-rate fractions name the same exact rate.</summary>
+  private static bool _SameRate(Rational left, Rational right)
+    => (Int128)left.Numerator * right.Denominator == (Int128)right.Numerator * left.Denominator;
 
   private static string _SamplingName(DvSampling sampling) => sampling switch {
     DvSampling.FourOneOne => "4:1:1",

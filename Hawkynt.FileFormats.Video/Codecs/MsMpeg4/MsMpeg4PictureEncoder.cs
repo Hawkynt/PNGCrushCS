@@ -74,6 +74,9 @@ internal sealed class MsMpeg4PictureEncoder {
   /// </remarks>
   private const int _MAX_VECTOR_DIFFERENCE = 31;
 
+  /// <summary>Extra luma SAD temporal prediction must lose by before paying for an intra macroblock.</summary>
+  private const int _INTRA_MODE_BIAS_PER_QUANTISER = 64;
+
   /// <summary>Which of three run-level tables version 3 is told to use: the pair versions 1 and 2 fix.</summary>
   private const int _RUN_LEVEL_TABLE_INDEX = 2;
 
@@ -225,7 +228,7 @@ internal sealed class MsMpeg4PictureEncoder {
   // Intra macroblocks
   // ============================================================================================
 
-  private void _EncodeIntraMacroblock(int address) {
+  private void _EncodeIntraMacroblock(int address, bool inPredictedPicture = false) {
     Span<int> levels = stackalloc int[6 * 64];
     var pattern = 0;
 
@@ -241,7 +244,11 @@ internal sealed class MsMpeg4PictureEncoder {
         }
     }
 
-    this._WriteIntraMacroblockHeader(address, pattern);
+    if (inPredictedPicture)
+      this._WritePredictedPictureIntraMacroblockHeader(pattern);
+    else
+      this._WriteIntraMacroblockHeader(address, pattern);
+
     this._WriteIntraBlocks(address, levels, pattern);
 
     this._isDecoded[address] = true;
@@ -292,6 +299,39 @@ internal sealed class MsMpeg4PictureEncoder {
         this._writer.Write(MsMpeg4Data.IntraMacroblockCodes[chroma], MsMpeg4Data.IntraMacroblockLengths[chroma]);
         this._writer.Write(
           MsMpeg4Data.CodedBlockPatternYCodes[luminance], MsMpeg4Data.CodedBlockPatternYLengths[luminance]);
+        return;
+      }
+    }
+  }
+
+  /// <summary>Writes an intra macroblock carried inside a predicted picture.</summary>
+  private void _WritePredictedPictureIntraMacroblockHeader(int pattern) {
+    var chroma = pattern & 3;
+    var luminance = pattern >> 2;
+
+    switch (this._version) {
+      case MsMpeg4Version.Version3:
+        // Bit six clear means intra in the P-picture table; the lower six bits are the direct CBP.
+        this._writer.Write(
+          MsMpeg4Data.MacroblockNonIntraCodes[pattern], MsMpeg4Data.MacroblockNonIntraLengths[pattern]);
+        this._writer.Write(0, 1); // AC prediction off.
+        return;
+
+      case MsMpeg4Version.Version2: {
+        var type = chroma | 4;
+        this._writer.Write(MsMpeg4Data.V2MacroblockTypeCodes[type], MsMpeg4Data.V2MacroblockTypeLengths[type]);
+        this._writer.Write(0, 1); // AC prediction off.
+        this._writer.Write(
+          MsMpeg4Data.CodedBlockPatternYCodes[luminance], MsMpeg4Data.CodedBlockPatternYLengths[luminance]);
+        return;
+      }
+
+      default: {
+        var type = chroma | 4;
+        this._writer.Write(MsMpeg4Data.InterMacroblockCodes[type], MsMpeg4Data.InterMacroblockLengths[type]);
+        var written = (pattern ^ 0x3C) >> 2;
+        this._writer.Write(
+          MsMpeg4Data.CodedBlockPatternYCodes[written], MsMpeg4Data.CodedBlockPatternYLengths[written]);
         return;
       }
     }
@@ -376,7 +416,7 @@ internal sealed class MsMpeg4PictureEncoder {
   private void _EncodePredictedMacroblock(int address) {
     var predictedX = this._PredictVector(address, horizontal: true);
     var predictedY = this._PredictVector(address, horizontal: false);
-    var (vectorX, vectorY) = this._Search(address, predictedX, predictedY);
+    var (vectorX, vectorY, interDistortion) = this._Search(address, predictedX, predictedY);
 
     // A vector whose difference cannot be written is given up rather than clipped, because clipping
     // the difference would move the vector somewhere the search never looked at.
@@ -384,6 +424,13 @@ internal sealed class MsMpeg4PictureEncoder {
         || Math.Abs(vectorY - predictedY) > _MAX_VECTOR_DIFFERENCE) {
       vectorX = predictedX;
       vectorY = predictedY;
+      interDistortion = this._Distortion(address, vectorX, vectorY);
+    }
+
+    if (this._ShouldEncodeIntra(address, interDistortion)) {
+      this._writer.Write(0, 1);
+      this._EncodeIntraMacroblock(address, inPredictedPicture: true);
+      return;
     }
 
     Span<int> levels = stackalloc int[6 * 64];
@@ -545,7 +592,7 @@ internal sealed class MsMpeg4PictureEncoder {
   /// is what is written and a search that wandered away from it would spend bits saying so. The zero
   /// vector is tried as well and wins ties, since it is what makes an unchanging macroblock skippable.
   /// </remarks>
-  private (int X, int Y) _Search(int address, int predictedX, int predictedY) {
+  private (int X, int Y, int Distortion) _Search(int address, int predictedX, int predictedY) {
     var (bestX, bestY) = (0, 0);
     var best = this._Distortion(address, 0, 0);
 
@@ -570,7 +617,31 @@ internal sealed class MsMpeg4PictureEncoder {
         }
     }
 
-    return (bestX, bestY);
+    return (bestX, bestY, best);
+  }
+
+  /// <summary>Whether spatial coding beats the best legal temporal predictor by enough to pay for intra syntax.</summary>
+  private bool _ShouldEncodeIntra(int address, int interDistortion)
+    => interDistortion > this._IntraDistortion(address) + _INTRA_MODE_BIAS_PER_QUANTISER * this._quantiser;
+
+  /// <summary>Sum of absolute deviations from each 8x8 luminance block's mean.</summary>
+  private int _IntraDistortion(int address) {
+    Span<int> samples = stackalloc int[64];
+    var total = 0;
+
+    for (var index = 0; index < 4; ++index) {
+      this._Read(this._source, address, index, samples);
+
+      var sum = 0;
+      for (var i = 0; i < samples.Length; ++i)
+        sum += samples[i];
+
+      var mean = (sum + 32) >> 6;
+      for (var i = 0; i < samples.Length; ++i)
+        total += Math.Abs(samples[i] - mean);
+    }
+
+    return total;
   }
 
   /// <summary>The absolute difference between a macroblock's luminance and what a vector predicts.</summary>
