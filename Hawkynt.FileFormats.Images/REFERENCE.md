@@ -38564,8 +38564,12 @@ Implements `IEquatable<WinFaxFile>`, `IImageFormatMetadata<WinFaxFile>`, `IImage
 | `PeImageResource` | `PeImageResource()` |  |
 | `Data` | `byte[] Data { get; init; }` |  |
 | `FormatHint` | `string FormatHint { get; init; }` |  |
+| `LanguageId` | `int? LanguageId { get; init; }` |  |
+| `LanguageName` | `string LanguageName { get; init; }` |  |
 | `ResourceId` | `int ResourceId { get; init; }` |  |
+| `ResourceName` | `string ResourceName { get; init; }` |  |
 | `ResourceTypeId` | `int ResourceTypeId { get; init; }` |  |
+| `ResourceTypeName` | `string ResourceTypeName { get; init; }` |  |
 | `ResourceType` | `PeImageResourceType ResourceType { get; init; }` |  |
 
 #### `PeImageResourceType`

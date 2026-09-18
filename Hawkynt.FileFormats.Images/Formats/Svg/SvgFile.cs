@@ -32,7 +32,7 @@ namespace FileFormat.Svg;
 /// a base64 PNG, at its own size, which is a conforming drawing that any renderer draws. Turning a
 /// bitmap into paths would put geometry into the file that the picture never had.
 /// </remarks>
-[VerifiedBy(ConformanceOracle.ImageMagick, ConformanceOracle.FFmpeg)]
+[VerifiedBy(ConformanceOracle.ImageMagick, ConformanceOracle.FFmpeg, ConformanceOracle.LibreOffice)]
 public readonly record struct SvgFile
   : IImageFormatReader<SvgFile>, IImageToRawImage<SvgFile>,
     IImageFromRawImage<SvgFile>, IImageFormatWriter<SvgFile> {

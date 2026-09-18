@@ -76,6 +76,36 @@ internal static class PeResourceEditor {
     }).ToArray();
   }
 
+  internal static IReadOnlyList<PeResourceInfo> GetEmbeddedImageResources(byte[] source) {
+    ArgumentNullException.ThrowIfNull(source);
+    var layout = _Parse(source);
+    var seen = new HashSet<(ResourceIdentifier Type, ResourceIdentifier Name)>();
+    var result = new List<PeResourceInfo>();
+
+    foreach (var resource in layout.Resources) {
+      if (!seen.Add((resource.Type, resource.Name)))
+        continue;
+
+      if (resource.Type.Id is 1 or 2 or 3 or 12 or 14)
+        continue;
+
+      if (PeResourceReader._DetectImageSignature(source, resource.DataOffset, resource.DataSize) is null)
+        continue;
+
+      result.Add(new PeResourceInfo {
+        TypeId = resource.Type.Id,
+        TypeName = resource.Type.Name,
+        ResourceId = resource.Name.Id,
+        ResourceName = resource.Name.Name,
+        LanguageId = resource.Language.Id,
+        LanguageName = resource.Language.Name,
+        Size = resource.DataSize,
+      });
+    }
+
+    return result;
+  }
+
   internal static byte[] ReplaceResource(
     byte[] source,
     int typeId,
@@ -134,6 +164,8 @@ internal static class PeResourceEditor {
       throw new InvalidDataException($"PE resource {groupType}/{groupId} has a truncated group directory.");
 
     var componentId = BinaryPrimitives.ReadUInt16LittleEndian(groupData[(groupEntryOffset + 12)..]);
+    _ThrowIfComponentShared(source, layout, groupType, componentId, group.Language);
+
     var componentLanguage = group.Language.Id;
     var component = _FindNumeric(layout, componentType, componentId, componentLanguage);
     var replacementImage = IcoDib.FromRawImage(image);
@@ -174,6 +206,47 @@ internal static class PeResourceEditor {
     }
 
     return _ReplaceLeaf(updated, layout, group, updatedGroupData);
+  }
+
+  private static void _ThrowIfComponentShared(
+    byte[] source,
+    Layout layout,
+    int groupType,
+    int componentId,
+    ResourceIdentifier language
+  ) {
+    var expectedType = groupType == 12 ? 2 : 1;
+    var references = 0;
+
+    foreach (var candidate in layout.Resources) {
+      if (candidate.Type.Id != groupType || candidate.Language != language || candidate.DataSize < 6)
+        continue;
+
+      var groupData = source.AsSpan(candidate.DataOffset, candidate.DataSize);
+      if (BinaryPrimitives.ReadUInt16LittleEndian(groupData) != 0
+          || BinaryPrimitives.ReadUInt16LittleEndian(groupData[2..]) != expectedType)
+        continue;
+
+      var count = BinaryPrimitives.ReadUInt16LittleEndian(groupData[4..]);
+      if (count > (groupData.Length - 6) / 14)
+        continue;
+
+      for (var i = 0; i < count; ++i) {
+        var entryOffset = 6 + i * 14;
+        if (BinaryPrimitives.ReadUInt16LittleEndian(groupData[(entryOffset + 12)..]) != componentId)
+          continue;
+
+        if (++references <= 1)
+          continue;
+
+        var componentName = groupType == 12 ? "RT_CURSOR" : "RT_ICON";
+        var groupName = groupType == 12 ? "RT_GROUP_CURSOR" : "RT_GROUP_ICON";
+        throw new InvalidOperationException(
+          $"{componentName} resource {componentId} is referenced by multiple {groupName} entries; "
+          + "replacing it through a group would silently modify another group image. Replace the raw component explicitly instead."
+        );
+      }
+    }
   }
 
   private static ResourceLeaf _FindNumeric(Layout layout, int typeId, int resourceId, int? languageId) {
