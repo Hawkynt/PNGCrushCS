@@ -184,6 +184,23 @@ public sealed class AvidMeridienCompressedVideoDecoderTests {
     Assert.That(failure!.Message, Does.Contain("spatial placement of the first coded field"));
   }
 
+  [Test]
+  [Category("Unit")]
+  public void AWovenFrameTallerThanTheContainerIsCroppedAtItsTopToo() {
+    // Two coded fields of four rows weave into eight, against a container stating six. The two rules
+    // meet here and their order matters: cropping a four-row field to six rows would refuse the
+    // packet outright, and weaving without cropping would hand back a frame two rows too tall.
+    var decoder = AvidMeridienCompressedVideoDecoder.Create(_Stream(4, 6, privateData: _AvidExtra(2)));
+    var packet = _Packet(_Jpeg(_Solid(4, 4, 30)), _Jpeg(_Solid(4, 4, 220)));
+
+    Assert.That(decoder.TryDecode(packet, out var frame), Is.True);
+    Assert.Multiple(() => {
+      Assert.That((frame.Width, frame.Height), Is.EqualTo((4, 6)));
+      Assert.That(frame.PixelData[0], Is.LessThan(frame.PixelData[4 * 3]),
+        "PAL puts the darker first coded field on even rows, and dropping two rows keeps that parity");
+    });
+  }
+
   // ============================================================================================
   // Malformed packets
   // ============================================================================================
