@@ -367,8 +367,10 @@ public sealed class H264VideoEncoder : IVideoCodecEncoder<H264VideoEncoder> {
     var centreX = _RoundToFullSample(predictor.X);
     var centreY = _RoundToFullSample(predictor.Y);
     var best = new MotionVector(centreX, centreY);
-    var bestCost = long.MaxValue;
     Span<byte> prediction = stackalloc byte[16 * 16];
+    var bestCost = this._MotionCost(source, reference, mbX, mbY, best, prediction);
+    if (bestCost == 0)
+      return best;
 
     for (var dy = -_INTEGER_SEARCH_RANGE; dy <= _INTEGER_SEARCH_RANGE; ++dy)
       for (var dx = -_INTEGER_SEARCH_RANGE; dx <= _INTEGER_SEARCH_RANGE; ++dx) {
