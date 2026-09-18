@@ -3259,11 +3259,11 @@ Primitives shared by the Commodore 64 picture formats.
 
 #### `ConformanceOracle`
 
-A tool from outside this repository that has read what one of our writers produced.
+A tool from outside this repository used as an independent conformance oracle.
 
 | Value | Numeric | Summary |
 | --- | --- | --- |
-| `None` | `0` | Nothing outside this repository has read what this writer produces. |
+| `None` | `0` | No external tool has supplied evidence for this implementation. |
 | `Recoil2Png` | `1` | RECOIL's `recoil2png`, the reference decoder for the retro-computer formats. |
 | `ImageMagick` | `2` | ImageMagick's `identify` / `convert`. |
 | `XnView` | `3` | XnView's `nconvert`. |
@@ -3281,6 +3281,62 @@ A tool from outside this repository that has read what one of our writers produc
 | `LibreOffice` | `15` | LibreOffice, driven headless as `soffice`. |
 | `Olefile` | `16` | The `olefile` Python package. |
 | `Ghostscript` | `17` | Ghostscript, the PostScript and PDF interpreter, as `gs`. |
+| `Deark` | `18` | Deark, the command-line historical image/file-format decoder. |
+| `AstcEnc` | `19` | Arm's reference-quality ASTC encoder/decoder, `astcenc`. |
+| `KtxTools` | `20` | Khronos KTX-Software's `ktx` command-line tools. |
+| `DjVuLibre` | `21` | DjVuLibre's encoder/decoder command-line tools such as `c44` and `ddjvu`. |
+| `LibBpg` | `22` | Fabrice Bellard's libbpg tools, `bpgenc` and `bpgdec`. |
+| `Flif` | `23` | The reference FLIF command-line encoder/decoder. |
+| `Jbig2Dec` | `24` | Artifex's `jbig2dec` decoder. |
+| `Jbig2Enc` | `25` | agl's `jbig2` encoder from jbig2enc. |
+| `Gdal` | `26` | GDAL's raster drivers, normally exercised through `gdal_translate`. |
+| `Convert3D` | `27` | Convert3D / ITK, normally exercised through `c3d`. |
+| `Netpbm` | `28` | The Netpbm converter suite. |
+| `AnsiLove` | `29` | Ansilove's ANSI/ASCII art renderer. |
+| `LibRaw` | `30` | LibRaw, normally exercised through `dcraw_emu`. |
+| `Krita` | `31` | Krita's command-line importer/exporter. |
+| `Hp2xx` | `32` | The `hp2xx` HP-GL converter. |
+| `GhostPcl` | `33` | GhostPDL's PCL interpreter, normally exposed as `gpcl6`. |
+| `Dcmtk` | `34` | OFFIS DCMTK's DICOM image tools such as `img2dcm` and `dcm2pnm`. |
+| `LibPng` | `35` | The official PNG reference library, normally exercised by `pngtest` or a tiny harness. |
+| `LibJpegTurbo` | `36` | libjpeg-turbo / IJG JPEG tools such as `cjpeg` and `djpeg`. |
+| `GifLib` | `37` | giflib's native GIF tools such as `gif2rgb`. |
+| `LibTiff` | `38` | libtiff's native TIFF tools such as `tiffinfo` and `tiffcp`. |
+| `OpenExr` | `39` | The OpenEXR reference implementation and command-line utilities. |
+| `LibSpng` | `40` | libspng, an implementation independent of libpng, exercised through a small harness. |
+| `Wuffs` | `41` | Wuffs image decoders, normally exercised through its example decoder harness. |
+| `StbImage` | `42` | `stb_image`, exercised through a deliberately minimal standalone harness. |
+| `TinyExr` | `43` | TinyEXR, exercised through its example tools or a minimal standalone harness. |
+| `QoiReference` | `44` | The QOI reference implementation, normally exercised through `qoiconv`. |
+| `OpenImageIo` | `45` | OpenImageIO, normally exercised through `oiiotool` or `iconvert`. |
+| `Gimp` | `46` | GIMP's import/export stack, driven in batch mode. |
+| `LibVips` | `47` | libvips, normally exercised through the `vips` command-line program. |
+| `LibVpx` | `48` | Google/WebM's VP8/VP9 reference SDK, normally `vpxdec` / `vpxenc`. |
+| `LibAom` | `49` | Alliance for Open Media's AV1 reference codec, normally `aomdec` / `aomenc`. |
+| `Dav1d` | `50` | VideoLAN's independent AV1 decoder, `dav1d`. |
+| `SvtAv1` | `51` | SVT-AV1's encoder application and decoder where available. |
+| `Rav1e` | `52` | Xiph's independent AV1 encoder, `rav1e`. |
+| `X264` | `53` | The x264 H.264/AVC encoder. |
+| `X265` | `54` | The x265 HEVC encoder. |
+| `Kvazaar` | `55` | The independent Kvazaar HEVC encoder. |
+| `Xvid` | `56` | Xvid's MPEG-4 Part 2 tools, including `xvid_decraw`. |
+| `LibTheora` | `57` | Xiph's Theora reference implementation and example tools. |
+| `OpenH264` | `58` | Cisco's OpenH264 encoder/decoder tools. |
+| `JmReference` | `59` | The H.264/AVC Joint Model reference software (JM). |
+| `HmReference` | `60` | The HEVC Test Model reference software (HM). |
+| `VtmReference` | `61` | The VVC Test Model reference software (VTM). |
+| `VvDec` | `62` | Fraunhofer's independent VVC decoder, normally `vvdecapp`. |
+| `VvEnc` | `63` | Fraunhofer's independent VVC encoder, normally `vvencapp`. |
+| `CineFormSdk` | `64` | GoPro's released CineForm SDK, normally exercised through `TestCFHD`. |
+| `Vc2Conformance` | `65` | BBC's VC-2 conformance suite, including its bitstream validator and reference decoder. |
+| `Gpac` | `66` | GPAC's independent multimedia parser/packager, normally `MP4Box`. |
+| `Bento4` | `67` | Bento4's ISO-BMFF inspection tools such as `mp4info` and `mp4dump`. |
+| `MkvToolNix` | `68` | MKVToolNix's Matroska/WebM tools such as `mkvinfo`, `mkvmerge` and `mkvextract`. |
+| `LibWebM` | `69` | WebM's native parser/muxer library and sample tools. |
+| `ShakaPackager` | `70` | Google's Shaka Packager for independent ISO-BMFF, WebM and MPEG-2 TS parsing/packaging. |
+| `Oggz` | `71` | Xiph's Ogg validation tools, normally `oggz validate`. |
+| `MediaInfo` | `72` | MediaArea's independent metadata/container inspector, `mediainfo`. |
+| `MediaConch` | `73` | MediaArea's preservation-oriented conformance checker, `mediaconch`. |
 
 #### `ConformanceOracles`
 
