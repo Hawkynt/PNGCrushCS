@@ -4,7 +4,6 @@ using FileFormat.Core;
 namespace FileFormat.Jbig;
 
 /// <summary>In-memory representation of a JBIG1 (ITU-T T.82) bi-level image.</summary>
-[VerifiedBy(ConformanceOracle.ImageMagick)]
 public readonly record struct JbigFile : IImageFormatReader<JbigFile>, IImageToRawImage<JbigFile>, IImageFromRawImage<JbigFile>, IImageFormatWriter<JbigFile> {
 
   static string IImageFormatMetadata<JbigFile>.PrimaryExtension => ".jbg";

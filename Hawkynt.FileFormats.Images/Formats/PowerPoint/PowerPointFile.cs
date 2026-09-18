@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using FileFormat.Core;
 using FileFormat.OfficeOpenXml;
+using FileFormat.Png;
 
 namespace FileFormat.PowerPoint;
 
@@ -10,9 +11,9 @@ namespace FileFormat.PowerPoint;
 /// <remarks>
 /// Legacy <c>.ppt</c>, <c>.pps</c> and <c>.pot</c> files use Microsoft Compound File Binary and
 /// OfficeArt BLIP records. Reading exposes every supported BLIP from the Pictures stream, while the
-/// compatibility <see cref="ToRawImage(PowerPointFile)"/> call returns the first one. Its legacy
-/// writer emits the image-level CFB <c>Pictures</c> carrier rather than claiming to implement the
-/// whole binary presentation model.
+/// compatibility <see cref="ToRawImage(PowerPointFile)"/> call returns the first one. Writing creates
+/// a complete one-slide binary PowerPoint presentation with the persisted object graph, Current User
+/// stream and Pictures stream required by PowerPoint 97-2003.
 /// <para/>
 /// Modern <c>.pptx</c>/<c>.ppsx</c>/<c>.potx</c> and macro-capable
 /// <c>.pptm</c>/<c>.ppsm</c>/<c>.potm</c> are native PresentationML packages. Reading enumerates all
@@ -149,12 +150,14 @@ public readonly record struct PowerPointFile()
   }
 
   private static byte[] _ToBytes(PowerPointFile file) {
-    if (!file.Kind.IsOpenXml())
-      return PowerPointWriter.ToBytes(file);
-
     var image = ImageCount(file) > 0
       ? ToRawImage(file, 0).EnsureFormat(PixelFormat.Rgb24)
       : throw new InvalidDataException("PowerPoint file contains no picture to write.");
+
+    if (!file.Kind.IsOpenXml()) {
+      var png = PngWriter.ToBytes(PngFile.FromRawImage(image));
+      return PowerPointBinaryPresentation.Write(image.Width, image.Height, png);
+    }
 
     return OfficeOpenXmlImagePackage.WritePowerPoint(
       image.Width, image.Height, image.PixelData, file.Kind.ContentType());
