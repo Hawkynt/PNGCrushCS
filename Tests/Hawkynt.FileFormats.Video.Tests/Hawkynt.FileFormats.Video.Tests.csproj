@@ -43,6 +43,17 @@
     </None>
   </ItemGroup>
 
+  <!-- Two cuts of a real VP5 file from samples.mplayerhq.hu, remuxed by ffmpeg with the video stream
+       copied untouched, and ffmpeg's own per-frame checksums of decoding them. VP5 has no published
+       bitstream specification at all, so a second implementation's decode is not a convenience here:
+       it is the only thing that can tell a plausible picture from a correct one. -->
+  <ItemGroup>
+    <None Include="Codecs\Vp5\Fixtures\*">
+      <Link>Fixtures\Vp5\%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
   <!-- Two single DV frames ffmpeg's own encoder wrote, so the decoder can be checked against a
        reference bitstream rather than only against streams built here. A DV frame is a fixed
        120000 or 240000 bytes whatever it contains, so these are one picture each and not a clip. -->

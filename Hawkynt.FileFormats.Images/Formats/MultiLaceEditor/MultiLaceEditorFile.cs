@@ -18,7 +18,7 @@ namespace FileFormat.MultiLaceEditor;
 /// matrices and a shared colour memory — the shape of a Koala picture doubled, which is not this
 /// format in size, geometry or colour.
 /// </remarks>
-[VerifiedBy(ConformanceOracle.Recoil2Png)]
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.IrfanView)]
 public readonly record struct MultiLaceEditorFile
   : IImageFormatReader<MultiLaceEditorFile>, IImageToRawImage<MultiLaceEditorFile>,
     IImageFromRawImage<MultiLaceEditorFile>, IImageFormatWriter<MultiLaceEditorFile> {
