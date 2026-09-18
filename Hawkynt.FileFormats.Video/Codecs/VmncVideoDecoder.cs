@@ -1,7 +1,7 @@
 using System;
 using System.Buffers.Binary;
-using System.Numerics;
 using System.IO;
+using System.Numerics;
 using FileFormat.Core;
 
 namespace FileFormat.Codecs;
@@ -10,11 +10,14 @@ namespace FileFormat.Codecs;
 /// <remarks>
 /// Adapted from FFmpeg's <c>libavcodec/vmnc.c</c>, copyright (c) 2006 Konstantin Shishkov,
 /// distributed there under LGPL-2.1-or-later. This adaptation is distributed with PNGCrushCS under
-/// LGPL-3.0-or-later.
+/// LGPL-3.0-or-later. The additional CopyRect, RRE, CoRRE, cursor-state, alpha-cursor and display-mode
+/// handling is implemented from the published VMnc/RFB wire descriptions rather than copied from a
+/// third-party implementation.
 /// <para/>
-/// VMnc is an RFB/VNC-shaped screen stream. Packets carry rectangular raw or Hextile updates and
-/// optional cursor records. The RFB server-initialisation record carries the actual channel maxima
-/// and bit shifts; those are retained here instead of assuming an indexed palette for 8-bit streams.
+/// VMnc is an RFB/VNC-shaped screen stream. Packets update a persistent framebuffer with Raw,
+/// CopyRect, RRE, CoRRE or Hextile rectangles and may carry VMware cursor and display-state records.
+/// That persistent framebuffer is the codec's inter-picture reference; the format has no B-picture
+/// or future-reference syntax.
 /// <para/>
 /// Measured against ffmpeg 9.0.1 on both of FATE's VMnc files, 241 frames in all: every byte of every
 /// frame is identical. One thing is deliberately not copied. Where a cursor hangs off the top or left
@@ -24,14 +27,18 @@ namespace FileFormat.Codecs;
 /// </remarks>
 public sealed class VmncVideoDecoder : IVideoCodecDecoder<VmncVideoDecoder> {
 
-  private const uint _CursorDefinition = 0x574D5664; // WMVd
-  private const uint _UnknownE = 0x574D5665;         // WMVe
-  private const uint _CursorPosition = 0x574D5666;   // WMVf
-  private const uint _UnknownG = 0x574D5667;         // WMVg
-  private const uint _UnknownH = 0x574D5668;         // WMVh
+  private const uint _CursorDefinition = 0x574D5664;     // WMVd
+  private const uint _CursorState = 0x574D5665;          // WMVe
+  private const uint _CursorPosition = 0x574D5666;       // WMVf
+  private const uint _KeyboardTypematic = 0x574D5667;    // WMVg
+  private const uint _KeyboardLedState = 0x574D5668;     // WMVh
   private const uint _ServerInitialization = 0x574D5669; // WMVi
-  private const uint _UnknownJ = 0x574D566A;         // WMVj
+  private const uint _VmState = 0x574D566A;              // WMVj
+
   private const uint _Raw = 0;
+  private const uint _CopyRectangle = 1;
+  private const uint _Rre = 2;
+  private const uint _CoRre = 4;
   private const uint _Hextile = 5;
 
   private const byte _HextileRaw = 1;
@@ -42,16 +49,20 @@ public sealed class VmncVideoDecoder : IVideoCodecDecoder<VmncVideoDecoder> {
 
   private static readonly CodecTag _Tag = CodecTag.FromCharacters("VMnc");
 
-  private readonly int _width;
-  private readonly int _height;
   private readonly int _streamIndex;
-  private readonly int _bytesPerPixel;
-  private readonly uint[] _canvas;
+
+  private int _width;
+  private int _height;
+  private int _bytesPerPixel;
+  private uint[] _canvas;
 
   private bool _bigEndian;
   private PixelDescriptor _pixelDescriptor;
+
+  private bool _cursorVisible = true;
   private uint[]? _cursorBits;
   private uint[]? _cursorMask;
+  private byte[]? _cursorRgba;
   private int _cursorWidth;
   private int _cursorHeight;
   private int _cursorHotX;
@@ -99,6 +110,12 @@ public sealed class VmncVideoDecoder : IVideoCodecDecoder<VmncVideoDecoder> {
     reader.Skip(2, "packet prefix");
     var chunks = reader.ReadUInt16("chunk count");
 
+    // CopyRect is explicitly a reference to the preceding framebuffer, not to rectangles that happen
+    // to occur earlier in this same update. Keep that reference stable while this packet is painted.
+    var referenceCanvas = (uint[])this._canvas.Clone();
+    var referenceWidth = this._width;
+    var referenceHeight = this._height;
+
     for (var chunk = 0; chunk < chunks; ++chunk) {
       if (reader.Remaining < 12)
         throw new InvalidDataException(
@@ -109,53 +126,81 @@ public sealed class VmncVideoDecoder : IVideoCodecDecoder<VmncVideoDecoder> {
       var width = reader.ReadUInt16("rectangle width");
       var height = reader.ReadUInt16("rectangle height");
       var encoding = reader.ReadUInt32("rectangle encoding");
-      this._RequireRectangle(x, y, width, height);
 
       switch (encoding) {
         case _Raw:
+          this._RequireRectangle(x, y, width, height);
           this._DecodeRaw(ref reader, x, y, width, height);
           break;
+
+        case _CopyRectangle:
+          this._RequireRectangle(x, y, width, height);
+          this._DecodeCopyRectangle(ref reader, x, y, width, height, referenceCanvas, referenceWidth, referenceHeight);
+          break;
+
+        case _Rre:
+          this._RequireRectangle(x, y, width, height);
+          this._DecodeRre(ref reader, x, y, width, height, compact: false);
+          break;
+
+        case _CoRre:
+          this._RequireRectangle(x, y, width, height);
+          this._DecodeRre(ref reader, x, y, width, height, compact: true);
+          break;
+
         case _Hextile:
+          this._RequireRectangle(x, y, width, height);
           this._DecodeHextile(ref reader, x, y, width, height);
           break;
+
         case _CursorDefinition:
           this._DecodeCursor(ref reader, width, height, x, y);
           break;
+
+        case _CursorState:
+          this._cursorVisible = (reader.ReadUInt16("WMVe cursor flags") & 1) != 0;
+          break;
+
         case _CursorPosition:
           this._cursorX = x - this._cursorHotX;
           this._cursorY = y - this._cursorHotY;
           break;
+
         case _ServerInitialization:
-          this._DecodeServerInitialization(ref reader);
+          this._DecodeServerInitialization(ref reader, width, height);
           break;
-        case _UnknownE:
-          reader.Skip(2, "WMVe payload");
-          break;
-        case _UnknownG:
+
+        case _KeyboardTypematic:
           reader.Skip(10, "WMVg payload");
           break;
-        case _UnknownH:
+
+        case _KeyboardLedState:
           reader.Skip(4, "WMVh payload");
           break;
-        case _UnknownJ:
+
+        case _VmState:
           reader.Skip(2, "WMVj payload");
           break;
+
         default:
-          // The reference decoder logs the encoding, abandons the rest of the packet and still
-          // hands back the picture it has. Throwing here would lose every rectangle already
-          // decoded, and would refuse a file that plays.
+          // There is no generic length field after an RFB encoding number. Once an unknown encoding
+          // appears its payload cannot be skipped safely, so preserve everything already painted and
+          // abandon the rest of this packet, matching the long-established reference behaviour.
           chunk = chunks;
           break;
       }
     }
 
     var display = (uint[])this._canvas.Clone();
-    this._ApplyCursor(display);
+    this._ApplyColorCursor(display);
+    var rgb = this._ToRgb24(display);
+    this._ApplyAlphaCursor(rgb);
+
     frame = new() {
       Width = this._width,
       Height = this._height,
       Format = PixelFormat.Rgb24,
-      PixelData = this._ToRgb24(display),
+      PixelData = rgb,
     };
     return true;
   }
@@ -164,6 +209,55 @@ public sealed class VmncVideoDecoder : IVideoCodecDecoder<VmncVideoDecoder> {
     for (var row = 0; row < height; ++row)
       for (var column = 0; column < width; ++column)
         this._canvas[(y + row) * this._width + x + column] = this._ReadPixel(ref reader);
+  }
+
+  private void _DecodeCopyRectangle(
+    ref BigEndianReader reader,
+    int destinationX,
+    int destinationY,
+    int width,
+    int height,
+    uint[] referenceCanvas,
+    int referenceWidth,
+    int referenceHeight) {
+    var sourceX = reader.ReadUInt16("CopyRect source x");
+    var sourceY = reader.ReadUInt16("CopyRect source y");
+    if (sourceX > referenceWidth - width || sourceY > referenceHeight - height)
+      throw new InvalidDataException(
+        $"VMnc stream {this._streamIndex} copies ({sourceX},{sourceY}) {width}x{height} outside its previous {referenceWidth}x{referenceHeight} framebuffer.");
+
+    for (var row = 0; row < height; ++row)
+      referenceCanvas.AsSpan((sourceY + row) * referenceWidth + sourceX, width)
+        .CopyTo(this._canvas.AsSpan((destinationY + row) * this._width + destinationX, width));
+  }
+
+  private void _DecodeRre(ref BigEndianReader reader, int x, int y, int width, int height, bool compact) {
+    var subrectangles = reader.ReadUInt32(compact ? "CoRRE subrectangle count" : "RRE subrectangle count");
+    var background = this._ReadPixel(ref reader);
+    this._FillRectangle(x, y, width, height, background);
+
+    for (uint index = 0; index < subrectangles; ++index) {
+      var color = this._ReadPixel(ref reader);
+      int rectangleX;
+      int rectangleY;
+      int rectangleWidth;
+      int rectangleHeight;
+
+      if (compact) {
+        rectangleX = reader.ReadByte("CoRRE subrectangle x");
+        rectangleY = reader.ReadByte("CoRRE subrectangle y");
+        rectangleWidth = reader.ReadByte("CoRRE subrectangle width");
+        rectangleHeight = reader.ReadByte("CoRRE subrectangle height");
+      } else {
+        rectangleX = reader.ReadUInt16("RRE subrectangle x");
+        rectangleY = reader.ReadUInt16("RRE subrectangle y");
+        rectangleWidth = reader.ReadUInt16("RRE subrectangle width");
+        rectangleHeight = reader.ReadUInt16("RRE subrectangle height");
+      }
+
+      this._RequireSubrectangle(rectangleX, rectangleY, rectangleWidth, rectangleHeight, width, height, compact ? "CoRRE" : "RRE");
+      this._FillRectangle(x + rectangleX, y + rectangleY, rectangleWidth, rectangleHeight, color);
+    }
   }
 
   private void _DecodeHextile(ref BigEndianReader reader, int x, int y, int width, int height) {
@@ -212,7 +306,11 @@ public sealed class VmncVideoDecoder : IVideoCodecDecoder<VmncVideoDecoder> {
   }
 
   private void _DecodeCursor(ref BigEndianReader reader, int width, int height, int hotX, int hotY) {
-    reader.Skip(2, "cursor prefix");
+    if ((long)width * height > int.MaxValue)
+      throw new InvalidDataException($"VMnc stream {this._streamIndex} carries a cursor too large to hold in memory.");
+
+    var type = reader.ReadByte("cursor type");
+    reader.Skip(1, "cursor padding");
     this._cursorWidth = width;
     this._cursorHeight = height;
     if (hotX > width || hotY > height)
@@ -220,18 +318,46 @@ public sealed class VmncVideoDecoder : IVideoCodecDecoder<VmncVideoDecoder> {
     this._cursorHotX = hotX;
     this._cursorHotY = hotY;
     var pixels = checked(width * height);
-    this._cursorBits = new uint[pixels];
-    this._cursorMask = new uint[pixels];
-    for (var i = 0; i < pixels; ++i)
-      this._cursorBits[i] = this._ReadPixel(ref reader);
-    for (var i = 0; i < pixels; ++i)
-      this._cursorMask[i] = this._ReadPixel(ref reader);
+
+    switch (type) {
+      case 0:
+        this._cursorRgba = null;
+        this._cursorBits = new uint[pixels];
+        this._cursorMask = new uint[pixels];
+        for (var i = 0; i < pixels; ++i)
+          this._cursorBits[i] = this._ReadPixel(ref reader);
+        for (var i = 0; i < pixels; ++i)
+          this._cursorMask[i] = this._ReadPixel(ref reader);
+        break;
+
+      case 1:
+        this._cursorBits = null;
+        this._cursorMask = null;
+        this._cursorRgba = new byte[checked(pixels * 4)];
+        for (var i = 0; i < this._cursorRgba.Length; ++i)
+          this._cursorRgba[i] = reader.ReadByte("alpha cursor RGBA data");
+        break;
+
+      default:
+        throw new InvalidDataException($"VMnc stream {this._streamIndex} carries unknown cursor type {type}.");
+    }
   }
 
-  private void _DecodeServerInitialization(ref BigEndianReader reader) {
+  private void _DecodeServerInitialization(ref BigEndianReader reader, int width, int height) {
+    // The recovered VMnc stream uses WMVi both as a display-mode record and as a keyframe marker.
+    // FFmpeg accepts 0x0 WMVi rectangles and keeps the container dimensions; preserve that behavior
+    // while still honoring non-zero dimensions as the published display-resize extension specifies.
+    if (width == 0 && height == 0) {
+      width = this._width;
+      height = this._height;
+    } else if (width <= 0 || height <= 0)
+      throw new InvalidDataException($"VMnc stream {this._streamIndex} changes to invalid display size {width}x{height}.");
+    if ((long)width * height > int.MaxValue)
+      throw new InvalidDataException($"VMnc stream {this._streamIndex}'s changed display is too large to hold in memory.");
+
     var bitsPerPixel = reader.ReadByte("RFB bits per pixel");
     _ = reader.ReadByte("RFB depth");
-    this._bigEndian = reader.ReadByte("RFB endian flag") switch {
+    var bigEndian = reader.ReadByte("RFB endian flag") switch {
       0 => false,
       1 => true,
       var value => throw new InvalidDataException($"VMnc stream {this._streamIndex} carries invalid RFB endian flag {value}."),
@@ -245,24 +371,40 @@ public sealed class VmncVideoDecoder : IVideoCodecDecoder<VmncVideoDecoder> {
     var blueShift = reader.ReadByte("RFB blue shift");
     reader.Skip(3, "RFB pixel-format padding");
 
-    // The reference decoder reads the depth, checks the endian flag and skips the rest, keeping
-    // the layout the container stated. A stream whose descriptor disagrees with the container, or
-    // describes an indexed screen, therefore still plays there — so it is kept rather than
-    // refused here, and only a descriptor this decoder can actually paint from is adopted.
-    var expectedBits = this._bytesPerPixel << 3;
-    if (bitsPerPixel == 24)
-      bitsPerPixel = 32;
-    if (bitsPerPixel != expectedBits
-        || trueColor != 1
-        || redMaximum == 0 || greenMaximum == 0 || blueMaximum == 0
-        || redShift >= expectedBits || greenShift >= expectedBits || blueShift >= expectedBits)
-      return;
+    var storageBits = bitsPerPixel == 24 ? 32 : bitsPerPixel;
+    var bytesPerPixel = storageBits switch {
+      8 => 1,
+      16 => 2,
+      32 => 4,
+      _ => throw new NotSupportedException(
+        $"VMnc stream {this._streamIndex} changes to unsupported {bitsPerPixel}-bit pixel storage."),
+    };
 
-    this._pixelDescriptor = new(true, redMaximum, greenMaximum, blueMaximum, redShift, greenShift, blueShift);
+    if (trueColor != 1)
+      throw new NotSupportedException(
+        $"VMnc stream {this._streamIndex} changes to indexed colour, but the recording supplies no palette that can be applied to it.");
+    if (redMaximum == 0 || greenMaximum == 0 || blueMaximum == 0
+        || redShift >= storageBits || greenShift >= storageBits || blueShift >= storageBits)
+      throw new InvalidDataException($"VMnc stream {this._streamIndex} carries an invalid RFB true-colour descriptor.");
+
+    var descriptor = new PixelDescriptor(true, redMaximum, greenMaximum, blueMaximum, redShift, greenShift, blueShift);
+    var formatChanged = bytesPerPixel != this._bytesPerPixel
+      || bigEndian != this._bigEndian
+      || this._pixelDescriptor != descriptor;
+    var sizeChanged = width != this._width || height != this._height;
+
+    this._width = width;
+    this._height = height;
+    this._bytesPerPixel = bytesPerPixel;
+    this._bigEndian = bigEndian;
+    this._pixelDescriptor = descriptor;
+
+    if (sizeChanged || formatChanged)
+      this._canvas = new uint[checked(width * height)];
   }
 
-  private void _ApplyCursor(Span<uint> display) {
-    if (this._cursorBits == null || this._cursorMask == null)
+  private void _ApplyColorCursor(Span<uint> display) {
+    if (!this._cursorVisible || this._cursorBits == null || this._cursorMask == null)
       return;
 
     for (var row = 0; row < this._cursorHeight; ++row) {
@@ -276,6 +418,39 @@ public sealed class VmncVideoDecoder : IVideoCodecDecoder<VmncVideoDecoder> {
         var cursorIndex = row * this._cursorWidth + column;
         var frameIndex = destinationY * this._width + destinationX;
         display[frameIndex] = (display[frameIndex] & this._cursorBits[cursorIndex]) ^ this._cursorMask[cursorIndex];
+      }
+    }
+  }
+
+  private void _ApplyAlphaCursor(Span<byte> rgb) {
+    if (!this._cursorVisible || this._cursorRgba == null)
+      return;
+
+    for (var row = 0; row < this._cursorHeight; ++row) {
+      var destinationY = this._cursorY + row;
+      if ((uint)destinationY >= (uint)this._height)
+        continue;
+      for (var column = 0; column < this._cursorWidth; ++column) {
+        var destinationX = this._cursorX + column;
+        if ((uint)destinationX >= (uint)this._width)
+          continue;
+
+        var source = (row * this._cursorWidth + column) * 4;
+        var destination = (destinationY * this._width + destinationX) * 3;
+        var alpha = this._cursorRgba[source + 3];
+        if (alpha == 0)
+          continue;
+        if (alpha == byte.MaxValue) {
+          rgb[destination] = this._cursorRgba[source];
+          rgb[destination + 1] = this._cursorRgba[source + 1];
+          rgb[destination + 2] = this._cursorRgba[source + 2];
+          continue;
+        }
+
+        var inverse = byte.MaxValue - alpha;
+        rgb[destination] = _Blend(this._cursorRgba[source], rgb[destination], alpha, inverse);
+        rgb[destination + 1] = _Blend(this._cursorRgba[source + 1], rgb[destination + 1], alpha, inverse);
+        rgb[destination + 2] = _Blend(this._cursorRgba[source + 2], rgb[destination + 2], alpha, inverse);
       }
     }
   }
@@ -313,6 +488,15 @@ public sealed class VmncVideoDecoder : IVideoCodecDecoder<VmncVideoDecoder> {
       throw new InvalidDataException(
         $"VMnc stream {this._streamIndex} carries rectangle ({x},{y}) {width}x{height} outside its {this._width}x{this._height} canvas.");
   }
+
+  private void _RequireSubrectangle(int x, int y, int width, int height, int outerWidth, int outerHeight, string encoding) {
+    if (width <= 0 || height <= 0 || x > outerWidth - width || y > outerHeight - height)
+      throw new InvalidDataException(
+        $"VMnc stream {this._streamIndex} carries a {encoding} subrectangle ({x},{y}) {width}x{height} outside its {outerWidth}x{outerHeight} rectangle.");
+  }
+
+  private static byte _Blend(byte source, byte destination, int alpha, int inverse)
+    => (byte)((source * alpha + destination * inverse + 127) / 255);
 
   /// <summary>Widens a channel of an RFB pixel to eight bits.</summary>
   /// <remarks>

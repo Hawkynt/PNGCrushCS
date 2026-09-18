@@ -13,14 +13,20 @@ namespace FileFormat.Codecs.CineForm;
 /// </remarks>
 internal static class CineFormTags {
   internal const int Index = 2;
-  internal const int ImageWidth = 20;
-  internal const int ImageHeight = 21;
+  internal const int TransformType = 10;
   internal const int ChannelCount = 12;
   internal const int SubbandCount = 14;
-  internal const int ChannelNumber = 62;
-  internal const int SubbandNumber = 48;
+  internal const int ImageWidth = 20;
+  internal const int ImageHeight = 21;
   internal const int LowpassPrecision = 35;
+  internal const int SubbandNumber = 48;
   internal const int Quantization = 53;
+  internal const int ChannelNumber = 62;
+  internal const int InterlacedFlags = 63;
+  internal const int SampleFlags = 68;
+  internal const int Precision = 70;
+  internal const int PrescaleTable = 83;
+  internal const int EncodedFormat = 84;
 
   /// <summary>Optional older CineForm tag 85. Its optional form is encoded as the negative tag.</summary>
   internal const int DisplayHeight = 85;
@@ -45,4 +51,13 @@ internal static class CineFormTags {
   /// <summary>A highpass subband's own stated width and height, tags 49 and 50.</summary>
   internal const int HighpassWidth = 49;
   internal const int HighpassHeight = 50;
+}
+
+/// <summary>The one-based values carried by CineForm tag 84 in real CFHD frames.</summary>
+internal enum CineFormEncodedFormat {
+  Unspecified = 0,
+  Yuv422 = 1,
+  Bayer = 2,
+  Rgb444 = 3,
+  Rgba4444 = 4,
 }

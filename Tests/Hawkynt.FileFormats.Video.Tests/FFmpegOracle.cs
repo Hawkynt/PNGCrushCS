@@ -116,7 +116,9 @@ internal static class FFmpegOracle {
 
       foreach (var argument in new[] {
         "-hide_banner", "-loglevel", "error", "-y", "-i", path,
-        "-map", "0:v:0", "-an", "-sn", "-dn", "-vsync", "0",
+        // -fps_mode, not -vsync: the old spelling was removed in ffmpeg 7 and this machine runs 9, where
+        // passing it aborts the whole command before a frame is read.
+        "-map", "0:v:0", "-an", "-sn", "-dn", "-fps_mode", "passthrough",
         "-f", "rawvideo", "-pix_fmt", "rgb24", raw,
       })
         startInfo.ArgumentList.Add(argument);
