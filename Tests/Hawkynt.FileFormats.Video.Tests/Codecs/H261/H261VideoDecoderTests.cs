@@ -461,7 +461,7 @@ public sealed class H261VideoDecoderTests {
     var second = new H261TestStream().PictureHeader(isCif: true, temporalReference: 1).ToArray();
 
     var failure = Assert.Throws<NotSupportedException>(() => _Decode(first, second));
-    Assert.That(failure.Message, Does.Contain("changes picture size"));
+    Assert.That(failure.Message, Does.Contain("changes coded picture size"));
   }
 
   // ============================================================================================
