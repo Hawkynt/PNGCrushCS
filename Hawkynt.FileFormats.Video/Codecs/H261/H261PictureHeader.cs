@@ -81,7 +81,10 @@ internal sealed class H261PictureHeader {
 
     // PTYPE, clause 4.2.1.3. Bits 1 to 3 (split screen, document camera, freeze picture release) are
     // instructions to a display and not to this decoder, so they are read and ignored exactly as the
-    // same kind of bits are in H.263's PTYPE.
+    // same kind of bits are in H.263's PTYPE. Nothing here ever freezes a picture, so there is nothing
+    // for bit 3 to release — which is not to say it carries nothing: it is the nearest thing H.261 has
+    // to a key-frame flag and the encoder beside this sets it on every intra picture for the decoders
+    // that do read it.
     reader.ReadBits(3);
 
     var isCif = reader.ReadBit() == 1;

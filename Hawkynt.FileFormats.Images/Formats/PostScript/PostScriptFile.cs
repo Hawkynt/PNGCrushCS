@@ -9,6 +9,7 @@ namespace FileFormat.PostScript;
 /// standards-valid Level-1 <c>colorimage</c> program, so arbitrary raster images have a compact,
 /// interoperable representation without pretending to reconstruct vector objects.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.Ghostscript)]
 public readonly record struct PostScriptFile : IImageFormatReader<PostScriptFile>, IImageToRawImage<PostScriptFile>, IImageFromRawImage<PostScriptFile>, IImageFormatWriter<PostScriptFile> {
 
   static string IImageFormatMetadata<PostScriptFile>.PrimaryExtension => ".ps";

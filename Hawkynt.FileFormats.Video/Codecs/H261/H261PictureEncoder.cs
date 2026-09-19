@@ -146,11 +146,23 @@ internal sealed class H261PictureEncoder {
     this._writer.Write(H261PictureHeader.StartCode, H261PictureHeader.StartCodeLength);
     this._writer.Write(this._temporalReference, 5);
 
-    // PTYPE, clause 4.2.1.3. Split screen, document camera and freeze picture release are instructions
-    // to a display rather than to a decoder and none of them is being asked for; then the source
-    // format, HI_RES (zero for Annex D still-image sub-pictures, one for motion video), then the spare
-    // bit, which 4.2.1.3 has set to 1 until it is given a meaning.
-    this._writer.Write(0, 3);
+    // PTYPE, clause 4.2.1.3. Split screen and document camera are instructions to a display rather
+    // than to a decoder and neither is being asked for.
+    this._writer.Write(0, 2);
+
+    // Freeze Picture Release, clause 4.2.1.3: how an encoder that has answered a fast update request
+    // tells a decoder it may leave freeze picture mode and show what it decodes from here on. An
+    // intra picture is that answer, and this bit is the only place in the picture layer where it can
+    // be said at all — H.261 states no picture-level intra/inter flag, so a decoder arriving mid
+    // stream has nothing else to tell it which picture it may start from, and every decoder that
+    // reports a key frame for H.261 reports this one. ffmpeg's own encoder writes it for exactly its
+    // intra pictures; written clear on every picture, as it was here until it was measured, a clip
+    // decodes sample for sample and still reports no key frame at all, so anything that seeks or
+    // selects on one throws the whole of it away.
+    this._writer.WriteBit(this._intra ? 1 : 0);
+
+    // Then the source format, then the bit that says this is not the still image transmission of
+    // Annex D, then the spare bit, which 4.2.1.3 has set to 1 until it is given a meaning.
     this._writer.WriteBit(this._isCif ? 1 : 0);
     this._writer.WriteBit(this._isStillImage ? 0 : 1);
     this._writer.WriteBit(1);

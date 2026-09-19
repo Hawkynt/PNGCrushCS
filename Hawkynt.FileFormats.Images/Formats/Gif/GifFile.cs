@@ -9,7 +9,7 @@ namespace FileFormat.Gif;
 /// FileFormat interface family plus the chunk-layout / chunk-rewrite APIs for metadata rearrangement.</summary>
 [FormatMagicBytes([(byte)'G', (byte)'I', (byte)'F', (byte)'8'])]
 [FormatMimeType("image/gif")]
-[VerifiedBy(ConformanceOracle.ImageMagick, ConformanceOracle.FFmpeg, ConformanceOracle.IrfanView)]
+[VerifiedBy(ConformanceOracle.ImageMagick, ConformanceOracle.XnView, ConformanceOracle.IrfanView, ConformanceOracle.FFmpeg)]
 public sealed class GifFile :
   IImageFormatReader<GifFile>, IImageToRawImage<GifFile>, IImageFromRawImage<GifFile>,
   IImageFormatWriter<GifFile>, IMultiImageFileFormat<GifFile>,
