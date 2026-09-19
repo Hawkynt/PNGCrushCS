@@ -314,11 +314,41 @@ internal static class FFmpegOracle {
       .Select(static line => line.Trim())
       .Where(static line => line.Length != 0
                             && !_IsAboutFFmpegsOwnVersion(line)
+                            && !_IsAnOlderProbePassMisreadingAFieldPair(line)
                             && !_IsWestwoodVqaReachingTheEndOfItsFile(line)));
 
   private static bool _IsAboutFFmpegsOwnVersion(string line)
     => line.StartsWith("[h261 @ ", StringComparison.Ordinal)
        && line.EndsWith("warning: first frame is no keyframe", StringComparison.Ordinal);
+
+  /// <summary>
+  /// <c>[mjpeg @ …] No JPEG data found in image</c>, which older FFmpeg prints while working out what
+  /// the stream is and then contradicts by decoding it.
+  /// </summary>
+  /// <remarks>
+  /// An Avid Meridien frame is two JPEG field pictures in one sample, and FFmpeg meets it twice: once
+  /// in the throwaway decoder <c>avformat_find_stream_info</c> runs to learn what the stream holds,
+  /// and then in the one that decodes it. On 6.0.1 the first of those loses the field pair's opening
+  /// <c>EOI</c> — its marker trace steps from the first field's <c>SOS</c> straight to the second
+  /// field's <c>SOI</c> — and gives up with these words; the second parses both <c>EOI</c>s and
+  /// decodes the clip. On 9.0.1 neither says anything.
+  /// <para/>
+  /// Measured rather than reasoned about, and this is the measurement that decides it: handed the
+  /// 720x486 and the 720x576 clips this package writes, FFmpeg 6.0.1 exits zero and produces decoded
+  /// video <b>byte-identical</b> to FFmpeg 9.0.1's, every frame of it, while printing this line once
+  /// per file. A line that accompanies an identical decode reports which FFmpeg is on the machine and
+  /// nothing whatever about the bytes handed to it, exactly as the H.261 line above does.
+  /// <para/>
+  /// <b>What it cannot hide.</b> These same words from a real decode mean FFmpeg found no picture, and
+  /// a run that found no picture has none to hand back: <see cref="TryDecodeFirstFrame"/> fails on the
+  /// PNG that was never written and <see cref="TryDecodePictures"/> on a byte count that is not the
+  /// frames that were asked for, neither of which needs a complaint to fail. Tolerating the line
+  /// therefore cannot turn a decode that did not happen into a pass — only one that did happen and was
+  /// grumbled about.
+  /// </remarks>
+  private static bool _IsAnOlderProbePassMisreadingAFieldPair(string line)
+    => line.StartsWith("[mjpeg @ ", StringComparison.Ordinal)
+       && line.EndsWith("No JPEG data found in image", StringComparison.Ordinal);
 
   /// <summary>
   /// The line FFmpeg's Westwood VQA demuxer prints when it runs out of file.
