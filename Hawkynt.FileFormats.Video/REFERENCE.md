@@ -4466,6 +4466,13 @@ Describes the pixel layout and bit depth of raw image data.
 | `Yuv422P16` | `39` | Planar 16-bit YUV 4:2:2 in little-endian ushort samples. |
 | `Yuv440P16` | `40` | Planar 16-bit YUV 4:4:0 in little-endian ushort samples. |
 | `Yuv444P16` | `41` | Planar 16-bit YUV 4:4:4 in little-endian ushort samples. |
+| `Yuv411P8` | `42` | Planar 8-bit YUV 4:1:1: Y, U, V. |
+| `Yuv420P9` | `43` | Planar 9-bit YUV 4:2:0 in right-justified little-endian ushort samples. |
+| `Yuv422P9` | `44` | Planar 9-bit YUV 4:2:2 in right-justified little-endian ushort samples. |
+| `Yuv444P9` | `45` | Planar 9-bit YUV 4:4:4 in right-justified little-endian ushort samples. |
+| `Yuv420P14` | `46` | Planar 14-bit YUV 4:2:0 in right-justified little-endian ushort samples. |
+| `Yuv422P14` | `47` | Planar 14-bit YUV 4:2:2 in right-justified little-endian ushort samples. |
+| `Yuv444P14` | `48` | Planar 14-bit YUV 4:4:4 in right-justified little-endian ushort samples. |
 
 #### `PixelRect`
 
@@ -5335,7 +5342,7 @@ Decodes PVRTC (PowerVR Texture Compression) 2bpp and 4bpp blocks to RGBA32 pixel
 
 ### Namespace `FileFormat.Core.PixelFormats`
 
-[`Argb32`](#argb32) · [`Bgr24`](#bgr24) · [`Bgra32`](#bgra32) · [`Gray10`](#gray10) · [`Gray16`](#gray16) · [`Gray8`](#gray8) · [`GrayAlpha16`](#grayalpha16) · [`GrayAlpha32`](#grayalpha32) · [`GrayAlphaF16`](#grayalphaf16) · [`GrayAlphaF32`](#grayalphaf32) · [`GrayF16`](#grayf16) · [`GrayF32`](#grayf32) · [`Indexed1`](#indexed1) · [`Indexed10`](#indexed10) · [`Indexed11`](#indexed11) · [`Indexed12`](#indexed12) · [`Indexed13`](#indexed13) · [`Indexed14`](#indexed14) · [`Indexed15`](#indexed15) · [`Indexed16`](#indexed16) · [`Indexed2`](#indexed2) · [`Indexed3`](#indexed3) · [`Indexed4`](#indexed4) · [`Indexed5`](#indexed5) · [`Indexed6`](#indexed6) · [`Indexed7`](#indexed7) · [`Indexed8`](#indexed8) · [`Indexed9`](#indexed9) · [`Rgb24`](#rgb24) · [`Rgb30`](#rgb30) · [`Rgb48`](#rgb48) · [`Rgb565`](#rgb565) · [`RgbF16`](#rgbf16) · [`RgbF32`](#rgbf32) · [`Rgba32`](#rgba32) · [`Rgba64`](#rgba64) · [`RgbaF16`](#rgbaf16) · [`RgbaF32`](#rgbaf32) · [`Yuv420P10`](#yuv420p10) · [`Yuv420P12`](#yuv420p12) · [`Yuv420P16`](#yuv420p16) · [`Yuv420P8`](#yuv420p8) · [`Yuv422P10`](#yuv422p10) · [`Yuv422P12`](#yuv422p12) · [`Yuv422P16`](#yuv422p16) · [`Yuv422P8`](#yuv422p8) · [`Yuv440P10`](#yuv440p10) · [`Yuv440P12`](#yuv440p12) · [`Yuv440P16`](#yuv440p16) · [`Yuv440P8`](#yuv440p8) · [`Yuv444P10`](#yuv444p10) · [`Yuv444P12`](#yuv444p12) · [`Yuv444P16`](#yuv444p16) · [`Yuv444P8`](#yuv444p8)
+[`Argb32`](#argb32) · [`Bgr24`](#bgr24) · [`Bgra32`](#bgra32) · [`Gray10`](#gray10) · [`Gray16`](#gray16) · [`Gray8`](#gray8) · [`GrayAlpha16`](#grayalpha16) · [`GrayAlpha32`](#grayalpha32) · [`GrayAlphaF16`](#grayalphaf16) · [`GrayAlphaF32`](#grayalphaf32) · [`GrayF16`](#grayf16) · [`GrayF32`](#grayf32) · [`Indexed1`](#indexed1) · [`Indexed10`](#indexed10) · [`Indexed11`](#indexed11) · [`Indexed12`](#indexed12) · [`Indexed13`](#indexed13) · [`Indexed14`](#indexed14) · [`Indexed15`](#indexed15) · [`Indexed16`](#indexed16) · [`Indexed2`](#indexed2) · [`Indexed3`](#indexed3) · [`Indexed4`](#indexed4) · [`Indexed5`](#indexed5) · [`Indexed6`](#indexed6) · [`Indexed7`](#indexed7) · [`Indexed8`](#indexed8) · [`Indexed9`](#indexed9) · [`Rgb24`](#rgb24) · [`Rgb30`](#rgb30) · [`Rgb48`](#rgb48) · [`Rgb565`](#rgb565) · [`RgbF16`](#rgbf16) · [`RgbF32`](#rgbf32) · [`Rgba32`](#rgba32) · [`Rgba64`](#rgba64) · [`RgbaF16`](#rgbaf16) · [`RgbaF32`](#rgbaf32) · [`Yuv411P8`](#yuv411p8) · [`Yuv420P10`](#yuv420p10) · [`Yuv420P12`](#yuv420p12) · [`Yuv420P14`](#yuv420p14) · [`Yuv420P16`](#yuv420p16) · [`Yuv420P8`](#yuv420p8) · [`Yuv420P9`](#yuv420p9) · [`Yuv422P10`](#yuv422p10) · [`Yuv422P12`](#yuv422p12) · [`Yuv422P14`](#yuv422p14) · [`Yuv422P16`](#yuv422p16) · [`Yuv422P8`](#yuv422p8) · [`Yuv422P9`](#yuv422p9) · [`Yuv440P10`](#yuv440p10) · [`Yuv440P12`](#yuv440p12) · [`Yuv440P16`](#yuv440p16) · [`Yuv440P8`](#yuv440p8) · [`Yuv444P10`](#yuv444p10) · [`Yuv444P12`](#yuv444p12) · [`Yuv444P14`](#yuv444p14) · [`Yuv444P16`](#yuv444p16) · [`Yuv444P8`](#yuv444p8) · [`Yuv444P9`](#yuv444p9)
 
 #### `Argb32`
 
@@ -5641,6 +5648,14 @@ Implements `IRawPixelFormat<RgbaF32>`.
 | --- | --- | --- |
 | `Traits` | `static RawPixelFormatTraits Traits { get; }` |  |
 
+#### `Yuv411P8`
+
+Implements `IRawPixelFormat<Yuv411P8>`.
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `Traits` | `static RawPixelFormatTraits Traits { get; }` |  |
+
 #### `Yuv420P10`
 
 Implements `IRawPixelFormat<Yuv420P10>`.
@@ -5652,6 +5667,14 @@ Implements `IRawPixelFormat<Yuv420P10>`.
 #### `Yuv420P12`
 
 Implements `IRawPixelFormat<Yuv420P12>`.
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `Traits` | `static RawPixelFormatTraits Traits { get; }` |  |
+
+#### `Yuv420P14`
+
+Implements `IRawPixelFormat<Yuv420P14>`.
 
 | Member | Signature | Summary |
 | --- | --- | --- |
@@ -5673,6 +5696,14 @@ Implements `IRawPixelFormat<Yuv420P8>`.
 | --- | --- | --- |
 | `Traits` | `static RawPixelFormatTraits Traits { get; }` |  |
 
+#### `Yuv420P9`
+
+Implements `IRawPixelFormat<Yuv420P9>`.
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `Traits` | `static RawPixelFormatTraits Traits { get; }` |  |
+
 #### `Yuv422P10`
 
 Implements `IRawPixelFormat<Yuv422P10>`.
@@ -5689,6 +5720,14 @@ Implements `IRawPixelFormat<Yuv422P12>`.
 | --- | --- | --- |
 | `Traits` | `static RawPixelFormatTraits Traits { get; }` |  |
 
+#### `Yuv422P14`
+
+Implements `IRawPixelFormat<Yuv422P14>`.
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `Traits` | `static RawPixelFormatTraits Traits { get; }` |  |
+
 #### `Yuv422P16`
 
 Implements `IRawPixelFormat<Yuv422P16>`.
@@ -5700,6 +5739,14 @@ Implements `IRawPixelFormat<Yuv422P16>`.
 #### `Yuv422P8`
 
 Implements `IRawPixelFormat<Yuv422P8>`.
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `Traits` | `static RawPixelFormatTraits Traits { get; }` |  |
+
+#### `Yuv422P9`
+
+Implements `IRawPixelFormat<Yuv422P9>`.
 
 | Member | Signature | Summary |
 | --- | --- | --- |
@@ -5753,6 +5800,14 @@ Implements `IRawPixelFormat<Yuv444P12>`.
 | --- | --- | --- |
 | `Traits` | `static RawPixelFormatTraits Traits { get; }` |  |
 
+#### `Yuv444P14`
+
+Implements `IRawPixelFormat<Yuv444P14>`.
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `Traits` | `static RawPixelFormatTraits Traits { get; }` |  |
+
 #### `Yuv444P16`
 
 Implements `IRawPixelFormat<Yuv444P16>`.
@@ -5764,6 +5819,14 @@ Implements `IRawPixelFormat<Yuv444P16>`.
 #### `Yuv444P8`
 
 Implements `IRawPixelFormat<Yuv444P8>`.
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `Traits` | `static RawPixelFormatTraits Traits { get; }` |  |
+
+#### `Yuv444P9`
+
+Implements `IRawPixelFormat<Yuv444P9>`.
 
 | Member | Signature | Summary |
 | --- | --- | --- |
