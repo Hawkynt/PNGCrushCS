@@ -173,17 +173,27 @@ public sealed class FormatSupportReadmeTests {
 
     var builder = new StringBuilder();
     builder.Append(
-      "**Oracle** — the tool outside this repository that has read what the writer produces. "
+      "**Oracle** — the tools outside this repository that have read what the writer produces. "
       + "`none` means nothing but this package's own reader ever has, and a reader agreeing with the "
       + "writer beside it proves only that the two share one reading of the format; `—` means there "
       + "is no writer, so there is nothing for anything to have read. What a name in this column "
       + "states exactly: handed a file this writer produced, under one of the format's own "
-      + "extensions and at one of the sizes the format declares, that tool decoded it back to a "
-      + "picture of the same size which is not a blank canvas. That is weaker than the pixel-for-pixel "
-      + "comparisons in `Tests/Conformance.Recoil.Tests` and in the codec evidence below, and it is "
-      + "the one thing that could be asked of every writer here rather than of a chosen few. It does "
-      + "not prove the pixels agree, and where two unrelated formats share an extension and a "
-      + "geometry it can be a tool reading the other one.");
+      + "extensions and at one of the sizes the format declares, that tool rebuilt the picture the "
+      + "file holds — at the geometry the file holds rather than the geometry it was offered, and "
+      + "agreeing pixel for pixel with every palette already resolved to colour. Which reference the "
+      + "pixels are held to is the format's own business. One that can carry the probe unchanged has "
+      + "to hand it back exactly. One that cannot — a gradient is not sixteen fixed hardware colours "
+      + "— is held instead to two things at once: the tool and this package have to agree about the "
+      + "picture, which is not circular because the tool is the independent party, and the file has "
+      + "to have kept what the writer was given, which is what stops two decoders agreeing that a "
+      + "file holds nothing. Geometry alone used to be the whole bar, and the Apple IIgs `$C1` "
+      + "writer is what that cost: every file it produced decoded as solid black at exactly the right "
+      + "size, and nothing noticed. A tool that has no reader for a format is recorded as having no "
+      + "opinion and never as agreeing. "
+      + "Two names are two opinions only where two engines are: ImageMagick reads the PostScript "
+      + "family through Ghostscript, the video containers through ffmpeg, and JPEG 2000, JPEG XL, "
+      + "WebP and the HEIF family through the same libraries `opj_decompress`, `djxl`, `dwebp` and "
+      + "`heif-dec` are, so on those formats a pair of names is one engine wearing two.");
 
     if (used.Count == 0)
       return builder.Append('\n').ToString();

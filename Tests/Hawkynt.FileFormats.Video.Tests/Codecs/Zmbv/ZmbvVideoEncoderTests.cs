@@ -41,6 +41,28 @@ public class ZmbvVideoEncoderTests {
     }
   }
 
+  private static RawImage[] _Rgb555Sequence(int width, int height, int count, int seed) {
+    var random = new Random(seed);
+    var result = new RawImage[count];
+
+    for (var frame = 0; frame < count; ++frame) {
+      var pixels = new byte[width * height * 3];
+      for (var i = 0; i < pixels.Length; ++i) {
+        var sample = random.Next(32);
+        pixels[i] = (byte)((sample << 3) | (sample >> 2));
+      }
+
+      result[frame] = new() {
+        Width = width,
+        Height = height,
+        Format = PixelFormat.Rgb24,
+        PixelData = pixels,
+      };
+    }
+
+    return result;
+  }
+
   // ============================================================================================
   // DescribeStream
   // ============================================================================================
@@ -50,6 +72,7 @@ public class ZmbvVideoEncoderTests {
   [TestCase(0, 32)]
   [TestCase(32, 32)]
   [TestCase(16, 16)]
+  [TestCase(15, 15)]
   [TestCase(8, 8)]
   public void DescribesAStreamTheDecoderAcceptsAndCreates(int requestedBits, int describedBits) {
     var encoder = ZmbvVideoEncoder.Create(_Stream(33, 17, requestedBits));
@@ -77,11 +100,10 @@ public class ZmbvVideoEncoderTests {
 
   [Test]
   [Category("Unit")]
-  [TestCase(16, 16, PixelFormat.Bgra32)]
-  [TestCase(33, 17, PixelFormat.Bgra32)]
-  [TestCase(40, 24, PixelFormat.Bgra32)]
-  [TestCase(5, 3, PixelFormat.Bgra32)]
+  [TestCase(16, 16, PixelFormat.Bgr24)]
   [TestCase(33, 17, PixelFormat.Bgr24)]
+  [TestCase(40, 24, PixelFormat.Bgr24)]
+  [TestCase(5, 3, PixelFormat.Bgr24)]
   [TestCase(33, 17, PixelFormat.Rgb24)]
   [TestCase(33, 17, PixelFormat.Gray8)]
   [TestCase(33, 17, PixelFormat.Indexed8)]
@@ -89,7 +111,21 @@ public class ZmbvVideoEncoderTests {
     var frames = LosslessEncoderPictures.Sequence(width, height, format, 9, seed: width * 3 + height);
     _RoundTrip(width, height, 32, frames, (i, packet) => {
       if (i == 0)
-        Assert.That(packet.Data.Span[..7].ToArray(), Is.EqualTo(new byte[] { 1, 0, 1, 1, 8, 16, 16 }), "version 0.1, zlib, 32-bit, 16x16 blocks");
+        Assert.That(packet.Data.Span[..7].ToArray(), Is.EqualTo(new byte[] { 1, 0, 1, 1, 8, 16, 16 }), "version 0.1, zlib, BGR0, 16x16 blocks");
+    });
+  }
+
+  [Test]
+  [Category("Unit")]
+  [TestCase(16, 16)]
+  [TestCase(33, 17)]
+  [TestCase(5, 3)]
+  public void RoundTripsA15BitSequenceExactly(int width, int height) {
+    var frames = _Rgb555Sequence(width, height, 9, seed: width * 11 + height);
+    _RoundTrip(width, height, 15, frames, (i, packet) => {
+      if (i == 0)
+        Assert.That(packet.Data.Span[..7].ToArray(), Is.EqualTo(new byte[] { 1, 0, 1, 1, 5, 16, 16 }), "version 0.1, zlib, RGB555, 16x16 blocks");
+      Assert.That(packet.Data.Span[0] & 2, Is.Zero, "no palette to change");
     });
   }
 
@@ -127,8 +163,39 @@ public class ZmbvVideoEncoderTests {
 
   [Test]
   [Category("Unit")]
+  public void A32BitStreamTreatsTheFourthByteAsBgr0Padding() {
+    var lowAlpha = new RawImage {
+      Width = 2,
+      Height = 1,
+      Format = PixelFormat.Bgra32,
+      PixelData = [0x11, 0x22, 0x33, 0x00, 0x44, 0x55, 0x66, 0x7F],
+    };
+    var highAlpha = new RawImage {
+      Width = 2,
+      Height = 1,
+      Format = PixelFormat.Bgra32,
+      PixelData = [0x11, 0x22, 0x33, 0xFF, 0x44, 0x55, 0x66, 0x01],
+    };
+
+    var firstEncoder = ZmbvVideoEncoder.Create(_Stream(2, 1, 32));
+    var secondEncoder = ZmbvVideoEncoder.Create(_Stream(2, 1, 32));
+    Assert.That(firstEncoder.TryEncode(lowAlpha, 0, out var first), Is.True);
+    Assert.That(secondEncoder.TryEncode(highAlpha, 0, out var second), Is.True);
+
+    Assert.That(second.Data.ToArray(), Is.EqualTo(first.Data.ToArray()), "alpha-only differences must not change a BGR0 packet");
+
+    var decoder = ZmbvVideoDecoder.Create(firstEncoder.DescribeStream());
+    Assert.That(decoder.TryDecode(first, out var decoded), Is.True);
+    Assert.That(decoded.PixelData, Is.EqualTo(new byte[] {
+      0x11, 0x22, 0x33, 0xFF,
+      0x44, 0x55, 0x66, 0xFF,
+    }));
+  }
+
+  [Test]
+  [Category("Unit")]
   public void ForcesAnIntraframeEveryTwentyFifthFrameAndRestartsTheZlibStream() {
-    var frames = LosslessEncoderPictures.Sequence(16, 16, PixelFormat.Bgra32, 52, seed: 4);
+    var frames = LosslessEncoderPictures.Sequence(16, 16, PixelFormat.Bgr24, 52, seed: 4);
     _RoundTrip(16, 16, 32, frames, (i, packet) => {
       if (i is 25 or 50)
         Assert.That(packet.Data.Span[..7].ToArray(), Is.EqualTo(new byte[] { 1, 0, 1, 1, 8, 16, 16 }), $"frame {i} restates the header");
@@ -140,7 +207,7 @@ public class ZmbvVideoEncoderTests {
   [Test]
   [Category("Unit")]
   public void AShiftedPictureIsCodedAsMotionVectorsRatherThanRestated() {
-    var first = LosslessEncoderPictures.Noise(64, 64, PixelFormat.Bgra32, seed: 8);
+    var first = LosslessEncoderPictures.Noise(64, 64, PixelFormat.Bgr24, seed: 8);
     var shifted = LosslessEncoderPictures.Shifted(first, 3, -2, seed: 9);
     var encoder = ZmbvVideoEncoder.Create(_Stream(64, 64, 32));
     var decoder = VideoFormatRegistry.CreateDecoder(encoder.DescribeStream());
@@ -158,7 +225,7 @@ public class ZmbvVideoEncoderTests {
   [Test]
   [Category("Unit")]
   public void PassesTimestampsThrough() {
-    var picture = LosslessEncoderPictures.Noise(4, 4, PixelFormat.Bgra32, seed: 5);
+    var picture = LosslessEncoderPictures.Noise(4, 4, PixelFormat.Bgr24, seed: 5);
     var encoder = ZmbvVideoEncoder.Create(_Stream(4, 4));
 
     Assert.That(encoder.TryEncode(picture, 1234, out var packet), Is.True);
@@ -212,12 +279,26 @@ public class ZmbvVideoEncoderTests {
 
   [Test]
   [Category("Unit")]
-  [TestCase(15)]
   [TestCase(24)]
   [TestCase(1)]
-  public void RefusesABitDepthTheFormatHasNoLosslessLayoutFor(int bitsPerPixel) {
+  public void RefusesABitDepthTheFormatHasNoSupportedLayoutFor(int bitsPerPixel) {
     var failure = Assert.Throws<NotSupportedException>(() => ZmbvVideoEncoder.Create(_Stream(4, 4, bitsPerPixel)));
     Assert.That(failure!.Message, Does.Contain($"{bitsPerPixel} bits"));
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void A15BitStreamRefusesColourThatWouldNeedQuantising() {
+    var encoder = ZmbvVideoEncoder.Create(_Stream(1, 1, 15));
+    var picture = new RawImage {
+      Width = 1,
+      Height = 1,
+      Format = PixelFormat.Rgb24,
+      PixelData = [1, 0, 0],
+    };
+
+    var failure = Assert.Throws<NotSupportedException>(() => encoder.TryEncode(picture, 0, out _));
+    Assert.That(failure!.Message, Does.Contain("refused rather than quantised"));
   }
 
   [Test]

@@ -18,7 +18,7 @@ namespace FileFormat.EmcEditor;
 /// It used to be written as 10000 bytes of bitmap, one video matrix and colour memory at 160 by 200,
 /// which is an ordinary multicolour screen and not FLI at all.
 /// </remarks>
-[VerifiedBy(ConformanceOracle.Recoil2Png)]
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.IrfanView)]
 public readonly record struct EmcEditorFile
   : IImageFormatReader<EmcEditorFile>, IImageToRawImage<EmcEditorFile>,
     IImageFromRawImage<EmcEditorFile>, IImageFormatWriter<EmcEditorFile> {
