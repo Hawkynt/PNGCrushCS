@@ -50,7 +50,7 @@ public sealed class FlashSv2VideoEncoderOracleTests {
       };
       foreach (var argument in new[] {
         "-hide_banner", "-loglevel", "error", "-y", "-i", input,
-        "-map", "0:v:0", "-an", "-sn", "-dn", "-vsync", "0",
+        "-map", "0:v:0", "-an", "-sn", "-dn", "-fps_mode", "passthrough",
         "-f", "rawvideo", "-pix_fmt", "bgr24", output,
       })
         startInfo.ArgumentList.Add(argument);

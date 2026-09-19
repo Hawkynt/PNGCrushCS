@@ -344,7 +344,7 @@ public class FlashSv2VideoDecoderTests {
     var packet = new CodedPacket(0, Concat(header, PrimedDiffBlock(0, 4, someDeflate)));
 
     var failure = Assert.Throws<InvalidDataException>(() => decoder.TryDecode(packet, out _));
-    Assert.That(failure!.Message, Does.Contain("before any key frame established one"));
+    Assert.That(failure!.Message, Does.Contain("before a key frame established that cell's reference"));
   }
 
   [Test]
