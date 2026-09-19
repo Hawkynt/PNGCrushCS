@@ -41,14 +41,29 @@ public sealed class H263VideoEncoderTests {
   [TestCase(160, 120)]
   [TestCase(320, 240)]
   [TestCase(720, 576)]
-  [TestCase(0, 0)]
   [Category("Unit")]
-  public void ACustomPictureSizeIsRefusedByName(int width, int height) {
+  public void H263PlusCustomSourceFormatsAreAccepted(int width, int height) {
+    var encoder = H263VideoEncoder.Create(_Stream(width, height));
+
+    Assert.Multiple(() => {
+      Assert.That(encoder.DescribeStream().Width, Is.EqualTo(width));
+      Assert.That(encoder.DescribeStream().Height, Is.EqualTo(height));
+    });
+  }
+
+  [TestCase(0, 0)]
+  [TestCase(2, 4)]
+  [TestCase(4, 2)]
+  [TestCase(181, 100)]
+  [TestCase(2049, 1152)]
+  [TestCase(2048, 1156)]
+  [Category("Unit")]
+  public void AnInvalidCustomPictureSizeIsRefusedByName(int width, int height) {
     var refusal = Assert.Throws<NotSupportedException>(() => H263VideoEncoder.Create(_Stream(width, height)));
 
     Assert.Multiple(() => {
       Assert.That(refusal!.Message, Does.Contain($"{width}x{height}"));
-      Assert.That(refusal.Message, Does.Contain("extended PTYPE"));
+      Assert.That(refusal.Message, Does.Contain("H.263+ custom picture formats"));
     });
   }
 
