@@ -166,7 +166,9 @@ public class DvVideoEncoderTests {
   [Test]
   [Category("Unit")]
   public void ARasterDvDoesNotDefineIsRefused() {
-    foreach (var (width, height) in new[] { (640, 480), (720, 486), (1440, 1080), (0, 0) }) {
+    // 1440x1080 used to belong here and is DVCPRO HD now, so an undefined high-definition raster
+    // takes its place: SMPTE 370M defines 1280x1080, 1440x1080 and 960x720, and nothing else.
+    foreach (var (width, height) in new[] { (640, 480), (720, 486), (1920, 1080), (0, 0) }) {
       var failure = Assert.Throws<NotSupportedException>(() => _Encoder(width, height));
       Assert.That(failure.Message, Does.Contain("720x480").And.Contain("720x576"), $"{width}x{height}");
     }

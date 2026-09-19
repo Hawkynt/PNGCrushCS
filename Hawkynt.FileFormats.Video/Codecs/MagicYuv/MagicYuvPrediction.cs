@@ -4,56 +4,38 @@ namespace FileFormat.Codecs.MagicYuv;
 
 /// <summary>The three ways a MagicYUV slice predicts a sample, as its frames number them.</summary>
 internal enum MagicYuvPredictor {
-
-  /// <summary>The sample to the left.</summary>
   Left = 1,
-
-  /// <summary>Left plus above less above-left.</summary>
   Gradient = 2,
-
-  /// <summary>The median of the left, the above, and the gradient of the two.</summary>
   Median = 3,
 }
 
-/// <summary>
-/// Turns a MagicYUV slice's coded differences back into samples.
-/// </summary>
-/// <remarks>
-/// <b>Every row starts again from the sample above it</b>, not from the end of the row before. That
-/// is the same at column zero for all three predictors, and it is what separates this codec from
-/// HuffYUV and Ut Video, whose running sums carry on across the end of a row. Reading it their way
-/// decodes the first row of a plane exactly and then puts every row after it out — which is how it
-/// was found, on a plane that agreed for exactly its first 64 samples and disagreed from the 65th.
-/// <para/>
-/// The first row of a slice has nothing above it, so its first sample is predicted from nought and
-/// the rest of it from the left, whichever of the three the slice names. That is what makes a slice
-/// independently decodable, which is the point of having them.
-/// <para/>
-/// Everything is a byte and wraps: a difference of 200 added to 100 is 44 and not 255. Saturating
-/// would lose the codec's losslessness at the first sample either side of the range.
-/// </remarks>
+/// <summary>Turns MagicYUV residuals back into samples.</summary>
 internal static class MagicYuvPrediction {
-
-  /// <summary>
-  /// Turns the differences in rows <paramref name="firstRow"/> to <paramref name="lastRow"/> into
-  /// samples.
-  /// </summary>
+  /// <summary>Reconstructs one 8-bit plane slice in-place.</summary>
   internal static void Apply(
-    Span<byte> plane, int width, int firstRow, int lastRow, MagicYuvPredictor predictor) {
+    Span<byte> plane,
+    int width,
+    int firstRow,
+    int lastRow,
+    MagicYuvPredictor predictor,
+    bool interlaced = false
+  ) {
+    var fieldStride = interlaced ? 2 : 1;
     for (var y = firstRow; y < lastRow; ++y) {
       var row = y * width;
+      var hasTop = y - firstRow >= fieldStride;
       for (var x = 0; x < width; ++x) {
         var at = row + x;
         byte predicted;
 
-        if (x == 0)
-          predicted = y == firstRow ? (byte)0 : plane[at - width];
-        else if (y == firstRow)
-          predicted = plane[at - 1];
+        if (!hasTop)
+          predicted = x == 0 ? (byte)0 : plane[at - 1];
+        else if (x == 0)
+          predicted = plane[at - fieldStride * width];
         else {
           var left = plane[at - 1];
-          var above = plane[at - width];
-          var aboveLeft = plane[at - width - 1];
+          var above = plane[at - fieldStride * width];
+          var aboveLeft = plane[at - fieldStride * width - 1];
           var gradient = (byte)(left + above - aboveLeft);
           predicted = predictor switch {
             MagicYuvPredictor.Left => left,
@@ -67,10 +49,63 @@ internal static class MagicYuvPrediction {
     }
   }
 
+  /// <summary>Reconstructs a 10/12/14-bit plane slice in-place.</summary>
+  /// <remarks>
+  /// Deep MagicYUV uses the normal JPEG-LS median edge predictor; unlike the historical 8-bit path,
+  /// the gradient entering the median is not first wrapped to the sample depth. FFmpeg and OxideAV
+  /// independently agree on this distinction.
+  /// </remarks>
+  internal static void Apply(
+    Span<ushort> plane,
+    int width,
+    int firstRow,
+    int lastRow,
+    MagicYuvPredictor predictor,
+    int mask,
+    bool interlaced = false
+  ) {
+    var fieldStride = interlaced ? 2 : 1;
+    for (var y = firstRow; y < lastRow; ++y) {
+      var row = y * width;
+      var hasTop = y - firstRow >= fieldStride;
+      for (var x = 0; x < width; ++x) {
+        var at = row + x;
+        int predicted;
+
+        if (!hasTop)
+          predicted = x == 0 ? 0 : plane[at - 1];
+        else if (x == 0)
+          predicted = plane[at - fieldStride * width];
+        else {
+          var left = (int)plane[at - 1];
+          var above = (int)plane[at - fieldStride * width];
+          var aboveLeft = (int)plane[at - fieldStride * width - 1];
+          predicted = predictor switch {
+            MagicYuvPredictor.Left => left,
+            MagicYuvPredictor.Gradient => left + above - aboveLeft,
+            _ => _MedianDeep(left, above, aboveLeft),
+          };
+        }
+
+        plane[at] = (ushort)((predicted + plane[at]) & mask);
+      }
+    }
+  }
+
   private static byte _Median(byte a, byte b, byte c) {
     if (a > b)
       (a, b) = (b, a);
 
     return c < a ? a : c > b ? b : c;
+  }
+
+  private static int _MedianDeep(int left, int above, int aboveLeft) {
+    var low = Math.Min(left, above);
+    var high = Math.Max(left, above);
+    if (aboveLeft >= high)
+      return low;
+    if (aboveLeft <= low)
+      return high;
+    return left + above - aboveLeft;
   }
 }

@@ -1,0 +1,24 @@
+The Sierra VMD video decoder helpers in this directory and
+Codecs/VmdVideoDecoder.cs are converted from FFmpeg (https://ffmpeg.org/):
+
+  libavcodec/vmdvideo.c    Sierra VMD video decoder and its LZSS/RLE coding
+  libavformat/sierravmd.c  Sierra VMD block/frame table interpretation
+
+Copyright (c) 2004 The FFmpeg Project
+
+Those FFmpeg files are licensed under the GNU Lesser General Public License,
+version 2.1 or (at your option) any later version. This work is distributed
+under the GNU Lesser General Public License version 3 or later, which the
+"or later" option permits; the licence text is in LICENSE at the repository
+root.
+
+The algorithms were converted into the repository's own C# structure and
+conventions rather than pasted as C. The marker-present and markerless LZSS
+initialisations, method-3 pair RLE, previous-picture copy semantics and fixed
+block/part table layout are format behaviour carried across from those files.
+The 770-byte palette-update layout and its first-index/count semantics were
+cross-checked against MultimediaWiki's VMD description and ScummVM's
+video/coktel_decoder.cpp; no ScummVM implementation code is copied here.
+
+FFmpeg's copyright and licence notices and the full LGPL text are available
+from https://ffmpeg.org/legal.html and in the source files named above.
