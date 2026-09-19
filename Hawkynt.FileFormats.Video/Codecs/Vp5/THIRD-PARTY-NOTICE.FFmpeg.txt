@@ -1,0 +1,46 @@
+The On2 VP5 decoder in this directory is converted from FFmpeg (https://github.com/FFmpeg/FFmpeg):
+
+  libavcodec/vp5.c       frame header, vector and coefficient models, coefficient parsing
+  libavcodec/vp5data.h   VP5's own probability-update and context-remapping tables
+  libavcodec/vp56.c      macroblock types and their statistics, motion-vector prediction, the
+                         direct-current predictor, motion compensation and the reconstruction loop
+  libavcodec/vp56data.c  the tables VP5 shares with VP6
+  libavcodec/vp5dsp.c    the prediction-time edge filter
+  libavcodec/vp3dsp.c    the 8x8 integer inverse DCT, in both the intra and the inter form
+  libavcodec/vpx_rac.h   the binary arithmetic decoder and its normalisation
+
+All of the above are
+
+ * Copyright (C) 2006  Aurelien Jacobs <aurel@gnuage.org>
+ * Copyright (c) 2010  Mans Rullgard <mans@mansr.com>          (vp5dsp.c)
+ *
+ * This file is part of FFmpeg.
+ *
+ * FFmpeg is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * FFmpeg is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with FFmpeg; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
+
+LGPL-2.1-or-later, which this package's LGPL-3.0-or-later can absorb.
+
+Why a conversion and not a specification. On2 published a VP6 bitstream specification and never
+published a VP5 one, and no reverse-engineer's description covers more of VP5 than its range coder
+and frame header. FFmpeg's decoder is therefore not a convenient second opinion about VP5 — it is the
+only complete account of the format that exists, and every VP5 file in circulation has been checked
+against it and against nothing else. Reimplementing from a description that does not exist was not an
+option, so this is the first rung of the repository's sourcing ladder taken deliberately.
+
+What is not taken from there. The zigzag scan and the range coder's normalisation table are built here
+rather than transcribed, because both have definitions and a second rendering of a derivable table is
+a second chance to get it wrong. The colour conversion is this package's own and deliberately differs
+from FFmpeg's, which is why the oracle test compares sample planes rather than RGB. The fixed tables
+were transcribed mechanically, by a script that parsed the C initialisers.

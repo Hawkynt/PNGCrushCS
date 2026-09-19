@@ -18,7 +18,7 @@ namespace FileFormat.FliEditor;
 /// The background register changing down the screen is what the table buys: pattern 00 can be a
 /// different colour on every raster line rather than one for the whole picture.
 /// </remarks>
-[VerifiedBy(ConformanceOracle.Recoil2Png)]
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.IrfanView)]
 public readonly record struct FliEditorFile
   : IImageFormatReader<FliEditorFile>, IImageToRawImage<FliEditorFile>,
     IImageFromRawImage<FliEditorFile>, IImageFormatWriter<FliEditorFile> {

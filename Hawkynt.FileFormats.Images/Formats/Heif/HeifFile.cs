@@ -30,7 +30,7 @@ public readonly record struct HeifImage {
 /// and is a real HEVC bitstream rather than a raw-RGB payload in an HEIF-shaped box tree.
 /// </remarks>
 [FormatMimeType("image/heic", "image/heif", "image/avci", "image/avcs")]
-[VerifiedBy(ConformanceOracle.ImageMagick, ConformanceOracle.HeifDec, ConformanceOracle.FFmpeg)]
+[VerifiedBy(ConformanceOracle.ImageMagick, ConformanceOracle.XnView, ConformanceOracle.HeifDec, ConformanceOracle.FFmpeg)]
 public readonly record struct HeifFile :
   IImageFormatReader<HeifFile>,
   IImageToRawImage<HeifFile>,

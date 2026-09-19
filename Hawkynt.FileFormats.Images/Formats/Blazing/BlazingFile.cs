@@ -4,7 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.Blazing;
 
 /// <summary>In-memory representation of a Blazing Paddles hires image (C64, 320x200, 1bpp cell-based).</summary>
-[VerifiedBy(ConformanceOracle.Recoil2Png)]
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.IrfanView)]
 public readonly record struct BlazingFile : IImageFormatReader<BlazingFile>, IImageToRawImage<BlazingFile>, IImageFromRawImage<BlazingFile>, IImageFormatWriter<BlazingFile> {
 
   /// <summary>Size of the load address in bytes.</summary>

@@ -17,6 +17,8 @@ namespace FileFormat.Codecs;
 /// the LOCO-I/JPEG-LS median-edge predictor. AVI carries a 12-byte trailer after the ordinary
 /// <c>BITMAPINFOHEADER</c>: version, colour mode, and the near-lossless step. Odd-width RGB carries the
 /// historical encoder's diagonal row-rotation fault and is repaired after the three planes are read.
+/// YUV modes are returned as their native planar samples rather than passed through a colour matrix,
+/// keeping lossless streams sample-exact and preserving near-lossless error exactly where it occurred.
 /// </remarks>
 public sealed class LocoVideoDecoder : IVideoCodecDecoder<LocoVideoDecoder> {
 
@@ -150,10 +152,13 @@ public sealed class LocoVideoDecoder : IVideoCodecDecoder<LocoVideoDecoder> {
   }
 
   private RawImage _DecodeYuv422(ReadOnlySpan<byte> source) {
-    var y = new byte[checked(this._width * this._height)];
+    var yLength = checked(this._width * this._height);
     var chromaWidth = this._width / 2;
-    var u = new byte[checked(chromaWidth * this._height)];
-    var v = new byte[u.Length];
+    var chromaLength = checked(chromaWidth * this._height);
+    var output = new byte[checked(yLength + 2 * chromaLength)];
+    var y = output.AsSpan(0, yLength);
+    var u = output.AsSpan(yLength, chromaLength);
+    var v = output.AsSpan(yLength + chromaLength, chromaLength);
 
     var at = 0;
     at += this._DecodePlane(source[at..], y, this._width, this._height);
@@ -163,17 +168,20 @@ public sealed class LocoVideoDecoder : IVideoCodecDecoder<LocoVideoDecoder> {
     return new() {
       Width = this._width,
       Height = this._height,
-      Format = PixelFormat.Rgb24,
-      PixelData = _YuvToRgb(y, u, v, this._width, this._height, chromaWidth, verticalSubsample: 1),
+      Format = PixelFormat.Yuv422P8,
+      PixelData = output,
     };
   }
 
   private RawImage _DecodeYuv420(ReadOnlySpan<byte> source) {
-    var y = new byte[checked(this._width * this._height)];
+    var yLength = checked(this._width * this._height);
     var chromaWidth = this._width / 2;
     var chromaHeight = this._height / 2;
-    var u = new byte[checked(chromaWidth * chromaHeight)];
-    var v = new byte[u.Length];
+    var chromaLength = checked(chromaWidth * chromaHeight);
+    var output = new byte[checked(yLength + 2 * chromaLength)];
+    var y = output.AsSpan(0, yLength);
+    var u = output.AsSpan(yLength, chromaLength);
+    var v = output.AsSpan(yLength + chromaLength, chromaLength);
 
     var at = 0;
     at += this._DecodePlane(source[at..], y, this._width, this._height);
@@ -183,8 +191,8 @@ public sealed class LocoVideoDecoder : IVideoCodecDecoder<LocoVideoDecoder> {
     return new() {
       Width = this._width,
       Height = this._height,
-      Format = PixelFormat.Rgb24,
-      PixelData = _YuvToRgb(y, u, v, this._width, this._height, chromaWidth, verticalSubsample: 2),
+      Format = PixelFormat.Yuv420P8,
+      PixelData = output,
     };
   }
 
@@ -237,35 +245,6 @@ public sealed class LocoVideoDecoder : IVideoCodecDecoder<LocoVideoDecoder> {
       return b;
     return c;
   }
-
-  private static byte[] _YuvToRgb(
-    ReadOnlySpan<byte> y,
-    ReadOnlySpan<byte> u,
-    ReadOnlySpan<byte> v,
-    int width,
-    int height,
-    int chromaWidth,
-    int verticalSubsample
-  ) {
-    var output = new byte[checked(width * height * 3)];
-    var at = 0;
-    for (var row = 0; row < height; ++row)
-      for (var column = 0; column < width; ++column) {
-        var yy = y[row * width + column];
-        var chromaAt = (row / verticalSubsample) * chromaWidth + (column >> 1);
-        var cb = u[chromaAt];
-        var cr = v[chromaAt];
-        var c = yy - 16;
-        var d = cb - 128;
-        var e = cr - 128;
-        output[at++] = _Clamp((298 * c + 409 * e + 128) >> 8);
-        output[at++] = _Clamp((298 * c - 100 * d - 208 * e + 128) >> 8);
-        output[at++] = _Clamp((298 * c + 516 * d + 128) >> 8);
-      }
-    return output;
-  }
-
-  private static byte _Clamp(int value) => (byte)(value < 0 ? 0 : value > 255 ? 255 : value);
 
   private sealed class RiceState {
     private int _save;
