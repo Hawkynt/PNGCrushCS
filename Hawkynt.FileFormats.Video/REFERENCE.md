@@ -2132,6 +2132,7 @@ Implements `IVideoCodecEncoder<RawVideoEncoder>`, `IVideoPacketEncoder`.
 | --- | --- | --- |
 | `CodecName` | `static string CodecName { get; }` |  |
 | `Codec` | `static CodecTag Codec { get; }` |  |
+| `Accepts` | `static bool Accepts(MediaStreamInfo stream)` |  |
 | `Create` | `static RawVideoEncoder Create(MediaStreamInfo stream)` |  |
 | `DescribeStream` | `MediaStreamInfo DescribeStream()` |  |
 | `TryEncode` | `bool TryEncode(RawImage frame, long? presentationTimestamp, out CodedPacket packet)` |  |
@@ -2393,6 +2394,34 @@ Implements `IVideoCodecEncoder<V210VideoEncoder>`, `IVideoPacketEncoder`.
 | `CodecName` | `static string CodecName { get; }` |  |
 | `Codec` | `static CodecTag Codec { get; }` |  |
 | `Create` | `static V210VideoEncoder Create(MediaStreamInfo stream)` |  |
+| `DescribeStream` | `MediaStreamInfo DescribeStream()` |  |
+| `TryEncode` | `bool TryEncode(RawImage frame, long? presentationTimestamp, out CodedPacket packet)` |  |
+
+#### `V210XVideoDecoder`
+
+Decodes FFmpeg's v210x/YUV10 packing: uncompressed 10-bit 4:2:2 YUV in big-endian 32-bit words.
+
+Implements `IVideoCodecDecoder<V210XVideoDecoder>`, `IVideoFrameDecoder`.
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `CodecName` | `static string CodecName { get; }` |  |
+| `Accepts` | `static bool Accepts(MediaStreamInfo stream)` |  |
+| `Create` | `static V210XVideoDecoder Create(MediaStreamInfo stream)` |  |
+| `TryDecode` | `bool TryDecode(CodedPacket packet, out RawImage frame)` |  |
+
+#### `V210XVideoEncoder`
+
+Encodes v210x/YUV10: uncompressed 10-bit 4:2:2 YUV in big-endian 32-bit words.
+
+Implements `IVideoCodecEncoder<V210XVideoEncoder>`, `IVideoPacketEncoder`.
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `CodecName` | `static string CodecName { get; }` |  |
+| `Codec` | `static CodecTag Codec { get; }` | v210x has no interoperable four-character code; FFmpeg identifies it by its codec name instead. |
+| `Accepts` | `static bool Accepts(MediaStreamInfo stream)` |  |
+| `Create` | `static V210XVideoEncoder Create(MediaStreamInfo stream)` |  |
 | `DescribeStream` | `MediaStreamInfo DescribeStream()` |  |
 | `TryEncode` | `bool TryEncode(RawImage frame, long? presentationTimestamp, out CodedPacket packet)` |  |
 
