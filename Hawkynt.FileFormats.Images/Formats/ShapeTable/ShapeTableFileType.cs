@@ -14,7 +14,7 @@ namespace FileFormat.ShapeTable;
 /// They are all here together because the extension is shared: implementing one and calling the
 /// extension covered would claim three formats for the work of one.
 /// </remarks>
-[VerifiedBy(ConformanceOracle.Recoil2Png)]
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.IrfanView)]
 public readonly record struct ShapeTableFileType
   : IImageFormatReader<ShapeTableFileType>, IImageToRawImage<ShapeTableFileType>,
     IImageFromRawImage<ShapeTableFileType>, IImageFormatWriter<ShapeTableFileType> {

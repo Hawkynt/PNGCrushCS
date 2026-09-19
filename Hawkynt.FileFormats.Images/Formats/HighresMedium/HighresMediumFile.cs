@@ -22,7 +22,7 @@ namespace FileFormat.HighresMedium;
 /// palette of its own, in the plain three-bit ST form. That is not this format's length, geometry,
 /// palette layout or colour depth — the picture is an STE's four bits a channel.
 /// </remarks>
-[VerifiedBy(ConformanceOracle.Recoil2Png)]
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.IrfanView)]
 public readonly record struct HighresMediumFile
   : IImageFormatReader<HighresMediumFile>, IImageToRawImage<HighresMediumFile>,
     IImageFromRawImage<HighresMediumFile>, IImageFormatWriter<HighresMediumFile> {
