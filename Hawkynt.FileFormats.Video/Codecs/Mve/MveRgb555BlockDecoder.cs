@@ -242,12 +242,12 @@ internal static class MveRgb555BlockDecoder {
     }
   }
 
-  private static void _FourColourQuadrant(ref _Reader data, MveRgb555Frame target, int x, int y, ReadOnlySpan<ushort> palette) {
+  private static void _FourColourQuadrant(ref _Reader data, MveRgb555Frame target, int x, int y, scoped ReadOnlySpan<ushort> palette) {
     var flags = data.UInt32();
     _PaintTwoBit(target, x, y, 4, 4, palette, flags);
   }
 
-  private static void _ReadPalette(ref _Reader data, Span<ushort> palette) {
+  private static void _ReadPalette(ref _Reader data, scoped Span<ushort> palette) {
     for (var i = 0; i < palette.Length; ++i)
       palette[i] = data.Word();
   }
