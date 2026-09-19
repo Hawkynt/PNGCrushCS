@@ -37,7 +37,7 @@ gaps tracked in the support tables rather than left for a consumer to discover.
 - Lossless optimization per format, searching the encoder's own parameter space rather than guessing
 - Cross-format conversion that keeps whichever result is smallest
 - A pure-C# compression core — DEFLATE, LZW, PackBits, Zopfli-class parsing
-- A WinForms viewer over the same registry the libraries use
+- A cross-platform viewer over the same registry the libraries use
 - Published as NuGet packages, with the complete support tables in each package README
 
 ## 🧩 Support matrix
@@ -82,7 +82,7 @@ The [CLI reference](#-cli-usage) below covers the format-specific verbs.
 | **[`Hawkynt.FileFormats.Video`](Hawkynt.FileFormats.Video/README.md)** | NuGet | Video containers and codecs with separate demux/decode/encode/mux contracts; decoded frames are `RawImage`s. |
 | **[`Hawkynt.ImageTransformUI`](Hawkynt.ImageTransformUI/README.md)** | NuGet | Shared WinForms color-reduction UI backed by FrameworkExtensions quantizer/ditherer registries. |
 | **`Crush.Image`** | CLI | Auto-detects input and runs format-specific optimization and optional cross-format conversion. |
-| **`Crush.Viewer`** | WinForms | Opens registered image formats with zoom, pan, multi-image navigation, transforms, and Save As conversion. |
+| **`Crush.Viewer`** | NativeForms | Ribbon-driven browser and converter: thumbnailed folders, folder walking, zoom and pan, page navigation, transforms, Save As, and single or batch conversion. |
 | **`Compression.Core`** | Library | Pure-C# DEFLATE/LZW/PackBits primitives, including Zopfli-class parsing used by optimizers. |
 | **`FileFormat.Core`** | Library | Shared `RawImage`, format contracts, metadata, detection primitives, and pixel conversion infrastructure. |
 | **`Optimizer.*`** | Libraries | Per-format lossless optimization engines. What each one does is tabled in the [image package README](Hawkynt.FileFormats.Images/README.md#-format-support). |
@@ -91,11 +91,11 @@ The complete image support table (read, write, metadata-only, multi-image, optim
 
 ## 🖥️ Viewer
 
-`Crush.Viewer` is the Windows desktop front end for the same format registry used by the libraries. It supports drag-and-drop/open, zoom and pan, multi-image navigation, crop/resize/rotate/flip, palette reduction, text-mode rendering, and conversion through **Save As**.
+`Crush.Viewer` is the desktop front end for the same format registry used by the libraries, built on [NativeForms](https://github.com/Hawkynt/NativeForms) over native widgets on Windows and GTK. A ribbon drives it: open a picture or a folder, browse the folder as thumbnails, walk it with the arrow keys — with a **Wrap around** toggle deciding whether the ends join up or stop you — page through multi-image files, extract every page to its own file, rotate, flip, resize, reduce colours, and convert one file or a whole folder into any registered writer's format.
 
 ![Crush Viewer showing the deterministic screenshot fixture](docs/screenshots/crush-viewer.png)
 
-The screenshot is not maintained by hand. Every push to a branch other than `main` builds the viewer on Windows, opens a deterministic PNG fixture through the real decoder, captures the rendered WinForms client area, and commits a changed screenshot back to that branch. Screenshot-only commits do not recursively trigger another capture.
+The screenshot is not maintained by hand. Every push to a branch other than `main` builds the viewer on Windows, opens a folder of deterministic PNG fixtures through the real decoder, reads the window's client area back off the screen, and commits a changed screenshot back to that branch. Screenshot-only commits do not recursively trigger another capture. NativeForms has no capture of its own, so `--screenshot` asks the platform for the pixels — GDI on Windows, `XGetImage` on X11 — and refuses rather than writing a blank picture when the window is not there to be read.
 
 ## ⌨️ CLI usage
 
@@ -171,7 +171,7 @@ Hawkynt.FileFormats.Video
 Crush.Core
 Optimizer.*                        exhaustive per-format optimizers
 Crush.Image                        unified CLI
-Crush.Viewer                       WinForms viewer / converter
+Crush.Viewer                       NativeForms viewer / converter
 ```
 
 Key design rules:
@@ -210,7 +210,7 @@ done
 # Run the unified CLI
 dotnet run --project Crush.Image -- auto -i input.png -o output.png
 
-# Run the viewer on Windows
+# Run the viewer
 dotnet run --project Crush.Viewer -- input.png
 ```
 

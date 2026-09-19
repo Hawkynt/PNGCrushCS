@@ -5,7 +5,7 @@ name: Build artifacts
 #
 # Two shippables, both net10.0-windows (so Windows host only):
 #   * Crush.Image    -- unified CLI (AssemblyName=crush.exe)
-#   * Crush.Viewer   -- WinForms GUI (500+ formats, zoom/pan/convert)
+#   * Crush.Viewer   -- NativeForms GUI (500+ formats, zoom/pan/convert)
 #
 # Depends on one sibling repo checked out side-by-side:
 #   * CompressionWorkbench — FileFormat.Jpeg (and others) link source files from
