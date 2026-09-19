@@ -3,14 +3,13 @@ using System.Collections.Generic;
 
 namespace FileFormat.Codecs.CineForm;
 
-/// <summary>Builds one progressive three-channel CineForm I-frame packet.</summary>
+/// <summary>Builds one progressive or interlaced CineForm I-frame packet.</summary>
 /// <remarks>
-/// The packet shape is the common subset emitted by GoPro's reference SDK and FFmpeg's <c>cfhd</c>
-/// encoder: one I-frame header and channel-size index, then Y, V and U channels, each containing a
-/// raw sixteen-bit lowpass followed by three spatial wavelet levels and three entropy-coded highpass
-/// bands per level. The tag numbers and marker values are interoperability constants, not an imported
-/// implementation; all transforms and entropy coding are the managed counterparts of this package's
-/// existing decoder.
+/// Progressive frames use three ordinary spatial 2/6 levels. Legacy interlaced YUV keeps the same
+/// ten-subband transform and changes only the finest level: adjacent field lines are split into a
+/// temporal low/high pair and each pair is transformed horizontally. GoPro documents this as the
+/// interlaced first transform and FFmpeg reconstructs the same four bands when SampleFlags clears the
+/// progressive bit. It is distinct from CineForm's older 17-subband two-frame field-plus transform.
 /// </remarks>
 internal static class CineFormPictureEncoder {
   private const int _SAMPLE_TYPE = 1;
@@ -53,6 +52,7 @@ internal static class CineFormPictureEncoder {
   private const int _BAND_HEADER = 55;
   private const int _BAND_TRAILER = 56;
   private const int _CHANNEL_NUMBER = 62;
+  private const int _INTERLACED_FLAGS = 63;
   private const int _SAMPLE_FLAGS = 68;
   private const int _FRAME_NUMBER = 69;
   private const int _PRECISION = 70;
@@ -63,8 +63,10 @@ internal static class CineFormPictureEncoder {
 
   private const int _SAMPLE_TYPE_IFRAME = 9;
   private const int _SAMPLE_TYPE_CHANNEL = 3;
-  private const int _ENCODED_FORMAT_YUV_422 = 1;
   private const int _BAND_ENCODING_CODEBOOK = 3;
+  private const int _SAMPLE_FLAGS_PROGRESSIVE = 1;
+  private const int _INTERLACED = 1;
+  private const int _FIELD1_FIRST = 2;
 
   private const int _LOWPASS_SEGMENT = 0x1A4A;
   private const int _LOWPASS_END_SEGMENT = 0x1B4B;
@@ -82,27 +84,71 @@ internal static class CineFormPictureEncoder {
 
   private readonly record struct Level(int Width, int Height, int[] Lh, int[] Hl, int[] Hh);
 
-  /// <summary>
-  /// Encodes already padded ten-bit Y, V and U planes. Channel widths are supplied independently
-  /// because 4:2:2 chroma is half the luma width.
-  /// </summary>
   internal static byte[] Encode(
     int[] y, int[] v, int[] u,
     int lumaWidth, int chromaWidth, int encodedHeight, int displayHeight,
-    ushort frameNumber = 0) {
+    ushort frameNumber = 0,
+    bool interlaced = false,
+    bool upperFieldFirst = true)
+    => Encode(
+      [y, v, u], [lumaWidth, chromaWidth, chromaWidth], encodedHeight, displayHeight,
+      CineFormEncodedFormat.Yuv422, 10, 0x2000, CineFormPrescale.TenBit, frameNumber, interlaced, upperFieldFirst);
 
-    if (lumaWidth <= 0 || chromaWidth * 2 != lumaWidth || encodedHeight <= 0 || displayHeight <= 0 || displayHeight > encodedHeight)
-      throw new ArgumentException("The CineForm picture geometry is not a padded 4:2:2 frame.");
+  internal static byte[] Encode(
+    int[][] planes,
+    int[] widths,
+    int encodedHeight,
+    int displayHeight,
+    CineFormEncodedFormat encodedFormat,
+    int precision,
+    int prescaleTable,
+    ReadOnlySpan<int> prescale,
+    ushort frameNumber = 0,
+    bool interlaced = false,
+    bool upperFieldFirst = true) {
 
-    if (y.Length < lumaWidth * encodedHeight || v.Length < chromaWidth * encodedHeight || u.Length < chromaWidth * encodedHeight)
-      throw new ArgumentException("A CineForm channel does not contain its complete padded plane.");
+    ArgumentNullException.ThrowIfNull(planes);
+    ArgumentNullException.ThrowIfNull(widths);
 
-    var prescale = CineFormPrescale.TenBit;
-    ChannelTransform[] channels = [
-      _Transform(y, lumaWidth, encodedHeight, prescale),
-      _Transform(v, chromaWidth, encodedHeight, prescale),
-      _Transform(u, chromaWidth, encodedHeight, prescale),
-    ];
+    var expectedChannels = encodedFormat switch {
+      CineFormEncodedFormat.Yuv422 or CineFormEncodedFormat.Rgb444 => 3,
+      CineFormEncodedFormat.Rgba4444 => 4,
+      _ => throw new NotSupportedException($"This CineForm writer does not encode {encodedFormat}."),
+    };
+
+    var expectedPrecision = encodedFormat == CineFormEncodedFormat.Yuv422 ? 10 : 12;
+    if (precision != expectedPrecision)
+      throw new ArgumentException($"CineForm {encodedFormat} is written at {expectedPrecision} bits, not {precision}.", nameof(precision));
+
+    if (interlaced && encodedFormat != CineFormEncodedFormat.Yuv422)
+      throw new NotSupportedException("Legacy CineForm interlaced coding is defined for YUV 4:2:2; RGB/RGBA remain progressive.");
+
+    if (interlaced && (encodedHeight & 1) != 0)
+      throw new ArgumentException("An interlaced CineForm coded frame must contain a whole pair of fields.", nameof(encodedHeight));
+
+    if (planes.Length != expectedChannels || widths.Length != expectedChannels)
+      throw new ArgumentException($"CineForm {encodedFormat} needs exactly {expectedChannels} channel planes and widths.");
+
+    var imageWidth = widths[0];
+    if (imageWidth <= 0 || encodedHeight <= 0 || displayHeight <= 0 || displayHeight > encodedHeight)
+      throw new ArgumentException("The CineForm picture geometry is not a positive padded frame.");
+
+    if (encodedFormat == CineFormEncodedFormat.Yuv422) {
+      if ((imageWidth & 1) != 0 || widths[1] * 2 != imageWidth || widths[2] != widths[1])
+        throw new ArgumentException("A CineForm YUV 4:2:2 frame needs two half-width chroma channels.");
+    } else {
+      for (var i = 1; i < widths.Length; ++i)
+        if (widths[i] != imageWidth)
+          throw new ArgumentException("CineForm RGB and RGBA channels must all have the full image width.");
+    }
+
+    var channels = new ChannelTransform[expectedChannels];
+    for (var i = 0; i < channels.Length; ++i) {
+      var width = widths[i];
+      if (planes[i].Length < width * encodedHeight)
+        throw new ArgumentException($"CineForm channel {i} does not contain its complete padded plane.");
+      channels[i] = _Transform(planes[i], width, encodedHeight, prescale, interlaced);
+    }
 
     var writer = new PacketWriter();
     writer.Tag(_SAMPLE_TYPE, _SAMPLE_TYPE_IFRAME);
@@ -114,19 +160,21 @@ internal static class CineFormPictureEncoder {
     writer.Tag(_TRANSFORM_TYPE, 0);
     writer.Tag(_NUM_FRAMES, 1);
     writer.Tag(_CHANNEL_COUNT, channels.Length);
-    writer.Tag(_ENCODED_FORMAT, _ENCODED_FORMAT_YUV_422);
+    writer.Tag(_ENCODED_FORMAT, (int)encodedFormat);
     writer.Tag(_WAVELET_COUNT, 3);
     writer.Tag(_SUBBAND_COUNT, 10);
     writer.Tag(_NUM_SPATIAL, 2);
     writer.Tag(_FIRST_WAVELET, 3);
-    writer.Tag(_IMAGE_WIDTH, lumaWidth);
+    writer.Tag(_IMAGE_WIDTH, imageWidth);
     writer.Tag(_IMAGE_HEIGHT, encodedHeight);
     if (displayHeight != encodedHeight)
       writer.Tag(-_DISPLAY_HEIGHT, displayHeight);
     writer.Tag(-_FRAME_NUMBER, frameNumber);
-    writer.Tag(_PRECISION, 10);
-    writer.Tag(_PRESCALE_TABLE, 0x2000);
-    writer.Tag(_SAMPLE_FLAGS, 1); // progressive
+    writer.Tag(_PRECISION, precision);
+    writer.Tag(_PRESCALE_TABLE, prescaleTable);
+    writer.Tag(_SAMPLE_FLAGS, interlaced ? 0 : _SAMPLE_FLAGS_PROGRESSIVE);
+    if (interlaced)
+      writer.Tag(-_INTERLACED_FLAGS, _INTERLACED | (upperFieldFirst ? _FIELD1_FIRST : 0));
 
     for (var channelIndex = 0; channelIndex < channels.Length; ++channelIndex) {
       if (channelIndex != 0) {
@@ -144,7 +192,16 @@ internal static class CineFormPictureEncoder {
     return writer.ToArray();
   }
 
-  private static ChannelTransform _Transform(ReadOnlySpan<int> source, int width, int height, ReadOnlySpan<int> prescale) {
+  private static ChannelTransform _Transform(
+    ReadOnlySpan<int> source,
+    int width,
+    int height,
+    ReadOnlySpan<int> prescale,
+    bool interlaced) {
+
+    if (prescale.Length != 3)
+      throw new ArgumentException("CineForm's three-level transform needs three prescale entries.", nameof(prescale));
+
     var current = source.ToArray();
     var currentWidth = width;
     var currentHeight = height;
@@ -156,7 +213,10 @@ internal static class CineFormPictureEncoder {
         for (var i = 0; i < current.Length; ++i)
           current[i] >>= shift;
 
-      var bands = CineFormWavelet.ForwardSpatial(current, currentWidth, currentHeight);
+      var bands = interlaced && level == 0
+        ? _ForwardInterlaced(current, currentWidth, currentHeight)
+        : CineFormWavelet.ForwardSpatial(current, currentWidth, currentHeight);
+
       currentWidth >>= 1;
       currentHeight >>= 1;
       fineToCoarse[level] = new(currentWidth, currentHeight, bands.Lh, bands.Hl, bands.Hh);
@@ -170,6 +230,50 @@ internal static class CineFormPictureEncoder {
       LowpassHeight = currentHeight,
       Levels = levels,
     };
+  }
+
+  /// <summary>
+  /// Forward transform for the finest level of an interlaced sample. For each adjacent pair of field
+  /// lines the temporal low/high values are even+odd and odd-even; each is then transformed only in
+  /// the horizontal direction. The four resulting bands occupy the same subband slots as a spatial
+  /// level, which is why the rest of the packet writer does not need an interlace-specific layout.
+  /// </summary>
+  private static (int[] Ll, int[] Lh, int[] Hl, int[] Hh) _ForwardInterlaced(
+    ReadOnlySpan<int> input, int width, int height) {
+
+    if (width < 6 || (width & 1) != 0 || height < 2 || (height & 1) != 0 || input.Length < width * height)
+      throw new ArgumentException("A CineForm interlaced level needs an even width of at least six and an even number of lines.");
+
+    var bandWidth = width >> 1;
+    var bandHeight = height >> 1;
+    var ll = new int[bandWidth * bandHeight];
+    var lh = new int[bandWidth * bandHeight];
+    var hl = new int[bandWidth * bandHeight];
+    var hh = new int[bandWidth * bandHeight];
+    var temporalLow = new int[width];
+    var temporalHigh = new int[width];
+
+    for (var pair = 0; pair < bandHeight; ++pair) {
+      var evenRow = (pair << 1) * width;
+      var oddRow = evenRow + width;
+      for (var x = 0; x < width; ++x) {
+        var even = input[evenRow + x];
+        var odd = input[oddRow + x];
+        temporalLow[x] = even + odd;
+        temporalHigh[x] = odd - even;
+      }
+
+      CineFormWavelet.ForwardOneDimensional(
+        temporalLow,
+        ll.AsSpan(pair * bandWidth, bandWidth),
+        lh.AsSpan(pair * bandWidth, bandWidth));
+      CineFormWavelet.ForwardOneDimensional(
+        temporalHigh,
+        hl.AsSpan(pair * bandWidth, bandWidth),
+        hh.AsSpan(pair * bandWidth, bandWidth));
+    }
+
+    return (ll, lh, hl, hh);
   }
 
   private static void _WriteChannel(PacketWriter writer, ChannelTransform channel) {

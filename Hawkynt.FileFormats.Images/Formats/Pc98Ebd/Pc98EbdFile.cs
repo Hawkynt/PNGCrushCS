@@ -13,7 +13,7 @@ namespace FileFormat.Pc98Ebd;
 /// looking: a byte whose halves are equal is a widened four-bit value, and a file where that does
 /// not hold everywhere must have its high nibbles clear or it is not a palette at all.
 /// </remarks>
-[VerifiedBy(ConformanceOracle.Recoil2Png)]
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.IrfanView)]
 public readonly record struct Pc98EbdFile
   : IImageFormatReader<Pc98EbdFile>, IImageToRawImage<Pc98EbdFile>,
     IImageFromRawImage<Pc98EbdFile>, IImageFormatWriter<Pc98EbdFile> {
