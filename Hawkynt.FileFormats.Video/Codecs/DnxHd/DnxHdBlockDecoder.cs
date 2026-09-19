@@ -69,6 +69,7 @@ internal sealed class DnxHdBlockDecoder {
   /// <param name="planeHeight">The height of that plane; rows past it are discarded.</param>
   /// <param name="originX">The block's left column in the plane.</param>
   /// <param name="originY">The block's top row in the plane.</param>
+  /// <param name="rowStep">Distance in raster rows between adjacent transform rows; two for field-DCT blocks.</param>
   internal void Decode(
     DnxHdBitReader bits,
     bool chroma,
@@ -78,7 +79,8 @@ internal sealed class DnxHdBlockDecoder {
     int planeWidth,
     int planeHeight,
     int originX,
-    int originY) {
+    int originY,
+    int rowStep = 1) {
     Span<double> block = stackalloc double[64];
     block.Clear();
 
@@ -134,7 +136,7 @@ internal sealed class DnxHdBlockDecoder {
     DnxHdInverseDct.Transform(block);
 
     for (var j = 0; j < 8; ++j) {
-      var row = originY + j;
+      var row = originY + j * rowStep;
       if (row >= planeHeight)
         break;
 

@@ -1,0 +1,33 @@
+The Duck/On2 TrueMotion 1 and TrueMotion 2 decoders in this directory, and the
+public codec adapters beside them, are converted from FFmpeg
+(https://ffmpeg.org/):
+
+  libavcodec/truemotion1.c      TrueMotion 1 frame/header and predictor decoder
+  libavcodec/truemotion1data.h  TrueMotion 1 delta and predictor-vector tables
+  libavcodec/truemotion2.c      TrueMotion 2 streams, Huffman coding and blocks
+  libavcodec/vlc.c              code assignment used by TrueMotion 2 trees
+
+  Copyright (C) 2003 Alex Beregszaszi & Mike Melanson  (truemotion1.c)
+  Copyright (c) 2005 Konstantin Shishkov                (truemotion2.c)
+
+FFmpeg distributes those decoder sources under the GNU Lesser General Public
+License, version 2.1 or (at your option) any later version. This work is
+distributed under the GNU Lesser General Public License version 3 or later,
+which the "or later" clause permits; the licence text is in LICENSE at the root
+of this repository.
+
+The algorithms are carried across into managed C# rather than vendored. The
+TrueMotion 1 numeric tables are reproduced exactly because they are fixed codec
+data required for interoperability. FFmpeg's truemotion1data.h records that
+those data originally appeared in On2's VpVision and explains FFmpeg's treatment
+of necessary decoding tables as non-expressive data; PNGCrushCS follows the same
+rule stated in AGENTS.md for codec tables and constants.
+
+The encoders are original inverse implementations. FFmpeg supplies decoders for
+TrueMotion 1 and TrueMotion 2 but no encoder for either. The write paths therefore
+use the decoded bitstream grammar and fixed tables as interoperability facts and
+produce conservative subsets of the formats rather than translating an external
+encoder.
+
+FFmpeg's copyright and licence notices and the full text of the LGPL are
+available from https://ffmpeg.org/legal.html and in the source files named above.

@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Linq;
 using FileFormat.Avi.Tests;
+using FileFormat.Codecs;
 using FileFormat.Core;
 using FileFormat.Mjpeg;
 
@@ -48,7 +49,46 @@ public sealed class VideoFormatRegistryTests {
       foreach (var encoder in encoders)
         Assert.That(decoders, Does.Contain(encoder.CodecName), $"'{encoder.CodecName}' encodes but no decoder answers to that name");
 
-      Assert.That(encoders.Select(e => e.Codec).ToList(), Is.Unique, "two encoders claim the same four-character code");
+      // Only among the encoders that have a code. CodecTag.None is the absence of one, not a code
+      // two encoders could both claim, and the registry routes a tagless stream by what each encoder
+      // Accepts rather than by its tag; the test below holds that routing to naming one of them.
+      Assert.That(
+        encoders.Where(static e => e.Codec != CodecTag.None).Select(static e => e.Codec).ToList(),
+        Is.Unique,
+        "two encoders claim the same four-character code");
+    });
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void TheTaglessEncodersAreToldApartByWhatTheStreamSaysItIs() {
+    // Two encoders carry no four-character code: the uncompressed one and v210x. Nothing in the tag
+    // separates them, so a stream that names v210x has to reach the v210x encoder and one that names
+    // no codec at all has to reach the uncompressed one. Routed the other way round, a caller asking
+    // for v210x silently gets uncompressed packets that decode as a picture and are not one.
+    var tagless = VideoFormatRegistry.AllEncoders.Where(static e => e.Codec == CodecTag.None).ToList();
+    Assert.That(tagless.Select(static e => e.CodecName), Is.Unique);
+
+    var v210x = new MediaStreamInfo {
+      Index = 0,
+      Kind = MediaStreamKind.Video,
+      Codec = CodecTag.None,
+      CodecId = "v210x",
+      Width = 4,
+      Height = 2,
+    };
+    var uncompressed = new MediaStreamInfo {
+      Index = 0,
+      Kind = MediaStreamKind.Video,
+      Codec = CodecTag.None,
+      Width = 4,
+      Height = 2,
+      BitsPerPixel = 24,
+    };
+
+    Assert.Multiple(() => {
+      Assert.That(VideoFormatRegistry.CreateEncoder(v210x), Is.InstanceOf<V210XVideoEncoder>());
+      Assert.That(VideoFormatRegistry.CreateEncoder(uncompressed), Is.InstanceOf<RawVideoEncoder>());
     });
   }
 

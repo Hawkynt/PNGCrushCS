@@ -71,6 +71,7 @@ internal sealed class H261PictureEncoder {
   private const int _IntraBias = 500;
 
   private readonly bool _intra;
+  private readonly bool _isStillImage;
   private readonly int _temporalReference;
   private readonly int _quantiser;
   private readonly H263Frame _source;
@@ -78,7 +79,7 @@ internal sealed class H261PictureEncoder {
   private readonly H263Frame? _reference;
   private readonly bool _isCif;
   private readonly int _groupCount;
-  private readonly H261BitWriter _writer = new();
+  private readonly H261BitWriter _writer;
 
   private int _previousVectorX;
   private int _previousVectorY;
@@ -87,8 +88,9 @@ internal sealed class H261PictureEncoder {
 
   internal H261PictureEncoder(
     bool intra, int temporalReference, int quantiser, H263Frame source, H263Frame target,
-    H263Frame? reference, bool isCif, int groupCount) {
+    H263Frame? reference, bool isCif, int groupCount, bool isStillImage = false, H261BitWriter? writer = null) {
     this._intra = intra || reference == null;
+    this._isStillImage = isStillImage;
     this._temporalReference = temporalReference;
     this._quantiser = quantiser;
     this._source = source;
@@ -96,6 +98,7 @@ internal sealed class H261PictureEncoder {
     this._reference = reference;
     this._isCif = isCif;
     this._groupCount = groupCount;
+    this._writer = writer ?? new();
 
     // Everything the picture never mentions reads back as the reference left it, which is only true of
     // a canvas that starts as a copy of it — the encoder's side of the decoder's own seeding.
@@ -108,6 +111,19 @@ internal sealed class H261PictureEncoder {
 
   /// <summary>Codes the whole picture and answers its bytes, the last one padded with zeroes.</summary>
   internal byte[] Encode() {
+    this.EncodeIntoBitstream();
+    return this._writer.ToArray();
+  }
+
+  /// <summary>
+  /// Codes one picture into the supplied bit writer without byte-aligning it afterwards.
+  /// </summary>
+  /// <remarks>
+  /// Annex D puts four ordinary QCIF/CIF picture syntaxes back to back to carry one high-resolution
+  /// still image. Only the packet as a whole may be padded to a byte boundary; padding each sub-image
+  /// independently would insert bits into the following picture's macroblock layer.
+  /// </remarks>
+  internal void EncodeIntoBitstream() {
     this._WritePictureHeader();
 
     for (var index = 0; index < this._groupCount; ++index) {
@@ -120,8 +136,6 @@ internal sealed class H261PictureEncoder {
       this._WriteGroupHeader(groupNumber);
       this._EncodeGroupMacroblocks(groupColumn * _GroupWidth, groupRow * _GroupHeight);
     }
-
-    return this._writer.ToArray();
   }
 
   // ============================================================================================
@@ -150,7 +164,7 @@ internal sealed class H261PictureEncoder {
     // Then the source format, then the bit that says this is not the still image transmission of
     // Annex D, then the spare bit, which 4.2.1.3 has set to 1 until it is given a meaning.
     this._writer.WriteBit(this._isCif ? 1 : 0);
-    this._writer.WriteBit(1);
+    this._writer.WriteBit(this._isStillImage ? 0 : 1);
     this._writer.WriteBit(1);
 
     // PEI, clause 4.2.1.4: no extra insertion information follows.

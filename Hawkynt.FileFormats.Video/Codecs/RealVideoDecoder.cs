@@ -9,10 +9,11 @@ namespace FileFormat.Codecs;
 
 /// <summary>Decodes RealVideo 1, named <c>RV10</c> or <c>RV13</c> by RealMedia containers.</summary>
 /// <remarks>
-/// RealVideo 1 replaces H.263's picture/group headers and reuses its macroblock layer. The original
-/// major-1/minor-0/micro-0 syntax is implemented here. Later micro versions alter intra-DC coding and
-/// are refused rather than decoded through the wrong H.263 path. RealVideo 2, 3 and 4 remain distinct
-/// codecs and are not accepted by this decoder.
+/// RealVideo 1 replaces H.263's picture/group headers and reuses its macroblock layer. Revision-zero
+/// streams use H.263's literal intra DC values; non-zero micro revisions use RealVideo's predictive
+/// intra-DC VLC and per-run Y/Cb/Cr seeds. Micro revision 2 selects H.263 Advanced Prediction/OBMC,
+/// and the private-data low bit selects Annex-D-style extended motion-vector reconstruction.
+/// RealVideo 2, 3 and 4 remain distinct codecs and are not accepted by this decoder.
 /// </remarks>
 public sealed class RealVideoDecoder : IVideoCodecDecoder<RealVideoDecoder> {
 
@@ -28,26 +29,18 @@ public sealed class RealVideoDecoder : IVideoCodecDecoder<RealVideoDecoder> {
   ];
 
   private readonly RealVideoBitstreamVersion _version;
+  private readonly bool _longVectors;
   private readonly int _macroblockWidth;
   private readonly int _macroblockHeight;
   private readonly int _width;
   private readonly int _height;
   private H263Frame? _reference;
 
-  /// <summary>
-  /// The picture a predicted one would be built on, in the decoder's own planes.
-  /// </summary>
-  /// <remarks>
-  /// This exists for the encoder beside it, which drives a decoder with its own output so that it
-  /// predicts from the samples a receiving decoder will hold rather than from the frame it was handed.
-  /// Handing back the planes rather than an image is the point: a round trip through RGB would
-  /// quantise the reference a second time, and the residual would then be measured against something
-  /// no decoder ever holds.
-  /// </remarks>
   internal H263Frame? CurrentReference => this._reference;
 
-  private RealVideoDecoder(RealVideoBitstreamVersion version, int width, int height) {
+  private RealVideoDecoder(RealVideoBitstreamVersion version, bool longVectors, int width, int height) {
     this._version = version;
+    this._longVectors = longVectors;
     this._width = width;
     this._height = height;
     this._macroblockWidth = (width + 15) / 16;
@@ -86,15 +79,6 @@ public sealed class RealVideoDecoder : IVideoCodecDecoder<RealVideoDecoder> {
         $"This stream is named {stream.Codec} but its private data states bitstream version 0x{version.Version:X8}, "
         + "whose major version names a different generation of RealVideo.");
 
-    if (version.Minor != RealVideoBitstreamVersion.IMPLEMENTED_MINOR
-        || version.Micro != RealVideoBitstreamVersion.IMPLEMENTED_MICRO)
-      throw new NotSupportedException(
-        $"This RealVideo 1 stream states version 0x{version.Version:X8} (minor {version.Minor}, micro {version.Micro}). "
-        + $"Only minor {RealVideoBitstreamVersion.IMPLEMENTED_MINOR}, micro {RealVideoBitstreamVersion.IMPLEMENTED_MICRO} "
-        + "is implemented. Non-zero RV10 micro versions use RealVideo-specific predictive intra-DC coding; micro 2 "
-        + "also enables overlapped motion compensation. Decoding those pictures as baseline H.263 would produce "
-        + "plausible corruption rather than a reliable refusal.");
-
     var macroblockWidth = (stream.Width + 15) / 16;
     var macroblockHeight = (stream.Height + 15) / 16;
     if (macroblockWidth > 63 || macroblockHeight > 63)
@@ -102,7 +86,9 @@ public sealed class RealVideoDecoder : IVideoCodecDecoder<RealVideoDecoder> {
         $"This RealVideo stream is {stream.Width}x{stream.Height}, which is {macroblockWidth}x{macroblockHeight} "
         + "macroblocks. This decoder currently supports run positions through sixty-three macroblocks each way.");
 
-    return new(version, stream.Width, stream.Height);
+    var privateData = stream.CodecPrivateData.Span;
+    var longVectors = privateData.Length >= 4 && (privateData[3] & 1) != 0;
+    return new(version, longVectors, stream.Width, stream.Height);
   }
 
   public bool TryDecode(CodedPacket packet, out RawImage frame) {
@@ -128,8 +114,6 @@ public sealed class RealVideoDecoder : IVideoCodecDecoder<RealVideoDecoder> {
   private H263Frame _DecodePicture(ReadOnlySpan<byte> data, IReadOnlyList<int> fragments) {
     var macroblockCount = this._macroblockWidth * this._macroblockHeight;
 
-    // RV10 reuses H.263 TCOEF but extends the otherwise reserved escape level -128 with a following
-    // signed twelve-bit level. Nothing else using H263BitReader gets that interpretation.
     var reader = new H263BitReader(data, realVideoExtendedEscapeLevel: true);
     var first = RealVideoSliceHeader.Read(ref reader, this._version, this._macroblockWidth, macroblockCount, false);
 
@@ -143,6 +127,8 @@ public sealed class RealVideoDecoder : IVideoCodecDecoder<RealVideoDecoder> {
       HasWideEscapeLevel = false,
       HasGroupLayer = false,
       AllowsVectorsOutsidePicture = true,
+      UsesExtendedMotionVectorRange = this._longVectors,
+      UsesAdvancedPrediction = this._version.UsesOverlappedMotionCompensation,
       TemporalReference = 0,
     };
 
@@ -156,6 +142,9 @@ public sealed class RealVideoDecoder : IVideoCodecDecoder<RealVideoDecoder> {
         throw new InvalidDataException(
           $"A run of this RealVideo picture states that it is {(run.IsIntra ? "intra" : "predicted")} coded where the "
           + $"first run states {(first.IsIntra ? "intra" : "predicted")}.");
+
+      if (run.HasPredictiveIntraDc)
+        reader.UseRealVideoPredictiveIntraDc(run.LumaDc, run.CbDc, run.CrDc);
 
       picture.DecodeRun(ref reader, run.FirstMacroblock, run.MacroblockCount, run.Quantiser);
 

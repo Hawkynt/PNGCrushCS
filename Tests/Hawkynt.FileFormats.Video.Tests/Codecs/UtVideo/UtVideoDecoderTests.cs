@@ -419,13 +419,14 @@ public class UtVideoDecoderTests {
 
   [Test]
   [Category("Unit")]
-  public void TheTwoFamilyCodesAreRefusedByName() {
+  public void TheTwoFamilyCodesAreTheOtherDecodersToAnswerFor() {
+    // These six were accepted here and then refused by name, because nothing read them. The T2
+    // family has its own packet layout and optional temporal references, so it has its own decoder
+    // now and this one does not claim the codes at all.
     foreach (var code in new[] { "UMRG", "UMRA", "UMY2", "UMY4", "UMH2", "UMH4" }) {
       var stream = UtVideoTestStream.Stream(code, 4, 4);
-      Assert.That(UtVideoDecoder.Accepts(stream), Is.True, code);
-
-      var failure = Assert.Throws<NotSupportedException>(() => UtVideoDecoder.Create(stream), code);
-      Assert.That(failure!.Message, Does.Contain("T2"), code);
+      Assert.That(UtVideoDecoder.Accepts(stream), Is.False, code);
+      Assert.That(UtVideoT2Decoder.Accepts(stream), Is.True, code);
     }
   }
 

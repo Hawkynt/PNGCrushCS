@@ -420,14 +420,19 @@ public sealed class H263VideoDecoderTests {
   [Test]
   [Category("Unit")]
   public void FourMotionVectorsPerMacroblockAreRefusedByAnnex() {
+    // Four vectors per macroblock is the Advanced Prediction mode of Annex F, which the decoder now
+    // implements, so this is no longer a feature it does not have: it is a stream saying INTER4V in a
+    // picture whose header did not switch the annex on, and that is an invalid stream rather than an
+    // unsupported one. What the picture may do is still decided by its own header.
     var stream = new H263TestStream().PictureHeader(sourceFormat: 1)
       .FlatIntraMacroblocks(_SUB_QCIF_MACROBLOCKS, 255)
       .PictureHeader(sourceFormat: 1, isIntra: false, temporalReference: 1)
       .Coded().Code(H263TestStream.InterMacroblockWithFourVectors)
       .ToArray();
 
-    var failure = Assert.Throws<NotSupportedException>(() => _Decode(stream));
+    var failure = Assert.Throws<InvalidDataException>(() => _Decode(stream));
     Assert.That(failure.Message, Does.Contain("Annex F"));
+    Assert.That(failure.Message, Does.Contain("INTER4V"));
   }
 
   [Test]

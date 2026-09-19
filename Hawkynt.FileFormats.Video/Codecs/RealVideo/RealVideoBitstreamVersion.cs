@@ -16,8 +16,8 @@ internal enum RealVideoGeneration {
 /// <remarks>
 /// The word is split the same way the reference decoder does: four major bits, eight minor bits and
 /// eight micro bits. In particular, <c>0x10001000</c> is major 1, minor 0, micro 1 — it is not
-/// "revision 1" in the minor field. That distinction matters because RV10 micro 3 switches the intra
-/// DC syntax to RealVideo-specific predictive VLCs.
+/// "revision 1" in the minor field. For RealVideo 1, a non-zero micro version selects the predictive
+/// intra-DC syntax. Micro version 2 additionally selects overlapped motion compensation.
 /// </remarks>
 /// <param name="Generation">The major RealVideo generation.</param>
 /// <param name="Version">The complete 32-bit word.</param>
@@ -27,6 +27,11 @@ internal readonly record struct RealVideoBitstreamVersion(
   RealVideoGeneration Generation, uint Version, int Minor, int Micro) {
 
   private const int _VERSION_OFFSET = 4;
+
+  internal bool UsesPredictiveIntraDc => this.Generation == RealVideoGeneration.RealVideo10 && this.Micro != 0;
+
+  internal bool UsesOverlappedMotionCompensation =>
+    this.Generation == RealVideoGeneration.RealVideo10 && this.Micro == 2;
 
   internal static RealVideoBitstreamVersion Read(ReadOnlySpan<byte> codecPrivateData, RealVideoGeneration fromTag) {
     if (codecPrivateData.Length < _VERSION_OFFSET + 4)
@@ -43,7 +48,4 @@ internal readonly record struct RealVideoBitstreamVersion(
       (int)((version >> 20) & 0xFF),
       (int)((version >> 12) & 0xFF));
   }
-
-  internal const int IMPLEMENTED_MINOR = 0;
-  internal const int IMPLEMENTED_MICRO = 0;
 }

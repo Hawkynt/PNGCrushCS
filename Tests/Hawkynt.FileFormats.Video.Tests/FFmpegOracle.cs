@@ -116,7 +116,9 @@ internal static class FFmpegOracle {
 
       foreach (var argument in new[] {
         "-hide_banner", "-loglevel", "error", "-y", "-i", path,
-        "-map", "0:v:0", "-an", "-sn", "-dn", "-vsync", "0",
+        // -fps_mode, not -vsync: the old spelling was removed in ffmpeg 7 and this machine runs 9, where
+        // passing it aborts the whole command before a frame is read.
+        "-map", "0:v:0", "-an", "-sn", "-dn", "-fps_mode", "passthrough",
         "-f", "rawvideo", "-pix_fmt", "rgb24", raw,
       })
         startInfo.ArgumentList.Add(argument);
@@ -188,11 +190,28 @@ internal static class FFmpegOracle {
     diagnostics
       .Split('\n')
       .Select(static line => line.Trim())
-      .Where(static line => line.Length != 0 && !_IsAboutFFmpegsOwnVersion(line)));
+      .Where(static line => line.Length != 0
+                            && !_IsAboutFFmpegsOwnVersion(line)
+                            && !_IsWestwoodVqaReachingTheEndOfItsFile(line)));
 
   private static bool _IsAboutFFmpegsOwnVersion(string line)
     => line.StartsWith("[h261 @ ", StringComparison.Ordinal)
        && line.EndsWith("warning: first frame is no keyframe", StringComparison.Ordinal);
+
+  /// <summary>
+  /// The line FFmpeg's Westwood VQA demuxer prints when it runs out of file.
+  /// </summary>
+  /// <remarks>
+  /// <c>wsvqa_read_packet</c> opens with <c>int ret = -1</c> and reads chunks until the read comes up
+  /// short; having nothing left to hand back it returns that -1, which is <c>AVERROR(EPERM)</c> and is
+  /// printed as "Operation not permitted". It is the demuxer's end of stream, not a judgement on the
+  /// bytes: FFmpeg prints it having already decoded every picture in the file and exits zero. What the
+  /// file was is still decided by the pictures it produced and by how many — a truncated or malformed
+  /// VQA fails on those, and on the chunk errors the demuxer raises before it gets here.
+  /// </remarks>
+  private static bool _IsWestwoodVqaReachingTheEndOfItsFile(string line)
+    => line.Contains("/wsvqa @ ", StringComparison.Ordinal)
+       && line.EndsWith("Error during demuxing: Operation not permitted", StringComparison.Ordinal);
 
   private static (int Width, int Height)? _PngSize(string path) {
     try {

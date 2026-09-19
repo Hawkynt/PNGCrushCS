@@ -12,35 +12,28 @@ internal enum DvSampling {
   /// <summary>One chroma pair for every two luma columns and every two lines — 625/50 at 25 Mbit.</summary>
   FourTwoZero,
 
-  /// <summary>One chroma pair for every two luma columns, every line its own — DVCPRO50.</summary>
+  /// <summary>One chroma pair for every two luma columns, every line its own — DVCPRO50 and DVCPRO HD.</summary>
   FourTwoTwo,
 }
 
 /// <summary>
-/// One of the handful of arrangements a DV frame may be in: a raster, a frame rate, a sampling and a
-/// frame size, all fixed together.
+/// One of the arrangements a DV frame may be in: raster, frame rate, sampling, DIF topology and
+/// block-layer syntax are fixed together by the recording system.
 /// </summary>
 /// <remarks>
-/// DV is a tape format before it is a file format, and that is what makes a profile table possible at
-/// all. A frame is a whole number of 80-byte DIF blocks, the block count is a property of the
-/// broadcast system rather than of the picture, and the encoder had to fill a fixed length of tape
-/// whatever the picture was. So there is no negotiation: a 625/50 frame at 25 Mbit is 144000 bytes
-/// and 720x576 and nothing else, and a stream that says otherwise is broken rather than unusual.
-/// <para/>
-/// The table is FFmpeg's <c>dv_profiles</c> from <c>libavcodec/dv_profile.c</c>, restricted to the
-/// standard-definition rows. The three high-definition rows — DVCPRO HD at 1080i and 720p — are named
-/// in <see cref="_HighDefinitionName"/> so that a frame carrying one is refused by name instead of
-/// being decoded as whichever standard-definition row happens to have the same signal type bits.
+/// The profile data is the normative/factual part of the format. The standard-definition rows and
+/// the SMPTE 370M rows are cross-checked against FFmpeg's LGPL-2.1-or-later
+/// <c>libavcodec/dv_profile.c</c>; see <c>THIRD-PARTY-NOTICE.FFmpeg.txt</c> beside this file.
 /// </remarks>
 internal sealed record DvProfile {
 
   /// <summary>The number of bytes a decoder must see to identify a profile: six DIF blocks.</summary>
   internal const int IdentificationBytes = 6 * 80;
 
-  /// <summary>The bytes one 80-byte DIF block occupies.</summary>
+  /// <summary>The bytes one DIF block occupies.</summary>
   internal const int DifBlockSize = 80;
 
-  /// <summary>Blocks per macroblock — six for every standard-definition profile.</summary>
+  /// <summary>Blocks per standard-definition macroblock.</summary>
   internal const int BlocksPerMacroblock = 6;
 
   /// <summary>Macroblocks per video segment.</summary>
@@ -49,197 +42,163 @@ internal sealed record DvProfile {
   /// <summary>Video segments per DIF sequence.</summary>
   internal const int SegmentsPerSequence = 27;
 
-  /// <summary>
-  /// The bit budget of each block of a macroblock, in the order the blocks are written.
-  /// </summary>
-  /// <remarks>
-  /// Four luma blocks of 112 bits and two colour blocks of 80: 14 and 10 bytes, which with the
-  /// one-byte macroblock header is the 77 bytes of a video DIF block's payload. A block that needs
-  /// more than its own budget spills into the space its neighbours did not use, which is what the
-  /// three passes of the block layer are about.
-  /// </remarks>
+  /// <summary>SD/DV50 block bit budgets: four 112-bit luma cells and two 80-bit chroma cells.</summary>
   internal static readonly int[] BlockSizes = [112, 112, 112, 112, 80, 80];
 
-  /// <summary>The name this arrangement goes by, used in refusals and in stream descriptions.</summary>
+  /// <summary>DVCPRO HD block bit budgets: six 80-bit cells followed by two 64-bit chroma cells.</summary>
+  internal static readonly int[] Dv100BlockSizes = [80, 80, 80, 80, 80, 80, 64, 64];
+
   internal required string Name { get; init; }
-
-  /// <summary>The DIF sequence flag: 0 for a 525/60 system, 1 for a 625/50 one.</summary>
   internal required int SequenceFlag { get; init; }
-
-  /// <summary>The signal type the VAUX source pack states: 0 or 1 for 25 Mbit, 4 for DVCPRO50.</summary>
   internal required int SignalType { get; init; }
-
-  /// <summary>The whole frame, in bytes.</summary>
   internal required int FrameSize { get; init; }
-
-  /// <summary>DIF sequences per channel — ten for 525/60, twelve for 625/50.</summary>
   internal required int SequencesPerChannel { get; init; }
-
-  /// <summary>DIF channels per frame — one at 25 Mbit, two at 50.</summary>
   internal required int ChannelCount { get; init; }
-
-  /// <summary>The frame rate's numerator.</summary>
   internal required int FrameRateNumerator { get; init; }
-
-  /// <summary>The frame rate's denominator.</summary>
   internal required int FrameRateDenominator { get; init; }
-
-  /// <summary>Picture width in pixels — 720 for every standard-definition profile.</summary>
   internal required int Width { get; init; }
-
-  /// <summary>Picture height in pixels.</summary>
   internal required int Height { get; init; }
-
-  /// <summary>How this profile sites its colour samples.</summary>
   internal required DvSampling Sampling { get; init; }
-
-  /// <summary>The sample aspect ratio of a 4:3 frame, as numerator and denominator.</summary>
   internal required (int Numerator, int Denominator) NarrowAspect { get; init; }
-
-  /// <summary>The sample aspect ratio of a 16:9 frame, as numerator and denominator.</summary>
   internal required (int Numerator, int Denominator) WideAspect { get; init; }
 
-  /// <summary>The width of one colour plane in samples.</summary>
-  internal int ChromaWidth => this.Sampling == DvSampling.FourOneOne ? this.Width / 4 : this.Width / 2;
+  /// <summary>Whether this is SMPTE 370M's 100-Mbit block layer rather than the SD/DV50 one.</summary>
+  internal bool IsDv100 { get; init; }
 
-  /// <summary>The height of one colour plane in samples.</summary>
+  /// <summary>Whether the coded picture is progressive. SMPTE 370M's 720-line profiles are.</summary>
+  internal bool Progressive { get; init; }
+
+  internal int CodedBlocksPerMacroblock => this.IsDv100 ? 8 : BlocksPerMacroblock;
+  internal int[] CodedBlockSizes => this.IsDv100 ? Dv100BlockSizes : BlockSizes;
+
+  internal int ChromaWidth => this.Sampling == DvSampling.FourOneOne ? this.Width / 4 : this.Width / 2;
   internal int ChromaHeight => this.Sampling == DvSampling.FourTwoZero ? this.Height / 2 : this.Height;
 
-  /// <summary>The video segments a whole frame is made of.</summary>
-  internal int SegmentCount => this.ChannelCount * this.SequencesPerChannel * SegmentsPerSequence;
+  /// <summary>The number of coded video segments. Some 50-Hz DVCPRO-HD DIF regions are padding.</summary>
+  internal int SegmentCount {
+    get {
+      var count = 0;
+      for (var channel = 0; channel < this.ChannelCount; ++channel)
+        for (var sequence = 0; sequence < this.SequencesPerChannel; ++sequence)
+          if (this.IsVideoSequenceActive(channel, sequence))
+            count += SegmentsPerSequence;
+      return count;
+    }
+  }
+
+  /// <summary>Whether a physical DIF sequence contains coded video for this profile.</summary>
+  internal bool IsVideoSequenceActive(int channel, int sequence) {
+    if (!this.IsDv100)
+      return true;
+
+    // SMPTE 370M 1080/50 leaves sequence 11 empty in channels 1..3; 720/50 codes only
+    // sequences 0..9. The DIF skeleton remains physically present in both cases.
+    if (this.Width == 1440 && channel != 0 && sequence == 11)
+      return false;
+    if (this.Width == 960 && this.SequenceFlag == 1 && sequence > 9)
+      return false;
+
+    return true;
+  }
 
   // ==============================================================================================
-  // The table
+  // Standard definition / DVCPRO50
   // ==============================================================================================
 
-  /// <summary>525/60 at 25 Mbit — IEC 61834 and SMPTE 314M agree on this one.</summary>
   internal static readonly DvProfile Ntsc25 = new() {
     Name = "DV25 525/60 4:1:1",
-    SequenceFlag = 0,
-    SignalType = 0x0,
-    FrameSize = 120000,
-    SequencesPerChannel = 10,
-    ChannelCount = 1,
-    FrameRateNumerator = 30000,
-    FrameRateDenominator = 1001,
-    Width = 720,
-    Height = 480,
-    Sampling = DvSampling.FourOneOne,
-    NarrowAspect = (8, 9),
-    WideAspect = (32, 27),
+    SequenceFlag = 0, SignalType = 0x0, FrameSize = 120000, SequencesPerChannel = 10, ChannelCount = 1,
+    FrameRateNumerator = 30000, FrameRateDenominator = 1001,
+    Width = 720, Height = 480, Sampling = DvSampling.FourOneOne,
+    NarrowAspect = (8, 9), WideAspect = (32, 27),
   };
 
-  /// <summary>625/50 at 25 Mbit as IEC 61834 defines it, colour sampled 4:2:0.</summary>
   internal static readonly DvProfile Pal25Iec = new() {
     Name = "DV25 625/50 4:2:0 (IEC 61834)",
-    SequenceFlag = 1,
-    SignalType = 0x0,
-    FrameSize = 144000,
-    SequencesPerChannel = 12,
-    ChannelCount = 1,
-    FrameRateNumerator = 25,
-    FrameRateDenominator = 1,
-    Width = 720,
-    Height = 576,
-    Sampling = DvSampling.FourTwoZero,
-    NarrowAspect = (16, 15),
-    WideAspect = (64, 45),
+    SequenceFlag = 1, SignalType = 0x0, FrameSize = 144000, SequencesPerChannel = 12, ChannelCount = 1,
+    FrameRateNumerator = 25, FrameRateDenominator = 1,
+    Width = 720, Height = 576, Sampling = DvSampling.FourTwoZero,
+    NarrowAspect = (16, 15), WideAspect = (64, 45),
   };
 
-  /// <summary>625/50 at 25 Mbit as SMPTE 314M defines it, colour sampled 4:1:1 — DVCPRO25 in Europe.</summary>
   internal static readonly DvProfile Pal25Smpte = new() {
     Name = "DV25 625/50 4:1:1 (SMPTE 314M)",
-    SequenceFlag = 1,
-    SignalType = 0x0,
-    FrameSize = 144000,
-    SequencesPerChannel = 12,
-    ChannelCount = 1,
-    FrameRateNumerator = 25,
-    FrameRateDenominator = 1,
-    Width = 720,
-    Height = 576,
-    Sampling = DvSampling.FourOneOne,
-    NarrowAspect = (16, 15),
-    WideAspect = (64, 45),
+    SequenceFlag = 1, SignalType = 0x0, FrameSize = 144000, SequencesPerChannel = 12, ChannelCount = 1,
+    FrameRateNumerator = 25, FrameRateDenominator = 1,
+    Width = 720, Height = 576, Sampling = DvSampling.FourOneOne,
+    NarrowAspect = (16, 15), WideAspect = (64, 45),
   };
 
-  /// <summary>625/50 at 25 Mbit as IEC 61883-5 states it, which differs only in the signal type it writes.</summary>
   internal static readonly DvProfile Pal25Iec61883 = new() {
     Name = "DV25 625/50 4:2:0 (IEC 61883-5)",
-    SequenceFlag = 1,
-    SignalType = 0x1,
-    FrameSize = 144000,
-    SequencesPerChannel = 12,
-    ChannelCount = 1,
-    FrameRateNumerator = 25,
-    FrameRateDenominator = 1,
-    Width = 720,
-    Height = 576,
-    Sampling = DvSampling.FourTwoZero,
-    NarrowAspect = (16, 15),
-    WideAspect = (64, 45),
+    SequenceFlag = 1, SignalType = 0x1, FrameSize = 144000, SequencesPerChannel = 12, ChannelCount = 1,
+    FrameRateNumerator = 25, FrameRateDenominator = 1,
+    Width = 720, Height = 576, Sampling = DvSampling.FourTwoZero,
+    NarrowAspect = (16, 15), WideAspect = (64, 45),
   };
 
-  /// <summary>525/60 at 50 Mbit — DVCPRO50, two DIF channels of the same geometry.</summary>
   internal static readonly DvProfile Ntsc50 = new() {
     Name = "DVCPRO50 525/60 4:2:2",
-    SequenceFlag = 0,
-    SignalType = 0x4,
-    FrameSize = 240000,
-    SequencesPerChannel = 10,
-    ChannelCount = 2,
-    FrameRateNumerator = 30000,
-    FrameRateDenominator = 1001,
-    Width = 720,
-    Height = 480,
-    Sampling = DvSampling.FourTwoTwo,
-    NarrowAspect = (8, 9),
-    WideAspect = (32, 27),
+    SequenceFlag = 0, SignalType = 0x4, FrameSize = 240000, SequencesPerChannel = 10, ChannelCount = 2,
+    FrameRateNumerator = 30000, FrameRateDenominator = 1001,
+    Width = 720, Height = 480, Sampling = DvSampling.FourTwoTwo,
+    NarrowAspect = (8, 9), WideAspect = (32, 27),
   };
 
-  /// <summary>625/50 at 50 Mbit — DVCPRO50.</summary>
   internal static readonly DvProfile Pal50 = new() {
     Name = "DVCPRO50 625/50 4:2:2",
-    SequenceFlag = 1,
-    SignalType = 0x4,
-    FrameSize = 288000,
-    SequencesPerChannel = 12,
-    ChannelCount = 2,
-    FrameRateNumerator = 25,
-    FrameRateDenominator = 1,
-    Width = 720,
-    Height = 576,
-    Sampling = DvSampling.FourTwoTwo,
-    NarrowAspect = (16, 15),
-    WideAspect = (64, 45),
+    SequenceFlag = 1, SignalType = 0x4, FrameSize = 288000, SequencesPerChannel = 12, ChannelCount = 2,
+    FrameRateNumerator = 25, FrameRateDenominator = 1,
+    Width = 720, Height = 576, Sampling = DvSampling.FourTwoTwo,
+    NarrowAspect = (16, 15), WideAspect = (64, 45),
   };
 
-  /// <summary>Every profile this decoder reads, in the order a frame is matched against them.</summary>
-  internal static readonly DvProfile[] All = [Ntsc25, Pal25Iec, Pal25Smpte, Ntsc50, Pal50, Pal25Iec61883];
+  // ==============================================================================================
+  // SMPTE 370M / DVCPRO HD
+  // ==============================================================================================
+
+  internal static readonly DvProfile DvcproHd1080I60 = new() {
+    Name = "DVCPRO HD 1080/60i",
+    SequenceFlag = 0, SignalType = 0x14, FrameSize = 480000, SequencesPerChannel = 10, ChannelCount = 4,
+    FrameRateNumerator = 30000, FrameRateDenominator = 1001,
+    Width = 1280, Height = 1080, Sampling = DvSampling.FourTwoTwo,
+    NarrowAspect = (1, 1), WideAspect = (3, 2), IsDv100 = true,
+  };
+
+  internal static readonly DvProfile DvcproHd1080I50 = new() {
+    Name = "DVCPRO HD 1080/50i",
+    SequenceFlag = 1, SignalType = 0x14, FrameSize = 576000, SequencesPerChannel = 12, ChannelCount = 4,
+    FrameRateNumerator = 25, FrameRateDenominator = 1,
+    Width = 1440, Height = 1080, Sampling = DvSampling.FourTwoTwo,
+    NarrowAspect = (1, 1), WideAspect = (4, 3), IsDv100 = true,
+  };
+
+  internal static readonly DvProfile DvcproHd720P60 = new() {
+    Name = "DVCPRO HD 720/60p",
+    SequenceFlag = 0, SignalType = 0x18, FrameSize = 240000, SequencesPerChannel = 10, ChannelCount = 2,
+    FrameRateNumerator = 60000, FrameRateDenominator = 1001,
+    Width = 960, Height = 720, Sampling = DvSampling.FourTwoTwo,
+    NarrowAspect = (1, 1), WideAspect = (4, 3), IsDv100 = true, Progressive = true,
+  };
+
+  internal static readonly DvProfile DvcproHd720P50 = new() {
+    Name = "DVCPRO HD 720/50p",
+    SequenceFlag = 1, SignalType = 0x18, FrameSize = 288000, SequencesPerChannel = 12, ChannelCount = 2,
+    FrameRateNumerator = 50, FrameRateDenominator = 1,
+    Width = 960, Height = 720, Sampling = DvSampling.FourTwoTwo,
+    NarrowAspect = (1, 1), WideAspect = (4, 3), IsDv100 = true, Progressive = true,
+  };
+
+  internal static readonly DvProfile[] All = [
+    Ntsc25, Pal25Iec, Pal25Smpte, Ntsc50, Pal50,
+    DvcproHd1080I60, DvcproHd1080I50, DvcproHd720P60, DvcproHd720P50,
+    Pal25Iec61883,
+  ];
 
   // ==============================================================================================
   // Identification
   // ==============================================================================================
 
-  /// <summary>
-  /// Works out which profile a frame is in, from the frame itself.
-  /// </summary>
-  /// <remarks>
-  /// The two fields that decide it are the DIF sequence flag in the header block and the signal type
-  /// in the VAUX source pack, which sits at a fixed offset because every DIF block is 80 bytes and
-  /// the first six of every sequence are control data. Nothing about the container is consulted: a DV
-  /// frame carries its own geometry, which is what lets a single frame be cut out of a tape dump and
-  /// still be read.
-  /// <para/>
-  /// Two special cases are FFmpeg's and are kept because real files need them. A 625/50 frame that
-  /// says signal type 0 but sets the track application ID is SMPTE 314M's 4:1:1 arrangement rather
-  /// than IEC 61834's 4:2:0 — the two are the same size and the same signal type, and the application
-  /// ID is the only thing that separates them. And a frame flagged 525/60 whose VAUX pack says 625/50
-  /// and whose length is a 625/50 frame is a 625/50 frame written by something that got the flag
-  /// wrong; several capture cards did.
-  /// </remarks>
-  /// <exception cref="NotSupportedException">The frame states a high-definition profile.</exception>
-  /// <exception cref="InvalidDataException">The frame states no profile this decoder knows.</exception>
   internal static DvProfile Identify(ReadOnlySpan<byte> frame) {
     if (frame.Length < IdentificationBytes)
       throw new InvalidDataException(
@@ -251,14 +210,6 @@ internal sealed record DvProfile {
     var fiftyHertz = (sourcePack & 0x20) != 0;
     var applicationId = frame[4] & 0x07;
 
-    if ((signalType & 0x10) != 0)
-      throw new NotSupportedException(
-        $"This is a {_HighDefinitionName(signalType, sequenceFlag)} frame. DVCPRO HD is not decoded here — its "
-        + "macroblocks carry eight blocks rather than six and its quantiser is a different table — and a frame "
-        + "that states it is refused rather than read as the standard-definition profile with the same flags.");
-
-    // 625/50 at 4:1:1 is the one arrangement two fields cannot tell apart: SMPTE 314M and IEC 61834
-    // write the same size and the same signal type, and only the application ID separates them.
     if (sequenceFlag == 1 && signalType == 0 && applicationId != 0)
       return Pal25Smpte;
 
@@ -269,38 +220,32 @@ internal sealed record DvProfile {
       if (profile.SequenceFlag == sequenceFlag && profile.SignalType == signalType)
         return profile;
 
-    // QuickTime 3 wrote frames whose header reserved bits are all set and whose VAUX source pack is
-    // absent altogether. The sequence flag is still right, and it is the only thing left to go on.
+    // Consumer IEC 61834-3 HD uses a different block layer from SMPTE 370M. Name it explicitly so
+    // callers do not mistake "unsupported" for an unrecognised/corrupt DV signal type.
+    if (signalType == 0x02)
+      throw new NotSupportedException(
+        $"This is an IEC 61834-3 HD-DVCR {(sequenceFlag == 0 ? "1125/60" : "1250/50")} frame. "
+        + "Its 50-Mbit consumer HD block layer is distinct from SMPTE 370M DVCPRO HD.");
+
     if ((frame[3] & 0x7f) == 0x3f && sourcePack == 0xff)
       return sequenceFlag == 0 ? Ntsc25 : Pal25Iec;
 
     throw new InvalidDataException(
       $"This DV frame states signal type {signalType} in a {(sequenceFlag == 1 ? "625/50" : "525/60")} system, "
-      + "which is no arrangement IEC 61834, SMPTE 314M or SMPTE 370M defines.");
+      + "which is no supported IEC 61834, SMPTE 314M or SMPTE 370M arrangement.");
   }
 
-  /// <summary>
-  /// Picks the profile a picture of this shape is written as.
-  /// </summary>
-  /// <remarks>
-  /// Geometry and sampling together, because for 625/50 they are not enough on their own: 720x576
-  /// names two 25 Mbit profiles that differ only in where the colour samples sit. The frame rate is
-  /// not consulted at all — at standard definition each raster has exactly one rate.
-  /// </remarks>
   internal static DvProfile? ForPicture(int width, int height, DvSampling sampling) {
     foreach (var profile in All)
       if (profile.Width == width && profile.Height == height && profile.Sampling == sampling)
         return profile;
-
     return null;
   }
 
-  /// <summary>The name of the high-definition profile a signal type and sequence flag between them state.</summary>
-  private static string _HighDefinitionName(int signalType, int sequenceFlag) => (signalType, sequenceFlag) switch {
-    (0x14, 0) => "DVCPRO HD 1080i60",
-    (0x14, 1) => "DVCPRO HD 1080i50",
-    (0x18, 0) => "DVCPRO HD 720p60",
-    (0x18, 1) => "DVCPRO HD 720p50",
-    _ => $"high-definition DV (signal type {signalType})",
-  };
+  internal static DvProfile? ForRaster(int width, int height) {
+    foreach (var profile in All)
+      if (profile.Width == width && profile.Height == height)
+        return profile;
+    return null;
+  }
 }

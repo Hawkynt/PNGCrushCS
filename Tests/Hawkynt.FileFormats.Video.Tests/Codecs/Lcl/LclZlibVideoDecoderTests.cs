@@ -2,30 +2,29 @@ using System;
 using System.Buffers.Binary;
 using System.IO;
 using System.IO.Compression;
+using System.Linq;
 using FileFormat.Core;
 
 namespace FileFormat.Codecs.Lcl.Tests;
 
 /// <summary>
-/// The parts of LCL ZLIB whose answers can be written down without a real recording: the trailer's
-/// own refusals, and the row-padding and row-order arithmetic underneath the format, using real zlib
-/// streams built with the same library this decoder reads them with.
+/// Small hand-checkable LCL ZLIB vectors covering every image type, both wrapper forms, the historical
+/// raw-RGB exception and the format's delta predictor. The expected samples are stated directly rather
+/// than copied from a third-party implementation.
 /// </summary>
-/// <remarks>
-/// The decoder as a whole was measured two ways: round-tripped through ffmpeg's own zlib encoder —
-/// eight streams, sizes from 2x2 to 320x240 including widths that leave a row unaligned — with every
-/// decoded frame identical to the source frame that was encoded, and against seven real recordings
-/// from samples.ffmpeg.org, 300 frames from 64x48 to 1246x992, every sample of every frame identical.
-/// What these tests add is the row-padding and row-order arithmetic small enough to state by hand, and
-/// the trailer's refusals.
-/// </remarks>
 [TestFixture]
 public class LclZlibVideoDecoderTests {
 
-  private static readonly CodecTag _Zlib = CodecTag.FromCharacters("ZLIB");
+  private static readonly CodecTag _ZlibCodec = CodecTag.FromCharacters("ZLIB");
 
-  /// <summary>A standard 40-byte <c>BITMAPINFOHEADER</c> followed by LCL's own eight-byte trailer.</summary>
-  private static byte[] _PrivateData(int width, int height, byte imageType = 2, sbyte compression = -1, byte flags = 0, byte codec = 3) {
+  private static byte[] _PrivateData(
+    int width,
+    int height,
+    byte imageType = 2,
+    sbyte compression = 6,
+    byte flags = 0,
+    byte codec = 3
+  ) {
     var data = new byte[40 + 8];
     BinaryPrimitives.WriteInt32LittleEndian(data.AsSpan(0), 40);
     BinaryPrimitives.WriteInt32LittleEndian(data.AsSpan(4), width);
@@ -34,7 +33,6 @@ public class LclZlibVideoDecoderTests {
     BinaryPrimitives.WriteInt16LittleEndian(data.AsSpan(14), 24);
     "ZLIB"u8.CopyTo(data.AsSpan(16));
 
-    // Bytes 40..43 are the format's own "unknown" field, always [4,0,0,0].
     data[40] = 4;
     data[44] = imageType;
     data[45] = unchecked((byte)compression);
@@ -43,26 +41,55 @@ public class LclZlibVideoDecoderTests {
     return data;
   }
 
-  private static MediaStreamInfo _Stream(int width, int height, byte[]? privateData = null, CodecTag? codec = null, MediaStreamKind kind = MediaStreamKind.Video) => new() {
+  private static MediaStreamInfo _Stream(
+    int width,
+    int height,
+    byte[]? privateData = null,
+    CodecTag? codec = null,
+    MediaStreamKind kind = MediaStreamKind.Video
+  ) => new() {
     Index = 0,
     Kind = kind,
-    Codec = codec ?? _Zlib,
+    Codec = codec ?? _ZlibCodec,
     Width = width,
     Height = height,
     CodecPrivateData = privateData ?? _PrivateData(width, height),
   };
 
-  private static byte[] Zlib(byte[] raw) {
-    using var ms = new MemoryStream();
-    using (var z = new ZLibStream(ms, CompressionLevel.Optimal, leaveOpen: true))
-      z.Write(raw);
-
-    return ms.ToArray();
+  private static byte[] _Zlib(ReadOnlySpan<byte> raw) {
+    using var output = new MemoryStream();
+    using (var zlib = new ZLibStream(output, CompressionLevel.Optimal, leaveOpen: true))
+      zlib.Write(raw);
+    return output.ToArray();
   }
 
-  // ============================================================================================
-  // Accepts
-  // ============================================================================================
+  private static byte[] _SplitPacket(ReadOnlySpan<byte> first, ReadOnlySpan<byte> second) {
+    var firstCompressed = _Zlib(first);
+    var secondCompressed = _Zlib(second);
+    var result = new byte[8 + firstCompressed.Length + secondCompressed.Length];
+    BinaryPrimitives.WriteUInt32LittleEndian(result, (uint)firstCompressed.Length);
+    BinaryPrimitives.WriteUInt32LittleEndian(result.AsSpan(4), (uint)first.Length);
+    firstCompressed.CopyTo(result.AsSpan(8));
+    secondCompressed.CopyTo(result.AsSpan(8 + firstCompressed.Length));
+    return result;
+  }
+
+  private static RawImage _Decode(int width, int height, byte imageType, ReadOnlySpan<byte> coded, byte flags = 0) {
+    var decoder = LclZlibVideoDecoder.Create(
+      _Stream(width, height, _PrivateData(width, height, imageType: imageType, flags: flags)));
+    Assert.That(decoder.TryDecode(new CodedPacket(0, _Zlib(coded)), out var frame), Is.True);
+    return frame;
+  }
+
+  private static void _AssertPlanes(RawImage frame, byte[] y, byte[] u, byte[] v) {
+    Assert.Multiple(() => {
+      Assert.That(frame.GetPlaneData(0).ToArray(), Is.EqualTo(y), "Y plane");
+      Assert.That(frame.GetPlaneData(1).ToArray(), Is.EqualTo(u), "U plane");
+      Assert.That(frame.GetPlaneData(2).ToArray(), Is.EqualTo(v), "V plane");
+      Assert.That(frame.ColorInfo?.Range, Is.EqualTo(RawColorRange.Full));
+      Assert.That(frame.ColorInfo?.Matrix, Is.EqualTo(RawMatrixCoefficients.Bt601));
+    });
+  }
 
   [Test]
   [Category("Unit")]
@@ -73,20 +100,16 @@ public class LclZlibVideoDecoderTests {
   [Test]
   [Category("Unit")]
   public void RefusesAnythingElse() {
-    var stream = _Stream(16, 16, codec: CodecTag.FromCharacters("MSZH"));
-    Assert.That(LclZlibVideoDecoder.Accepts(stream), Is.False);
+    Assert.That(
+      LclZlibVideoDecoder.Accepts(_Stream(16, 16, codec: CodecTag.FromCharacters("MSZH"))),
+      Is.False);
   }
 
   [Test]
   [Category("Unit")]
   public void RefusesAnAudioStream() {
-    var stream = _Stream(16, 16, kind: MediaStreamKind.Audio);
-    Assert.That(LclZlibVideoDecoder.Accepts(stream), Is.False);
+    Assert.That(LclZlibVideoDecoder.Accepts(_Stream(16, 16, kind: MediaStreamKind.Audio)), Is.False);
   }
-
-  // ============================================================================================
-  // Create
-  // ============================================================================================
 
   [Test]
   [Category("Unit")]
@@ -104,123 +127,262 @@ public class LclZlibVideoDecoderTests {
 
   [Test]
   [Category("Unit")]
-  public void RefusesAnImageTypeOtherThanRgb24() {
-    var stream = _Stream(16, 16, privateData: _PrivateData(16, 16, imageType: 5));
-    var failure = Assert.Throws<NotSupportedException>(() => LclZlibVideoDecoder.Create(stream));
-    Assert.That(failure!.Message, Does.Contain("image type 5"));
+  public void RefusesAnUnknownImageType() {
+    var failure = Assert.Throws<NotSupportedException>(() =>
+      LclZlibVideoDecoder.Create(_Stream(16, 16, _PrivateData(16, 16, imageType: 6))));
+    Assert.That(failure!.Message, Does.Contain("image type 6"));
   }
 
   [Test]
   [Category("Unit")]
-  public void RefusesTheMultithreadFlag() {
-    var stream = _Stream(16, 16, privateData: _PrivateData(16, 16, flags: 0x01));
-    var failure = Assert.Throws<NotSupportedException>(() => LclZlibVideoDecoder.Create(stream));
-    Assert.That(failure!.Message, Does.Contain("multithread"));
+  public void RefusesTheSiblingCodecMarker() {
+    var failure = Assert.Throws<InvalidDataException>(() =>
+      LclZlibVideoDecoder.Create(_Stream(16, 16, _PrivateData(16, 16, codec: 1))));
+    Assert.That(failure!.Message, Does.Contain("not ZLIB"));
   }
 
   [Test]
   [Category("Unit")]
-  public void RefusesThePngFilterFlag() {
-    var stream = _Stream(16, 16, privateData: _PrivateData(16, 16, flags: 0x08));
-    var failure = Assert.Throws<NotSupportedException>(() => LclZlibVideoDecoder.Create(stream));
-    Assert.That(failure!.Message, Does.Contain("PNG filter"));
+  [TestCase(-2)]
+  [TestCase(10)]
+  public void RefusesAnInvalidCompressionLevel(int compression) {
+    var failure = Assert.Throws<NotSupportedException>(() =>
+      LclZlibVideoDecoder.Create(_Stream(16, 16, _PrivateData(16, 16, compression: (sbyte)compression))));
+    Assert.That(failure!.Message, Does.Contain("compression level"));
   }
-
-  // ============================================================================================
-  // A packet whose zlib stream cannot supply the picture's own padded byte count
-  // ============================================================================================
 
   [Test]
   [Category("Unit")]
-  public void RefusesAPacketThatRunsOutBeforeItsFrameDoes() {
+  public void UsesValueFourForThePngFilterFlag() {
+    var frame = _Decode(
+      2,
+      1,
+      imageType: 2,
+      coded: new byte[] { 10, 20, 30, 1, 1, 255 },
+      flags: 0x04);
+
+    Assert.That(frame.PixelData, Is.EqualTo(new byte[] { 10, 20, 30, 9, 19, 31 }));
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void IgnoresAnUnknownFlagInsteadOfMistakingItForThePngFilter() {
+    var frame = _Decode(1, 1, imageType: 2, coded: new byte[] { 3, 4, 5 }, flags: 0x08);
+    Assert.That(frame.PixelData, Is.EqualTo(new byte[] { 3, 4, 5 }));
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void RefusesOddDimensionsWhereThePackingCannotRepresentThem() {
+    Assert.Multiple(() => {
+      Assert.Throws<NotSupportedException>(() =>
+        LclZlibVideoDecoder.Create(_Stream(3, 2, _PrivateData(3, 2, imageType: 4))));
+      Assert.Throws<NotSupportedException>(() =>
+        LclZlibVideoDecoder.Create(_Stream(2, 3, _PrivateData(2, 3, imageType: 5))));
+    });
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void RefusesDimensionsWhoseSizeArithmeticOverflows() {
+    var failure = Assert.Throws<InvalidDataException>(() =>
+      LclZlibVideoDecoder.Create(_Stream(int.MaxValue, int.MaxValue, _PrivateData(int.MaxValue, int.MaxValue, imageType: 0))));
+    Assert.That(failure!.Message, Does.Contain("arithmetic overflows"));
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void RefusesDimensionsWhoseCanonicalFrameCannotFitManagedMemory() {
+    const int height = 400_000_000;
+    var failure = Assert.Throws<InvalidDataException>(() =>
+      LclZlibVideoDecoder.Create(_Stream(3, height, _PrivateData(3, height, imageType: 1))));
+    Assert.That(failure!.Message, Does.Contain("too large"));
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void APaddedRgbRowIsUnpackedToItsExactPixelCount() {
+    var decoder = LclZlibVideoDecoder.Create(_Stream(3, 2));
+    var coded = new byte[] {
+      1, 2, 3, 4, 5, 6, 7, 8, 9, 0xff, 0xff, 0xff,
+      10, 11, 12, 13, 14, 15, 16, 17, 18, 0xaa, 0xaa, 0xaa,
+    };
+
+    Assert.That(decoder.TryDecode(new CodedPacket(0, _Zlib(coded)), out var frame), Is.True);
+    Assert.Multiple(() => {
+      Assert.That(frame.Format, Is.EqualTo(PixelFormat.Bgr24));
+      Assert.That(frame.PixelData[..9], Is.EqualTo(new byte[] { 10, 11, 12, 13, 14, 15, 16, 17, 18 }));
+      Assert.That(frame.PixelData[9..], Is.EqualTo(new byte[] { 1, 2, 3, 4, 5, 6, 7, 8, 9 }));
+    });
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void AnUnpaddedRgbRowIsReadAsTightlyPacked() {
+    var decoder = LclZlibVideoDecoder.Create(_Stream(3, 2));
+    var bottom = new byte[] { 1, 2, 3, 4, 5, 6, 7, 8, 9 };
+    var top = new byte[] { 10, 11, 12, 13, 14, 15, 16, 17, 18 };
+    var coded = bottom.Concat(top).ToArray();
+
+    Assert.That(decoder.TryDecode(new CodedPacket(0, _Zlib(coded)), out var frame), Is.True);
+    Assert.Multiple(() => {
+      Assert.That(frame.PixelData[..9], Is.EqualTo(top));
+      Assert.That(frame.PixelData[9..], Is.EqualTo(bottom));
+    });
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void AShortValidZlibFrameIsZeroFilledLikeTheReferenceDecoder() {
     var decoder = LclZlibVideoDecoder.Create(_Stream(4, 2));
 
-    // A 4x2 BGR24 frame (width already a multiple of four, so packed and padded agree) is 24 bytes;
-    // compress far fewer.
-    var packet = new CodedPacket(0, Zlib(new byte[4]));
-
-    var failure = Assert.Throws<InvalidDataException>(() => decoder.TryDecode(packet, out _));
-    Assert.That(failure!.Message, Does.Contain("inflates to 4 byte(s)"));
-    Assert.That(failure!.Message, Does.Contain("needs either 24"));
+    Assert.That(decoder.TryDecode(new CodedPacket(0, _Zlib(new byte[] { 1, 2, 3, 4 })), out var frame), Is.True);
+    Assert.That(frame.PixelData, Is.EqualTo(new byte[] {
+      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+      1, 2, 3, 4, 0, 0, 0, 0, 0, 0, 0, 0,
+    }));
   }
 
-  // ============================================================================================
-  // Row padding: a coded row is a whole four-byte word, not the packed pixel count
-  // ============================================================================================
-
-  /// <summary>Three pixels wide packs to nine bytes, which is not a multiple of four, so each coded
-  /// row carries three bytes of padding a real encoder never states anywhere in the header.</summary>
   [Test]
   [Category("Unit")]
-  public void APaddedRowIsUnpackedToItsExactPixelCount() {
-    const int _WIDTH = 3;
-    const int _HEIGHT = 2;
-
-    var decoder = LclZlibVideoDecoder.Create(_Stream(_WIDTH, _HEIGHT));
-
-    // Two coded rows of 12 bytes each: 9 packed bytes (3 BGR pixels) plus 3 bytes of padding, whose
-    // value must be ignored rather than read as part of the picture.
-    var codedBottomRow = new byte[] { 1, 2, 3, 4, 5, 6, 7, 8, 9, 0xFF, 0xFF, 0xFF };
-    var codedTopRow = new byte[] { 10, 11, 12, 13, 14, 15, 16, 17, 18, 0xAA, 0xAA, 0xAA };
-    var padded = new byte[24];
-    codedBottomRow.CopyTo(padded, 0);
-    codedTopRow.CopyTo(padded, 12);
-
-    var packet = new CodedPacket(0, Zlib(padded));
-    Assert.That(decoder.TryDecode(packet, out var frame), Is.True);
-    Assert.That(frame.Format, Is.EqualTo(PixelFormat.Bgr24));
-    Assert.That(frame.PixelData.Length, Is.EqualTo(_WIDTH * _HEIGHT * 3));
-
-    // Display row 0 is the coded stream's second (top) row; display row 1 is its first (bottom) row.
-    Assert.That(frame.PixelData[..9], Is.EqualTo(new byte[] { 10, 11, 12, 13, 14, 15, 16, 17, 18 }));
-    Assert.That(frame.PixelData[9..18], Is.EqualTo(new byte[] { 1, 2, 3, 4, 5, 6, 7, 8, 9 }));
+  public void RefusesZlibOutputBeyondTheDeclaredFrameCapacity() {
+    var decoder = LclZlibVideoDecoder.Create(_Stream(1, 1));
+    var failure = Assert.Throws<InvalidDataException>(() =>
+      decoder.TryDecode(new CodedPacket(0, _Zlib(new byte[] { 1, 2, 3, 4, 5 })), out _));
+    Assert.That(failure!.Message, Does.Contain("expands beyond"));
   }
 
-  /// <summary>An unaligned width whose packet inflates to exactly the packed byte count — what
-  /// ffmpeg's own encoder writes — is read as tightly packed rather than refused as short of the
-  /// padded figure, since which of the two an encoder wrote is not this format's to assume.</summary>
   [Test]
   [Category("Unit")]
-  public void AnUnpaddedRowIsReadAsTightlyPacked() {
-    const int _WIDTH = 3;
-    const int _HEIGHT = 2;
+  public void ReadsTheOriginalCodecsRawRgbNormalCompressionException() {
+    var decoder = LclZlibVideoDecoder.Create(_Stream(2, 2, _PrivateData(2, 2, compression: -1)));
+    var bottom = new byte[] { 1, 2, 3, 4, 5, 6 };
+    var top = new byte[] { 11, 12, 13, 14, 15, 16 };
+    var coded = bottom.Concat(top).ToArray();
 
-    var decoder = LclZlibVideoDecoder.Create(_Stream(_WIDTH, _HEIGHT));
-
-    // Two coded rows of exactly 9 bytes each, no padding at all.
-    var codedBottomRow = new byte[] { 1, 2, 3, 4, 5, 6, 7, 8, 9 };
-    var codedTopRow = new byte[] { 10, 11, 12, 13, 14, 15, 16, 17, 18 };
-    var packed = new byte[18];
-    codedBottomRow.CopyTo(packed, 0);
-    codedTopRow.CopyTo(packed, 9);
-
-    var packet = new CodedPacket(0, Zlib(packed));
-    Assert.That(decoder.TryDecode(packet, out var frame), Is.True);
-
-    Assert.That(frame.PixelData[..9], Is.EqualTo(codedTopRow));
-    Assert.That(frame.PixelData[9..], Is.EqualTo(codedBottomRow));
+    Assert.That(decoder.TryDecode(new CodedPacket(0, coded), out var frame), Is.True);
+    Assert.That(frame.PixelData, Is.EqualTo(top.Concat(bottom).ToArray()));
   }
 
-  /// <summary>A width already a multiple of four pixels leaves no padding to strip at all, and the
-  /// decoded picture is exactly the decompressed bytes with the rows reversed.</summary>
   [Test]
   [Category("Unit")]
-  public void AnAlignedWidthNeedsNoPadding() {
-    const int _WIDTH = 4;
-    const int _HEIGHT = 2;
+  public void ReadsTwoIndependentlyCompressedSections() {
+    var decoder = LclZlibVideoDecoder.Create(_Stream(4, 2, _PrivateData(4, 2, flags: 0x01)));
+    var bottom = new byte[] { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12 };
+    var top = new byte[] { 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32 };
 
-    var decoder = LclZlibVideoDecoder.Create(_Stream(_WIDTH, _HEIGHT));
+    Assert.That(decoder.TryDecode(new CodedPacket(0, _SplitPacket(bottom, top)), out var frame), Is.True);
+    Assert.That(frame.PixelData, Is.EqualTo(top.Concat(bottom).ToArray()));
+  }
 
-    var codedBottomRow = new byte[] { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12 };
-    var codedTopRow = new byte[] { 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32 };
-    var picture = new byte[24];
-    codedBottomRow.CopyTo(picture, 0);
-    codedTopRow.CopyTo(picture, 12);
+  [Test]
+  [Category("Unit")]
+  public void RefusesATruncatedSplitHeader() {
+    var decoder = LclZlibVideoDecoder.Create(_Stream(4, 2, _PrivateData(4, 2, flags: 0x01)));
+    var failure = Assert.Throws<InvalidDataException>(() => decoder.TryDecode(new CodedPacket(0, new byte[7]), out _));
+    Assert.That(failure!.Message, Does.Contain("eight-byte split header"));
+  }
 
-    var packet = new CodedPacket(0, Zlib(picture));
-    Assert.That(decoder.TryDecode(packet, out var frame), Is.True);
+  [Test]
+  [Category("Unit")]
+  public void DecodesYuv111AsCanonical444() {
+    var frame = _Decode(2, 2, 0, new byte[] {
+      10, 0, 0, 20, 1, 255,
+      30, 2, 254, 40, 3, 253,
+    });
 
-    Assert.That(frame.PixelData[..12], Is.EqualTo(codedTopRow));
-    Assert.That(frame.PixelData[12..], Is.EqualTo(codedBottomRow));
+    Assert.That(frame.Format, Is.EqualTo(PixelFormat.Yuv444P8));
+    _AssertPlanes(
+      frame,
+      y: new byte[] { 30, 40, 10, 20 },
+      u: new byte[] { 130, 131, 128, 129 },
+      v: new byte[] { 126, 125, 128, 127 });
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void DecodesYuv422InFourPixelGroups() {
+    var frame = _Decode(4, 2, 1, new byte[] {
+      1, 2, 3, 4, 0, 1, 0, 255,
+      5, 6, 7, 8, 2, 3, 254, 253,
+    });
+
+    Assert.That(frame.Format, Is.EqualTo(PixelFormat.Yuv422P8));
+    _AssertPlanes(
+      frame,
+      y: new byte[] { 5, 6, 7, 8, 1, 2, 3, 4 },
+      u: new byte[] { 130, 131, 128, 129 },
+      v: new byte[] { 126, 125, 128, 127 });
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void DecodesYuv422PartialHorizontalGroupLikeTheReferenceDecoder() {
+    var frame = _Decode(5, 1, 1, new byte[] { 1, 2, 3, 4, 0, 1, 2, 3 });
+
+    _AssertPlanes(
+      frame,
+      y: new byte[] { 1, 2, 3, 4, 0 },
+      u: new byte[] { 128, 129, 129 },
+      v: new byte[] { 130, 131, 131 });
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void DecodesYuv411WithoutDiscardingItsNativeSampling() {
+    var frame = _Decode(4, 2, 3, new byte[] {
+      1, 2, 3, 4, 0, 0,
+      5, 6, 7, 8, 1, 255,
+    });
+
+    Assert.That(frame.Format, Is.EqualTo(PixelFormat.Yuv411P8));
+    Assert.That(frame.GetPlaneDimensions(1), Is.EqualTo((1, 2)));
+    _AssertPlanes(
+      frame,
+      y: new byte[] { 5, 6, 7, 8, 1, 2, 3, 4 },
+      u: new byte[] { 129, 128 },
+      v: new byte[] { 127, 128 });
+    Assert.That(frame.ToBgra32(), Has.Length.EqualTo(4 * 2 * 4));
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void DecodesYuv211AsCanonical422() {
+    var frame = _Decode(2, 2, 4, new byte[] {
+      1, 2, 0, 0,
+      3, 4, 1, 255,
+    });
+
+    Assert.That(frame.Format, Is.EqualTo(PixelFormat.Yuv422P8));
+    _AssertPlanes(
+      frame,
+      y: new byte[] { 3, 4, 1, 2 },
+      u: new byte[] { 129, 128 },
+      v: new byte[] { 127, 128 });
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void DecodesYuv420InBottomUpTwoRowBlocks() {
+    var frame = _Decode(2, 2, 5, new byte[] { 1, 2, 3, 4, 0, 255 });
+
+    Assert.That(frame.Format, Is.EqualTo(PixelFormat.Yuv420P8));
+    _AssertPlanes(
+      frame,
+      y: new byte[] { 3, 4, 1, 2 },
+      u: new byte[] { 128 },
+      v: new byte[] { 127 });
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void AppliesThePredictorToYuv420ComponentsIndependently() {
+    var frame = _Decode(2, 2, 5, new byte[] { 255, 255, 253, 255, 251, 250 }, flags: 0x04);
+
+    _AssertPlanes(
+      frame,
+      y: new byte[] { 3, 4, 1, 2 },
+      u: new byte[] { 133 },
+      v: new byte[] { 134 });
   }
 }

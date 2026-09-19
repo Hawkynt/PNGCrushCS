@@ -29,8 +29,8 @@ namespace FileFormat.Codecs.Ffv1;
 /// </remarks>
 internal sealed class Ffv1RangeEncoder {
 
-  private readonly byte[] _zeroState;
-  private readonly byte[] _oneState;
+  private byte[] _zeroState;
+  private byte[] _oneState;
   private byte[] _bytes = new byte[4096];
   private int _length;
   private int _low;
@@ -39,6 +39,19 @@ internal sealed class Ffv1RangeEncoder {
   private int _outstandingByte = -1;
 
   internal Ffv1RangeEncoder(byte[] zeroState, byte[] oneState) {
+    this._zeroState = zeroState;
+    this._oneState = oneState;
+  }
+
+  /// <summary>
+  /// Changes the transition tables without changing the coder's arithmetic position.
+  /// </summary>
+  /// <remarks>
+  /// A custom-table legacy stream writes its table deltas with the default table and applies the
+  /// resulting table only after that header. Replacing the coder itself there would lose the range,
+  /// low value and bytes already emitted, so the table is deliberately replaceable in place.
+  /// </remarks>
+  internal void UseStateTransitions(byte[] zeroState, byte[] oneState) {
     this._zeroState = zeroState;
     this._oneState = oneState;
   }
