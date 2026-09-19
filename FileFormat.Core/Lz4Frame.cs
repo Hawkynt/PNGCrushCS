@@ -7,9 +7,10 @@ namespace FileFormat.Core;
 /// <remarks>
 /// LZ4 is a modern compressor rather than a period one, and it turns up here because a picture
 /// format written recently for an old machine has no reason to invent a packer. Only the subset
-/// those files use is accepted: independent blocks, no dictionary, and the optional checksums
-/// skipped rather than verified — a decoder that refused a file for a checksum it does not compute
-/// would be worse than one that reads it.
+/// those files use is accepted: no dictionary, and the optional checksums skipped rather than
+/// verified — a decoder that refused a file for a checksum it does not compute would be worse than
+/// one that reads it. Blocks may be independent or linked; a linked block's matches reach back into
+/// what the blocks before it produced, which is how this package's own PL4 pictures are written.
 /// </remarks>
 public static class Lz4Frame {
 
@@ -21,10 +22,12 @@ public static class Lz4Frame {
   /// exactly the input given.
   /// </summary>
   public static byte[] Unpack(ReadOnlySpan<byte> data, int unpackedLength) {
-    // FLG: version 01, independent blocks required, reserved bit and dictionary id clear.
-    // Content size and checksums are permitted because this reader can skip them safely.
-    if (data.Length < 11 || !data[..Magic.Length].SequenceEqual(Magic) || (data[4] & 0xE3) != 0x60)
-      throw new InvalidDataException("Not an independent-block LZ4 frame this reader accepts.");
+    // FLG: version 01, reserved bit and dictionary id clear. Block independence is not required:
+    // a linked block's matches reach back into what earlier blocks produced, which is why the whole
+    // output is handed to the block decoder. Content size and checksums are permitted because this
+    // reader can skip them safely.
+    if (data.Length < 11 || !data[..Magic.Length].SequenceEqual(Magic) || (data[4] & 0xC3) != 0x40)
+      throw new InvalidDataException("Not an LZ4 frame this reader accepts.");
 
     var unpacked = new byte[unpackedLength];
     var at = 7;
@@ -55,7 +58,7 @@ public static class Lz4Frame {
       if (end < at || end > data.Length)
         throw new InvalidDataException("An LZ4 block runs past the end of the frame.");
 
-      target += Lz4Block.DecodeInto(data[at..end], unpacked.AsSpan(target));
+      target += Lz4Block.DecodeInto(data[at..end], unpacked, target);
       at = end;
 
       if ((data[4] & 16) != 0) {

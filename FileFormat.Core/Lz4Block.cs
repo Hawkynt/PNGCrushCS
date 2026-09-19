@@ -18,7 +18,7 @@ public static class Lz4Block {
     ArgumentOutOfRangeException.ThrowIfNegative(unpackedLength);
 
     var result = new byte[unpackedLength];
-    var written = DecodeInto(data, result);
+    var written = DecodeInto(data, result, 0);
     if (written != unpackedLength)
       throw new InvalidDataException(
         $"An LZ4 block produced {written} bytes where {unpackedLength} were required.");
@@ -50,20 +50,26 @@ public static class Lz4Block {
   }
 
   /// <summary>
-  /// Decodes one complete raw LZ4 block into the beginning of <paramref name="target"/> and returns
-  /// how many bytes it produced.
+  /// Decodes one complete raw LZ4 block into <paramref name="target"/> at <paramref name="produced"/>
+  /// and returns how many bytes it produced.
   /// </summary>
-  internal static int DecodeInto(ReadOnlySpan<byte> data, Span<byte> target) {
+  /// <remarks>
+  /// A match reaches back past the block's own first byte where the frame around it links its blocks,
+  /// which is why the whole output is handed over rather than the part this block fills. A caller
+  /// decoding a lone block passes nought and gets the independent-block rule for free, because there
+  /// is then nothing behind the block to reach into.
+  /// </remarks>
+  internal static int DecodeInto(ReadOnlySpan<byte> data, Span<byte> target, int produced) {
     var at = 0;
     var written = 0;
 
     while (at < data.Length) {
       var token = data[at++];
       var literals = _ReadCount(data, ref at, token >> 4);
-      if (at > data.Length - literals || written > target.Length - literals)
+      if (at > data.Length - literals || produced + written > target.Length - literals)
         throw new InvalidDataException("An LZ4 run of literals runs past the end of its block or target.");
 
-      data.Slice(at, literals).CopyTo(target[written..]);
+      data.Slice(at, literals).CopyTo(target[(produced + written)..]);
       at += literals;
       written += literals;
 
@@ -76,15 +82,15 @@ public static class Lz4Block {
 
       var distance = data[at] | data[at + 1] << 8;
       at += 2;
-      if (distance == 0 || distance > written)
-        throw new InvalidDataException("An LZ4 match points outside the bytes already produced by this block.");
+      if (distance == 0 || distance > produced + written)
+        throw new InvalidDataException("An LZ4 match points outside the bytes already produced.");
 
       var count = checked(_ReadCount(data, ref at, token & 15) + 4);
-      if (written > target.Length - count)
+      if (produced + written > target.Length - count)
         throw new InvalidDataException("An LZ4 match runs past the end of its target.");
 
       for (var i = 0; i < count; ++i, ++written)
-        target[written] = target[written - distance];
+        target[produced + written] = target[produced + written - distance];
     }
 
     return written;

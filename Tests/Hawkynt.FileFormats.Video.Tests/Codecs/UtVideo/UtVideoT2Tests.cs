@@ -141,12 +141,21 @@ public sealed class UtVideoT2Tests {
 
   [Test]
   [Category("Unit")]
-  public void Lz4FrameRejectsLinkedBlocksBecauseItsDecoderHasNoCrossBlockDictionary() {
-    byte[] independent = [4, 34, 77, 24, 0x60, 0x40, 0, 0, 0, 0, 0];
-    byte[] linked = [4, 34, 77, 24, 0x40, 0x40, 0, 0, 0, 0, 0];
+  public void Lz4FrameReadsALinkedBlockWhoseMatchReachesIntoTheBlockBefore() {
+    // T2's own control streams are single raw blocks and cannot link, but the frame reader is
+    // shared: this package writes PL4 pictures as a frame whose blocks are linked, so refusing the
+    // flag would leave it unable to read back what it writes. The second block below carries no
+    // literals and one match four bytes back, which is inside the first block's output.
+    byte[] independentAndEmpty = [4, 34, 77, 24, 0x60, 0x40, 0, 0, 0, 0, 0];
+    byte[] linked = [
+      4, 34, 77, 24, 0x40, 0x40, 0,
+      4, 0, 0, 0x80, 0x41, 0x42, 0x43, 0x44,
+      3, 0, 0, 0, 0x00, 0x04, 0x00,
+      0, 0, 0, 0,
+    ];
 
-    Assert.That(Lz4Frame.Unpack(independent, 0), Is.Empty);
-    Assert.Throws<InvalidDataException>(() => Lz4Frame.Unpack(linked, 0));
+    Assert.That(Lz4Frame.Unpack(independentAndEmpty, 0), Is.Empty);
+    Assert.That(Lz4Frame.Unpack(linked, 8), Is.EqualTo("ABCDABCD"u8.ToArray()));
   }
 
   [Test]

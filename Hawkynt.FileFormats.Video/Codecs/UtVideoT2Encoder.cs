@@ -232,9 +232,9 @@ public sealed class UtVideoT2Encoder : IVideoCodecEncoder<UtVideoT2Encoder> {
     if (this._format.ColourSpace == UtVideoColourSpace.Yuv) {
       for (var plane = 0; plane < planes.Length; ++plane) {
         var width = this._format.PlaneWidth(plane, this._width);
-        var stride = this._format.PlaneStride(plane, this._width);
+        var planeStride = this._format.PlaneStride(plane, this._width);
         var source = picture.GetPlaneData(plane);
-        planes[plane] = _PadPlane(source, width, this._height, stride);
+        planes[plane] = _PadPlane(source, width, this._height, planeStride);
       }
       return planes;
     }
