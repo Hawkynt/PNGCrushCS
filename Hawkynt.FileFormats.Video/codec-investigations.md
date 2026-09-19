@@ -297,11 +297,22 @@ Anybody resuming VP6 should take the transform, the reference-frame handling and
 from the Theora decoder rather than from the On2 document, and spend the effort on the first eight
 decisions of the first block.
 
-## VP5
+## VP5, which is no longer here
 
-Not attempted. VP5 shares the range coder and the coefficient model family with VP6, so it is behind
-the same wall, and unlike VP6 it has no published specification at all — only a community description
-of its range coder and frame header. Whatever unblocks VP6 is the thing to try first on VP5.
+VP5 was written off in this document for the reason above it: it shares the range coder and the
+coefficient model family with VP6, so a clean-room reimplementation of it stops at the same place, and
+unlike VP6 it has no published specification at all to reimplement from.
+
+**That was the wrong conclusion, and VP5 now decodes.** What was wrong was not the diagnosis but the
+choice of method. This repository's sourcing ladder puts licence-compatible source above a
+specification, and FFmpeg's VP5 decoder is LGPL-2.1-or-later, which this package can absorb. It was
+converted rather than reimplemented, and the result is byte-identical to FFmpeg's own decode on every
+plane of every frame of both published VP5 files — 2,084 frames of `potter512-400.avi` and 2,395 of
+`vp5_interlace.avi`. [The notes have the measurement](codec-notes.md).
+
+Nothing about the wall moved, and this says nothing about VP6 either. VP6's own conversion is equally
+available and equally untried; what is written above is the record of one method failing on it, not of
+the format being unreachable.
 
 # Lagarith, where the entropy coder's state is a floating-point number
 

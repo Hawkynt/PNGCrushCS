@@ -24,13 +24,20 @@ namespace FileFormat.Codecs;
 /// which of the format's pixel layouts this stream uses, and the block grid it is cut into — and none
 /// of that is repeated in the interframes after it, so it is kept here rather than read again. A
 /// stream that opens on an interframe has no picture to predict from and no zlib stream to continue,
-/// and is refused rather than guessed at.
+/// and is refused rather than guessed at. Interframes are P-pictures only: the format has no B-frame
+/// syntax and no future-picture reference.
 /// <para/>
 /// <b>Palettised frames carry their own palette</b>, 256 entries of red, green and blue with no bias
 /// and no swap. An intraframe states it outright; an interframe with the palette-change bit set states
 /// the bytes to XOR into the one already held, and one without the bit leaves it untouched. There is
 /// no palette anywhere in the container for this codec — <see cref="MediaStreamInfo.CodecPrivateData"/>
 /// is not read at all — because the stream states its own.
+/// <para/>
+/// <b>The 32-bit layout is BGR0, not BGRA.</b> FFmpeg exposes format 8 as <c>AV_PIX_FMT_BGR0</c> and
+/// explicitly defines its fourth byte as unused/undefined. The predictor still carries all four coded
+/// bytes because they are part of the bitstream, but the public <see cref="RawImage"/> has no BGR0
+/// type, so output uses <see cref="PixelFormat.Bgra32"/> with alpha forced opaque instead of leaking an
+/// arbitrary padding byte as transparency.
 /// <para/>
 /// <b>Measured against ffmpeg's own encoder</b>, since ZMBV is one of the few codecs in this package
 /// ffmpeg can write as well as read. Every pixel layout it will encode — 8-bit palettised, 15-bit,
@@ -41,9 +48,9 @@ namespace FileFormat.Codecs;
 /// <para/>
 /// <b>What refuses.</b> A stream that opens on an interframe; a version other than the only one the
 /// format defines, 0.1; a block width or height of zero; a pixel layout the format defines but no
-/// encoder writes — 1, 2 and 4 bits a pixel palettised, and 24 bits a pixel — since there is nothing
-/// to measure a guess at their byte packing against; and a packet whose compressed data runs out
-/// before its frame does.
+/// enabled reference encoder writes — 1, 2 and 4 bits a pixel palettised, and 24 bits a pixel — since
+/// there is nothing to measure a guess at their byte packing against; and a packet whose compressed
+/// data runs out before its frame does.
 /// </remarks>
 public sealed class ZmbvVideoDecoder : IVideoCodecDecoder<ZmbvVideoDecoder> {
 
@@ -196,10 +203,10 @@ public sealed class ZmbvVideoDecoder : IVideoCodecDecoder<ZmbvVideoDecoder> {
       4 => (1, true, PixelFormat.Indexed8),
       5 => (2, false, PixelFormat.Rgb24), // 15 bpp — widened, see _ComposeFrame
       6 => (2, false, PixelFormat.Rgb565),
-      8 => (4, false, PixelFormat.Bgra32),
+      8 => (4, false, PixelFormat.Bgra32), // BGR0 on wire — alpha is normalised in _ComposeFrame
       1 or 2 or 3 or 7 => throw new NotSupportedException(
         $"Video stream {this._streamIndex} states ZMBV video format {videoFormat}. The format defines it, but no "
-        + "encoder in existence writes it, so there is nothing to measure this codec's byte packing of it against; "
+        + "enabled reference encoder writes it, so there is nothing to measure this codec's byte packing against; "
         + "it is refused rather than guessed at."),
       _ => throw new NotSupportedException(
         $"Video stream {this._streamIndex} states ZMBV video format {videoFormat}, which the format does not define."),
@@ -216,7 +223,7 @@ public sealed class ZmbvVideoDecoder : IVideoCodecDecoder<ZmbvVideoDecoder> {
     this._blocksX = (this._width + blockWidth - 1) / blockWidth;
     this._blocksY = (this._height + blockHeight - 1) / blockHeight;
 
-    var frameBytes = this._width * this._height * this._bytesPerPixel;
+    var frameBytes = checked(this._width * this._height * this._bytesPerPixel);
     this._previous = new byte[frameBytes];
     this._current = new byte[frameBytes];
     if (this._paletteMode)
@@ -351,6 +358,19 @@ public sealed class ZmbvVideoDecoder : IVideoCodecDecoder<ZmbvVideoDecoder> {
         Format = PixelFormat.Rgb24,
         PixelData = _Widen555(current, this._width * this._height),
       };
+
+    if (this._bytesPerPixel == 4 && this._outputFormatWhenNotWidened == PixelFormat.Bgra32) {
+      var bgra = (byte[])current.Clone();
+      for (var i = 3; i < bgra.Length; i += 4)
+        bgra[i] = byte.MaxValue;
+
+      return new() {
+        Width = this._width,
+        Height = this._height,
+        Format = PixelFormat.Bgra32,
+        PixelData = bgra,
+      };
+    }
 
     return new() {
       Width = this._width,

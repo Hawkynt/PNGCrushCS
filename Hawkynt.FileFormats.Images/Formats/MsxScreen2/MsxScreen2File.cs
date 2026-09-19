@@ -21,7 +21,7 @@ namespace FileFormat.MsxScreen2;
 // as their magic, and the registry consults magic before extension — so whichever it happened to
 // reach first took every MSX picture. A Screen 5 file, 256 by 212, was being opened as a Screen 6
 // one and drawn 512 by 424. The extension is what tells these apart, and it is what decides now.
-[VerifiedBy(ConformanceOracle.Recoil2Png)]
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.IrfanView)]
 public sealed class MsxScreen2File : IImageFormatReader<MsxScreen2File>, IImageToRawImage<MsxScreen2File>, IImageFromRawImage<MsxScreen2File>, IImageFormatWriter<MsxScreen2File> {
 
   static string IImageFormatMetadata<MsxScreen2File>.PrimaryExtension => ".sc2";
