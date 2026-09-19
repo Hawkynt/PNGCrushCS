@@ -16,7 +16,7 @@ namespace FileFormat.HiresInterlaceFeniks;
 /// was written instead was 18002 bytes of bitmap, screen, bitmap, screen, which is the order of the
 /// sentence and not of the machine.
 /// </remarks>
-[VerifiedBy(ConformanceOracle.Recoil2Png)]
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.IrfanView)]
 public readonly record struct HiresInterlaceFeniksFile
   : IImageFormatReader<HiresInterlaceFeniksFile>, IImageToRawImage<HiresInterlaceFeniksFile>,
     IImageFromRawImage<HiresInterlaceFeniksFile>, IImageFormatWriter<HiresInterlaceFeniksFile> {
