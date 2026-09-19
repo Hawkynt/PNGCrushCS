@@ -4,6 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.SyntheticArts;
 
 /// <summary>In-memory representation of an Atari ST Synthetic Arts image (640x200, 4 colors, 2-plane medium resolution).</summary>
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.IrfanView)]
 public readonly record struct SyntheticArtsFile : IImageFormatReader<SyntheticArtsFile>, IImageToRawImage<SyntheticArtsFile>, IImageFromRawImage<SyntheticArtsFile>, IImageFormatWriter<SyntheticArtsFile> {
 
   /// <summary>Total file size: 32-byte palette + 32000 bytes planar data.</summary>
