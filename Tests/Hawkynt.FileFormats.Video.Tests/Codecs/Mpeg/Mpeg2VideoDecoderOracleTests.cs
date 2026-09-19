@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
@@ -155,7 +154,7 @@ public sealed class Mpeg2VideoDecoderOracleTests {
       var bytes = File.ReadAllBytes(output);
       Assert.That(bytes.Length, Is.EqualTo(checked(width * height * 3 * expectedFrames)));
       return bytes;
-    } catch (Win32Exception) {
+    } catch (System.ComponentModel.Win32Exception) {
       Assert.Inconclusive("ffmpeg disappeared after the oracle availability check");
       return [];
     } finally {
