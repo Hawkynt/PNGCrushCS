@@ -4,7 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.Avs;
 
 /// <summary>In-memory representation of an AVS (Application Visualization System) image.</summary>
-[VerifiedBy(ConformanceOracle.ImageMagick)]
+[VerifiedBy(ConformanceOracle.ImageMagick, ConformanceOracle.XnView)]
 public readonly record struct AvsFile : IImageFormatReader<AvsFile>, IImageToRawImage<AvsFile>, IImageFromRawImage<AvsFile>, IImageFormatWriter<AvsFile> {
 
   static string IImageFormatMetadata<AvsFile>.PrimaryExtension => ".avs";
