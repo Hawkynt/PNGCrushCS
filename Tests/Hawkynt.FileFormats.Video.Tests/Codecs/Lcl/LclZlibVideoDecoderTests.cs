@@ -15,7 +15,7 @@ namespace FileFormat.Codecs.Lcl.Tests;
 [TestFixture]
 public class LclZlibVideoDecoderTests {
 
-  private static readonly CodecTag _Zlib = CodecTag.FromCharacters("ZLIB");
+  private static readonly CodecTag _ZlibCodec = CodecTag.FromCharacters("ZLIB");
 
   private static byte[] _PrivateData(
     int width,
@@ -50,7 +50,7 @@ public class LclZlibVideoDecoderTests {
   ) => new() {
     Index = 0,
     Kind = kind,
-    Codec = codec ?? _Zlib,
+    Codec = codec ?? _ZlibCodec,
     Width = width,
     Height = height,
     CodecPrivateData = privateData ?? _PrivateData(width, height),
