@@ -16,6 +16,7 @@ namespace FileFormat.ZxTrefiBorderScreen;
 /// the whole picture but the position within a line is not, which is why a line that ends mid-run
 /// abandons it rather than carrying it over.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.IrfanView)]
 public readonly record struct ZxTrefiBorderScreenFile
   : IImageFormatReader<ZxTrefiBorderScreenFile>, IImageToRawImage<ZxTrefiBorderScreenFile>,
     IImageFromRawImage<ZxTrefiBorderScreenFile>, IImageFormatWriter<ZxTrefiBorderScreenFile> {

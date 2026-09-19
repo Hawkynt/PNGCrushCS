@@ -2,6 +2,7 @@ using System;
 using System.Text;
 using FileFormat.ChinonEs1000;
 using FileFormat.Core;
+using FileFormat.Core.Vector;
 using FileFormat.Fff;
 using FileFormat.Hta;
 using FileFormat.Illustrator;
@@ -83,17 +84,31 @@ public sealed class AdditionalWriterClosureTests {
     Assert.That(decoded.PixelData, Is.EqualTo(source.PixelData));
   }
 
+  /// <summary>
+  /// A written program states a page a point to the sample, and the renderer rasterises points at
+  /// ninety-six to the inch, so the picture that comes back is four thirds of the one that went in.
+  /// </summary>
+  /// <remarks>
+  /// This used to assert the two were the same size, and they were — because the writer scaled the
+  /// picture down by three quarters on the way out, cancelling exactly the ninety-six the renderer
+  /// scales it back up by. The round trip was pixel-perfect and the file was wrong: it declared a
+  /// 320 by 200 picture to be 240 by 150 points, a size nothing in it explained, and the only reader
+  /// that recovered the original was the one making the same assumption. What is checked here now is
+  /// the box the file states, which is the thing every other reader acts on.
+  /// </remarks>
   [Test]
   [Category("Unit")]
-  public void PostScript_ColorImageRoundTrip_PreservesDeclaredRasterSize() {
+  public void PostScript_ColorImageRoundTrip_StatesThePageAPointToTheSample() {
     var source = _Pattern(23, 17);
     var bytes = PostScriptWriter.ToBytes(PostScriptFile.FromRawImage(source));
     var parsed = PostScriptReader.FromBytes(bytes);
     var rendering = PostScriptRenderer.Render(parsed);
 
     Assert.Multiple(() => {
-      Assert.That(rendering.Image.Width, Is.EqualTo(source.Width));
-      Assert.That(rendering.Image.Height, Is.EqualTo(source.Height));
+      Assert.That(parsed.Comments.Box.Width, Is.EqualTo((double)source.Width));
+      Assert.That(parsed.Comments.Box.Height, Is.EqualTo((double)source.Height));
+      Assert.That(rendering.Image.Width, Is.EqualTo((int)Math.Round(VectorViewport.PixelsFromPoints(source.Width))));
+      Assert.That(rendering.Image.Height, Is.EqualTo((int)Math.Round(VectorViewport.PixelsFromPoints(source.Height))));
       Assert.That(rendering.HasInk, Is.True);
       Assert.That(rendering.PagesShown, Is.GreaterThanOrEqualTo(1));
     });
