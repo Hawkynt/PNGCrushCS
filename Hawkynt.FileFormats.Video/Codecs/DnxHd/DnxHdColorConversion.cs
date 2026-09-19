@@ -4,21 +4,17 @@ namespace FileFormat.Codecs.DnxHd;
 /// Turns the reconstructed component planes into the packed 8-bit RGB every reader here hands back.
 /// </summary>
 /// <remarks>
-/// A display convention, not part of the coding. VC-3 codes Y′CbCr and states in Coding Control B
-/// (SMPTE ST 2019-1:2016, 7.2.5) which colour volume the samples were meant for, which is honoured
-/// where it names one. Where it says the volume is described out of band, the fallback is BT.709 —
-/// every raster this format defines is high definition, and BT.709 is what a player assumes for one.
+/// A display convention, not part of the coding. VC-3 normally codes Y′CbCr and states in Coding
+/// Control B (SMPTE ST 2019-1:2016, 7.2.5) which colour volume the samples were meant for, which is
+/// honoured where it names one. CID 1256 additionally permits RGB-format macroblocks: an ACF-clear
+/// macroblock is already R, G and B, while an ACF-set one is Y′CbCr and 7.3.1.1 requires the BT.709
+/// inverse transform during decode. The distinction is therefore retained to this final packing step
+/// instead of converting ten-bit samples to another ten-bit representation and rounding twice.
 /// <para/>
 /// The samples are studio swing, per Table 1: black at <c>16 * 2^(b-8)</c> and nominal peak white at
 /// <c>235 * 2^(b-8)</c>, with chroma centred on <c>128 * 2^(b-8)</c>. Reading them as though they
 /// filled the range leaves every picture washed out by about seven per cent of its contrast, which
 /// looks like a decode that worked.
-/// <para/>
-/// The reduction from the coded depth to the eight bits a <see cref="FileFormat.Core.RawImage"/>
-/// holds is folded into the conversion, so a sample is rounded once rather than twice. Moving a
-/// Y′CbCr sample between depths is an exact power of two — Table 1 scales every level by
-/// <c>2^(b-8)</c> — which is why the shift below is the whole of it and no ratio of maxima appears
-/// anywhere.
 /// </remarks>
 internal static class DnxHdColorConversion {
 
@@ -27,15 +23,19 @@ internal static class DnxHdColorConversion {
   /// </summary>
   /// <param name="planes">The reconstructed planes, a whole number of macroblocks in both directions.</param>
   /// <param name="width">The header's samples per line; columns past it are discarded.</param>
-  /// <param name="height">The header's active lines per frame; rows past it are discarded.</param>
+  /// <param name="height">The displayed active lines; rows past it are discarded.</param>
   /// <param name="colorVolume">The CLV field of Coding Control B.</param>
   internal static byte[] ToRgb24(DnxHdPlanes planes, int width, int height, int colorVolume) {
     var rgb = new byte[width * height * 3];
-    var (redFromCr, greenFromCb, greenFromCr, blueFromCb) = Matrix(colorVolume);
+
+    // ACF=1 has its own normative BT.709 transform. CLV chooses the matrix only for ordinary
+    // Y′CbCr bitstreams; it must not leak into the alternate representation of an RGB-format frame.
+    var (redFromCr, greenFromCb, greenFromCr, blueFromCb) = Matrix(planes.RgbFormat ? 0 : colorVolume);
 
     var extra = planes.BitDepth - 8;
     var black = 16 << extra;
     var centre = 128 << extra;
+    var nominalRange = 219 << extra;
     var shift = 8 + extra;
     var half = 1 << (shift - 1);
 
@@ -43,15 +43,23 @@ internal static class DnxHdColorConversion {
     var lastChromaColumn = planes.ChromaWidth - 1;
 
     for (var y = 0; y < height; ++y) {
-      var lumaRow = y * planes.Width;
-      var chromaRow = y * planes.ChromaWidth;
+      var firstRow = y * planes.Width;
+      var secondRow = y * planes.ChromaWidth;
       var target = y * width * 3;
 
       for (var x = 0; x < width; ++x) {
+        if (planes.RgbFormat && planes.IsDirectRgb(x, y)) {
+          rgb[target] = _ScaleDirectRgb(planes.Luma[firstRow + x], black, nominalRange);
+          rgb[target + 1] = _ScaleDirectRgb(planes.Cb[secondRow + x], black, nominalRange);
+          rgb[target + 2] = _ScaleDirectRgb(planes.Cr[secondRow + x], black, nominalRange);
+          target += 3;
+          continue;
+        }
+
         // 298/256 is 219/255 inverted: the studio-swing luma range expanded to fill the byte.
-        var scaledLuma = 298 * (planes.Luma[lumaRow + x] - black);
-        var blueDifference = _Chroma(planes.Cb, chromaRow, x, subsampled, lastChromaColumn) - centre;
-        var redDifference = _Chroma(planes.Cr, chromaRow, x, subsampled, lastChromaColumn) - centre;
+        var scaledLuma = 298 * (planes.Luma[firstRow + x] - black);
+        var blueDifference = _Chroma(planes.Cb, secondRow, x, subsampled, lastChromaColumn) - centre;
+        var redDifference = _Chroma(planes.Cr, secondRow, x, subsampled, lastChromaColumn) - centre;
 
         rgb[target] = _Clamp(scaledLuma + redFromCr * redDifference + half, shift);
         rgb[target + 1] = _Clamp(scaledLuma - greenFromCb * blueDifference - greenFromCr * redDifference + half, shift);
@@ -61,6 +69,11 @@ internal static class DnxHdColorConversion {
     }
 
     return rgb;
+  }
+
+  private static byte _ScaleDirectRgb(int sample, int black, int nominalRange) {
+    var scaled = ((sample - black) * 255 + nominalRange / 2) / nominalRange;
+    return (byte)(scaled < 0 ? 0 : scaled > 255 ? 255 : scaled);
   }
 
   /// <summary>

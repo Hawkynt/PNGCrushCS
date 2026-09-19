@@ -98,4 +98,8 @@ public enum PixelFormat {
   Yuv440P16,
   /// <summary>Planar 16-bit YUV 4:4:4 in little-endian ushort samples.</summary>
   Yuv444P16,
+
+  // Added after the original planar enum block to preserve the numeric values of all existing public members.
+  /// <summary>Planar 8-bit YUV 4:1:1: Y, U, V.</summary>
+  Yuv411P8,
 }

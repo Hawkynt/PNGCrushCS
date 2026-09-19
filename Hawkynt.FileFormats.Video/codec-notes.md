@@ -3036,6 +3036,11 @@ since nothing measured exercises what a partial reference would mean; a primed b
 reference to prime against; and a decompressed pixel stream that runs out before the pixel count a
 block's position in the grid calls for.
 
+
+**Encoding writes lossless 24-bit keyblocks and interblocks.** The writer uses 64x64 cells and starts a new key frame every twelve pictures. On an interframe a cell identical to the previous displayed picture is the format's zero-sized unchanged block; otherwise the writer sends the smallest contiguous row range that differs from the last key frame. A cell that changed on an earlier interframe and then returns completely to the key-frame image is therefore a zero-height diff block rather than an unchanged block. Each payload is an independent zlib stream: previous-block priming is an optional compression mode, not required syntax, and the writer does not invent the underspecified current-block priming or I-frame-image forms. Flash Screen Video 2 has no B-picture or backward-reference syntax.
+
+The write path is checked outside its own decoder: a dedicated FFmpeg oracle muxes fourteen pictures through FLV, crosses both interframe chains and a key-frame boundary, decodes every picture as BGR24 with FFmpeg, and requires every byte to match the source. Malformed input is kept separate from unsupported syntax: a key frame may not use a zero-sized block because it must establish every cell's reference, and a custom palette must inflate to exactly 128 three-byte entries.
+
 ### ZeroCodec
 
 Lossless, and built entirely out of zlib in the plainest way this package has seen: a packet is one

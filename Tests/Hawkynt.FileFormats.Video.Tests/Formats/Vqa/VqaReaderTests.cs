@@ -7,27 +7,9 @@ using FileFormat.Core;
 
 namespace FileFormat.Vqa.Tests;
 
-/// <summary>
-/// The VQA container's demuxing behaviour: which chunk becomes which stream's packet, how the header
-/// fields are read, and how it treats a file that runs out of room for its next chunk — the shape a
-/// real recording is free to take.
-/// </summary>
-/// <remarks>
-/// Chunk-level codebook and index-table decoding is not exercised here — <see
-/// cref="Codecs.Tests.VqaVideoDecoderTests"/> and <see cref="Codecs.Vqa.Tests.VqaFormat80Tests"/> cover
-/// that, and three real files spanning 245 pictures were compared frame by frame against ffmpeg's
-/// decode with no differing sample anywhere. What is worth a hand-built fixture is what a real file's
-/// own shape does not force a reader to exercise: a signature that is not <c>FORM</c>/<c>WVQA</c>, a
-/// <c>FORM</c> chunk whose own stated size undershoots the real file (every real sample this reader was
-/// measured against has one that either matches or does exactly this), and which chunk types become
-/// which stream's packets.
-/// </remarks>
+/// <summary>The VQA container's header, demuxing, VQFL association and packet ordering behaviour.</summary>
 [TestFixture]
 public sealed class VqaReaderTests {
-
-  // ============================================================================================
-  // Opening
-  // ============================================================================================
 
   [Test]
   [Category("Unit")]
@@ -40,7 +22,6 @@ public sealed class VqaReaderTests {
   [Category("Unit")]
   public void AFileWithNoVqhdChunkIsRefused() {
     var file = _File(width: 0, height: 0, includeVqhd: false, chunks: []);
-
     Assert.Throws<InvalidDataException>(() => VqaContainer.FromBytes(file));
   }
 
@@ -50,17 +31,17 @@ public sealed class VqaReaderTests {
     var file = _File(width: 320, height: 156, blockWidth: 4, blockHeight: 2, frames: 85, sampleRate: 22050, channels: 1, chunks: []);
     var container = VqaContainer.FromBytes(file);
 
-    Assert.That(container.Width, Is.EqualTo(320));
-    Assert.That(container.Height, Is.EqualTo(156));
-    Assert.That(container.BlockWidth, Is.EqualTo(4));
-    Assert.That(container.BlockHeight, Is.EqualTo(2));
-    Assert.That(container.VideoFrameCount, Is.EqualTo(85));
-    Assert.That(container.AudioSampleRate, Is.EqualTo(22050));
-    Assert.That(container.AudioChannels, Is.EqualTo(1));
+    Assert.Multiple(() => {
+      Assert.That(container.Width, Is.EqualTo(320));
+      Assert.That(container.Height, Is.EqualTo(156));
+      Assert.That(container.BlockWidth, Is.EqualTo(4));
+      Assert.That(container.BlockHeight, Is.EqualTo(2));
+      Assert.That(container.VideoFrameCount, Is.EqualTo(85));
+      Assert.That(container.AudioSampleRate, Is.EqualTo(22050));
+      Assert.That(container.AudioChannels, Is.EqualTo(1));
+    });
   }
 
-  /// <summary>A FORM chunk's own stated size is not trustworthy — measured against a real file, one
-  /// covers only its header chunks and the real file runs on for megabytes past it.</summary>
   [Test]
   [Category("Unit")]
   public void ChunksPastWhereFormSaysItEndsAreStillWalked() {
@@ -68,21 +49,15 @@ public sealed class VqaReaderTests {
     var file = _FileWithUndersizedForm(width: 4, height: 2, blockWidth: 4, blockHeight: 2, frames: 1, chunks: [vqfr]);
     var container = VqaContainer.FromBytes(file);
 
-    var packets = VqaContainer.ReadPackets(container).ToArray();
-    Assert.That(packets, Has.Length.EqualTo(1));
+    Assert.That(VqaContainer.ReadPackets(container).ToArray(), Has.Length.EqualTo(1));
   }
-
-  // ============================================================================================
-  // Streams
-  // ============================================================================================
 
   [Test]
   [Category("Unit")]
   public void AFileWithNoSoundDeclaresOneStream() {
     var file = _File(width: 4, height: 2, blockWidth: 4, blockHeight: 2, frames: 0, sampleRate: 0, channels: 0, chunks: []);
-    var container = VqaContainer.FromBytes(file);
+    var streams = VqaContainer.Streams(VqaContainer.FromBytes(file));
 
-    var streams = VqaContainer.Streams(container);
     Assert.That(streams, Has.Count.EqualTo(1));
     Assert.That(streams[0].Kind, Is.EqualTo(MediaStreamKind.Video));
   }
@@ -91,12 +66,33 @@ public sealed class VqaReaderTests {
   [Category("Unit")]
   public void AFileWithSoundDeclaresTwoStreams() {
     var file = _File(width: 4, height: 2, blockWidth: 4, blockHeight: 2, frames: 0, sampleRate: 22050, channels: 1, chunks: []);
-    var container = VqaContainer.FromBytes(file);
+    var streams = VqaContainer.Streams(VqaContainer.FromBytes(file));
 
-    var streams = VqaContainer.Streams(container);
-    Assert.That(streams, Has.Count.EqualTo(2));
-    Assert.That(streams[1].Kind, Is.EqualTo(MediaStreamKind.Audio));
-    Assert.That(streams[1].TimeBase, Is.EqualTo(new Rational(1, 22050)));
+    Assert.Multiple(() => {
+      Assert.That(streams, Has.Count.EqualTo(2));
+      Assert.That(streams[1].Kind, Is.EqualTo(MediaStreamKind.Audio));
+      Assert.That(streams[1].TimeBase, Is.EqualTo(new Rational(1, 22050)));
+      Assert.That(streams[1].SampleRate, Is.EqualTo(22050));
+      Assert.That(streams[1].Channels, Is.EqualTo(1));
+    });
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void VideoStreamUsesVqhdFrameRateAndColourDepth() {
+    var palFile = _File(width: 4, height: 2, blockWidth: 4, blockHeight: 2, frames: 0, sampleRate: 0, channels: 0, chunks: [], frameRate: 10, highColour: false);
+    var highFile = _File(width: 4, height: 2, blockWidth: 4, blockHeight: 2, frames: 0, sampleRate: 0, channels: 0, chunks: [], frameRate: 24, highColour: true, version: 3);
+
+    var pal = VqaContainer.Streams(VqaContainer.FromBytes(palFile))[0];
+    var high = VqaContainer.Streams(VqaContainer.FromBytes(highFile))[0];
+
+    Assert.Multiple(() => {
+      Assert.That(pal.FrameRate, Is.EqualTo(new Rational(10, 1)));
+      Assert.That(pal.TimeBase, Is.EqualTo(new Rational(1, 10)));
+      Assert.That(pal.BitsPerPixel, Is.EqualTo(8));
+      Assert.That(high.FrameRate, Is.EqualTo(new Rational(24, 1)));
+      Assert.That(high.BitsPerPixel, Is.EqualTo(15));
+    });
   }
 
   [Test]
@@ -108,10 +104,6 @@ public sealed class VqaReaderTests {
     Assert.That(VqaContainer.Streams(container)[0].CodecPrivateData.Length, Is.EqualTo(42));
   }
 
-  // ============================================================================================
-  // Packets
-  // ============================================================================================
-
   [Test]
   [Category("Unit")]
   public void VqfrChunksGoOnStreamZeroAndSoundChunksOnStreamOne() {
@@ -119,21 +111,69 @@ public sealed class VqaReaderTests {
       _Chunk("SND2", [1, 2, 3, 4]),
       _Vqfr([]),
     ]);
-    var container = VqaContainer.FromBytes(file);
+    var packets = VqaContainer.ReadPackets(VqaContainer.FromBytes(file)).ToArray();
 
-    var packets = VqaContainer.ReadPackets(container).ToArray();
     Assert.That(packets.Select(p => p.StreamIndex), Is.EqualTo(new[] { 1, 0 }));
   }
 
   [Test]
   [Category("Unit")]
-  public void APacketCarriesItsPictureSSubChunksVerbatim() {
+  public void APacketCarriesItsPictureSubChunksVerbatim() {
     var subChunk = _Chunk("CPL0", new byte[768]);
     var file = _File(width: 4, height: 2, blockWidth: 4, blockHeight: 2, frames: 1, sampleRate: 0, channels: 0, chunks: [_Vqfr(subChunk)]);
-    var container = VqaContainer.FromBytes(file);
 
-    var packet = VqaContainer.ReadPackets(container).Single();
+    var packet = VqaContainer.ReadPackets(VqaContainer.FromBytes(file)).Single();
     Assert.That(packet.Data.Span[..4].ToArray(), Is.EqualTo("CPL0"u8.ToArray()));
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void VqflPayloadIsPrependedToTheFollowingPicture() {
+    var codebook = _Chunk("CBF0", [1, 2, 3, 4]);
+    var pointers = _Chunk("VPTR", [0, 0]);
+    var file = _File(width: 4, height: 2, blockWidth: 4, blockHeight: 2, frames: 1, sampleRate: 0, channels: 0, highColour: true, version: 3, chunks: [
+      _Chunk("VQFL", codebook),
+      _Vqfr(pointers),
+    ]);
+
+    var packet = VqaContainer.ReadPackets(VqaContainer.FromBytes(file)).Single();
+
+    Assert.That(packet.Data.ToArray(), Is.EqualTo(codebook.Concat(pointers)));
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void SeveralVqflChunksStayWithOneFollowingPicture() {
+    var one = _Chunk("CBF0", [1, 2]);
+    var two = _Chunk("JUNK", [3, 4]);
+    var frame = _Chunk("VPTR", [0, 0]);
+    var file = _File(width: 4, height: 2, blockWidth: 4, blockHeight: 2, frames: 1, sampleRate: 0, channels: 0, highColour: true, version: 3, chunks: [
+      _Chunk("VQFL", one),
+      _Chunk("VQFL", two),
+      _Vqfr(frame),
+    ]);
+
+    var packet = VqaContainer.ReadPackets(VqaContainer.FromBytes(file)).Single();
+    Assert.That(packet.Data.ToArray(), Is.EqualTo(one.Concat(two).Concat(frame)));
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void DanglingVqflWithoutPictureRefuses() {
+    var file = _File(width: 4, height: 2, blockWidth: 4, blockHeight: 2, frames: 1, sampleRate: 0, channels: 0, highColour: true, version: 3, chunks: [
+      _Chunk("VQFL", _Chunk("CBF0", [1, 2])),
+    ]);
+
+    Assert.Throws<InvalidDataException>(() => VqaContainer.ReadPackets(VqaContainer.FromBytes(file)).ToArray());
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void OnlyTheFirstPacketIsUniversallySafeAsASeekPoint() {
+    var file = _File(width: 4, height: 2, blockWidth: 4, blockHeight: 2, frames: 2, sampleRate: 0, channels: 0, chunks: [_Vqfr([]), _Vqfr([])]);
+    var packets = VqaContainer.ReadPackets(VqaContainer.FromBytes(file)).ToArray();
+
+    Assert.That(packets.Select(p => p.IsKeyFrame), Is.EqualTo(new[] { true, false }));
   }
 
   [Test]
@@ -144,15 +184,9 @@ public sealed class VqaReaderTests {
       _Chunk("CMDS", new byte[8]),
       _Vqfr([]),
     ]);
-    var container = VqaContainer.FromBytes(file);
 
-    var packets = VqaContainer.ReadPackets(container).ToArray();
-    Assert.That(packets, Has.Length.EqualTo(1));
+    Assert.That(VqaContainer.ReadPackets(VqaContainer.FromBytes(file)).ToArray(), Has.Length.EqualTo(1));
   }
-
-  // ============================================================================================
-  // Helpers
-  // ============================================================================================
 
   private static byte[] _Chunk(string id, byte[] payload) {
     var chunk = new byte[8 + payload.Length + (payload.Length & 1)];
@@ -162,26 +196,49 @@ public sealed class VqaReaderTests {
     return chunk;
   }
 
-  private static byte[] _Vqfr(byte[] subChunks) {
-    var payload = subChunks;
-    return _Chunk("VQFR", payload);
-  }
+  private static byte[] _Vqfr(byte[] subChunks) => _Chunk("VQFR", subChunks);
 
-  private static byte[] _Header(int width, int height, int blockWidth, int blockHeight, int frames, int sampleRate, int channels) {
+  private static byte[] _Header(
+    int width,
+    int height,
+    int blockWidth,
+    int blockHeight,
+    int frames,
+    int sampleRate,
+    int channels,
+    int frameRate = 15,
+    bool highColour = false,
+    int version = 2) {
     var payload = new byte[42];
-    BinaryPrimitives.WriteUInt16LittleEndian(payload, 2); // version
+    BinaryPrimitives.WriteUInt16LittleEndian(payload, (ushort)version);
+    BinaryPrimitives.WriteUInt16LittleEndian(payload.AsSpan(2), highColour ? (ushort)0x10 : (ushort)0);
     BinaryPrimitives.WriteUInt16LittleEndian(payload.AsSpan(4), (ushort)frames);
     BinaryPrimitives.WriteUInt16LittleEndian(payload.AsSpan(6), (ushort)width);
     BinaryPrimitives.WriteUInt16LittleEndian(payload.AsSpan(8), (ushort)height);
     payload[10] = (byte)blockWidth;
     payload[11] = (byte)blockHeight;
+    payload[12] = (byte)frameRate;
+    payload[13] = highColour ? (byte)0 : (byte)8;
+    BinaryPrimitives.WriteUInt16LittleEndian(payload.AsSpan(14), highColour ? (ushort)0 : (ushort)256);
     BinaryPrimitives.WriteUInt16LittleEndian(payload.AsSpan(24), (ushort)sampleRate);
     payload[26] = (byte)channels;
+    payload[27] = sampleRate == 0 ? (byte)0 : (byte)16;
     return _Chunk("VQHD", payload);
   }
 
-  private static byte[] _File(int width, int height, int blockWidth, int blockHeight, int frames, int sampleRate, int channels, IReadOnlyList<byte[]> chunks) {
-    var vqhd = _Header(width, height, blockWidth, blockHeight, frames, sampleRate, channels);
+  private static byte[] _File(
+    int width,
+    int height,
+    int blockWidth,
+    int blockHeight,
+    int frames,
+    int sampleRate,
+    int channels,
+    IReadOnlyList<byte[]> chunks,
+    int frameRate = 15,
+    bool highColour = false,
+    int version = 2) {
+    var vqhd = _Header(width, height, blockWidth, blockHeight, frames, sampleRate, channels, frameRate, highColour, version);
     var body = vqhd.Concat(chunks.SelectMany(c => c)).ToArray();
     var file = new byte[12 + body.Length];
     System.Text.Encoding.ASCII.GetBytes("FORM").CopyTo(file, 0);
@@ -193,7 +250,7 @@ public sealed class VqaReaderTests {
 
   private static byte[] _File(int width, int height, bool includeVqhd, IReadOnlyList<byte[]> chunks) {
     var body = includeVqhd
-      ? _Header(width, height, 1, 1, 0, 0, 0).Concat(chunks.SelectMany(c => c)).ToArray()
+      ? _Header(width, height, 4, 2, 0, 0, 0).Concat(chunks.SelectMany(c => c)).ToArray()
       : chunks.SelectMany(c => c).ToArray();
     var file = new byte[12 + body.Length];
     System.Text.Encoding.ASCII.GetBytes("FORM").CopyTo(file, 0);
@@ -203,14 +260,12 @@ public sealed class VqaReaderTests {
     return file;
   }
 
-  /// <summary>A file whose FORM chunk states a size covering only VQHD, the same shape a real sample
-  /// takes, with the real chunks running on past it.</summary>
   private static byte[] _FileWithUndersizedForm(int width, int height, int blockWidth, int blockHeight, int frames, IReadOnlyList<byte[]> chunks) {
     var vqhd = _Header(width, height, blockWidth, blockHeight, frames, 0, 0);
     var body = vqhd.Concat(chunks.SelectMany(c => c)).ToArray();
     var file = new byte[12 + body.Length];
     System.Text.Encoding.ASCII.GetBytes("FORM").CopyTo(file, 0);
-    BinaryPrimitives.WriteUInt32BigEndian(file.AsSpan(4), (uint)(4 + vqhd.Length)); // undersized on purpose
+    BinaryPrimitives.WriteUInt32BigEndian(file.AsSpan(4), (uint)(4 + vqhd.Length));
     System.Text.Encoding.ASCII.GetBytes("WVQA").CopyTo(file, 8);
     body.CopyTo(file, 12);
     return file;

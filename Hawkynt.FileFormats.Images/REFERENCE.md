@@ -9676,6 +9676,7 @@ Describes the pixel layout and bit depth of raw image data.
 | `Yuv422P16` | `39` | Planar 16-bit YUV 4:2:2 in little-endian ushort samples. |
 | `Yuv440P16` | `40` | Planar 16-bit YUV 4:4:0 in little-endian ushort samples. |
 | `Yuv444P16` | `41` | Planar 16-bit YUV 4:4:4 in little-endian ushort samples. |
+| `Yuv411P8` | `42` | Planar 8-bit YUV 4:1:1: Y, U, V. |
 
 #### `PixelRect`
 
