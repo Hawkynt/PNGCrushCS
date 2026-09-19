@@ -16,7 +16,7 @@ namespace FileFormat.FliDesigner2;
 /// table at all. The reader made the same assumption, so the two agreed with each other and with
 /// nothing else.
 /// </remarks>
-[VerifiedBy(ConformanceOracle.Recoil2Png)]
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.IrfanView)]
 public readonly record struct FliDesigner2File
   : IImageFormatReader<FliDesigner2File>, IImageToRawImage<FliDesigner2File>,
     IImageFromRawImage<FliDesigner2File>, IImageFormatWriter<FliDesigner2File> {

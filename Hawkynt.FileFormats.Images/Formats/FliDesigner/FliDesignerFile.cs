@@ -15,7 +15,7 @@ namespace FileFormat.FliDesigner;
 /// The picture is 296 across rather than 160: FLI cannot colour the first three cells of a row, and
 /// each multicolour pixel is drawn two wide, so what is left is 148 stored pixels shown as 296.
 /// </remarks>
-[VerifiedBy(ConformanceOracle.Recoil2Png)]
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.IrfanView)]
 public readonly record struct FliDesignerFile
   : IImageFormatReader<FliDesignerFile>, IImageToRawImage<FliDesignerFile>,
     IImageFromRawImage<FliDesignerFile>, IImageFormatWriter<FliDesignerFile> {
