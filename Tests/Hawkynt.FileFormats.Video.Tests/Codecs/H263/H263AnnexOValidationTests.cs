@@ -36,13 +36,15 @@ public sealed class H263AnnexOValidationTests {
     Assert.That(failure!.Message, Does.Contain("15 pixels"));
   }
 
-  [TestCase(H263PictureKind.ImprovedPb, "Improved PB")]
-  [TestCase(H263PictureKind.EnhancementPredicted, "EnhancementPredicted")]
+  // The picture kind is internal, so it travels as its underlying byte: a public test method
+  // cannot take a parameter of a type the assembly does not expose.
+  [TestCase((byte)H263PictureKind.ImprovedPb, "Improved PB")]
+  [TestCase((byte)H263PictureKind.EnhancementPredicted, "EnhancementPredicted")]
   [Category("Unit")]
   public void LegalRtypeOneOnUnsupportedPictureKindsReachesTheUnsupportedModeRefusal(
-    H263PictureKind pictureKind,
+    byte pictureKind,
     string expectedMessage) {
-    var data = _PlusHeaderWithRtypeOne(pictureKind);
+    var data = _PlusHeaderWithRtypeOne((H263PictureKind)pictureKind);
 
     var failure = Assert.Throws<NotSupportedException>(() => _ParseAfterPictureStart(data));
     Assert.That(failure!.Message, Does.Contain(expectedMessage));

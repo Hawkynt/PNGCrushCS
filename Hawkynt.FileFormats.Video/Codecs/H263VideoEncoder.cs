@@ -57,7 +57,7 @@ public sealed class H263VideoEncoder : IVideoCodecEncoder<H263VideoEncoder> {
     this._reconstruction = H263VideoDecoder.Create(stream);
   }
 
-  public static string CodecName => "H.263 / H.263+ (I/P and Annex O temporal B-pictures)";
+  public static string CodecName => "H.263 / H.263+ (Annex O temporal B-pictures, Sorenson Spark)";
 
   public static CodecTag Codec => _Tag;
 

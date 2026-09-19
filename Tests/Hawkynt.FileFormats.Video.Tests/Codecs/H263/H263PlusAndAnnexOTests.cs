@@ -76,9 +76,8 @@ public sealed class H263PlusAndAnnexOTests {
     const int width = 128;
     const int height = 96;
     var stream = _Stream(width, height);
-    var encoder = H263VideoEncoder.Create(stream) {
-      BidirectionalPicturesBetweenReferences = 2,
-    };
+    var encoder = H263VideoEncoder.Create(stream);
+    encoder.BidirectionalPicturesBetweenReferences = 2;
 
     byte[] luminances = [48, 80, 112, 144];
     var packets = new List<CodedPacket>();
