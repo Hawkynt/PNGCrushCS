@@ -2,6 +2,7 @@ using System;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 
 namespace Hawkynt.FileFormats.Video.Tests;
 
@@ -62,12 +63,10 @@ internal static class FFmpegOracle {
         return (false, "ffmpeg timed out");
       }
 
-      var diagnostics = string.Concat(stdout.Result, stderr.Result).Trim();
+      var diagnostics = SignificantDiagnostics(string.Concat(stdout.Result, stderr.Result));
       var size = _PngSize(png);
 
-      // At -loglevel error FFmpeg says nothing at all about a stream it read cleanly, so anything on
-      // the error channel is it telling us it patched over something. A picture of the right size
-      // that came with a complaint is not the picture that went in.
+      // A picture of the right size that came with a complaint is not the picture that went in.
       if (diagnostics.Length != 0)
         return (false, diagnostics);
 
@@ -89,6 +88,23 @@ internal static class FFmpegOracle {
   /// </summary>
   public static (bool Decoded, string Output) TryDecodeFrameCount(
     string path, int width, int height, int expectedFrames) {
+    var (decoded, output, _) = TryDecodePictures(path, width, height, expectedFrames);
+    return (decoded, output);
+  }
+
+  /// <summary>
+  /// Decodes the complete first video stream to unframed RGB24 and hands back the pictures
+  /// themselves, so a caller can compare what came out against what it encoded rather than only
+  /// counting frames.
+  /// </summary>
+  /// <remarks>
+  /// Counting says a decoder walked the file; only the samples say it read it. A codec whose frames
+  /// are laid out wrongly — fields on the wrong rows, a picture cropped at the wrong end — produces
+  /// exactly the right number of frames of exactly the right size while being wrong in every one of
+  /// them.
+  /// </remarks>
+  public static (bool Decoded, string Output, byte[] Pictures) TryDecodePictures(
+    string path, int width, int height, int expectedFrames) {
     var raw = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName() + ".rgb");
 
     try {
@@ -100,48 +116,85 @@ internal static class FFmpegOracle {
 
       foreach (var argument in new[] {
         "-hide_banner", "-loglevel", "error", "-y", "-i", path,
-        "-map", "0:v:0", "-an", "-sn", "-dn", "-vsync", "0",
+        // -fps_mode, not -vsync: the old spelling was removed in ffmpeg 7 and this machine runs 9, where
+        // passing it aborts the whole command before a frame is read.
+        "-map", "0:v:0", "-an", "-sn", "-dn", "-fps_mode", "passthrough",
         "-f", "rawvideo", "-pix_fmt", "rgb24", raw,
       })
         startInfo.ArgumentList.Add(argument);
 
       using var process = Process.Start(startInfo);
       if (process == null)
-        return (false, "ffmpeg would not start");
+        return (false, "ffmpeg would not start", []);
 
       var stdout = process.StandardOutput.ReadToEndAsync();
       var stderr = process.StandardError.ReadToEndAsync();
 
       if (!process.WaitForExit(_TIMEOUT_MILLISECONDS)) {
         try { process.Kill(entireProcessTree: true); } catch { /* already gone */ }
-        return (false, "ffmpeg timed out");
+        return (false, "ffmpeg timed out", []);
       }
 
-      var diagnostics = string.Concat(stdout.Result, stderr.Result).Trim();
+      var diagnostics = SignificantDiagnostics(string.Concat(stdout.Result, stderr.Result));
       if (diagnostics.Length != 0)
-        return (false, diagnostics);
+        return (false, diagnostics, []);
 
       if (!File.Exists(raw))
-        return (false, "it produced no decoded video bytes");
+        return (false, "it produced no decoded video bytes", []);
 
-      var frameBytes = checked((long)width * height * 3);
-      var actualBytes = new FileInfo(raw).Length;
-      var expectedBytes = checked(frameBytes * expectedFrames);
-      if (actualBytes != expectedBytes)
+      var pictures = File.ReadAllBytes(raw);
+      var frameBytes = checked(width * height * 3);
+      if (pictures.Length != checked(frameBytes * expectedFrames))
         return (false,
-          actualBytes % frameBytes == 0
-            ? $"it decoded {actualBytes / frameBytes} frames instead of {expectedFrames}"
-            : $"it produced {actualBytes} bytes, which is not a whole number of {width}x{height} RGB24 frames");
+          pictures.Length % frameBytes == 0
+            ? $"it decoded {pictures.Length / frameBytes} frames instead of {expectedFrames}"
+            : $"it produced {pictures.Length} bytes, which is not a whole number of {width}x{height} RGB24 frames",
+          []);
 
-      return (true, $"it decoded all {expectedFrames} {width}x{height} frames");
+      return (true, $"it decoded all {expectedFrames} {width}x{height} frames", pictures);
     } catch (Win32Exception) {
-      return (false, "no ffmpeg on this machine");
+      return (false, "no ffmpeg on this machine", []);
     } catch (Exception exception) {
-      return (false, $"{exception.GetType().Name}: {exception.Message}");
+      return (false, $"{exception.GetType().Name}: {exception.Message}", []);
     } finally {
       try { File.Delete(raw); } catch { /* best effort */ }
     }
   }
+
+  /// <summary>
+  /// What FFmpeg said that is about the file, with the one line that is about FFmpeg's own version
+  /// dropped.
+  /// </summary>
+  /// <remarks>
+  /// At <c>-loglevel error</c> FFmpeg says nothing at all about a stream it read cleanly, so anything
+  /// on the error channel is it telling us it patched over something — which is the whole worth of
+  /// this oracle, and the reason the list of lines that do not count is one line long, is keyed to the
+  /// decoder that printed it as well as to its text, and grows only against measurement.
+  /// <para/>
+  /// <b><c>[h261 @ …] warning: first frame is no keyframe</c>.</b> H.261 has no I picture. Clause 3.2
+  /// puts the intra/inter choice on every macroblock's own MTYPE and leaves the picture header with no
+  /// intra/inter flag to set, so FFmpeg's H.261 decoder enters every picture as
+  /// <c>AV_PICTURE_TYPE_P</c> and mpegvideo's "the first picture is not an I picture" complaint fires
+  /// on the opening picture of every H.261 stream there has ever been. Measured rather than reasoned
+  /// about: FFmpeg 4.2.2 prints it twice for a clip <b>FFmpeg's own H.261 encoder</b> wrote, exactly as
+  /// it does for one written here, and FFmpeg 8.1 prints it for neither, because FFmpeg silenced it
+  /// itself — <c>s->codec_id != AV_CODEC_ID_H261 /* H.261 has no keyframes */</c> guards the log call
+  /// in <c>ff_mpv_alloc_dummy_frames</c>. The line therefore reports which FFmpeg is on the machine and
+  /// nothing whatever about the bytes handed to it, and a check that fails on it fails by calendar.
+  /// <para/>
+  /// Nothing else is tolerated. The same words from any other decoder are kept, because in a format
+  /// that does have an I picture they mean the encoder did not write one; so is every other line H.261
+  /// can produce; and so is a picture that never arrived, which no complaint is needed to fail.
+  /// </remarks>
+  internal static string SignificantDiagnostics(string diagnostics) => string.Join('\n',
+    diagnostics
+      .Split('\n')
+      .Select(static line => line.Trim())
+      .Where(static line => line.Length != 0 && !_IsAboutFFmpegsOwnVersion(line)));
+
+  private static bool _IsAboutFFmpegsOwnVersion(string line)
+    => line.StartsWith("[h261 @ ", StringComparison.Ordinal)
+       && line.EndsWith("warning: first frame is no keyframe", StringComparison.Ordinal);
 
   private static (int Width, int Height)? _PngSize(string path) {
     try {

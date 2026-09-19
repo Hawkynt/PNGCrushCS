@@ -13,6 +13,7 @@ namespace FileFormat.PmgDesigner;
 /// A sheet of a single row is laid out to its own width; anything taller is 320 pixels across with
 /// two blank scanlines between rows.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.IrfanView)]
 public readonly record struct PmgDesignerFile
   : IImageFormatReader<PmgDesignerFile>, IImageToRawImage<PmgDesignerFile>,
     IImageFromRawImage<PmgDesignerFile>, IImageFormatWriter<PmgDesignerFile> {
