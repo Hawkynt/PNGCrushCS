@@ -18,6 +18,7 @@ namespace FileFormat.EmbeddedDib;
 [FormatMagicBytes([0x38, 0x00, 0x00, 0x00])]
 [FormatMagicBytes([0x6C, 0x00, 0x00, 0x00])]
 [FormatMagicBytes([0x7C, 0x00, 0x00, 0x00])]
+[VerifiedBy(ConformanceOracle.ImageMagick)]
 public readonly record struct EmbeddedDibFile
   : IImageFormatReader<EmbeddedDibFile>, IImageToRawImage<EmbeddedDibFile>,
     IImageFromRawImage<EmbeddedDibFile>, IImageFormatWriter<EmbeddedDibFile> {

@@ -150,16 +150,17 @@ public sealed class WriterOracleTests {
       foreach (var (width, height, mode) in OracleProbePicture.CasesFor(entry))
       foreach (var extension in _ExtensionsOf(entry)) {
         var path = Path.Combine(directory.FullName, "sample" + extension);
+        var source = OracleProbePicture.Sample(width, height, mode);
 
         try {
-          if (!FormatRegistry.Write(OracleProbePicture.Sample(width, height, mode), entry.Format, new FileInfo(path)))
+          if (!FormatRegistry.Write(source, entry.Format, new FileInfo(path)))
             continue;
         } catch (Exception) {
           // A size this format will not take. Another one on the list may be.
           continue;
         }
 
-        var (verdict, why) = WriterOracleTool.Ask(oracle, path, width, height);
+        var (verdict, why) = WriterOracleTool.Ask(oracle, path, entry, source);
         if (verdict == WriterOracleTool.Verdict.Accepted)
           return (verdict, string.Empty);
 
