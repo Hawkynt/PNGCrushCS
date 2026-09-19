@@ -90,6 +90,7 @@ public static class RawPixelFormats {
     PixelFormat.GrayAlphaF32 => _Floating(format, 64, 8, 32, RawPixelAlphaKind.Channel),
     PixelFormat.RgbF32 => _Floating(format, 96, 12, 32),
     PixelFormat.RgbaF32 => _Floating(format, 128, 16, 32, RawPixelAlphaKind.Channel),
+    PixelFormat.Yuv411P8 => _Yuv(format, 12, 8, 4, 1),
     PixelFormat.Yuv420P8 => _Yuv(format, 12, 8, 2, 2),
     PixelFormat.Yuv422P8 => _Yuv(format, 16, 8, 2, 1),
     PixelFormat.Yuv440P8 => _Yuv(format, 16, 8, 1, 2),

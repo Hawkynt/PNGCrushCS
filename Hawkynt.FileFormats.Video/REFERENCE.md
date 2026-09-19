@@ -1471,7 +1471,7 @@ Implements `IVideoCodecEncoder<IyuvVideoEncoder>`, `IVideoPacketEncoder`.
 
 #### `LclZlibVideoDecoder`
 
-Decodes the ZLIB variant of the Lossless Codec Library (LCL): a picture converted to a target colour space and handed straight to zlib's DEFLATE, with the compressor reset fresh for every frame, so every packet decodes on its own with nothing carried from the one before it.
+Decodes the ZLIB variant of the Lossless Codec Library (LCL): an intra-only lossless picture whose packed colour-space bytes are optionally delta-filtered and then stored in one or two RFC 1950 zlib streams.
 
 Implements `IVideoCodecDecoder<LclZlibVideoDecoder>`, `IVideoFrameDecoder`.
 
@@ -1484,7 +1484,7 @@ Implements `IVideoCodecDecoder<LclZlibVideoDecoder>`, `IVideoFrameDecoder`.
 
 #### `LclZlibVideoEncoder`
 
-Encodes the ZLIB variant of the Lossless Codec Library (LCL): every picture as one complete zlib stream of its RGB24 rows, bottom row first, with the compressor started fresh for each frame so every packet is a key frame that decodes on its own.
+Encodes the ZLIB variant of the Lossless Codec Library (LCL): one independently decodable intra picture, optionally transformed to one of LCL's historical YUV layouts, delta-filtered, and split into the format's two independently compressed zlib sections.
 
 Implements `IVideoCodecEncoder<LclZlibVideoEncoder>`, `IVideoPacketEncoder`.
 
@@ -1492,9 +1492,23 @@ Implements `IVideoCodecEncoder<LclZlibVideoEncoder>`, `IVideoPacketEncoder`.
 | --- | --- | --- |
 | `CodecName` | `static string CodecName { get; }` |  |
 | `Codec` | `static CodecTag Codec { get; }` |  |
-| `Create` | `static LclZlibVideoEncoder Create(MediaStreamInfo stream)` |  |
+| `Create` | `static LclZlibVideoEncoder Create(MediaStreamInfo stream)` | Builds the conservative RGB24/single-stream encoder used before historical modes were exposed. |
+| `Create` | `static LclZlibVideoEncoder Create(MediaStreamInfo stream, ImageType imageType, bool pngFiltered = false, bool multithreaded = false)` | Builds an encoder for one of LCL's historical image layouts and optional packet transforms. |
 | `DescribeStream` | `MediaStreamInfo DescribeStream()` |  |
 | `TryEncode` | `bool TryEncode(RawImage frame, long? presentationTimestamp, out CodedPacket packet)` |  |
+
+#### `LclZlibVideoEncoder.ImageType`
+
+The image-type byte in LCL's extended BITMAPINFOHEADER.
+
+| Value | Numeric | Summary |
+| --- | --- | --- |
+| `Yuv111` | `0` | Three samples per pixel; exposed canonically as planar YUV 4:4:4. |
+| `Yuv422` | `1` | Four luma bytes followed by two U and two V bytes per four pixels. |
+| `Rgb24` | `2` | Bottom-up packed BGR24. |
+| `Yuv411` | `3` | Four luma bytes followed by one U and one V byte per four pixels. |
+| `Yuv211` | `4` | Two luma bytes followed by one U and one V byte per two pixels. |
+| `Yuv420` | `5` | Two luma samples from each of two rows followed by one U and one V sample. |
 
 #### `LocoVideoDecoder`
 
@@ -4579,6 +4593,7 @@ Describes the pixel layout and bit depth of raw image data.
 | `Yuv422P16` | `39` | Planar 16-bit YUV 4:2:2 in little-endian ushort samples. |
 | `Yuv440P16` | `40` | Planar 16-bit YUV 4:4:0 in little-endian ushort samples. |
 | `Yuv444P16` | `41` | Planar 16-bit YUV 4:4:4 in little-endian ushort samples. |
+| `Yuv411P8` | `42` | Planar 8-bit YUV 4:1:1: Y, U, V. |
 
 #### `PixelRect`
 
