@@ -7,10 +7,9 @@ using Hawkynt.FileFormats.Video;
 
 namespace FileFormat.RoqVideo;
 
-/// <summary>Writes RoQ video chunks verbatim and sound chunks with their preserved predictor arguments.</summary>
+/// <summary>Writes RoQ video chunks verbatim and optional RoQ DPCM sound.</summary>
 [VerifiedBy(ConformanceOracle.FFmpeg)]
 public sealed class RoqWriter : IVideoContainerWriter<RoqWriter> {
-
   private readonly IReadOnlyList<MediaStreamInfo> _streams;
   private readonly MemoryStream _output = new();
   private bool _finished;
@@ -31,12 +30,35 @@ public sealed class RoqWriter : IVideoContainerWriter<RoqWriter> {
     }
 
     this._streams = streams;
-    this._output.Write(RoqReader.Signature);
+    _WriteSignature(this._output, streams[0]);
   }
 
   public static string PrimaryExtension => ".roq";
   public static string[] FileExtensions => [".roq"];
   public static RoqWriter Create(IReadOnlyList<MediaStreamInfo> streams, VideoMetadata metadata) => new(streams, metadata);
+
+  private static void _WriteSignature(Stream output, MediaStreamInfo video) {
+    var privateData = video.CodecPrivateData.Span;
+    if (privateData.Length > 0 && privateData[0] == 2) {
+      ContainerWriterTools.WriteUInt16LittleEndian(output, RoqChunkType.SIGNATURE);
+      ContainerWriterTools.WriteUInt32LittleEndian(output, 0);
+      ContainerWriterTools.WriteUInt16LittleEndian(output, 0);
+      return;
+    }
+
+    var rate = video.FrameRate;
+    var fps = 30;
+    if (rate.IsKnown) {
+      if (rate.Numerator <= 0 || rate.Denominator <= 0 || rate.Numerator % rate.Denominator != 0)
+        throw new NotSupportedException($"RoQ's header stores an integer frame rate; {rate.Numerator}/{rate.Denominator} cannot be represented exactly.");
+      var integral = rate.Numerator / rate.Denominator;
+      if (integral is <= 0 or > ushort.MaxValue)
+        throw new NotSupportedException($"RoQ's header stores its frame rate in sixteen bits; {integral} is out of range.");
+      fps = (int)integral;
+    }
+
+    output.Write(RoqReader.CreateSignature(fps));
+  }
 
   public void WritePacket(CodedPacket packet) {
     if (this._finished)
@@ -51,48 +73,26 @@ public sealed class RoqWriter : IVideoContainerWriter<RoqWriter> {
     }
 
     if (packet.ContainerPrivateData.Length != 2)
-      throw new NotSupportedException(
-        "A RoQ sound packet needs the original two-byte chunk argument in ContainerPrivateData; it is the DPCM predictor seed and cannot be invented.");
+      throw new NotSupportedException("A RoQ sound packet needs its original two-byte DPCM predictor argument in ContainerPrivateData.");
 
     var audio = this._streams[1];
-    var id = audio.Codec.EqualsIgnoringCase(CodecTag.FromCharacters("RoQS"))
-      ? RoqChunkType.SOUND_STEREO
-      : RoqChunkType.SOUND_MONO;
+    var id = audio.Codec.EqualsIgnoringCase(CodecTag.FromCharacters("RoQS")) ? RoqChunkType.SOUND_STEREO : RoqChunkType.SOUND_MONO;
     ContainerWriterTools.WriteUInt16LittleEndian(this._output, id);
     ContainerWriterTools.WriteUInt32LittleEndian(this._output, checked((uint)packet.Data.Length));
     this._output.Write(packet.ContainerPrivateData.Span);
     this._output.Write(packet.Data.Span);
   }
 
-  /// <summary>
-  /// Checks that a video packet is a whole number of RoQ chunks, each stating its own length truly.
-  /// </summary>
-  /// <remarks>
-  /// One packet, one chunk is what the demuxer hands out, and a remux writes those back unchanged. An
-  /// encoder cannot work that way: a picture is a <c>QUAD_VQ</c> chunk plus the <c>QUAD_CODEBOOK</c>
-  /// chunk it needs and, at the start of a film, an <c>INFO</c> chunk, and
-  /// <see cref="FileFormat.Core.IVideoPacketEncoder.TryEncode"/> hands back one packet per picture. So a
-  /// packet is a run of chunks here rather than exactly one, and the run is walked rather than the first
-  /// header trusted for the whole of it — a packet whose last chunk overruns is a file that cannot be
-  /// read back, and is refused here rather than written.
-  /// </remarks>
   private static void _CheckVideoChunks(ReadOnlySpan<byte> data) {
     if (data.Length < 8)
       throw new InvalidDataException("A RoQ video packet must include its eight-byte codec chunk header.");
 
-    var at = 0;
-    while (at < data.Length) {
+    for (var at = 0; at < data.Length;) {
       if (at + 8 > data.Length)
-        throw new InvalidDataException(
-          $"A RoQ chunk header would start {data.Length - at} bytes from the end of a packet whose chunk "
-          + "headers are eight bytes each.");
-
+        throw new InvalidDataException($"A RoQ chunk header starts {data.Length - at} bytes from the end of a video packet.");
       var size = BinaryPrimitives.ReadUInt32LittleEndian(data.Slice(at + 2, 4));
       if (size > int.MaxValue || at + 8 + (long)size > data.Length)
-        throw new InvalidDataException(
-          $"A RoQ chunk at byte {at} of a packet states {size} payload bytes, which runs past the packet's "
-          + $"{data.Length - at - 8} remaining.");
-
+        throw new InvalidDataException($"A RoQ chunk at byte {at} states {size} bytes past the end of its packet.");
       at += 8 + (int)size;
     }
   }
