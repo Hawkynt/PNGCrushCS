@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using FileFormat.Core;
+using FileFormat.Png;
 
 namespace FileFormat.WindowsPe.Tests;
 
@@ -28,6 +29,102 @@ public sealed class PeResourceSafetyTests {
       Assert.That(resource.FormatHint, Is.EqualTo("png"));
     });
   }
+
+  [Test]
+  public void ReadEditable_EmbeddedImage_RetainsEveryLanguageVariant() {
+    var german = _Png(0x22);
+    var english = _Png(0x11);
+    var pe = _BuildPe(
+      new ResourceLeaf(10, 100, 0x0407, german),
+      new ResourceLeaf(10, 100, 0x0409, english)
+    );
+
+    var images = PeResourceFile.ReadEditable(pe).ImageResources
+      .Where(static image => image.ResourceType == PeImageResourceType.EmbeddedImage)
+      .OrderBy(static image => image.LanguageId)
+      .ToArray();
+
+    Assert.Multiple(() => {
+      Assert.That(images, Has.Length.EqualTo(2));
+      Assert.That(images.Select(static image => image.ResourceTypeId), Is.All.EqualTo(10));
+      Assert.That(images.Select(static image => image.ResourceId), Is.All.EqualTo(100));
+      Assert.That(images.Select(static image => image.ResourceTypeName), Is.All.Null);
+      Assert.That(images.Select(static image => image.ResourceName), Is.All.Null);
+      Assert.That(images.Select(static image => image.LanguageName), Is.All.Null);
+      Assert.That(images.Select(static image => image.LanguageId), Is.EqualTo(new int?[] { 0x0407, 0x0409 }));
+      Assert.That(images[0].Data, Is.EqualTo(german));
+      Assert.That(images[1].Data, Is.EqualTo(english));
+    });
+  }
+
+  [Test]
+  public void ReplaceImage_ByIndex_UsesTheRetainedEmbeddedImageLanguage() {
+    var german = _Png(0x22);
+    var english = _Png(0x11);
+    var pe = _BuildPe(
+      new ResourceLeaf(10, 100, 0x0407, german),
+      new ResourceLeaf(10, 100, 0x0409, english)
+    );
+    var editable = PeResourceFile.ReadEditable(pe);
+    var germanIndex = editable.ImageResources
+      .Select(static (image, index) => (image, index))
+      .Single(static pair =>
+        pair.image.ResourceType == PeImageResourceType.EmbeddedImage && pair.image.LanguageId == 0x0407)
+      .index;
+
+    // No language is passed here on purpose: type 10 / ID 100 is ambiguous without one, so the edit
+    // can only succeed if the selected image resource still carries the language it was read under.
+    var replacement = _Image(2, 2);
+    var edited = editable.ReplaceImage(germanIndex, replacement);
+
+    var images = edited.ImageResources
+      .Where(static image => image.ResourceType == PeImageResourceType.EmbeddedImage)
+      .ToArray();
+
+    Assert.Multiple(() => {
+      Assert.That(
+        images.Single(static image => image.LanguageId == 0x0407).Data,
+        Is.EqualTo(PngWriter.ToBytes(PngFile.FromRawImage(replacement)))
+      );
+      Assert.That(images.Single(static image => image.LanguageId == 0x0409).Data, Is.EqualTo(english));
+    });
+  }
+
+  [Test]
+  public void ReadEditable_IconGroupTooLargeToAssemble_YieldsNoGroupInsteadOfOverflowing() {
+    const ushort count = ushort.MaxValue;
+    var component = new byte[32768];
+    var group = new byte[6 + count * 14];
+    BinaryPrimitives.WriteUInt16LittleEndian(group.AsSpan(2), 1);
+    BinaryPrimitives.WriteUInt16LittleEndian(group.AsSpan(4), count);
+    for (var i = 0; i < count; ++i) {
+      var entry = 6 + i * 14;
+      group[entry] = 16;
+      group[entry + 1] = 16;
+      BinaryPrimitives.WriteUInt16LittleEndian(group.AsSpan(entry + 4), 1);
+      BinaryPrimitives.WriteUInt16LittleEndian(group.AsSpan(entry + 6), 32);
+      BinaryPrimitives.WriteInt32LittleEndian(group.AsSpan(entry + 8), component.Length);
+      BinaryPrimitives.WriteUInt16LittleEndian(group.AsSpan(entry + 12), 1);
+    }
+
+    // 65535 entries of 32 KiB each: the assembled ICO would be just over 2 GiB, which used to wrap
+    // into a negative array length instead of being refused.
+    var pe = _BuildPe(
+      new ResourceLeaf(3, 1, 0x0409, component),
+      new ResourceLeaf(14, 1, 0x0409, group)
+    );
+
+    PeResourceFile? file = null;
+    Assert.DoesNotThrow(() => file = PeResourceFile.ReadEditable(pe));
+    Assert.Multiple(() => {
+      Assert.That(file!.IconGroups, Is.Empty);
+      Assert.That(file.ImageResources.Any(static image => image.ResourceType == PeImageResourceType.Icon), Is.False);
+    });
+  }
+
+  [Test]
+  public void DetectImageSignature_RangeOverflowingIntArithmetic_ReturnsNull()
+    => Assert.That(PeResourceReader._DetectImageSignature(new byte[8], int.MaxValue, 8), Is.Null);
 
   [Test]
   public void ReplaceResource_WithoutLanguage_RejectsActualMultipleLanguageVariants() {
@@ -93,6 +190,10 @@ public sealed class PeResourceSafetyTests {
 
     Assert.That(exception!.Message, Does.Contain("referenced by multiple RT_GROUP_CURSOR entries"));
   }
+
+  /// <summary>A payload that is recognized as PNG by signature but is not a decodable image.</summary>
+  private static byte[] _Png(byte marker)
+    => [0x89, (byte)'P', (byte)'N', (byte)'G', 0x0D, 0x0A, 0x1A, 0x0A, marker, 2, 3, 4];
 
   private readonly record struct ResourceLeaf(int TypeId, int ResourceId, int LanguageId, byte[] Data);
 

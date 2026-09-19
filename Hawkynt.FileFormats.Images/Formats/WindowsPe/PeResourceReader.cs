@@ -280,7 +280,10 @@ public static class PeResourceReader {
           continue;
         }
 
-        // Level 3: language variants (pick the first one)
+        // Level 3: language variants. Icons, cursors and bitmaps are keyed by resource ID here and
+        // keep their historical "first language wins" assembly. Every other type is reported once
+        // per language variant, so an embedded image that exists in several languages stays
+        // individually addressable instead of collapsing onto the first one.
         var level3Offset = rsrcFileOffset + resOffset;
         if (level3Offset < 0 || level3Offset > data.Length - _RESOURCE_DIRECTORY_SIZE)
           continue;
@@ -293,14 +296,16 @@ public static class PeResourceReader {
           if (!_ReadDataEntry(data, rsrcFileOffset + langOffset, rsrcFileOffset, rsrcRva, out var dataFileOffset, out var dataSize))
             continue;
 
-          if (dataFileOffset >= 0 && dataSize > 0) {
-            if (targetDict != null)
-              targetDict[resId] = (dataFileOffset, dataSize);
-            else
-              otherResources.Add((id, resId, dataFileOffset, dataSize));
+          if (dataFileOffset < 0 || dataSize <= 0)
+            continue;
 
-            break; // Take first language variant
+          if (targetDict == null) {
+            otherResources.Add((id, resId, dataFileOffset, dataSize));
+            continue;
           }
+
+          targetDict[resId] = (dataFileOffset, dataSize);
+          break; // Grouped and bitmap resources are keyed by ID: take the first language variant.
         }
       }
     }
@@ -404,12 +409,13 @@ public static class PeResourceReader {
   }
 
   /// <summary>Detects known image file signatures in resource data.</summary>
+  /// <remarks>
+  /// The range check is written so that no intermediate sum can overflow: <c>offset + size</c> would
+  /// wrap for a hostile resource entry near <see cref="int.MaxValue"/> and let an out-of-range read
+  /// through, so the bounds are compared by subtraction against the buffer length instead.
+  /// </remarks>
   internal static string? _DetectImageSignature(byte[] data, int offset, int size) {
-    if (size < 4)
-      return null;
-
-    var end = Math.Min(offset + size, data.Length);
-    if (end - offset < 4)
+    if (offset < 0 || size < 4 || size > data.Length || offset > data.Length - size)
       return null;
 
     // PNG: 89 50 4E 47 0D 0A 1A 0A
@@ -502,7 +508,10 @@ public static class PeResourceReader {
 
     // First pass: compute total data size and collect entries
     var entries = new List<(byte Width, byte Height, byte ColorCount, byte Reserved, ushort Planes, ushort BitCount, int BytesInRes, int ResourceId, int ActualDataOffset, int ActualDataSize)>();
-    var totalDataSize = 0;
+    // 65535 group entries may each name a multi-kilobyte RT_ICON, so the assembled total does not
+    // fit an int. Accumulate in long and refuse the group rather than wrapping into a negative
+    // array length below.
+    var totalDataSize = 0L;
 
     for (var i = 0; i < count; ++i) {
       var entryBase = grpOffset + 6 + i * grpEntrySize;
@@ -526,9 +535,12 @@ public static class PeResourceReader {
     if (entries.Count == 0)
       return null;
 
-    // Build the ICO file
-    var icoSize = icoHeaderSize + entries.Count * 16 + totalDataSize;
-    var ico = new byte[icoSize];
+    // Build the ICO file only once the size arithmetic is known to fit managed array indexing.
+    var icoSize = icoHeaderSize + entries.Count * 16L + totalDataSize;
+    if (icoSize > int.MaxValue)
+      return null;
+
+    var ico = new byte[(int)icoSize];
 
     // Write ICO header
     BinaryPrimitives.WriteUInt16LittleEndian(ico.AsSpan(0), 0);                         // Reserved
@@ -584,7 +596,8 @@ public static class PeResourceReader {
 
     var icoHeaderSize = 6;
     var entries = new List<(ushort HotspotX, ushort HotspotY, byte Width, byte Height, byte ColorCount, int ActualDataOffset, int ActualDataSize, ushort Planes, ushort BitCount)>();
-    var totalDataSize = 0;
+    // See _AssembleIco: the accumulated payload of a maximal cursor group exceeds int range.
+    var totalDataSize = 0L;
 
     for (var i = 0; i < count; ++i) {
       var entryBase = grpOffset + 6 + i * grpEntrySize;
@@ -620,9 +633,12 @@ public static class PeResourceReader {
     if (entries.Count == 0)
       return null;
 
-    // Build CUR file (Type=2)
-    var curSize = icoHeaderSize + entries.Count * 16 + totalDataSize;
-    var cur = new byte[curSize];
+    // Build CUR file (Type=2) only once the size arithmetic is known to fit managed array indexing.
+    var curSize = icoHeaderSize + entries.Count * 16L + totalDataSize;
+    if (curSize > int.MaxValue)
+      return null;
+
+    var cur = new byte[(int)curSize];
 
     BinaryPrimitives.WriteUInt16LittleEndian(cur.AsSpan(0), 0);                          // Reserved
     BinaryPrimitives.WriteUInt16LittleEndian(cur.AsSpan(2), 2);                           // Type = Cursor
