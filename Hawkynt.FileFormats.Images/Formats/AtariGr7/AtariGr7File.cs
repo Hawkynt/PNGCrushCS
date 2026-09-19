@@ -4,6 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.AtariGr7;
 
 /// <summary>In-memory representation of an Atari 8-bit Graphics Mode 7 screen dump (160x96, 2bpp, 4 colors).</summary>
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.IrfanView)]
 public readonly record struct AtariGr7File : IImageFormatReader<AtariGr7File>, IImageToRawImage<AtariGr7File>, IImageFromRawImage<AtariGr7File>, IImageFormatWriter<AtariGr7File> {
 
   /// <summary>Fixed width in pixels.</summary>

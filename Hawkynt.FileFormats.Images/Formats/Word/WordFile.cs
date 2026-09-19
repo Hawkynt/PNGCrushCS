@@ -2,29 +2,29 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using FileFormat.Core;
+using FileFormat.Fpx;
 using FileFormat.OfficeOpenXml;
 
 namespace FileFormat.Word;
 
-/// <summary>The images carried by a Word Open XML document or template.</summary>
+/// <summary>The images carried by a Word document or template.</summary>
 /// <remarks>
-/// Reading enumerates every decodable image part in the OPC package, not just the first item under
-/// <c>word/media</c>. That includes ordinary document/background pictures and any image-typed package
-/// thumbnail, icon or object/control preview a producer stores elsewhere. The ordinary
-/// <see cref="ToRawImage(WordFile)"/> API remains first-image compatibility; multi-image callers can
-/// enumerate them all through <see cref="IMultiImageFileFormat{TSelf}"/>.
+/// Open XML reading enumerates every decodable image part in the OPC package, not just the first
+/// item under <c>word/media</c>. Legacy Word binary reading validates the WordDocument/FIB and its
+/// selected table stream, then extracts the inline picture from Data. The ordinary
+/// <see cref="ToRawImage(WordFile)"/> API remains first-image compatibility.
 /// <para/>
-/// Writing creates a native minimal WordprocessingML package whose body contains the source picture
-/// as an inline drawing. The extension selects document versus template and ordinary versus
-/// macro-capable main-part content types; macro-capable output intentionally contains no VBA project
-/// when the source is only pixels.
+/// Open XML writing creates a native minimal WordprocessingML package whose body contains the source
+/// picture as an inline drawing. Legacy <c>.doc</c>/<c>.dot</c> writing creates a real Compound File
+/// Binary document with WordDocument, 1Table and Data streams; the FIB points through the document's
+/// CLX and CHPX/PAPX tables to a U+0001 inline picture character whose OfficeArt PNG lives in Data.
 /// </remarks>
 public readonly record struct WordFile()
   : IImageFormatReader<WordFile>, IImageToRawImage<WordFile>,
     IImageFromRawImage<WordFile>, IImageFormatWriter<WordFile>, IMultiImageFileFormat<WordFile> {
 
   static string IImageFormatMetadata<WordFile>.PrimaryExtension => ".docx";
-  static string[] IImageFormatMetadata<WordFile>.FileExtensions => [".docx", ".docm", ".dotx", ".dotm"];
+  static string[] IImageFormatMetadata<WordFile>.FileExtensions => [".doc", ".dot", ".docx", ".docm", ".dotx", ".dotm"];
   static FormatCapability IImageFormatMetadata<WordFile>.Capabilities => FormatCapability.MultiImage;
   static WordFile IImageFormatReader<WordFile>.FromSpan(ReadOnlySpan<byte> data) => WordReader.FromSpan(data);
   static WordFile IImageFromRawImage<WordFile>.FromRawImage(RawImage image, string extension) => FromRawImage(image, extension);
@@ -33,17 +33,17 @@ public readonly record struct WordFile()
   static bool? IImageFormatMetadata<WordFile>.MatchesSignature(ReadOnlySpan<byte> header) {
     if (header.Length < 4)
       return null;
-    return header[0] == 0x50 && header[1] == 0x4B && header[2] == 0x03 && header[3] == 0x04 ? null : false;
+    if (header[0] == 0x50 && header[1] == 0x4B && header[2] == 0x03 && header[3] == 0x04)
+      return null;
+    if (CompoundFile.HasSignature(header))
+      return null;
+    return false;
   }
 
-  /// <summary>Compatibility dimensions of the first image.</summary>
   public int Width { get; init; }
   public int Height { get; init; }
   public byte[] PixelData { get; init; } = [];
-
-  /// <summary>Every decodable image carried by the package, in package order with Word media first.</summary>
   public IReadOnlyList<RawImage> Images { get; init; } = [];
-
   internal WordOpenXmlKind Kind { get; init; }
 
   public static int ImageCount(WordFile file)
@@ -72,7 +72,7 @@ public readonly record struct WordFile()
 
   public static WordFile FromRawImage(RawImage image) => FromRawImage(image, ".docx");
 
-  /// <summary>Creates the Word variant named by .docx, .docm, .dotx, or .dotm.</summary>
+  /// <summary>Creates the Word variant named by .doc, .dot, .docx, .docm, .dotx, or .dotm.</summary>
   public static WordFile FromRawImage(RawImage image, string extension) {
     ArgumentNullException.ThrowIfNull(image);
     if (image.Width <= 0 || image.Height <= 0)
@@ -109,6 +109,8 @@ public readonly record struct WordFile()
 }
 
 internal enum WordOpenXmlKind {
+  LegacyDocument,
+  LegacyTemplate,
   Document,
   MacroDocument,
   Template,
@@ -119,11 +121,13 @@ internal static class WordOpenXmlKindExtensions {
   internal static WordOpenXmlKind FromExtension(string extension) {
     ArgumentException.ThrowIfNullOrWhiteSpace(extension);
     return extension.ToLowerInvariant() switch {
+      ".doc" => WordOpenXmlKind.LegacyDocument,
+      ".dot" => WordOpenXmlKind.LegacyTemplate,
       ".docx" => WordOpenXmlKind.Document,
       ".docm" => WordOpenXmlKind.MacroDocument,
       ".dotx" => WordOpenXmlKind.Template,
       ".dotm" => WordOpenXmlKind.MacroTemplate,
-      _ => throw new ArgumentException($"Unsupported Word Open XML extension '{extension}'.", nameof(extension)),
+      _ => throw new ArgumentException($"Unsupported Word extension '{extension}'.", nameof(extension)),
     };
   }
 
@@ -140,14 +144,20 @@ internal static class WordOpenXmlKindExtensions {
     WordOpenXmlKind.MacroDocument => OfficeOpenXmlImagePackage.WordMacroDocumentContentType,
     WordOpenXmlKind.Template => OfficeOpenXmlImagePackage.WordTemplateContentType,
     WordOpenXmlKind.MacroTemplate => OfficeOpenXmlImagePackage.WordMacroTemplateContentType,
-    _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, null),
+    _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, "Legacy Word binary files do not have an OPC content type."),
   };
+
+  internal static bool IsLegacy(this WordOpenXmlKind kind)
+    => kind is WordOpenXmlKind.LegacyDocument or WordOpenXmlKind.LegacyTemplate;
 }
 
 public static class WordReader {
   public static WordFile FromSpan(ReadOnlySpan<byte> data) {
+    if (CompoundFile.HasSignature(data))
+      return WordBinaryFile.Read(data);
+
     if (data.Length < 4 || data[0] != 0x50 || data[1] != 0x4B || data[2] != 0x03 || data[3] != 0x04)
-      throw new InvalidDataException("Not a Word Open XML document: ZIP/OPC signature is missing.");
+      throw new InvalidDataException("Not a Word document: neither CFB binary nor ZIP/OPC signature is present.");
 
     var result = OfficeOpenXmlImageReader.ReadAll(data, "word/media/", "/word/document.xml");
     var first = result.Images.Count > 0 ? result.Images[0].EnsureFormat(PixelFormat.Rgb24) : null;
@@ -166,6 +176,9 @@ public static class WordWriter {
     var image = WordFile.ImageCount(file) > 0
       ? WordFile.ToRawImage(file, 0).EnsureFormat(PixelFormat.Rgb24)
       : throw new InvalidDataException("Word document contains no picture to write.");
-    return OfficeOpenXmlImagePackage.WriteWord(image.Width, image.Height, image.PixelData, file.Kind.ContentType());
+
+    return file.Kind.IsLegacy()
+      ? WordBinaryFile.Write(image, file.Kind == WordOpenXmlKind.LegacyTemplate)
+      : OfficeOpenXmlImagePackage.WriteWord(image.Width, image.Height, image.PixelData, file.Kind.ContentType());
   }
 }

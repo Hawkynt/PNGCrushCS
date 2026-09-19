@@ -216,9 +216,9 @@ public sealed class PeResourceFile :
   }
 
   private byte[] _ReplaceEmbeddedBytes(PeImageResource resource, RawImage image, int? languageId) {
-    if (resource.ResourceTypeId <= 0)
+    if (resource.ResourceTypeName is not null || resource.ResourceName is not null || resource.ResourceTypeId <= 0)
       throw new InvalidOperationException(
-        "The embedded image does not expose its owning PE resource type; use ReplaceResource(typeId, resourceId, ...) with encoded bytes instead."
+        "Replacing an embedded image whose PE type or name is textual is not supported by the numeric resource editor."
       );
 
     byte[] encoded = resource.FormatHint switch {
@@ -231,7 +231,13 @@ public sealed class PeResourceFile :
       ),
     };
 
-    return PeResourceEditor.ReplaceResource(SourceData!, resource.ResourceTypeId, resource.ResourceId, languageId, encoded);
+    return PeResourceEditor.ReplaceResource(
+      SourceData!,
+      resource.ResourceTypeId,
+      resource.ResourceId,
+      languageId ?? resource.LanguageId,
+      encoded
+    );
   }
 
   private PeImageResource _ImageAt(int index) {
@@ -252,18 +258,29 @@ public sealed class PeResourceFile :
   }
 
   private static PeResourceFile _AttachSource(PeResourceFile parsed, byte[] source) {
+    var embeddedMetadata = PeResourceEditor.GetEmbeddedImageResources(source);
+    var embeddedIndex = 0;
     var images = new PeImageResource[parsed.ImageResources.Count];
+
     for (var i = 0; i < images.Length; ++i) {
       var image = parsed.ImageResources[i];
+      PeResourceInfo? metadata = null;
+      if (image.ResourceType == PeImageResourceType.EmbeddedImage && embeddedIndex < embeddedMetadata.Count)
+        metadata = embeddedMetadata[embeddedIndex++];
+
       images[i] = new PeImageResource {
         ResourceType = image.ResourceType,
-        ResourceTypeId = image.ResourceTypeId != 0 ? image.ResourceTypeId : image.ResourceType switch {
+        ResourceTypeId = metadata?.TypeId ?? (image.ResourceTypeId != 0 ? image.ResourceTypeId : image.ResourceType switch {
           PeImageResourceType.Bitmap => 2,
           PeImageResourceType.Cursor => 12,
           PeImageResourceType.Icon => 14,
           _ => 0,
-        },
-        ResourceId = image.ResourceId,
+        }),
+        ResourceTypeName = metadata?.TypeName,
+        ResourceId = metadata?.ResourceId ?? image.ResourceId,
+        ResourceName = metadata?.ResourceName,
+        LanguageId = metadata?.LanguageId,
+        LanguageName = metadata?.LanguageName,
         Data = image.Data,
         FormatHint = image.FormatHint,
       };

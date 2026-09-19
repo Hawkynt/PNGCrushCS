@@ -9,24 +9,21 @@ namespace FileFormat.Codecs;
 /// picture.
 /// </summary>
 /// <remarks>
-/// Written from the free part of its specification, SMPTE ST 2073-1:2017 (<i>VC-5 Video Essence —
-/// Part 1: Elementary Bitstream</i>) — GoPro's own SDK documentation describes VC-5 as a "superset" of
-/// the original CineForm compression engine, standardised and better defined; what that means in
-/// practice, and what real files carry beyond what the free standard states, is in
-/// <see cref="FileFormat.Codecs.CineForm.CineFormChannelDecoder"/>'s remarks. Nothing here is derived
-/// from GoPro's SDK source or from ffmpeg's <c>cfhd</c> decoder — both are used, if at all, only as a
-/// black-box oracle on their output.
+/// The elementary wavelet model follows SMPTE ST 2073-1:2017 (<i>VC-5 Video Essence — Part 1:
+/// Elementary Bitstream</i>). Real CFHD files predate that cleaned-up standard and carry additional
+/// CineForm tags and conventions; those were cross-checked against GoPro's dual MIT/Apache-2.0 SDK and
+/// FFmpeg's LGPL <c>cfhd</c> implementation where the public standard does not define them. The measured
+/// framing details are documented in <see cref="FileFormat.Codecs.CineForm.CineFormChannelDecoder"/>.
 /// <para/>
-/// <b>Intra only</b>, like every other codec of this shape in this library: no reference handling, no
-/// state carried between packets beyond the stream's declared dimensions.
+/// <b>Intra only.</b> CineForm has no MPEG-style P/B pictures or motion references here. Progressive
+/// samples use three spatial wavelet levels. Legacy interlaced YUV remains one independently decodable
+/// picture and uses a horizontal/field-pair transform at the finest level followed by the same two
+/// coarser spatial levels.
 /// <para/>
-/// <b>Scope.</b> ffmpeg's own <c>cfhd</c> encoder writes exactly three pixel formats —
-/// <c>yuv422p10le</c>, <c>gbrp12le</c> and <c>gbrap12le</c> — and this decoder reads the two of them
-/// without alpha: ten-bit 4:2:2 YUV and twelve-bit RGB, three channels each, both confirmed against
-/// real encoded files. A frame stating any other channel count, including the alpha-bearing
-/// <c>gbrap12le</c> layout, is refused by name: alpha's channel position was never measured against a
-/// real file, and guessing at it would risk exactly the wrong-picture-that-looks-right failure this
-/// library refuses to ship.
+/// <b>Scope.</b> The decoder reads ten-bit YUV 4:2:2 progressive and legacy interlaced samples, plus
+/// twelve-bit RGB 4:4:4 and RGBA 4:4:4:4 progressive samples. Bayer/CFA and the separate 14/17-subband
+/// field/field-plus transforms remain distinct extensions and are refused explicitly rather than
+/// silently interpreted as the ten-subband picture layout.
 /// </remarks>
 public sealed class CineFormVideoDecoder : IVideoCodecDecoder<CineFormVideoDecoder> {
 
@@ -61,14 +58,21 @@ public sealed class CineFormVideoDecoder : IVideoCodecDecoder<CineFormVideoDecod
   public bool TryDecode(CodedPacket packet, out RawImage frame) {
     var channels = this.DecodeChannels(packet.Data);
 
-    frame = new() {
-      Width = channels.ImageWidth,
-      Height = channels.ImageHeight,
-      Format = PixelFormat.Rgb24,
-      PixelData = channels.IsYuv
-        ? CineFormColorConversion.YuvToRgb24(channels)
-        : CineFormColorConversion.RgbToRgb24(channels),
-    };
+    frame = channels.HasAlpha
+      ? new() {
+        Width = channels.ImageWidth,
+        Height = channels.ImageHeight,
+        Format = PixelFormat.Rgba32,
+        PixelData = CineFormColorConversion.RgbaToRgba32(channels),
+      }
+      : new() {
+        Width = channels.ImageWidth,
+        Height = channels.ImageHeight,
+        Format = PixelFormat.Rgb24,
+        PixelData = channels.IsYuv
+          ? CineFormColorConversion.YuvToRgb24(channels)
+          : CineFormColorConversion.RgbToRgb24(channels),
+      };
 
     return true;
   }
