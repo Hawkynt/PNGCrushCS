@@ -2396,7 +2396,7 @@ Implements `IVideoCodecDecoder<VbleVideoDecoder>`, `IVideoFrameDecoder`.
 
 #### `Vc1VideoDecoder`
 
-Decodes VC-1 video, SMPTE 421M — the codec Windows Media Video 9 is, under its four-character code `WMV3`.
+Decodes VC-1 / Windows Media Video 9 progressive Simple and Main profile pictures.
 
 Implements `IVideoCodecDecoder<Vc1VideoDecoder>`, `IVideoFrameDecoder`.
 
@@ -2404,13 +2404,13 @@ Implements `IVideoCodecDecoder<Vc1VideoDecoder>`, `IVideoFrameDecoder`.
 | --- | --- | --- |
 | `CodecName` | `static string CodecName { get; }` |  |
 | `Accepts` | `static bool Accepts(MediaStreamInfo stream)` |  |
-| `Create` | `static Vc1VideoDecoder Create(MediaStreamInfo stream)` | Builds a decoder for one stream, reading its sequence header out of the container's private data. |
-| `Flush` | `IEnumerable<RawImage> Flush()` | Nothing is ever held back, so there is nothing left when the packets run out. |
-| `TryDecode` | `bool TryDecode(CodedPacket packet, out RawImage frame)` | Decodes one packet and hands back the picture it holds. |
+| `Create` | `static Vc1VideoDecoder Create(MediaStreamInfo stream)` |  |
+| `Flush` | `IEnumerable<RawImage> Flush()` | Releases any delayed anchor picture after the final B picture has been consumed. |
+| `TryDecode` | `bool TryDecode(CodedPacket packet, out RawImage frame)` | Consumes one coded picture and returns the next picture that is due for display, if one is ready. |
 
 #### `Vc1VideoEncoder`
 
-Encodes VC-1 / Windows Media Video 9 as progressive Main-profile intra pictures.
+Encodes progressive Main-profile VC-1 with I, P and direct B pictures.
 
 Implements `IVideoCodecEncoder<Vc1VideoEncoder>`, `IVideoPacketEncoder`.
 
@@ -2420,7 +2420,8 @@ Implements `IVideoCodecEncoder<Vc1VideoEncoder>`, `IVideoPacketEncoder`.
 | `Codec` | `static CodecTag Codec { get; }` |  |
 | `Create` | `static Vc1VideoEncoder Create(MediaStreamInfo stream)` |  |
 | `DescribeStream` | `MediaStreamInfo DescribeStream()` |  |
-| `TryEncode` | `bool TryEncode(RawImage frame, long? presentationTimestamp, out CodedPacket packet)` | Encodes one independently decodable Main-profile I picture. |
+| `Flush` | `IEnumerable<CodedPacket> Flush()` |  |
+| `TryEncode` | `bool TryEncode(RawImage frame, long? presentationTimestamp, out CodedPacket packet)` |  |
 
 #### `VmdVideoDecoder`
 
