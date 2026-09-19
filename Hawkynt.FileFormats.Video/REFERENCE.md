@@ -2098,13 +2098,12 @@ Implements `IVideoCodecEncoder<RealVideoEncoder>`, `IVideoPacketEncoder`.
 
 #### `RoqVideoDecoder`
 
-Decodes id RoQ (`RoQV`) — the FMV format Quake III and its contemporaries use — vector quantisation with motion compensation over a quadtree of 8x8, 4x4 and 2x2 blocks.
+Decodes standard id RoQ and the older Trilobyte RoQ video extensions.
 
 Implements `IVideoCodecDecoder<RoqVideoDecoder>`, `IVideoFrameDecoder`.
 
 | Member | Signature | Summary |
 | --- | --- | --- |
-| `RoqVideoDecoder` | `RoqVideoDecoder()` |  |
 | `CodecName` | `static string CodecName { get; }` |  |
 | `Accepts` | `static bool Accepts(MediaStreamInfo stream)` |  |
 | `Create` | `static RoqVideoDecoder Create(MediaStreamInfo stream)` |  |
@@ -6799,31 +6798,33 @@ Implements `IVideoContainerWriter<RealMediaWriter>`, `IVideoFormatMetadata<RealM
 
 #### `RoqContainer`
 
-A RoQ file (`.roq`) — the FMV format Graeme Devine wrote for The 11th Hour and id Software carried on into Quake III and its Return to Castle Wolfenstein-era engine — taken apart into the streams it declares and the chunks it holds, and nothing else.
+A RoQ movie: id's quadtree video plus optional RoQ DPCM sound.
 
 Implements `IVideoContainerReader<RoqContainer>`, `IVideoFormatMetadata<RoqContainer>`.
 
 | Member | Signature | Summary |
 | --- | --- | --- |
 | `RoqContainer` | `RoqContainer()` |  |
-| `AudioIsStereo` | `bool AudioIsStereo { get; init; }` | Whether the sound this file carries is two channels rather than one. |
-| `Data` | `ReadOnlyMemory<byte> Data { get; init; }` | The whole file, which every packet is a window onto. |
+| `AudioIsStereo` | `bool AudioIsStereo { get; init; }` |  |
+| `Data` | `ReadOnlyMemory<byte> Data { get; init; }` |  |
 | `FileExtensions` | `static string[] FileExtensions { get; }` |  |
-| `HasAudio` | `bool HasAudio { get; init; }` | Whether the file carries any sound chunk at all. |
-| `Height` | `int Height { get; init; }` | Picture height in pixels, as the file's `RoQ_INFO` chunk states it. |
+| `FrameRate` | `int FrameRate { get; init; }` |  |
+| `HasAudio` | `bool HasAudio { get; init; }` |  |
+| `Height` | `int Height { get; init; }` |  |
+| `MotionScale` | `int MotionScale { get; init; }` |  |
 | `PrimaryExtension` | `static string PrimaryExtension { get; }` |  |
-| `VideoFrameCount` | `int VideoFrameCount { get; init; }` | How many `QUAD_VQ` chunks the file holds, counted by walking it once. |
-| `Width` | `int Width { get; init; }` | Picture width in pixels, as the file's `RoQ_INFO` chunk states it. |
-| `FromBytes` | `static RoqContainer FromBytes(byte[] data)` | Opens a file over the caller's array, keeping it rather than copying it. |
+| `VideoFrameCount` | `int VideoFrameCount { get; init; }` |  |
+| `Width` | `int Width { get; init; }` |  |
+| `FromBytes` | `static RoqContainer FromBytes(byte[] data)` |  |
 | `FromFile` | `static RoqContainer FromFile(FileInfo file)` |  |
 | `FromSpan` | `static RoqContainer FromSpan(ReadOnlySpan<byte> data)` |  |
-| `Metadata` | `static VideoMetadata Metadata(RoqContainer container)` | Nothing beyond the streams themselves. A RoQ file has no field for a title, an author or a creation date — nothing here carries anything but pictures, chunks and sound. |
+| `Metadata` | `static VideoMetadata Metadata(RoqContainer container)` |  |
 | `ReadPackets` | `static IEnumerable<CodedPacket> ReadPackets(RoqContainer container)` |  |
 | `Streams` | `static IReadOnlyList<MediaStreamInfo> Streams(RoqContainer container)` |  |
 
 #### `RoqWriter`
 
-Writes RoQ video chunks verbatim and sound chunks with their preserved predictor arguments.
+Writes RoQ video chunks verbatim and optional RoQ DPCM sound.
 
 Implements `IVideoContainerWriter<RoqWriter>`, `IVideoFormatMetadata<RoqWriter>`.
 
