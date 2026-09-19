@@ -75,7 +75,7 @@ internal sealed class Ffv1SliceDecoder {
       if (negative)
         difference = -difference;
 
-      plane[x, y] = (Median(left, top, left + top - topLeft) + difference) & this._sampleMask;
+      plane[x, y] = (this.Predict(left, top, topLeft) + difference) & this._sampleMask;
     }
   }
 
@@ -135,7 +135,7 @@ internal sealed class Ffv1SliceDecoder {
       if (negative)
         difference = -difference;
 
-      plane[x, y] = (Median(left, top, left + top - topLeft) + difference) & this._sampleMask;
+      plane[x, y] = (this.Predict(left, top, topLeft) + difference) & this._sampleMask;
     }
   }
 
@@ -145,7 +145,8 @@ internal sealed class Ffv1SliceDecoder {
   /// <remarks>
   /// Each of the five is looked up in its own table and the results added, and because each table's
   /// entries were already multiplied by the range of the tables before it, adding them cannot make
-  /// two different neighbourhoods land on the same number.
+  /// two different neighbourhoods land on the same number. RFC 9043 deliberately indexes with only
+  /// the low eight bits even when the samples themselves are deeper than eight bits.
   /// </remarks>
   internal static int ContextOf(int[][] tables, Ffv1Plane plane, int x, int y, int left, int top, int topLeft) {
     var topRight = plane.At(x + 1, y - 1);
@@ -158,6 +159,21 @@ internal sealed class Ffv1SliceDecoder {
            + tables[3][(leftLeft - left) & 0xFF]
            + tables[4][(topTop - top) & 0xFF];
   }
+
+  /// <summary>The FFV1 median prediction, including the historical 16-bit YCbCr range-coder rule.</summary>
+  internal int Predict(int left, int top, int topLeft) {
+    if (this._parameters.ColourSpaceType == 0
+        && this._parameters.BitsPerRawSample == 16
+        && this._parameters.CoderType is 1 or 2) {
+      left = _Signed16(left);
+      top = _Signed16(top);
+      topLeft = _Signed16(topLeft);
+    }
+
+    return Median(left, top, left + top - topLeft);
+  }
+
+  private static int _Signed16(int value) => value >= 0x8000 ? value - 0x10000 : value;
 
   internal static int Median(int a, int b, int c) {
     if (a > b)
