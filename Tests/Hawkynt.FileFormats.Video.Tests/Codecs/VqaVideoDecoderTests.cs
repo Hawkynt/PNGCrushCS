@@ -122,7 +122,7 @@ public sealed class VqaVideoDecoderTests {
 
     Assert.Multiple(() => {
       Assert.That(second.PixelData[..3], Is.EqualTo(new byte[] { 255, 0, 0 }));
-      Assert.That(second.PixelData[4 * 3..4 * 3 + 3], Is.EqualTo(new byte[] { 0, 0, 255 }));
+      Assert.That(second.PixelData[(4 * 3)..(4 * 3 + 3)], Is.EqualTo(new byte[] { 0, 0, 255 }));
     });
   }
 

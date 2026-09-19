@@ -2,6 +2,7 @@ using System;
 using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using FileFormat.Codecs.Vqa;
 using FileFormat.Core;
 
