@@ -207,7 +207,7 @@ internal static class VmdReader {
         frameBlocks[index] = block;
         if (currentOffset + length > tocOffset)
           throw new InvalidDataException(
-            $"VMD block {block}, part {part} ends at {currentOffset + length}, beyond the table of contents at {tocOffset}.");
+            $"VMD block {block}, part {part} ends at {currentOffset + length}, which does not fit before the table of contents at {tocOffset}.");
 
         if (type == _FRAME_TYPE_VIDEO && length != 0)
           ++videoFrameCount;
@@ -239,9 +239,16 @@ internal static class VmdReader {
       frameOffsets[i] = checked((int)currentOffset);
       frameBlocks[i] = block;
 
+      // A block/part table may carry parts of a type this reader has no use for, and the reference
+      // decoder walks past them; the flat table has no such parts, so a type it does not know there
+      // is a corrupt record rather than a part to skip.
+      if (type != _FRAME_TYPE_AUDIO && type != _FRAME_TYPE_VIDEO && (type != 0 || length != 0))
+        throw new InvalidDataException(
+          $"Frame information record {i} states type {type}, which is neither 1 (audio) nor 2 "
+          + "(video), and is not the zero-length placeholder this reader passes over.");
       if (currentOffset + length > tocOffset)
         throw new InvalidDataException(
-          $"Legacy VMD frame record {i} ends at {currentOffset + length}, beyond the table of contents at {tocOffset}.");
+          $"Legacy VMD frame record {i} ends at {currentOffset + length}, which does not fit before the table of contents at {tocOffset}.");
       if (type == _FRAME_TYPE_VIDEO && length != 0)
         ++videoFrameCount;
       else if (type == _FRAME_TYPE_AUDIO)

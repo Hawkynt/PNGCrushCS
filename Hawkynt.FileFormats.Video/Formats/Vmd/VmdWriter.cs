@@ -168,7 +168,7 @@ public sealed class VmdWriter : IVideoContainerWriter<VmdWriter> {
         currentHasVideo = false;
       }
 
-      current.Add(this._Part(packet, header));
+      current.Add(this._PartOf(packet, header));
       currentHasVideo |= isVideo;
     }
 
@@ -177,7 +177,7 @@ public sealed class VmdWriter : IVideoContainerWriter<VmdWriter> {
     return blocks;
   }
 
-  private _Part _Part(CodedPacket packet, ReadOnlySpan<byte> header) {
+  private _Part _PartOf(CodedPacket packet, ReadOnlySpan<byte> header) {
     if (this._isIndeo3 && packet.StreamIndex == 0) {
       var record = new byte[_FRAME_RECORD_LENGTH];
       record[0] = _TYPE_VIDEO;
