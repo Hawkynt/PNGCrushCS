@@ -1616,7 +1616,7 @@ Implements `IVideoCodecDecoder<Mpeg1VideoDecoder>`, `IVideoFrameDecoder`.
 
 #### `Mpeg1VideoEncoder`
 
-Encodes ISO/IEC 11172-2 MPEG-1 video as progressive 4:2:0 I and P pictures.
+Encodes ISO/IEC 11172-2 MPEG-1 video as progressive 4:2:0 I, P and B pictures.
 
 Implements `IVideoCodecEncoder<Mpeg1VideoEncoder>`, `IVideoPacketEncoder`.
 
@@ -1624,10 +1624,10 @@ Implements `IVideoCodecEncoder<Mpeg1VideoEncoder>`, `IVideoPacketEncoder`.
 | --- | --- | --- |
 | `CodecName` | `static string CodecName { get; }` |  |
 | `Codec` | `static CodecTag Codec { get; }` |  |
-| `Create` | `static Mpeg1VideoEncoder Create(MediaStreamInfo stream)` | Creates an MPEG-1 encoder for a geometry and one of the eight frame rates the syntax can state. |
-| `DescribeStream` | `MediaStreamInfo DescribeStream()` | The stream description muxers need to name the elementary MPEG-1 payload. |
-| `Flush` | `IEnumerable<CodedPacket> Flush()` | Returns the last picture with the sequence-end start code following it. |
-| `TryEncode` | `bool TryEncode(RawImage frame, long? presentationTimestamp, out CodedPacket packet)` | Codes one picture: intra at the head of a group, forward-predicted otherwise. |
+| `Create` | `static Mpeg1VideoEncoder Create(MediaStreamInfo stream)` |  |
+| `DescribeStream` | `MediaStreamInfo DescribeStream()` |  |
+| `Flush` | `IEnumerable<CodedPacket> Flush()` | Emits delayed coding-order packets and turns a short tail with no following anchor into P pictures. The final picture carries the sequence-end start code. |
+| `TryEncode` | `bool TryEncode(RawImage frame, long? presentationTimestamp, out CodedPacket packet)` | Accepts one display-order picture and returns the next coding-order packet when available. |
 
 #### `Mpeg2VideoDecoder`
 
