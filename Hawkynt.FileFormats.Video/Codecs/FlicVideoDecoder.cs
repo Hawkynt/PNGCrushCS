@@ -7,85 +7,43 @@ using FileFormat.FlicVideo;
 namespace FileFormat.Codecs;
 
 /// <summary>
-/// Decodes Autodesk FLIC (<c>FLIC</c>): palette updates, delta-coded frames and whole frames over a
-/// paletted eight-bit canvas that is never cleared between packets.
+/// Decodes Autodesk/DTA FLIC: palettised eight-bit FLI/FLC/FLX plus RGB555, RGB565 and BGR24
+/// extended FLIC, including whole pictures and previous-frame delta updates.
 /// </summary>
 /// <remarks>
-/// FLIC fuses container and codec into one file, so the split this package otherwise draws between a
-/// demuxer that knows where the packets are and a decoder that knows what is in them happens inside a
-/// single format rather than across two. <see cref="FliContainer"/> does the first half — it finds
-/// each <c>FRAME_TYPE</c> chunk's boundaries and nothing more — and everything below reads what the
-/// container left untouched: every palette packet, every byte-run and word-run opcode.
+/// FLIC has I-like whole-picture chunks and P-like conditional-replenishment chunks only. Delta
+/// chunks paint a persistent canvas left by the immediately preceding packet; the format has no
+/// future reference and no B-frame equivalent.
 /// <para/>
-/// A packet may carry a palette chunk, a picture chunk, both, or neither — a frame with nothing at all
-/// is a legitimate way of saying "unchanged," seen throughout ffmpeg's own <c>.fli</c> sample corpus.
-/// Sub-chunks are walked in the order the packet states them and applied to state kept between
-/// packets, the same way <see cref="MicrosoftRleDecoder"/> keeps a canvas a delta frame paints on top
-/// of: the palette and the canvas are what a whole-frame chunk replaces and a delta chunk edits, and
-/// neither is cleared first.
-/// <para/>
-/// <b>Two details are easy to get quietly wrong.</b> A palette packet's skip and change counts are in
-/// palette *entries*, not bytes — a two-byte header in front of up to 256 three-byte colours. And the
-/// older <c>FLI_COLOR64</c> form packs each component in six bits rather than eight, which are widened
-/// by repeating the top two bits into the bottom rather than by shifting, the same rule this library's
-/// other six-bit channels use.
-/// <para/>
-/// <b>The coding is lossless</b>, so a decoder reading the same bitstream has nothing to round: every
-/// sample of every frame measured against ffmpeg's own decode of the same file came out identical.
-/// <para/>
-/// A <c>PSTAMP</c> sub-chunk — a postage-stamp thumbnail for a file requestor, at its own smaller size
-/// and the universal 6x6x6 palette — is skipped rather than decoded into the canvas. It is reachable
-/// and exercised: ffmpeg's own <c>fli-flc/2422.FLC</c> sample carries a genuine 100x63 byte-run
-/// thumbnail on its first frame, behind a header stating <c>oframe1</c> beyond an intervening
-/// undocumented prefix chunk, which is also what confirms <see cref="FliContainer"/> follows that field
-/// rather than assuming frame one sits directly behind the header.
-/// <para/>
-/// <b>What it does not read refuses by name.</b> A chunk type outside the eight this decodes, a
-/// palette index or a delta cursor running past the picture, an opcode wanting more bytes than the
-/// packet holds, and an ambiguous zero-length byte-run packet all throw and say which. There is no
-/// <c>catch</c> handing back a blank frame or the frame before: a repeated frame is exactly what an
-/// empty packet legitimately means, so returning one on failure would be indistinguishable from working.
+/// Fifteen-bit pixels have no native <see cref="PixelFormat"/> in the shared raw-image contract, so
+/// they are widened losslessly to their exact RGB24 display values by bit replication. RGB565 and
+/// BGR24 remain in their native packed forms. The internal reference canvas always keeps the coded
+/// bytes, so delta arithmetic never depends on that presentation conversion.
 /// </remarks>
 public sealed class FlicVideoDecoder : IVideoCodecDecoder<FlicVideoDecoder> {
 
   private static readonly CodecTag _FLIC = CodecTag.FromCharacters("FLIC");
+  private const int _PALETTE_BYTES = 256 * 3;
 
   private readonly int _width;
   private readonly int _height;
-
-  /// <summary>
-  /// The picture as palette indices, one byte a pixel, top row first — the orientation FLIC stores
-  /// frames in, unlike the bottom-up Windows bitmap layouts <see cref="MicrosoftRleDecoder"/> and
-  /// <see cref="MicrosoftVideo1Decoder"/> read.
-  /// </summary>
-  /// <remarks>
-  /// Kept between packets and never cleared. A delta chunk names only the pixels that changed, and an
-  /// empty packet names none at all — both mean "as the frame before left it," which needs the frame
-  /// before to still be there.
-  /// </remarks>
+  private readonly int _depth;
+  private readonly int _bytesPerPixel;
   private readonly byte[] _canvas;
+  private readonly byte[] _palette = new byte[_PALETTE_BYTES];
 
-  /// <summary>
-  /// The palette as 256 RGB triples, updated in place by whichever colour chunks a packet carries.
-  /// </summary>
-  /// <remarks>
-  /// Starts at all zeroes. Every sample reachable here opens its first frame with a full-coverage
-  /// palette chunk, so nothing was found that depends on what an unstated entry defaults to; a file
-  /// that relied on one would need a starting palette this format states nowhere.
-  /// </remarks>
-  private readonly byte[] _palette = new byte[256 * 3];
-
-  private FlicVideoDecoder(int width, int height) {
+  private FlicVideoDecoder(int width, int height, int depth) {
     this._width = width;
     this._height = height;
-    this._canvas = new byte[width * height];
+    this._depth = depth;
+    this._bytesPerPixel = depth switch { 8 => 1, 15 or 16 => 2, 24 => 3, _ => throw new ArgumentOutOfRangeException(nameof(depth)) };
+    this._canvas = new byte[checked(width * height * this._bytesPerPixel)];
   }
 
   public static string CodecName => "FLIC";
 
   public static bool Accepts(MediaStreamInfo stream) {
     ArgumentNullException.ThrowIfNull(stream);
-
     return stream.Kind == MediaStreamKind.Video && stream.Codec.EqualsIgnoringCase(_FLIC);
   }
 
@@ -98,37 +56,65 @@ public sealed class FlicVideoDecoder : IVideoCodecDecoder<FlicVideoDecoder> {
       throw new InvalidOperationException(
         $"FLIC video stream {stream.Index} states a picture of {width}x{height}, which has no pixels.");
 
-    // Multiplied as a long before the canvas is asked for. FLIC's own width and height fields are
-    // sixteen bits each, so a maximum picture (65535x65535) overflows an int product to a negative
-    // number, which would otherwise surface as an unnamed allocation failure rather than a refusal
-    // naming the field and the stream.
-    if ((long)width * height > int.MaxValue)
-      throw new InvalidOperationException(
-        $"FLIC video stream {stream.Index} states a picture of {width}x{height}, which is more pixels than "
-        + "can be held.");
-
-    if (stream.BitsPerPixel is not (0 or 8))
+    var depth = stream.BitsPerPixel == 0 ? 8 : stream.BitsPerPixel;
+    if (depth is not (8 or 15 or 16 or 24))
       throw new NotSupportedException(
-        $"FLIC video stream {stream.Index} states {stream.BitsPerPixel} bits per pixel. This codec is paletted "
-        + "eight-bit throughout and nothing else is read.");
+        $"FLIC video stream {stream.Index} states {stream.BitsPerPixel} bits per pixel. This codec reads "
+        + "the renderable 8-, 15-, 16- and 24-bit FLIC pixel formats.");
 
-    return new(width, height);
+    var bytesPerPixel = depth switch { 8 => 1, 15 or 16 => 2, 24 => 3, _ => 0 };
+    if ((long)width * height * bytesPerPixel > int.MaxValue)
+      throw new InvalidOperationException(
+        $"FLIC video stream {stream.Index} states a {width}x{height} picture at {depth} bits per pixel, "
+        + "which is more coded image data than can be held.");
+
+    return new(width, height, depth);
   }
 
-  /// <summary>Decodes one packet, which for this codec is always exactly one whole frame.</summary>
   public bool TryDecode(CodedPacket packet, out RawImage frame) {
     this._DecodeSubChunks(packet.Data.Span);
 
-    frame = new() {
-      Width = this._width,
-      Height = this._height,
-      Format = PixelFormat.Indexed8,
-      PixelData = (byte[])this._canvas.Clone(),
-      Palette = (byte[])this._palette.Clone(),
-      PaletteCount = 256,
+    frame = this._depth switch {
+      8 => new() {
+        Width = this._width,
+        Height = this._height,
+        Format = PixelFormat.Indexed8,
+        PixelData = (byte[])this._canvas.Clone(),
+        Palette = (byte[])this._palette.Clone(),
+        PaletteCount = 256,
+      },
+      15 => new() {
+        Width = this._width,
+        Height = this._height,
+        Format = PixelFormat.Rgb24,
+        PixelData = this._ExpandRgb555(),
+      },
+      16 => new() {
+        Width = this._width,
+        Height = this._height,
+        Format = PixelFormat.Rgb565,
+        PixelData = (byte[])this._canvas.Clone(),
+      },
+      24 => new() {
+        Width = this._width,
+        Height = this._height,
+        Format = PixelFormat.Bgr24,
+        PixelData = (byte[])this._canvas.Clone(),
+      },
+      _ => throw new InvalidOperationException(),
     };
-
     return true;
+  }
+
+  private byte[] _ExpandRgb555() {
+    var result = new byte[this._width * this._height * 3];
+    for (var pixel = 0; pixel < this._width * this._height; ++pixel) {
+      var packed = BinaryPrimitives.ReadUInt16LittleEndian(this._canvas.AsSpan(pixel * 2));
+      result[pixel * 3] = ChannelScaling.Expand5((packed >> 10) & 31);
+      result[pixel * 3 + 1] = ChannelScaling.Expand5((packed >> 5) & 31);
+      result[pixel * 3 + 2] = ChannelScaling.Expand5(packed & 31);
+    }
+    return result;
   }
 
   // ============================================================================================
@@ -144,81 +130,87 @@ public sealed class FlicVideoDecoder : IVideoCodecDecoder<FlicVideoDecoder> {
 
       var size = BinaryPrimitives.ReadUInt32LittleEndian(data[at..]);
       var type = BinaryPrimitives.ReadUInt16LittleEndian(data[(at + 4)..]);
-      if (size < 6 || at + size > data.Length)
+      if (size < 6 || size > data.Length - at)
         throw new InvalidDataException(
           $"A FLIC sub-chunk of type {type} at byte {at} states a size of {size}, which "
           + (size < 6 ? "is shorter than its own six-byte header." : $"runs past the frame's {data.Length} bytes."));
 
-      var payload = data.Slice(at + 6, (int)size - 6);
+      var payload = data.Slice(at + 6, checked((int)size) - 6);
       switch (type) {
         case FliChunkType.COLOR256:
-          this._DecodeColor(payload, sixBit: false);
+          if (this._depth == 8) this._DecodeColor(payload, sixBit: false);
           break;
         case FliChunkType.COLOR64:
-          this._DecodeColor(payload, sixBit: true);
+          if (this._depth == 8) this._DecodeColor(payload, sixBit: true);
           break;
         case FliChunkType.SS2:
-          this._DecodeSs2(payload);
+          if (this._depth == 8) this._DecodeSs2(payload);
+          else this._DecodeHighColourSs2(payload);
           break;
         case FliChunkType.LC:
+          if (this._depth != 8)
+            throw new NotSupportedException($"FLI_LC is byte-oriented and is not defined for {this._depth}-bit FLIC pixels.");
           this._DecodeLc(payload);
-          break;
-        case FliChunkType.BRUN:
-          this._DecodeBrun(payload);
-          break;
-        case FliChunkType.COPY:
-          this._DecodeCopy(payload);
           break;
         case FliChunkType.BLACK:
           Array.Clear(this._canvas);
           break;
+        case FliChunkType.BRUN:
+          this._DecodeByteBrun(payload);
+          break;
+        case FliChunkType.COPY:
+          this._DecodeCopy(payload, "FLI_COPY");
+          break;
         case FliChunkType.PSTAMP:
-          // A postage-stamp thumbnail for a file requestor: its own smaller picture at the universal
-          // 6x6x6 palette, entirely unrelated to the film's own canvas and palette. Skipped rather
-          // than decoded — reachable and exercised (ffmpeg's fli-flc/2422.FLC carries a genuine
-          // 100x63 byte-run thumbnail on its first frame), but not a picture of the film.
+          break;
+        case FliChunkType.DTA_BRUN:
+          this._RequireTrueColour(type);
+          this._DecodePixelBrun(payload);
+          break;
+        case FliChunkType.DTA_COPY:
+          this._RequireTrueColour(type);
+          this._DecodeCopy(payload, "DTA_COPY");
+          break;
+        case FliChunkType.DTA_LC:
+          this._RequireTrueColour(type);
+          this._DecodePixelDelta(payload, "DTA_LC");
           break;
         default:
           throw new NotSupportedException(
-            $"A FLIC frame carries a sub-chunk of type {type} at byte {at}, which this decoder does not read. "
-            + "Chunk types outside {4, 7, 11, 12, 13, 15, 16, 18} are not part of what this codec was built and "
-            + "measured against.");
+            $"A FLIC frame carries a sub-chunk of type {type} at byte {at}, which this decoder does not render. "
+            + "Supported image chunks are {4, 7, 11, 12, 13, 15, 16, 18, 25, 26, 27}.");
       }
 
-      at += (int)size;
+      at += checked((int)size);
     }
   }
 
+  private void _RequireTrueColour(ushort type) {
+    if (this._depth == 8)
+      throw new NotSupportedException($"DTA FLIC chunk type {type} codes whole pixels and is not valid for an 8-bit palettised stream.");
+  }
+
   // ============================================================================================
-  // Palette chunks — FLI_COLOR256 (type 4) and FLI_COLOR64 (type 11)
+  // Palette chunks
   // ============================================================================================
 
-  /// <summary>
-  /// Applies a palette chunk's packets: a skip count, a change count and that many RGB triples,
-  /// repeated until the chunk's stated packet count is exhausted.
-  /// </summary>
   private void _DecodeColor(ReadOnlySpan<byte> payload, bool sixBit) {
     var at = 0;
     var packetCount = _ReadU16(payload, ref at, "a palette chunk's packet count");
     var index = 0;
 
     for (var packet = 0; packet < packetCount; ++packet) {
-      var skip = _ReadU8(payload, ref at, "a palette packet's skip count");
-      index += skip;
-
+      index += _ReadU8(payload, ref at, "a palette packet's skip count");
       var changeByte = _ReadU8(payload, ref at, "a palette packet's change count");
       var change = changeByte == 0 ? 256 : changeByte;
-
       if (index + change > 256)
         throw new InvalidDataException(
-          $"A FLIC palette chunk writes {change} colour(s) starting at index {index}, which reaches past the "
-          + "256 entries a palette holds.");
+          $"A FLIC palette chunk writes {change} colour(s) starting at index {index}, which reaches past the 256 entries a palette holds.");
 
       for (var entry = 0; entry < change; ++entry, ++index) {
         var r = _ReadU8(payload, ref at, "a palette entry's red component");
         var g = _ReadU8(payload, ref at, "a palette entry's green component");
         var b = _ReadU8(payload, ref at, "a palette entry's blue component");
-
         this._palette[index * 3] = sixBit ? ChannelScaling.Expand6(r) : r;
         this._palette[index * 3 + 1] = sixBit ? ChannelScaling.Expand6(g) : g;
         this._palette[index * 3 + 2] = sixBit ? ChannelScaling.Expand6(b) : b;
@@ -227,87 +219,92 @@ public sealed class FlicVideoDecoder : IVideoCodecDecoder<FlicVideoDecoder> {
   }
 
   // ============================================================================================
-  // Whole-frame chunks — FLI_BLACK (type 13), FLI_BRUN (type 15) and FLI_COPY (type 16)
+  // Whole pictures
   // ============================================================================================
 
-  /// <summary>
-  /// One row a line: a packet-count byte the format holds over from the original Animator and never
-  /// reads back, then byte-run packets until the row's <see cref="_width"/> pixels are accounted for.
-  /// </summary>
-  /// <remarks>
-  /// The sign convention is the opposite of <see cref="_DecodeLc"/>'s. A positive count replicates the
-  /// single byte that follows it; a negative one copies the <c>|count|</c> bytes that follow literally.
-  /// Two independent primary sources — the 1993 Dr Dobb's article Autodesk itself contributed to, and
-  /// the FLC.txt Animator Pro file format reference — agree on this reading, against at least one
-  /// third-party summary that has the two the wrong way round.
-  /// </remarks>
-  private void _DecodeBrun(ReadOnlySpan<byte> payload) {
+  /// <summary>Standard BRUN is byte-oriented even when an FLX pixel occupies two bytes.</summary>
+  private void _DecodeByteBrun(ReadOnlySpan<byte> payload) {
     var at = 0;
+    var rowBytes = checked(this._width * this._bytesPerPixel);
     for (var row = 0; row < this._height; ++row) {
-      _ReadU8(payload, ref at, "a byte-run row's packet count"); // held over from Animator; not used
-      var rowStart = row * this._width;
+      _ReadU8(payload, ref at, "a byte-run row's packet count");
+      var rowStart = row * rowBytes;
       var x = 0;
-
-      while (x < this._width) {
+      while (x < rowBytes) {
         var count = unchecked((sbyte)_ReadU8(payload, ref at, "a byte-run packet's count"));
         if (count > 0) {
-          var value = _ReadU8(payload, ref at, "a byte-run packet's replicated pixel");
-          _RefuseRunPastRow(x, count, row, this._width);
-          for (var i = 0; i < count; ++i)
-            this._canvas[rowStart + x++] = value;
+          var value = _ReadU8(payload, ref at, "a byte-run packet's replicated byte");
+          _RefuseRunPastRow(x, count, row, rowBytes, "byte");
+          this._canvas.AsSpan(rowStart + x, count).Fill(value);
+          x += count;
         } else if (count < 0) {
           var n = -count;
-          _RefuseRunPastRow(x, n, row, this._width);
-          for (var i = 0; i < n; ++i)
-            this._canvas[rowStart + x++] = _ReadU8(payload, ref at, "a byte-run packet's literal pixel");
+          _RefuseRunPastRow(x, n, row, rowBytes, "byte");
+          _ReadBytes(payload, ref at, this._canvas.AsSpan(rowStart + x, n), "a byte-run packet's literal bytes");
+          x += n;
         } else
-          throw new NotSupportedException(
-            $"A FLI_BRUN packet on row {row} states a count of zero. Read as a replicated pixel that is a "
-            + "no-op consuming one byte; read as a literal run it consumes none. The format does not say "
-            + "which, and no encoder writes a packet that costs a byte to do nothing.");
+          throw new NotSupportedException($"A FLI_BRUN packet on row {row} states a count of zero, whose byte-run meaning is ambiguous.");
       }
     }
   }
 
-  private void _DecodeCopy(ReadOnlySpan<byte> payload) {
-    var packedLength = this._canvas.Length;
+  /// <summary>DTA BRUN is identical in sign convention but every count measures complete pixels.</summary>
+  private void _DecodePixelBrun(ReadOnlySpan<byte> payload) {
+    var at = 0;
+    for (var row = 0; row < this._height; ++row) {
+      _ReadU8(payload, ref at, "a DTA byte-run row's packet count");
+      var x = 0;
+      while (x < this._width) {
+        var count = unchecked((sbyte)_ReadU8(payload, ref at, "a DTA byte-run packet's count"));
+        if (count > 0) {
+          _RefuseRunPastRow(x, count, row, this._width, "pixel");
+          var pixel = _ReadPixel(payload, ref at, "a DTA byte-run packet's replicated pixel");
+          for (var i = 0; i < count; ++i)
+            pixel.CopyTo(this._canvas.AsSpan(((row * this._width) + x++) * this._bytesPerPixel, this._bytesPerPixel));
+        } else if (count < 0) {
+          var n = -count;
+          _RefuseRunPastRow(x, n, row, this._width, "pixel");
+          var bytes = checked(n * this._bytesPerPixel);
+          _ReadBytes(payload, ref at, this._canvas.AsSpan(((row * this._width) + x) * this._bytesPerPixel, bytes),
+            "a DTA byte-run packet's literal pixels");
+          x += n;
+        } else
+          throw new NotSupportedException($"A DTA_BRUN packet on row {row} states a count of zero, whose run meaning is ambiguous.");
+      }
+    }
+  }
+
+  private void _DecodeCopy(ReadOnlySpan<byte> payload, string name) {
+    var packedStride = checked(this._width * this._bytesPerPixel);
+    var packedLength = checked(packedStride * this._height);
     if (payload.Length == packedLength) {
       payload.CopyTo(this._canvas);
       return;
     }
 
-    var paddedStride = ((long)this._width + 3) & ~3L;
-    var paddedLength = paddedStride * this._height;
+    // FFmpeg accepts the historical padding emitted by real files: 8-bit COPY rows align to a
+    // dword, while high/true-colour variants may pad an odd pixel count to the next even pixel.
+    var paddedStride = this._depth == 8
+      ? (packedStride + 3) & ~3
+      : checked(((this._width + 1) & ~1) * this._bytesPerPixel);
+    var paddedLength = checked(paddedStride * this._height);
     if (payload.Length != paddedLength)
       throw new InvalidDataException(
-        $"A FLI_COPY chunk carries {payload.Length} byte(s) for a {this._width}x{this._height} picture, which "
-        + $"needs either {packedLength} packed byte(s) or {paddedLength} byte(s) with rows padded to four-byte boundaries.");
+        $"A {name} chunk carries {payload.Length} byte(s) for a {this._width}x{this._height} {this._depth}-bit picture, "
+        + $"which needs either {packedLength} packed byte(s) or {paddedLength} byte(s) in the tolerated padded layout.");
 
-    for (var row = 0; row < this._height; ++row) {
-      var sourceStart = checked((int)(row * paddedStride));
-      var destinationStart = row * this._width;
-      payload.Slice(sourceStart, this._width).CopyTo(this._canvas.AsSpan(destinationStart, this._width));
-    }
+    for (var row = 0; row < this._height; ++row)
+      payload.Slice(row * paddedStride, packedStride).CopyTo(this._canvas.AsSpan(row * packedStride, packedStride));
   }
 
   // ============================================================================================
-  // Delta chunks — FLI_LC (type 12) and FLI_SS2 (type 7)
+  // Eight-bit delta chunks
   // ============================================================================================
 
-  /// <summary>
-  /// The byte-oriented delta the original Animator writes: a first-changed-line index, a line count,
-  /// and per line a packet count followed by that many skip/run packets.
-  /// </summary>
-  /// <remarks>
-  /// The sign convention is the opposite of <see cref="_DecodeBrun"/>'s: positive copies literal bytes,
-  /// negative replicates one. A count of zero is unambiguous here — a copy of zero literal bytes is a
-  /// well-defined no-op — so unlike the byte-run chunk it is not refused.
-  /// </remarks>
   private void _DecodeLc(ReadOnlySpan<byte> payload) {
     var at = 0;
     var firstLine = _ReadU16(payload, ref at, "a delta chunk's first changed line");
     var lineCount = _ReadU16(payload, ref at, "a delta chunk's line count");
-
     _RefuseLinesPastPicture(firstLine, lineCount, this._height, "FLI_LC");
 
     for (var line = 0; line < lineCount; ++line) {
@@ -315,37 +312,24 @@ public sealed class FlicVideoDecoder : IVideoCodecDecoder<FlicVideoDecoder> {
       var rowStart = row * this._width;
       var packetCount = _ReadU8(payload, ref at, "a delta line's packet count");
       var x = 0;
-
       for (var packet = 0; packet < packetCount; ++packet) {
-        var skip = _ReadU8(payload, ref at, "a delta packet's skip count");
-        x += skip;
-
+        x += _ReadU8(payload, ref at, "a delta packet's skip count");
         var size = unchecked((sbyte)_ReadU8(payload, ref at, "a delta packet's size"));
         if (size > 0) {
-          _RefuseRunPastRow(x, size, row, this._width);
-          for (var i = 0; i < size; ++i)
-            this._canvas[rowStart + x++] = _ReadU8(payload, ref at, "a delta packet's literal pixel");
+          _RefuseRunPastRow(x, size, row, this._width, "pixel");
+          _ReadBytes(payload, ref at, this._canvas.AsSpan(rowStart + x, size), "a delta packet's literal pixels");
+          x += size;
         } else if (size < 0) {
           var n = -size;
           var value = _ReadU8(payload, ref at, "a delta packet's replicated pixel");
-          _RefuseRunPastRow(x, n, row, this._width);
-          for (var i = 0; i < n; ++i)
-            this._canvas[rowStart + x++] = value;
+          _RefuseRunPastRow(x, n, row, this._width, "pixel");
+          this._canvas.AsSpan(rowStart + x, n).Fill(value);
+          x += n;
         }
       }
     }
   }
 
-  /// <summary>
-  /// The word-oriented delta <c>.flc</c> writes: opcode words that skip lines or set a line's last
-  /// pixel, a packet count, and per packet a skip/run of whole pixel pairs.
-  /// </summary>
-  /// <remarks>
-  /// Everything here moves in pairs of pixels — a "word" is two adjacent bytes of the canvas, copied
-  /// or replicated together — except the column skip, which counts single pixels, and the one opcode
-  /// that sets a line's last pixel directly, which exists because a line of odd width has one pixel a
-  /// word cannot reach.
-  /// </remarks>
   private void _DecodeSs2(ReadOnlySpan<byte> payload) {
     var at = 0;
     var lineCount = _ReadU16(payload, ref at, "a word-delta chunk's line count");
@@ -353,91 +337,195 @@ public sealed class FlicVideoDecoder : IVideoCodecDecoder<FlicVideoDecoder> {
 
     for (var line = 0; line < lineCount; ++line) {
       var word = _ReadU16(payload, ref at, "a word-delta opcode");
-
       while ((word & 0xC000) == 0xC000) {
-        // Top two bits 11: a line-skip count, the word's value taken as negative.
         y += -unchecked((short)word);
         word = _ReadU16(payload, ref at, "a word-delta opcode");
       }
 
       if (y >= this._height)
-        throw new InvalidDataException(
-          $"A FLI_SS2 chunk's line skips reach row {y} of a {this._height}-row picture.");
-
+        throw new InvalidDataException($"A FLI_SS2 chunk's line skips reach row {y} of a {this._height}-row picture.");
       var rowStart = y * this._width;
 
       if ((word & 0xC000) == 0x8000) {
-        // Top two bits 10: the low byte is this line's last pixel, for a line an even count of whole
-        // pixel-pairs cannot reach every column of.
         this._canvas[rowStart + this._width - 1] = unchecked((byte)word);
         word = _ReadU16(payload, ref at, "a word-delta packet count");
       }
+      if ((word & 0xC000) != 0)
+        throw new InvalidDataException($"A FLI_SS2 packet-count opcode has unsupported high bits 0x{word & 0xC000:X4}.");
 
-      // Top two bits 00: word holds this line's packet count outright.
       var packetCount = word;
       var x = 0;
-
       for (var packet = 0; packet < packetCount; ++packet) {
-        var skip = _ReadU8(payload, ref at, "a word-delta packet's skip count");
-        x += skip;
-
+        x += _ReadU8(payload, ref at, "a word-delta packet's skip count");
         var size = unchecked((sbyte)_ReadU8(payload, ref at, "a word-delta packet's size"));
         if (size >= 0) {
           var pixels = size * 2;
-          _RefuseRunPastRow(x, pixels, y, this._width);
-          for (var i = 0; i < size; ++i) {
-            this._canvas[rowStart + x] = _ReadU8(payload, ref at, "a word-delta packet's literal low pixel");
-            this._canvas[rowStart + x + 1] = _ReadU8(payload, ref at, "a word-delta packet's literal high pixel");
-            x += 2;
-          }
+          _RefuseRunPastRow(x, pixels, y, this._width, "pixel");
+          _ReadBytes(payload, ref at, this._canvas.AsSpan(rowStart + x, pixels), "a word-delta packet's literal pixel pairs");
+          x += pixels;
         } else {
           var n = -size;
+          _RefuseRunPastRow(x, n * 2, y, this._width, "pixel");
           var low = _ReadU8(payload, ref at, "a word-delta packet's replicated low pixel");
           var high = _ReadU8(payload, ref at, "a word-delta packet's replicated high pixel");
-          _RefuseRunPastRow(x, n * 2, y, this._width);
           for (var i = 0; i < n; ++i) {
-            this._canvas[rowStart + x] = low;
-            this._canvas[rowStart + x + 1] = high;
-            x += 2;
+            this._canvas[rowStart + x++] = low;
+            this._canvas[rowStart + x++] = high;
           }
         }
       }
-
       ++y;
     }
   }
 
   // ============================================================================================
-  // Byte reading and bounds
+  // High-colour AF12 FLX delta chunks
   // ============================================================================================
 
-  private static byte _ReadU8(ReadOnlySpan<byte> data, ref int at, string what) {
-    if (at + 1 > data.Length)
-      throw new InvalidDataException($"A FLIC chunk ends before {what}, {1 - (data.Length - at)} byte(s) short.");
+  /// <summary>
+  /// Decodes the standard type-7 DELTA_FLC/SS2 grammar used by 15-bit Autodesk/Ulead FLX.
+  /// </summary>
+  /// <remarks>
+  /// The line opcodes remain standard SS2: only <c>11</c> in the high bits is a line skip, <c>00</c>
+  /// is a packet count and <c>01</c> is undefined. The <c>10</c> last-byte opcode exists to finish an
+  /// odd-width 8-bit scanline; a 15-bit FLX pixel is already one complete word, so that opcode has no
+  /// valid high-colour meaning and is refused. Packet data is word-oriented, which makes one word one
+  /// RGB555 pixel. Autodesk/Ulead FLX counts a packet's column skip in pixels; the older Tempra FLX
+  /// variant counts that field in bytes and cannot be distinguished reliably from an AF12 header
+  /// alone, so this path deliberately implements the externally verifiable Autodesk/Ulead dialect.
+  /// </remarks>
+  private void _DecodeHighColourSs2(ReadOnlySpan<byte> payload) {
+    if (this._bytesPerPixel != 2)
+      throw new NotSupportedException($"Standard FLI_SS2 high-colour words are defined for 15/16-bit pixels, not {this._depth}-bit FLIC.");
 
+    var at = 0;
+    var lineCount = _ReadU16(payload, ref at, "a high-colour SS2 chunk's line count");
+    var y = 0;
+
+    for (var line = 0; line < lineCount; ++line) {
+      var opcode = _ReadU16(payload, ref at, "a high-colour SS2 line opcode");
+      while ((opcode & 0xC000) == 0xC000) {
+        y += -unchecked((short)opcode);
+        opcode = _ReadU16(payload, ref at, "a high-colour SS2 line opcode");
+      }
+
+      if (y >= this._height)
+        throw new InvalidDataException($"A high-colour FLI_SS2 chunk's line skips reach row {y} of a {this._height}-row picture.");
+
+      switch (opcode & 0xC000) {
+        case 0x4000:
+          throw new InvalidDataException($"A high-colour FLI_SS2 line uses undefined opcode class 01 (0x{opcode:X4}).");
+        case 0x8000:
+          throw new InvalidDataException(
+            $"A high-colour FLI_SS2 line uses the 8-bit-only last-byte opcode 0x{opcode:X4}; a 15/16-bit FLX pixel is already one word.");
+      }
+
+      var packetCount = opcode;
+      var x = 0;
+      for (var packet = 0; packet < packetCount; ++packet) {
+        x += _ReadU8(payload, ref at, "a high-colour SS2 packet's pixel skip count");
+        var count = unchecked((sbyte)_ReadU8(payload, ref at, "a high-colour SS2 packet's word count"));
+        if (count > 0) {
+          _RefuseRunPastRow(x, count, y, this._width, "pixel");
+          _ReadBytes(payload, ref at, this._canvas.AsSpan(((y * this._width) + x) * 2, count * 2),
+            "a high-colour SS2 packet's literal RGB555 words");
+          x += count;
+        } else if (count < 0) {
+          var n = -count;
+          _RefuseRunPastRow(x, n, y, this._width, "pixel");
+          var pixel = _ReadPixel(payload, ref at, "a high-colour SS2 packet's replicated RGB555 word");
+          for (var i = 0; i < n; ++i)
+            pixel.CopyTo(this._canvas.AsSpan(((y * this._width) + x++) * 2, 2));
+        }
+      }
+      ++y;
+    }
+  }
+
+  // ============================================================================================
+  // DTA/true-colour delta chunks
+  // ============================================================================================
+
+  private void _DecodePixelDelta(ReadOnlySpan<byte> payload, string name) {
+    var at = 0;
+    var lineCount = _ReadU16(payload, ref at, $"a {name} chunk's changed-line count");
+    var y = 0;
+
+    for (var line = 0; line < lineCount; ++line) {
+      var opcode = unchecked((short)_ReadU16(payload, ref at, $"a {name} line opcode"));
+      while (opcode < 0) {
+        y += -opcode;
+        opcode = unchecked((short)_ReadU16(payload, ref at, $"a {name} line opcode"));
+      }
+      if (y >= this._height)
+        throw new InvalidDataException($"A {name} chunk's line skips reach row {y} of a {this._height}-row picture.");
+
+      var packetCount = opcode;
+      var x = 0;
+      for (var packet = 0; packet < packetCount; ++packet) {
+        x += _ReadU8(payload, ref at, $"a {name} packet's pixel skip count");
+        var count = unchecked((sbyte)_ReadU8(payload, ref at, $"a {name} packet's pixel count"));
+        if (count > 0) {
+          _RefuseRunPastRow(x, count, y, this._width, "pixel");
+          var bytes = checked(count * this._bytesPerPixel);
+          _ReadBytes(payload, ref at,
+            this._canvas.AsSpan(((y * this._width) + x) * this._bytesPerPixel, bytes),
+            $"a {name} packet's literal pixels");
+          x += count;
+        } else if (count < 0) {
+          var n = -count;
+          _RefuseRunPastRow(x, n, y, this._width, "pixel");
+          var pixel = _ReadPixel(payload, ref at, $"a {name} packet's replicated pixel");
+          for (var i = 0; i < n; ++i)
+            pixel.CopyTo(this._canvas.AsSpan(((y * this._width) + x++) * this._bytesPerPixel, this._bytesPerPixel));
+        }
+      }
+      ++y;
+    }
+  }
+
+  // ============================================================================================
+  // Reading and bounds
+  // ============================================================================================
+
+  private ReadOnlySpan<byte> _ReadPixel(ReadOnlySpan<byte> data, ref int at, string what) {
+    if (at + this._bytesPerPixel > data.Length)
+      throw new InvalidDataException($"A FLIC chunk ends before {what}.");
+    var result = data.Slice(at, this._bytesPerPixel);
+    at += this._bytesPerPixel;
+    return result;
+  }
+
+  private static byte _ReadU8(ReadOnlySpan<byte> data, ref int at, string what) {
+    if (at >= data.Length)
+      throw new InvalidDataException($"A FLIC chunk ends before {what}, 1 byte short.");
     return data[at++];
   }
 
   private static ushort _ReadU16(ReadOnlySpan<byte> data, ref int at, string what) {
     if (at + 2 > data.Length)
-      throw new InvalidDataException($"A FLIC chunk ends before {what}, {2 - (data.Length - at)} byte(s) short.");
-
+      throw new InvalidDataException($"A FLIC chunk ends before {what}, {at + 2 - data.Length} byte(s) short.");
     var value = BinaryPrimitives.ReadUInt16LittleEndian(data[at..]);
     at += 2;
     return value;
   }
 
-  private static void _RefuseRunPastRow(int x, int count, int row, int width) {
-    if (x + count > width)
+  private static void _ReadBytes(ReadOnlySpan<byte> data, ref int at, Span<byte> destination, string what) {
+    if (at + destination.Length > data.Length)
+      throw new InvalidDataException($"A FLIC chunk ends before {what}, {at + destination.Length - data.Length} byte(s) short.");
+    data.Slice(at, destination.Length).CopyTo(destination);
+    at += destination.Length;
+  }
+
+  private static void _RefuseRunPastRow(int x, int count, int row, int width, string unit) {
+    if (x < 0 || count < 0 || x + (long)count > width)
       throw new InvalidDataException(
-        $"A FLIC packet on row {row} writes {count} pixel(s) starting at column {x}, which reaches past the "
-        + $"picture's width of {width}.");
+        $"A FLIC packet on row {row} writes {count} {unit}(s) starting at column {x}, which reaches past the row width of {width}.");
   }
 
   private static void _RefuseLinesPastPicture(int firstLine, int lineCount, int height, string chunkName) {
-    if (firstLine + lineCount > height)
+    if (firstLine + (long)lineCount > height)
       throw new InvalidDataException(
-        $"A {chunkName} chunk states {lineCount} line(s) starting at row {firstLine}, which reaches past the "
-        + $"picture's height of {height}.");
+        $"A {chunkName} chunk states {lineCount} line(s) starting at row {firstLine}, which reaches past the picture's height of {height}.");
   }
 }

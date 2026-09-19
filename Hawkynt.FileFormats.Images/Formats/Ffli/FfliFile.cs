@@ -18,7 +18,7 @@ namespace FileFormat.Ffli;
 /// What was written before was 17002 bytes holding one field, with the matrices packed a thousand
 /// apart and no signature at all.
 /// </remarks>
-[VerifiedBy(ConformanceOracle.Recoil2Png)]
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.IrfanView)]
 public readonly record struct FfliFile
   : IImageFormatReader<FfliFile>, IImageToRawImage<FfliFile>,
     IImageFromRawImage<FfliFile>, IImageFormatWriter<FfliFile> {

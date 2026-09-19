@@ -13,7 +13,8 @@ namespace FileFormat.Codecs.Lcl;
 /// (multimedia.cx/lcl.txt, GNU FDL 1.2), the one written description of this format that is not an
 /// implementation. Its own first paragraph calls itself "random notes... while building a decoder",
 /// and says so again at the end: several fields are left as <c>[add ...]</c> placeholders the document
-/// never fills in.
+/// never fills in. FFmpeg's LGPL-2.1-or-later <c>lcl.h</c> supplies the numeric flag constants used by
+/// the interoperable decoder, including <c>FLAG_PNGFILTER = 4</c>.
 /// </remarks>
 internal readonly record struct LclHeader(byte ImageType, sbyte Compression, byte Flags, byte Codec) {
 
@@ -37,12 +38,13 @@ internal readonly record struct LclHeader(byte ImageType, sbyte Compression, byt
   public bool NullFramesUsed => (this.Flags & 0x02) != 0;
 
   /// <summary>
-  /// Bit 3 of <see cref="Flags"/>: a per-line prediction applied between decompression and colour
-  /// conversion, ZLIB only. Its structure is one of the document's unfilled placeholders, and its own
-  /// author states outright that his RGB24 implementation of it "doesn't work ok" — so there is
-  /// nothing here to decode it against even if the byte layout were known.
+  /// Bit 2 of <see cref="Flags"/> (the document calls it its third flag bit): a per-line prediction
+  /// applied between decompression and colour conversion, ZLIB only. Its structure is one of the
+  /// document's unfilled placeholders, and its own author states outright that his RGB24 implementation
+  /// of it "doesn't work ok" — so there is nothing here to decode it against even if the byte layout
+  /// were known.
   /// </summary>
-  public bool PngFiltered => (this.Flags & 0x08) != 0;
+  public bool PngFiltered => (this.Flags & 0x04) != 0;
 
   /// <summary>
   /// Reads the trailer from the eight bytes immediately following a standard <c>BITMAPINFOHEADER</c>.
