@@ -50,11 +50,18 @@ public sealed class Mpeg4QuarterSampleTests {
         block.Slice(y * 8, 8).CopyTo(inter4v.Slice((top + y) * 16 + left, 8));
     }
 
+    // The samples are read out before the assertions: a stack-allocated span cannot be captured by
+    // the closure Assert.Multiple takes.
+    var macroblockLeftOfBoundary = macroblock[7];
+    var inter4vLeftOfBoundary = inter4v[7];
+    var macroblockRightOfBoundary = macroblock[8];
+    var inter4vRightOfBoundary = inter4v[8];
+
     Assert.Multiple(() => {
-      Assert.That(macroblock[7], Is.EqualTo(90));
-      Assert.That(inter4v[7], Is.EqualTo(91));
-      Assert.That(macroblock[8], Is.EqualTo(102));
-      Assert.That(inter4v[8], Is.EqualTo(101));
+      Assert.That(macroblockLeftOfBoundary, Is.EqualTo(90));
+      Assert.That(inter4vLeftOfBoundary, Is.EqualTo(91));
+      Assert.That(macroblockRightOfBoundary, Is.EqualTo(102));
+      Assert.That(inter4vRightOfBoundary, Is.EqualTo(101));
     });
   }
 
@@ -72,12 +79,16 @@ public sealed class Mpeg4QuarterSampleTests {
     Span<int> prediction = stackalloc int[64];
     Mpeg4QuarterSample.Predict(prediction, reference, 9, 0, 9, 9, 0, 0, 1, 3, 0);
 
+    // Read out before the assertions: a stack-allocated span cannot be captured by the closure
+    // Assert.Multiple takes.
+    int[] samples = [prediction[0], prediction[3], prediction[3 * 8], prediction[3 * 8 + 3], prediction[7 * 8 + 7]];
+
     Assert.Multiple(() => {
-      Assert.That(prediction[0], Is.EqualTo(12));
-      Assert.That(prediction[3], Is.EqualTo(64));
-      Assert.That(prediction[3 * 8], Is.EqualTo(46));
-      Assert.That(prediction[3 * 8 + 3], Is.EqualTo(98));
-      Assert.That(prediction[7 * 8 + 7], Is.EqualTo(210));
+      Assert.That(samples[0], Is.EqualTo(12));
+      Assert.That(samples[1], Is.EqualTo(64));
+      Assert.That(samples[2], Is.EqualTo(46));
+      Assert.That(samples[3], Is.EqualTo(98));
+      Assert.That(samples[4], Is.EqualTo(210));
     });
   }
 
