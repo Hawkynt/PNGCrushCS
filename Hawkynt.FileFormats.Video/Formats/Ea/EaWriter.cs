@@ -7,9 +7,14 @@ using FileFormat.Core;
 namespace FileFormat.Ea;
 
 /// <summary>
-/// Replays Electronic Arts' self-delimiting video and audio-family chunks without parsing nested codec
-/// patch headers. Both logical streams already expose complete eight-byte-header-plus-payload chunks.
+/// Writes Electronic Arts' self-delimiting video and audio-family chunks in packet order.
 /// </summary>
+/// <remarks>
+/// A packet is allowed to contain several complete chunks from the same logical stream. That matters
+/// for codecs such as CMV, where a palette/geometry <c>MVIh</c> state chunk may need to sit immediately
+/// before the <c>MVIf</c> picture produced by the same encoder call. Demuxed packets containing one
+/// chunk remain byte-for-byte replayable.
+/// </remarks>
 public sealed class EaWriter : IVideoContainerWriter<EaWriter> {
 
   private readonly IReadOnlyList<MediaStreamInfo> _streams;
@@ -55,24 +60,46 @@ public sealed class EaWriter : IVideoContainerWriter<EaWriter> {
       throw new ArgumentOutOfRangeException(nameof(packet), packet.StreamIndex, "Packet names no declared EA stream.");
 
     var data = packet.Data.Span;
-    if (data.Length < 8)
-      throw new InvalidDataException("EA packet must include its eight-byte chunk header.");
-    var size = BinaryPrimitives.ReadUInt32LittleEndian(data.Slice(4, 4));
-    if (size != data.Length)
-      throw new InvalidDataException($"EA chunk header states {size} bytes including itself, packet carries {data.Length}.");
+    if (data.IsEmpty)
+      throw new InvalidDataException("EA packet must contain at least one complete chunk.");
 
-    var fourCc = BinaryPrimitives.ReadUInt32LittleEndian(data);
     var stream = this._streams[packet.StreamIndex];
-    if (stream.Kind == MediaStreamKind.Audio) {
-      if (!EaChunkType.IsAudio(fourCc))
-        throw new InvalidDataException("An EAAU packet must carry one of the documented EA sound-family chunk identifiers.");
-    } else if (stream.Codec.EqualsIgnoringCase(CodecTag.FromCharacters("cmv "))) {
-      if (!EaChunkType.IsCmv(fourCc))
-        throw new InvalidDataException("A CMV packet must carry an MVIh/MVIf/MVIe chunk.");
-    } else if (!EaChunkType.IsTgv(fourCc))
-      throw new InvalidDataException("A TGV packet must carry a kVGT/fVGT chunk.");
+    for (var at = 0; at < data.Length;) {
+      var remaining = data.Length - at;
+      if (remaining < 8)
+        throw new InvalidDataException($"EA packet ends with {remaining} byte(s), short of another eight-byte chunk header.");
+
+      var chunk = data[at..];
+      var fourCc = BinaryPrimitives.ReadUInt32LittleEndian(chunk);
+      var size = BinaryPrimitives.ReadUInt32LittleEndian(chunk[4..]);
+      if (size < 8)
+        throw new InvalidDataException($"EA chunk at packet byte {at} states {size} bytes including itself, shorter than its header.");
+      if (size > (uint)remaining)
+        throw new InvalidDataException(
+          $"EA chunk at packet byte {at} states {size} bytes including itself, but only {remaining} remain in the packet.");
+
+      this._ValidateChunkKind(stream, fourCc);
+      at += checked((int)size);
+    }
 
     this._output.Write(data);
+  }
+
+  private void _ValidateChunkKind(MediaStreamInfo stream, uint fourCc) {
+    if (stream.Kind == MediaStreamKind.Audio) {
+      if (!EaChunkType.IsAudio(fourCc))
+        throw new InvalidDataException("An EAAU packet must carry only documented EA sound-family chunk identifiers.");
+      return;
+    }
+
+    if (stream.Codec.EqualsIgnoringCase(CodecTag.FromCharacters("cmv "))) {
+      if (!EaChunkType.IsCmv(fourCc))
+        throw new InvalidDataException("A CMV packet must carry only MVIh/MVIf/MVIe chunks.");
+      return;
+    }
+
+    if (!EaChunkType.IsTgv(fourCc))
+      throw new InvalidDataException("A TGV packet must carry only kVGT/fVGT chunks.");
   }
 
   public byte[] Finish() {

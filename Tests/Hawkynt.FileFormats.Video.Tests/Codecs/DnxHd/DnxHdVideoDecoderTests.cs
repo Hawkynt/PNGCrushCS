@@ -340,18 +340,24 @@ public class DnxHdVideoDecoderTests {
 
   [Test]
   [Category("Unit")]
-  public void AnInterlacedFrameIsRefused() {
+  public void AnInterlacedFrameIsDecodedRatherThanRefused() {
+    // Interlaced source was a refusal until the field-encoded coding units it comes in could be
+    // woven; it is now read, so what this asks of it is a picture of the stated geometry rather than
+    // an exception. How the two fields are interleaved is what DnxHdInterlacedTests measures.
     var options = new DnxHdTestStream.Options { Interlaced = true };
-    var failure = Assert.Throws<NotSupportedException>(() => _Decode(options, _FlatPayload()));
+    var planes = _Decode(options, _FlatPayload());
 
-    Assert.That(failure!.Message, Does.Contain("interlaced"));
+    Assert.That(planes.Luma.Length, Is.EqualTo(options.Width * options.Height));
   }
 
   [Test]
   [Category("Unit")]
   public void AFieldEncodedCodingUnitIsRefused() {
+    // A field-encoded coding unit is now read, but only from a frame that says its source is
+    // interlaced: the two go together, and one without the other describes no picture. That makes it
+    // a statement the stream contradicts rather than a mode this decoder lacks.
     var options = new DnxHdTestStream.Options { FrameEncoded = false };
-    var failure = Assert.Throws<NotSupportedException>(() => _Decode(options, _FlatPayload()));
+    var failure = Assert.Throws<InvalidDataException>(() => _Decode(options, _FlatPayload()));
 
     Assert.That(failure!.Message, Does.Contain("interlaced"));
   }
@@ -359,8 +365,10 @@ public class DnxHdVideoDecoderTests {
   [Test]
   [Category("Unit")]
   public void TheAdaptiveMacroblockModeIsRefused() {
+    // MACF is read now, and compression ID 1260 is the only one that defines it, so stating it under
+    // any other is an invalid stream rather than an unimplemented mode.
     var options = new DnxHdTestStream.Options { AdaptiveMacroblocks = true };
-    var failure = Assert.Throws<NotSupportedException>(() => _Decode(options, _FlatPayload()));
+    var failure = Assert.Throws<InvalidDataException>(() => _Decode(options, _FlatPayload()));
 
     Assert.That(failure!.Message, Does.Contain("1260"));
   }

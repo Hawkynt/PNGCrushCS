@@ -103,6 +103,14 @@ public sealed class RawVideoEncoder : IVideoCodecEncoder<RawVideoEncoder> {
 
   public static CodecTag Codec => CodecTag.None;
 
+  public static bool Accepts(MediaStreamInfo stream) {
+    ArgumentNullException.ThrowIfNull(stream);
+
+    return stream.Kind == MediaStreamKind.Video
+           && stream.Codec == CodecTag.None
+           && (stream.CodecId == null || string.Equals(stream.CodecId, _VFW_CODEC_ID, StringComparison.OrdinalIgnoreCase));
+  }
+
   public static RawVideoEncoder Create(MediaStreamInfo stream) {
     ArgumentNullException.ThrowIfNull(stream);
 
