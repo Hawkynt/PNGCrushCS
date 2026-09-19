@@ -190,14 +190,26 @@ public class AvuiVideoDecoderTests {
 
   [Test]
   [Category("Unit")]
-  public void Depth32RefusesATruncatedAlphaCompanion() {
+  public void Depth32WithAnIncompleteAlphaCompanionDecodesOpaque() {
     const int height = 486;
-    var opaqueLength = 2 * _Width * (height + 10);
+    const int skip = 10;
+    var opaqueLength = 2 * _Width * (height + skip);
+    var packet = new byte[2 * opaqueLength + 3];
+    var colour = 2 * _Width * skip;
+    new byte[] { 128, 16, 128, 16 }.CopyTo(packet, colour);
+
     var decoder = AvuiVideoDecoder.Create(_Stream(
       _Width, height, depth: AvuiVideoFormat.AlphaDepth, privateData: _Aprg(interlaced: false)));
+    var (_, _, _, alpha) = decoder.DecodePlanesWithAlpha(packet);
+    var decoded = decoder.TryDecode(new(0, packet), out var frame);
 
-    var failure = Assert.Throws<InvalidDataException>(() => decoder.DecodePlanes(new byte[2 * opaqueLength + 3]));
-    Assert.That(failure!.Message, Does.Contain("colour and alpha"));
+    Assert.Multiple(() => {
+      Assert.That(alpha, Is.Not.Null);
+      Assert.That(alpha!, Is.All.EqualTo(byte.MaxValue));
+      Assert.That(decoded, Is.True);
+      Assert.That(frame.Format, Is.EqualTo(PixelFormat.Rgba32));
+      Assert.That(frame.PixelData[3], Is.EqualTo(byte.MaxValue));
+    });
   }
 
   [Test]
