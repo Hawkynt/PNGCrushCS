@@ -78,7 +78,7 @@ public sealed class MveVideoEncoderTests {
 
     Assert.That(decoder.TryDecode(new(0, _Opcode(_SET_PALETTE_COMPRESSED, compressed.ToArray())), out _), Is.False);
     Assert.That(decoder.TryDecode(new(0, _Opcode(_DECODING_MAP, [0x0E])), out _), Is.False);
-    Assert.That(decoder.TryDecode(new(0, _Opcode(_VIDEO_DATA_11, _VideoPayload(1, 1, [8])), out var picture), Is.True);
+    Assert.That(decoder.TryDecode(new(0, _Opcode(_VIDEO_DATA_11, _VideoPayload(1, 1, [8]))), out var picture), Is.True);
 
     Assert.That(picture.Palette![8 * 3], Is.EqualTo(255));
     Assert.That(picture.Palette[8 * 3 + 1], Is.Zero);
@@ -108,7 +108,7 @@ public sealed class MveVideoEncoderTests {
 
     Assert.That(decoder.TryDecode(new(0, _Opcode(_SKIP_MAP, [0xFF, 0xFF])), out _), Is.False); // signed -1: changed
     Assert.That(decoder.TryDecode(new(0, _Opcode(_DECODING_MAP, [0, 0])), out _), Is.False);
-    Assert.That(decoder.TryDecode(new(0, _Opcode(_VIDEO_DATA_10, _VideoPayload(1, 1, pixels)), out var picture), Is.True);
+    Assert.That(decoder.TryDecode(new(0, _Opcode(_VIDEO_DATA_10, _VideoPayload(1, 1, pixels))), out var picture), Is.True);
     Assert.That(picture.PixelData, Is.EqualTo(pixels));
   }
 
