@@ -1013,7 +1013,7 @@ Entropy coder used for FFV1 prediction differences.
 
 #### `FlashSv2VideoDecoder`
 
-Decodes Flash Screen Video 2 (FSV2): the same block grid as FSV1, extended with a colourspace that packs a pixel into one byte or two, a compression technique that primes a block against the bytes its cell held at the last key frame rather than restating them, and updates that touch only a run of a cell's rows rather than the whole thing. Read from the SWF File Format Specification's own appendix, like FSV1, and despite the name a genuinely different bitstream rather than a variant of it — nothing below the grid header is shared with `FlashSvVideoDecoder`.
+Decodes Flash Screen Video 2 (FSV2): block-grid keyframes and interframes, 24-bit BGR and the hybrid 15/7-bit colorspace, partial-row updates, custom palettes, and the measured `ZlibPrimeCompressPrevious` form of ZLIB priming.
 
 Implements `IVideoCodecDecoder<FlashSv2VideoDecoder>`, `IVideoFrameDecoder`.
 
@@ -1023,6 +1023,20 @@ Implements `IVideoCodecDecoder<FlashSv2VideoDecoder>`, `IVideoFrameDecoder`.
 | `Accepts` | `static bool Accepts(MediaStreamInfo stream)` |  |
 | `Create` | `static FlashSv2VideoDecoder Create(MediaStreamInfo stream)` |  |
 | `TryDecode` | `bool TryDecode(CodedPacket packet, out RawImage frame)` |  |
+
+#### `FlashSv2VideoEncoder`
+
+Encodes Flash Screen Video 2 (`FSV2`) as lossless 24-bit BGR keyblocks and interblocks.
+
+Implements `IVideoCodecEncoder<FlashSv2VideoEncoder>`, `IVideoPacketEncoder`.
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `CodecName` | `static string CodecName { get; }` |  |
+| `Codec` | `static CodecTag Codec { get; }` |  |
+| `Create` | `static FlashSv2VideoEncoder Create(MediaStreamInfo stream)` |  |
+| `DescribeStream` | `MediaStreamInfo DescribeStream()` |  |
+| `TryEncode` | `bool TryEncode(RawImage frame, long? presentationTimestamp, out CodedPacket packet)` |  |
 
 #### `FlashSvVideoDecoder`
 
