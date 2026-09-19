@@ -132,48 +132,13 @@ public sealed class AvrnVideoDecoder : IVideoCodecDecoder<AvrnVideoDecoder> {
       return false;
     }
 
-    var width = this._width > 0 ? this._width : decoded.Width;
-    var height = this._height > 0 ? this._height : decoded.Height;
-    if (width > decoded.Width || height > decoded.Height)
-      throw new InvalidDataException(
-        $"Video stream {this._streamIndex} states a picture size of {width}x{height}, larger than the "
-        + $"{decoded.Width}x{decoded.Height} its AVRn Motion JPEG packet codes.");
-
-    if (width == decoded.Width && height == decoded.Height) {
-      frame = decoded;
-      return true;
-    }
-
-    frame = new() {
-      Width = width,
-      Height = height,
-      Format = decoded.Format,
-      PixelData = _CropBottomLeft(decoded, width, height),
-      ColorInfo = decoded.ColorInfo,
-      Palette = decoded.Palette,
-      PaletteCount = decoded.PaletteCount,
-      AlphaTable = decoded.AlphaTable,
-      Metadata = decoded.Metadata,
-    };
+    frame = AvidMotionJpegLayout.CropToDisplay(
+      decoded,
+      this._width > 0 ? this._width : decoded.Width,
+      this._height > 0 ? this._height : decoded.Height,
+      this._streamIndex,
+      "AVRn Motion JPEG packet");
     return true;
-  }
-
-  /// <summary>
-  /// Keeps the bottom rows and left columns of an AVRn Motion JPEG picture. The vertical choice is
-  /// the Avid-specific part: coded macroblock padding is above the displayed picture, not below it.
-  /// </summary>
-  private static byte[] _CropBottomLeft(RawImage source, int width, int height) {
-    var bytesPerPixel = RawImage.BytesPerPixel(source.Format);
-    var sourceStride = checked(source.Width * bytesPerPixel);
-    var targetStride = checked(width * bytesPerPixel);
-    var target = new byte[checked(targetStride * height)];
-    var firstRow = source.Height - height;
-
-    for (var row = 0; row < height; ++row)
-      source.PixelData.AsSpan((firstRow + row) * sourceStride, targetStride)
-        .CopyTo(target.AsSpan(row * targetStride, targetStride));
-
-    return target;
   }
 
   /// <summary>

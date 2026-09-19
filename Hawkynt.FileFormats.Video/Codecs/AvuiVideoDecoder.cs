@@ -14,17 +14,18 @@ namespace FileFormat.Codecs;
 /// are treated as interlaced, matching the long-standing reference-decoder behaviour. NTSC interlace
 /// stores the odd field first while PAL stores the even field first.
 /// <para/>
-/// A depth-32 sample carries a second field-laid-out plane after the UYVY data. Every other byte is an
-/// inverted alpha value, which is why this decoder returns RGBA32 for that variant and RGB24 for the
-/// ordinary depth-16 one. Colour is interpreted in the 601/709 legal range Avid prescribes; at these
-/// SD geometries the shared conversion path uses BT.601 limited range.
+/// A depth-32 sample may carry a second field-laid-out plane after the UYVY data. Every other byte is
+/// an inverted alpha value. A short or absent companion does not make the colour picture invalid:
+/// the reference decoder treats that picture as fully opaque, so this decoder does the same and still
+/// returns RGBA32 for the depth-32 stream. Colour is interpreted in the 601/709 legal range Avid
+/// prescribes; at these SD geometries the shared conversion path uses BT.601 limited range.
 /// <para/>
-/// There is no MultimediaWiki page for this one and no published layout, so the byte offsets were
-/// recovered rather than read: pseudo-random <c>uyvy422</c> content carried through ffmpeg's own avui
-/// encoder, swept against every placement of the blanking runs ahead of, between and behind the
-/// picture data, keeping the one that reproduces every sample. That sweep is what the field offsets
-/// here and in <see cref="AvuiVideoEncoder"/> encode, and the two agree with ffmpeg's own encoder byte
-/// for byte at both geometries in both field modes.
+/// There is no published layout for the packet bytes, so the offsets were recovered rather than read:
+/// pseudo-random <c>uyvy422</c> content carried through ffmpeg's own avui encoder, swept against every
+/// placement of the blanking runs ahead of, between and behind the picture data, keeping the one that
+/// reproduces every sample. That sweep is what the field offsets here and in
+/// <see cref="AvuiVideoEncoder"/> encode, and the two agree with ffmpeg's own encoder byte for byte at
+/// both geometries in both field modes.
 /// </remarks>
 public sealed class AvuiVideoDecoder : IVideoCodecDecoder<AvuiVideoDecoder> {
 
@@ -97,7 +98,11 @@ public sealed class AvuiVideoDecoder : IVideoCodecDecoder<AvuiVideoDecoder> {
     return (y, cb, cr);
   }
 
-  /// <summary>Unpacks the field order, UYVY pairs and, at depth 32, the inverted alpha companion.</summary>
+  /// <summary>
+  /// Unpacks the field order, UYVY pairs and, at depth 32, the inverted alpha companion. A declared
+  /// alpha stream whose packet stops before the complete companion remains valid and comes back opaque,
+  /// matching the reference decoder rather than turning an optional plane into a packet requirement.
+  /// </summary>
   internal (byte[] Y, byte[] Cb, byte[] Cr, byte[]? Alpha) DecodePlanesWithAlpha(ReadOnlySpan<byte> data) {
     var opaqueLength = this._layout.OpaqueLength;
     if (data.Length < opaqueLength)
@@ -105,21 +110,19 @@ public sealed class AvuiVideoDecoder : IVideoCodecDecoder<AvuiVideoDecoder> {
         $"A {AvuiVideoFormat.Width}x{this._layout.Height} AVUI packet in this field mode needs at least {opaqueLength} byte(s); "
         + $"the packet contains {data.Length} byte(s).");
 
-    var alphaLength = this._depth == AvuiVideoFormat.AlphaDepth ? this._layout.AlphaPacketLength : 0;
-    if (alphaLength != 0 && data.Length < alphaLength)
-      throw new InvalidDataException(
-        $"A depth-32 {AvuiVideoFormat.Width}x{this._layout.Height} AVUI packet needs {alphaLength} byte(s) for colour and alpha; "
-        + $"the packet contains {data.Length} byte(s).");
-
+    var wantsAlpha = this._depth == AvuiVideoFormat.AlphaDepth;
+    var hasAlphaCompanion = wantsAlpha && data.Length >= this._layout.AlphaPacketLength;
     var luma = new byte[checked(AvuiVideoFormat.Width * this._layout.Height)];
     var chroma = new byte[checked((AvuiVideoFormat.Width / 2) * this._layout.Height)];
     var cb = new byte[chroma.Length];
     var cr = new byte[chroma.Length];
-    var alpha = alphaLength == 0 ? null : new byte[luma.Length];
+    var alpha = wantsAlpha ? new byte[luma.Length] : null;
+    if (alpha != null && !hasAlphaCompanion)
+      Array.Fill(alpha, byte.MaxValue);
 
     for (var field = 0; field < this._layout.Fields; ++field) {
       var source = this._layout.FieldOffset(field);
-      var alphaSource = alpha == null ? 0 : this._layout.AlphaFieldOffset(field);
+      var alphaSource = hasAlphaCompanion ? this._layout.AlphaFieldOffset(field) : 0;
 
       for (var row = this._layout.FirstRow(field); row < this._layout.Height; row += this._layout.RowStep) {
         var yAt = checked(row * AvuiVideoFormat.Width);
@@ -131,8 +134,8 @@ public sealed class AvuiVideoDecoder : IVideoCodecDecoder<AvuiVideoDecoder> {
           cr[cAt + pair] = data[source++];
           luma[yAt + pair * 2 + 1] = data[source++];
 
-          if (alpha != null) {
-            alpha[yAt + pair * 2] = (byte)(byte.MaxValue - data[alphaSource]);
+          if (hasAlphaCompanion) {
+            alpha![yAt + pair * 2] = (byte)(byte.MaxValue - data[alphaSource]);
             alphaSource += 2;
             alpha[yAt + pair * 2 + 1] = (byte)(byte.MaxValue - data[alphaSource]);
             alphaSource += 2;

@@ -8,11 +8,12 @@ namespace FileFormat.Codecs.Lcl;
 /// force, and which of the library's two sibling codecs — MSZH or ZLIB — wrote the stream.
 /// </summary>
 /// <remarks>
-/// The field layout comes from Roberto Togni's published LCL notes. The flag values use the compatible
-/// FFmpeg implementation because the prose calls the PNG predictor "bit 3" while that implementation —
-/// and therefore interoperable bitstreams — assigns it numeric value <c>4</c> (zero-based bit 2).
-/// FFmpeg's <c>libavcodec/lcl.h</c> is copyright (c) 2002-2004 Roberto Togni and LGPL-2.1-or-later;
-/// these factual constants are used here by the LGPL-3.0-or-later project.
+/// Recovered from "Description of the LCL codecs (MSZH and ZLIB)" by Roberto Togni
+/// (multimedia.cx/lcl.txt, GNU FDL 1.2), the one written description of this format that is not an
+/// implementation. Its own first paragraph calls itself "random notes... while building a decoder",
+/// and says so again at the end: several fields are left as <c>[add ...]</c> placeholders the document
+/// never fills in. FFmpeg's LGPL-2.1-or-later <c>lcl.h</c> supplies the numeric flag constants used by
+/// the interoperable decoder, including <c>FLAG_PNGFILTER = 4</c>.
 /// </remarks>
 internal readonly record struct LclHeader(byte ImageType, sbyte Compression, byte Flags, byte Codec) {
 
