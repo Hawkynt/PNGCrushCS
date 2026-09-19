@@ -1,63 +1,45 @@
 using System;
-using System.IO;
 using FileFormat.Core;
 
 namespace FileFormat.Codecs.MagicYuv;
 
 /// <summary>What a MagicYUV stream's samples mean.</summary>
 internal enum MagicYuvColourSpace {
-
-  /// <summary>One plane of luminance and nothing else.</summary>
   Grey,
-
-  /// <summary>Blue, green and red planes, with an alpha plane after them where there is one.</summary>
   Rgb,
-
-  /// <summary>Luminance and two chrominance planes, with an alpha plane where there is one.</summary>
   Yuv,
 }
 
-/// <summary>
-/// The layout a MagicYUV four-character code stands for, and the header every frame opens with.
-/// </summary>
+/// <summary>The layout a MagicYUV v7 FourCC stands for.</summary>
 /// <remarks>
-/// Unlike every other codec in this package, MagicYUV states almost nothing in the stream
-/// description: the sixteen bytes an AVI carries behind the <c>BITMAPINFOHEADER</c> are a copy of
-/// the first bytes of the frame, and the frame is where the picture size, the slice height and the
-/// tables all are. So the description is not read at all — the frame is, and it is checked against
-/// the size the container states.
-/// <para/>
-/// There is no published description of any of this. Everything below was established by measuring
-/// frames against the pictures they were made from.
+/// MagicYUV never published a bitstream specification. The format-byte/depth mapping below is
+/// cross-checked against FFmpeg's LGPL-2.1-or-later decoder and OxideAV's MIT-licensed clean-room
+/// implementation. The latter also independently documents the per-depth Huffman limit and the
+/// vendor BITMAPINFOHEADER depth values.
 /// </remarks>
 internal sealed class MagicYuvFormat {
-
-  /// <summary>The signature every frame opens with.</summary>
   internal static readonly byte[] Signature = [(byte)'M', (byte)'A', (byte)'G', (byte)'Y'];
-
-  /// <summary>The one header size measured, and the only one whose fields are known.</summary>
   internal const int HEADER_SIZE = 32;
-
-  /// <summary>
-  /// The byte at offset eight, which is 7 in every frame measured.
-  /// </summary>
-  /// <remarks>
-  /// Called a version here because that is what its position suggests, not because anything says so:
-  /// the codec's author has described its releases publicly without ever referring to a bitstream
-  /// version number, so the name is this decoder's guess at what the byte is for. What is certain is
-  /// only that every frame reachable here holds 7 in it, and that a frame holding anything else is
-  /// one nothing was measured against.
-  /// </remarks>
   internal const int VERSION_BYTE = 7;
 
   private MagicYuvFormat(
-    MagicYuvColourSpace colourSpace, int planeCount, int chromaHorizontalShift,
-    int chromaVerticalShift, bool hasAlpha) {
+    MagicYuvColourSpace colourSpace,
+    int planeCount,
+    int chromaHorizontalShift,
+    int chromaVerticalShift,
+    bool hasAlpha,
+    int bitDepth,
+    byte formatByte,
+    int streamBitsPerPixel
+  ) {
     this.ColourSpace = colourSpace;
     this.PlaneCount = planeCount;
     this.ChromaHorizontalShift = chromaHorizontalShift;
     this.ChromaVerticalShift = chromaVerticalShift;
     this.HasAlpha = hasAlpha;
+    this.BitDepth = bitDepth;
+    this.FormatByte = formatByte;
+    this.StreamBitsPerPixel = streamBitsPerPixel;
   }
 
   internal MagicYuvColourSpace ColourSpace { get; }
@@ -65,28 +47,47 @@ internal sealed class MagicYuvFormat {
   internal int ChromaHorizontalShift { get; }
   internal int ChromaVerticalShift { get; }
   internal bool HasAlpha { get; }
+  internal int BitDepth { get; }
+  internal byte FormatByte { get; }
+  internal int StreamBitsPerPixel { get; }
+  internal int SymbolCount => 1 << this.BitDepth;
+  internal int SampleMask => this.SymbolCount - 1;
+  internal int MaxHuffmanLength => this.BitDepth + 4;
+  internal bool IsHighBitDepth => this.BitDepth > 8;
 
-  /// <summary>Whether a plane is one of the two that carry chrominance.</summary>
+  internal PixelFormat NativePixelFormat => (this.ColourSpace, this.BitDepth, this.HasAlpha, this.ChromaHorizontalShift, this.ChromaVerticalShift) switch {
+    (MagicYuvColourSpace.Grey, 8, _, _, _) => PixelFormat.Gray8,
+    (MagicYuvColourSpace.Grey, 10, _, _, _) => PixelFormat.Gray10,
+    (MagicYuvColourSpace.Rgb, 8, false, _, _) => PixelFormat.Rgb24,
+    (MagicYuvColourSpace.Rgb, 8, true, _, _) => PixelFormat.Rgba32,
+    (MagicYuvColourSpace.Rgb, _, false, _, _) => PixelFormat.Rgb48,
+    (MagicYuvColourSpace.Rgb, _, true, _, _) => PixelFormat.Rgba64,
+    (MagicYuvColourSpace.Yuv, 8, false, 1, 1) => PixelFormat.Yuv420P8,
+    (MagicYuvColourSpace.Yuv, 8, false, 1, 0) => PixelFormat.Yuv422P8,
+    (MagicYuvColourSpace.Yuv, 8, false, 0, 0) => PixelFormat.Yuv444P8,
+    (MagicYuvColourSpace.Yuv, 10, false, 1, 1) => PixelFormat.Yuv420P10,
+    (MagicYuvColourSpace.Yuv, 10, false, 1, 0) => PixelFormat.Yuv422P10,
+    (MagicYuvColourSpace.Yuv, 10, false, 0, 0) => PixelFormat.Yuv444P10,
+    (MagicYuvColourSpace.Yuv, 8, true, _, _) => PixelFormat.Rgba32,
+    _ => throw new NotSupportedException(
+      $"No RawImage representation exists for {this.BitDepth}-bit {this.ColourSpace} samples."),
+  };
+
   internal bool IsChroma(int plane)
     => this.ColourSpace == MagicYuvColourSpace.Yuv && plane is 1 or 2;
 
-  /// <summary>The width and height of one plane, rounding a subsampled one up.</summary>
-  /// <remarks>
-  /// Up rather than down, because a subsampled plane has to cover the odd row and column too: a
-  /// 33-wide 4:2:2 picture has 17 chrominance samples a row and not 16, and rounding the other way
-  /// loses the last column of every such picture.
-  /// </remarks>
   internal (int Width, int Height) PlaneSize(int plane, int width, int height) {
     if (!this.IsChroma(plane))
       return (width, height);
 
     var horizontal = 1 << this.ChromaHorizontalShift;
     var vertical = 1 << this.ChromaVerticalShift;
-    return ((width + horizontal - 1) >> this.ChromaHorizontalShift,
-      (height + vertical - 1) >> this.ChromaVerticalShift);
+    return (
+      (width + horizontal - 1) >> this.ChromaHorizontalShift,
+      (height + vertical - 1) >> this.ChromaVerticalShift
+    );
   }
 
-  /// <summary>How many rows of one plane a slice covers.</summary>
   internal int SliceHeight(int plane, int frameSliceHeight) {
     if (!this.IsChroma(plane))
       return frameSliceHeight;
@@ -95,26 +96,32 @@ internal sealed class MagicYuvFormat {
     return (frameSliceHeight + vertical - 1) >> this.ChromaVerticalShift;
   }
 
-  /// <summary>The layout each four-character code stands for, refusing the rest by name.</summary>
   internal static MagicYuvFormat Of(CodecTag codec, int streamIndex) {
     var name = codec.ToString();
     return name switch {
-      "M8RG" => new(MagicYuvColourSpace.Rgb, 3, 0, 0, false),
-      "M8RA" => new(MagicYuvColourSpace.Rgb, 4, 0, 0, true),
-      "M8Y0" => new(MagicYuvColourSpace.Yuv, 3, 1, 1, false),
-      "M8Y2" => new(MagicYuvColourSpace.Yuv, 3, 1, 0, false),
-      "M8Y4" => new(MagicYuvColourSpace.Yuv, 3, 0, 0, false),
-      "M8YA" => new(MagicYuvColourSpace.Yuv, 4, 0, 0, true),
-      "M8G0" => new(MagicYuvColourSpace.Grey, 1, 0, 0, false),
+      "M8RG" => new(MagicYuvColourSpace.Rgb, 3, 0, 0, false, 8, 0x65, 24),
+      "M8RA" => new(MagicYuvColourSpace.Rgb, 4, 0, 0, true, 8, 0x66, 32),
+      "M8Y4" => new(MagicYuvColourSpace.Yuv, 3, 0, 0, false, 8, 0x67, 24),
+      "M8Y2" => new(MagicYuvColourSpace.Yuv, 3, 1, 0, false, 8, 0x68, 24),
+      "M8Y0" => new(MagicYuvColourSpace.Yuv, 3, 1, 1, false, 8, 0x69, 24),
+      "M8YA" => new(MagicYuvColourSpace.Yuv, 4, 0, 0, true, 8, 0x6A, 32),
+      "M8G0" => new(MagicYuvColourSpace.Grey, 1, 0, 0, false, 8, 0x6B, 24),
+      "M0Y2" => new(MagicYuvColourSpace.Yuv, 3, 1, 0, false, 10, 0x6C, 20),
+      "M0RG" => new(MagicYuvColourSpace.Rgb, 3, 0, 0, false, 10, 0x6D, 30),
+      "M0RA" => new(MagicYuvColourSpace.Rgb, 4, 0, 0, true, 10, 0x6E, 40),
+      "M2RG" => new(MagicYuvColourSpace.Rgb, 3, 0, 0, false, 12, 0x6F, 36),
+      "M2RA" => new(MagicYuvColourSpace.Rgb, 4, 0, 0, true, 12, 0x70, 48),
+      "M4RG" => new(MagicYuvColourSpace.Rgb, 3, 0, 0, false, 14, 0x71, 42),
+      "M4RA" => new(MagicYuvColourSpace.Rgb, 4, 0, 0, true, 14, 0x72, 56),
+      "M0G0" => new(MagicYuvColourSpace.Grey, 1, 0, 0, false, 10, 0x73, 10),
+      "M0Y4" => new(MagicYuvColourSpace.Yuv, 3, 0, 0, false, 10, 0x76, 30),
+      "M0Y0" => new(MagicYuvColourSpace.Yuv, 3, 1, 1, false, 10, 0x7B, 15),
       "M8GA" => throw new NotSupportedException(
-        $"Video stream {streamIndex} is M8GA — grey with an alpha channel. No encoder reachable here writes one, so there is no file against which a reading of it could be measured, and it is refused rather than decoded on the assumption that it is M8G0 with a second plane behind it."),
+        $"Video stream {streamIndex} is M8GA — grey with an alpha channel — which is not one of MagicYUV v7's native formats."),
       "MAGY" => throw new NotSupportedException(
-        $"Video stream {streamIndex} is MAGY, the single code MagicYUV used before it gave each pixel format one of its own. Which format such a file holds is not in its code, and no encoder reachable here writes one, so it is refused rather than guessed at."),
-      "M0RG" or "M0RA" or "M0Y0" or "M0Y2" or "M0Y4" or "M0G0"
-        or "M2RG" or "M2RA" or "M4RG" or "M4RA" => throw new NotSupportedException(
-        $"Video stream {streamIndex} is {name}, one of MagicYUV's codes for samples deeper than eight bits — ten, twelve or fourteen. How those samples are packed is published nowhere and no encoder reachable here writes one, so it is refused by name rather than read as though its samples were bytes."),
+        $"Video stream {streamIndex} is MAGY, the single code MagicYUV used before it gave each pixel format one of its own. Which format such a file holds is not in its code, so it is refused rather than guessed at."),
       _ => throw new NotSupportedException(
-        $"Video stream {streamIndex} is named {name}, which is not a MagicYUV code this reads."),
+        $"Video stream {streamIndex} is named {name}, which is not a MagicYUV v7 native format code."),
     };
   }
 }

@@ -1454,7 +1454,7 @@ Implements `IVideoCodecDecoder<M101VideoDecoder>`, `IVideoFrameDecoder`.
 
 #### `MagicYuvDecoder`
 
-Decodes MagicYUV, a lossless capture codec: Huffman coding over a spatial prediction, with the frame cut into slices that decode independently of one another.
+Decodes MagicYUV v7, a lossless intra-only capture codec with independent horizontal slices.
 
 Implements `IVideoCodecDecoder<MagicYuvDecoder>`, `IVideoFrameDecoder`.
 
@@ -1462,33 +1462,34 @@ Implements `IVideoCodecDecoder<MagicYuvDecoder>`, `IVideoFrameDecoder`.
 | --- | --- | --- |
 | `CodecName` | `static string CodecName { get; }` |  |
 | `Accepts` | `static bool Accepts(MediaStreamInfo stream)` |  |
-| `Create` | `static MagicYuvDecoder Create(MediaStreamInfo stream)` | Builds a decoder from the code and the picture size, which is all the container has to give. |
-| `TryDecode` | `bool TryDecode(CodedPacket packet, out RawImage frame)` | Decodes one frame, which for this codec is always exactly one whole picture. |
+| `Create` | `static MagicYuvDecoder Create(MediaStreamInfo stream)` |  |
+| `TryDecode` | `bool TryDecode(CodedPacket packet, out RawImage frame)` | Decodes one self-contained MagicYUV key frame. |
 
 #### `MagicYuvEncoder`
 
-Encodes MagicYUV: a spatial prediction, its differences Huffman coded with one table a plane, and the frame cut into slices that decode independently of one another.
+Encodes MagicYUV v7 losslessly in its native sample domain, including 8/10/12/14-bit formats.
 
 Implements `IVideoCodecEncoder<MagicYuvEncoder>`, `IVideoPacketEncoder`.
 
 | Member | Signature | Summary |
 | --- | --- | --- |
-| `CodecName` | `static string CodecName { get; }` | The codec's name as a person would say it. |
-| `Codec` | `static CodecTag Codec { get; }` | The code written when the stream names none of the codec's own: colour without alpha. |
-| `Create` | `static MagicYuvEncoder Create(MediaStreamInfo stream)` | Builds an encoder for the stream described, predicting by median and writing one slice a frame. |
-| `Create` | `static MagicYuvEncoder Create(MediaStreamInfo stream, Predictor predictor, int slices)` | Builds an encoder for the stream described, with the prediction and the slice count stated. |
-| `DescribeStream` | `MediaStreamInfo DescribeStream()` | The stream this writes, which the package's own decoder accepts as it stands. |
-| `TryEncode` | `bool TryEncode(RawImage frame, long? presentationTimestamp, out CodedPacket packet)` | Encodes one picture as one frame, which for this codec is always a key frame. |
+| `CodecName` | `static string CodecName { get; }` |  |
+| `Codec` | `static CodecTag Codec { get; }` |  |
+| `Create` | `static MagicYuvEncoder Create(MediaStreamInfo stream)` | Builds a progressive encoder using median prediction and one slice. |
+| `Create` | `static MagicYuvEncoder Create(MediaStreamInfo stream, Predictor predictor, int slices)` | Builds a progressive encoder with the requested predictor and slice count. |
+| `Create` | `static MagicYuvEncoder Create(MediaStreamInfo stream, Predictor predictor, int slices, bool interlaced)` | Builds an encoder, optionally using MagicYUV's interlaced field-stride prediction. |
+| `DescribeStream` | `MediaStreamInfo DescribeStream()` |  |
+| `TryEncode` | `bool TryEncode(RawImage frame, long? presentationTimestamp, out CodedPacket packet)` | Encodes one complete key frame. |
 
 #### `MagicYuvEncoder.Predictor`
 
-The three ways a slice may predict a sample, as the format numbers them.
+The three spatial predictors a slice may use.
 
 | Value | Numeric | Summary |
 | --- | --- | --- |
-| `Left` | `1` | The sample to the left. |
-| `Gradient` | `2` | Left plus above less above-left. |
-| `Median` | `3` | The median of the left, the above, and the gradient of the two. |
+| `Left` | `1` |  |
+| `Gradient` | `2` |  |
+| `Median` | `3` |  |
 
 #### `MicrosoftRleDecoder`
 
