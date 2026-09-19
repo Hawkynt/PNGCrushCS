@@ -1,10 +1,13 @@
+extern alias Images;
+
 using System;
 using System.Buffers.Binary;
 using System.IO;
 using System.Linq;
 using FileFormat.Core;
-using FileFormat.Jpeg;
 using FileFormat.RoqVideo;
+using JpegFile = Images::FileFormat.Jpeg.JpegFile;
+using JpegWriter = Images::FileFormat.Jpeg.JpegWriter;
 
 namespace FileFormat.Codecs.Tests;
 
