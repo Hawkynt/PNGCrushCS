@@ -8,7 +8,13 @@ using Hawkynt.FileFormats.Video;
 
 namespace FileFormat.Codecs.Ffv1.Tests;
 
-/// <summary>One-shot fixture producer used to validate this branch's writer with an external FFmpeg.</summary>
+/// <summary>Writes every FFV1 configuration this library can write and emits each as a Matroska file.</summary>
+/// <remarks>
+/// The encoder and the muxer are exercised here for all seventeen configurations, so a writer
+/// that refuses one, or throws on it, fails this. The resulting files are printed to the test
+/// output for an external FFmpeg to read back; that comparison happens outside the suite, which
+/// is why emitting them is not itself a failure.
+/// </remarks>
 [TestFixture]
 public class Ffv1WriterOracleGeneratorTests {
 
@@ -41,7 +47,7 @@ public class Ffv1WriterOracleGeneratorTests {
     }
 
     var file = VideoIO.Mux<MatroskaWriter>([encoder.DescribeStream()], packets);
-    Assert.Fail($"FFV1_WRITER_ORACLE|{oracleCase.Name}|{oracleCase.FfmpegPixelFormat}|{Convert.ToBase64String(raw.ToArray())}|{Convert.ToBase64String(file)}");
+    TestContext.Out.WriteLine($"FFV1_WRITER_ORACLE|{oracleCase.Name}|{oracleCase.FfmpegPixelFormat}|{Convert.ToBase64String(raw.ToArray())}|{Convert.ToBase64String(file)}");
   }
 
   private static IEnumerable<TestCaseData> _Cases() {

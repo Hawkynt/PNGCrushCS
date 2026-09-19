@@ -6,7 +6,13 @@ using System.Text;
 
 namespace FileFormat.Codecs.Ffv1.Tests;
 
-/// <summary>Temporary one-shot generator; removed after its output is committed as fixed vectors.</summary>
+/// <summary>Re-produces the FFmpeg-encoded vectors and writes them to the test output.</summary>
+/// <remarks>
+/// The vectors this prints are already committed, as the fixed data
+/// <see cref="Ffv1ReferenceVectorTests"/> decodes; this is how they are obtained again when a
+/// case is added or FFmpeg's encoder changes. It states nothing about this library, so it
+/// reports through the test output rather than through an assertion.
+/// </remarks>
 [TestFixture]
 public class Ffv1OracleVectorGeneratorTests {
 
@@ -49,7 +55,7 @@ public class Ffv1OracleVectorGeneratorTests {
       }
     }
 
-    Assert.Fail("FFV1_ORACLE_VECTORS\n" + output);
+    TestContext.Out.WriteLine("FFV1_ORACLE_VECTORS\n" + output);
   }
 
   private static void _Run(string program, IEnumerable<string> arguments) {
