@@ -102,15 +102,22 @@ public class HuffYuvDecoderTests {
 
   [Test, Category("Unit")]
   public void HeaderOnlyClassicDescriptionIsAcceptedAndUsesLowModeBits() {
-    var request = _LegacyRequest(12, 6, 16 | 1);
+    // Mode lives in the three low bits of the stored depth: 1 is left prediction and 3 is gradient.
+    // Both had to be coded here, because mode 0 and mode 1 both mean left, so a fixture built on
+    // mode 1 alone passes just as well against a reader that ignores the nibble entirely.
     var source = _RandomYuv422(12, 6, 91);
-    var encoder = HuffYuvEncoder.Create(request);
-    Assert.That(encoder.TryEncode(source, null, out var packet), Is.True);
-    var described = encoder.DescribeStream();
+    var left = HuffYuvEncoder.Create(_LegacyRequest(12, 6, 16 | 1));
+    var gradient = HuffYuvEncoder.Create(_LegacyRequest(12, 6, 16 | 3));
+    Assert.That(left.TryEncode(source, null, out var leftPacket), Is.True);
+    Assert.That(gradient.TryEncode(source, null, out var gradientPacket), Is.True);
+
     Assert.Multiple(() => {
-      Assert.That(described.CodecPrivateData.Length, Is.EqualTo(_BITMAP_INFO_HEADER_SIZE));
-      Assert.That(() => HuffYuvDecoder.Create(described), Throws.Nothing);
-      Assert.That(_Decode(described, packet).PixelData, Is.EqualTo(_Yuv422ToRgb(source)));
+      Assert.That(left.DescribeStream().CodecPrivateData.Length, Is.EqualTo(_BITMAP_INFO_HEADER_SIZE));
+      Assert.That(() => HuffYuvDecoder.Create(left.DescribeStream()), Throws.Nothing);
+      Assert.That(gradientPacket.Data.ToArray(), Is.Not.EqualTo(leftPacket.Data.ToArray()),
+        "the same picture cannot code identically under left and gradient prediction");
+      Assert.That(_Decode(left.DescribeStream(), leftPacket).PixelData, Is.EqualTo(_Yuv422ToRgb(source)));
+      Assert.That(_Decode(gradient.DescribeStream(), gradientPacket).PixelData, Is.EqualTo(_Yuv422ToRgb(source)));
     });
   }
 
@@ -145,6 +152,78 @@ public class HuffYuvDecoderTests {
   public void CodecAnswersToBothFourccSpellingsOnlyForVideo() {
     foreach (var code in new[] { "HFYU", "FFVH", "hfyu" }) Assert.That(HuffYuvDecoder.Accepts(_Request(4, 4, 16, CodecTag.FromCharacters(code))), Is.True, code);
     Assert.That(HuffYuvDecoder.Accepts(_Request(4, 4, 16, CodecTag.FromCharacters("FFV1"))), Is.False);
+    // "only for video" is half the name, so a stream that carries the right code as something else
+    // has to be refused as well.
+    foreach (var kind in new[] { MediaStreamKind.Audio, MediaStreamKind.Subtitle })
+      Assert.That(HuffYuvDecoder.Accepts(_Request(4, 4, 16, CodecTag.FromCharacters("HFYU"), kind)), Is.False, kind.ToString());
+  }
+
+  // ============================================================================================
+  // The bytes themselves, built by hand
+  //
+  // These two are the only place the decoder is measured against the format rather than against the
+  // encoder beside it. An encoder and a decoder that permute a pixel the same wrong way round trip
+  // perfectly; a frame written out here does not move when either of them changes.
+  // ============================================================================================
+
+  [Test, Category("Unit")]
+  public void TheFirstFourSamplesOfAnInterleavedFrameAreRawAndArriveReversed() {
+    // The word swap showing through: the four bytes of the first pixel pair come out as the second
+    // chrominance sample, the second luminance sample, the first chrominance sample and the first
+    // luminance sample — which is Y U Y V read backwards.
+    var stream = HuffYuvTestStream.InterleavedStream(2, 1, _LEFT, 16, _PROGRESSIVE);
+    var frame = _Decode(stream, new HuffYuvTestStream().Symbols(200, 60, 100, 50).End());
+
+    // Those four bytes are therefore luminance 50 and 60 against chrominance 100 and 200. The
+    // expectation is the same two pixels stated as planes and put through the conversion the decoder
+    // says it uses, so the assertion is about which byte is which plane and nothing else. The
+    // original of this test compared two channels of one pixel, which a swapped prelude survives.
+    var expected = _Yuv422ToRgb(new RawImage {
+      Width = 2, Height = 1, Format = PixelFormat.Yuv422P8, PixelData = [50, 60, 100, 200],
+    });
+
+    Assert.That(frame.Format, Is.EqualTo(PixelFormat.Rgb24));
+    Assert.That(frame.PixelData, Is.EqualTo(expected));
+  }
+
+  [Test, Category("Unit")]
+  public void TheThirtyTwoBitPackedFormPutsAlphaInFrontOfTheColour() {
+    var stream = HuffYuvTestStream.InterleavedStream(1, 1, _LEFT, 32, _PROGRESSIVE);
+    var frame = _Decode(stream, new HuffYuvTestStream().Symbols(200, 10, 20, 30).End());
+
+    Assert.That(frame.Format, Is.EqualTo(PixelFormat.Rgba32));
+    Assert.That(frame.PixelData, Is.EqualTo(new byte[] { 10, 20, 30, 200 }));
+  }
+
+  // ============================================================================================
+  // Refusals whose guards outlived their tests
+  // ============================================================================================
+
+  [Test, Category("Unit")]
+  public void AnInterleavedMedianPictureWithTooFewRowsIsRefusedByName() {
+    // The classic interleaved median prelude needs a row above it, and an interlaced one needs two.
+    // 4:2:0 needs them in the chrominance planes as well, which a two-row picture has only one of.
+    // The width arm of the same guard is covered by UnsupportedLayoutsAreStillRefusedByName.
+    Assert.Multiple(() => {
+      Assert.That(() => HuffYuvDecoder.Create(HuffYuvTestStream.InterleavedStream(8, 1, _MEDIAN, 16, _PROGRESSIVE)),
+        Throws.TypeOf<NotSupportedException>().With.Message.Contains("too small"), "8x1 progressive 4:2:2");
+      Assert.That(() => HuffYuvDecoder.Create(HuffYuvTestStream.InterleavedStream(8, 2, _MEDIAN, 16, _INTERLACED)),
+        Throws.TypeOf<NotSupportedException>().With.Message.Contains("too small"), "8x2 interlaced 4:2:2");
+      Assert.That(() => HuffYuvDecoder.Create(HuffYuvTestStream.InterleavedStream(8, 2, _MEDIAN, 12, _PROGRESSIVE)),
+        Throws.TypeOf<NotSupportedException>().With.Message.Contains("too small"), "8x2 progressive 4:2:0");
+    });
+  }
+
+  [Test, Category("Unit")]
+  public void APredictionMethodThatIsNoneOfTheThreeIsRefusedByName() {
+    Assert.That(() => HuffYuvDecoder.Create(HuffYuvTestStream.InterleavedStream(8, 8, method: 5, 16, _PROGRESSIVE)),
+      Throws.TypeOf<NotSupportedException>().With.Message.Contains("prediction method 5"));
+  }
+
+  [Test, Category("Unit")]
+  public void ABitstreamDepthTheCodecDoesNotUseIsRefusedByName() {
+    Assert.That(() => HuffYuvDecoder.Create(HuffYuvTestStream.InterleavedStream(4, 4, _LEFT, 20, _PROGRESSIVE)),
+      Throws.TypeOf<NotSupportedException>().With.Message.Contains("20 bits a pixel"));
   }
 
   private static RawImage _Decode(MediaStreamInfo stream, byte[] frame) => _Decode(stream, new CodedPacket(0, frame));
@@ -153,7 +232,8 @@ public class HuffYuvDecoderTests {
     var decoder = HuffYuvDecoder.Create(stream); Assert.That(decoder.TryDecode(packet, out var picture), Is.True); return picture;
   }
 
-  private static MediaStreamInfo _Request(int width, int height, int bpp, CodecTag codec = default) => new() { Index = 0, Kind = MediaStreamKind.Video, Codec = codec, Width = width, Height = height, BitsPerPixel = bpp };
+  private static MediaStreamInfo _Request(int width, int height, int bpp, CodecTag codec = default, MediaStreamKind kind = MediaStreamKind.Video)
+    => new() { Index = 0, Kind = kind, Codec = codec, Width = width, Height = height, BitsPerPixel = bpp };
 
   private static MediaStreamInfo _LegacyRequest(int width, int height, int bpp) {
     var header = new byte[_BITMAP_INFO_HEADER_SIZE];

@@ -1,11 +1,13 @@
 using System;
 using System.Buffers.Binary;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using FileFormat.Avi;
 using FileFormat.Core;
 using FileFormat.Matroska;
 using Hawkynt.FileFormats.Video;
+using Hawkynt.FileFormats.Video.Tests;
 
 namespace FileFormat.Codecs.HuffYuv.Tests;
 
@@ -55,14 +57,18 @@ public class HuffYuvEncoderTests {
 
   [Test, Category("Unit")]
   public void PackedColourRoundTripsBothSupportedPredictorsProgressiveAndInterlaced() {
-    foreach (var (format, bpp) in new[] { (PixelFormat.Rgb24, 24), (PixelFormat.Bgra32, 32) })
-      foreach (var prediction in new[] { HuffYuvPredictionMethod.Left, HuffYuvPredictionMethod.Gradient })
-        foreach (var interlaced in new[] { false, true }) {
-          var frame = _Random(format, 11, 7, bpp * 100 + (int)prediction * 10 + (interlaced ? 1 : 0));
-          var encoder = HuffYuvEncoder.Create(_Request(11, 7, bpp), prediction, interlaced: interlaced);
-          Assert.That(encoder.TryEncode(frame, null, out var packet), Is.True);
-          Assert.That(_Decode(encoder.DescribeStream(), packet).PixelData, Is.EqualTo(_Expected8(frame)), $"{format}, {prediction}, interlaced={interlaced}");
-        }
+    // 1x1 and 2x1 earn their place: the packed path prices the first row against width - 1, so a
+    // picture one pixel wide is the row where that count is nought and an off-by-one shows up.
+    foreach (var (width, height) in new[] { (1, 1), (2, 1), (11, 7) })
+      foreach (var (format, bpp) in new[] { (PixelFormat.Rgb24, 24), (PixelFormat.Bgra32, 32) })
+        foreach (var prediction in new[] { HuffYuvPredictionMethod.Left, HuffYuvPredictionMethod.Gradient })
+          foreach (var interlaced in new[] { false, true }) {
+            var frame = _Random(format, width, height, bpp * 100 + (int)prediction * 10 + (interlaced ? 1 : 0) + width * 7);
+            var encoder = HuffYuvEncoder.Create(_Request(width, height, bpp), prediction, interlaced: interlaced);
+            Assert.That(encoder.TryEncode(frame, null, out var packet), Is.True);
+            Assert.That(_Decode(encoder.DescribeStream(), packet).PixelData, Is.EqualTo(_Expected8(frame)),
+              $"{width}x{height} {format}, {prediction}, interlaced={interlaced}");
+          }
   }
 
   [Test, Category("Unit")]
@@ -213,6 +219,134 @@ public class HuffYuvEncoderTests {
     });
   }
 
+  // ============================================================================================
+  // The oracle the codec claims
+  // ============================================================================================
+
+  /// <summary>
+  /// What <c>[VerifiedBy(ConformanceOracle.FFmpeg)]</c> on this encoder is supposed to mean.
+  /// </summary>
+  /// <remarks>
+  /// The registry-driven claim test asks only whether ffmpeg produced a frame of the right size,
+  /// which a wrongly laid out picture does too. Packed colour is lossless and needs no conversion
+  /// either way, so here the samples themselves have to come back, which is the only assertion in
+  /// this fixture that an encoder and a decoder agreeing with each other cannot satisfy on their own.
+  /// Skips where ffmpeg is absent, as every oracle in this repository does.
+  /// </remarks>
+  [Test, Category("Conformance")]
+  public void FFmpegReadsBackTheSamplesOfAPackedColourClipAndNotMerelyItsFrameCount() {
+    FFmpegOracle.RequireAvailable();
+
+    const int width = 16;
+    const int height = 8;
+    var frames = new[] {
+      _Random(PixelFormat.Rgb24, width, height, 7001),
+      _Random(PixelFormat.Rgb24, width, height, 7002),
+    };
+
+    var encoder = HuffYuvEncoder.Create(
+      _Request(width, height, 24, timeBase: new Rational(1, 25), frameRate: new Rational(25, 1)),
+      HuffYuvPredictionMethod.Left);
+    var packets = new List<CodedPacket>();
+    for (var i = 0; i < frames.Length; ++i) {
+      Assert.That(encoder.TryEncode(frames[i], i, out var packet), Is.True);
+      packets.Add(packet with { Duration = 1 });
+    }
+
+    var path = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName() + ".avi");
+    try {
+      File.WriteAllBytes(path, VideoIO.Mux<AviWriter>([encoder.DescribeStream()], packets));
+      var (decoded, detail, pictures) = FFmpegOracle.TryDecodePictures(path, width, height, frames.Length);
+
+      Assert.That(decoded, Is.True, detail);
+      Assert.That(pictures, Is.EqualTo(frames.SelectMany(static frame => frame.PixelData).ToArray()));
+    } finally {
+      try { File.Delete(path); } catch { /* best effort */ }
+    }
+  }
+
+  // ============================================================================================
+  // Refusals and orderings whose guards outlived their tests
+  // ============================================================================================
+
+  [Test, Category("Unit")]
+  public void RefusesGeometryPredictorsAndDescriptionsItCannotWrite() {
+    Assert.Multiple(() => {
+      Assert.That(() => HuffYuvEncoder.Create(_Request(16, 8, 16, kind: MediaStreamKind.Audio)),
+        Throws.TypeOf<NotSupportedException>().With.Message.Contains("video pictures only"));
+      Assert.That(() => HuffYuvEncoder.Create(_Request(0, 8, 16)),
+        Throws.TypeOf<NotSupportedException>().With.Message.Contains("positive picture size"));
+      Assert.That(() => HuffYuvEncoder.Create(_Request(16, 0, 16)),
+        Throws.TypeOf<NotSupportedException>().With.Message.Contains("positive picture size"));
+      Assert.That(() => HuffYuvEncoder.Create(_Request(16, 8, 16), (HuffYuvPredictionMethod)7),
+        Throws.TypeOf<NotSupportedException>().With.Message.Contains("not a HuffYUV prediction method"));
+      Assert.That(() => HuffYuvEncoder.Create(_WithDescription(16, 8, 16, [0, 16, _PROGRESSIVE])),
+        Throws.TypeOf<NotSupportedException>().With.Message.Contains("HuffYUV description byte"));
+      Assert.That(() => HuffYuvEncoder.Create(_WithDescription(16, 8, 16, [3, 16, _PROGRESSIVE, 0])),
+        Throws.TypeOf<NotSupportedException>().With.Message.Contains("prediction method 3"));
+    });
+  }
+
+  [Test, Category("Unit")]
+  public void AnInterleavedMedianPictureTooSmallIsRefusedByTheEncoderToo() {
+    // The decoder refuses these streams; the writer must not be able to produce one.
+    Assert.Multiple(() => {
+      Assert.That(() => HuffYuvEncoder.Create(_Request(2, 4, 16), HuffYuvPredictionMethod.Median),
+        Throws.TypeOf<NotSupportedException>().With.Message.Contains("too small"), "narrower than four samples");
+      Assert.That(() => HuffYuvEncoder.Create(_Request(8, 1, 16), HuffYuvPredictionMethod.Median),
+        Throws.TypeOf<NotSupportedException>().With.Message.Contains("too small"), "8x1 progressive 4:2:2");
+      Assert.That(() => HuffYuvEncoder.Create(_Request(8, 2, 16), HuffYuvPredictionMethod.Median, interlaced: true),
+        Throws.TypeOf<NotSupportedException>().With.Message.Contains("too small"), "8x2 interlaced 4:2:2");
+      Assert.That(() => HuffYuvEncoder.Create(_Request(8, 2, 12), HuffYuvPredictionMethod.Median),
+        Throws.TypeOf<NotSupportedException>().With.Message.Contains("too small"), "8x2 progressive 4:2:0");
+    });
+  }
+
+  [Test, Category("Unit")]
+  public void APictureOfAnotherSizeOrWithTooFewBytesIsRefused() {
+    var encoder = HuffYuvEncoder.Create(_Request(16, 8, 16), HuffYuvPredictionMethod.Left);
+    var truncated = new RawImage {
+      Width = 16, Height = 8, Format = PixelFormat.Yuv422P8,
+      PixelData = new byte[16 * 8 * 2 - 1],
+    };
+
+    Assert.Multiple(() => {
+      Assert.That(() => encoder.TryEncode(_Random(PixelFormat.Yuv422P8, 8, 8, 5), null, out _),
+        Throws.TypeOf<InvalidDataException>().With.Message.Contains("16x8"));
+      Assert.That(() => encoder.TryEncode(truncated, null, out _),
+        Throws.TypeOf<InvalidDataException>().With.Message.Contains("truncated"));
+    });
+  }
+
+  [Test, Category("Unit")]
+  public void ADescriptionAskedForBeforeAnyPictureStillDecodesEveryPicture() {
+    // A muxer writes the stream header before it has a packet, so the description handed out before
+    // the first TryEncode has to pin the tables every later frame is then coded against.
+    var encoder = HuffYuvEncoder.Create(_Request(16, 8, 16), HuffYuvPredictionMethod.Left);
+    var described = encoder.DescribeStream();
+
+    var frames = new[] {
+      _Random(PixelFormat.Yuv422P8, 16, 8, 4101),
+      _Flat(PixelFormat.Yuv422P8, 16, 8, 200),
+      _Random(PixelFormat.Yuv422P8, 16, 8, 4102),
+    };
+
+    Assert.Multiple(() => {
+      for (var i = 0; i < frames.Length; ++i) {
+        Assert.That(encoder.TryEncode(frames[i], i, out var packet), Is.True, $"frame {i}");
+        Assert.That(_Decode(described, packet).PixelData, Is.EqualTo(_Expected8(frames[i])), $"frame {i}");
+      }
+
+      Assert.That(encoder.DescribeStream().CodecPrivateData.ToArray(), Is.EqualTo(described.CodecPrivateData.ToArray()),
+        "the description must not change once it has been handed out");
+    });
+  }
+
+  private static MediaStreamInfo _WithDescription(int width, int height, int bitsPerPixel, byte[] description) => new() {
+    Index = 0, Kind = MediaStreamKind.Video, Codec = CodecTag.FromCharacters("HFYU"),
+    Width = width, Height = height, BitsPerPixel = bitsPerPixel, CodecPrivateData = description,
+  };
+
   private static HuffYuvEncoder _PlanarYuvEncoder(int width, int height, int bits, HuffYuvPredictionMethod prediction, int hShift, int vShift, bool interlaced, bool tablesPerFrame)
     => HuffYuvEncoder.Create(_PlanarDescriptionRequest(width, height, bits, hShift, vShift, interlaced, tablesPerFrame, prediction));
 
@@ -239,8 +373,8 @@ public class HuffYuvEncoderTests {
     return new() { Index = 0, Kind = MediaStreamKind.Video, Codec = CodecTag.FromCharacters("HFYU"), Width = width, Height = height, BitsPerPixel = bitsPerPixel, CodecPrivateData = header };
   }
 
-  private static MediaStreamInfo _Request(int width, int height, int bitsPerPixel, Rational? timeBase = null, Rational? frameRate = null) => new() {
-    Index = 0, Kind = MediaStreamKind.Video, Width = width, Height = height, BitsPerPixel = bitsPerPixel,
+  private static MediaStreamInfo _Request(int width, int height, int bitsPerPixel, Rational? timeBase = null, Rational? frameRate = null, MediaStreamKind kind = MediaStreamKind.Video) => new() {
+    Index = 0, Kind = kind, Width = width, Height = height, BitsPerPixel = bitsPerPixel,
     TimeBase = timeBase ?? Rational.Unknown, FrameRate = frameRate ?? Rational.Unknown,
   };
 
