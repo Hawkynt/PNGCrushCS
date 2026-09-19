@@ -33,7 +33,7 @@ public sealed class DnxHdVideoEncoder : IVideoCodecEncoder<DnxHdVideoEncoder> {
     this._frameEncoder = new(profile);
   }
 
-  public static string CodecName => "Avid DNxHD (SMPTE VC-3)";
+  public static string CodecName => "Avid DNxHD / DNxHR (SMPTE VC-3)";
 
   public static CodecTag Codec => _Tag;
 

@@ -170,7 +170,7 @@ public sealed class DnxHdVideoDecoder : IVideoCodecDecoder<DnxHdVideoDecoder> {
     var secondUnit = packet.Slice(codingUnitSize, codingUnitSize);
     var second = DnxHdFrameHeader.Parse(secondUnit.Span);
     this._RefuseWhatIsNotRead(second);
-    this._RequireMatchingFields(first, second);
+    _RequireMatchingFields(first, second);
 
     var planes = this._AllocatePlanes(first, first.HeightInMacroblocks * 16 * 2);
     DnxHdCodingUnitDecoder.Decode(packet[..codingUnitSize], first, planes, first.FieldFrameCount & 1, 2);

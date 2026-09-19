@@ -3,6 +3,7 @@ using System.Buffers.Binary;
 using System.Diagnostics;
 using System.IO;
 using FileFormat.Core;
+using Hawkynt.FileFormats.Video;
 using Hawkynt.FileFormats.Video.Tests;
 
 namespace FileFormat.Codecs.DnxHd.Tests;
