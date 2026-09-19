@@ -895,7 +895,7 @@ Implements `IVideoCodecEncoder<DvVideoEncoder>`, `IVideoPacketEncoder`.
 
 #### `EaCmvVideoDecoder`
 
-Decodes Electronic Arts CMV — the block-replacement codec behind NHL 95's own cinematics, four pixels square at a time, with motion compensation reaching back either one or two pictures.
+Decodes Electronic Arts CMV: eight-bit palette indices painted four pixels square at a time, either literally or from one of the two pictures completed immediately before this one.
 
 Implements `IVideoCodecDecoder<EaCmvVideoDecoder>`, `IVideoFrameDecoder`.
 
@@ -906,6 +906,22 @@ Implements `IVideoCodecDecoder<EaCmvVideoDecoder>`, `IVideoFrameDecoder`.
 | `Accepts` | `static bool Accepts(MediaStreamInfo stream)` |  |
 | `Create` | `static EaCmvVideoDecoder Create(MediaStreamInfo stream)` |  |
 | `TryDecode` | `bool TryDecode(CodedPacket packet, out RawImage frame)` |  |
+
+#### `EaCmvVideoEncoder`
+
+Encodes Electronic Arts CMV losslessly from eight-bit palettised pictures.
+
+Implements `IVideoCodecEncoder<EaCmvVideoEncoder>`, `IVideoPacketEncoder`.
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `CodecName` | `static string CodecName { get; }` |  |
+| `Codec` | `static CodecTag Codec { get; }` |  |
+| `Accepts` | `static bool Accepts(MediaStreamInfo stream)` |  |
+| `Create` | `static EaCmvVideoEncoder Create(MediaStreamInfo stream)` |  |
+| `DescribeStream` | `MediaStreamInfo DescribeStream()` |  |
+| `Flush` | `IEnumerable<CodedPacket> Flush()` |  |
+| `TryEncode` | `bool TryEncode(RawImage frame, long? presentationTimestamp, out CodedPacket packet)` |  |
 
 #### `EightBpsVideoDecoder`
 
@@ -6111,7 +6127,7 @@ Which of Electronic Arts' own video codecs an `EaContainer`'s chunks belong to.
 
 #### `EaWriter`
 
-Replays Electronic Arts' self-delimiting video and audio-family chunks without parsing nested codec patch headers. Both logical streams already expose complete eight-byte-header-plus-payload chunks.
+Writes Electronic Arts' self-delimiting video and audio-family chunks in packet order.
 
 Implements `IVideoContainerWriter<EaWriter>`, `IVideoFormatMetadata<EaWriter>`.
 

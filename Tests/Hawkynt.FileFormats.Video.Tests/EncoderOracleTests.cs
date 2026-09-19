@@ -5,6 +5,7 @@ using System.Linq;
 using System.Text;
 using FileFormat.Avi;
 using FileFormat.Core;
+using FileFormat.Ea;
 using FileFormat.FlicVideo;
 using FileFormat.Flv;
 using FileFormat.Matroska;
@@ -261,6 +262,7 @@ public sealed class EncoderOracleTests {
     ("Flv", ".flv", static (streams, packets) => VideoIO.Mux<FlvWriter>(streams, packets)),
     ("Fli", ".flc", static (streams, packets) => VideoIO.Mux<FliWriter>(streams, packets)),
     ("Roq", ".roq", static (streams, packets) => VideoIO.Mux<RoqWriter>(streams, packets)),
+    ("Ea", ".cmv", static (streams, packets) => VideoIO.Mux<EaWriter>(streams, packets)),
     ("Vqa", ".vqa", static (streams, packets) => VideoIO.Mux<VqaWriter>(streams, packets)),
     ("Mjpeg", ".mjpg", static (streams, packets) => VideoIO.Mux<MjpegWriter>(streams, packets)),
     ("Ogg", ".ogv", static (streams, packets) => VideoIO.Mux<OggWriter>(streams, packets)),
