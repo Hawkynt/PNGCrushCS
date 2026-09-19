@@ -139,8 +139,12 @@ public sealed class MagicYuvDeepTests {
     var tablesEnd = 32 + checked((int)BinaryPrimitives.ReadUInt32LittleEndian(frame[32..36]));
     var descriptorStart = 32 + 8 + 1 + 1;
 
+    // Read out first: the frame is a span over the packet and cannot be captured by the closure
+    // Assert.Multiple takes.
+    var firstSliceByte = frame[firstSlice];
+
     Assert.Multiple(() => {
-      Assert.That(frame[firstSlice], Is.EqualTo(1), "one-sample deep slice should be stored raw");
+      Assert.That(firstSliceByte, Is.EqualTo(1), "one-sample deep slice should be stored raw");
       Assert.That(tablesEnd - descriptorStart, Is.LessThan(1024), "deep code lengths should use RLE descriptors");
     });
 
