@@ -3,7 +3,7 @@
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net10.0</TargetFramework>
-    <Description>Cross-platform image browser, viewer, converter, and lightweight editor for the PNGCrushCS format suite.</Description>
+    <Description>Cross-platform image browser, viewer, converter, and page assembler for the PNGCrushCS format suite.</Description>
     <PublishSingleFile Condition="'$(OS)' == 'Windows_NT'">true</PublishSingleFile>
     <SelfContained Condition="'$(OS)' == 'Windows_NT'">true</SelfContained>
     <RuntimeIdentifier Condition="'$(OS)' == 'Windows_NT' And '$(RuntimeIdentifier)' == ''">win-x64</RuntimeIdentifier>
@@ -12,29 +12,19 @@
     <EnableSingleFileBundle Condition="'$(OS)' == 'Windows_NT'">true</EnableSingleFileBundle>
   </PropertyGroup>
 
+  <!-- One toolkit, three backends. The backend packages are registered explicitly in Program and
+       the ones that do not apply to the running platform are dropped again by the trimmer. -->
   <ItemGroup>
-    <PackageReference Include="Avalonia.Desktop" Version="12.0.3" />
-    <PackageReference Include="Avalonia.Fonts.Inter" Version="12.0.3" />
-    <PackageReference Include="Avalonia.Themes.Fluent" Version="12.0.3" />
+    <PackageReference Include="Hawkynt.NativeForms" Version="1.0.0.227" />
+    <PackageReference Include="Hawkynt.NativeForms.Backends.Windows" Version="1.0.0.63" />
+    <PackageReference Include="Hawkynt.NativeForms.Backends.Gtk" Version="1.0.0.73" />
+    <PackageReference Include="Hawkynt.NativeForms.Backends.MacOS" Version="1.0.0.92" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\Optimizers\Optimizer.Image\Optimizer.Image.csproj" />
     <ProjectReference Include="..\Hawkynt.FileFormats.Images\Hawkynt.FileFormats.Images.csproj" />
     <ProjectReference Include="..\FileFormat.Core\FileFormat.Core.csproj" />
-  </ItemGroup>
-
-  <!-- The original viewer was WinForms-only. Keep the source in history, not in this cross-platform build. -->
-  <ItemGroup>
-    <Compile Remove="AspectRatioCropDialog.cs" />
-    <Compile Remove="BitmapBridge.cs" />
-    <Compile Remove="CanvasSizeDialog.cs" />
-    <Compile Remove="CropToSizeDialog.cs" />
-    <Compile Remove="ImagePanel.cs" />
-    <Compile Remove="MainForm.cs" />
-    <Compile Remove="ResizeDialog.cs" />
-    <Compile Remove="ThumbnailStrip.cs" />
-    <Compile Remove="VideoModeDialog.cs" />
   </ItemGroup>
 
   <Import Project="..\build\SingleFileBundle.targets" />
