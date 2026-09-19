@@ -2631,7 +2631,7 @@ Implements `IVideoCodecEncoder<Vp9VideoEncoder>`, `IVideoPacketEncoder`.
 
 #### `VqaVideoDecoder`
 
-Decodes Westwood VQA video (`WSVQ`) — the FMV codec behind Command & Conquer, Red Alert and most of Westwood's DOS-and-Windows-era catalogue — vector-quantised 8-bit blocks read against a codebook that is itself spread across the pictures that use it.
+Decodes Westwood VQA video (`WSVQ`): the version-1 and version-2 palettised vector formats and the version-2/version-3 15-bit HiColor delta format.
 
 Implements `IVideoCodecDecoder<VqaVideoDecoder>`, `IVideoFrameDecoder`.
 
@@ -2641,6 +2641,20 @@ Implements `IVideoCodecDecoder<VqaVideoDecoder>`, `IVideoFrameDecoder`.
 | `Accepts` | `static bool Accepts(MediaStreamInfo stream)` |  |
 | `Create` | `static VqaVideoDecoder Create(MediaStreamInfo stream)` |  |
 | `TryDecode` | `bool TryDecode(CodedPacket packet, out RawImage frame)` |  |
+
+#### `VqaVideoEncoder`
+
+Encodes Westwood VQA (`WSVQ`) in the defined version-1/version-2 palettised forms or the version-2/version-3 15-bit HiColor form.
+
+Implements `IVideoCodecEncoder<VqaVideoEncoder>`, `IVideoPacketEncoder`.
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `CodecName` | `static string CodecName { get; }` |  |
+| `Codec` | `static CodecTag Codec { get; }` |  |
+| `Create` | `static VqaVideoEncoder Create(MediaStreamInfo stream)` |  |
+| `DescribeStream` | `MediaStreamInfo DescribeStream()` |  |
+| `TryEncode` | `bool TryEncode(RawImage frame, long? presentationTimestamp, out CodedPacket packet)` |  |
 
 #### `VyuyVideoDecoder`
 
@@ -7145,28 +7159,28 @@ Implements `IVideoContainerReader<VqaContainer>`, `IVideoFormatMetadata<VqaConta
 | Member | Signature | Summary |
 | --- | --- | --- |
 | `VqaContainer` | `VqaContainer()` |  |
-| `AudioChannels` | `int AudioChannels { get; init; }` | Audio channel count, or zero where `AudioSampleRate` is zero. |
-| `AudioSampleRate` | `int AudioSampleRate { get; init; }` | The audio sample rate the header states, in hertz, or zero for a file with no sound. |
-| `BlockHeight` | `int BlockHeight { get; init; }` | A codebook entry's height in pixels — two in every sample this was measured against. |
-| `BlockWidth` | `int BlockWidth { get; init; }` | A codebook entry's width in pixels — four in every sample this was measured against. |
-| `Data` | `ReadOnlyMemory<byte> Data { get; init; }` | The whole file, which every packet is a window onto. |
+| `AudioChannels` | `int AudioChannels { get; init; }` |  |
+| `AudioSampleRate` | `int AudioSampleRate { get; init; }` |  |
+| `BlockHeight` | `int BlockHeight { get; init; }` |  |
+| `BlockWidth` | `int BlockWidth { get; init; }` |  |
+| `Data` | `ReadOnlyMemory<byte> Data { get; init; }` |  |
 | `FileExtensions` | `static string[] FileExtensions { get; }` |  |
-| `HeaderPayload` | `ReadOnlyMemory<byte> HeaderPayload { get; init; }` | The forty-two-byte `VQHD` payload verbatim, carried through as the video stream's private data so the codec can read the version and high-colour flag this container does not interpret. |
-| `Height` | `int Height { get; init; }` | Picture height in pixels. |
+| `HeaderPayload` | `ReadOnlyMemory<byte> HeaderPayload { get; init; }` |  |
+| `Height` | `int Height { get; init; }` |  |
 | `PrimaryExtension` | `static string PrimaryExtension { get; }` |  |
-| `VideoFrameCount` | `int VideoFrameCount { get; init; }` | How many `VQFR` chunks the header states the file holds. |
-| `Width` | `int Width { get; init; }` | Picture width in pixels. |
-| `FromBytes` | `static VqaContainer FromBytes(byte[] data)` | Opens a file over the caller's array, keeping it rather than copying it. |
+| `VideoFrameCount` | `int VideoFrameCount { get; init; }` |  |
+| `Width` | `int Width { get; init; }` |  |
+| `FromBytes` | `static VqaContainer FromBytes(byte[] data)` |  |
 | `FromFile` | `static VqaContainer FromFile(FileInfo file)` |  |
 | `FromSpan` | `static VqaContainer FromSpan(ReadOnlySpan<byte> data)` |  |
-| `MatchesSignature` | `static bool? MatchesSignature(ReadOnlySpan<byte> header)` | `FORM` alone is IFF's own signature, shared by AIFF and other unrelated formats built on the same envelope — the four bytes right after `FORM`'s own size that name the form's type, `WVQA`, are what actually says "this is a Westwood VQA file". |
-| `Metadata` | `static VideoMetadata Metadata(VqaContainer container)` | Nothing beyond the streams themselves. A VQA file has no field for a title, an author or a creation date. |
+| `MatchesSignature` | `static bool? MatchesSignature(ReadOnlySpan<byte> header)` |  |
+| `Metadata` | `static VideoMetadata Metadata(VqaContainer container)` |  |
 | `ReadPackets` | `static IEnumerable<CodedPacket> ReadPackets(VqaContainer container)` |  |
 | `Streams` | `static IReadOnlyList<MediaStreamInfo> Streams(VqaContainer container)` |  |
 
 #### `VqaWriter`
 
-Writes Westwood VQA FORM/WVQA files from VQFR video packets and optional WSAD sound.
+Writes complete Westwood VQA FORM/WVQA files from coded WSVQ video and optional WSAD sound.
 
 Implements `IVideoContainerWriter<VqaWriter>`, `IVideoFormatMetadata<VqaWriter>`.
 

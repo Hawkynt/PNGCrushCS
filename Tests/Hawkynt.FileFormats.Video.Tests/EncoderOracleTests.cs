@@ -13,6 +13,7 @@ using FileFormat.Ogg;
 using FileFormat.RealMedia;
 using FileFormat.Mp4;
 using FileFormat.RoqVideo;
+using FileFormat.Vqa;
 using FileFormat.Yuv4Mpeg;
 
 namespace Hawkynt.FileFormats.Video.Tests;
@@ -260,6 +261,7 @@ public sealed class EncoderOracleTests {
     ("Flv", ".flv", static (streams, packets) => VideoIO.Mux<FlvWriter>(streams, packets)),
     ("Fli", ".flc", static (streams, packets) => VideoIO.Mux<FliWriter>(streams, packets)),
     ("Roq", ".roq", static (streams, packets) => VideoIO.Mux<RoqWriter>(streams, packets)),
+    ("Vqa", ".vqa", static (streams, packets) => VideoIO.Mux<VqaWriter>(streams, packets)),
     ("Mjpeg", ".mjpg", static (streams, packets) => VideoIO.Mux<MjpegWriter>(streams, packets)),
     ("Ogg", ".ogv", static (streams, packets) => VideoIO.Mux<OggWriter>(streams, packets)),
   ];
