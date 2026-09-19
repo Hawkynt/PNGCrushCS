@@ -37,6 +37,128 @@ internal static class FFmpegOracle {
       Assert.Inconclusive("no ffmpeg on this machine to ask. Set FFMPEG to the binary or put it on PATH.");
   }
 
+  /// <summary>
+  /// The words FFmpeg prints for <c>AVERROR_PATCHWELCOME</c>.
+  /// </summary>
+  /// <remarks>
+  /// This is the one thing FFmpeg can say that is about the binary rather than about the bytes it was
+  /// handed. <c>avpriv_request_sample</c> raises it where a decoder meets a feature the build does not
+  /// implement, and nothing else produces it: a stream that is malformed answers "Invalid data", a
+  /// stream that decodes differently answers nothing at all and is caught by comparing what came out.
+  /// So a check may branch on it without any risk of swallowing a disagreement, which is what makes it
+  /// worth having a named constant instead of a version number — a version number stops being true the
+  /// moment a distribution backports a patch, and this does not.
+  /// </remarks>
+  public const string NOT_IMPLEMENTED = "Not yet implemented in FFmpeg, patches welcome";
+
+  /// <summary>Whether FFmpeg answered that this build has not implemented what the file needs.</summary>
+  public static bool SaysItHasNotImplementedThis(string diagnostics)
+    => diagnostics.Contains(NOT_IMPLEMENTED, StringComparison.Ordinal);
+
+  /// <summary>
+  /// Which feature FFmpeg says it has not implemented, in FFmpeg's own words.
+  /// </summary>
+  /// <remarks>
+  /// <c>avpriv_request_sample</c> names the feature at warning level and the error level beneath it
+  /// carries only the generic <see cref="NOT_IMPLEMENTED"/> sentence, so the decode is run once more
+  /// one level louder purely to quote the name. Only ever on the way to a skip, never on the way to a
+  /// verdict: what is measured stays measured at <c>-loglevel error</c>, where a build that reads the
+  /// file cleanly says nothing whatever.
+  /// </remarks>
+  public static string WhatItSaysIsMissing(string path) {
+    const string BOILERPLATE = ". Update your FFmpeg version";
+
+    var startInfo = new ProcessStartInfo(ExecutablePath!) {
+      RedirectStandardOutput = true,
+      RedirectStandardError = true,
+      UseShellExecute = false,
+    };
+
+    foreach (var argument in new[] {
+      "-hide_banner", "-loglevel", "warning", "-y", "-i", path, "-an", "-f", "null", "-",
+    })
+      startInfo.ArgumentList.Add(argument);
+
+    try {
+      using var process = Process.Start(startInfo);
+      if (process == null)
+        return NOT_IMPLEMENTED;
+
+      var stdout = process.StandardOutput.ReadToEndAsync();
+      var stderr = process.StandardError.ReadToEndAsync();
+      if (!process.WaitForExit(_TIMEOUT_MILLISECONDS)) {
+        try { process.Kill(entireProcessTree: true); } catch { /* already gone */ }
+        return NOT_IMPLEMENTED;
+      }
+
+      var named = string.Concat(stdout.Result, stderr.Result)
+        .Split('\n')
+        .Select(static line => line.Trim())
+        .FirstOrDefault(static line => line.Contains(BOILERPLATE, StringComparison.Ordinal));
+
+      return named == null
+        ? NOT_IMPLEMENTED
+        : _WithoutTheAllocationAddress(named[..named.IndexOf(BOILERPLATE, StringComparison.Ordinal)]);
+    } catch (Exception) {
+      return NOT_IMPLEMENTED;
+    }
+  }
+
+  /// <summary>
+  /// The build that answered, in its own words: the first line of <c>ffmpeg -version</c>.
+  /// </summary>
+  /// <remarks>
+  /// For attributing an answer and for nothing else. No check here decides anything from a version
+  /// number — a build number is a guess at a capability, and a wrong one as soon as somebody backports
+  /// — so what is acted on is always what the binary did when it was asked. This is how a skip says
+  /// which binary it was that could not.
+  /// </remarks>
+  public static string Banner { get; } = _ReadBanner();
+
+  private static string _ReadBanner() {
+    if (ExecutablePath == null)
+      return "no ffmpeg";
+
+    var startInfo = new ProcessStartInfo(ExecutablePath) {
+      RedirectStandardOutput = true,
+      RedirectStandardError = true,
+      UseShellExecute = false,
+    };
+
+    foreach (var argument in new[] { "-hide_banner", "-version" })
+      startInfo.ArgumentList.Add(argument);
+
+    try {
+      using var process = Process.Start(startInfo);
+      if (process == null)
+        return ExecutablePath;
+
+      var stdout = process.StandardOutput.ReadToEndAsync();
+      process.StandardError.ReadToEndAsync();
+      if (!process.WaitForExit(_TIMEOUT_MILLISECONDS)) {
+        try { process.Kill(entireProcessTree: true); } catch { /* already gone */ }
+        return ExecutablePath;
+      }
+
+      var first = stdout.Result.Split('\n').Select(static line => line.Trim()).FirstOrDefault(static line => line.Length != 0);
+
+      return string.IsNullOrEmpty(first) ? ExecutablePath : first;
+    } catch (Exception) {
+      return ExecutablePath;
+    }
+  }
+
+  /// <summary>Drops the <c>@ 0x…</c> out of a decoder tag, which changes every run and says nothing.</summary>
+  private static string _WithoutTheAllocationAddress(string line) {
+    var at = line.IndexOf(" @ 0x", StringComparison.Ordinal);
+    if (at < 0)
+      return line;
+
+    var close = line.IndexOf(']', at);
+
+    return close < 0 ? line : line[..at] + line[close..];
+  }
+
   /// <summary>Decodes the first frame and says whether it came back at the size it went in at.</summary>
   public static (bool Decoded, string Output) TryDecodeFirstFrame(string path, int width, int height) {
     var png = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName() + ".png");

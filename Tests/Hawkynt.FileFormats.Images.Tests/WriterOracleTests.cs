@@ -136,6 +136,18 @@ public sealed class WriterOracleTests {
         $"{oracle.DisplayName()} on this machine has no reader for {entry.Name}, so the claim is "
         + $"unconfirmed here rather than wrong: {detail}");
 
+    // The same distinction again, for the tools that do not say it in words. A build that refuses a
+    // file of this format that nobody here wrote has no reader for it either; it is simply less
+    // forthcoming about it than ImageMagick is. See WriterOracleTool.CannotReadThisFormatAtAll for
+    // why the control is a file and not a version number, and for why this takes nothing away from a
+    // machine whose tool can read the format.
+    if (verdict == WriterOracleTool.Verdict.Rejected
+        && WriterOracleTool.CannotReadThisFormatAtAll(oracle, entry, out var control))
+      Assert.Inconclusive(
+        $"{oracle.DisplayName()} on this machine cannot read {entry.Name} at all — {control} — so it "
+        + $"is not judging this writer and the claim is unconfirmed here rather than wrong. It "
+        + $"refused what this package wrote too: {detail}. The build asked was: {WriterOracleTool.Identify(oracle)}");
+
     Assert.That(verdict, Is.EqualTo(WriterOracleTool.Verdict.Accepted),
       $"{entry.Name} says {oracle.DisplayName()} has read what it writes, and it has not: {detail}");
   }

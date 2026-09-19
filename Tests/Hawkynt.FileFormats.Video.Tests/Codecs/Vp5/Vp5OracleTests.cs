@@ -81,6 +81,19 @@ public sealed class Vp5OracleTests {
   /// that the committed file cannot quietly become a record of a decoder agreeing with its own past
   /// mistake. Where it is absent the check reports inconclusive and the rest of the suite runs
   /// untouched.
+  /// <para/>
+  /// <b>And where it is present but cannot decode the clip.</b> FFmpeg's VP5 decoder has not always
+  /// been able to read an interlaced one: a build without it answers <c>Interlacing is not
+  /// implemented</c> and decodes nothing, which 6.0.1 does and 9.0.1 does not. That build has no
+  /// decode to hold the digests against, so
+  /// there is nothing here for it to agree or disagree with, and failing it would report the age of
+  /// the binary as though it were a defect in this package. What the check branches on is FFmpeg
+  /// saying it has not implemented something — <see cref="FFmpegOracle.NOT_IMPLEMENTED"/>, which no
+  /// disagreement about samples can produce — and never on a version number, which stops being true
+  /// the moment a distribution backports the patch. Everything else FFmpeg can say still fails,
+  /// including a decode that merely comes out different: the two clips that are not interlaced are
+  /// byte-identical to the committed digests on FFmpeg 6 and on FFmpeg 9 alike, so the digests are
+  /// not tied to the build that wrote them and a mismatch is news.
   /// </remarks>
   [TestCase(Vp5Fixtures.SIXTY_FRAMES)]
   [TestCase(Vp5Fixtures.THREE_KEY_FRAMES)]
@@ -89,15 +102,30 @@ public sealed class Vp5OracleTests {
   public void TheFFmpegOnThisMachineAgreesWithTheCommittedDigests(string fixture) {
     FFmpegOracle.RequireAvailable();
 
+    var path = Vp5Fixtures.Path(fixture + ".avi");
+    var (diagnostics, digests) = _RunFFmpegFrameDigests(path);
+
+    if (FFmpegOracle.SaysItHasNotImplementedThis(diagnostics))
+      Assert.Inconclusive(
+        $"the FFmpeg on this machine has not implemented what '{fixture}' needs and says so itself — "
+        + $"{FFmpegOracle.WhatItSaysIsMissing(path)} — so it produced no decode to hold the committed "
+        + $"digests against. The build asked was: {FFmpegOracle.Banner}.");
+
+    Assert.That(diagnostics, Is.Empty, "ffmpeg complained about a file it is supposed to read cleanly.");
+
     Assert.That(
-      _RunFFmpegFrameDigests(Vp5Fixtures.Path(fixture + ".avi")),
+      digests,
       Is.EqualTo(Vp5Fixtures.ExpectedFrameDigests(fixture)).AsCollection,
       $"the FFmpeg on this machine decodes '{fixture}' differently from the one that wrote the committed digests.");
   }
 
   // ==============================================================================================
 
-  private static List<string> _RunFFmpegFrameDigests(string path) {
+  /// <summary>
+  /// What FFmpeg said about the file and what it made of it, kept apart so the caller can tell a
+  /// build that will not decode the clip from one that decodes it differently.
+  /// </summary>
+  private static (string Diagnostics, List<string> Digests) _RunFFmpegFrameDigests(string path) {
     var output = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName() + ".framemd5");
 
     try {
@@ -123,10 +151,10 @@ public sealed class Vp5OracleTests {
         Assert.Inconclusive("ffmpeg timed out.");
       }
 
-      Assert.That(string.Concat(diagnostics.Result, chatter.Result).Trim(), Is.Empty,
-        "ffmpeg complained about a file it is supposed to read cleanly.");
-
-      return Vp5Fixtures.ParseFrameMd5(File.ReadAllLines(output));
+      return (
+        string.Concat(diagnostics.Result, chatter.Result).Trim(),
+        File.Exists(output) ? Vp5Fixtures.ParseFrameMd5(File.ReadAllLines(output)) : []
+      );
     } finally {
       try { File.Delete(output); } catch { /* best effort */ }
     }

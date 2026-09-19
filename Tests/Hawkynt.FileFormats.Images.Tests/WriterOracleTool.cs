@@ -153,6 +153,86 @@ internal static class WriterOracleTool {
   }
 
   /// <summary>
+  /// A file of this format that somebody else produced, carried in this repository, and what it is.
+  /// </summary>
+  /// <remarks>
+  /// The control in <see cref="CannotReadThisFormatAtAll"/>. It has to be a file this package did not
+  /// write, or the question it answers is circular; and it has to be the same shape as what the
+  /// writer produces, or a refusal of it says nothing about a refusal of ours. HEIF is the format
+  /// that needs one and the only one that has one: <c>main10.heic</c> is libheif's, branded
+  /// <c>heix</c>/<c>miaf</c> where this writer brands <c>heic</c>/<c>mif1</c>, and it carries the
+  /// same thing inside — one intra-coded HEVC item.
+  /// </remarks>
+  private static (string File, string What)? _ControlFileFor(FormatEntry entry) => entry.Format switch {
+    ImageFormat.Heif => (
+      Path.Combine(AppContext.BaseDirectory, "Fixtures", "Heif", "main10.heic"),
+      "a HEIC libheif wrote, not this package"),
+    _ => null,
+  };
+
+  /// <summary>
+  /// Whether the tool has no reader for this format at all, proven by handing it a file of that
+  /// format that this package did not write.
+  /// </summary>
+  /// <remarks>
+  /// <see cref="_IsNoOpinion"/> catches the tools that say so in words. FFmpeg does not: a build
+  /// without HEIF support probes the file as MP4, finds no <c>moov</c>, and answers <c>moov atom not
+  /// found</c> — which is also what it would say about an MP4 this package had truncated, so the
+  /// words cannot be told apart and a check keyed to them would be keyed to a guess. What can be told
+  /// apart is what the tool does with somebody else's file. A build that refuses libheif's HEIC
+  /// refuses ours for a reason that has nothing to do with ours; a build that reads libheif's and
+  /// refuses ours has read the format and disagreed, which is the whole worth of the column, and is
+  /// still a failure.
+  /// <para/>
+  /// So this narrows nothing away on a capable machine. The control is a fixed file no writer here
+  /// can influence, and while it decodes, every rejection of our output is reported as one.
+  /// </remarks>
+  public static bool CannotReadThisFormatAtAll(ConformanceOracle oracle, FormatEntry entry, out string detail) {
+    detail = string.Empty;
+
+    var control = _ControlFileFor(entry);
+    var executable = _Executable(oracle);
+    if (control == null || executable == null || !File.Exists(control.Value.File))
+      return false;
+
+    var output = _OutputPath(oracle, control.Value.File);
+    try {
+      var (exitCode, diagnostics) = _Run(executable, _Arguments(oracle, control.Value.File, output), oracle);
+
+      // It read a file nobody here wrote, so its refusal of ours is about ours.
+      if (exitCode == 0 && _ReadPng(output) != null)
+        return false;
+
+      detail = $"handed {Path.GetFileName(control.Value.File)} — {control.Value.What} — it answered "
+               + (diagnostics.Length == 0 ? "with no picture at all" : _FirstLine(diagnostics));
+
+      return true;
+    } finally {
+      _DeleteOutput(oracle, output);
+    }
+  }
+
+  /// <summary>The tool's own account of which build it is, so a skip can name the binary that could not.</summary>
+  /// <remarks>
+  /// Reported, never acted on. Nothing here compares a version against a number: a build number is a
+  /// guess at a capability and a wrong one as soon as a distribution backports a patch, so what a
+  /// check acts on is what the binary did when it was asked and this is only how the answer is
+  /// attributed.
+  /// </remarks>
+  public static string Identify(ConformanceOracle oracle) {
+    var executable = _Executable(oracle);
+    if (executable == null)
+      return $"{oracle.DisplayName()} is not on this machine";
+
+    if (oracle != ConformanceOracle.FFmpeg)
+      return executable;
+
+    var (_, banner) = _Run(executable, ["-hide_banner", "-version"], oracle);
+
+    return banner.Trim().Length == 0 ? executable : _FirstLine(banner);
+  }
+
+  /// <summary>
   /// Hands one written file to one tool and returns the picture the tool rebuilt from it, or
   /// <c>null</c> where the tool is absent, has no reader for the name, or would not decode it.
   /// </summary>
