@@ -1,3 +1,5 @@
+using System;
+
 namespace FileFormat.Codecs.Vc1;
 
 /// <summary>Specification-defined tables used by progressive P and B pictures.</summary>

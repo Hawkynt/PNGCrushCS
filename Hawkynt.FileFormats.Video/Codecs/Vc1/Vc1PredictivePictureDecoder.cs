@@ -153,8 +153,8 @@ internal sealed class Vc1PredictivePictureDecoder {
     Vc1Frame destination,
     int mbX,
     int mbY,
-    Span<int> ordered,
-    Span<int> residual) {
+    scoped Span<int> ordered,
+    scoped Span<int> residual) {
     var doubleQuant = (2 * header.Quantiser) + (header.HalfStep ? 1 : 0);
     var conservativeEscape = header.Quantiser <= 7;
 
