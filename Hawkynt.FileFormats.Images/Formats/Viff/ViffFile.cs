@@ -4,7 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.Viff;
 
 /// <summary>In-memory representation of a VIFF (Khoros Visualization Image File Format) image.</summary>
-[VerifiedBy(ConformanceOracle.ImageMagick)]
+[VerifiedBy(ConformanceOracle.ImageMagick, ConformanceOracle.XnView)]
 public readonly record struct ViffFile : IImageFormatReader<ViffFile>, IImageToRawImage<ViffFile>, IImageFromRawImage<ViffFile>, IImageFormatWriter<ViffFile> {
 
   static string IImageFormatMetadata<ViffFile>.PrimaryExtension => ".viff";

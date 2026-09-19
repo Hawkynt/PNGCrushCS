@@ -4,7 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.Vips;
 
 /// <summary>In-memory representation of a libvips native image (.v / .vips).</summary>
-[VerifiedBy(ConformanceOracle.ImageMagick)]
+[VerifiedBy(ConformanceOracle.ImageMagick, ConformanceOracle.XnView)]
 public readonly record struct VipsFile : IImageFormatReader<VipsFile>, IImageToRawImage<VipsFile>, IImageFromRawImage<VipsFile>, IImageFormatWriter<VipsFile> {
 
   static string IImageFormatMetadata<VipsFile>.PrimaryExtension => ".v";

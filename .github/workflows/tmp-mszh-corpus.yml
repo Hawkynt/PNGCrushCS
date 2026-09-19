@@ -1,0 +1,312 @@
+name: Temporary MSZH corpus diagnostics
+
+on:
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
+jobs:
+  corpus:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.x
+
+      - name: Install FFmpeg
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+
+      - name: Fetch archived MSZH samples
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/mszh-samples
+          base=https://samples.ffmpeg.org/V-codecs/mszh-zlib/mszh
+          cat > /tmp/mszh-samples/expected.md5 <<'EOF'
+          f158c1abdd182d5e473fd276bafa6479  mszh_rgb24.avi
+          b05a460f6d87740c29951281fe5cad5b  mszh_rgb24_nocomp.avi
+          e1c8f262e3195e981068a4d21b1b64ea  mszh_yuv111.avi
+          e1c8f262e3195e981068a4d21b1b64ea  mszh_yuv111_invert.avi
+          0921950e997300f31227d82b776bc1ec  mszh_yuv111_nocomp.avi
+          f010322765e64c13f4d2118f37a845a7  mszh_yuv211.avi
+          3fdb8269b0c556fbb078b1d535dbb703  mszh_yuv211_nocomp.avi
+          3ab51fc5e956561a796e761d9e7eb833  mszh_yuv411.avi
+          b747fab63cf20d28ff941e340f9da94f  mszh_yuv411_multithread.avi
+          faac9c5d478f8d0f9ed4a20abbd861d8  mszh_yuv411_nocomp.avi
+          03a7c154b765466c75802ac23f6b2a7e  mszh_yuv411_nocomp_nullframe.avi
+          2765c6c6a6d48b1c3df6f5c8822e1a7b  mszh_yuv420.avi
+          ba08ac1bad95c59fd2cff228186a29ad  mszh_yuv420_nocomp.avi
+          4acc273d658657acb8d7517171f8d48f  mszh_yuv420_nullframe.avi
+          fc8c302ff2b1edd3e4a927f8a903f452  mszh_yuv422.avi
+          dbc5ed28f514c1648f712b5dd322fa6a  mszh_yuv422_nocomp.avi
+          EOF
+          sed -i 's/^          //' /tmp/mszh-samples/expected.md5
+          while read -r hash file; do
+            curl --fail --location --retry 3 --silent --show-error "$base/$file" -o "/tmp/mszh-samples/$file"
+          done < /tmp/mszh-samples/expected.md5
+          cd /tmp/mszh-samples
+          md5sum --check expected.md5
+
+      - name: Add temporary native-frame and packet-hash modes
+        shell: python
+        run: |
+          from pathlib import Path
+
+          program = Path('Tools/parity/Decode/Program.cs')
+          text = program.read_text()
+          marker = '// Every frame of an animation, rather than the one a still viewer would draw.'
+          block = r'''
+          // Temporary corpus-oracle paths. They are injected only in CI and never become product code.
+          if (args[0] == "--native-frames") {
+            if (args.Length < 3)
+              return 2;
+            var animation = new FileInfo(args[1]);
+            var into = args[2];
+            Directory.CreateDirectory(into);
+            var containers = VideoParity.ContainersClaiming(animation);
+            return containers.Count == 0 ? 2 : VideoParity.WriteNativeFrames(animation, into, containers[0]);
+          }
+
+          if (args[0] == "--packet-hashes") {
+            if (args.Length < 2)
+              return 2;
+            return VideoParity.WritePacketHashes(new FileInfo(args[1]));
+          }
+
+          '''
+          if marker not in text:
+              raise SystemExit('Program.cs insertion marker not found')
+          program.write_text(text.replace(marker, block + marker, 1))
+
+          parity = Path('Tools/parity/Decode/VideoParity.cs')
+          text = parity.read_text()
+          method = r'''
+
+            internal static int WriteNativeFrames(FileInfo source, string into, VideoFormatEntry entry) {
+              var bytes = File.ReadAllBytes(source.FullName);
+              var streams = entry.ReadStreams(bytes);
+              var video = streams.FirstOrDefault(s => s.Kind == MediaStreamKind.Video);
+              if (video == null)
+                return 1;
+
+              var frame = 0;
+              foreach (var decoded in _Frames(entry, bytes, video)) {
+                var picture = decoded.Image;
+                var wanted = picture.MinimumPixelDataLength;
+                if (wanted > int.MaxValue || picture.PixelData.LongLength < wanted)
+                  return 1;
+                var path = Path.Combine(into, $"{source.Name}.{frame:D4}.{picture.Format}.raw");
+                File.WriteAllBytes(path, picture.PixelData.AsSpan(0, (int)wanted).ToArray());
+                File.AppendAllText(Path.Combine(into, "frames.tsv"), $"{frame}\t{decoded.PresentationTimestamp}\t{picture.Width}\t{picture.Height}\t{picture.Format}\t{wanted}\n");
+                ++frame;
+              }
+              return frame == 0 ? 1 : 0;
+            }
+
+            internal static int WritePacketHashes(FileInfo file) {
+              var bytes = File.ReadAllBytes(file.FullName);
+              var containers = ContainersClaiming(file);
+              if (containers.Count == 0)
+                return 2;
+              var entry = containers[0];
+              var videoStreams = entry.ReadStreams(bytes).Where(s => s.Kind == MediaStreamKind.Video).Select(s => s.Index).ToHashSet();
+              foreach (var packet in entry.ReadPackets(bytes)) {
+                if (!videoStreams.Contains(packet.StreamIndex))
+                  continue;
+                var hash = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(packet.Data.Span)).ToLowerInvariant();
+                Console.WriteLine($"{packet.StreamIndex},{_Stamp(packet.PresentationTimestamp)},{_Stamp(packet.DecodeTimestamp)},{packet.Data.Length},{(packet.IsKeyFrame ? "K__" : "___")},sha256:{hash}");
+              }
+              return 0;
+            }
+          '''
+          at = text.rfind('\n}')
+          if at < 0:
+              raise SystemExit('VideoParity.cs class terminator not found')
+          parity.write_text(text[:at] + method + text[at:])
+
+      - name: Build parity decoder
+        run: dotnet build Tools/parity/Decode/Decode.csproj -c Release --nologo
+
+      - name: Capture packet metadata and hashes
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf /tmp/mszh-packets
+          mkdir -p /tmp/mszh-packets
+          for path in /tmp/mszh-samples/*.avi; do
+            file=$(basename "$path")
+            dotnet run --project Tools/parity/Decode/Decode.csproj -c Release --no-build -- --packet-hashes "$path" > "/tmp/mszh-packets/$file.ours"
+            ffprobe -v error -select_streams v:0 -show_packets -show_data_hash sha256 -show_entries packet=stream_index,pts,dts,size,flags,data_hash -of csv=p=0 "$path" > "/tmp/mszh-packets/$file.ffprobe"
+          done
+
+      - name: Decode corpus natively with both implementations
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf /tmp/mszh-ours /tmp/mszh-ffmpeg-forced /tmp/mszh-ffmpeg-native
+          mkdir -p /tmp/mszh-ours /tmp/mszh-ffmpeg-forced /tmp/mszh-ffmpeg-native
+          for path in /tmp/mszh-samples/*.avi; do
+            file=$(basename "$path")
+            mkdir -p "/tmp/mszh-ours/$file"
+            case "$file" in
+              mszh_rgb24*) pix_fmt=bgr24 ;;
+              mszh_yuv111*) pix_fmt=yuv444p ;;
+              mszh_yuv211*|mszh_yuv422*) pix_fmt=yuv422p ;;
+              mszh_yuv411*) pix_fmt=yuv411p ;;
+              mszh_yuv420*) pix_fmt=yuv420p ;;
+            esac
+            dotnet run --project Tools/parity/Decode/Decode.csproj -c Release --no-build -- --native-frames "$path" "/tmp/mszh-ours/$file"
+            ffmpeg -hide_banner -loglevel error -y -i "$path" -map 0:v:0 -an -sn -dn -vsync 0 -pix_fmt "$pix_fmt" -f rawvideo "/tmp/mszh-ffmpeg-forced/$file.raw"
+            ffmpeg -hide_banner -loglevel error -y -i "$path" -map 0:v:0 -an -sn -dn -vsync 0 -f rawvideo "/tmp/mszh-ffmpeg-native/$file.raw"
+          done
+
+      - name: Build compact diagnostic report
+        shell: python
+        run: |
+          from pathlib import Path
+          import csv
+          import hashlib
+          import subprocess
+
+          samples = Path('/tmp/mszh-samples')
+          ours_root = Path('/tmp/mszh-ours')
+          forced_root = Path('/tmp/mszh-ffmpeg-forced')
+          native_root = Path('/tmp/mszh-ffmpeg-native')
+          packet_root = Path('/tmp/mszh-packets')
+          report = []
+
+          def sha(data):
+              return hashlib.sha256(data).hexdigest()
+
+          def dimensions(path):
+              value = subprocess.check_output([
+                  'ffprobe', '-v', 'error', '-select_streams', 'v:0',
+                  '-show_entries', 'stream=width,height', '-of', 'csv=p=0:s=x', str(path)
+              ], text=True).strip()
+              return tuple(map(int, value.split('x')))
+
+          def planes(name, width, height):
+              y = width * height
+              if 'rgb24' in name:
+                  return [('BGR', width * height * 3, width)]
+              if 'yuv111' in name:
+                  return [('Y', y, width), ('U', y, width), ('V', y, width)]
+              if 'yuv211' in name or 'yuv422' in name:
+                  cw = (width + 1) // 2
+                  return [('Y', y, width), ('U', cw * height, cw), ('V', cw * height, cw)]
+              if 'yuv411' in name:
+                  cw = (width + 3) // 4
+                  return [('Y', y, width), ('U', cw * height, cw), ('V', cw * height, cw)]
+              if 'yuv420' in name:
+                  cw, ch = (width + 1) // 2, (height + 1) // 2
+                  return [('Y', y, width), ('U', cw * ch, cw), ('V', cw * ch, cw)]
+              raise ValueError(name)
+
+          def collapse_411(data, width, height):
+              samples_count = width * height
+              if len(data) != samples_count * 3:
+                  return data
+              y = data[:samples_count]
+              u444 = data[samples_count:samples_count * 2]
+              v444 = data[samples_count * 2:]
+              u, v = bytearray(), bytearray()
+              for row in range(height):
+                  base = row * width
+                  for x in range(0, width, 4):
+                      u.append(u444[base + x])
+                      v.append(v444[base + x])
+              return y + bytes(u) + bytes(v)
+
+          report.append('# MSZH archived-corpus diagnostics')
+          report.append('')
+          report.append('## Packet parity')
+          for sample in sorted(samples.glob('*.avi')):
+              name = sample.name
+              ours = (packet_root / f'{name}.ours').read_text().splitlines()
+              ff = (packet_root / f'{name}.ffprobe').read_text().splitlines()
+              exact = ours == ff
+              report.append(f'- {name}: ours={len(ours)} ffprobe={len(ff)} exact={exact}')
+              if not exact:
+                  first = next((i for i, pair in enumerate(zip(ours, ff)) if pair[0] != pair[1]), min(len(ours), len(ff)))
+                  report.append(f'  first packet difference index={first}')
+                  report.append(f'  ours: {ours[first] if first < len(ours) else "<missing>"}')
+                  report.append(f'  ffprobe: {ff[first] if first < len(ff) else "<missing>"}')
+
+          report.append('')
+          report.append('## FFmpeg native versus explicitly forced format')
+          for sample in sorted(samples.glob('*.avi')):
+              name = sample.name
+              forced = (forced_root / f'{name}.raw').read_bytes()
+              native = (native_root / f'{name}.raw').read_bytes()
+              report.append(f'- {name}: exact={forced == native} forced={sha(forced)} native={sha(native)}')
+
+          report.append('')
+          report.append('## Frames and planes')
+          for sample in sorted(samples.glob('*.avi')):
+              name = sample.name
+              width, height = dimensions(sample)
+              layout = planes(name, width, height)
+              frame_size = sum(size for _, size, _ in layout)
+              ff_data = (forced_root / f'{name}.raw').read_bytes()
+              ff_frames = [ff_data[i:i + frame_size] for i in range(0, len(ff_data), frame_size)] if frame_size else []
+              ours_paths = sorted((ours_root / name).glob('*.raw'))
+              ours_frames = []
+              for path in ours_paths:
+                  data = path.read_bytes()
+                  if 'yuv411' in name:
+                      data = collapse_411(data, width, height)
+                  ours_frames.append(data)
+              report.append(f'- {name}: ours_frames={len(ours_frames)} ffmpeg_frames={len(ff_frames)} frame_size={frame_size}')
+              for index, (ours, expected) in enumerate(zip(ours_frames, ff_frames)):
+                  report.append(f'  frame {index}: exact={ours == expected} ours={sha(ours)} ffmpeg={sha(expected)}')
+                  offset = 0
+                  for plane, size, row_width in layout:
+                      left = ours[offset:offset + size]
+                      right = expected[offset:offset + size]
+                      report.append(f'    {plane}: exact={left == right} ours={sha(left)} ffmpeg={sha(right)}')
+                      offset += size
+                  if ours != expected:
+                      common = min(len(ours), len(expected))
+                      first = next((i for i in range(common) if ours[i] != expected[i]), common)
+                      if first < common:
+                          start = 0
+                          for plane, size, row_width in layout:
+                              if first < start + size:
+                                  local = first - start
+                                  row, col = divmod(local, row_width)
+                                  lo, hi = max(0, first - 16), min(common, first + 17)
+                                  report.append(f'    FIRST_MISMATCH absolute={first} plane={plane} local={local} row={row} col={col} ours={ours[first]} ffmpeg={expected[first]}')
+                                  report.append(f'    ours[{lo}:{hi}]={ours[lo:hi].hex()}')
+                                  report.append(f'    ffmp[{lo}:{hi}]={expected[lo:hi].hex()}')
+                                  break
+                              start += size
+
+          Path('/tmp/mszh-diagnostics.txt').write_text('\n'.join(report) + '\n')
+          print('\n'.join(report))
+
+      - name: Upload diagnostic report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mszh-diagnostics
+          path: |
+            /tmp/mszh-diagnostics.txt
+            /tmp/mszh-packets/*.ours
+            /tmp/mszh-packets/*.ffprobe
+          if-no-files-found: error
+
+      - name: Publish diagnostic report on PR
+        if: github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh pr comment "${{ github.event.pull_request.number }}" --body-file /tmp/mszh-diagnostics.txt
