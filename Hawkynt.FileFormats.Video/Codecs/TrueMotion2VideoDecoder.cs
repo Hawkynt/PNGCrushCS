@@ -663,20 +663,21 @@ public sealed class TrueMotion2VideoDecoder : IVideoCodecDecoder<TrueMotion2Vide
   }
 
   private ref struct WordBitReader(ReadOnlySpan<byte> data) {
+    private readonly ReadOnlySpan<byte> _data = data;
     private int _bitPosition;
     internal int AlignedBytesConsumed => (this._bitPosition + 31) / 32 * 4;
 
     internal uint Read(int count, int streamIndex, string field) {
       if (count is < 0 or > 32)
         throw new ArgumentOutOfRangeException(nameof(count));
-      if (this._bitPosition > data.Length * 8 - count)
+      if (this._bitPosition > this._data.Length * 8 - count)
         throw new InvalidDataException($"TrueMotion 2 stream {streamIndex}: {field} runs past the available bits.");
 
       uint value = 0;
       for (var i = 0; i < count; ++i) {
         var wordOffset = (this._bitPosition >> 5) * 4;
         var bitInWord = this._bitPosition & 31;
-        var word = BinaryPrimitives.ReadUInt32LittleEndian(data[wordOffset..]);
+        var word = BinaryPrimitives.ReadUInt32LittleEndian(this._data[wordOffset..]);
         value = (value << 1) | ((word >> (31 - bitInWord)) & 1);
         ++this._bitPosition;
       }
