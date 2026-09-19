@@ -1071,7 +1071,7 @@ Implements `IVideoCodecEncoder<H261VideoEncoder>`, `IVideoPacketEncoder`.
 
 #### `H263VideoDecoder`
 
-Decodes H.263 video, ITU-T Rec. H.263 baseline, and the Sorenson Spark variant of it that Flash Video carries.
+Decodes baseline H.263, the H.263+ PLUSPTYPE subset used for custom formats and Annex O temporal B-pictures, and Sorenson Spark.
 
 Implements `IVideoCodecDecoder<H263VideoDecoder>`, `IVideoFrameDecoder`.
 
@@ -1079,24 +1079,25 @@ Implements `IVideoCodecDecoder<H263VideoDecoder>`, `IVideoFrameDecoder`.
 | --- | --- | --- |
 | `CodecName` | `static string CodecName { get; }` |  |
 | `Accepts` | `static bool Accepts(MediaStreamInfo stream)` |  |
-| `Create` | `static H263VideoDecoder Create(MediaStreamInfo stream)` | Builds a decoder for one stream. |
-| `Flush` | `IEnumerable<RawImage> Flush()` | Nothing is ever held back, so there is nothing left when the packets run out. |
-| `TryDecode` | `bool TryDecode(CodedPacket packet, out RawImage frame)` | Decodes one packet and hands back the picture it holds. |
+| `Create` | `static H263VideoDecoder Create(MediaStreamInfo stream)` |  |
+| `Flush` | `IEnumerable<RawImage> Flush()` | Returns the final reference held behind reordered Annex O B-pictures. |
+| `TryDecode` | `bool TryDecode(CodedPacket packet, out RawImage frame)` |  |
 
 #### `H263VideoEncoder`
 
-Encodes baseline H.263 video as intra pictures in the five standard source formats of Table 5.
+Encodes H.263 I/P pictures, H.263+ custom picture formats, and optionally Annex O temporal B-pictures with coding/display reordering.
 
 Implements `IVideoCodecEncoder<H263VideoEncoder>`, `IVideoPacketEncoder`.
 
 | Member | Signature | Summary |
 | --- | --- | --- |
+| `BidirectionalPicturesBetweenReferences` | `int BidirectionalPicturesBetweenReferences { get; set; }` | Number of Annex O B-pictures placed between reference anchors. The default is zero. |
 | `CodecName` | `static string CodecName { get; }` |  |
 | `Codec` | `static CodecTag Codec { get; }` |  |
-| `Create` | `static H263VideoEncoder Create(MediaStreamInfo stream)` | Creates an encoder for one of H.263 Table 5's five standard picture formats. |
-| `DescribeStream` | `MediaStreamInfo DescribeStream()` | Describes the VFW-style H.263 stream that AVI and Matroska use for the `H263` tag. |
-| `Flush` | `IEnumerable<CodedPacket> Flush()` | Nothing is reordered or delayed: every input picture is one output packet. |
-| `TryEncode` | `bool TryEncode(RawImage frame, long? presentationTimestamp, out CodedPacket packet)` | Encodes one picture: intra at the head of a group, forward-predicted otherwise. |
+| `Create` | `static H263VideoEncoder Create(MediaStreamInfo stream)` |  |
+| `DescribeStream` | `MediaStreamInfo DescribeStream()` |  |
+| `Flush` | `IEnumerable<CodedPacket> Flush()` |  |
+| `TryEncode` | `bool TryEncode(RawImage frame, long? presentationTimestamp, out CodedPacket packet)` |  |
 
 #### `H264VideoDecoder`
 
