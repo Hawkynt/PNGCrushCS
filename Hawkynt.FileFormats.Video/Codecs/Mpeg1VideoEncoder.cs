@@ -7,79 +7,47 @@ using FileFormat.Core;
 
 namespace FileFormat.Codecs;
 
-/// <summary>Encodes ISO/IEC 11172-2 MPEG-1 video as progressive 4:2:0 I and P pictures.</summary>
+/// <summary>Encodes ISO/IEC 11172-2 MPEG-1 video as progressive 4:2:0 I, P and B pictures.</summary>
 /// <remarks>
-/// Writes I and P pictures. A group of pictures opens with an I picture and continues with P
-/// pictures that predict forwards from the anchor before them, which is the arrangement every
-/// MPEG-1 decoder must handle. Coding order equals display order, so no packet is reordered and
-/// each keeps the timestamp of the frame that produced it.
+/// The encoder writes a twelve-picture GOP with two bidirectionally coded pictures between anchors:
+/// <c>I B B P B B P B B P B B I</c>. P pictures predict from the previous reconstructed anchor.
+/// B pictures choose per macroblock between the previous anchor, the following anchor and the rounded
+/// average of both predictions, with independent forward and backward motion vectors.
 /// <para/>
-/// B pictures are not written. They would reorder coding against display, which changes this
-/// encoder's contract with its caller rather than only its bitstream, and they gain nothing a P
-/// picture cannot already express here. Reading them is supported in full.
+/// B pictures are coded after the anchor that follows them in display order. <see cref="TryEncode"/>
+/// therefore buffers source pictures and may return a packet belonging to an earlier picture.
+/// Presentation timestamps stay with their pictures; decode timestamps consume the input timeline in
+/// coding order.
 /// <para/>
-/// The reference a P picture predicts from is read back out of a decoder this encoder drives with
-/// its own output, so the prediction starts from the picture the receiving decoder will hold. An
-/// encoder predicting from its source instead drifts a little further from its decoder with every
-/// predicted picture.
+/// Every anchor is reconstructed by this library's MPEG decoder before it becomes a reference. That
+/// keeps encoder and decoder prediction on the same quantised samples and prevents drift across P
+/// pictures. B pictures never become references and therefore do not change the anchor state.
 /// <para/>
-/// Each picture is one slice containing every macroblock in raster order. Right and bottom padding
-/// repeats the edge sample; the sequence header keeps the caller's actual dimensions, so those
-/// samples are coding padding only and are cropped by a decoder. Chrominance is 4:2:0, produced by
-/// averaging each 2x2 luma footprint under ITU-R BT.601 limited-range conversion where the input is
-/// not already planar YUV.
-/// <para/>
-/// The block quantiser is the encoder model described by ISO/IEC 11172-2 Annex D: DC uses the fixed
-/// step of eight and AC uses the default intra matrix with a fixed quantiser scale. MPEG-1 is lossy;
-/// this encoder makes no lossless claim.
+/// Motion search is whole-pixel and exhaustive around the transmitted-vector predictor. MPEG-1 also
+/// permits half-pixel vectors; decoding supports them, while this encoder deliberately emits the
+/// full-pel form so the search and the transmitted prediction use exactly the samples that were
+/// scored. This is an encoder choice, not a restriction on accepted streams.
 /// </remarks>
 [VerifiedBy(ConformanceOracle.FFmpeg)]
 public sealed class Mpeg1VideoEncoder : IVideoCodecEncoder<Mpeg1VideoEncoder> {
 
   private static readonly CodecTag _Tag = CodecTag.FromCharacters("MPG1");
   private const int _QUANTISER_SCALE = 8;
-
-  /// <summary>Pictures per group: one I picture and eleven P pictures.</summary>
-  /// <remarks>
-  /// Twelve is the length the MPEG-1 constrained-parameters material uses and what decoders were
-  /// tested against. It also bounds error propagation: nothing predicted is ever more than eleven
-  /// pictures away from an independently decodable one.
-  /// </remarks>
-  private const int _GROUP_SIZE = 12;
-
-  /// <summary>forward_f_code, which fixes the range a forward vector can state.</summary>
-  /// <remarks>
-  /// The decoder folds the reconstructed vector into <c>[-16 * f, 16 * f - 1]</c> where
-  /// <c>f = 1 &lt;&lt; (f_code - 1)</c> — the fold is applied to the vector itself, not to the
-  /// difference that was coded — so f_code is what decides how far anything may move, and a search
-  /// beyond it does not merely cost bits but comes back as a different vector. Two gives
-  /// <c>[-32, 31]</c> whole pixels, which covers the motion in a picture of the sizes MPEG-1 is
-  /// used at; one would cap motion at sixteen pixels and cap it silently.
-  /// </remarks>
+  private const int _KEY_FRAME_INTERVAL = 12;
+  private const int _B_FRAMES = 2;
   private const int _FORWARD_F_CODE = 2;
-
-  /// <summary>f, the scale a motion difference is stated in.</summary>
+  private const int _BACKWARD_F_CODE = 2;
   private const int _MOTION_SCALE = 1 << (_FORWARD_F_CODE - 1);
-
-  /// <summary>The largest whole-pixel displacement the forward vectors can state.</summary>
   private const int _MOTION_LIMIT = 16 * _MOTION_SCALE;
-
-  /// <summary>
-  /// How far a motion search looks, in whole pixels, around the vector predicted from the
-  /// macroblock before it.
-  /// </summary>
   private const int _SEARCH_RANGE = 15;
 
-  /// <summary>Table B.1 reversed: an address increment to the code that states it.</summary>
   private static readonly IReadOnlyDictionary<int, string> _AddressIncrementCodes =
     MpegVlcTables.MacroblockAddressIncrement.Entries
       .ToDictionary(static entry => entry.Value, static entry => entry.Code);
 
-  /// <summary>Table B.9 reversed: a coded block pattern to the code that states it.</summary>
   private static readonly IReadOnlyDictionary<int, string> _CodedBlockPatternCodes =
     MpegVlcTables.CodedBlockPattern.Entries.ToDictionary(static entry => entry.Value, static entry => entry.Code);
 
-  /// <summary>Table B.10 reversed: a motion difference to the code that states it.</summary>
   private static readonly IReadOnlyDictionary<int, string> _MotionCodes =
     MpegVlcTables.MotionCode.Entries.ToDictionary(static entry => entry.Value, static entry => entry.Code);
 
@@ -100,17 +68,15 @@ public sealed class Mpeg1VideoEncoder : IVideoCodecEncoder<Mpeg1VideoEncoder> {
   private readonly int _macroblockWidth;
   private readonly int _macroblockHeight;
   private readonly int _frameRateCode;
-
-  private CodedPacket? _pending;
-  private MediaStreamInfo? _stream;
-  private int _pictureIndex;
-  private bool _finished;
-
-  /// <summary>Drives on this encoder's own output, to hand back the reference a P picture predicts from.</summary>
   private readonly MpegVideoDecoder _reconstruction = new();
+  private readonly List<PendingFrame> _pending = [];
+  private readonly Queue<CodedPacket> _ready = new();
+  private readonly Queue<long?> _decodeTimestamps = new();
 
-  /// <summary>How far into the current group of pictures the next frame is; zero codes an I picture.</summary>
-  private int _groupPosition;
+  private MediaStreamInfo? _stream;
+  private long _displayIndex;
+  private bool _wroteSequenceHeader;
+  private bool _finished;
 
   private Mpeg1VideoEncoder(MediaStreamInfo stream, int frameRateCode) {
     this._requested = stream;
@@ -125,7 +91,6 @@ public sealed class Mpeg1VideoEncoder : IVideoCodecEncoder<Mpeg1VideoEncoder> {
 
   public static CodecTag Codec => _Tag;
 
-  /// <summary>Creates an MPEG-1 encoder for a geometry and one of the eight frame rates the syntax can state.</summary>
   public static Mpeg1VideoEncoder Create(MediaStreamInfo stream) {
     ArgumentNullException.ThrowIfNull(stream);
 
@@ -145,12 +110,7 @@ public sealed class Mpeg1VideoEncoder : IVideoCodecEncoder<Mpeg1VideoEncoder> {
     return new(stream, frameRateCode);
   }
 
-  /// <summary>Codes one picture: intra at the head of a group, forward-predicted otherwise.</summary>
-  /// <remarks>
-  /// One picture is held so <see cref="Flush"/> can put the sequence-end code after the final
-  /// picture rather than manufacture a packet that is not a picture. There is no coding-order
-  /// reordering: every returned packet keeps the timestamp of the frame that produced it.
-  /// </remarks>
+  /// <summary>Accepts one display-order picture and returns the next coding-order packet when available.</summary>
   public bool TryEncode(RawImage frame, long? presentationTimestamp, out CodedPacket packet) {
     ArgumentNullException.ThrowIfNull(frame);
 
@@ -161,65 +121,53 @@ public sealed class Mpeg1VideoEncoder : IVideoCodecEncoder<Mpeg1VideoEncoder> {
       throw new InvalidDataException(
         $"This MPEG-1 stream is {this._width}x{this._height}; a {frame.Width}x{frame.Height} frame arrived.");
 
-    var planes = _PlanesOf(frame);
-    var writer = new MpegBitWriter();
-    if (this._pictureIndex == 0)
-      this._WriteSequenceHeader(writer);
+    var pending = new PendingFrame(_PlanesOf(frame), this._displayIndex++, presentationTimestamp);
+    this._decodeTimestamps.Enqueue(presentationTimestamp);
 
-    // The first picture of every group is intra, and so is any picture with no reference yet.
-    var reference = this._reconstruction.CurrentAnchor;
-    var isIntra = this._groupPosition == 0 || reference == null;
-    this._WritePicture(writer, planes, isIntra ? null : reference);
-    this._groupPosition = (this._groupPosition + 1) % _GROUP_SIZE;
-
-    var bytes = writer.ToArray();
-
-    // Reconstruct by decoding what was just written. This is what makes the next P picture predict
-    // from the same samples its decoder will have.
-    this._reconstruction.DecodePacket(bytes);
-
-    var current = new CodedPacket(
-      this._requested.Index,
-      bytes,
-      PresentationTimestamp: presentationTimestamp,
-      DecodeTimestamp: presentationTimestamp,
-      Duration: 1,
-      IsKeyFrame: isIntra);
-
-    ++this._pictureIndex;
-
-    if (this._pending is not { } ready) {
-      this._pending = current;
-      packet = default;
-      return false;
+    if (this._reconstruction.CurrentAnchor == null)
+      this._EncodeAnchor(pending, isIntra: true);
+    else {
+      this._pending.Add(pending);
+      if (this._pending.Count == _B_FRAMES + 1)
+        this._EncodeGroup();
     }
 
-    this._pending = current;
-    packet = ready;
-    return true;
+    return this._TryTakeReady(out packet);
   }
 
-  /// <summary>Returns the last picture with the sequence-end start code following it.</summary>
+  /// <summary>
+  /// Emits delayed coding-order packets and turns a short tail with no following anchor into P
+  /// pictures. The final picture carries the sequence-end start code.
+  /// </summary>
   public IEnumerable<CodedPacket> Flush() {
     if (this._finished)
       yield break;
 
     this._finished = true;
-    if (this._pending is not { } pending)
+
+    foreach (var pending in this._pending) {
+      var isIntra = pending.DisplayIndex % _KEY_FRAME_INTERVAL == 0;
+      this._EncodeAnchor(pending, isIntra);
+    }
+
+    this._pending.Clear();
+
+    while (this._ready.Count > 1)
+      yield return this._ready.Dequeue();
+
+    if (this._ready.Count == 0)
       yield break;
 
-    var bytes = new byte[pending.Data.Length + 4];
-    pending.Data.Span.CopyTo(bytes);
+    var last = this._ready.Dequeue();
+    var bytes = new byte[last.Data.Length + 4];
+    last.Data.Span.CopyTo(bytes);
     bytes[^4] = 0x00;
     bytes[^3] = 0x00;
     bytes[^2] = 0x01;
     bytes[^1] = MpegStartCode.SequenceEnd;
-
-    this._pending = null;
-    yield return pending with { Data = bytes };
+    yield return last with { Data = bytes };
   }
 
-  /// <summary>The stream description muxers need to name the elementary MPEG-1 payload.</summary>
   public MediaStreamInfo DescribeStream()
     => this._stream ??= new() {
       Index = this._requested.Index,
@@ -229,119 +177,262 @@ public sealed class Mpeg1VideoEncoder : IVideoCodecEncoder<Mpeg1VideoEncoder> {
       CodecId = "V_MPEG1",
       TimeBase = this._requested.TimeBase,
       FrameRate = this._requested.FrameRate,
+      DeclaredFrameCount = this._requested.DeclaredFrameCount,
       Width = this._width,
       Height = this._height,
       BitsPerPixel = 12,
+      Language = this._requested.Language,
+      Name = this._requested.Name,
     };
+
+  private bool _TryTakeReady(out CodedPacket packet) {
+    if (this._ready.Count > 1) {
+      packet = this._ready.Dequeue();
+      return true;
+    }
+
+    packet = default;
+    return false;
+  }
+
+  private void _EncodeGroup() {
+    var oldAnchor = this._reconstruction.CurrentAnchor!;
+    var next = this._pending[^1];
+    var isIntra = next.DisplayIndex % _KEY_FRAME_INTERVAL == 0;
+
+    this._EncodeAnchor(next, isIntra);
+    var newAnchor = this._reconstruction.CurrentAnchor!;
+
+    for (var index = 0; index < _B_FRAMES; ++index) {
+      var between = this._pending[index];
+      var writer = new MpegBitWriter();
+      this._WritePicture(
+        writer,
+        between.Source,
+        MpegPictureDecoder.BidirectionallyCoded,
+        oldAnchor,
+        newAnchor,
+        between.DisplayIndex);
+      this._ready.Enqueue(this._Packet(writer.ToArray(), between.PresentationTimestamp, isKeyFrame: false));
+    }
+
+    this._pending.Clear();
+  }
+
+  private void _EncodeAnchor(PendingFrame pending, bool isIntra) {
+    var reference = isIntra ? null : this._reconstruction.CurrentAnchor;
+    if (!isIntra && reference == null)
+      isIntra = true;
+
+    var writer = new MpegBitWriter();
+    if (!this._wroteSequenceHeader) {
+      this._WriteSequenceHeader(writer);
+      this._wroteSequenceHeader = true;
+    }
+
+    this._WritePicture(
+      writer,
+      pending.Source,
+      isIntra ? MpegPictureDecoder.IntraCoded : MpegPictureDecoder.PredictiveCoded,
+      reference,
+      backwardReference: null,
+      pending.DisplayIndex);
+
+    var bytes = writer.ToArray();
+    this._reconstruction.DecodePacket(bytes);
+    while (this._reconstruction.TryTakeReady(out _)) { }
+
+    this._ready.Enqueue(this._Packet(bytes, pending.PresentationTimestamp, isIntra));
+  }
+
+  private CodedPacket _Packet(byte[] bytes, long? presentationTimestamp, bool isKeyFrame) {
+    var decodeTimestamp = this._decodeTimestamps.Count == 0 ? null : this._decodeTimestamps.Dequeue();
+    return new(
+      this._requested.Index,
+      bytes,
+      PresentationTimestamp: presentationTimestamp,
+      DecodeTimestamp: decodeTimestamp,
+      Duration: 1,
+      IsKeyFrame: isKeyFrame);
+  }
 
   private void _WriteSequenceHeader(MpegBitWriter writer) {
     writer.WriteStartCode(MpegStartCode.SequenceHeader);
     writer.WriteBits(this._width, 12);
     writer.WriteBits(this._height, 12);
-    writer.WriteBits(1, 4);                    // pel_aspect_ratio: square pels
+    writer.WriteBits(1, 4);
     writer.WriteBits(this._frameRateCode, 4);
-    writer.WriteBits(0x3FFFF, 18);             // bit_rate: variable/unspecified
-    writer.WriteBit(1);                    // marker_bit
-    writer.WriteBits(0x3FF, 10);               // largest VBV buffer size the field can state
-    writer.WriteBit(0);                    // constrained_parameters_flag
-    writer.WriteBit(0);                    // load_intra_quantizer_matrix: use the default
-    writer.WriteBit(0);                    // load_non_intra_quantizer_matrix
+    writer.WriteBits(0x3FFFF, 18);
+    writer.WriteBit(1);
+    writer.WriteBits(0x3FF, 10);
+    writer.WriteBit(0);
+    writer.WriteBit(0);
+    writer.WriteBit(0);
   }
 
-  private void _WritePicture(MpegBitWriter writer, Yuv420Planes planes, MpegFrame? reference) {
+  private void _WritePicture(
+    MpegBitWriter writer,
+    Yuv420Planes planes,
+    int codingType,
+    MpegFrame? forwardReference,
+    MpegFrame? backwardReference,
+    long displayIndex) {
     writer.WriteStartCode(MpegStartCode.Picture);
-    writer.WriteBits(this._pictureIndex & 0x3FF, 10); // temporal_reference
-    writer.WriteBits(reference == null ? MpegPictureDecoder.IntraCoded : MpegPictureDecoder.PredictiveCoded, 3);
-    writer.WriteBits(0xFFFF, 16);                    // vbv_delay: unspecified
+    writer.WriteBits((int)(displayIndex & 0x3FF), 10);
+    writer.WriteBits(codingType, 3);
+    writer.WriteBits(0xFFFF, 16);
 
-    if (reference != null) {
-      // full_pel_forward_vector: the vectors below count whole pixels, so no half-pixel
-      // interpolation stands between the prediction and the samples the search compared.
+    if (codingType is MpegPictureDecoder.PredictiveCoded or MpegPictureDecoder.BidirectionallyCoded) {
       writer.WriteBit(1);
       writer.WriteBits(_FORWARD_F_CODE, 3);
     }
 
-    writer.WriteBit(0);                          // extra_bit_picture
+    if (codingType == MpegPictureDecoder.BidirectionallyCoded) {
+      writer.WriteBit(1);
+      writer.WriteBits(_BACKWARD_F_CODE, 3);
+    }
 
-    // One slice beginning in the first macroblock row. A slice may continue across rows; using one
-    // for the whole picture also keeps pictures taller than the 175 start-code row values encodable.
+    writer.WriteBit(0);
     writer.WriteStartCode(MpegStartCode.FirstSlice);
     writer.WriteBits(_QUANTISER_SCALE, 5);
-    writer.WriteBit(0); // extra_bit_slice
+    writer.WriteBit(0);
 
     Span<int> block = stackalloc int[64];
     Span<int> levels = stackalloc int[64 * 6];
     var dcY = 128;
     var dcCb = 128;
     var dcCr = 128;
-
-    // The forward vector is coded as its difference from the macroblock before it, and both the
-    // predictor and the intra/skip rules reset at the start of a slice. There is one slice here.
-    var predictedX = 0;
-    var predictedY = 0;
-
-    // Macroblocks that neither moved nor left a residual are not written at all: the next coded
-    // macroblock's address increment steps over them. This is what makes a predicted picture cheap,
-    // and without it one costs more than coding the picture whole -- every macroblock would spend a
-    // type and two vectors saying nothing happened.
+    var forwardPredictorX = 0;
+    var forwardPredictorY = 0;
+    var backwardPredictorX = 0;
+    var backwardPredictorY = 0;
     var pendingSkips = 0;
+    var previousUsedForward = false;
+    var previousUsedBackward = false;
     var lastAddress = this._macroblockWidth * this._macroblockHeight - 1;
 
     for (var address = 0; address <= lastAddress; ++address) {
       var macroblockY = address / this._macroblockWidth;
       var macroblockX = address % this._macroblockWidth;
 
-      if (reference == null) {
-        writer.WriteCode("1"); // macroblock_address_increment = 1, Table B.1
-        writer.WriteCode("1"); // I-picture macroblock_type = intra, Table B.2
+      if (codingType == MpegPictureDecoder.IntraCoded) {
+        writer.WriteCode("1");
+        writer.WriteCode("1");
         _WriteIntraBlocks(writer, planes, macroblockX, macroblockY, block, ref dcY, ref dcCb, ref dcCr);
         continue;
       }
 
-      var (vectorX, vectorY) = _SearchMotion(
-        planes, reference, macroblockX, macroblockY, predictedX, predictedY);
+      if (codingType == MpegPictureDecoder.PredictiveCoded) {
+        var reference = forwardReference!;
+        var (vectorX, vectorY) = _SearchMotion(
+          planes, reference, macroblockX, macroblockY, forwardPredictorX, forwardPredictorY);
+        var forwardPrediction = new Prediction(reference, vectorX, vectorY, null, 0, 0);
+        var forwardPattern = _QuantiseResidual(planes, forwardPrediction, macroblockX, macroblockY, block, levels);
 
-      var pattern = _QuantiseResidual(
-        planes, reference, macroblockX, macroblockY, vectorX, vectorY, block, levels);
+        if (vectorX == 0 && vectorY == 0 && forwardPattern == 0 && address != 0 && address != lastAddress) {
+          ++pendingSkips;
+          forwardPredictorX = 0;
+          forwardPredictorY = 0;
+          continue;
+        }
 
-      // A skipped macroblock means exactly a zero vector and no residual. The first and last
-      // macroblock of a slice are always coded: the first fixes where the slice starts, and a slice
-      // that ended on a skip would not say where it ended.
-      if (vectorX == 0 && vectorY == 0 && pattern == 0 && address != 0 && address != lastAddress) {
+        _WriteAddressIncrement(writer, pendingSkips + 1);
+        pendingSkips = 0;
+        writer.WriteCode(forwardPattern != 0 ? "1" : "001");
+        _WriteMotionCode(writer, vectorX - forwardPredictorX, _FORWARD_F_CODE);
+        _WriteMotionCode(writer, vectorY - forwardPredictorY, _FORWARD_F_CODE);
+        forwardPredictorX = vectorX;
+        forwardPredictorY = vectorY;
+        _WriteInterBlocks(writer, forwardPattern, levels);
+        continue;
+      }
+
+      var forward = forwardReference!;
+      var backward = backwardReference!;
+      var forwardVector = _SearchMotion(
+        planes, forward, macroblockX, macroblockY, forwardPredictorX, forwardPredictorY);
+      var backwardVector = _SearchMotion(
+        planes, backward, macroblockX, macroblockY, backwardPredictorX, backwardPredictorY);
+
+      var mode = _ChooseBPrediction(
+        planes,
+        forward,
+        backward,
+        macroblockX,
+        macroblockY,
+        forwardVector,
+        backwardVector);
+
+      var prediction = mode switch {
+        BPrediction.Forward => new Prediction(forward, forwardVector.X, forwardVector.Y, null, 0, 0),
+        BPrediction.Backward => new Prediction(null, 0, 0, backward, backwardVector.X, backwardVector.Y),
+        _ => new Prediction(
+          forward, forwardVector.X, forwardVector.Y,
+          backward, backwardVector.X, backwardVector.Y),
+      };
+
+      var pattern = _QuantiseResidual(planes, prediction, macroblockX, macroblockY, block, levels);
+
+      var usesForward = mode is BPrediction.Forward or BPrediction.Bidirectional;
+      var usesBackward = mode is BPrediction.Backward or BPrediction.Bidirectional;
+
+      // A skipped macroblock of a B picture repeats the previous macroblock's direction and is
+      // predicted from the vector predictors as they stand (2.4.4.4), so it can only stand in for
+      // one that says exactly that and carries no coefficients. The first and last macroblock of a
+      // slice are always coded, and nothing can be repeated before a macroblock has been coded.
+      if (pattern == 0
+          && address != 0
+          && address != lastAddress
+          && usesForward == previousUsedForward
+          && usesBackward == previousUsedBackward
+          && (!usesForward || (forwardVector.X == forwardPredictorX && forwardVector.Y == forwardPredictorY))
+          && (!usesBackward || (backwardVector.X == backwardPredictorX && backwardVector.Y == backwardPredictorY))) {
         ++pendingSkips;
-        // Skipping resets the decoder's vector predictors, so the encoder's must follow.
-        predictedX = 0;
-        predictedY = 0;
         continue;
       }
 
       _WriteAddressIncrement(writer, pendingSkips + 1);
       pendingSkips = 0;
+      previousUsedForward = usesForward;
+      previousUsedBackward = usesBackward;
+      writer.WriteCode((usesForward, usesBackward, pattern != 0) switch {
+        (true, true, true) => "11",
+        (true, true, false) => "10",
+        (false, true, true) => "011",
+        (false, true, false) => "010",
+        (true, false, true) => "0011",
+        (true, false, false) => "0010",
+        _ => throw new InvalidOperationException("An MPEG-1 B macroblock must use at least one reference."),
+      });
 
-      // Table B.3.
-      writer.WriteCode(pattern != 0 ? "1" : "001");
+      if (usesForward) {
+        _WriteMotionCode(writer, forwardVector.X - forwardPredictorX, _FORWARD_F_CODE);
+        _WriteMotionCode(writer, forwardVector.Y - forwardPredictorY, _FORWARD_F_CODE);
+        forwardPredictorX = forwardVector.X;
+        forwardPredictorY = forwardVector.Y;
+      }
 
-      _WriteMotionCode(writer, vectorX - predictedX);
-      _WriteMotionCode(writer, vectorY - predictedY);
-      predictedX = vectorX;
-      predictedY = vectorY;
+      if (usesBackward) {
+        _WriteMotionCode(writer, backwardVector.X - backwardPredictorX, _BACKWARD_F_CODE);
+        _WriteMotionCode(writer, backwardVector.Y - backwardPredictorY, _BACKWARD_F_CODE);
+        backwardPredictorX = backwardVector.X;
+        backwardPredictorY = backwardVector.Y;
+      }
 
-      if (pattern == 0)
-        continue;
-
-      writer.WriteCode(_CodedBlockPatternCodes[pattern]);
-      for (var index = 0; index < 6; ++index)
-        if ((pattern & (1 << (5 - index))) != 0)
-          MpegInterBlockEncoder.Write(writer, levels.Slice(index * 64, 64), isMpeg2: false);
+      _WriteInterBlocks(writer, pattern, levels);
     }
   }
 
-  /// <summary>Writes macroblock_address_increment, escaping the part above thirty-three.</summary>
-  /// <remarks>
-  /// Table B.1 states one to thirty-three directly. A larger step is written as macroblock_escape
-  /// codes, each worth a further thirty-three, followed by the remainder — which is how a run of
-  /// skipped macroblocks longer than a table entry is spelled.
-  /// </remarks>
+  private static void _WriteInterBlocks(MpegBitWriter writer, int pattern, ReadOnlySpan<int> levels) {
+    if (pattern == 0)
+      return;
+
+    writer.WriteCode(_CodedBlockPatternCodes[pattern]);
+    for (var index = 0; index < 6; ++index)
+      if ((pattern & (1 << (5 - index))) != 0)
+        MpegInterBlockEncoder.Write(writer, levels.Slice(index * 64, 64), isMpeg2: false);
+  }
+
   private static void _WriteAddressIncrement(MpegBitWriter writer, int increment) {
     while (increment > 33) {
       writer.WriteCode(_AddressIncrementCodes[MpegVlcTables.Escape]);
@@ -351,7 +442,7 @@ public sealed class Mpeg1VideoEncoder : IVideoCodecEncoder<Mpeg1VideoEncoder> {
     writer.WriteCode(_AddressIncrementCodes[increment]);
   }
 
-  private void _WriteIntraBlocks(
+  private static void _WriteIntraBlocks(
     MpegBitWriter writer,
     Yuv420Planes planes,
     int macroblockX,
@@ -369,42 +460,21 @@ public sealed class Mpeg1VideoEncoder : IVideoCodecEncoder<Mpeg1VideoEncoder> {
 
     var chromaX = macroblockX * 8;
     var chromaY = macroblockY * 8;
-
     _ReadBlock(planes.Cb, planes.ChromaWidth, planes.ChromaHeight, chromaX, chromaY, block);
     Mpeg1BlockEncoder.Write(writer, block, isChroma: true, _QUANTISER_SCALE, ref dcCb);
-
     _ReadBlock(planes.Cr, planes.ChromaWidth, planes.ChromaHeight, chromaX, chromaY, block);
     Mpeg1BlockEncoder.Write(writer, block, isChroma: true, _QUANTISER_SCALE, ref dcCr);
   }
 
-  /// <summary>
-  /// Finds the whole-pixel vector whose 16x16 luminance prediction differs least from the source.
-  /// </summary>
-  /// <remarks>
-  /// A plain exhaustive search over the window, scored by absolute difference. The search is
-  /// centred on the predicted vector rather than on zero, because that is what the coded difference
-  /// is measured from: a window around the predictor is the set of vectors the syntax can state
-  /// cheaply.
-  /// <para/>
-  /// The zero vector is the incumbent and is only displaced by a strictly better one. That is not a
-  /// tie-break detail: a macroblock that did not move must come out of here with a zero vector, or
-  /// it cannot be skipped, and on flat or repeating content -- which is most of a background --
-  /// many vectors score identically. Taking the first equal-scoring candidate instead picks
-  /// whichever corner the scan began at, and the picture then spends a type and two vectors per
-  /// macroblock saying nothing happened.
-  /// </remarks>
-  private (int X, int Y) _SearchMotion(
+  private static (int X, int Y) _SearchMotion(
     Yuv420Planes planes, MpegFrame reference, int macroblockX, int macroblockY, int predictedX, int predictedY) {
     var originX = macroblockX * 16;
     var originY = macroblockY * 16;
-
     var best = (X: 0, Y: 0);
     var bestCost = _MatchCost(planes, reference, originX, originY, 0, 0, int.MaxValue);
 
     for (var candidateY = predictedY - _SEARCH_RANGE; candidateY <= predictedY + _SEARCH_RANGE; ++candidateY)
     for (var candidateX = predictedX - _SEARCH_RANGE; candidateX <= predictedX + _SEARCH_RANGE; ++candidateX) {
-      // The vector itself, not the difference, is what the decoder folds into the range f_code
-      // states. A candidate outside it would be reconstructed as a different vector entirely.
       if (candidateX < -_MOTION_LIMIT || candidateX >= _MOTION_LIMIT
           || candidateY < -_MOTION_LIMIT || candidateY >= _MOTION_LIMIT)
         continue;
@@ -426,10 +496,6 @@ public sealed class Mpeg1VideoEncoder : IVideoCodecEncoder<Mpeg1VideoEncoder> {
     return best;
   }
 
-  /// <summary>
-  /// Absolute difference between a macroblock and the prediction one vector offers, abandoned as
-  /// soon as it cannot beat <paramref name="ceiling"/>.
-  /// </summary>
   private static int _MatchCost(
     Yuv420Planes planes, MpegFrame reference, int originX, int originY, int vectorX, int vectorY, int ceiling) {
     var cost = 0;
@@ -437,76 +503,196 @@ public sealed class Mpeg1VideoEncoder : IVideoCodecEncoder<Mpeg1VideoEncoder> {
     for (var x = 0; x < 16; ++x)
       cost += Math.Abs(
         _Sample(planes.Y, planes.YWidth, planes.YHeight, originX + x, originY + y)
-        - _Sample(reference.Luma, reference.LumaWidth, reference.LumaHeight,
-            originX + x + vectorX, originY + y + vectorY));
+        - reference.Luma[(originY + y + vectorY) * reference.LumaWidth + originX + x + vectorX]);
 
     return cost;
   }
 
-  /// <summary>
-  /// Quantises the six residual blocks of one motion-compensated macroblock into
-  /// <paramref name="levels"/> and returns the coded block pattern.
-  /// </summary>
-  private int _QuantiseResidual(
+  private static BPrediction _ChooseBPrediction(
     Yuv420Planes planes,
-    MpegFrame reference,
+    MpegFrame forward,
+    MpegFrame backward,
     int macroblockX,
     int macroblockY,
-    int vectorX,
-    int vectorY,
+    (int X, int Y) forwardVector,
+    (int X, int Y) backwardVector) {
+    var originX = macroblockX * 16;
+    var originY = macroblockY * 16;
+    var forwardCost = 0;
+    var backwardCost = 0;
+    var bidirectionalCost = 0;
+
+    for (var y = 0; y < 16; ++y)
+    for (var x = 0; x < 16; ++x) {
+      var source = _Sample(planes.Y, planes.YWidth, planes.YHeight, originX + x, originY + y);
+      var fromForward = forward.Luma[
+        (originY + y + forwardVector.Y) * forward.LumaWidth + originX + x + forwardVector.X];
+      var fromBackward = backward.Luma[
+        (originY + y + backwardVector.Y) * backward.LumaWidth + originX + x + backwardVector.X];
+
+      forwardCost += Math.Abs(source - fromForward);
+      backwardCost += Math.Abs(source - fromBackward);
+      bidirectionalCost += Math.Abs(source - ((fromForward + fromBackward + 1) >> 1));
+    }
+
+    if (bidirectionalCost < forwardCost && bidirectionalCost < backwardCost)
+      return BPrediction.Bidirectional;
+
+    return backwardCost < forwardCost ? BPrediction.Backward : BPrediction.Forward;
+  }
+
+  private static int _QuantiseResidual(
+    Yuv420Planes planes,
+    Prediction prediction,
+    int macroblockX,
+    int macroblockY,
     scoped Span<int> block,
     scoped Span<int> levels) {
-    var pattern = 0;
+    Span<int> predictedY = stackalloc int[16 * 16];
+    Span<int> predictedCb = stackalloc int[8 * 8];
+    Span<int> predictedCr = stackalloc int[8 * 8];
+    _FormPrediction(predictedY, prediction, component: 0, macroblockX, macroblockY);
+    _FormPrediction(predictedCb, prediction, component: 1, macroblockX, macroblockY);
+    _FormPrediction(predictedCr, prediction, component: 2, macroblockX, macroblockY);
 
+    var pattern = 0;
     for (var index = 0; index < 4; ++index) {
-      var x = macroblockX * 16 + (index & 1) * 8;
-      var y = macroblockY * 16 + (index >> 1) * 8;
+      var sourceX = macroblockX * 16 + (index & 1) * 8;
+      var sourceY = macroblockY * 16 + (index >> 1) * 8;
+      var predictionX = (index & 1) * 8;
+      var predictionY = (index >> 1) * 8;
       _ReadResidual(
         planes.Y, planes.YWidth, planes.YHeight,
-        reference.Luma, reference.LumaWidth, reference.LumaHeight,
-        x, y, vectorX, vectorY, block);
+        sourceX, sourceY,
+        predictedY, predictionStride: 16, predictionX, predictionY,
+        block);
       if (MpegInterBlockEncoder.TryQuantise(block, _QUANTISER_SCALE, isMpeg2: false, levels.Slice(index * 64, 64)))
         pattern |= 1 << (5 - index);
     }
 
-    // 4:2:0 chrominance is half the size in both directions, so the vector halves with it. The
-    // standard's own scaling truncates towards zero, which an arithmetic shift would not do for
-    // negative vectors.
-    var chromaVectorX = vectorX / 2;
-    var chromaVectorY = vectorY / 2;
     var chromaX = macroblockX * 8;
     var chromaY = macroblockY * 8;
-
     _ReadResidual(
       planes.Cb, planes.ChromaWidth, planes.ChromaHeight,
-      reference.Cb, reference.ChromaWidth, reference.ChromaHeight,
-      chromaX, chromaY, chromaVectorX, chromaVectorY, block);
+      chromaX, chromaY,
+      predictedCb, predictionStride: 8, predictionX: 0, predictionY: 0,
+      block);
     if (MpegInterBlockEncoder.TryQuantise(block, _QUANTISER_SCALE, isMpeg2: false, levels.Slice(4 * 64, 64)))
       pattern |= 1 << 1;
 
     _ReadResidual(
       planes.Cr, planes.ChromaWidth, planes.ChromaHeight,
-      reference.Cr, reference.ChromaWidth, reference.ChromaHeight,
-      chromaX, chromaY, chromaVectorX, chromaVectorY, block);
+      chromaX, chromaY,
+      predictedCr, predictionStride: 8, predictionX: 0, predictionY: 0,
+      block);
     if (MpegInterBlockEncoder.TryQuantise(block, _QUANTISER_SCALE, isMpeg2: false, levels.Slice(5 * 64, 64)))
-      pattern |= 1 << 0;
+      pattern |= 1;
 
     return pattern;
   }
 
-  /// <summary>Writes one forward vector component as motion_code and its residual.</summary>
-  /// <remarks>
-  /// The decoder reads <c>delta = (|motion_code| - 1) * f + residual + 1</c>, signed by
-  /// motion_code, and zero alone means no displacement. This inverts exactly that. The difference
-  /// is first folded by the range, because both this vector and the one it is predicted from lie
-  /// inside <c>[-16f, 16f)</c> while their difference need not: the decoder folds the sum back, so
-  /// a folded difference reconstructs the vector that was searched for.
-  /// </remarks>
-  private static void _WriteMotionCode(MpegBitWriter writer, int difference) {
-    var range = 2 * _MOTION_LIMIT;
-    if (difference < -_MOTION_LIMIT)
+  private static void _FormPrediction(
+    Span<int> destination,
+    Prediction prediction,
+    int component,
+    int macroblockX,
+    int macroblockY) {
+    var tileSize = component == 0 ? 16 : 8;
+    var hasForward = prediction.Forward != null;
+    var hasBackward = prediction.Backward != null;
+
+    if (hasForward)
+      _PredictFrom(
+        destination,
+        prediction.Forward!,
+        prediction.ForwardX,
+        prediction.ForwardY,
+        component,
+        macroblockX,
+        macroblockY,
+        tileSize);
+
+    if (!hasBackward)
+      return;
+
+    Span<int> backward = stackalloc int[16 * 16];
+    var backwardTile = backward[..(tileSize * tileSize)];
+    _PredictFrom(
+      backwardTile,
+      prediction.Backward!,
+      prediction.BackwardX,
+      prediction.BackwardY,
+      component,
+      macroblockX,
+      macroblockY,
+      tileSize);
+
+    if (!hasForward) {
+      backwardTile.CopyTo(destination);
+      return;
+    }
+
+    MpegMotionCompensation.Average(destination, backwardTile);
+  }
+
+  private static void _PredictFrom(
+    Span<int> destination,
+    MpegFrame reference,
+    int vectorX,
+    int vectorY,
+    int component,
+    int macroblockX,
+    int macroblockY,
+    int tileSize) {
+    var (plane, planeWidth, planeHeight) = reference.PlaneOf(component);
+    var blockX = macroblockX * tileSize;
+    var blockY = macroblockY * tileSize;
+    var halfPelX = component == 0 ? vectorX * 2 : vectorX;
+    var halfPelY = component == 0 ? vectorY * 2 : vectorY;
+    if (!MpegMotionCompensation.TryPredict(
+          destination,
+          tileSize,
+          0,
+          plane,
+          planeWidth,
+          0,
+          planeWidth,
+          planeHeight,
+          blockX,
+          blockY,
+          tileSize,
+          tileSize,
+          halfPelX,
+          halfPelY))
+      throw new InvalidOperationException(
+        $"The encoder selected a motion vector ({vectorX}, {vectorY}) that falls outside its reconstructed reference.");
+  }
+
+  private static void _ReadResidual(
+    byte[] source,
+    int sourceWidth,
+    int sourceHeight,
+    int sourceX,
+    int sourceY,
+    ReadOnlySpan<int> prediction,
+    int predictionStride,
+    int predictionX,
+    int predictionY,
+    scoped Span<int> block) {
+    for (var y = 0; y < 8; ++y)
+    for (var x = 0; x < 8; ++x)
+      block[y * 8 + x] =
+        _Sample(source, sourceWidth, sourceHeight, sourceX + x, sourceY + y)
+        - prediction[(predictionY + y) * predictionStride + predictionX + x];
+  }
+
+  private static void _WriteMotionCode(MpegBitWriter writer, int difference, int fCode) {
+    var motionScale = 1 << (fCode - 1);
+    var motionLimit = 16 * motionScale;
+    var range = 2 * motionLimit;
+    if (difference < -motionLimit)
       difference += range;
-    else if (difference >= _MOTION_LIMIT)
+    else if (difference >= motionLimit)
       difference -= range;
 
     if (difference == 0) {
@@ -515,29 +701,15 @@ public sealed class Mpeg1VideoEncoder : IVideoCodecEncoder<Mpeg1VideoEncoder> {
     }
 
     var magnitude = Math.Abs(difference) - 1;
-    var code = magnitude / _MOTION_SCALE + 1;
-    var residual = magnitude % _MOTION_SCALE;
-
+    var code = magnitude / motionScale + 1;
+    var residual = magnitude % motionScale;
     writer.WriteCode(_MotionCodes[difference < 0 ? -code : code]);
-    if (_MOTION_SCALE > 1)
-      writer.WriteBits(residual, _FORWARD_F_CODE - 1);
+    if (motionScale > 1)
+      writer.WriteBits(residual, fCode - 1);
   }
 
-  /// <summary>One sample of a plane, with the edge repeated past its bounds.</summary>
   private static int _Sample(byte[] plane, int width, int height, int x, int y)
     => plane[Math.Clamp(y, 0, height - 1) * width + Math.Clamp(x, 0, width - 1)];
-
-  /// <summary>Reads one 8x8 block of source-minus-prediction.</summary>
-  private static void _ReadResidual(
-    byte[] source, int sourceWidth, int sourceHeight,
-    byte[] reference, int referenceWidth, int referenceHeight,
-    int originX, int originY, int vectorX, int vectorY, scoped Span<int> block) {
-    for (var y = 0; y < 8; ++y)
-    for (var x = 0; x < 8; ++x)
-      block[y * 8 + x] =
-        _Sample(source, sourceWidth, sourceHeight, originX + x, originY + y)
-        - _Sample(reference, referenceWidth, referenceHeight, originX + x + vectorX, originY + y + vectorY);
-  }
 
   private static void _ReadBlock(
     byte[] plane, int width, int height, int originX, int originY, scoped Span<int> block) {
@@ -610,6 +782,12 @@ public sealed class Mpeg1VideoEncoder : IVideoCodecEncoder<Mpeg1VideoEncoder> {
     return 0;
   }
 
+  private enum BPrediction {
+    Forward,
+    Backward,
+    Bidirectional,
+  }
+
   private sealed record Yuv420Planes(
     byte[] Y,
     byte[] Cb,
@@ -618,4 +796,17 @@ public sealed class Mpeg1VideoEncoder : IVideoCodecEncoder<Mpeg1VideoEncoder> {
     int YHeight,
     int ChromaWidth,
     int ChromaHeight);
+
+  private readonly record struct PendingFrame(
+    Yuv420Planes Source,
+    long DisplayIndex,
+    long? PresentationTimestamp);
+
+  private readonly record struct Prediction(
+    MpegFrame? Forward,
+    int ForwardX,
+    int ForwardY,
+    MpegFrame? Backward,
+    int BackwardX,
+    int BackwardY);
 }

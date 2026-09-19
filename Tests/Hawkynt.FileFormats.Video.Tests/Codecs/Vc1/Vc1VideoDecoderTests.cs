@@ -288,16 +288,18 @@ public sealed class Vc1VideoDecoderTests {
 
   [Test]
   [Category("Unit")]
-  public void APredictedPictureIsRefusedByName() {
-    // It needs motion compensation against a reference this decoder never builds. There is no branch
-    // that hands back a blank or a repeated picture instead: a repeated frame is what a legitimate
-    // still passage looks like, and nobody checks a picture that looks like a picture.
+  public void APredictedPictureWithAReservedQuantiserIndexIsRefusedByName() {
+    // This picture used to be refused for being predicted at all. Predicted pictures are decoded
+    // now, and the round trips in Vc1VideoEncoderTests are what covers that; what this fixture still
+    // holds is a header no decoder may accept, and the refusal has to name why rather than hand back
+    // a blank or a repeated picture. A repeated frame is what a legitimate still passage looks like,
+    // and nobody checks a picture that looks like a picture.
     var sequence = Vc1SequenceHeader.ReadFrom(Vc1TestStream.SequenceHeader(quantiser: 3));
     var decoder = new Vc1PictureDecoder(sequence, 2, 2);
 
-    var refusal = Assert.Throws<NotSupportedException>(() => decoder.Decode(Vc1TestStream.PredictedPicture(), default, out _));
+    var refusal = Assert.Throws<InvalidDataException>(() => decoder.Decode(Vc1TestStream.PredictedPicture(), default, out _));
 
-    Assert.That(refusal!.Message, Does.Contain("predicted"));
+    Assert.That(refusal!.Message, Does.Contain("quantiser index of zero"));
   }
 
   [TestCase("WVC1")]

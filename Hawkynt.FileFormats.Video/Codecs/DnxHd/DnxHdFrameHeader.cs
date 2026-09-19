@@ -41,7 +41,7 @@ internal sealed class DnxHdFrameHeader {
   /// <summary>Samples per line, 7.2.3. A whole number of macroblocks is coded whatever this says.</summary>
   internal required int SamplesPerLine { get; init; }
 
-  /// <summary>Active lines per frame, 7.2.3.</summary>
+  /// <summary>Active lines in this coding unit, 7.2.3; one field for classic field coding.</summary>
   internal required int ActiveLines { get; init; }
 
   /// <summary>Bits per sample: 8, 10 or 12, from the SBD field of 7.2.3.</summary>
@@ -50,13 +50,16 @@ internal sealed class DnxHdFrameHeader {
   /// <summary>Whether the source was interlaced, from the SST field of 7.2.3.</summary>
   internal required bool InterlacedSource { get; init; }
 
+  /// <summary>The FFC field of Coding Control A: 1 frame, 2 field one, 3 field two.</summary>
+  internal required int FieldFrameCount { get; init; }
+
   /// <summary>Whether this coding unit holds a whole frame, from the FFE field of 7.2.5.</summary>
   internal required bool FrameEncoded { get; init; }
 
   /// <summary>The chroma sampling, from the SSC field of 7.2.5: 0 is 4:2:2, 1 is 4:2:0, 2 is 4:4:4.</summary>
   internal required int SubSampling { get; init; }
 
-  /// <summary>Whether the channels are RGB rather than Y′CbCr, from the CLF field of 7.2.5.</summary>
+  /// <summary>Whether the channels use the RGB format rules, from the CLF field of 7.2.5.</summary>
   internal required bool Rgb { get; init; }
 
   /// <summary>The colour volume, from the CLV field of 7.2.5.</summary>
@@ -81,6 +84,9 @@ internal sealed class DnxHdFrameHeader {
 
   /// <summary>The height of the coded picture in macroblocks, which the header states outright.</summary>
   internal int HeightInMacroblocks => this.ScanIndices.Length;
+
+  /// <summary>The displayed frame height after a pair of classic field coding units is woven.</summary>
+  internal int DisplayHeight => this.FrameEncoded ? this.ActiveLines : this.ActiveLines * 2;
 
   internal static DnxHdFrameHeader Parse(ReadOnlySpan<byte> unit) {
     if (unit.Length < _SCAN_INDICES_AT + 4)
@@ -141,6 +147,7 @@ internal sealed class DnxHdFrameHeader {
       ActiveLines = BinaryPrimitives.ReadUInt16BigEndian(unit[0x18..]),
       BitDepth = depth,
       InterlacedSource = ((unit[0x22] >> 2) & 1) != 0,
+      FieldFrameCount = codingControlA[0] & 3,
       FrameEncoded = (codingControlB & 0x80) != 0,
       SubSampling = (codingControlB >> 5) & 3,
       ColorVolume = (codingControlB >> 1) & 3,

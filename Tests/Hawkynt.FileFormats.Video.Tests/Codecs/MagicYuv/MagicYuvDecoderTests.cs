@@ -93,7 +93,7 @@ public class MagicYuvDecoderTests {
     var frame = MagicYuvTestStream.SinglePlane(4, 1, MagicYuvTestStream.LEFT, [0, 0, 0, 0], lengths);
 
     var failure = Assert.Throws<InvalidDataException>(() => _Planes(stream, frame));
-    Assert.That(failure!.Message, Does.Contain("longest"));
+    Assert.That(failure!.Message, Does.Contain("allows at most 12"));
   }
 
   // ============================================================================================

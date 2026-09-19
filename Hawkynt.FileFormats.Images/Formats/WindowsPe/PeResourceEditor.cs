@@ -76,16 +76,22 @@ internal static class PeResourceEditor {
     }).ToArray();
   }
 
+  /// <summary>
+  /// Describes every resource leaf whose payload carries an image signature and that is not already
+  /// covered by the grouped icon/cursor or bitmap readers.
+  /// </summary>
+  /// <remarks>
+  /// One entry per language variant, in resource-tree order, matching what
+  /// <see cref="PeResourceReader"/> reports for the same file: a resource that exists in several
+  /// languages must stay individually addressable, because replacing it without naming a language
+  /// is rejected as ambiguous.
+  /// </remarks>
   internal static IReadOnlyList<PeResourceInfo> GetEmbeddedImageResources(byte[] source) {
     ArgumentNullException.ThrowIfNull(source);
     var layout = _Parse(source);
-    var seen = new HashSet<(ResourceIdentifier Type, ResourceIdentifier Name)>();
     var result = new List<PeResourceInfo>();
 
     foreach (var resource in layout.Resources) {
-      if (!seen.Add((resource.Type, resource.Name)))
-        continue;
-
       if (resource.Type.Id is 1 or 2 or 3 or 12 or 14)
         continue;
 

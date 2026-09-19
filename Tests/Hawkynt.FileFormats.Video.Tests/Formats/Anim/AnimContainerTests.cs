@@ -92,6 +92,7 @@ public sealed class AnimContainerTests {
     Assert.That(streams, Has.Count.EqualTo(1));
     Assert.That(streams[0].Kind, Is.EqualTo(MediaStreamKind.Video));
     Assert.That(streams[0].Codec.ToString(), Is.EqualTo("ANIM"));
+    Assert.That(streams[0].TimeBase, Is.EqualTo(new Rational(1, 60)));
   }
 
   [Test]
@@ -107,6 +108,23 @@ public sealed class AnimContainerTests {
     Assert.That(packets.All(p => p.StreamIndex == 0), Is.True);
     Assert.That(packets[0].PresentationTimestamp, Is.EqualTo(0));
     Assert.That(packets[1].PresentationTimestamp, Is.EqualTo(1));
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void RelativeTimeDrivesPresentationTimestampsAndDurationsInJiffies() {
+    var file = _AnimFile(
+      _Keyframe(width: 4, height: 4, planes: 1),
+      _DeltaFrame([], relativeTime: 3),
+      _DeltaFrame([], relativeTime: 5));
+    var container = AnimContainer.FromBytes(file);
+
+    var packets = AnimContainer.ReadPackets(container).ToArray();
+    Assert.Multiple(() => {
+      Assert.That(packets.Select(p => p.PresentationTimestamp), Is.EqualTo(new long?[] { 0, 3, 8 }));
+      Assert.That(packets.Select(p => p.DecodeTimestamp), Is.EqualTo(new long?[] { 0, 3, 8 }));
+      Assert.That(packets.Select(p => p.Duration), Is.EqualTo(new long?[] { 3, 5, 5 }));
+    });
   }
 
   [Test]
@@ -198,9 +216,15 @@ public sealed class AnimContainerTests {
     return _Form("ILBM", _Chunk("BMHD", bmhd), _Chunk("BODY", body));
   }
 
-  internal static byte[] _DeltaFrame(byte[] dltaData, byte operation = 5, byte interleave = 0, uint bits = 0) {
+  internal static byte[] _DeltaFrame(
+    byte[] dltaData,
+    byte operation = 5,
+    byte interleave = 0,
+    uint bits = 0,
+    uint relativeTime = 0) {
     var anhd = new byte[40];
     anhd[0] = operation;
+    BinaryPrimitives.WriteUInt32BigEndian(anhd.AsSpan(14, 4), relativeTime);
     anhd[18] = interleave;
     BinaryPrimitives.WriteUInt32BigEndian(anhd.AsSpan(20), bits);
 
