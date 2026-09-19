@@ -1,0 +1,21 @@
+FFmpeg DNxHD reference notice
+============================
+
+The DNxHD encoder implementation was developed from SMPTE ST 2019-1 and cross-checked against the
+FFmpeg VC-3/DNxHD encoder and decoder, including header construction, coding-unit sizing, entropy
+coding order and interlaced macroblock interpretation.
+
+FFmpeg source consulted:
+  libavcodec/dnxhdenc.c
+  libavcodec/dnxhddec.c
+  libavcodec/dnxhddata.c
+  https://github.com/FFmpeg/FFmpeg
+
+Relevant FFmpeg copyright notices include:
+  Copyright (c) 2007 Baptiste Coudurier / SmartJog S.A.
+  Copyright (c) 2011 MirriAd Ltd
+  Copyright (c) 2015 Christophe Gisquet
+
+Those FFmpeg files are licensed under the GNU Lesser General Public License, version 2.1 or later.
+The converted implementation in this package is distributed under this repository's LGPL-3.0-or-later
+license. No FFmpeg binary, native library or NuGet dependency is required at runtime.

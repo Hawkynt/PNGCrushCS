@@ -839,7 +839,7 @@ Implements `IVideoCodecDecoder<CscdVideoDecoder>`, `IVideoFrameDecoder`.
 
 #### `DnxHdVideoDecoder`
 
-Decodes Avid DNxHD and DNxHR — SMPTE VC-3 — whose every frame is a whole picture.
+Decodes Avid DNxHD and DNxHR — SMPTE VC-3 — whose every frame is independently decodable.
 
 Implements `IVideoCodecDecoder<DnxHdVideoDecoder>`, `IVideoFrameDecoder`.
 
@@ -848,7 +848,23 @@ Implements `IVideoCodecDecoder<DnxHdVideoDecoder>`, `IVideoFrameDecoder`.
 | `CodecName` | `static string CodecName { get; }` |  |
 | `Accepts` | `static bool Accepts(MediaStreamInfo stream)` |  |
 | `Create` | `static DnxHdVideoDecoder Create(MediaStreamInfo stream)` | Builds a decoder from the stream description, which for this codec states only the picture size. |
-| `TryDecode` | `bool TryDecode(CodedPacket packet, out RawImage frame)` | Decodes one frame, which for a progressive stream is one coding unit. |
+| `TryDecode` | `bool TryDecode(CodedPacket packet, out RawImage frame)` | Decodes one frame; classic interlaced frames contain two field coding units. |
+
+#### `DnxHdVideoEncoder`
+
+Encodes progressive 8-bit 4:2:2 Avid DNxHD / SMPTE VC-3.
+
+Implements `IVideoCodecEncoder<DnxHdVideoEncoder>`, `IVideoPacketEncoder`.
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `CodecName` | `static string CodecName { get; }` |  |
+| `Codec` | `static CodecTag Codec { get; }` |  |
+| `Accepts` | `static bool Accepts(MediaStreamInfo stream)` |  |
+| `Create` | `static DnxHdVideoEncoder Create(MediaStreamInfo stream)` |  |
+| `DescribeStream` | `MediaStreamInfo DescribeStream()` |  |
+| `Flush` | `IEnumerable<CodedPacket> Flush()` |  |
+| `TryEncode` | `bool TryEncode(RawImage frame, long? presentationTimestamp, out CodedPacket packet)` |  |
 
 #### `DvVideoDecoder`
 
