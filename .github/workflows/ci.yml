@@ -32,6 +32,23 @@ jobs:
       os-matrix: '["ubuntu-latest","windows-latest"]'
       build-args: '-p:EnableWindowsTargeting=true'
       test-args: '--filter "TestCategory!=Regression&TestCategory!=Performance"'
+      # The conformance oracles shell out to third-party tools, and a test whose tool is absent
+      # reports Skipped -- which is not a failure, so the run goes green having checked nothing.
+      # This repository carries 166 members claiming verification against ffmpeg and the hosted
+      # runner has none, so every one of them has been Skipped on both required legs for as long
+      # as they have existed. Installing it here is what turns those claims into a gate.
+      #
+      # The pull request is the right tier for this and the only one that gets it: smoke.yml runs
+      # on every push and stays fast, exactly because it does not do this.
+      #
+      # Linux only, deliberately. The oracle runs once per claim and a second platform would buy
+      # nothing but minutes; on Windows those tests keep skipping as before.
+      setup-command: |
+        if [ "$RUNNER_OS" = "Linux" ]; then
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends ffmpeg
+          ffmpeg -version | head -1
+        fi
       # Wall-clock timings must not redden a pull request on a slow shared runner.
       advisory-test-args: '--filter "TestCategory=Performance"'
       # PngCrush references CompressionWorkbench, so the sibling sits next to this checkout.
