@@ -4,6 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.Pcd;
 
 /// <summary>In-memory representation of a PCD (Kodak Photo CD) image.</summary>
+[VerifiedBy(ConformanceOracle.FFmpeg)]
 public readonly record struct PcdFile : IImageFormatReader<PcdFile>, IImageToRawImage<PcdFile>, IImageFromRawImage<PcdFile>, IImageFormatWriter<PcdFile> {
 
   /// <summary>Size of the preamble (zeros) before the magic identifier.</summary>

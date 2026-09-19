@@ -79,18 +79,18 @@ public sealed class FlicVideoDecoderTests {
       Width = 65535, Height = 65535, BitsPerPixel = 8,
     };
     var failure = Assert.Throws<InvalidOperationException>(() => FlicVideoDecoder.Create(stream));
-    Assert.That(failure!.Message, Does.Contain("more pixels than"));
+    Assert.That(failure!.Message, Does.Contain("more coded image data than"));
   }
 
   [Test]
   [Category("Unit")]
-  public void ADepthOtherThanEightIsRefused() {
+  public void UnsupportedDepthIsRefused() {
     var stream = new MediaStreamInfo {
       Index = 0, Kind = MediaStreamKind.Video, Codec = CodecTag.FromCharacters("FLIC"),
-      Width = 4, Height = 4, BitsPerPixel = 16,
+      Width = 4, Height = 4, BitsPerPixel = 32,
     };
     var failure = Assert.Throws<NotSupportedException>(() => FlicVideoDecoder.Create(stream));
-    Assert.That(failure!.Message, Does.Contain("16 bits per pixel"));
+    Assert.That(failure!.Message, Does.Contain("32 bits per pixel"));
   }
 
   // ============================================================================================

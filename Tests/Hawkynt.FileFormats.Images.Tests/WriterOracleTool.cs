@@ -13,12 +13,17 @@ namespace Hawkynt.FileFormats.Images.Tests;
 /// </summary>
 /// <remarks>
 /// The question every oracle is asked here is the same one, and it is deliberately stronger than
-/// "did it exit zero". The tool is made to decode the file into a PNG and the picture that comes out
-/// has to be the size the picture that went in was. Exit codes are cheap — a tool handed a name it
-/// knows and bytes it does not understand may still report a size, and several extensions in this
-/// registry are claimed by two unrelated formats, so a tool accepting the file can mean it read the
-/// other one's header and stopped. A tool that reconstructs the right geometry has done more than
-/// recognise the extension.
+/// "did it exit zero" and stronger than "did it get the geometry back". The tool is made to decode
+/// the file into a PNG, and the picture that comes out is then compared, pixel by pixel and with
+/// every palette resolved to colour, against what this package wrote and against what this package
+/// reads back — <see cref="WriterOracleComparison"/> is where that judgement lives and why it is
+/// shaped the way it is.
+/// <para/>
+/// Geometry alone was the old bar and it was not enough. A tool handed a name it knows and bytes it
+/// does not understand may still report a size, several extensions in this registry are claimed by
+/// two unrelated formats, and a reader can answer with the right width and height and then hand back
+/// a canvas that has nothing of the picture in it — which is the shape the Apple IIgs <c>$C1</c>
+/// defect took for as long as it survived.
 /// <para/>
 /// An absent tool is not a disagreement. Every entry point here answers <see cref="Verdict.Absent"/>
 /// rather than failing, so a machine without the tool runs the rest of the suite.
@@ -34,7 +39,7 @@ internal static class WriterOracleTool {
     /// <summary>The tool has no reader for this name and so has no opinion about the bytes.</summary>
     NoOpinion,
 
-    /// <summary>The tool read the file and rebuilt the picture at the size it was written at.</summary>
+    /// <summary>The tool read the file and rebuilt a picture that agrees with what was written.</summary>
     Accepted,
 
     /// <summary>The tool was asked and would not produce that picture.</summary>
@@ -113,7 +118,11 @@ internal static class WriterOracleTool {
   };
 
   /// <summary>Hands one written file to one tool and asks what it makes of it.</summary>
-  public static (Verdict Verdict, string Detail) Ask(ConformanceOracle oracle, string path, int width, int height) {
+  /// <param name="oracle">The tool to ask.</param>
+  /// <param name="path">The file this package's writer produced.</param>
+  /// <param name="entry">The format that wrote it, whose own reader is the second opinion.</param>
+  /// <param name="source">The picture that was handed to the writer.</param>
+  public static (Verdict Verdict, string Detail) Ask(ConformanceOracle oracle, string path, FormatEntry entry, RawImage source) {
     var executable = _Executable(oracle);
     if (executable == null)
       return (Verdict.Absent, "not installed here");
@@ -133,10 +142,11 @@ internal static class WriterOracleTool {
       if (_IsNoOpinion(diagnostics) || _NeverHeardOfTheName(oracle, diagnostics))
         return (Verdict.NoOpinion, _FirstLine(diagnostics));
 
-      if (_RebuiltThePicture(output, width, height))
-        return (Verdict.Accepted, string.Empty);
+      var rebuilt = _ReadPng(output);
+      if (rebuilt == null)
+        return (Verdict.Rejected, diagnostics.Length == 0 ? "it produced no picture" : _FirstLine(diagnostics));
 
-      return (Verdict.Rejected, diagnostics.Length == 0 ? "it produced no picture of that size" : _FirstLine(diagnostics));
+      return WriterOracleComparison.Judge(entry, path, source, rebuilt);
     } finally {
       _DeleteOutput(oracle, output);
     }
@@ -147,9 +157,9 @@ internal static class WriterOracleTool {
   /// <c>null</c> where the tool is absent, has no reader for the name, or would not decode it.
   /// </summary>
   /// <remarks>
-  /// <see cref="Ask"/> answers whether a tool got the geometry back, which is the question the
-  /// support table asks. A lossless writer has to answer a stronger one — whether the samples that
-  /// come back are the samples that went in — and that needs the picture itself.
+  /// <see cref="Ask"/> reaches a verdict and reports it in words. A caller that wants to measure the
+  /// samples itself — the WebP fixture compares channel for channel against a reference of its own —
+  /// needs the picture rather than the verdict, and this is where it gets it.
   /// </remarks>
   public static RawImage? Rebuild(ConformanceOracle oracle, string path) {
     var executable = _Executable(oracle);
@@ -273,11 +283,11 @@ internal static class WriterOracleTool {
       // so the size that comes back is the size the file claims and not the size of a sheet of A4.
       "-dEPSCrop", "-dUseCropBox",
       "-dFirstPage=1", "-dLastPage=1",
-      // One point to the pixel, which is what the PDF and EPS writers mean: both state a box the
-      // size of the picture in points. The other two do not — the PostScript and Illustrator
-      // writers scale the picture by three quarters, as though a point were a pixel at ninety-six
-      // to the inch — so rendering at any one resolution can only match one convention, and this is
-      // the one the file says outright rather than the one that has to be inferred from a scale.
+      // One point to the pixel, which is what all four writers in this family mean: each states a
+      // box the size of the picture in points, and each stretches the picture over exactly that box.
+      // The PostScript and Illustrator writers used to scale by three quarters instead, as though a
+      // point were a pixel at ninety-six to the inch, so that no single resolution could match both
+      // conventions; they now say the same thing as the EPS and PDF writers beside them.
       "-r72",
       "-sOutputFile=" + output,
       // A page painted black before the file gets to it. Ghostscript's default sheet is white, and
@@ -398,47 +408,24 @@ internal static class WriterOracleTool {
     }
   }
 
-  /// <summary>Whether the PNG the tool wrote is the picture it was handed, in size and in content.</summary>
+  /// <summary>The picture the tool rebuilt, read with this package's own PNG reader.</summary>
   /// <remarks>
-  /// The geometry alone is not enough, and the case that showed it is Aseprite: ImageMagick reads
-  /// the sprite's header, reports the right width and height, and hands back a canvas of zeroes. A
-  /// reader that answers with the size and then decodes nothing would count as an oracle on the
-  /// strength of the header, which is the opposite of what this column is for.
-  /// <para/>
-  /// A blank canvas and not merely a flat one. Requiring two distinct pixels sounded stronger and
-  /// was wrong: several of the smallest formats here — a two-pixel Atari missile, a Degas brush —
-  /// hold so little of the probe that a correct decode is one colour, and six of them were being
-  /// recorded as never having been read when they had been read perfectly. All-zero is the shape the
-  /// failure actually takes.
-  /// <para/>
-  /// Read with this package's own PNG reader, which is the one place that is sound: PNG is the
-  /// format with the most independent checks on it here, and the file being read was written by the
-  /// tool under examination rather than by us.
+  /// PNG is the one format here it is sound to read with our own code in this fixture: it has more
+  /// independent checks on it than anything else in the registry, and the file being read was
+  /// written by the tool under examination rather than by us. What is done with the picture
+  /// afterwards is <see cref="WriterOracleComparison"/>'s business.
   /// </remarks>
-  private static bool _RebuiltThePicture(string path, int width, int height) {
+  private static RawImage? _ReadPng(string path) {
     try {
-      if (!File.Exists(path))
-        return false;
-
-      var picture = FormatRegistry.GetEntry(ImageFormat.Png)?.LoadRawImageFromBytes(File.ReadAllBytes(path));
-      if (picture == null || picture.Width != width || picture.Height != height)
-        return false;
-
-      return _IsNotABlankCanvas(picture);
+      return !File.Exists(path)
+        ? null
+        : FormatRegistry.GetEntry(ImageFormat.Png)?.LoadRawImageFromBytes(File.ReadAllBytes(path));
     } catch (IOException) {
-      return false;
+      return null;
+    } catch (Exception) {
+      // A PNG the tool wrote that our reader will not follow is the tool's answer being unreadable
+      // rather than the writer being wrong, and either way there is no picture to compare.
+      return null;
     }
-  }
-
-  private static bool _IsNotABlankCanvas(RawImage picture) {
-    var data = picture.PixelData;
-    if (data == null || data.Length == 0)
-      return false;
-
-    foreach (var sample in data)
-      if (sample != 0)
-        return true;
-
-    return false;
   }
 }
