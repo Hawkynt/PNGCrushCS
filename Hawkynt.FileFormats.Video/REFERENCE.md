@@ -2098,7 +2098,7 @@ Implements `IVideoCodecDecoder<RealVideoDecoder>`, `IVideoFrameDecoder`.
 
 #### `RealVideoEncoder`
 
-Encodes interoperable RealVideo 1 (`RV10`) intra pictures.
+Encodes interoperable RealVideo 1 (`RV10`) intra and predicted pictures.
 
 Implements `IVideoCodecEncoder<RealVideoEncoder>`, `IVideoPacketEncoder`.
 

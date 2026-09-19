@@ -3,45 +3,20 @@ using System;
 namespace FileFormat.Codecs.H263;
 
 /// <summary>
-/// Forms the motion-compensated prediction of one 8x8 block at half-pixel resolution (ITU-T H.263,
-/// clause 6.1.2).
+/// Forms H.263 motion-compensated predictions at half-pixel resolution.
 /// </summary>
-/// <remarks>
-/// The interpolation is bilinear and rounds upward at exactly a half in both directions — the
-/// <c>+1</c> and <c>+2</c> of Figure 12. Truncating instead loses about a quarter of a level per
-/// predicted picture, which is nothing in one frame and a visible darkening by the end of a long run
-/// of them, and it looks like drift rather than like a rounding rule.
-/// <para/>
-/// A vector that points outside the reference is refused rather than clamped. Baseline H.263 requires
-/// every sample a vector reaches to lie inside the coded picture (clause 6.1.1); the mode that lifts
-/// that requirement is Annex D, which this decoder refuses at the picture header, so a vector that
-/// reaches outside here is a bitstream this decoder has misread and not a picture to be invented.
-/// </remarks>
 internal static class H263MotionCompensation {
 
   /// <summary>
   /// Predicts one 8x8 block from a reference plane.
   /// </summary>
-  /// <param name="prediction">Sixty-four samples, written in raster order.</param>
-  /// <param name="plane">The reference plane.</param>
-  /// <param name="planeWidth">Its width; its height follows from its length.</param>
-  /// <param name="blockX">The block's left edge in the plane.</param>
-  /// <param name="blockY">The block's top edge in the plane.</param>
-  /// <param name="vectorX">The horizontal vector in half-pixel units, already scaled for this plane.</param>
-  /// <param name="vectorY">The vertical vector in half-pixel units.</param>
-  /// <param name="clampToEdge">
-  /// Whether a vector reaching outside the reference reads the edge sample instead of being refused,
-  /// which is the Unrestricted Motion Vector rule of ITU-T H.263 Annex D.1.
-  /// </param>
-  /// <returns><c>false</c> when the vector reads outside the reference picture and may not.</returns>
   internal static bool TryPredict(
     Span<int> prediction, byte[] plane, int planeWidth, int blockX, int blockY, int vectorX, int vectorY,
     bool clampToEdge) {
     var planeHeight = plane.Length / planeWidth;
 
     // The whole-pixel part is an arithmetic shift and not a division: a vector of -3 half-pixels is
-    // one whole pixel to the left plus a half-pixel to the right, which is -2 and a half-step forward
-    // rather than -1 and a half-step backward.
+    // one whole pixel to the left plus a half-pixel to the right.
     var wholeX = vectorX >> 1;
     var wholeY = vectorY >> 1;
     var halfX = vectorX - 2 * wholeX;
@@ -50,8 +25,6 @@ internal static class H263MotionCompensation {
     var sourceX = blockX + wholeX;
     var sourceY = blockY + wholeY;
 
-    // Half-pixel interpolation reads one sample past the block in each interpolated direction, so the
-    // reach is eight samples plus the half-step and not eight.
     var reachesOutside = sourceX < 0 || sourceY < 0
                          || sourceX + 8 + halfX > planeWidth || sourceY + 8 + halfY > planeHeight;
 
@@ -106,20 +79,100 @@ internal static class H263MotionCompensation {
   }
 
   /// <summary>
-  /// Predicts a block whose vector reaches outside the reference, by reading the edge sample in place
-  /// of the one that is not there (ITU-T H.263, Annex D.1).
+  /// Forms Annex F's overlapped prediction for one 8x8 luminance block.
   /// </summary>
   /// <remarks>
-  /// The clamp is on the sample coordinate and not on the vector, and it is applied to each component
-  /// on its own — a vector that leaves the picture at the left but stays inside it vertically is
-  /// clamped horizontally only. Clamping the vector instead would move the whole block back inside
-  /// and shift the half-pixel phase with it, which is a different prediction and not the one the
-  /// encoder made.
-  /// <para/>
-  /// The clamp happens before the interpolation and on the whole-pixel grid, which is what makes a
-  /// half-pixel position just outside the edge come out as the edge sample repeated rather than as
-  /// the average of the edge with something that was never coded.
+  /// Annex F weights the prediction made by the block's own vector together with one vertical and one
+  /// horizontal neighbour. The active vertical neighbour is the top one in the top half and the
+  /// bottom one in the bottom half; likewise the active horizontal neighbour changes from left to
+  /// right at the block centre. The three integer weights sum to eight for every sample, and the
+  /// normative rounding term is four.
   /// </remarks>
+  internal static bool TryPredictOverlapped(
+    Span<int> prediction, byte[] plane, int planeWidth, int blockX, int blockY,
+    int currentX, int currentY,
+    int topX, int topY, int leftX, int leftY, int rightX, int rightY, int bottomX, int bottomY,
+    bool clampToEdge) {
+    Span<int> current = stackalloc int[64];
+    Span<int> vertical = stackalloc int[64];
+    Span<int> horizontal = stackalloc int[64];
+
+    if (!TryPredict(current, plane, planeWidth, blockX, blockY, currentX, currentY, clampToEdge))
+      return false;
+
+    for (var y = 0; y < 8; ++y) {
+      var useTop = y < 4;
+      var verticalX = useTop ? topX : bottomX;
+      var verticalY = useTop ? topY : bottomY;
+      Span<int> rowPrediction = stackalloc int[64];
+      if (!TryPredict(rowPrediction, plane, planeWidth, blockX, blockY, verticalX, verticalY, clampToEdge))
+        return false;
+      rowPrediction.CopyTo(vertical);
+      break;
+    }
+
+    // Only two complete predictions are needed for each axis. Building both halves explicitly keeps
+    // the filter independent of any implementation-specific scratch-buffer layout.
+    Span<int> top = stackalloc int[64];
+    Span<int> bottom = stackalloc int[64];
+    Span<int> left = stackalloc int[64];
+    Span<int> right = stackalloc int[64];
+    if (!TryPredict(top, plane, planeWidth, blockX, blockY, topX, topY, clampToEdge)
+        || !TryPredict(bottom, plane, planeWidth, blockX, blockY, bottomX, bottomY, clampToEdge)
+        || !TryPredict(left, plane, planeWidth, blockX, blockY, leftX, leftY, clampToEdge)
+        || !TryPredict(right, plane, planeWidth, blockX, blockY, rightX, rightY, clampToEdge))
+      return false;
+
+    for (var y = 0; y < 8; ++y)
+      for (var x = 0; x < 8; ++x) {
+        var at = y * 8 + x;
+        var verticalSample = y < 4 ? top[at] : bottom[at];
+        var horizontalSample = x < 4 ? left[at] : right[at];
+        prediction[at] = (
+          _CurrentWeight[at] * current[at]
+          + _VerticalWeight[at] * verticalSample
+          + _HorizontalWeight[at] * horizontalSample
+          + 4) >> 3;
+      }
+
+    return true;
+  }
+
+  // Annex F, Figure F.2/F.3 weighting matrices. These values are normative data, not an
+  // implementation-derived optimisation.
+  private static readonly byte[] _CurrentWeight = [
+    4,5,5,5,5,5,5,4,
+    5,5,5,5,5,5,5,5,
+    5,5,6,6,6,6,5,5,
+    5,5,6,6,6,6,5,5,
+    5,5,6,6,6,6,5,5,
+    5,5,6,6,6,6,5,5,
+    5,5,5,5,5,5,5,5,
+    4,5,5,5,5,5,5,4,
+  ];
+
+  private static readonly byte[] _VerticalWeight = [
+    2,2,2,2,2,2,2,2,
+    1,1,2,2,2,2,1,1,
+    1,1,1,1,1,1,1,1,
+    1,1,1,1,1,1,1,1,
+    1,1,1,1,1,1,1,1,
+    1,1,1,1,1,1,1,1,
+    1,1,2,2,2,2,1,1,
+    2,2,2,2,2,2,2,2,
+  ];
+
+  private static readonly byte[] _HorizontalWeight = [
+    2,1,1,1,1,1,1,2,
+    2,2,1,1,1,1,2,2,
+    2,2,1,1,1,1,2,2,
+    2,2,1,1,1,1,2,2,
+    2,2,1,1,1,1,2,2,
+    2,2,1,1,1,1,2,2,
+    2,2,1,1,1,1,2,2,
+    2,1,1,1,1,1,1,2,
+  ];
+
   private static void _PredictFromEdge(
     Span<int> prediction, byte[] plane, int planeWidth, int planeHeight, int sourceX, int sourceY,
     int halfX, int halfY) {
@@ -156,27 +209,23 @@ internal static class H263MotionCompensation {
   }
 
   /// <summary>
-  /// Derives one component of the chrominance vector from the macroblock's luminance vector (ITU-T
-  /// H.263, clause 6.1.1 and Table 18).
+  /// Derives one component of the chrominance vector from a single luminance vector.
   /// </summary>
-  /// <remarks>
-  /// Halving a half-pixel luminance vector leaves a quarter-pixel chrominance one, and the
-  /// chrominance planes are only interpolated to halves — so Table 18 says what to do with the two
-  /// quarter positions: both of them, a quarter and three quarters, become a half. Not the nearest
-  /// half, which would send three quarters up to the next whole pixel; every quarter position becomes
-  /// the half of the pixel it is inside.
-  /// <para/>
-  /// Written over the magnitude and signed afterwards, so that a vector and its negation stay mirror
-  /// images. Taking the integer part of a negative quarter-pixel vector by rounding downward instead
-  /// would put leftward and upward motion half a chrominance sample out of step with rightward and
-  /// downward, which is a colour smear along one pair of edges of every moving object and not along
-  /// the other.
-  /// </remarks>
-  /// <param name="vector">The luminance vector component, in half-pixel units of the luminance plane.</param>
-  /// <returns>The chrominance vector component, in half-pixel units of the chrominance plane.</returns>
   internal static int ToChroma(int vector) {
     var magnitude = vector < 0 ? -vector : vector;
     var rounded = 2 * (magnitude >> 2) + ((magnitude & 3) != 0 ? 1 : 0);
     return vector < 0 ? -rounded : rounded;
+  }
+
+  /// <summary>
+  /// Derives an Annex F chrominance vector component from the sum of four luminance components.
+  /// </summary>
+  /// <remarks>
+  /// The four half-pixel luminance vectors sum at sixteenth-pixel chroma resolution. Table F.1 maps
+  /// that value onto the nearest half-pixel chroma position with its specified tie behaviour.
+  /// </remarks>
+  internal static int FourVectorChroma(int sum) {
+    ReadOnlySpan<byte> round = [0, 0, 0, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 1, 1];
+    return (sum >> 3) + round[sum & 0xF];
   }
 }
