@@ -7,11 +7,12 @@ using Hawkynt.FileFormats.Video;
 
 namespace FileFormat.FlicVideo;
 
-/// <summary>Writes an Autodesk Animator Pro FLC file from already-coded FLIC frame sub-chunks.</summary>
+/// <summary>Writes Autodesk FLC or DTA extended FLIC from already-coded FLIC frame sub-chunks.</summary>
 public sealed class FliWriter : IVideoContainerWriter<FliWriter> {
 
   private const ushort _FRAME_MAGIC = 0xF1FA;
   private readonly MediaStreamInfo _stream;
+  private readonly ushort _depth;
   private readonly List<CodedPacket> _packets = [];
   private bool _finished;
 
@@ -24,11 +25,17 @@ public sealed class FliWriter : IVideoContainerWriter<FliWriter> {
       throw new NotSupportedException($"FLIC writer needs FLIC-coded packets, not '{streams[0].Codec}'.");
     if (streams[0].Width is <= 0 or > ushort.MaxValue || streams[0].Height is <= 0 or > ushort.MaxValue)
       throw new NotSupportedException("FLIC width and height must fit unsigned 16-bit header fields.");
+
+    var depth = streams[0].BitsPerPixel == 0 ? 8 : streams[0].BitsPerPixel;
+    if (depth is not (8 or 15 or 16 or 24))
+      throw new NotSupportedException($"FLIC writer supports 8, 15, 16 and 24 bits per pixel; {depth} was requested.");
+
     this._stream = streams[0];
+    this._depth = checked((ushort)depth);
   }
 
   public static string PrimaryExtension => ".flc";
-  public static string[] FileExtensions => [".fli", ".flc", ".flx"];
+  public static string[] FileExtensions => [".fli", ".flc", ".flx", ".flh", ".flt"];
 
   public static FliWriter Create(IReadOnlyList<MediaStreamInfo> streams, VideoMetadata metadata) => new(streams, metadata);
 
@@ -47,7 +54,7 @@ public sealed class FliWriter : IVideoContainerWriter<FliWriter> {
 
     using var output = new MemoryStream();
     output.Write(new byte[FliReader.HEADER_SIZE]);
-    var firstFrame = (uint)output.Position;
+    var firstFrame = checked((uint)output.Position);
 
     foreach (var packet in this._packets) {
       var payload = packet.Data.Span;
@@ -67,12 +74,12 @@ public sealed class FliWriter : IVideoContainerWriter<FliWriter> {
 
     var result = output.ToArray();
     BinaryPrimitives.WriteUInt32LittleEndian(result.AsSpan(0, 4), checked((uint)result.Length));
-    BinaryPrimitives.WriteUInt16LittleEndian(result.AsSpan(4, 2), FliReader.MAGIC_FLC);
+    BinaryPrimitives.WriteUInt16LittleEndian(result.AsSpan(4, 2), this._depth == 8 ? FliReader.MAGIC_FLC : FliReader.MAGIC_DTA);
     BinaryPrimitives.WriteUInt16LittleEndian(result.AsSpan(6, 2), checked((ushort)this._packets.Count));
     BinaryPrimitives.WriteUInt16LittleEndian(result.AsSpan(8, 2), checked((ushort)this._stream.Width));
     BinaryPrimitives.WriteUInt16LittleEndian(result.AsSpan(10, 2), checked((ushort)this._stream.Height));
-    BinaryPrimitives.WriteUInt16LittleEndian(result.AsSpan(12, 2), 8);
-    BinaryPrimitives.WriteUInt16LittleEndian(result.AsSpan(14, 2), 3); // finished + updated
+    BinaryPrimitives.WriteUInt16LittleEndian(result.AsSpan(12, 2), this._depth);
+    BinaryPrimitives.WriteUInt16LittleEndian(result.AsSpan(14, 2), 3);
     var speed = this._stream.FrameRate.IsKnown
       ? Math.Max(1, (long)Math.Round(1000d / this._stream.FrameRate.ToDouble()))
       : this._packets.Count != 0 && this._packets[0].Duration is > 0

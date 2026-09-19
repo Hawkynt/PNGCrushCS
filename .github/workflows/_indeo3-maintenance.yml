@@ -9,7 +9,7 @@ permissions:
 
 jobs:
   validate-and-document:
-    if: github.head_ref == 'feature/indeo3-encoder'
+    if: github.head_ref == 'video/indeo3-temporal-frames'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -38,53 +38,48 @@ jobs:
         working-directory: PNGCrushCS
         run: dotnet build PngCrush.slnx --configuration Release --no-restore -p:EnableWindowsTargeting=true
 
-      - name: Update Indeo 3 support ledger
+      - name: Update Indeo 3 measurement notes
         working-directory: PNGCrushCS
         shell: python
         run: |
           from pathlib import Path
 
-          readme_path = Path('Hawkynt.FileFormats.Video/README.md')
-          text = readme_path.read_text(encoding='utf-8')
-
-          replacements = {
-              'builds, 46 of them.': 'builds, 47 of them.',
-              "Microsoft's MPEG-4, ASUS V1 and V2, Apple Video, H.261, Hap, Apple ProRes, id RoQ —":
-                  "Microsoft's MPEG-4, ASUS V1 and V2, Apple Video, H.261, Intel Indeo 3, Hap, Apple ProRes, id RoQ —",
-              '| [Intel Indeo 3](https://wiki.multimedia.cx/index.php/Indeo_3) | ⚠️ | — | — | `IV31`, `IV32`; a binary tree cutting each plane into cells, motion compensation, and vector quantisation over 4x4 to 8x8 blocks. Eight-bit samples and half-sample motion vectors are flagged in a frame header and refused — no encoder is known to have written either — as is the "skip cell" null code, whose effect on the two frame buffers is stated nowhere | [MultimediaWiki Indeo 3](https://wiki.multimedia.cx/index.php/Indeo_3) |':
-                  '| [Intel Indeo 3](https://wiki.multimedia.cx/index.php/Indeo_3) | ⚠️ | ✅ | ffmpeg | `IV31`, `IV32`; a binary tree cutting each plane into cells, motion compensation, and vector quantisation over 4x4 to 8x8 blocks. Eight-bit samples and half-sample motion vectors are flagged in a frame header and refused — no encoder is known to have written either — as is the "skip cell" null code, whose effect on the two frame buffers is stated nowhere. The encoder writes `IV32` all-intra frames only: one whole-plane mode-0 VQ cell per plane, the finest table, and no motion vectors. It is lossy through seven-bit YUV 4:1:0 sampling and VQ delta selection; every packet is independently decodable | [MultimediaWiki Indeo 3](https://wiki.multimedia.cx/index.php/Indeo_3) |',
-              'Encoding is a smaller domain than decoding on purpose: 46 codecs of the 100 read can also be written. Most are lossless; twelve are not, and each says so in its own row.':
-                  'Encoding is a smaller domain than decoding on purpose: 47 codecs of the 100 read can also be written. Most are lossless; thirteen are not, and each says so in its own row.',
-              "H.261's and Apple ProRes's quantised transforms, Hap's texture blocks and id RoQ's vector quantisation":
-                  "H.261's, Intel Indeo 3's and Apple ProRes's quantised transforms, Hap's texture blocks and id RoQ's vector quantisation",
-          }
-
-          for old, new in replacements.items():
-            count = text.count(old)
-            if count != 1:
-              raise SystemExit(f'expected exactly one README occurrence of {old!r}, found {count}')
-            text = text.replace(old, new)
-
-          readme_path.write_text(text, encoding='utf-8')
-
-          notes_path = Path('Hawkynt.FileFormats.Video/codec-notes.md')
-          notes = notes_path.read_text(encoding='utf-8')
+          path = Path('Hawkynt.FileFormats.Video/codec-notes.md')
+          text = path.read_text(encoding='utf-8')
           marker = '### Intel Indeo 3\n\n'
-          addition = (
-              'The writer deliberately starts at the format\'s interoperable floor rather than trying to reproduce '
-              'Intel\'s encoder heuristics: every packet is an IV32 key frame, each plane is one intra cell, mode 0, '
-              'quantisation table 0, and there are no motion vectors. RGB input is reduced to the codec\'s seven-bit '
-              'YUV 4:1:0 planes; each dyad is selected against the exact packed 16-bit addition used by the decoder, '
-              'so encoder-side reconstruction follows the same carries and masks as decoding. The registry\'s FFmpeg '
-              'oracle muxes the packets into AVI and requires FFmpeg to decode them, independently of this package\'s '
-              'own decoder.\n\n'
+          old = (
+              "The writer deliberately starts at the format's interoperable floor rather than trying to reproduce "
+              "Intel's encoder heuristics: every packet is an IV32 key frame, each plane is one intra cell, mode 0, "
+              "quantisation table 0, and there are no motion vectors. RGB input is reduced to the codec's seven-bit "
+              "YUV 4:1:0 planes; each dyad is selected against the exact packed 16-bit addition used by the decoder, "
+              "so encoder-side reconstruction follows the same carries and masks as decoding. The registry's FFmpeg "
+              "oracle muxes the packets into AVI and requires FFmpeg to decode them, independently of this package's "
+              "own decoder.\n\n"
           )
-          if addition not in notes:
-            count = notes.count(marker)
+          new = (
+              "**Encoding writes intra and forward-predicted frames.** A twelve-picture group opens with an IV32 "
+              "key frame and continues with eleven inter frames. The format owns two picture buffers; the writer "
+              "alternates them and predicts each inter picture from the reconstruction in the other buffer, not from "
+              "the source image, so seven-bit YUV 4:1:0/VQ quantisation error cannot accumulate as reference drift. "
+              "Inter planes use the ordinary motion-compensated cell syntax with vector 0,0 and mode-0 residuals; "
+              "unchanged 4x4 blocks use the FA/FB copy escapes and a wholly unchanged plane collapses to a VQ-tree "
+              "copy leaf. There is no display-order reordering or B-picture analogue in Indeo 3. Non-zero motion "
+              "search would improve compression but is not required for the format's reference semantics.\n\n"
+              "The registry's FFmpeg oracle muxes thirteen packets into AVI and requires FFmpeg to decode the complete "
+              "I/P chain across a group boundary. The writer deliberately does not guess the obscure SkipCell procedure, "
+              "which FFmpeg itself leaves unimplemented; eight-bit samples and half-sample motion vectors remain refused "
+              "for the same reasons as the decoder.\n\n"
+          )
+
+          if old in text:
+            text = text.replace(old, new, 1)
+          elif new not in text:
+            count = text.count(marker)
             if count != 1:
               raise SystemExit(f'expected exactly one Indeo 3 notes heading, found {count}')
-            notes = notes.replace(marker, marker + addition)
-            notes_path.write_text(notes, encoding='utf-8')
+            text = text.replace(marker, marker + new, 1)
+
+          path.write_text(text, encoding='utf-8')
 
       - name: Generate package documentation
         uses: Hawkynt/RepositoryTemplate/package-readme@v1
@@ -97,13 +92,13 @@ jobs:
         working-directory: PNGCrushCS
         run: dotnet test PngCrush.slnx --configuration Release --no-build -p:EnableWindowsTargeting=true --filter "TestCategory!=Regression&TestCategory!=Performance"
 
-      - name: Commit generated documentation and remove maintenance workflow
+      - name: Commit generated Indeo 3 documentation and remove maintenance workflow
         shell: bash
         run: |
           cd PNGCrushCS
           git rm .github/workflows/_indeo3-maintenance.yml
           git config user.name "Hawkynt"
           git config user.email "14230988+Hawkynt@users.noreply.github.com"
-          git add -- '*README.md' '*REFERENCE.md' 'Hawkynt.FileFormats.Video/codec-notes.md'
-          git commit -m "* document Indeo 3 video encoding and regenerate reference"
+          git add Hawkynt.FileFormats.Video/README.md Hawkynt.FileFormats.Video/REFERENCE.md Hawkynt.FileFormats.Video/codec-notes.md
+          git commit -m "* document Indeo 3 temporal encoding"
           git push origin HEAD:${{ github.head_ref }}

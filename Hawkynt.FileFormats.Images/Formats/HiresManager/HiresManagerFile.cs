@@ -18,7 +18,7 @@ namespace FileFormat.HiresManager;
 /// The old model had a 320 by 200 screen with the matrices packed a thousand bytes apart, which is
 /// neither the geometry nor the layout.
 /// </remarks>
-[VerifiedBy(ConformanceOracle.Recoil2Png)]
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.IrfanView)]
 public readonly record struct HiresManagerFile
   : IImageFormatReader<HiresManagerFile>, IImageToRawImage<HiresManagerFile>,
     IImageFromRawImage<HiresManagerFile>, IImageFormatWriter<HiresManagerFile> {

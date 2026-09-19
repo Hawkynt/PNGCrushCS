@@ -11,6 +11,7 @@ namespace FileFormat.IconLibrary;
 /// whose entries point at one or more <c>RT_ICON</c> image resources. Both PE (Win32) and legacy NE
 /// (Win16) libraries are accepted; newly encoded libraries are PE resource-only DLLs.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.IrfanView)]
 public readonly record struct IconLibraryFile
   : IImageFormatReader<IconLibraryFile>, IImageToRawImage<IconLibraryFile>, IImageFromRawImage<IconLibraryFile>,
     IImageFormatWriter<IconLibraryFile>, IMultiImageFileFormat<IconLibraryFile> {
