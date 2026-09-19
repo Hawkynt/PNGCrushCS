@@ -240,23 +240,30 @@ public sealed class EaCmvVideoEncoderTests {
   public void FFmpegDecodesTheGeneratedInterFrame() {
     FFmpegOracle.RequireAvailable();
 
+    // Four pictures, not two. FFmpeg reads five chunks looking for the codecs an EA file declares,
+    // and a file that runs out before the fifth is refused as one whose chunk size is too small --
+    // which says nothing about the pictures in it. Four pictures put six chunks in front of it.
     var encoder = EaCmvVideoEncoder.Create(_Requested(8, 8));
     var packets = new List<CodedPacket>();
     encoder.TryEncode(_Picture(8, 8, 3), 0, out var first);
     encoder.TryEncode(_Picture(8, 8, 3), 1, out var second);
+    encoder.TryEncode(_Picture(8, 8, 3), 2, out var third);
+    encoder.TryEncode(_Picture(8, 8, 3), 3, out var fourth);
     var secondPicture = _Chunks(second.Data.Span).Single(static c => c.FourCc == "MVIf");
     Assert.That(BinaryPrimitives.ReadUInt16LittleEndian(secondPicture.Payload), Is.EqualTo(1),
       "the external oracle must reach a generated inter picture, not merely the opening intra picture");
 
     packets.Add(first);
     packets.Add(second);
+    packets.Add(third);
+    packets.Add(fourth);
     packets.AddRange(encoder.Flush());
     var file = VideoIO.Mux<EaWriter>([encoder.DescribeStream()], packets);
     var path = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName() + ".cmv");
 
     try {
       File.WriteAllBytes(path, file);
-      var (decoded, detail) = FFmpegOracle.TryDecodeFrameCount(path, 8, 8, expectedFrames: 2);
+      var (decoded, detail) = FFmpegOracle.TryDecodeFrameCount(path, 8, 8, expectedFrames: 4);
       Assert.That(decoded, Is.True, detail);
     } finally {
       try { File.Delete(path); } catch { /* best effort */ }

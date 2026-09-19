@@ -242,7 +242,7 @@ public sealed class EaCmvVideoEncoder : IVideoCodecEncoder<EaCmvVideoEncoder> {
   }
 
   private (byte[] Data, bool IsKeyFrame) _Picture(EaCmvFrame current) {
-    var intra = this._Intra(current);
+    var intra = _Intra(current);
     if (this._lastFrame == null || this._width % _BLOCK != 0 || this._height % _BLOCK != 0 || !this._InterCanFit())
       return (intra, true);
 
