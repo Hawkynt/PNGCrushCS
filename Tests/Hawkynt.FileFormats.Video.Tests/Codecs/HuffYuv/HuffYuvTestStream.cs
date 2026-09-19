@@ -28,27 +28,18 @@ internal sealed class HuffYuvTestStream {
   private int _partial;
   private int _partialBits;
 
-  // ============================================================================================
-  // The frame
-  // ============================================================================================
-
-  /// <summary>Appends symbols coded with the default table, where a symbol is its own byte.</summary>
   internal HuffYuvTestStream Symbols(params int[] values) {
     foreach (var value in values)
       this.Bits(value, 8);
-
     return this;
   }
 
-  /// <summary>Appends the low <paramref name="count"/> bits of a value, most significant first.</summary>
   internal HuffYuvTestStream Bits(int value, int count) {
     for (var i = count - 1; i >= 0; --i)
       this._Bit((value >> i) & 1);
-
     return this;
   }
 
-  /// <summary>Appends a code written as its bits, the way a table would be printed.</summary>
   internal HuffYuvTestStream Code(string code) {
     foreach (var character in code)
       switch (character) {
@@ -57,13 +48,9 @@ internal sealed class HuffYuvTestStream {
         case ' ': break;
         default: throw new ArgumentException($"'{character}' is not a bit.", nameof(code));
       }
-
     return this;
   }
 
-  /// <summary>
-  /// Finishes the frame, turning every four bytes back to front as the coder left them.
-  /// </summary>
   internal byte[] End() {
     while (this._partialBits != 0)
       this._Bit(0);
@@ -71,10 +58,8 @@ internal sealed class HuffYuvTestStream {
     var length = (this._bits.Count + 3) / 4 * 4;
     var frame = new byte[length];
     this._bits.CopyTo(frame);
-
     for (var i = 0; i < length; i += 4)
       Array.Reverse(frame, i, 4);
-
     return frame;
   }
 
@@ -82,66 +67,52 @@ internal sealed class HuffYuvTestStream {
     this._partial = (this._partial << 1) | bit;
     if (++this._partialBits != 8)
       return;
-
     this._bits.Add((byte)this._partial);
     this._partial = 0;
     this._partialBits = 0;
   }
 
-  // ============================================================================================
-  // The description
-  // ============================================================================================
-
-  /// <summary>The run-length coded lengths of a table where every symbol's code is eight bits.</summary>
   internal static byte[] FlatTable() => [0x08, 0x80, 0x08, 0x80];
 
-  /// <summary>
-  /// The run-length coded lengths of a table stated symbol by symbol.
-  /// </summary>
-  /// <remarks>
-  /// One run a symbol, which is wasteful and exactly what a test wants: the point is to say a
-  /// particular set of lengths, not to say it briefly.
-  /// </remarks>
   internal static byte[] TableOfLengths(params int[] lengths) {
     var bytes = new List<byte>();
     for (var i = 0; i < 256; ++i) {
       bytes.Add((byte)(i < lengths.Length ? lengths[i] : 0));
       bytes.Add(1);
     }
-
     return bytes.ToArray();
   }
 
-  /// <summary>
-  /// A stream description: a <c>BITMAPINFOHEADER</c>, the codec's four bytes, and its tables.
-  /// </summary>
   internal static byte[] Description(byte method, byte depthAndSubsampling, byte flags, byte form, int tableCount, byte[]? table = null) {
-    var bytes = new List<byte>(new byte[_BITMAP_INFO_HEADER_SIZE]);
+    var header = _Header();
+    var bytes = new List<byte>(header);
     bytes.Add(method);
     bytes.Add(depthAndSubsampling);
     bytes.Add(flags);
     bytes.Add(form);
-
     for (var i = 0; i < tableCount; ++i)
       bytes.AddRange(table ?? FlatTable());
-
     return bytes.ToArray();
   }
 
-  /// <summary>A stream coded in the planar form, whose description states its subsampling.</summary>
   internal static MediaStreamInfo PlanarStream(
     int width, int height, byte method, byte flags, int tableCount, int chromaHorizontal = 0, int chromaVertical = 0, byte[]? table = null) {
     var depth = (byte)(0x70 | chromaHorizontal | (chromaVertical << 2));
     return _Stream(width, height, 24, Description(method, depth, flags, 1, tableCount, table));
   }
 
-  /// <summary>A stream coded in the interleaved form, whose description states a bitstream depth.</summary>
   internal static MediaStreamInfo InterleavedStream(int width, int height, byte method, byte bitstreamDepth, byte flags, byte[]? table = null)
     => _Stream(width, height, bitstreamDepth, Description(method, bitstreamDepth, flags, 0, 3, table));
 
-  /// <summary>A stream whose description is only its <c>BITMAPINFOHEADER</c>, as the first version's is.</summary>
   internal static MediaStreamInfo UndescribedStream(int width, int height, int bitsPerPixel)
-    => _Stream(width, height, bitsPerPixel, new byte[_BITMAP_INFO_HEADER_SIZE]);
+    => _Stream(width, height, bitsPerPixel, _Header());
+
+  private static byte[] _Header() {
+    var header = new byte[_BITMAP_INFO_HEADER_SIZE];
+    BinaryPrimitives.WriteUInt32LittleEndian(header, _BITMAP_INFO_HEADER_SIZE);
+    BinaryPrimitives.WriteUInt32LittleEndian(header.AsSpan(16), CodecTag.FromCharacters("HFYU").Value);
+    return header;
+  }
 
   private static MediaStreamInfo _Stream(int width, int height, int bitsPerPixel, byte[] description) => new() {
     Index = 0,
