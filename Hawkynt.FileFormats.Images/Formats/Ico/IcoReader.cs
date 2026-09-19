@@ -74,7 +74,7 @@ public static class IcoReader {
       if (dataSize < 0 || dataOffset < 0)
         throw new InvalidDataException($"Invalid directory entry {i}: negative size or offset.");
 
-      if (dataOffset + dataSize > data.Length)
+      if (dataOffset > data.Length - dataSize)
         throw new InvalidDataException($"Directory entry {i} references data beyond end of file.");
 
       var payload = data.Slice(dataOffset, dataSize).ToArray();
@@ -145,7 +145,7 @@ public static class IcoReader {
 
     var width = BinaryPrimitives.ReadInt32LittleEndian(dibData.AsSpan(4));
     var height = BinaryPrimitives.ReadInt32LittleEndian(dibData.AsSpan(8));
-    if (width <= 0 || height == 0)
+    if (width <= 0 || height == 0 || height == int.MinValue)
       return (directoryWidth, directoryHeight);
 
     // The stated height covers the picture and the mask below it.

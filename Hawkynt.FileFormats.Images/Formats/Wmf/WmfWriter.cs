@@ -9,7 +9,21 @@ public static class WmfWriter {
   private const uint _PLACEABLE_MAGIC = 0x9AC6CDD7;
   private const ushort _META_STRETCHDIB = 0x0F43;
   private const int _BITMAPINFOHEADER_SIZE = 40;
-  private const ushort _LOGICAL_UNITS_PER_INCH = 1440;
+
+  /// <summary>How many of the metafile's own units make an inch.</summary>
+  /// <remarks>
+  /// The placeable header's <c>Inch</c> field is what turns the bounding box into a physical size,
+  /// and the box here is stated in pixels because the only record in the file is one that paints a
+  /// DIB across it, pixel for pixel. The two have to agree, and there were two ways to make them:
+  /// leave the field at the twip, 1440, and multiply the box up into twips, or declare the unit to
+  /// be what the numbers already are. The second is taken here — it is exact where the first rounds,
+  /// and it keeps the box, the destination rectangle and the DIB all counted in the same thing.
+  /// <para/>
+  /// Ninety-six to the inch is the screen pixel, so a picture written here is an inch wide for every
+  /// ninety-six samples across it. Left at 1440 with a box still counted in pixels, as it was, a
+  /// 320 by 200 picture declared itself a fifth of an inch wide and players duly rendered it 21 by 13.
+  /// </remarks>
+  private const ushort _LOGICAL_UNITS_PER_INCH = 96;
 
   public static byte[] ToBytes(WmfFile file) {
     ArgumentNullException.ThrowIfNull(file);
@@ -53,6 +67,7 @@ public static class WmfWriter {
       SizeInWords: (uint)stretchDibRecordSizeInWords,
       Function: _META_STRETCHDIB,
       RasterOp: 0x00CC0020,
+      ColorUse: 0,
       SrcHeight: (ushort)height,
       SrcWidth: (ushort)width,
       YSrc: 0,
@@ -60,8 +75,7 @@ public static class WmfWriter {
       DestHeight: (ushort)height,
       DestWidth: (ushort)width,
       YDest: 0,
-      XDest: 0,
-      ColorUse: 0
+      XDest: 0
     );
     stretchDib.WriteTo(span[recOff..]);
 
