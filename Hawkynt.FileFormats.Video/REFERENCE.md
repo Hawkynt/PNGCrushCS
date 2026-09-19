@@ -1051,12 +1051,12 @@ Implements `IVideoCodecDecoder<H261VideoDecoder>`, `IVideoFrameDecoder`.
 | `CodecName` | `static string CodecName { get; }` |  |
 | `Accepts` | `static bool Accepts(MediaStreamInfo stream)` |  |
 | `Create` | `static H261VideoDecoder Create(MediaStreamInfo stream)` |  |
-| `Flush` | `IEnumerable<RawImage> Flush()` | Nothing is ever held back: H.261 has no bidirectional prediction to reorder around. |
-| `TryDecode` | `bool TryDecode(CodedPacket packet, out RawImage frame)` | Decodes one packet and hands back the picture it holds. |
+| `Flush` | `IEnumerable<RawImage> Flush()` | Nothing is ever held back for reordering: H.261 has no bidirectional prediction. |
+| `TryDecode` | `bool TryDecode(CodedPacket packet, out RawImage frame)` | Decodes one packet and hands back the last complete ordinary or Annex D picture it holds. |
 
 #### `H261VideoEncoder`
 
-Encodes H.261 video, ITU-T Recommendation H.261 — the write direction of `H261VideoDecoder`, and the whole of the Recommendation's normative coding except the four macroblock types that restate the quantiser.
+Encodes H.261 video, ITU-T Recommendation H.261 — the write direction of `H261VideoDecoder`, including Annex D still-image transmission.
 
 Implements `IVideoCodecEncoder<H261VideoEncoder>`, `IVideoPacketEncoder`.
 
@@ -1064,10 +1064,11 @@ Implements `IVideoCodecEncoder<H261VideoEncoder>`, `IVideoPacketEncoder`.
 | --- | --- | --- |
 | `CodecName` | `static string CodecName { get; }` |  |
 | `Codec` | `static CodecTag Codec { get; }` |  |
-| `Create` | `static H261VideoEncoder Create(MediaStreamInfo stream)` | Builds an encoder for the stream described, or refuses a geometry H.261 cannot state. |
-| `DescribeStream` | `MediaStreamInfo DescribeStream()` | The stream as a muxer needs it: a `BITMAPINFOHEADER` naming H.261. |
+| `Create` | `static H261VideoEncoder Create(MediaStreamInfo stream)` | Builds an encoder for one of H.261's two coded stream geometries. |
+| `DescribeStream` | `MediaStreamInfo DescribeStream()` | The stream description used by containers: the coded QCIF/CIF size, never Annex D's display size. |
 | `Flush` | `IEnumerable<CodedPacket> Flush()` | Nothing is ever held back: H.261 has no bidirectional prediction to reorder around. |
-| `TryEncode` | `bool TryEncode(RawImage frame, long? presentationTimestamp, out CodedPacket packet)` | Codes one picture, either whole or against the one before it. |
+| `TryEncodeStillImage` | `bool TryEncodeStillImage(RawImage frame, long? presentationTimestamp, out CodedPacket packet)` | Codes one Annex D still image at twice the stream width and height as sub-images 0, 1, 2 and 3. |
+| `TryEncode` | `bool TryEncode(RawImage frame, long? presentationTimestamp, out CodedPacket packet)` | Codes one ordinary motion picture in the stream's QCIF/CIF geometry. |
 
 #### `H263VideoDecoder`
 
