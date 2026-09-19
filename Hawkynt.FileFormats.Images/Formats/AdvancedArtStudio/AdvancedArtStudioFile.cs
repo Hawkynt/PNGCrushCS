@@ -4,7 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.AdvancedArtStudio;
 
 /// <summary>Advanced Art Studio (.ocp) C64 image. Supports both multicolor and hi-res screen layouts.</summary>
-[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.IrfanView)]
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.XnView, ConformanceOracle.IrfanView)]
 public readonly record struct AdvancedArtStudioFile : IImageFormatReader<AdvancedArtStudioFile>, IImageToRawImage<AdvancedArtStudioFile>, IImageFromRawImage<AdvancedArtStudioFile>, IImageFormatWriter<AdvancedArtStudioFile> {
 
   static string IImageFormatMetadata<AdvancedArtStudioFile>.PrimaryExtension => ".ocp";

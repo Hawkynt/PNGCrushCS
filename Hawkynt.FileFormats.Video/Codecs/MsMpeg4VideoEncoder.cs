@@ -18,16 +18,15 @@ namespace FileFormat.Codecs;
 /// names, while a caller invoking <see cref="Create"/> with no code gets version 3 under <c>MP43</c>.
 /// <para/>
 /// <b>What it writes.</b> An intra picture every <see cref="_KEY_FRAME_INTERVAL"/> frames and a
-/// predicted picture between them, one slice a picture, one motion vector a macroblock, the
-/// alternating current prediction always off and — for version 3 — the middle run-level tables, the
-/// first DC table and the first motion vector table. Every one of those is a choice the format leaves
-/// open and none of them changes whether the result decodes; leaving them fixed is what makes the same
-/// input produce the same bytes.
+/// predicted picture between them, one slice a picture and one half-sample motion vector per inter
+/// macroblock. A P-picture macroblock switches to the format's intra form when the best legal temporal
+/// prediction is materially worse than coding its local spatial variation. Alternating-current
+/// prediction remains off and version 3 uses the middle run-level tables, first DC table and first
+/// motion-vector table so identical input still produces identical bytes.
 /// <para/>
-/// <b>What it does not write.</b> No intra macroblock inside a predicted picture. The format has one
-/// and this encoder never chooses it: a predicted picture that cannot predict is answered by the next
-/// intra picture instead, which is a coarser answer and a much smaller decision surface. Nor does it
-/// alternate the interpolation's rounding, which version 3 alone could.
+/// <b>Picture types and references.</b> Microsoft's versions 1 to 3 have I and P picture syntax only;
+/// they have no B picture and therefore no future/backward reference queue to write. Version 3 can
+/// alternate half-sample interpolation rounding; this encoder deliberately keeps that optional mode off.
 /// <para/>
 /// <b>Lossy, and by how much.</b> The transform and the quantiser are the format's, so nothing but a
 /// picture already on the quantiser's own reconstruction grid comes back exactly. What the encoder

@@ -11,6 +11,7 @@ namespace FileFormat.ZxBigFont;
 /// across at the size of the largest, which is why the whole table has to be walked before anything
 /// can be drawn.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.IrfanView)]
 public readonly record struct ZxBigFontFile
   : IImageFormatReader<ZxBigFontFile>, IImageToRawImage<ZxBigFontFile>,
     IImageFromRawImage<ZxBigFontFile>, IImageFormatWriter<ZxBigFontFile> {
