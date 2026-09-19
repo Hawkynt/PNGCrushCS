@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.IO;
 
 namespace FileFormat.Zoomatic;
@@ -17,51 +17,27 @@ public static class ZoomaticReader {
   public static ZoomaticFile FromStream(Stream stream) => FromBytes(StreamBytes.ReadAll(stream));
 
   public static ZoomaticFile FromSpan(ReadOnlySpan<byte> data) {
+    var unpacked = ZoomaticCompression.Unpack(data, ZoomaticFile.UnpackedSize);
 
+    // Little-endian, and read from the file rather than from the stream: the depacker stops before
+    // these two bytes, which is exactly why they can hold the address.
+    var loadAddress = (ushort)(data[0] | (data[1] << 8));
 
-    if (data.Length < ZoomaticFile.LoadAddressSize + ZoomaticFile.MinPayloadSize)
-      throw new InvalidDataException($"File too small for Zoomatic format (got {data.Length} bytes, need at least {ZoomaticFile.LoadAddressSize + ZoomaticFile.MinPayloadSize}).");
-
-    var offset = 0;
-
-    // Load address (2 bytes, little-endian)
-    var loadAddress = (ushort)(data[offset] | (data[offset + 1] << 8));
-    offset += ZoomaticFile.LoadAddressSize;
-
-    // Bitmap data (8000 bytes)
     var bitmapData = new byte[ZoomaticFile.BitmapDataSize];
-    data.Slice(offset, ZoomaticFile.BitmapDataSize).CopyTo(bitmapData);
-    offset += ZoomaticFile.BitmapDataSize;
+    Array.Copy(unpacked, ZoomaticFile.BitmapOffset, bitmapData, 0, ZoomaticFile.BitmapDataSize);
 
-    // Screen RAM (1000 bytes)
     var screenData = new byte[ZoomaticFile.ScreenDataSize];
-    data.Slice(offset, ZoomaticFile.ScreenDataSize).CopyTo(screenData);
-    offset += ZoomaticFile.ScreenDataSize;
+    Array.Copy(unpacked, ZoomaticFile.ScreenOffset, screenData, 0, ZoomaticFile.ScreenDataSize);
 
-    // Color RAM (1000 bytes)
     var colorData = new byte[ZoomaticFile.ColorDataSize];
-    data.Slice(offset, ZoomaticFile.ColorDataSize).CopyTo(colorData);
-    offset += ZoomaticFile.ColorDataSize;
-
-    // Background color: first byte of trailing data if available, else 0
-    byte backgroundColor = 0;
-    var trailingData = Array.Empty<byte>();
-    if (offset < data.Length) {
-      backgroundColor = data[offset];
-      ++offset;
-      if (offset < data.Length) {
-        trailingData = new byte[data.Length - offset];
-        data[offset..].CopyTo(trailingData);
-      }
-    }
+    Array.Copy(unpacked, ZoomaticFile.ColorOffset, colorData, 0, ZoomaticFile.ColorDataSize);
 
     return new() {
       LoadAddress = loadAddress,
       BitmapData = bitmapData,
       ScreenData = screenData,
       ColorData = colorData,
-      BackgroundColor = backgroundColor,
-      TrailingData = trailingData,
+      BackgroundColor = unpacked[ZoomaticFile.BackgroundOffset],
     };
   }
 

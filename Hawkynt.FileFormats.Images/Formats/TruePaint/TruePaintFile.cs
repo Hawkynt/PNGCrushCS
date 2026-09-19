@@ -4,6 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.TruePaint;
 
 /// <summary>In-memory representation of a True Paint interlace multicolor image (.mci).</summary>
+[VerifiedBy(ConformanceOracle.Recoil2Png)]
 public readonly record struct TruePaintFile : IImageFormatReader<TruePaintFile>, IImageToRawImage<TruePaintFile>, IImageFromRawImage<TruePaintFile>, IImageFormatWriter<TruePaintFile> {
 
   static string IImageFormatMetadata<TruePaintFile>.PrimaryExtension => ".mci";
@@ -11,11 +12,25 @@ public readonly record struct TruePaintFile : IImageFormatReader<TruePaintFile>,
   static TruePaintFile IImageFormatReader<TruePaintFile>.FromSpan(ReadOnlySpan<byte> data) => TruePaintReader.FromSpan(data);
   static byte[] IImageFormatWriter<TruePaintFile>.ToBytes(TruePaintFile file) => TruePaintWriter.ToBytes(file);
 
-  /// <summary>The fixed width of the image in pixels.</summary>
-  public const int FixedWidth = 160;
+  /// <summary>
+  /// The width of the picture the two fields make between them, always 320.
+  /// </summary>
+  /// <remarks>
+  /// One multicolour field is 160 pixels across, but the second is displayed half a multicolour
+  /// pixel to the right of the first, so between them they place a boundary every 320th of the
+  /// screen. That is what makes the format worth having over a plain multicolour screen and it is
+  /// what <see cref="ToRawImage"/> reproduces.
+  /// </remarks>
+  public const int FixedWidth = 320;
 
   /// <summary>The fixed height of the image in pixels.</summary>
   public const int FixedHeight = 200;
+
+  /// <summary>Multicolour pixels across one field.</summary>
+  internal const int CodedWidth = FixedWidth / 2;
+
+  /// <summary>Character cells across the screen.</summary>
+  internal const int CellsPerRow = 40;
 
   /// <summary>Size of the load address in bytes.</summary>
   internal const int LoadAddressSize = 2;
@@ -29,19 +44,42 @@ public readonly record struct TruePaintFile : IImageFormatReader<TruePaintFile>,
   /// <summary>Size of the color RAM section in bytes.</summary>
   internal const int ColorRamSize = 1000;
 
-  /// <summary>Size of the background/border section in bytes.</summary>
-  internal const int BackgroundBorderSize = 2;
+  /// <summary>
+  /// Where each section sits in the file, which is where the C64 memory it is loaded into puts it.
+  /// </summary>
+  /// <remarks>
+  /// The file is a straight image of memory from <c>$9C00</c> upwards, so every section lands on the
+  /// address the VIC-II wants it at and the gaps between them are the bytes those alignments leave
+  /// over: the first video matrix at <c>$9C00</c>, the two bitmaps at <c>$A000</c> and <c>$C000</c>,
+  /// the second video matrix at <c>$E000</c> and colour RAM at <c>$E400</c>. Laying the five
+  /// sections out end to end instead — which is what this did before — gives a file of exactly the
+  /// right length that no True Paint reader can follow, and <c>recoil2png</c> rebuilt one 142 levels
+  /// a channel away from the picture that went in.
+  /// </remarks>
+  internal const int ScreenRam1Offset = 2; // $9C00
 
-  /// <summary>Size of the trailing padding in bytes.</summary>
-  internal const int PaddingSize = 430;
+  /// <inheritdoc cref="ScreenRam1Offset"/>
+  internal const int BackgroundOffset = 1002; // $9FE8
 
-  /// <summary>Total uncompressed payload size (8000 + 1000 + 8000 + 1000 + 1000 + 2 + 430).</summary>
-  internal const int UncompressedPayloadSize = BitmapDataSize + ScreenRamSize + BitmapDataSize + ScreenRamSize + ColorRamSize + BackgroundBorderSize + PaddingSize;
+  /// <inheritdoc cref="ScreenRam1Offset"/>
+  internal const int BorderOffset = 1003; // $9FE9
 
-  /// <summary>Expected total file size including the 2-byte load address.</summary>
-  public const int ExpectedFileSize = LoadAddressSize + UncompressedPayloadSize;
+  /// <inheritdoc cref="ScreenRam1Offset"/>
+  internal const int BitmapData1Offset = 1026; // $A000
 
-  /// <summary>Image width, always 160.</summary>
+  /// <inheritdoc cref="ScreenRam1Offset"/>
+  internal const int BitmapData2Offset = 9218; // $C000
+
+  /// <inheritdoc cref="ScreenRam1Offset"/>
+  internal const int ScreenRam2Offset = 17410; // $E000
+
+  /// <inheritdoc cref="ScreenRam1Offset"/>
+  internal const int ColorRamOffset = 18434; // $E400
+
+  /// <summary>Expected total file size, which is colour RAM's end at <c>$E7E8</c>.</summary>
+  public const int ExpectedFileSize = ColorRamOffset + ColorRamSize; // 19434
+
+  /// <summary>Image width, always 320.</summary>
   public int Width => FixedWidth;
 
   /// <summary>Image height, always 200.</summary>
@@ -72,52 +110,31 @@ public readonly record struct TruePaintFile : IImageFormatReader<TruePaintFile>,
   public byte BorderColor { get; init; }
 
   /// <summary>Converts this True Paint image to a platform-independent <see cref="RawImage"/> in Rgb24 format.</summary>
+  /// <remarks>
+  /// The screen alternates between two multicolour fields faster than the eye separates them, so
+  /// what is seen is their average — and the second field is drawn one 320th of the screen to the
+  /// right of the first, which is the half a multicolour pixel that gives the format its extra
+  /// resolution. Column zero therefore has no second field to average with and takes the background
+  /// register in its place, which is where the picture runs off the left of the shifted field.
+  /// </remarks>
   public static RawImage ToRawImage(TruePaintFile file) {
 
     const int width = FixedWidth;
     const int height = FixedHeight;
     var rgb = new byte[width * height * 3];
+    var background = Commodore64Graphics.HexColors[file.BackgroundColor & 0x0F];
 
     for (var y = 0; y < height; ++y)
       for (var x = 0; x < width; ++x) {
-        var cellX = x / 4;
-        var cellY = y / 8;
-        var cellIndex = cellY * 40 + cellX;
-        var byteInCell = y % 8;
-        var pixelInByte = x % 4;
-        var shift = (3 - pixelInByte) * 2;
-
-        var bitmapByte1 = file.BitmapData1[cellIndex * 8 + byteInCell];
-        var bitValue1 = (bitmapByte1 >> shift) & 0x03;
-        var colorIndex1 = bitValue1 switch {
-          0 => file.BackgroundColor & 0x0F,
-          1 => (file.ScreenRam1[cellIndex] >> 4) & 0x0F,
-          2 => file.ScreenRam1[cellIndex] & 0x0F,
-          3 => file.ColorRam[cellIndex] & 0x0F,
-          _ => 0
-        };
-
-        var bitmapByte2 = file.BitmapData2[cellIndex * 8 + byteInCell];
-        var bitValue2 = (bitmapByte2 >> shift) & 0x03;
-        var colorIndex2 = bitValue2 switch {
-          0 => file.BackgroundColor & 0x0F,
-          1 => (file.ScreenRam2[cellIndex] >> 4) & 0x0F,
-          2 => file.ScreenRam2[cellIndex] & 0x0F,
-          3 => file.ColorRam[cellIndex] & 0x0F,
-          _ => 0
-        };
-
-        var color1 = Commodore64Graphics.HexColors[colorIndex1];
-        var color2 = Commodore64Graphics.HexColors[colorIndex2];
-
-        var r = (byte)((((color1 >> 16) & 0xFF) + ((color2 >> 16) & 0xFF)) / 2);
-        var g = (byte)((((color1 >> 8) & 0xFF) + ((color2 >> 8) & 0xFF)) / 2);
-        var b = (byte)(((color1 & 0xFF) + (color2 & 0xFF)) / 2);
+        var color1 = _FieldColour(file.BitmapData1, file.ScreenRam1, file.ColorRam, file.BackgroundColor, x, y);
+        var color2 = x == 0
+          ? background
+          : _FieldColour(file.BitmapData2, file.ScreenRam2, file.ColorRam, file.BackgroundColor, x - 1, y);
 
         var offset = (y * width + x) * 3;
-        rgb[offset] = r;
-        rgb[offset + 1] = g;
-        rgb[offset + 2] = b;
+        rgb[offset] = (byte)((((color1 >> 16) & 0xFF) + ((color2 >> 16) & 0xFF)) / 2);
+        rgb[offset + 1] = (byte)((((color1 >> 8) & 0xFF) + ((color2 >> 8) & 0xFF)) / 2);
+        rgb[offset + 2] = (byte)(((color1 & 0xFF) + (color2 & 0xFF)) / 2);
       }
 
     return new() {
@@ -128,14 +145,28 @@ public readonly record struct TruePaintFile : IImageFormatReader<TruePaintFile>,
     };
   }
 
-  /// <summary>Creates a True Paint picture from a <see cref="RawImage"/>, sampling it to the VIC-II's 160x200 multicolour screen.</summary>
+  /// <summary>What one field shows at a point on the 320-pixel screen.</summary>
+  private static int _FieldColour(byte[] bitmap, byte[] screenRam, byte[] colorRam, byte background, int x, int y) {
+    var cellIndex = (y >> 3) * CellsPerRow + (x >> 3);
+    var bits = (bitmap[cellIndex * 8 + (y & 7)] >> (~x & 6)) & 3;
+    var colorIndex = bits switch {
+      1 => (screenRam[cellIndex] >> 4) & 0x0F,
+      2 => screenRam[cellIndex] & 0x0F,
+      3 => colorRam[cellIndex] & 0x0F,
+      _ => background & 0x0F,
+    };
+
+    return Commodore64Graphics.HexColors[colorIndex];
+  }
+
+  /// <summary>Creates a True Paint picture from a <see cref="RawImage"/>, sampling it onto the VIC-II's multicolour screen.</summary>
   /// <remarks>
   /// True Paint holds two multicolour screens that the machine alternates between, and
   /// <see cref="ToRawImage"/> reproduces that by averaging the two. Writing the same screen into
   /// both fields is what a still picture wants: the average of a colour with itself is that colour,
-  /// so what comes back is exactly what went in. Mixing two different fields would buy extra
-  /// apparent colours at the cost of never reproducing the original, which is a dithering decision
-  /// and not one an encoder should make silently.
+  /// so every column both fields agree on comes back exactly as it went in. Mixing two different
+  /// fields would buy extra apparent colours at the cost of never reproducing the original, which is
+  /// a dithering decision and not one an encoder should make silently.
   /// <para/>
   /// Within one field the hardware allows four colours per 4x8 cell: a shared background register
   /// plus the two screen nibbles and the colour RAM nibble.
@@ -143,12 +174,17 @@ public readonly record struct TruePaintFile : IImageFormatReader<TruePaintFile>,
   public static TruePaintFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
 
+    // The columns the fields agree on are the odd ones — an even column is the seam where the
+    // shifted field still shows the multicolour pixel to its left — so those are the ones read off
+    // the picture, and a picture this format produced comes back through it unchanged.
     var bgra = image.SampleTo(FixedWidth, FixedHeight).ToBgra32();
-    var indices = new byte[FixedWidth * FixedHeight];
-    for (var i = 0; i < indices.Length; ++i) {
-      var offset = i * 4;
-      indices[i] = (byte)Commodore64Graphics.FindNearestColorIndex(bgra[offset + 2], bgra[offset + 1], bgra[offset]);
-    }
+    var indices = new byte[CodedWidth * FixedHeight];
+    for (var y = 0; y < FixedHeight; ++y)
+      for (var x = 0; x < CodedWidth; ++x) {
+        var offset = (y * FixedWidth + x * 2 + 1) * 4;
+        indices[y * CodedWidth + x] =
+          (byte)Commodore64Graphics.FindNearestColorIndex(bgra[offset + 2], bgra[offset + 1], bgra[offset]);
+      }
 
     Span<int> frequency = stackalloc int[16];
     foreach (var index in indices)
@@ -175,7 +211,7 @@ public readonly record struct TruePaintFile : IImageFormatReader<TruePaintFile>,
         for (var row = 0; row < 8; ++row) {
           byte packed = 0;
           for (var column = 0; column < 4; ++column) {
-            var color = indices[(cellY * 8 + row) * FixedWidth + cellX * 4 + column];
+            var color = indices[(cellY * 8 + row) * CodedWidth + cellX * 4 + column];
             var pattern = _PickPattern(color, (byte)background, cellColors);
             packed |= (byte)(pattern << ((3 - column) * 2));
           }
@@ -201,7 +237,7 @@ public readonly record struct TruePaintFile : IImageFormatReader<TruePaintFile>,
     Span<int> frequency = stackalloc int[16];
     for (var row = 0; row < 8; ++row)
       for (var column = 0; column < 4; ++column)
-        ++frequency[indices[(cellY * 8 + row) * FixedWidth + cellX * 4 + column]];
+        ++frequency[indices[(cellY * 8 + row) * CodedWidth + cellX * 4 + column]];
 
     frequency[background] = -1;
     for (var slot = 0; slot < 3; ++slot) {
