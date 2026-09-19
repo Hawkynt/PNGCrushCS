@@ -6,32 +6,13 @@ using FileFormat.Core;
 
 namespace FileFormat.Vmd;
 
-/// <summary>
-/// Splits a Sierra VMD file into its header, its table of contents and the packets those describe,
-/// without reading a single LZ back-reference or a single palette byte's meaning.
-/// </summary>
+/// <summary>Reads the classic 816-byte Sierra VMD container and its fixed block/part table.</summary>
 /// <remarks>
-/// A file is an 816-byte header (a two-byte length field stating 814, then the fields themselves),
-/// a run of coded data the header's own <c>multimedia data offset</c> field names the start of, and a
-/// table of contents near the end of the file: a block offset table, then a frame information table.
-/// <para/>
-/// "Block" and "frame" are two different things here and the format keeps them apart: a block is a
-/// unit of interleaving — one video frame and the one or more audio frames that play alongside it —
-/// and the block offset table exists only so a player can seek to one without walking every frame
-/// before it. Nothing here needs that table for sequential reading: every frame information record
-/// states its own data length, so a running cursor that starts at the header's multimedia data offset
-/// and advances by each record's stated length in turn lands on every frame's own bytes in order — and,
-/// measured against every file this reader was built against, lands exactly on the table of contents'
-/// own offset once every record has been walked. That agreement is checked rather than assumed: a file
-/// whose lengths do not sum to its own table of contents offset is refused, because a cursor that
-/// landed anywhere else would be handing out some other frame's bytes under the wrong header.
-/// <para/>
-/// A frame information record names one of two kinds — audio or video — and this reader has met a
-/// third: a record of type zero and length zero, a handful of times, always contributing nothing to
-/// the cursor. It is skipped rather than refused, since it is indistinguishable from a placeholder no
-/// packet needs to come from. A record of any other type, or a zero-typed record with a nonzero length,
-/// is refused: nothing measured here explains what such a record would mean, and guessing would hand a
-/// decoder bytes under the wrong description.
+/// The fixed table walk is converted from FFmpeg's LGPL-2.1-or-later <c>libavformat/sierravmd.c</c>;
+/// see <c>Codecs/Vmd/THIRD-PARTY-NOTICE.FFmpeg.txt</c>. Every block supplies its own absolute data
+/// offset and owns exactly the number of part records stated at header offset 18. Unknown part types
+/// are skipped but still consume their declared data length, matching the format's role as a container
+/// for subtitles and embedded-file records as well as audio/video.
 /// </remarks>
 internal static class VmdReader {
 
@@ -47,26 +28,20 @@ internal static class VmdReader {
   private const int _OFFSET_WIDTH = 12;
   private const int _OFFSET_HEIGHT = 14;
   private const int _OFFSET_FLAGS = 16;
+  private const int _OFFSET_FRAMES_PER_BLOCK = 18;
   private const int _OFFSET_MULTIMEDIA_DATA_OFFSET = 20;
+  private const int _OFFSET_VIDEO_CODEC = 24;
   private const int _OFFSET_AUDIO_SAMPLE_RATE = 804;
   private const int _OFFSET_AUDIO_FRAME_LENGTH = 806;
   private const int _OFFSET_TOC_OFFSET = 812;
 
   private const ushort _FLAG_HAS_SOUND = 0x1000;
-
   private const byte _FRAME_TYPE_AUDIO = 1;
   private const byte _FRAME_TYPE_VIDEO = 2;
 
-  /// <summary>
-  /// Whether a header looks like a Sierra VMD file's: the fixed 814-byte length field every real
-  /// sample states, a picture size within bounds no real file exceeds (or none at all — VMD carries
-  /// sound-only recordings), and a multimedia data offset that lands exactly where this fixed-size
-  /// header ends. VMD carries no signature of its own, so this is the only check a container can make.
-  /// </summary>
   internal static bool LooksPlausible(ReadOnlySpan<byte> header) {
     if (header.Length < _HEADER_LENGTH)
       return false;
-
     if (BinaryPrimitives.ReadUInt16LittleEndian(header[_OFFSET_HEADER_LENGTH_FIELD..]) != _EXPECTED_HEADER_LENGTH_FIELD)
       return false;
 
@@ -75,23 +50,20 @@ internal static class VmdReader {
     if (width > _MAX_DIMENSION || height > _MAX_DIMENSION)
       return false;
 
-    var multimediaOffset = BinaryPrimitives.ReadUInt32LittleEndian(header[_OFFSET_MULTIMEDIA_DATA_OFFSET..]);
-    return multimediaOffset == _HEADER_LENGTH;
+    return BinaryPrimitives.ReadUInt32LittleEndian(header[_OFFSET_MULTIMEDIA_DATA_OFFSET..]) == _HEADER_LENGTH;
   }
 
   internal static VmdContainer Open(ReadOnlyMemory<byte> data) {
     if (!LooksPlausible(data.Span))
       throw new NotSupportedException(
-        "This file's header does not state the fixed 814-byte length field every Sierra VMD file "
-        + "opens with, or its multimedia data offset does not land at byte 816 where that fixed-size "
-        + "header ends. This is not a Sierra VMD file, or is a header variant — a 52-byte header "
-        + "omitting the palette, or one carrying an external audio codec's extra fields — this reader "
-        + "does not read; only the classic 816-byte form is implemented.");
+        "This file is not the classic 816-byte Sierra VMD form: its 814-byte header-length field, "
+        + "picture geometry or multimedia-data offset does not match that layout.");
 
     var span = data.Span;
     var width = BinaryPrimitives.ReadUInt16LittleEndian(span[_OFFSET_WIDTH..]);
     var height = BinaryPrimitives.ReadUInt16LittleEndian(span[_OFFSET_HEIGHT..]);
     var numBlocks = BinaryPrimitives.ReadUInt16LittleEndian(span[_OFFSET_NUM_BLOCKS..]);
+    var framesPerBlock = BinaryPrimitives.ReadUInt16LittleEndian(span[_OFFSET_FRAMES_PER_BLOCK..]);
     var flags = BinaryPrimitives.ReadUInt16LittleEndian(span[_OFFSET_FLAGS..]);
     var multimediaOffset = BinaryPrimitives.ReadUInt32LittleEndian(span[_OFFSET_MULTIMEDIA_DATA_OFFSET..]);
     var audioSampleRate = BinaryPrimitives.ReadUInt16LittleEndian(span[_OFFSET_AUDIO_SAMPLE_RATE..]);
@@ -99,164 +71,209 @@ internal static class VmdReader {
     var tocOffset = BinaryPrimitives.ReadUInt32LittleEndian(span[_OFFSET_TOC_OFFSET..]);
     var codecVersion = BinaryPrimitives.ReadUInt16LittleEndian(span[_OFFSET_CODEC_VERSION..]);
 
-    if (tocOffset > data.Length)
+    if (tocOffset < multimediaOffset || tocOffset > data.Length)
       throw new InvalidDataException(
-        $"The table of contents offset ({tocOffset}) is past the end of a file of {data.Length} bytes.");
+        $"The VMD table of contents offset {tocOffset} is outside the multimedia-data range of this {data.Length}-byte file.");
 
-    var blockTableLength = (long)numBlocks * _BLOCK_RECORD_LENGTH;
-    var frameTableStart = tocOffset + blockTableLength;
+    var blockTableLength = checked((long)numBlocks * _BLOCK_RECORD_LENGTH);
+    var frameTableStart = checked((long)tocOffset + blockTableLength);
     if (frameTableStart > data.Length)
       throw new InvalidDataException(
-        $"The block offset table ({numBlocks} records of six bytes, starting at {tocOffset}) runs past "
-        + $"the end of a file of {data.Length} bytes.");
+        $"The VMD block table ({numBlocks} six-byte records) runs past the end of the file.");
 
-    var frameTableBytes = data.Length - frameTableStart;
-    if (frameTableBytes % _FRAME_RECORD_LENGTH != 0)
-      throw new InvalidDataException(
-        $"The frame information table, {frameTableBytes} bytes starting at {frameTableStart}, is not a "
-        + "whole number of sixteen-byte records.");
-
-    var frameCount = (int)(frameTableBytes / _FRAME_RECORD_LENGTH);
+    int frameCount;
+    var legacyFlatTable = framesPerBlock == 0;
+    if (legacyFlatTable) {
+      var bytes = data.Length - frameTableStart;
+      if (bytes % _FRAME_RECORD_LENGTH != 0)
+        throw new InvalidDataException(
+          $"The legacy VMD frame table occupies {bytes} bytes, not a whole number of sixteen-byte records.");
+      frameCount = checked((int)(bytes / _FRAME_RECORD_LENGTH));
+    } else {
+      var count = checked((long)numBlocks * framesPerBlock);
+      if (count > int.MaxValue)
+        throw new InvalidDataException("The VMD block/part table contains more records than can be indexed in memory.");
+      frameCount = (int)count;
+      var frameTableEnd = checked(frameTableStart + count * _FRAME_RECORD_LENGTH);
+      if (frameTableEnd > data.Length)
+        throw new InvalidDataException(
+          $"The VMD frame table needs {count} sixteen-byte records and runs past the end of the file.");
+    }
 
     var blockOffsets = new int[numBlocks];
-    for (var b = 0; b < numBlocks; ++b) {
-      var blockRecordOffset = (int)tocOffset + b * _BLOCK_RECORD_LENGTH;
-      var blockOffset = BinaryPrimitives.ReadUInt32LittleEndian(span.Slice(blockRecordOffset + 2, 4));
-      if (blockOffset > data.Length)
+    for (var block = 0; block < numBlocks; ++block) {
+      var at = checked((int)tocOffset + block * _BLOCK_RECORD_LENGTH + 2);
+      var value = BinaryPrimitives.ReadUInt32LittleEndian(span.Slice(at, 4));
+      if (value < multimediaOffset || value > tocOffset)
         throw new InvalidDataException(
-          $"Block offset table record {b} states an absolute offset of {blockOffset}, past the end of "
-          + $"a file of {data.Length} bytes.");
-      if (b > 0 && blockOffset < blockOffsets[b - 1])
+          $"VMD block {block} starts at {value}, outside the multimedia-data area {multimediaOffset}..{tocOffset}.");
+      if (block > 0 && value < blockOffsets[block - 1])
         throw new InvalidDataException(
-          $"Block offset table record {b} states offset {blockOffset}, before record {b - 1}'s "
-          + $"{blockOffsets[b - 1]}. The table this reader uses to number a video frame by the block "
-          + "it belongs to is expected to be non-decreasing.");
-      blockOffsets[b] = (int)blockOffset;
+          $"VMD block {block} starts at {value}, before block {block - 1} at {blockOffsets[block - 1]}.");
+      blockOffsets[block] = checked((int)value);
     }
 
-    var cursor = (long)multimediaOffset;
+    var frameOffsets = new int[frameCount];
+    var frameBlocks = new int[frameCount];
     var videoFrameCount = 0;
-    var hasAudio = false;
-    var declaredWidth = width;
-    var declaredHeight = height;
+    var hasAudioRecord = false;
 
-    for (var i = 0; i < frameCount; ++i) {
-      var recordOffset = (int)(frameTableStart + (long)i * _FRAME_RECORD_LENGTH);
-      var record = span.Slice(recordOffset, _FRAME_RECORD_LENGTH);
-      var type = record[0];
-      var length = BinaryPrimitives.ReadUInt32LittleEndian(record[2..]);
+    if (legacyFlatTable)
+      _ReadLegacyFlatTable(
+        span, checked((int)frameTableStart), frameCount, multimediaOffset, tocOffset, blockOffsets,
+        frameOffsets, frameBlocks, ref videoFrameCount, ref hasAudioRecord);
+    else
+      _ReadFixedTable(
+        span, checked((int)frameTableStart), numBlocks, framesPerBlock, tocOffset, blockOffsets,
+        frameOffsets, frameBlocks, ref videoFrameCount, ref hasAudioRecord);
 
-      if (type != _FRAME_TYPE_AUDIO && type != _FRAME_TYPE_VIDEO) {
-        if (type != 0 || length != 0)
-          throw new InvalidDataException(
-            $"Frame information record {i} states type {type}, which is neither 1 (audio) nor 2 "
-            + $"(video), and is not the zero-length placeholder this reader passes over.");
-      } else {
-        if (cursor + length > data.Length)
-          throw new InvalidDataException(
-            $"Frame information record {i} (type {type}) states {length} bytes of data starting at "
-            + $"{cursor}, which runs past the end of a file of {data.Length} bytes.");
-
-        if (type == _FRAME_TYPE_VIDEO) {
-          ++videoFrameCount;
-          if (declaredWidth == 0 && length >= 8) {
-            var payloadStart = (int)cursor;
-            var left = BinaryPrimitives.ReadUInt16LittleEndian(span.Slice(payloadStart, 2));
-            var top = BinaryPrimitives.ReadUInt16LittleEndian(span.Slice(payloadStart + 2, 2));
-            var right = BinaryPrimitives.ReadUInt16LittleEndian(span.Slice(payloadStart + 4, 2));
-            var bottom = BinaryPrimitives.ReadUInt16LittleEndian(span.Slice(payloadStart + 6, 2));
-            if (right >= left && bottom >= top) {
-              declaredWidth = (ushort)(right - left + 1);
-              declaredHeight = (ushort)(bottom - top + 1);
-            }
-          }
-        } else {
-          hasAudio = true;
-        }
-      }
-
-      cursor += length;
+    var isIndeo3 = _IsIndeo3(span);
+    var finalWidth = width;
+    var finalHeight = height;
+    if (isIndeo3 && finalWidth > 320) {
+      finalWidth /= 2;
+      finalHeight /= 2;
     }
-
-    if (cursor != tocOffset)
-      throw new InvalidDataException(
-        $"Every frame information record's stated length sums to a cursor of {cursor}, which does not "
-        + $"land on the table of contents' own offset ({tocOffset}). The frame data and the table that "
-        + "describes it disagree about where one ends and the other begins.");
-
-    var finalWidth = width != 0 ? width : declaredWidth;
-    var finalHeight = height != 0 ? height : declaredHeight;
 
     return new() {
       Data = data,
       Width = finalWidth,
       Height = finalHeight,
       VideoFrameCount = videoFrameCount,
-      HasAudio = hasAudio && (flags & _FLAG_HAS_SOUND) != 0 && audioSampleRate != 0,
+      HasAudio = hasAudioRecord && (flags & _FLAG_HAS_SOUND) != 0 && audioSampleRate != 0,
       AudioSampleRate = audioSampleRate,
       AudioFrameLength = Math.Abs(audioFrameLengthRaw),
       CodecVersion = codecVersion,
+      IsIndeo3 = isIndeo3,
       TocOffset = tocOffset,
       NumBlocks = numBlocks,
+      FramesPerBlock = framesPerBlock,
       FrameCount = frameCount,
-      FrameTableStart = (int)frameTableStart,
+      FrameTableStart = checked((int)frameTableStart),
+      FrameDataOffsets = frameOffsets,
+      FrameBlockIndices = frameBlocks,
       MultimediaDataOffset = multimediaOffset,
       HeaderPayload = data[.._HEADER_LENGTH],
       BlockOffsets = blockOffsets,
     };
   }
 
-  /// <summary>Walks the frame information table a second time, handing out the packets a caller can do
-  /// anything with — sequentially, from the same cursor arithmetic <see cref="Open"/> already checked
-  /// sums correctly, so this cannot land on the wrong bytes without <see cref="Open"/> having refused
-  /// the file first.</summary>
   internal static IEnumerable<CodedPacket> ReadPackets(VmdContainer container) {
     var data = container.Data;
-    var blockOffsets = container.BlockOffsets;
-
-    long cursor = container.MultimediaDataOffset;
-    var isFirstVideoFrame = true;
-    var blockIndex = 0;
+    var firstVideo = true;
 
     for (var i = 0; i < container.FrameCount; ++i) {
       var recordOffset = container.FrameTableStart + i * _FRAME_RECORD_LENGTH;
-      var recordMemory = data.Slice(recordOffset, _FRAME_RECORD_LENGTH);
-      var type = recordMemory.Span[0];
-      var length = BinaryPrimitives.ReadUInt32LittleEndian(recordMemory.Span[2..]);
+      var record = data.Slice(recordOffset, _FRAME_RECORD_LENGTH);
+      var type = record.Span[0];
+      var length = BinaryPrimitives.ReadUInt32LittleEndian(record.Span[2..]);
+      if (length == 0 && type != _FRAME_TYPE_AUDIO)
+        continue;
 
-      while (blockIndex + 1 < blockOffsets.Count && blockOffsets[blockIndex + 1] <= cursor)
-        ++blockIndex;
-
+      var dataOffset = container.FrameDataOffsets[i];
       if (type == _FRAME_TYPE_VIDEO) {
+        var packetData = container.IsIndeo3
+          ? data.Slice(dataOffset, checked((int)length))
+          : _WithRecord(record, data, dataOffset, length);
         yield return new(
           StreamIndex: 0,
-          Data: _WithRecord(recordMemory, data, cursor, length),
-          PresentationTimestamp: blockIndex,
-          DecodeTimestamp: blockIndex,
-          IsKeyFrame: isFirstVideoFrame);
-        isFirstVideoFrame = false;
+          Data: packetData,
+          PresentationTimestamp: container.FrameBlockIndices[i],
+          DecodeTimestamp: container.FrameBlockIndices[i],
+          IsKeyFrame: firstVideo);
+        firstVideo = false;
       } else if (type == _FRAME_TYPE_AUDIO && container.HasAudio) {
         yield return new(
           StreamIndex: 1,
-          Data: _WithRecord(recordMemory, data, cursor, length),
+          Data: _WithRecord(record, data, dataOffset, length),
           IsKeyFrame: true);
       }
-
-      cursor += length;
     }
   }
 
-  /// <summary>Prepends the sixteen-byte frame information record to the frame's own data. The record
-  /// and the data it describes are not adjacent in the file — the record lives in the table of
-  /// contents near the end, the data wherever its block was written — so, unlike a container whose
-  /// packet already carries its header in front of it, this is a real copy rather than a wider window
-  /// onto the same bytes. What it buys is the same thing RoQ's and MVE's own headers-kept-in-front buy:
-  /// a decoder reads a video frame's rectangle and its new-palette flag from the packet handed to it,
-  /// without the container having to understand what either of those mean.</summary>
-  private static ReadOnlyMemory<byte> _WithRecord(ReadOnlyMemory<byte> record, ReadOnlyMemory<byte> data, long cursor, uint length) {
-    var combined = new byte[_FRAME_RECORD_LENGTH + length];
+  private static void _ReadFixedTable(
+    ReadOnlySpan<byte> file, int frameTableStart, int numBlocks, int framesPerBlock, uint tocOffset,
+    IReadOnlyList<int> blockOffsets, int[] frameOffsets, int[] frameBlocks,
+    ref int videoFrameCount, ref bool hasAudioRecord) {
+    for (var block = 0; block < numBlocks; ++block) {
+      long currentOffset = blockOffsets[block];
+      for (var part = 0; part < framesPerBlock; ++part) {
+        var index = block * framesPerBlock + part;
+        var record = file.Slice(frameTableStart + index * _FRAME_RECORD_LENGTH, _FRAME_RECORD_LENGTH);
+        var type = record[0];
+        var length = BinaryPrimitives.ReadUInt32LittleEndian(record[2..]);
+
+        frameOffsets[index] = checked((int)currentOffset);
+        frameBlocks[index] = block;
+        if (currentOffset + length > tocOffset)
+          throw new InvalidDataException(
+            $"VMD block {block}, part {part} ends at {currentOffset + length}, which does not fit before the table of contents at {tocOffset}.");
+
+        if (type == _FRAME_TYPE_VIDEO && length != 0)
+          ++videoFrameCount;
+        else if (type == _FRAME_TYPE_AUDIO)
+          hasAudioRecord = true;
+
+        currentOffset += length;
+      }
+
+      if (block + 1 < numBlocks && currentOffset > blockOffsets[block + 1])
+        throw new InvalidDataException(
+          $"VMD block {block}'s parts run through {currentOffset}, overlapping block {block + 1} at {blockOffsets[block + 1]}.");
+    }
+  }
+
+  private static void _ReadLegacyFlatTable(
+    ReadOnlySpan<byte> file, int frameTableStart, int frameCount, uint multimediaOffset, uint tocOffset,
+    IReadOnlyList<int> blockOffsets, int[] frameOffsets, int[] frameBlocks,
+    ref int videoFrameCount, ref bool hasAudioRecord) {
+    long currentOffset = multimediaOffset;
+    var block = 0;
+    for (var i = 0; i < frameCount; ++i) {
+      while (block + 1 < blockOffsets.Count && blockOffsets[block + 1] <= currentOffset)
+        ++block;
+
+      var record = file.Slice(frameTableStart + i * _FRAME_RECORD_LENGTH, _FRAME_RECORD_LENGTH);
+      var type = record[0];
+      var length = BinaryPrimitives.ReadUInt32LittleEndian(record[2..]);
+      frameOffsets[i] = checked((int)currentOffset);
+      frameBlocks[i] = block;
+
+      // A block/part table may carry parts of a type this reader has no use for, and the reference
+      // decoder walks past them; the flat table has no such parts, so a type it does not know there
+      // is a corrupt record rather than a part to skip.
+      if (type != _FRAME_TYPE_AUDIO && type != _FRAME_TYPE_VIDEO && (type != 0 || length != 0))
+        throw new InvalidDataException(
+          $"Frame information record {i} states type {type}, which is neither 1 (audio) nor 2 "
+          + "(video), and is not the zero-length placeholder this reader passes over.");
+      if (currentOffset + length > tocOffset)
+        throw new InvalidDataException(
+          $"Legacy VMD frame record {i} ends at {currentOffset + length}, which does not fit before the table of contents at {tocOffset}.");
+      if (type == _FRAME_TYPE_VIDEO && length != 0)
+        ++videoFrameCount;
+      else if (type == _FRAME_TYPE_AUDIO)
+        hasAudioRecord = true;
+
+      currentOffset += length;
+    }
+
+    if (currentOffset != tocOffset)
+      throw new InvalidDataException(
+        $"The legacy VMD record lengths end at {currentOffset}, not at the table of contents offset {tocOffset}.");
+  }
+
+  private static bool _IsIndeo3(ReadOnlySpan<byte> header)
+    => _AsciiEqualsIgnoreCase(header[_OFFSET_VIDEO_CODEC], (byte)'i')
+       && _AsciiEqualsIgnoreCase(header[_OFFSET_VIDEO_CODEC + 1], (byte)'v')
+       && header[_OFFSET_VIDEO_CODEC + 2] == (byte)'3';
+
+  private static bool _AsciiEqualsIgnoreCase(byte value, byte lower)
+    => value == lower || value == lower - 32;
+
+  private static ReadOnlyMemory<byte> _WithRecord(ReadOnlyMemory<byte> record, ReadOnlyMemory<byte> data, int offset, uint length) {
+    var combined = new byte[checked(_FRAME_RECORD_LENGTH + (int)length)];
     record.Span.CopyTo(combined);
-    data.Slice((int)cursor, (int)length).Span.CopyTo(combined.AsSpan(_FRAME_RECORD_LENGTH));
+    data.Slice(offset, checked((int)length)).Span.CopyTo(combined.AsSpan(_FRAME_RECORD_LENGTH));
     return combined;
   }
 }

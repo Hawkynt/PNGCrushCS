@@ -2439,7 +2439,7 @@ Implements `IVideoCodecEncoder<Vc1VideoEncoder>`, `IVideoPacketEncoder`.
 
 #### `VmdVideoDecoder`
 
-Decodes Sierra VMD video — the FMV codec behind Phantasmagoria, Gabriel Knight 2 and Sierra's other CD-ROM adventures — an LZSS-compressed run-length coding painted onto a persistent, palettised picture one rectangle at a time.
+Decodes classic eight-bit Sierra VMD video onto its persistent palettised canvas.
 
 Implements `IVideoCodecDecoder<VmdVideoDecoder>`, `IVideoFrameDecoder`.
 
@@ -7097,41 +7097,45 @@ Implements `IVideoContainerWriter<StrWriter>`, `IVideoFormatMetadata<StrWriter>`
 
 #### `VmdContainer`
 
-A Sierra VMD file (`.vmd`) — "Video and Music Data", the format behind Phantasmagoria, Gabriel Knight 2 and Sierra's other CD-ROM adventures — taken apart into its header fields and the packets its table of contents describes, and nothing else.
+A classic Sierra VMD file split into its streams, block table and fixed per-block part table.
 
 Implements `IVideoContainerReader<VmdContainer>`, `IVideoFormatMetadata<VmdContainer>`.
 
 | Member | Signature | Summary |
 | --- | --- | --- |
 | `VmdContainer` | `VmdContainer()` |  |
-| `AudioFrameLength` | `int AudioFrameLength { get; init; }` | The audio frame length the header states, in samples — negative in the header for sixteen-bit sound, unsigned here since nothing in this container reads sound. |
-| `AudioSampleRate` | `int AudioSampleRate { get; init; }` | The audio sample rate the header states, in hertz, or zero for a file with none. |
-| `BlockOffsets` | `IReadOnlyList<int> BlockOffsets { get; init; }` | Each block's own absolute file offset, in the order the block offset table states them. Not needed to walk the frame data sequentially — see `VmdReader`'s remarks — but needed for the one thing this table exists for: naming which block a video frame belongs to, which is the presentation timestamp `ReadPackets` reports for it. A block may hold more than one audio frame and no video frame at all — measured directly against a real file, where a run of blocks carrying only extra sound leaves the timestamps of the video frames around them further apart than one block — so a plain running count of video frames does not reproduce it and the block table is what does. |
-| `CodecVersion` | `int CodecVersion { get; init; }` | The video codec version the header states — `1` for the eight-bit palettised form every sample this reader was measured against carries. Left for the codec to read and to refuse by name, the same way a container never itself refuses a codec it has not decoded. |
-| `Data` | `ReadOnlyMemory<byte> Data { get; init; }` | The whole file, which every packet is a window or a small reconstruction onto. |
+| `AudioFrameLength` | `int AudioFrameLength { get; init; }` |  |
+| `AudioSampleRate` | `int AudioSampleRate { get; init; }` |  |
+| `BlockOffsets` | `IReadOnlyList<int> BlockOffsets { get; init; }` |  |
+| `CodecVersion` | `int CodecVersion { get; init; }` |  |
+| `Data` | `ReadOnlyMemory<byte> Data { get; init; }` |  |
 | `FileExtensions` | `static string[] FileExtensions { get; }` |  |
-| `FrameCount` | `int FrameCount { get; init; }` | How many records the frame information table holds. |
-| `FrameTableStart` | `int FrameTableStart { get; init; }` | The frame information table's own absolute file offset. |
-| `HasAudio` | `bool HasAudio { get; init; }` | Whether the file carries sound: the header's own flag, corroborated by at least one audio-type record actually present in the table of contents. |
-| `HeaderPayload` | `ReadOnlyMemory<byte> HeaderPayload { get; init; }` | The 816-byte header verbatim, carried through as the video stream's private data so the codec can read the codec version and the initial palette this container does not interpret. |
-| `Height` | `int Height { get; init; }` | Picture height in pixels. |
-| `MultimediaDataOffset` | `uint MultimediaDataOffset { get; init; }` | Where the coded frame data begins — always 816, immediately after the fixed-size header, in every sample this reader was measured against. |
-| `NumBlocks` | `int NumBlocks { get; init; }` | How many records the block offset table holds — the same count as `BlockOffsets`'s length, kept as its own field because it is also what locates the frame information table. |
+| `FrameBlockIndices` | `IReadOnlyList<int> FrameBlockIndices { get; init; }` |  |
+| `FrameCount` | `int FrameCount { get; init; }` |  |
+| `FrameDataOffsets` | `IReadOnlyList<int> FrameDataOffsets { get; init; }` |  |
+| `FrameTableStart` | `int FrameTableStart { get; init; }` |  |
+| `FramesPerBlock` | `int FramesPerBlock { get; init; }` |  |
+| `HasAudio` | `bool HasAudio { get; init; }` |  |
+| `HeaderPayload` | `ReadOnlyMemory<byte> HeaderPayload { get; init; }` |  |
+| `Height` | `int Height { get; init; }` |  |
+| `IsIndeo3` | `bool IsIndeo3 { get; init; }` |  |
+| `MultimediaDataOffset` | `uint MultimediaDataOffset { get; init; }` |  |
+| `NumBlocks` | `int NumBlocks { get; init; }` |  |
 | `PrimaryExtension` | `static string PrimaryExtension { get; }` |  |
-| `TocOffset` | `uint TocOffset { get; init; }` | The table of contents' own absolute file offset, as the header states it. |
-| `VideoFrameCount` | `int VideoFrameCount { get; init; }` | How many video-type records the table of contents holds. |
-| `Width` | `int Width { get; init; }` | Picture width in pixels. |
-| `FromBytes` | `static VmdContainer FromBytes(byte[] data)` | Opens a file over the caller's array, keeping it rather than copying it. |
+| `TocOffset` | `uint TocOffset { get; init; }` |  |
+| `VideoFrameCount` | `int VideoFrameCount { get; init; }` |  |
+| `Width` | `int Width { get; init; }` |  |
+| `FromBytes` | `static VmdContainer FromBytes(byte[] data)` |  |
 | `FromFile` | `static VmdContainer FromFile(FileInfo file)` |  |
 | `FromSpan` | `static VmdContainer FromSpan(ReadOnlySpan<byte> data)` |  |
 | `MatchesSignature` | `static bool? MatchesSignature(ReadOnlySpan<byte> header)` |  |
-| `Metadata` | `static VideoMetadata Metadata(VmdContainer container)` | Nothing beyond the streams themselves. A VMD file has no field for a title, an author or a creation date. |
+| `Metadata` | `static VideoMetadata Metadata(VmdContainer container)` |  |
 | `ReadPackets` | `static IEnumerable<CodedPacket> ReadPackets(VmdContainer container)` |  |
 | `Streams` | `static IReadOnlyList<MediaStreamInfo> Streams(VmdContainer container)` |  |
 
 #### `VmdWriter`
 
-Writes classic 816-byte Sierra VMD files from record-prefixed demux packets.
+Writes classic 816-byte Sierra VMD files with a real fixed-stride block/part table.
 
 Implements `IVideoContainerWriter<VmdWriter>`, `IVideoFormatMetadata<VmdWriter>`.
 
