@@ -393,7 +393,7 @@ internal sealed class H263PictureDecoder {
   }
 
   private void _ReconstructAdvancedInter(
-    ref H263BitReader reader, int address, int pattern, ReadOnlySpan<int> vectorX, ReadOnlySpan<int> vectorY) {
+    ref H263BitReader reader, int address, int pattern, scoped ReadOnlySpan<int> vectorX, scoped ReadOnlySpan<int> vectorY) {
     var reference = this._reference
       ?? throw new InvalidDataException("An Advanced Prediction macroblock has no reference picture.");
 
@@ -417,7 +417,7 @@ internal sealed class H263PictureDecoder {
         : this._RemoteVector(address - 1, block + 1, current);
       var rightVector = (block & 1) == 0
         ? (X: vectorX[block + 1], Y: vectorY[block + 1])
-        : this._RemoteRightVector(right, block - 1, current);
+        : _RemoteRightVector(right, block - 1, current);
       var bottom = block < 2
         ? (X: vectorX[block + 2], Y: vectorY[block + 2])
         : current;
@@ -575,8 +575,11 @@ internal sealed class H263PictureDecoder {
       return;
 
     throw new InvalidDataException(
-      $"Block {index} of macroblock {address} has a motion vector of ({vectorX}, {vectorY}) half-pixels that reads "
-      + "outside the reference picture.");
+      $"Block {index} of macroblock {address} (column {address % this._macroblockWidth}, row "
+      + $"{address / this._macroblockWidth}) of this H.263 picture has a motion vector of ({vectorX}, {vectorY}) "
+      + $"half-pixels from ({left}, {top}), which reads outside the {planeWidth}x"
+      + $"{referencePlane.Length / planeWidth} reference plane. ITU-T H.263 6.1.1 permits a vector outside the "
+      + "picture only in the Unrestricted Motion Vector mode of Annex D, which this picture does not use.");
   }
 
   private void _Store(int address, int index, ReadOnlySpan<int> samples) {
