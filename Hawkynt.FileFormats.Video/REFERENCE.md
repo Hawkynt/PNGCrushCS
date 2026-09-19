@@ -1185,7 +1185,7 @@ Implements `IVideoCodecEncoder<HapVideoEncoder>`, `IVideoPacketEncoder`.
 
 #### `HuffYuvDecoder`
 
-Decodes HuffYUV and its extension FFVHUFF: Huffman coding over the difference between each sample and a prediction of it from the samples already decoded.
+Decodes HuffYUV and FFVHUFF, including classic headerless streams and high-depth v3 planes.
 
 Implements `IVideoCodecDecoder<HuffYuvDecoder>`, `IVideoFrameDecoder`.
 
@@ -1193,12 +1193,12 @@ Implements `IVideoCodecDecoder<HuffYuvDecoder>`, `IVideoFrameDecoder`.
 | --- | --- | --- |
 | `CodecName` | `static string CodecName { get; }` |  |
 | `Accepts` | `static bool Accepts(MediaStreamInfo stream)` |  |
-| `Create` | `static HuffYuvDecoder Create(MediaStreamInfo stream)` | Builds a decoder from the stream description, which for this codec is a `BITMAPINFOHEADER` with the codec's own four bytes and its Huffman tables behind it. |
-| `TryDecode` | `bool TryDecode(CodedPacket packet, out RawImage frame)` | Decodes one frame, which for this codec is always exactly one whole picture. |
+| `Create` | `static HuffYuvDecoder Create(MediaStreamInfo stream)` |  |
+| `TryDecode` | `bool TryDecode(CodedPacket packet, out RawImage frame)` |  |
 
 #### `HuffYuvEncoder`
 
-Encodes HuffYUV and its extension FFVHUFF: each sample predicted from its neighbours and the difference Huffman coded with one table per plane.
+Encodes classic HuffYUV and FFVHUFF, including high-depth planar version 3.
 
 Implements `IVideoCodecEncoder<HuffYuvEncoder>`, `IVideoPacketEncoder`.
 
@@ -1206,10 +1206,10 @@ Implements `IVideoCodecEncoder<HuffYuvEncoder>`, `IVideoPacketEncoder`.
 | --- | --- | --- |
 | `CodecName` | `static string CodecName { get; }` |  |
 | `Codec` | `static CodecTag Codec { get; }` |  |
-| `Create` | `static HuffYuvEncoder Create(MediaStreamInfo stream)` | Builds an encoder for the stream described. |
-| `Create` | `static HuffYuvEncoder Create(MediaStreamInfo stream, HuffYuvPredictionMethod prediction, bool planar = false)` | Builds an encoder with the predictor and form chosen outright, for a caller that has no description to hand over. |
-| `DescribeStream` | `MediaStreamInfo DescribeStream()` | Describes the stream the packets belong to: the tag, the depth, and a `BITMAPINFOHEADER` with the codec's four bytes and its Huffman tables behind it. |
-| `TryEncode` | `bool TryEncode(RawImage frame, long? presentationTimestamp, out CodedPacket packet)` | Codes one picture as one packet, which for this codec is always a key frame. |
+| `Create` | `static HuffYuvEncoder Create(MediaStreamInfo stream)` |  |
+| `Create` | `static HuffYuvEncoder Create(MediaStreamInfo stream, HuffYuvPredictionMethod prediction, bool planar = false, bool interlaced = false, bool tablesPerFrame = false)` |  |
+| `DescribeStream` | `MediaStreamInfo DescribeStream()` |  |
+| `TryEncode` | `bool TryEncode(RawImage frame, long? presentationTimestamp, out CodedPacket packet)` |  |
 
 #### `HuffYuvPredictionMethod`
 
