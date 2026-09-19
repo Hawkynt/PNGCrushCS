@@ -144,11 +144,11 @@ public class ZmbvVideoDecoderTests {
   [Category("Unit")]
   public void RefusesAVideoFormatNoEncoderWrites() {
     var decoder = ZmbvVideoDecoder.Create(_Stream(8, 8));
-    // Format 7 is 24 bits a pixel, defined by the format and written by nothing.
+    // Format 7 is 24 bits a pixel, defined by the format and written by nothing in enabled reference builds.
     var packet = new CodedPacket(0, new byte[] { 0x01, 0x00, 0x01, 0x00, 0x07, 0x04, 0x04 });
 
     var failure = Assert.Throws<NotSupportedException>(() => decoder.TryDecode(packet, out _));
-    Assert.That(failure!.Message, Does.Contain("no encoder"));
+    Assert.That(failure!.Message, Does.Contain("reference encoder"));
   }
 
   [Test]
@@ -159,6 +159,24 @@ public class ZmbvVideoDecoderTests {
 
     var failure = Assert.Throws<NotSupportedException>(() => decoder.TryDecode(packet, out _));
     Assert.That(failure!.Message, Does.Contain("does not define"));
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void ThirtyTwoBitPaddingIsNotExposedAsAlpha() {
+    var decoder = ZmbvVideoDecoder.Create(_Stream(2, 1));
+    var header = new byte[] { 0x01, 0x00, 0x01, 0x00, 0x08, 0x02, 0x01 };
+    var bgr0 = new byte[] {
+      0x11, 0x22, 0x33, 0x00,
+      0x44, 0x55, 0x66, 0x7F,
+    };
+
+    Assert.That(decoder.TryDecode(new(0, _Concat(header, bgr0)), out var frame), Is.True);
+    Assert.That(frame.Format, Is.EqualTo(PixelFormat.Bgra32));
+    Assert.That(frame.PixelData, Is.EqualTo(new byte[] {
+      0x11, 0x22, 0x33, 0xFF,
+      0x44, 0x55, 0x66, 0xFF,
+    }));
   }
 
   // ============================================================================================

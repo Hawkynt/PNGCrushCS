@@ -121,7 +121,7 @@ public class LclZlibVideoDecoderTests {
   [Test]
   [Category("Unit")]
   public void RefusesThePngFilterFlag() {
-    var stream = _Stream(16, 16, privateData: _PrivateData(16, 16, flags: 0x08));
+    var stream = _Stream(16, 16, privateData: _PrivateData(16, 16, flags: 0x04));
     var failure = Assert.Throws<NotSupportedException>(() => LclZlibVideoDecoder.Create(stream));
     Assert.That(failure!.Message, Does.Contain("PNG filter"));
   }

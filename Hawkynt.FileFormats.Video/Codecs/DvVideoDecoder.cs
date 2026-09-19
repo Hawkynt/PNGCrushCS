@@ -71,7 +71,7 @@ public sealed class DvVideoDecoder : IVideoCodecDecoder<DvVideoDecoder> {
     this._height = height;
   }
 
-  public static string CodecName => "DV (IEC 61834 / SMPTE 314M)";
+  public static string CodecName => "DV (IEC 61834 / SMPTE 314M / SMPTE 370M)";
 
   public static bool Accepts(MediaStreamInfo stream) {
     ArgumentNullException.ThrowIfNull(stream);

@@ -65,12 +65,17 @@ public class DvVideoTimingTests {
   public void ADeclaredFrameRateMustBePositive() {
     foreach (var requested in new[] {
       new Rational(-30000, -1001),
-      new Rational(0, 1),
       new Rational(25, -1),
     }) {
       var failure = Assert.Throws<NotSupportedException>(() => _Encoder(720, 480, requested));
       Assert.That(failure.Message, Does.Contain("positive").And.Contain(requested.ToString()));
     }
+
+    // A numerator of nought is how Rational spells "not stated", so it is not a rate to refuse: the
+    // raster supplies the canonical one, exactly as an unstated rate does.
+    Assert.That(
+      _Encoder(720, 480, new Rational(0, 1)).DescribeStream().FrameRate,
+      Is.EqualTo(new Rational(30000, 1001)));
   }
 
   private static DvVideoEncoder _Encoder(int width, int height, Rational frameRate)

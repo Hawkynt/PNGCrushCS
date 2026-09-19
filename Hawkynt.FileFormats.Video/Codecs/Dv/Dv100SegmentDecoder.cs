@@ -20,7 +20,7 @@ internal static class Dv100SegmentDecoder {
   private static readonly uint[] _Factors1080 = _BuildFactors(Dv100Tables.Inverse1080Luma, Dv100Tables.Inverse1080Chroma);
   private static readonly uint[] _Factors720 = _BuildFactors(Dv100Tables.Inverse720Luma, Dv100Tables.Inverse720Chroma);
 
-  private struct BlockState {
+  internal struct BlockState {
     internal int Position;
     internal int PartialBitCount;
     internal uint PartialBitBuffer;
@@ -33,8 +33,8 @@ internal static class Dv100SegmentDecoder {
     internal readonly byte[] MacroblockOverflow = new byte[_MacroblockOverflowBytes];
     internal readonly byte[] SegmentOverflow = new byte[_SegmentOverflowBytes];
     internal readonly byte[] BlockPixels = new byte[_BlocksPerMacroblock * 64];
-    private readonly BlockState[] _states = new BlockState[_BlocksPerSegment];
-    private readonly bool[] _fieldModes = new bool[DvProfile.MacroblocksPerSegment];
+    internal readonly BlockState[] States = new BlockState[_BlocksPerSegment];
+    internal readonly bool[] FieldModes = new bool[DvProfile.MacroblocksPerSegment];
   }
 
   internal static void Decode(
@@ -45,10 +45,10 @@ internal static class Dv100SegmentDecoder {
       throw new ArgumentException("The DV100 segment decoder only accepts SMPTE 370M profiles.", nameof(profile));
 
     var factors = profile.Height == 720 ? _Factors720 : _Factors1080;
-    var states = scratch._states;
+    var states = scratch.States;
     var coefficients = scratch.Coefficients;
     Array.Clear(states);
-    Array.Clear(scratch._fieldModes);
+    Array.Clear(scratch.FieldModes);
     Array.Clear(coefficients);
 
     var segmentOverflow = new DvBitWriter(scratch.SegmentOverflow, 0, _SegmentOverflowBytes);
@@ -76,7 +76,7 @@ internal static class Dv100SegmentDecoder {
         var dctMode = reader.ReadBits(ref index, 1) != 0;
         var classNumber = (int)reader.ReadBits(ref index, 2);
         if (b == 0)
-          scratch._fieldModes[macroblock] = dctMode;
+          scratch.FieldModes[macroblock] = dctMode;
 
         ref var state = ref states[first + b];
         state.FactorBase =
@@ -121,7 +121,7 @@ internal static class Dv100SegmentDecoder {
     }
 
     for (var macroblock = 0; macroblock < DvProfile.MacroblocksPerSegment; ++macroblock)
-      _Place(frame, profile, segment, macroblock, scratch._fieldModes[macroblock], coefficients, planes, scratch);
+      _Place(frame, profile, segment, macroblock, scratch.FieldModes[macroblock], coefficients, planes, scratch);
   }
 
   private static uint[] _BuildFactors(ReadOnlySpan<ushort> luma, ReadOnlySpan<ushort> chroma) {
@@ -232,11 +232,12 @@ internal static class Dv100SegmentDecoder {
   private static void _PlaceLast1080Row(
     int first, bool fieldMode, short[] coefficients, DvPlanes planes, int lumaOffset, int mbX, Scratch scratch) {
 
+    var chromaOffset = 134 * 8 * planes.ChromaWidth + (mbX >> 1) * 8;
+
     if (!fieldMode) {
       for (var b = 0; b < 4; ++b)
         _Put(coefficients, first + b, planes.Luma, lumaOffset + b * 8, planes.Width);
 
-      var chromaOffset = 134 * 8 * planes.ChromaWidth + (mbX >> 1) * 8;
       _Put(coefficients, first + 4, planes.Cr, chromaOffset, planes.ChromaWidth);
       _Put(coefficients, first + 5, planes.Cr, chromaOffset + 8, planes.ChromaWidth);
       _Put(coefficients, first + 6, planes.Cb, chromaOffset, planes.ChromaWidth);
@@ -257,7 +258,6 @@ internal static class Dv100SegmentDecoder {
     _CopyFourRows(scratch.BlockPixels, 3, 0, planes.Luma, lumaOffset + planes.Width + 8, planes.Width * 2);
     _CopyFourRows(scratch.BlockPixels, 3, 4, planes.Luma, lumaOffset + planes.Width + 24, planes.Width * 2);
 
-    var chromaOffset = 134 * 8 * planes.ChromaWidth + (mbX >> 1) * 8;
     _CopyFourRows(scratch.BlockPixels, 4, 0, planes.Cr, chromaOffset, planes.ChromaWidth * 2);
     _CopyFourRows(scratch.BlockPixels, 4, 4, planes.Cr, chromaOffset + 8, planes.ChromaWidth * 2);
     _CopyFourRows(scratch.BlockPixels, 5, 0, planes.Cr, chromaOffset + planes.ChromaWidth, planes.ChromaWidth * 2);
