@@ -5,7 +5,12 @@ namespace FileFormat.Eps;
 
 /// <summary>In-memory representation of an EPS (Encapsulated PostScript) image with embedded TIFF preview.</summary>
 [FormatMagicBytes([0xC5, 0xD0, 0xD3, 0xC6])]
-[VerifiedBy(ConformanceOracle.ImageMagick)]
+// Ghostscript alone, and the two omissions are deliberate. ImageMagick renders EPS by shelling out
+// to Ghostscript, so naming both would be one engine counted twice — `magick -list delegate` says
+// so. And a tool that opens one of these by reading the TIFF preview has said nothing about the
+// PostScript program beside it, which is the half that was empty until recently; only an
+// interpreter that runs the program is evidence here.
+[VerifiedBy(ConformanceOracle.Ghostscript)]
 public readonly record struct EpsFile : IImageFormatReader<EpsFile>, IImageToRawImage<EpsFile>, IImageFromRawImage<EpsFile>, IImageFormatWriter<EpsFile> {
 
   static string IImageFormatMetadata<EpsFile>.PrimaryExtension => ".eps";

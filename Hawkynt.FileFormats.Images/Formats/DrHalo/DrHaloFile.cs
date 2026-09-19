@@ -4,7 +4,7 @@ using FileFormat.Core;
 namespace FileFormat.DrHalo;
 
 /// <summary>In-memory representation of a Dr. Halo CUT image.</summary>
-[VerifiedBy(ConformanceOracle.ImageMagick)]
+[VerifiedBy(ConformanceOracle.ImageMagick, ConformanceOracle.XnView)]
 public readonly record struct DrHaloFile : IImageFormatReader<DrHaloFile>, IImageToRawImage<DrHaloFile>, IImageFromRawImage<DrHaloFile>, IImageFormatWriter<DrHaloFile> {
 
   static string IImageFormatMetadata<DrHaloFile>.PrimaryExtension => ".cut";

@@ -6,6 +6,9 @@ namespace FileFormat.Ccitt;
 /// <summary>Encodes raw 1bpp scanlines to CCITT Group 3 1D (Modified Huffman) compressed data.</summary>
 internal static class CcittG3Encoder {
 
+  /// <summary>How many end-of-line words make T.4's return-to-control.</summary>
+  private const int _RETURN_TO_CONTROL_MARKERS = 6;
+
   /// <summary>Encodes 1bpp pixel data to Group 3 1D compressed bytes.</summary>
   /// <param name="pixelData">Packed rows, a set bit being ink.</param>
   /// <param name="width">Pixels across.</param>
@@ -17,7 +20,14 @@ internal static class CcittG3Encoder {
   /// as a shifted one, because the first codeword lands mid-byte. Off by default so that the
   /// streams this has always written are unchanged.
   /// </param>
-  internal static byte[] Encode(byte[] pixelData, int width, int height, bool leadingEndOfLine = false) {
+  /// <param name="returnToControl">
+  /// Whether to close the stream with T.4's return-to-control word, which is six end-of-line words
+  /// in a row and is how a page says it has ended. Without it the coding simply stops, and a decoder
+  /// that has been told nothing about the height cannot tell the last row from a truncated file —
+  /// it reports the row it was reading when the bits ran out as unreadable. Off by default so that
+  /// the wrappers which state their own height are unchanged.
+  /// </param>
+  internal static byte[] Encode(byte[] pixelData, int width, int height, bool leadingEndOfLine = false, bool returnToControl = false) {
     var bytesPerRow = (width + 7) / 8;
     using var ms = new MemoryStream();
     var bitPos = 0;
@@ -38,6 +48,12 @@ internal static class CcittG3Encoder {
 
       _WriteBits(ref currentByte, ref bitPos, ms, CcittHuffmanTable.EolCode, CcittHuffmanTable.EolBitLength);
     }
+
+    // Every row has just written one, and return-to-control is six of them in a row, so five more
+    // finish it rather than six — a seventh would be fill, not punctuation.
+    if (returnToControl)
+      for (var i = 1; i < _RETURN_TO_CONTROL_MARKERS; ++i)
+        _WriteBits(ref currentByte, ref bitPos, ms, CcittHuffmanTable.EolCode, CcittHuffmanTable.EolBitLength);
 
     if (bitPos > 0)
       ms.WriteByte((byte)(currentByte << (8 - bitPos)));
