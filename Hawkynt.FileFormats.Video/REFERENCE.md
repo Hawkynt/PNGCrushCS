@@ -350,7 +350,7 @@ Implements `IVideoContainerWriter<CdxlWriter>`, `IVideoFormatMetadata<CdxlWriter
 
 ### Namespace `FileFormat.Codecs`
 
-[`AascVideoDecoder`](#aascvideodecoder) · [`AascVideoEncoder`](#aascvideoencoder) · [`AnimVideoDecoder`](#animvideodecoder) · [`AppleGraphicsDecoder`](#applegraphicsdecoder) · [`AppleGraphicsEncoder`](#applegraphicsencoder) · [`AppleVideoDecoder`](#applevideodecoder) · [`AppleVideoEncoder`](#applevideoencoder) · [`Asv1VideoDecoder`](#asv1videodecoder) · [`Asv1VideoEncoder`](#asv1videoencoder) · [`Asv2VideoDecoder`](#asv2videodecoder) · [`Asv2VideoEncoder`](#asv2videoencoder) · [`AvidMeridienCompressedVideoDecoder`](#avidmeridiencompressedvideodecoder) · [`AvidMeridienCompressedVideoEncoder`](#avidmeridiencompressedvideoencoder) · [`AvrnVideoDecoder`](#avrnvideodecoder) · [`AvrnVideoEncoder`](#avrnvideoencoder) · [`AvrpVideoDecoder`](#avrpvideodecoder) · [`AvrpVideoEncoder`](#avrpvideoencoder) · [`AvuiVideoDecoder`](#avuivideodecoder) · [`AvuiVideoEncoder`](#avuivideoencoder) · [`AyuvVideoDecoder`](#ayuvvideodecoder) · [`AyuvVideoEncoder`](#ayuvvideoencoder) · [`BfiVideoDecoder`](#bfivideodecoder) · [`CanopusLosslessVideoDecoder`](#canopuslosslessvideodecoder) · [`CanopusLosslessVideoEncoder`](#canopuslosslessvideoencoder) · [`CdxlVideoDecoder`](#cdxlvideodecoder) · [`CineFormEncodingFormat`](#cineformencodingformat) · [`CineFormScanMode`](#cineformscanmode) · [`CineFormVideoDecoder`](#cineformvideodecoder) · [`CineFormVideoEncoder`](#cineformvideoencoder) · [`CinepakVideoDecoder`](#cinepakvideodecoder) · [`CinepakVideoEncoder`](#cinepakvideoencoder) · [`CljrVideoDecoder`](#cljrvideodecoder) · [`CljrVideoEncoder`](#cljrvideoencoder) · [`CreativeYuvVideoDecoder`](#creativeyuvvideodecoder) · [`CreativeYuvVideoEncoder`](#creativeyuvvideoencoder) · [`CscdVideoDecoder`](#cscdvideodecoder) · [`DnxHdVideoDecoder`](#dnxhdvideodecoder) · [`DvVideoDecoder`](#dvvideodecoder) · [`DvVideoEncoder`](#dvvideoencoder) · [`EaCmvVideoDecoder`](#eacmvvideodecoder) · [`EightBpsVideoDecoder`](#eightbpsvideodecoder) · [`EightBpsVideoEncoder`](#eightbpsvideoencoder) · [`Escape124VideoDecoder`](#escape124videodecoder) · [`Escape130VideoDecoder`](#escape130videodecoder) · [`Ffv1Decoder`](#ffv1decoder) · [`Ffv1Encoder`](#ffv1encoder) · [`FlashSv2VideoDecoder`](#flashsv2videodecoder) · [`FlashSvVideoDecoder`](#flashsvvideodecoder) · [`FlashSvVideoEncoder`](#flashsvvideoencoder) · [`FlicVideoDecoder`](#flicvideodecoder) · [`FlicVideoEncoder`](#flicvideoencoder) · [`H261VideoDecoder`](#h261videodecoder) · [`H261VideoEncoder`](#h261videoencoder) · [`H263VideoDecoder`](#h263videodecoder) · [`H263VideoEncoder`](#h263videoencoder) · [`H264VideoDecoder`](#h264videodecoder) · [`H264VideoEncoder`](#h264videoencoder) · [`H265VideoDecoder`](#h265videodecoder) · [`H265VideoEncoder`](#h265videoencoder) · [`HapDecoder`](#hapdecoder) · [`HapVideoEncoder`](#hapvideoencoder) · [`HuffYuvDecoder`](#huffyuvdecoder) · [`HuffYuvEncoder`](#huffyuvencoder) · [`HuffYuvPredictionMethod`](#huffyuvpredictionmethod) · [`I420VideoDecoder`](#i420videodecoder) · [`I420VideoEncoder`](#i420videoencoder) · [`IdcinVideoDecoder`](#idcinvideodecoder) · [`Indeo2VideoDecoder`](#indeo2videodecoder) · [`Indeo2VideoEncoder`](#indeo2videoencoder) · [`Indeo3VideoDecoder`](#indeo3videodecoder) · [`Indeo3VideoEncoder`](#indeo3videoencoder) · [`Indeo4VideoDecoder`](#indeo4videodecoder) · [`Indeo4VideoEncoder`](#indeo4videoencoder) · [`Indeo5VideoDecoder`](#indeo5videodecoder) · [`IyuvVideoDecoder`](#iyuvvideodecoder) · [`IyuvVideoEncoder`](#iyuvvideoencoder) · [`LclZlibVideoDecoder`](#lclzlibvideodecoder) · [`LclZlibVideoEncoder`](#lclzlibvideoencoder) · [`LocoVideoDecoder`](#locovideodecoder) · [`LocoVideoEncoder`](#locovideoencoder) · [`M101VideoDecoder`](#m101videodecoder) · [`MagicYuvDecoder`](#magicyuvdecoder) · [`MagicYuvEncoder`](#magicyuvencoder) · [`MagicYuvEncoder.Predictor`](#magicyuvencoderpredictor) · [`MicrosoftRleDecoder`](#microsoftrledecoder) · [`MicrosoftRleEncoder`](#microsoftrleencoder) · [`MicrosoftVideo1Decoder`](#microsoftvideo1decoder) · [`MicrosoftVideo1Encoder`](#microsoftvideo1encoder) · [`MjpegBVideoDecoder`](#mjpegbvideodecoder) · [`MjpegBVideoEncoder`](#mjpegbvideoencoder) · [`MotionJpegDecoder`](#motionjpegdecoder) · [`MotionJpegVideoEncoder`](#motionjpegvideoencoder) · [`Mpeg1VideoDecoder`](#mpeg1videodecoder) · [`Mpeg1VideoEncoder`](#mpeg1videoencoder) · [`Mpeg2VideoDecoder`](#mpeg2videodecoder) · [`Mpeg2VideoEncoder`](#mpeg2videoencoder) · [`Mpeg4VideoDecoder`](#mpeg4videodecoder) · [`Mpeg4VideoEncoder`](#mpeg4videoencoder) · [`MsMpeg4VideoDecoder`](#msmpeg4videodecoder) · [`MsMpeg4VideoEncoder`](#msmpeg4videoencoder) · [`MsccVideoDecoder`](#msccvideodecoder) · [`Mss1VideoDecoder`](#mss1videodecoder) · [`MszhVideoDecoder`](#mszhvideodecoder) · [`MszhVideoEncoder`](#mszhvideoencoder) · [`MveVideoDecoder`](#mvevideodecoder) · [`MvhaVideoDecoder`](#mvhavideodecoder) · [`MwscVideoDecoder`](#mwscvideodecoder) · [`Nv12VideoDecoder`](#nv12videodecoder) · [`Nv12VideoEncoder`](#nv12videoencoder) · [`Nv21VideoDecoder`](#nv21videodecoder) · [`Nv21VideoEncoder`](#nv21videoencoder) · [`ProResVideoDecoder`](#proresvideodecoder) · [`ProResVideoEncoder`](#proresvideoencoder) · [`QpegVideoDecoder`](#qpegvideodecoder) · [`QpegVideoEncoder`](#qpegvideoencoder) · [`QuickTimeRleDecoder`](#quicktimerledecoder) · [`QuickTimeRleEncoder`](#quicktimerleencoder) · [`R10kVideoDecoder`](#r10kvideodecoder) · [`R10kVideoEncoder`](#r10kvideoencoder) · [`R210VideoDecoder`](#r210videodecoder) · [`R210VideoEncoder`](#r210videoencoder) · [`RascVideoDecoder`](#rascvideodecoder) · [`RascVideoEncoder`](#rascvideoencoder) · [`RawPlanarVideoDecoder`](#rawplanarvideodecoder) · [`RawPlanarVideoEncoder`](#rawplanarvideoencoder) · [`RawVideoDecoder`](#rawvideodecoder) · [`RawVideoEncoder`](#rawvideoencoder) · [`RealVideoDecoder`](#realvideodecoder) · [`RealVideoEncoder`](#realvideoencoder) · [`RoqVideoDecoder`](#roqvideodecoder) · [`RoqVideoEncoder`](#roqvideoencoder) · [`RsccVideoDecoder`](#rsccvideodecoder) · [`ScreenpressoVideoDecoder`](#screenpressovideodecoder) · [`SmackerVideoDecoder`](#smackervideodecoder) · [`TdscVideoDecoder`](#tdscvideodecoder) · [`TheoraVideoDecoder`](#theoravideodecoder) · [`TheoraVideoEncoder`](#theoravideoencoder) · [`TsccVideoDecoder`](#tsccvideodecoder) · [`Uncompressed012vVideoDecoder`](#uncompressed012vvideodecoder) · [`Uncompressed012vVideoEncoder`](#uncompressed012vvideoencoder) · [`UtVideoDecoder`](#utvideodecoder) · [`UtVideoEncoder`](#utvideoencoder) · [`UyvyVideoDecoder`](#uyvyvideodecoder) · [`UyvyVideoEncoder`](#uyvyvideoencoder) · [`V210VideoDecoder`](#v210videodecoder) · [`V210VideoEncoder`](#v210videoencoder) · [`V308VideoDecoder`](#v308videodecoder) · [`V308VideoEncoder`](#v308videoencoder) · [`V408VideoDecoder`](#v408videodecoder) · [`V408VideoEncoder`](#v408videoencoder) · [`VbleVideoDecoder`](#vblevideodecoder) · [`Vc1VideoDecoder`](#vc1videodecoder) · [`Vc1VideoEncoder`](#vc1videoencoder) · [`VmdVideoDecoder`](#vmdvideodecoder) · [`VmncVideoDecoder`](#vmncvideodecoder) · [`VmncVideoEncoder`](#vmncvideoencoder) · [`Vp3VideoDecoder`](#vp3videodecoder) · [`Vp3VideoEncoder`](#vp3videoencoder) · [`Vp5VideoDecoder`](#vp5videodecoder) · [`Vp8VideoDecoder`](#vp8videodecoder) · [`Vp8VideoEncoder`](#vp8videoencoder) · [`Vp9VideoDecoder`](#vp9videodecoder) · [`Vp9VideoEncoder`](#vp9videoencoder) · [`VqaVideoDecoder`](#vqavideodecoder) · [`VyuyVideoDecoder`](#vyuyvideodecoder) · [`VyuyVideoEncoder`](#vyuyvideoencoder) · [`WcmvVideoDecoder`](#wcmvvideodecoder) · [`Y41pVideoDecoder`](#y41pvideodecoder) · [`Y41pVideoEncoder`](#y41pvideoencoder) · [`Y800VideoDecoder`](#y800videodecoder) · [`Y800VideoEncoder`](#y800videoencoder) · [`Yuy2VideoDecoder`](#yuy2videodecoder) · [`Yuy2VideoEncoder`](#yuy2videoencoder) · [`Yv12VideoDecoder`](#yv12videodecoder) · [`Yv12VideoEncoder`](#yv12videoencoder) · [`YvyuVideoDecoder`](#yvyuvideodecoder) · [`YvyuVideoEncoder`](#yvyuvideoencoder) · [`ZeroCodecVideoDecoder`](#zerocodecvideodecoder) · [`ZmbvVideoDecoder`](#zmbvvideodecoder) · [`ZmbvVideoEncoder`](#zmbvvideoencoder)
+[`AascVideoDecoder`](#aascvideodecoder) · [`AascVideoEncoder`](#aascvideoencoder) · [`AnimVideoDecoder`](#animvideodecoder) · [`AppleGraphicsDecoder`](#applegraphicsdecoder) · [`AppleGraphicsEncoder`](#applegraphicsencoder) · [`AppleVideoDecoder`](#applevideodecoder) · [`AppleVideoEncoder`](#applevideoencoder) · [`Asv1VideoDecoder`](#asv1videodecoder) · [`Asv1VideoEncoder`](#asv1videoencoder) · [`Asv2VideoDecoder`](#asv2videodecoder) · [`Asv2VideoEncoder`](#asv2videoencoder) · [`AvidMeridienCompressedVideoDecoder`](#avidmeridiencompressedvideodecoder) · [`AvidMeridienCompressedVideoEncoder`](#avidmeridiencompressedvideoencoder) · [`AvrnVideoDecoder`](#avrnvideodecoder) · [`AvrnVideoEncoder`](#avrnvideoencoder) · [`AvrpVideoDecoder`](#avrpvideodecoder) · [`AvrpVideoEncoder`](#avrpvideoencoder) · [`AvuiVideoDecoder`](#avuivideodecoder) · [`AvuiVideoEncoder`](#avuivideoencoder) · [`AyuvVideoDecoder`](#ayuvvideodecoder) · [`AyuvVideoEncoder`](#ayuvvideoencoder) · [`BfiVideoDecoder`](#bfivideodecoder) · [`CanopusLosslessVideoDecoder`](#canopuslosslessvideodecoder) · [`CanopusLosslessVideoEncoder`](#canopuslosslessvideoencoder) · [`CdxlVideoDecoder`](#cdxlvideodecoder) · [`CineFormEncodingFormat`](#cineformencodingformat) · [`CineFormScanMode`](#cineformscanmode) · [`CineFormVideoDecoder`](#cineformvideodecoder) · [`CineFormVideoEncoder`](#cineformvideoencoder) · [`CinepakVideoDecoder`](#cinepakvideodecoder) · [`CinepakVideoEncoder`](#cinepakvideoencoder) · [`CljrVideoDecoder`](#cljrvideodecoder) · [`CljrVideoEncoder`](#cljrvideoencoder) · [`CreativeYuvVideoDecoder`](#creativeyuvvideodecoder) · [`CreativeYuvVideoEncoder`](#creativeyuvvideoencoder) · [`CscdVideoDecoder`](#cscdvideodecoder) · [`DnxHdVideoDecoder`](#dnxhdvideodecoder) · [`DvVideoDecoder`](#dvvideodecoder) · [`DvVideoEncoder`](#dvvideoencoder) · [`EaCmvVideoDecoder`](#eacmvvideodecoder) · [`EightBpsVideoDecoder`](#eightbpsvideodecoder) · [`EightBpsVideoEncoder`](#eightbpsvideoencoder) · [`Escape124VideoDecoder`](#escape124videodecoder) · [`Escape130VideoDecoder`](#escape130videodecoder) · [`Ffv1Decoder`](#ffv1decoder) · [`Ffv1Encoder`](#ffv1encoder) · [`FlashSv2VideoDecoder`](#flashsv2videodecoder) · [`FlashSvVideoDecoder`](#flashsvvideodecoder) · [`FlashSvVideoEncoder`](#flashsvvideoencoder) · [`FlicVideoDecoder`](#flicvideodecoder) · [`FlicVideoEncoder`](#flicvideoencoder) · [`H261VideoDecoder`](#h261videodecoder) · [`H261VideoEncoder`](#h261videoencoder) · [`H263VideoDecoder`](#h263videodecoder) · [`H263VideoEncoder`](#h263videoencoder) · [`H264VideoDecoder`](#h264videodecoder) · [`H264VideoEncoder`](#h264videoencoder) · [`H265VideoDecoder`](#h265videodecoder) · [`H265VideoEncoder`](#h265videoencoder) · [`HapDecoder`](#hapdecoder) · [`HapVideoEncoder`](#hapvideoencoder) · [`HuffYuvDecoder`](#huffyuvdecoder) · [`HuffYuvEncoder`](#huffyuvencoder) · [`HuffYuvPredictionMethod`](#huffyuvpredictionmethod) · [`I420VideoDecoder`](#i420videodecoder) · [`I420VideoEncoder`](#i420videoencoder) · [`IdcinVideoDecoder`](#idcinvideodecoder) · [`Indeo2VideoDecoder`](#indeo2videodecoder) · [`Indeo2VideoEncoder`](#indeo2videoencoder) · [`Indeo3VideoDecoder`](#indeo3videodecoder) · [`Indeo3VideoEncoder`](#indeo3videoencoder) · [`Indeo4VideoDecoder`](#indeo4videodecoder) · [`Indeo4VideoEncoder`](#indeo4videoencoder) · [`Indeo5VideoDecoder`](#indeo5videodecoder) · [`IyuvVideoDecoder`](#iyuvvideodecoder) · [`IyuvVideoEncoder`](#iyuvvideoencoder) · [`LclZlibVideoDecoder`](#lclzlibvideodecoder) · [`LclZlibVideoEncoder`](#lclzlibvideoencoder) · [`LocoVideoDecoder`](#locovideodecoder) · [`LocoVideoEncoder`](#locovideoencoder) · [`M101VideoDecoder`](#m101videodecoder) · [`MagicYuvDecoder`](#magicyuvdecoder) · [`MagicYuvEncoder`](#magicyuvencoder) · [`MagicYuvEncoder.Predictor`](#magicyuvencoderpredictor) · [`MicrosoftRleDecoder`](#microsoftrledecoder) · [`MicrosoftRleEncoder`](#microsoftrleencoder) · [`MicrosoftVideo1Decoder`](#microsoftvideo1decoder) · [`MicrosoftVideo1Encoder`](#microsoftvideo1encoder) · [`MjpegBVideoDecoder`](#mjpegbvideodecoder) · [`MjpegBVideoEncoder`](#mjpegbvideoencoder) · [`MotionJpegDecoder`](#motionjpegdecoder) · [`MotionJpegVideoEncoder`](#motionjpegvideoencoder) · [`Mpeg1VideoDecoder`](#mpeg1videodecoder) · [`Mpeg1VideoEncoder`](#mpeg1videoencoder) · [`Mpeg2VideoDecoder`](#mpeg2videodecoder) · [`Mpeg2VideoEncoder`](#mpeg2videoencoder) · [`Mpeg4VideoDecoder`](#mpeg4videodecoder) · [`Mpeg4VideoEncoder`](#mpeg4videoencoder) · [`MsMpeg4VideoDecoder`](#msmpeg4videodecoder) · [`MsMpeg4VideoEncoder`](#msmpeg4videoencoder) · [`MsccVideoDecoder`](#msccvideodecoder) · [`Mss1VideoDecoder`](#mss1videodecoder) · [`MszhVideoDecoder`](#mszhvideodecoder) · [`MszhVideoEncoder`](#mszhvideoencoder) · [`MveVideoDecoder`](#mvevideodecoder) · [`MvhaVideoDecoder`](#mvhavideodecoder) · [`MwscVideoDecoder`](#mwscvideodecoder) · [`Nv12VideoDecoder`](#nv12videodecoder) · [`Nv12VideoEncoder`](#nv12videoencoder) · [`Nv21VideoDecoder`](#nv21videodecoder) · [`Nv21VideoEncoder`](#nv21videoencoder) · [`ProResVideoDecoder`](#proresvideodecoder) · [`ProResVideoEncoder`](#proresvideoencoder) · [`QpegVideoDecoder`](#qpegvideodecoder) · [`QpegVideoEncoder`](#qpegvideoencoder) · [`QuickTimeRleDecoder`](#quicktimerledecoder) · [`QuickTimeRleEncoder`](#quicktimerleencoder) · [`R10kVideoDecoder`](#r10kvideodecoder) · [`R10kVideoEncoder`](#r10kvideoencoder) · [`R210VideoDecoder`](#r210videodecoder) · [`R210VideoEncoder`](#r210videoencoder) · [`RascVideoDecoder`](#rascvideodecoder) · [`RawPlanarVideoDecoder`](#rawplanarvideodecoder) · [`RawPlanarVideoEncoder`](#rawplanarvideoencoder) · [`RawVideoDecoder`](#rawvideodecoder) · [`RawVideoEncoder`](#rawvideoencoder) · [`RealVideoDecoder`](#realvideodecoder) · [`RealVideoEncoder`](#realvideoencoder) · [`RoqVideoDecoder`](#roqvideodecoder) · [`RoqVideoEncoder`](#roqvideoencoder) · [`RsccVideoDecoder`](#rsccvideodecoder) · [`ScreenpressoVideoDecoder`](#screenpressovideodecoder) · [`SmackerVideoDecoder`](#smackervideodecoder) · [`TdscVideoDecoder`](#tdscvideodecoder) · [`TheoraVideoDecoder`](#theoravideodecoder) · [`TheoraVideoEncoder`](#theoravideoencoder) · [`TrueMotion2VideoDecoder`](#truemotion2videodecoder) · [`TrueMotion2VideoEncoder`](#truemotion2videoencoder) · [`TsccVideoDecoder`](#tsccvideodecoder) · [`Uncompressed012vVideoDecoder`](#uncompressed012vvideodecoder) · [`Uncompressed012vVideoEncoder`](#uncompressed012vvideoencoder) · [`UtVideoDecoder`](#utvideodecoder) · [`UtVideoEncoder`](#utvideoencoder) · [`UyvyVideoDecoder`](#uyvyvideodecoder) · [`UyvyVideoEncoder`](#uyvyvideoencoder) · [`V210VideoDecoder`](#v210videodecoder) · [`V210VideoEncoder`](#v210videoencoder) · [`V308VideoDecoder`](#v308videodecoder) · [`V308VideoEncoder`](#v308videoencoder) · [`V408VideoDecoder`](#v408videodecoder) · [`V408VideoEncoder`](#v408videoencoder) · [`VbleVideoDecoder`](#vblevideodecoder) · [`Vc1VideoDecoder`](#vc1videodecoder) · [`Vc1VideoEncoder`](#vc1videoencoder) · [`VmdVideoDecoder`](#vmdvideodecoder) · [`VmncVideoDecoder`](#vmncvideodecoder) · [`VmncVideoEncoder`](#vmncvideoencoder) · [`Vp3VideoDecoder`](#vp3videodecoder) · [`Vp3VideoEncoder`](#vp3videoencoder) · [`Vp5VideoDecoder`](#vp5videodecoder) · [`Vp8VideoDecoder`](#vp8videodecoder) · [`Vp8VideoEncoder`](#vp8videoencoder) · [`Vp9VideoDecoder`](#vp9videodecoder) · [`Vp9VideoEncoder`](#vp9videoencoder) · [`VqaVideoDecoder`](#vqavideodecoder) · [`VyuyVideoDecoder`](#vyuyvideodecoder) · [`VyuyVideoEncoder`](#vyuyvideoencoder) · [`WcmvVideoDecoder`](#wcmvvideodecoder) · [`Y41pVideoDecoder`](#y41pvideodecoder) · [`Y41pVideoEncoder`](#y41pvideoencoder) · [`Y800VideoDecoder`](#y800videodecoder) · [`Y800VideoEncoder`](#y800videoencoder) · [`Yuy2VideoDecoder`](#yuy2videodecoder) · [`Yuy2VideoEncoder`](#yuy2videoencoder) · [`Yv12VideoDecoder`](#yv12videodecoder) · [`Yv12VideoEncoder`](#yv12videoencoder) · [`YvyuVideoDecoder`](#yvyuvideodecoder) · [`YvyuVideoEncoder`](#yvyuvideoencoder) · [`ZeroCodecVideoDecoder`](#zerocodecvideodecoder) · [`ZmbvVideoDecoder`](#zmbvvideodecoder) · [`ZmbvVideoEncoder`](#zmbvvideoencoder)
 
 #### `AascVideoDecoder`
 
@@ -1051,12 +1051,12 @@ Implements `IVideoCodecDecoder<H261VideoDecoder>`, `IVideoFrameDecoder`.
 | `CodecName` | `static string CodecName { get; }` |  |
 | `Accepts` | `static bool Accepts(MediaStreamInfo stream)` |  |
 | `Create` | `static H261VideoDecoder Create(MediaStreamInfo stream)` |  |
-| `Flush` | `IEnumerable<RawImage> Flush()` | Nothing is ever held back for reordering: H.261 has no bidirectional prediction. |
-| `TryDecode` | `bool TryDecode(CodedPacket packet, out RawImage frame)` | Decodes one packet and hands back the last complete ordinary or Annex D picture it holds. |
+| `Flush` | `IEnumerable<RawImage> Flush()` | Nothing is ever held back: H.261 has no bidirectional prediction to reorder around. |
+| `TryDecode` | `bool TryDecode(CodedPacket packet, out RawImage frame)` | Decodes one packet and hands back the picture it holds. |
 
 #### `H261VideoEncoder`
 
-Encodes H.261 video, ITU-T Recommendation H.261 — the write direction of `H261VideoDecoder`, including Annex D still-image transmission.
+Encodes H.261 video, ITU-T Recommendation H.261 — the write direction of `H261VideoDecoder`, and the whole of the Recommendation's normative coding except the four macroblock types that restate the quantiser.
 
 Implements `IVideoCodecEncoder<H261VideoEncoder>`, `IVideoPacketEncoder`.
 
@@ -1064,11 +1064,10 @@ Implements `IVideoCodecEncoder<H261VideoEncoder>`, `IVideoPacketEncoder`.
 | --- | --- | --- |
 | `CodecName` | `static string CodecName { get; }` |  |
 | `Codec` | `static CodecTag Codec { get; }` |  |
-| `Create` | `static H261VideoEncoder Create(MediaStreamInfo stream)` | Builds an encoder for one of H.261's two coded stream geometries. |
-| `DescribeStream` | `MediaStreamInfo DescribeStream()` | The stream description used by containers: the coded QCIF/CIF size, never Annex D's display size. |
+| `Create` | `static H261VideoEncoder Create(MediaStreamInfo stream)` | Builds an encoder for the stream described, or refuses a geometry H.261 cannot state. |
+| `DescribeStream` | `MediaStreamInfo DescribeStream()` | The stream as a muxer needs it: a `BITMAPINFOHEADER` naming H.261. |
 | `Flush` | `IEnumerable<CodedPacket> Flush()` | Nothing is ever held back: H.261 has no bidirectional prediction to reorder around. |
-| `TryEncodeStillImage` | `bool TryEncodeStillImage(RawImage frame, long? presentationTimestamp, out CodedPacket packet)` | Codes one Annex D still image at twice the stream width and height as sub-images 0, 1, 2 and 3. |
-| `TryEncode` | `bool TryEncode(RawImage frame, long? presentationTimestamp, out CodedPacket packet)` | Codes one ordinary motion picture in the stream's QCIF/CIF geometry. |
+| `TryEncode` | `bool TryEncode(RawImage frame, long? presentationTimestamp, out CodedPacket packet)` | Codes one picture, either whole or against the one before it. |
 
 #### `H263VideoDecoder`
 
@@ -1454,7 +1453,7 @@ Implements `IVideoCodecDecoder<M101VideoDecoder>`, `IVideoFrameDecoder`.
 
 #### `MagicYuvDecoder`
 
-Decodes MagicYUV v7, a lossless intra-only capture codec with independent horizontal slices.
+Decodes MagicYUV, a lossless capture codec: Huffman coding over a spatial prediction, with the frame cut into slices that decode independently of one another.
 
 Implements `IVideoCodecDecoder<MagicYuvDecoder>`, `IVideoFrameDecoder`.
 
@@ -1462,34 +1461,33 @@ Implements `IVideoCodecDecoder<MagicYuvDecoder>`, `IVideoFrameDecoder`.
 | --- | --- | --- |
 | `CodecName` | `static string CodecName { get; }` |  |
 | `Accepts` | `static bool Accepts(MediaStreamInfo stream)` |  |
-| `Create` | `static MagicYuvDecoder Create(MediaStreamInfo stream)` |  |
-| `TryDecode` | `bool TryDecode(CodedPacket packet, out RawImage frame)` | Decodes one self-contained MagicYUV key frame. |
+| `Create` | `static MagicYuvDecoder Create(MediaStreamInfo stream)` | Builds a decoder from the code and the picture size, which is all the container has to give. |
+| `TryDecode` | `bool TryDecode(CodedPacket packet, out RawImage frame)` | Decodes one frame, which for this codec is always exactly one whole picture. |
 
 #### `MagicYuvEncoder`
 
-Encodes MagicYUV v7 losslessly in its native sample domain, including 8/10/12/14-bit formats.
+Encodes MagicYUV: a spatial prediction, its differences Huffman coded with one table a plane, and the frame cut into slices that decode independently of one another.
 
 Implements `IVideoCodecEncoder<MagicYuvEncoder>`, `IVideoPacketEncoder`.
 
 | Member | Signature | Summary |
 | --- | --- | --- |
-| `CodecName` | `static string CodecName { get; }` |  |
-| `Codec` | `static CodecTag Codec { get; }` |  |
-| `Create` | `static MagicYuvEncoder Create(MediaStreamInfo stream)` | Builds a progressive encoder using median prediction and one slice. |
-| `Create` | `static MagicYuvEncoder Create(MediaStreamInfo stream, Predictor predictor, int slices)` | Builds a progressive encoder with the requested predictor and slice count. |
-| `Create` | `static MagicYuvEncoder Create(MediaStreamInfo stream, Predictor predictor, int slices, bool interlaced)` | Builds an encoder, optionally using MagicYUV's interlaced field-stride prediction. |
-| `DescribeStream` | `MediaStreamInfo DescribeStream()` |  |
-| `TryEncode` | `bool TryEncode(RawImage frame, long? presentationTimestamp, out CodedPacket packet)` | Encodes one complete key frame. |
+| `CodecName` | `static string CodecName { get; }` | The codec's name as a person would say it. |
+| `Codec` | `static CodecTag Codec { get; }` | The code written when the stream names none of the codec's own: colour without alpha. |
+| `Create` | `static MagicYuvEncoder Create(MediaStreamInfo stream)` | Builds an encoder for the stream described, predicting by median and writing one slice a frame. |
+| `Create` | `static MagicYuvEncoder Create(MediaStreamInfo stream, Predictor predictor, int slices)` | Builds an encoder for the stream described, with the prediction and the slice count stated. |
+| `DescribeStream` | `MediaStreamInfo DescribeStream()` | The stream this writes, which the package's own decoder accepts as it stands. |
+| `TryEncode` | `bool TryEncode(RawImage frame, long? presentationTimestamp, out CodedPacket packet)` | Encodes one picture as one frame, which for this codec is always a key frame. |
 
 #### `MagicYuvEncoder.Predictor`
 
-The three spatial predictors a slice may use.
+The three ways a slice may predict a sample, as the format numbers them.
 
 | Value | Numeric | Summary |
 | --- | --- | --- |
-| `Left` | `1` |  |
-| `Gradient` | `2` |  |
-| `Median` | `3` |  |
+| `Left` | `1` | The sample to the left. |
+| `Gradient` | `2` | Left plus above less above-left. |
+| `Median` | `3` | The median of the left, the above, and the gradient of the two. |
 
 #### `MicrosoftRleDecoder`
 
@@ -1618,7 +1616,7 @@ Implements `IVideoCodecDecoder<Mpeg1VideoDecoder>`, `IVideoFrameDecoder`.
 
 #### `Mpeg1VideoEncoder`
 
-Encodes ISO/IEC 11172-2 MPEG-1 video as progressive 4:2:0 I, P and B pictures.
+Encodes ISO/IEC 11172-2 MPEG-1 video as progressive 4:2:0 I and P pictures.
 
 Implements `IVideoCodecEncoder<Mpeg1VideoEncoder>`, `IVideoPacketEncoder`.
 
@@ -1626,10 +1624,10 @@ Implements `IVideoCodecEncoder<Mpeg1VideoEncoder>`, `IVideoPacketEncoder`.
 | --- | --- | --- |
 | `CodecName` | `static string CodecName { get; }` |  |
 | `Codec` | `static CodecTag Codec { get; }` |  |
-| `Create` | `static Mpeg1VideoEncoder Create(MediaStreamInfo stream)` |  |
-| `DescribeStream` | `MediaStreamInfo DescribeStream()` |  |
-| `Flush` | `IEnumerable<CodedPacket> Flush()` | Emits delayed coding-order packets and turns a short tail with no following anchor into P pictures. The final picture carries the sequence-end start code. |
-| `TryEncode` | `bool TryEncode(RawImage frame, long? presentationTimestamp, out CodedPacket packet)` | Accepts one display-order picture and returns the next coding-order packet when available. |
+| `Create` | `static Mpeg1VideoEncoder Create(MediaStreamInfo stream)` | Creates an MPEG-1 encoder for a geometry and one of the eight frame rates the syntax can state. |
+| `DescribeStream` | `MediaStreamInfo DescribeStream()` | The stream description muxers need to name the elementary MPEG-1 payload. |
+| `Flush` | `IEnumerable<CodedPacket> Flush()` | Returns the last picture with the sequence-end start code following it. |
+| `TryEncode` | `bool TryEncode(RawImage frame, long? presentationTimestamp, out CodedPacket packet)` | Codes one picture: intra at the head of a group, forward-predicted otherwise. |
 
 #### `Mpeg2VideoDecoder`
 
@@ -2015,20 +2013,6 @@ Implements `IVideoCodecDecoder<RascVideoDecoder>`, `IVideoFrameDecoder`.
 | `Create` | `static RascVideoDecoder Create(MediaStreamInfo stream)` |  |
 | `TryDecode` | `bool TryDecode(CodedPacket packet, out RawImage frame)` |  |
 
-#### `RascVideoEncoder`
-
-Encodes RemotelyAnywhere Screen Capture (`RASC`) video.
-
-Implements `IVideoCodecEncoder<RascVideoEncoder>`, `IVideoPacketEncoder`.
-
-| Member | Signature | Summary |
-| --- | --- | --- |
-| `CodecName` | `static string CodecName { get; }` |  |
-| `Codec` | `static CodecTag Codec { get; }` |  |
-| `Create` | `static RascVideoEncoder Create(MediaStreamInfo stream)` |  |
-| `DescribeStream` | `MediaStreamInfo DescribeStream()` |  |
-| `TryEncode` | `bool TryEncode(RawImage frame, long? presentationTimestamp, out CodedPacket packet)` |  |
-
 #### `RawPlanarVideoDecoder`
 
 Decodes canonical planar raw-video packets described by a YUV4MPEG2 chroma token.
@@ -2099,7 +2083,7 @@ Implements `IVideoCodecDecoder<RealVideoDecoder>`, `IVideoFrameDecoder`.
 
 #### `RealVideoEncoder`
 
-Encodes interoperable RealVideo 1 (`RV10`) intra and predicted pictures.
+Encodes interoperable RealVideo 1 (`RV10`) intra pictures.
 
 Implements `IVideoCodecEncoder<RealVideoEncoder>`, `IVideoPacketEncoder`.
 
@@ -2114,12 +2098,13 @@ Implements `IVideoCodecEncoder<RealVideoEncoder>`, `IVideoPacketEncoder`.
 
 #### `RoqVideoDecoder`
 
-Decodes standard id RoQ and the older Trilobyte RoQ video extensions.
+Decodes id RoQ (`RoQV`) — the FMV format Quake III and its contemporaries use — vector quantisation with motion compensation over a quadtree of 8x8, 4x4 and 2x2 blocks.
 
 Implements `IVideoCodecDecoder<RoqVideoDecoder>`, `IVideoFrameDecoder`.
 
 | Member | Signature | Summary |
 | --- | --- | --- |
+| `RoqVideoDecoder` | `RoqVideoDecoder()` |  |
 | `CodecName` | `static string CodecName { get; }` |  |
 | `Accepts` | `static bool Accepts(MediaStreamInfo stream)` |  |
 | `Create` | `static RoqVideoDecoder Create(MediaStreamInfo stream)` |  |
@@ -2219,6 +2204,33 @@ Implements `IVideoCodecEncoder<TheoraVideoEncoder>`, `IVideoPacketEncoder`.
 | `DescribeStream` | `MediaStreamInfo DescribeStream()` | Describes the stream using Matroska's canonical codec ID and Xiph-laced Theora header packets. Ogg identifies the same codec from the first header packet rather than requiring a different encoder-side stream description. |
 | `Flush` | `IEnumerable<CodedPacket> Flush()` |  |
 | `TryEncode` | `bool TryEncode(RawImage frame, long? presentationTimestamp, out CodedPacket packet)` | Encodes one picture immediately; Theora needs no reordering for this all-intra stream. |
+
+#### `TrueMotion2VideoDecoder`
+
+Decodes Duck/On2 TrueMotion 2 (`TM20`): seven independently Huffman-coded token streams drive 4x4 luminance / 2x2 chroma blocks, with still, additive-update and motion blocks predicted from the immediately previous picture.
+
+Implements `IVideoCodecDecoder<TrueMotion2VideoDecoder>`, `IVideoFrameDecoder`.
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `CodecName` | `static string CodecName { get; }` |  |
+| `Accepts` | `static bool Accepts(MediaStreamInfo stream)` |  |
+| `Create` | `static TrueMotion2VideoDecoder Create(MediaStreamInfo stream)` |  |
+| `TryDecode` | `bool TryDecode(CodedPacket packet, out RawImage frame)` |  |
+
+#### `TrueMotion2VideoEncoder`
+
+Encodes Duck/On2 TrueMotion 2 (`TM20`) pictures as spatial high-resolution key frames and previous-picture update/still P frames.
+
+Implements `IVideoCodecEncoder<TrueMotion2VideoEncoder>`, `IVideoPacketEncoder`.
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `CodecName` | `static string CodecName { get; }` |  |
+| `Codec` | `static CodecTag Codec { get; }` |  |
+| `Create` | `static TrueMotion2VideoEncoder Create(MediaStreamInfo stream)` |  |
+| `DescribeStream` | `MediaStreamInfo DescribeStream()` |  |
+| `TryEncode` | `bool TryEncode(RawImage frame, long? presentationTimestamp, out CodedPacket packet)` |  |
 
 #### `TsccVideoDecoder`
 
@@ -2439,7 +2451,7 @@ Implements `IVideoCodecEncoder<Vc1VideoEncoder>`, `IVideoPacketEncoder`.
 
 #### `VmdVideoDecoder`
 
-Decodes classic eight-bit Sierra VMD video onto its persistent palettised canvas.
+Decodes Sierra VMD video — the FMV codec behind Phantasmagoria, Gabriel Knight 2 and Sierra's other CD-ROM adventures — an LZSS-compressed run-length coding painted onto a persistent, palettised picture one rectangle at a time.
 
 Implements `IVideoCodecDecoder<VmdVideoDecoder>`, `IVideoFrameDecoder`.
 
@@ -4466,13 +4478,6 @@ Describes the pixel layout and bit depth of raw image data.
 | `Yuv422P16` | `39` | Planar 16-bit YUV 4:2:2 in little-endian ushort samples. |
 | `Yuv440P16` | `40` | Planar 16-bit YUV 4:4:0 in little-endian ushort samples. |
 | `Yuv444P16` | `41` | Planar 16-bit YUV 4:4:4 in little-endian ushort samples. |
-| `Yuv411P8` | `42` | Planar 8-bit YUV 4:1:1: Y, U, V. |
-| `Yuv420P9` | `43` | Planar 9-bit YUV 4:2:0 in right-justified little-endian ushort samples. |
-| `Yuv422P9` | `44` | Planar 9-bit YUV 4:2:2 in right-justified little-endian ushort samples. |
-| `Yuv444P9` | `45` | Planar 9-bit YUV 4:4:4 in right-justified little-endian ushort samples. |
-| `Yuv420P14` | `46` | Planar 14-bit YUV 4:2:0 in right-justified little-endian ushort samples. |
-| `Yuv422P14` | `47` | Planar 14-bit YUV 4:2:2 in right-justified little-endian ushort samples. |
-| `Yuv444P14` | `48` | Planar 14-bit YUV 4:4:4 in right-justified little-endian ushort samples. |
 
 #### `PixelRect`
 
@@ -5342,7 +5347,7 @@ Decodes PVRTC (PowerVR Texture Compression) 2bpp and 4bpp blocks to RGBA32 pixel
 
 ### Namespace `FileFormat.Core.PixelFormats`
 
-[`Argb32`](#argb32) · [`Bgr24`](#bgr24) · [`Bgra32`](#bgra32) · [`Gray10`](#gray10) · [`Gray16`](#gray16) · [`Gray8`](#gray8) · [`GrayAlpha16`](#grayalpha16) · [`GrayAlpha32`](#grayalpha32) · [`GrayAlphaF16`](#grayalphaf16) · [`GrayAlphaF32`](#grayalphaf32) · [`GrayF16`](#grayf16) · [`GrayF32`](#grayf32) · [`Indexed1`](#indexed1) · [`Indexed10`](#indexed10) · [`Indexed11`](#indexed11) · [`Indexed12`](#indexed12) · [`Indexed13`](#indexed13) · [`Indexed14`](#indexed14) · [`Indexed15`](#indexed15) · [`Indexed16`](#indexed16) · [`Indexed2`](#indexed2) · [`Indexed3`](#indexed3) · [`Indexed4`](#indexed4) · [`Indexed5`](#indexed5) · [`Indexed6`](#indexed6) · [`Indexed7`](#indexed7) · [`Indexed8`](#indexed8) · [`Indexed9`](#indexed9) · [`Rgb24`](#rgb24) · [`Rgb30`](#rgb30) · [`Rgb48`](#rgb48) · [`Rgb565`](#rgb565) · [`RgbF16`](#rgbf16) · [`RgbF32`](#rgbf32) · [`Rgba32`](#rgba32) · [`Rgba64`](#rgba64) · [`RgbaF16`](#rgbaf16) · [`RgbaF32`](#rgbaf32) · [`Yuv411P8`](#yuv411p8) · [`Yuv420P10`](#yuv420p10) · [`Yuv420P12`](#yuv420p12) · [`Yuv420P14`](#yuv420p14) · [`Yuv420P16`](#yuv420p16) · [`Yuv420P8`](#yuv420p8) · [`Yuv420P9`](#yuv420p9) · [`Yuv422P10`](#yuv422p10) · [`Yuv422P12`](#yuv422p12) · [`Yuv422P14`](#yuv422p14) · [`Yuv422P16`](#yuv422p16) · [`Yuv422P8`](#yuv422p8) · [`Yuv422P9`](#yuv422p9) · [`Yuv440P10`](#yuv440p10) · [`Yuv440P12`](#yuv440p12) · [`Yuv440P16`](#yuv440p16) · [`Yuv440P8`](#yuv440p8) · [`Yuv444P10`](#yuv444p10) · [`Yuv444P12`](#yuv444p12) · [`Yuv444P14`](#yuv444p14) · [`Yuv444P16`](#yuv444p16) · [`Yuv444P8`](#yuv444p8) · [`Yuv444P9`](#yuv444p9)
+[`Argb32`](#argb32) · [`Bgr24`](#bgr24) · [`Bgra32`](#bgra32) · [`Gray10`](#gray10) · [`Gray16`](#gray16) · [`Gray8`](#gray8) · [`GrayAlpha16`](#grayalpha16) · [`GrayAlpha32`](#grayalpha32) · [`GrayAlphaF16`](#grayalphaf16) · [`GrayAlphaF32`](#grayalphaf32) · [`GrayF16`](#grayf16) · [`GrayF32`](#grayf32) · [`Indexed1`](#indexed1) · [`Indexed10`](#indexed10) · [`Indexed11`](#indexed11) · [`Indexed12`](#indexed12) · [`Indexed13`](#indexed13) · [`Indexed14`](#indexed14) · [`Indexed15`](#indexed15) · [`Indexed16`](#indexed16) · [`Indexed2`](#indexed2) · [`Indexed3`](#indexed3) · [`Indexed4`](#indexed4) · [`Indexed5`](#indexed5) · [`Indexed6`](#indexed6) · [`Indexed7`](#indexed7) · [`Indexed8`](#indexed8) · [`Indexed9`](#indexed9) · [`Rgb24`](#rgb24) · [`Rgb30`](#rgb30) · [`Rgb48`](#rgb48) · [`Rgb565`](#rgb565) · [`RgbF16`](#rgbf16) · [`RgbF32`](#rgbf32) · [`Rgba32`](#rgba32) · [`Rgba64`](#rgba64) · [`RgbaF16`](#rgbaf16) · [`RgbaF32`](#rgbaf32) · [`Yuv420P10`](#yuv420p10) · [`Yuv420P12`](#yuv420p12) · [`Yuv420P16`](#yuv420p16) · [`Yuv420P8`](#yuv420p8) · [`Yuv422P10`](#yuv422p10) · [`Yuv422P12`](#yuv422p12) · [`Yuv422P16`](#yuv422p16) · [`Yuv422P8`](#yuv422p8) · [`Yuv440P10`](#yuv440p10) · [`Yuv440P12`](#yuv440p12) · [`Yuv440P16`](#yuv440p16) · [`Yuv440P8`](#yuv440p8) · [`Yuv444P10`](#yuv444p10) · [`Yuv444P12`](#yuv444p12) · [`Yuv444P16`](#yuv444p16) · [`Yuv444P8`](#yuv444p8)
 
 #### `Argb32`
 
@@ -5648,14 +5653,6 @@ Implements `IRawPixelFormat<RgbaF32>`.
 | --- | --- | --- |
 | `Traits` | `static RawPixelFormatTraits Traits { get; }` |  |
 
-#### `Yuv411P8`
-
-Implements `IRawPixelFormat<Yuv411P8>`.
-
-| Member | Signature | Summary |
-| --- | --- | --- |
-| `Traits` | `static RawPixelFormatTraits Traits { get; }` |  |
-
 #### `Yuv420P10`
 
 Implements `IRawPixelFormat<Yuv420P10>`.
@@ -5667,14 +5664,6 @@ Implements `IRawPixelFormat<Yuv420P10>`.
 #### `Yuv420P12`
 
 Implements `IRawPixelFormat<Yuv420P12>`.
-
-| Member | Signature | Summary |
-| --- | --- | --- |
-| `Traits` | `static RawPixelFormatTraits Traits { get; }` |  |
-
-#### `Yuv420P14`
-
-Implements `IRawPixelFormat<Yuv420P14>`.
 
 | Member | Signature | Summary |
 | --- | --- | --- |
@@ -5696,14 +5685,6 @@ Implements `IRawPixelFormat<Yuv420P8>`.
 | --- | --- | --- |
 | `Traits` | `static RawPixelFormatTraits Traits { get; }` |  |
 
-#### `Yuv420P9`
-
-Implements `IRawPixelFormat<Yuv420P9>`.
-
-| Member | Signature | Summary |
-| --- | --- | --- |
-| `Traits` | `static RawPixelFormatTraits Traits { get; }` |  |
-
 #### `Yuv422P10`
 
 Implements `IRawPixelFormat<Yuv422P10>`.
@@ -5720,14 +5701,6 @@ Implements `IRawPixelFormat<Yuv422P12>`.
 | --- | --- | --- |
 | `Traits` | `static RawPixelFormatTraits Traits { get; }` |  |
 
-#### `Yuv422P14`
-
-Implements `IRawPixelFormat<Yuv422P14>`.
-
-| Member | Signature | Summary |
-| --- | --- | --- |
-| `Traits` | `static RawPixelFormatTraits Traits { get; }` |  |
-
 #### `Yuv422P16`
 
 Implements `IRawPixelFormat<Yuv422P16>`.
@@ -5739,14 +5712,6 @@ Implements `IRawPixelFormat<Yuv422P16>`.
 #### `Yuv422P8`
 
 Implements `IRawPixelFormat<Yuv422P8>`.
-
-| Member | Signature | Summary |
-| --- | --- | --- |
-| `Traits` | `static RawPixelFormatTraits Traits { get; }` |  |
-
-#### `Yuv422P9`
-
-Implements `IRawPixelFormat<Yuv422P9>`.
 
 | Member | Signature | Summary |
 | --- | --- | --- |
@@ -5800,14 +5765,6 @@ Implements `IRawPixelFormat<Yuv444P12>`.
 | --- | --- | --- |
 | `Traits` | `static RawPixelFormatTraits Traits { get; }` |  |
 
-#### `Yuv444P14`
-
-Implements `IRawPixelFormat<Yuv444P14>`.
-
-| Member | Signature | Summary |
-| --- | --- | --- |
-| `Traits` | `static RawPixelFormatTraits Traits { get; }` |  |
-
 #### `Yuv444P16`
 
 Implements `IRawPixelFormat<Yuv444P16>`.
@@ -5819,14 +5776,6 @@ Implements `IRawPixelFormat<Yuv444P16>`.
 #### `Yuv444P8`
 
 Implements `IRawPixelFormat<Yuv444P8>`.
-
-| Member | Signature | Summary |
-| --- | --- | --- |
-| `Traits` | `static RawPixelFormatTraits Traits { get; }` |  |
-
-#### `Yuv444P9`
-
-Implements `IRawPixelFormat<Yuv444P9>`.
 
 | Member | Signature | Summary |
 | --- | --- | --- |
@@ -6877,33 +6826,31 @@ Implements `IVideoContainerWriter<RealMediaWriter>`, `IVideoFormatMetadata<RealM
 
 #### `RoqContainer`
 
-A RoQ movie: id's quadtree video plus optional RoQ DPCM sound.
+A RoQ file (`.roq`) — the FMV format Graeme Devine wrote for The 11th Hour and id Software carried on into Quake III and its Return to Castle Wolfenstein-era engine — taken apart into the streams it declares and the chunks it holds, and nothing else.
 
 Implements `IVideoContainerReader<RoqContainer>`, `IVideoFormatMetadata<RoqContainer>`.
 
 | Member | Signature | Summary |
 | --- | --- | --- |
 | `RoqContainer` | `RoqContainer()` |  |
-| `AudioIsStereo` | `bool AudioIsStereo { get; init; }` |  |
-| `Data` | `ReadOnlyMemory<byte> Data { get; init; }` |  |
+| `AudioIsStereo` | `bool AudioIsStereo { get; init; }` | Whether the sound this file carries is two channels rather than one. |
+| `Data` | `ReadOnlyMemory<byte> Data { get; init; }` | The whole file, which every packet is a window onto. |
 | `FileExtensions` | `static string[] FileExtensions { get; }` |  |
-| `FrameRate` | `int FrameRate { get; init; }` |  |
-| `HasAudio` | `bool HasAudio { get; init; }` |  |
-| `Height` | `int Height { get; init; }` |  |
-| `MotionScale` | `int MotionScale { get; init; }` |  |
+| `HasAudio` | `bool HasAudio { get; init; }` | Whether the file carries any sound chunk at all. |
+| `Height` | `int Height { get; init; }` | Picture height in pixels, as the file's `RoQ_INFO` chunk states it. |
 | `PrimaryExtension` | `static string PrimaryExtension { get; }` |  |
-| `VideoFrameCount` | `int VideoFrameCount { get; init; }` |  |
-| `Width` | `int Width { get; init; }` |  |
-| `FromBytes` | `static RoqContainer FromBytes(byte[] data)` |  |
+| `VideoFrameCount` | `int VideoFrameCount { get; init; }` | How many `QUAD_VQ` chunks the file holds, counted by walking it once. |
+| `Width` | `int Width { get; init; }` | Picture width in pixels, as the file's `RoQ_INFO` chunk states it. |
+| `FromBytes` | `static RoqContainer FromBytes(byte[] data)` | Opens a file over the caller's array, keeping it rather than copying it. |
 | `FromFile` | `static RoqContainer FromFile(FileInfo file)` |  |
 | `FromSpan` | `static RoqContainer FromSpan(ReadOnlySpan<byte> data)` |  |
-| `Metadata` | `static VideoMetadata Metadata(RoqContainer container)` |  |
+| `Metadata` | `static VideoMetadata Metadata(RoqContainer container)` | Nothing beyond the streams themselves. A RoQ file has no field for a title, an author or a creation date — nothing here carries anything but pictures, chunks and sound. |
 | `ReadPackets` | `static IEnumerable<CodedPacket> ReadPackets(RoqContainer container)` |  |
 | `Streams` | `static IReadOnlyList<MediaStreamInfo> Streams(RoqContainer container)` |  |
 
 #### `RoqWriter`
 
-Writes RoQ video chunks verbatim and optional RoQ DPCM sound.
+Writes RoQ video chunks verbatim and sound chunks with their preserved predictor arguments.
 
 Implements `IVideoContainerWriter<RoqWriter>`, `IVideoFormatMetadata<RoqWriter>`.
 
@@ -7097,45 +7044,41 @@ Implements `IVideoContainerWriter<StrWriter>`, `IVideoFormatMetadata<StrWriter>`
 
 #### `VmdContainer`
 
-A classic Sierra VMD file split into its streams, block table and fixed per-block part table.
+A Sierra VMD file (`.vmd`) — "Video and Music Data", the format behind Phantasmagoria, Gabriel Knight 2 and Sierra's other CD-ROM adventures — taken apart into its header fields and the packets its table of contents describes, and nothing else.
 
 Implements `IVideoContainerReader<VmdContainer>`, `IVideoFormatMetadata<VmdContainer>`.
 
 | Member | Signature | Summary |
 | --- | --- | --- |
 | `VmdContainer` | `VmdContainer()` |  |
-| `AudioFrameLength` | `int AudioFrameLength { get; init; }` |  |
-| `AudioSampleRate` | `int AudioSampleRate { get; init; }` |  |
-| `BlockOffsets` | `IReadOnlyList<int> BlockOffsets { get; init; }` |  |
-| `CodecVersion` | `int CodecVersion { get; init; }` |  |
-| `Data` | `ReadOnlyMemory<byte> Data { get; init; }` |  |
+| `AudioFrameLength` | `int AudioFrameLength { get; init; }` | The audio frame length the header states, in samples — negative in the header for sixteen-bit sound, unsigned here since nothing in this container reads sound. |
+| `AudioSampleRate` | `int AudioSampleRate { get; init; }` | The audio sample rate the header states, in hertz, or zero for a file with none. |
+| `BlockOffsets` | `IReadOnlyList<int> BlockOffsets { get; init; }` | Each block's own absolute file offset, in the order the block offset table states them. Not needed to walk the frame data sequentially — see `VmdReader`'s remarks — but needed for the one thing this table exists for: naming which block a video frame belongs to, which is the presentation timestamp `ReadPackets` reports for it. A block may hold more than one audio frame and no video frame at all — measured directly against a real file, where a run of blocks carrying only extra sound leaves the timestamps of the video frames around them further apart than one block — so a plain running count of video frames does not reproduce it and the block table is what does. |
+| `CodecVersion` | `int CodecVersion { get; init; }` | The video codec version the header states — `1` for the eight-bit palettised form every sample this reader was measured against carries. Left for the codec to read and to refuse by name, the same way a container never itself refuses a codec it has not decoded. |
+| `Data` | `ReadOnlyMemory<byte> Data { get; init; }` | The whole file, which every packet is a window or a small reconstruction onto. |
 | `FileExtensions` | `static string[] FileExtensions { get; }` |  |
-| `FrameBlockIndices` | `IReadOnlyList<int> FrameBlockIndices { get; init; }` |  |
-| `FrameCount` | `int FrameCount { get; init; }` |  |
-| `FrameDataOffsets` | `IReadOnlyList<int> FrameDataOffsets { get; init; }` |  |
-| `FrameTableStart` | `int FrameTableStart { get; init; }` |  |
-| `FramesPerBlock` | `int FramesPerBlock { get; init; }` |  |
-| `HasAudio` | `bool HasAudio { get; init; }` |  |
-| `HeaderPayload` | `ReadOnlyMemory<byte> HeaderPayload { get; init; }` |  |
-| `Height` | `int Height { get; init; }` |  |
-| `IsIndeo3` | `bool IsIndeo3 { get; init; }` |  |
-| `MultimediaDataOffset` | `uint MultimediaDataOffset { get; init; }` |  |
-| `NumBlocks` | `int NumBlocks { get; init; }` |  |
+| `FrameCount` | `int FrameCount { get; init; }` | How many records the frame information table holds. |
+| `FrameTableStart` | `int FrameTableStart { get; init; }` | The frame information table's own absolute file offset. |
+| `HasAudio` | `bool HasAudio { get; init; }` | Whether the file carries sound: the header's own flag, corroborated by at least one audio-type record actually present in the table of contents. |
+| `HeaderPayload` | `ReadOnlyMemory<byte> HeaderPayload { get; init; }` | The 816-byte header verbatim, carried through as the video stream's private data so the codec can read the codec version and the initial palette this container does not interpret. |
+| `Height` | `int Height { get; init; }` | Picture height in pixels. |
+| `MultimediaDataOffset` | `uint MultimediaDataOffset { get; init; }` | Where the coded frame data begins — always 816, immediately after the fixed-size header, in every sample this reader was measured against. |
+| `NumBlocks` | `int NumBlocks { get; init; }` | How many records the block offset table holds — the same count as `BlockOffsets`'s length, kept as its own field because it is also what locates the frame information table. |
 | `PrimaryExtension` | `static string PrimaryExtension { get; }` |  |
-| `TocOffset` | `uint TocOffset { get; init; }` |  |
-| `VideoFrameCount` | `int VideoFrameCount { get; init; }` |  |
-| `Width` | `int Width { get; init; }` |  |
-| `FromBytes` | `static VmdContainer FromBytes(byte[] data)` |  |
+| `TocOffset` | `uint TocOffset { get; init; }` | The table of contents' own absolute file offset, as the header states it. |
+| `VideoFrameCount` | `int VideoFrameCount { get; init; }` | How many video-type records the table of contents holds. |
+| `Width` | `int Width { get; init; }` | Picture width in pixels. |
+| `FromBytes` | `static VmdContainer FromBytes(byte[] data)` | Opens a file over the caller's array, keeping it rather than copying it. |
 | `FromFile` | `static VmdContainer FromFile(FileInfo file)` |  |
 | `FromSpan` | `static VmdContainer FromSpan(ReadOnlySpan<byte> data)` |  |
 | `MatchesSignature` | `static bool? MatchesSignature(ReadOnlySpan<byte> header)` |  |
-| `Metadata` | `static VideoMetadata Metadata(VmdContainer container)` |  |
+| `Metadata` | `static VideoMetadata Metadata(VmdContainer container)` | Nothing beyond the streams themselves. A VMD file has no field for a title, an author or a creation date. |
 | `ReadPackets` | `static IEnumerable<CodedPacket> ReadPackets(VmdContainer container)` |  |
 | `Streams` | `static IReadOnlyList<MediaStreamInfo> Streams(VmdContainer container)` |  |
 
 #### `VmdWriter`
 
-Writes classic 816-byte Sierra VMD files with a real fixed-stride block/part table.
+Writes classic 816-byte Sierra VMD files from record-prefixed demux packets.
 
 Implements `IVideoContainerWriter<VmdWriter>`, `IVideoFormatMetadata<VmdWriter>`.
 
