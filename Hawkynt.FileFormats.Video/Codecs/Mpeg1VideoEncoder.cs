@@ -307,6 +307,8 @@ public sealed class Mpeg1VideoEncoder : IVideoCodecEncoder<Mpeg1VideoEncoder> {
     var backwardPredictorX = 0;
     var backwardPredictorY = 0;
     var pendingSkips = 0;
+    var previousUsedForward = false;
+    var previousUsedBackward = false;
     var lastAddress = this._macroblockWidth * this._macroblockHeight - 1;
 
     for (var address = 0; address <= lastAddress; ++address) {
@@ -324,10 +326,10 @@ public sealed class Mpeg1VideoEncoder : IVideoCodecEncoder<Mpeg1VideoEncoder> {
         var reference = forwardReference!;
         var (vectorX, vectorY) = _SearchMotion(
           planes, reference, macroblockX, macroblockY, forwardPredictorX, forwardPredictorY);
-        var prediction = new Prediction(reference, vectorX, vectorY, null, 0, 0);
-        var pattern = _QuantiseResidual(planes, prediction, macroblockX, macroblockY, block, levels);
+        var forwardPrediction = new Prediction(reference, vectorX, vectorY, null, 0, 0);
+        var forwardPattern = _QuantiseResidual(planes, forwardPrediction, macroblockX, macroblockY, block, levels);
 
-        if (vectorX == 0 && vectorY == 0 && pattern == 0 && address != 0 && address != lastAddress) {
+        if (vectorX == 0 && vectorY == 0 && forwardPattern == 0 && address != 0 && address != lastAddress) {
           ++pendingSkips;
           forwardPredictorX = 0;
           forwardPredictorY = 0;
@@ -336,12 +338,12 @@ public sealed class Mpeg1VideoEncoder : IVideoCodecEncoder<Mpeg1VideoEncoder> {
 
         _WriteAddressIncrement(writer, pendingSkips + 1);
         pendingSkips = 0;
-        writer.WriteCode(pattern != 0 ? "1" : "001");
+        writer.WriteCode(forwardPattern != 0 ? "1" : "001");
         _WriteMotionCode(writer, vectorX - forwardPredictorX, _FORWARD_F_CODE);
         _WriteMotionCode(writer, vectorY - forwardPredictorY, _FORWARD_F_CODE);
         forwardPredictorX = vectorX;
         forwardPredictorY = vectorY;
-        _WriteInterBlocks(writer, pattern, levels);
+        _WriteInterBlocks(writer, forwardPattern, levels);
         continue;
       }
 
@@ -370,10 +372,29 @@ public sealed class Mpeg1VideoEncoder : IVideoCodecEncoder<Mpeg1VideoEncoder> {
       };
 
       var pattern = _QuantiseResidual(planes, prediction, macroblockX, macroblockY, block, levels);
-      _WriteAddressIncrement(writer, 1);
 
       var usesForward = mode is BPrediction.Forward or BPrediction.Bidirectional;
       var usesBackward = mode is BPrediction.Backward or BPrediction.Bidirectional;
+
+      // A skipped macroblock of a B picture repeats the previous macroblock's direction and is
+      // predicted from the vector predictors as they stand (2.4.4.4), so it can only stand in for
+      // one that says exactly that and carries no coefficients. The first and last macroblock of a
+      // slice are always coded, and nothing can be repeated before a macroblock has been coded.
+      if (pattern == 0
+          && address != 0
+          && address != lastAddress
+          && usesForward == previousUsedForward
+          && usesBackward == previousUsedBackward
+          && (!usesForward || (forwardVector.X == forwardPredictorX && forwardVector.Y == forwardPredictorY))
+          && (!usesBackward || (backwardVector.X == backwardPredictorX && backwardVector.Y == backwardPredictorY))) {
+        ++pendingSkips;
+        continue;
+      }
+
+      _WriteAddressIncrement(writer, pendingSkips + 1);
+      pendingSkips = 0;
+      previousUsedForward = usesForward;
+      previousUsedBackward = usesBackward;
       writer.WriteCode((usesForward, usesBackward, pattern != 0) switch {
         (true, true, true) => "11",
         (true, true, false) => "10",
