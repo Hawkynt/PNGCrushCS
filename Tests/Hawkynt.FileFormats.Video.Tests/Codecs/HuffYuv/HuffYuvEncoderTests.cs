@@ -5,6 +5,7 @@ using System.Linq;
 using FileFormat.Avi;
 using FileFormat.Core;
 using FileFormat.Matroska;
+using Hawkynt.FileFormats.Video;
 
 namespace FileFormat.Codecs.HuffYuv.Tests;
 
@@ -124,7 +125,7 @@ public class HuffYuvEncoderTests {
       (PixelFormat.Rgb30, 10, false), (PixelFormat.Rgb48, 16, false), (PixelFormat.Rgba64, 16, true),
     }) {
       var frame = _ValidHighPacked(format, 9, 7, bits, 5100 + (int)format);
-      var encoder = _PlanarColourEncoder(9, 7, bits, alpha, HuffYuvPredictionMethod.Gradient);
+      var encoder = _PlanarColourEncoder(9, 7, bits, alpha, HuffYuvPredictionMethod.Gradient, grey: format is PixelFormat.Gray10 or PixelFormat.Gray16);
       Assert.That(encoder.TryEncode(frame, null, out var packet), Is.True);
       var decoded = _Decode(encoder.DescribeStream(), packet);
       Assert.Multiple(() => {
@@ -213,18 +214,18 @@ public class HuffYuvEncoderTests {
   }
 
   private static HuffYuvEncoder _PlanarYuvEncoder(int width, int height, int bits, HuffYuvPredictionMethod prediction, int hShift, int vShift, bool interlaced, bool tablesPerFrame)
-    => HuffYuvEncoder.Create(_PlanarDescriptionRequest(width, height, bits, hShift, vShift, interlaced, tablesPerFrame) with { CodecPrivateData = new byte[] {
-      (byte)prediction, (byte)(((bits - 1) << 4) | hShift | (vShift << 2)), (byte)((interlaced ? _INTERLACED : _PROGRESSIVE) | _CHROMA | (tablesPerFrame ? _TABLES_PER_FRAME : 0)), 1,
-    }});
+    => HuffYuvEncoder.Create(_PlanarDescriptionRequest(width, height, bits, hShift, vShift, interlaced, tablesPerFrame, prediction));
 
-  private static MediaStreamInfo _PlanarDescriptionRequest(int width, int height, int bits, int hShift, int vShift, bool interlaced, bool tablesPerFrame) => new() {
+  private static MediaStreamInfo _PlanarDescriptionRequest(int width, int height, int bits, int hShift, int vShift, bool interlaced, bool tablesPerFrame, HuffYuvPredictionMethod prediction = 0) => new() {
     Index = 0, Kind = MediaStreamKind.Video, Codec = CodecTag.FromCharacters("FFVH"), Width = width, Height = height,
-    BitsPerPixel = bits, CodecPrivateData = new byte[] { 0, (byte)(((bits - 1) << 4) | hShift | (vShift << 2)), (byte)((interlaced ? _INTERLACED : _PROGRESSIVE) | _CHROMA | (tablesPerFrame ? _TABLES_PER_FRAME : 0)), 1 },
+    BitsPerPixel = bits, CodecPrivateData = new byte[] { (byte)prediction, (byte)(((bits - 1) << 4) | hShift | (vShift << 2)), (byte)((interlaced ? _INTERLACED : _PROGRESSIVE) | _CHROMA | (tablesPerFrame ? _TABLES_PER_FRAME : 0)), 1 },
   };
 
-  private static HuffYuvEncoder _PlanarColourEncoder(int width, int height, int bits, bool alpha, HuffYuvPredictionMethod prediction) => HuffYuvEncoder.Create(new MediaStreamInfo {
+  // Neither the chroma nor the planar-RGB bit is greyscale, so a grey frame has to be described as
+  // grey; asking for planar RGB makes the decoder answer with RGB whatever went in.
+  private static HuffYuvEncoder _PlanarColourEncoder(int width, int height, int bits, bool alpha, HuffYuvPredictionMethod prediction, bool grey = false) => HuffYuvEncoder.Create(new MediaStreamInfo {
     Index = 0, Kind = MediaStreamKind.Video, Codec = CodecTag.FromCharacters("FFVH"), Width = width, Height = height, BitsPerPixel = bits,
-    CodecPrivateData = new byte[] { (byte)prediction, (byte)((bits - 1) << 4), (byte)(_PROGRESSIVE | 0x02 | (alpha ? 0x04 : 0)), 1 },
+    CodecPrivateData = new byte[] { (byte)prediction, (byte)((bits - 1) << 4), (byte)(_PROGRESSIVE | (grey ? 0 : 0x02) | (alpha ? 0x04 : 0)), 1 },
   });
 
   private static MediaStreamInfo _LegacyRequest(int width, int height, int bitsPerPixel) {

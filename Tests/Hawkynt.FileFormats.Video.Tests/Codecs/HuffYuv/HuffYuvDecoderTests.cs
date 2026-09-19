@@ -143,15 +143,17 @@ public class HuffYuvDecoderTests {
 
   [Test, Category("Unit")]
   public void CodecAnswersToBothFourccSpellingsOnlyForVideo() {
-    foreach (var code in new[] { "HFYU", "FFVH", "hfyu" }) Assert.That(HuffYuvDecoder.Accepts(_Request(4, 4, 16) with { Codec = CodecTag.FromCharacters(code) }), Is.True, code);
-    Assert.That(HuffYuvDecoder.Accepts(_Request(4, 4, 16) with { Codec = CodecTag.FromCharacters("FFV1") }), Is.False);
+    foreach (var code in new[] { "HFYU", "FFVH", "hfyu" }) Assert.That(HuffYuvDecoder.Accepts(_Request(4, 4, 16, CodecTag.FromCharacters(code))), Is.True, code);
+    Assert.That(HuffYuvDecoder.Accepts(_Request(4, 4, 16, CodecTag.FromCharacters("FFV1"))), Is.False);
   }
 
-  private static RawImage _Decode(MediaStreamInfo stream, byte[] frame) {
-    var decoder = HuffYuvDecoder.Create(stream); Assert.That(decoder.TryDecode(new(0, frame), out var picture), Is.True); return picture;
+  private static RawImage _Decode(MediaStreamInfo stream, byte[] frame) => _Decode(stream, new CodedPacket(0, frame));
+
+  private static RawImage _Decode(MediaStreamInfo stream, CodedPacket packet) {
+    var decoder = HuffYuvDecoder.Create(stream); Assert.That(decoder.TryDecode(packet, out var picture), Is.True); return picture;
   }
 
-  private static MediaStreamInfo _Request(int width, int height, int bpp) => new() { Index = 0, Kind = MediaStreamKind.Video, Width = width, Height = height, BitsPerPixel = bpp };
+  private static MediaStreamInfo _Request(int width, int height, int bpp, CodecTag codec = default) => new() { Index = 0, Kind = MediaStreamKind.Video, Codec = codec, Width = width, Height = height, BitsPerPixel = bpp };
 
   private static MediaStreamInfo _LegacyRequest(int width, int height, int bpp) {
     var header = new byte[_BITMAP_INFO_HEADER_SIZE];
