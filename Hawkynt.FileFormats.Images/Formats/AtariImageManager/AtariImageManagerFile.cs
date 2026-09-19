@@ -10,7 +10,7 @@ namespace FileFormat.AtariImageManager;
 /// scanned images wanted: the file is the sample values as they came off the scanner, and anything
 /// else would have to be stripped before processing them.
 /// </remarks>
-[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.IrfanView)]
+[VerifiedBy(ConformanceOracle.Recoil2Png, ConformanceOracle.XnView, ConformanceOracle.IrfanView)]
 public readonly record struct AtariImageManagerFile
   : IImageFormatReader<AtariImageManagerFile>, IImageToRawImage<AtariImageManagerFile>,
     IImageFromRawImage<AtariImageManagerFile>, IImageFormatWriter<AtariImageManagerFile> {

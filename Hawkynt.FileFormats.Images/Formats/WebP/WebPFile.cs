@@ -9,7 +9,7 @@ namespace FileFormat.WebP;
 
 /// <summary>In-memory representation of a WebP file with full VP8/VP8L pixel codec support.</summary>
 [FormatMimeType("image/webp")]
-[VerifiedBy(ConformanceOracle.ImageMagick, ConformanceOracle.DWebp, ConformanceOracle.FFmpeg, ConformanceOracle.IrfanView)]
+[VerifiedBy(ConformanceOracle.ImageMagick, ConformanceOracle.XnView, ConformanceOracle.IrfanView, ConformanceOracle.DWebp, ConformanceOracle.FFmpeg)]
 public sealed class WebPFile :
   IImageFormatReader<WebPFile>, IImageToRawImage<WebPFile>, IImageFromRawImage<WebPFile>, IImageFormatWriter<WebPFile>,
   IMultiImageFileFormat<WebPFile>,

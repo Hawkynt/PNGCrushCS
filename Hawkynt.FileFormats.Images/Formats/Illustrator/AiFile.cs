@@ -12,6 +12,7 @@ namespace FileFormat.Illustrator;
 /// directly, while retaining the PostScript renderer for vector files whose required procsets are
 /// present. Version 9 and newer PDF-based AI belongs to the PDF reader.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.Ghostscript)]
 public readonly record struct AiFile :
   IImageFormatReader<AiFile>, IImageToRawImage<AiFile>, IImageFromRawImage<AiFile>, IImageFormatWriter<AiFile> {
 

@@ -146,19 +146,19 @@ public sealed class MszhVideoDecoderTests {
 
   [Test]
   [Category("Unit")]
-  public void SplitPacketWhoseDeclaredHalvesDoNotCoverTheFrameRefuses() {
+  public void SplitPacketWhoseDeclaredHalvesExceedTheFrameRefuses() {
     var decoder = MszhVideoDecoder.Create(_StreamWithFormat(2, 2, compression: 0, flags: 0x01));
     var payload = new byte[10];
     BinaryPrimitives.WriteUInt32LittleEndian(payload, 1);
-    BinaryPrimitives.WriteUInt32LittleEndian(payload.AsSpan(4), 4); // two halves would cover only 8 of 16 bytes
+    BinaryPrimitives.WriteUInt32LittleEndian(payload.AsSpan(4), 12); // two sections would need 24 decoded bytes, not 16
 
     Assert.Throws<InvalidDataException>(() => decoder.TryDecode(new(0, payload), out _));
   }
 
   [Test]
   [Category("Unit")]
-  public void NonRgbLclImageTypeRefuses() {
-    var stream = _StreamWithFormat(2, 2, compression: 0, imageType: 5);
+  public void UnknownLclImageTypeRefuses() {
+    var stream = _StreamWithFormat(2, 2, compression: 0, imageType: 6);
     Assert.Throws<NotSupportedException>(() => MszhVideoDecoder.Create(stream));
   }
 
