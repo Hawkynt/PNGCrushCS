@@ -18,6 +18,9 @@ public sealed class AviContainer : IVideoContainerReader<AviContainer> {
   public required ReadOnlyMemory<byte> MovieList { get; init; }
   internal IReadOnlyList<ReadOnlyMemory<byte>> MovieLists { get; init; } = [];
 
+  /// <summary>The <c>idx1</c> chunk's body, or empty where the file carries none.</summary>
+  internal ReadOnlyMemory<byte> LegacyIndex { get; init; }
+
   public static string PrimaryExtension => ".avi";
   public static string[] FileExtensions => [".avi"];
 
@@ -102,6 +105,7 @@ public sealed class AviContainer : IVideoContainerReader<AviContainer> {
   private static IEnumerable<CodedPacket> _Walk(AviContainer container, int? onlyStream) {
     var ordinals = new long[container.StreamInfos.Count];
     var movieLists = container.MovieLists.Count == 0 ? new[] { container.MovieList } : container.MovieLists;
+    var keyFlags = _ReadKeyFrameFlags(container, movieLists);
 
     foreach (var movieList in movieLists)
       foreach (var element in RiffScanner.Walk(movieList, 0, movieList.Length)) {
@@ -110,14 +114,160 @@ public sealed class AviContainer : IVideoContainerReader<AviContainer> {
             continue;
 
           foreach (var record in RiffScanner.Walk(element))
-            if (_TryPacket(container, record, ordinals, onlyStream, out var recorded))
+            if (_TryPacket(container, record, ordinals, keyFlags, onlyStream, out var recorded))
               yield return recorded;
           continue;
         }
 
-        if (_TryPacket(container, element, ordinals, onlyStream, out var packet))
+        if (_TryPacket(container, element, ordinals, keyFlags, onlyStream, out var packet))
           yield return packet;
       }
+  }
+
+  // ============================================================================================
+  // Which packets a decoder may begin at
+  // ============================================================================================
+
+  /// <summary>The <c>idx1</c> entry flag that marks a chunk a decoder may begin at.</summary>
+  private const uint _AVIIF_KEYFRAME = 0x10;
+
+  /// <summary>Set in an OpenDML index entry's size field to mean the opposite: <i>not</i> a key frame.</summary>
+  private const uint _AVISTDINDEX_NOT_KEYFRAME = 0x8000_0000;
+
+  /// <summary>Bytes of <c>AVISTDINDEX</c> before its first entry.</summary>
+  private const int _STANDARD_INDEX_HEADER_SIZE = 24;
+
+  /// <summary><c>bIndexType</c> naming an index that points at chunks rather than at other indexes.</summary>
+  private const byte _AVI_INDEX_OF_CHUNKS = 1;
+
+  /// <summary>
+  /// Reads which of each stream's chunks a decoder may begin at, in the order the chunks lie in
+  /// <c>movi</c>, or <c>null</c> where the file states nothing.
+  /// </summary>
+  /// <remarks>
+  /// An AVI puts this nowhere near the picture it describes. There is no per-chunk header in
+  /// <c>movi</c> and no flag inside the payload — a codec whose I and P pictures are told apart by
+  /// nothing else is told apart by the file's index or not at all. ZeroCodec is exactly that codec:
+  /// its inter picture writes a zero byte to mean "keep the byte under this one", so reading a P
+  /// picture as an I picture yields a frame that is mostly black and reading an I picture as a P
+  /// picture yields one built on a reference that does not exist. This used to return nothing at all,
+  /// so every AVI packet this package produced said it was not a key frame, and that is the whole of
+  /// why the round trip below could not tell the two picture types apart.
+  /// <para/>
+  /// Two indexes may be present and they are not equivalent. The OpenDML <c>ix##</c> chunks sit
+  /// inside each <c>movi</c> list, one per stream per segment, and so describe every segment of a
+  /// file that has more than one; the legacy <c>idx1</c> sits once after the first <c>movi</c> and by
+  /// convention describes only that first RIFF. The OpenDML index is therefore preferred where it
+  /// exists and <c>idx1</c> is the fallback.
+  /// <para/>
+  /// Entries are matched to chunks by their position in each stream's own run and not by the offsets
+  /// they carry. An <c>idx1</c> offset is measured from the <c>movi</c> list's form type in most
+  /// files and from the start of the file in some, the specification never said which, and a reader
+  /// that picks wrong silently attaches every flag to the wrong picture. The ordering is not
+  /// ambiguous in either convention, so the ordering is what is used, and the same chunks are
+  /// filtered out here as in <see cref="_TryPacket"/> so the two counts stay in step.
+  /// <para/>
+  /// Where a file carries no index nothing is claimed: the flags stay false, a codec that needs them
+  /// refuses the stream by name, and no picture is invented. An AVI that does not say which of its
+  /// pictures stand alone has not said it, and guessing "all of them" would turn every inter picture
+  /// of every predicted codec into a plausible wrong frame rather than an error.
+  /// </remarks>
+  private static bool[][]? _ReadKeyFrameFlags(
+    AviContainer container, IReadOnlyList<ReadOnlyMemory<byte>> movieLists) {
+    var streamCount = container.StreamInfos.Count;
+    if (streamCount == 0)
+      return null;
+
+    var flags = new List<bool>[streamCount];
+    for (var i = 0; i < streamCount; ++i)
+      flags[i] = [];
+
+    return _ReadStandardIndexes(movieLists, flags) || _ReadLegacyIndex(container.LegacyIndex.Span, flags)
+      ? Array.ConvertAll(flags, static stream => stream.ToArray())
+      : null;
+  }
+
+  /// <summary>Collects the OpenDML <c>ix##</c> indexes inside every <c>movi</c> list, in file order.</summary>
+  private static bool _ReadStandardIndexes(
+    IReadOnlyList<ReadOnlyMemory<byte>> movieLists, List<bool>[] flags) {
+    var found = false;
+
+    foreach (var movieList in movieLists)
+      foreach (var element in RiffScanner.Walk(movieList, 0, movieList.Length)) {
+        if (element.IsList)
+          continue;
+
+        // OpenDML spells the standard index with the "ix" in front of the stream digits — ix00 —
+        // and not behind them. _TryPacket's filter catches the other spelling; neither reaches a
+        // decoder, because a chunk beginning with a letter fails its leading-digit test as well.
+        var id = element.Id.ToString();
+        if (id.Length != 4 || id[0] != 'i' || id[1] != 'x'
+            || !char.IsAsciiDigit(id[2]) || !char.IsAsciiDigit(id[3]))
+          continue;
+
+        if (_ReadStandardIndex(element.Body.Span, flags))
+          found = true;
+      }
+
+    return found;
+  }
+
+  private static bool _ReadStandardIndex(ReadOnlySpan<byte> index, List<bool>[] flags) {
+    if (index.Length < _STANDARD_INDEX_HEADER_SIZE)
+      return false;
+
+    var longsPerEntry = BinaryPrimitives.ReadUInt16LittleEndian(index);
+    if (index[3] != _AVI_INDEX_OF_CHUNKS || longsPerEntry != 2)
+      return false; // a superindex points at other indexes, and an unexpected stride cannot be walked.
+
+    // AVISTDINDEX: wLongsPerEntry, bIndexSubType, bIndexType, nEntriesInUse, dwChunkId,
+    // qwBaseOffset, dwReserved3 — so the count is at four and the chunk id at eight.
+    var chunkId = index.Slice(8, 4);
+    if (!char.IsAsciiDigit((char)chunkId[0]) || !char.IsAsciiDigit((char)chunkId[1]))
+      return false;
+
+    var streamIndex = (chunkId[0] - '0') * 10 + (chunkId[1] - '0');
+    if ((uint)streamIndex >= (uint)flags.Length)
+      return false;
+
+    var entries = BinaryPrimitives.ReadUInt32LittleEndian(index[4..]);
+    var available = (index.Length - _STANDARD_INDEX_HEADER_SIZE) / 8;
+    if (entries > (uint)available)
+      entries = (uint)available; // a truncated index describes the chunks it reached and no more.
+
+    for (var i = 0; i < entries; ++i) {
+      var size = BinaryPrimitives.ReadUInt32LittleEndian(index[(_STANDARD_INDEX_HEADER_SIZE + i * 8 + 4)..]);
+      flags[streamIndex].Add((size & _AVISTDINDEX_NOT_KEYFRAME) == 0);
+    }
+
+    return entries != 0;
+  }
+
+  /// <summary>Walks <c>idx1</c>, whose sixteen-byte entries lie in <c>movi</c> order across all streams.</summary>
+  private static bool _ReadLegacyIndex(ReadOnlySpan<byte> index, List<bool>[] flags) {
+    var found = false;
+
+    for (var at = 0; at + 16 <= index.Length; at += 16) {
+      var entry = index.Slice(at, 16);
+      if (!char.IsAsciiDigit((char)entry[0]) || !char.IsAsciiDigit((char)entry[1]))
+        continue;
+
+      var suffix = $"{(char)entry[2]}{(char)entry[3]}";
+      if (suffix is _INDEX_SUFFIX or _PALETTE_CHANGE_SUFFIX)
+        continue;
+
+      var streamIndex = (entry[0] - '0') * 10 + (entry[1] - '0');
+      if ((uint)streamIndex >= (uint)flags.Length)
+        continue;
+
+      if (BinaryPrimitives.ReadUInt32LittleEndian(entry[12..]) == 0)
+        continue; // an empty chunk yields no packet, so it must consume no entry either.
+
+      flags[streamIndex].Add((BinaryPrimitives.ReadUInt32LittleEndian(entry[4..]) & _AVIIF_KEYFRAME) != 0);
+      found = true;
+    }
+
+    return found;
   }
 
   /// <summary>The OpenDML index, which points at chunks rather than being one.</summary>
@@ -147,6 +297,7 @@ public sealed class AviContainer : IVideoContainerReader<AviContainer> {
     AviContainer container,
     RiffElement element,
     long[] ordinals,
+    bool[][]? keyFlags,
     int? onlyStream,
     out CodedPacket packet) {
     packet = default;
@@ -166,7 +317,13 @@ public sealed class AviContainer : IVideoContainerReader<AviContainer> {
       return false;
 
     var isVideo = container.StreamInfos[streamIndex].Kind == MediaStreamKind.Video;
-    packet = new(streamIndex, element.Body, isVideo ? ordinal : null, isVideo ? ordinal : null);
+    var stream = keyFlags?[streamIndex];
+    packet = new(
+      streamIndex,
+      element.Body,
+      isVideo ? ordinal : null,
+      isVideo ? ordinal : null,
+      IsKeyFrame: stream != null && ordinal < stream.Length && stream[ordinal]);
     return true;
   }
 }

@@ -33,6 +33,7 @@ public static class AviReader {
   private const string _OPEN_DML_LIST = "odml";
   private const string _MOVIE_LIST = "movi";
   private const string _INFO_LIST = "INFO";
+  private const string _LEGACY_INDEX_ID = "idx1";
   private const string _MAIN_HEADER_ID = "avih";
   private const string _EXTENDED_HEADER_ID = "dmlh";
   private const string _STREAM_HEADER_ID = "strh";
@@ -100,10 +101,14 @@ public static class AviReader {
     RiffElement? headerList = null;
     RiffElement? infoList = null;
     var movieLists = new List<ReadOnlyMemory<byte>>();
+    ReadOnlyMemory<byte> legacyIndex = default;
 
     foreach (var element in RiffScanner.Walk(memory, RiffHeader.StructSize, firstRiffEnd)) {
-      if (!element.IsList)
+      if (!element.IsList) {
+        if (element.Id.ToString() == _LEGACY_INDEX_ID && legacyIndex.IsEmpty)
+          legacyIndex = element.Body;
         continue;
+      }
 
       switch (element.ListType.ToString()) {
         case _HEADER_LIST:
@@ -151,6 +156,7 @@ public static class AviReader {
       StreamInfos = streams,
       MovieList = movieLists[0],
       MovieLists = movieLists,
+      LegacyIndex = legacyIndex,
       FileMetadata = _ReadMetadata(header, streams, infoList, extendedTotalFrames),
     };
   }
