@@ -226,8 +226,28 @@ internal static class FFmpegOracle {
   /// them.
   /// </remarks>
   public static (bool Decoded, string Output, byte[] Pictures) TryDecodePictures(
-    string path, int width, int height, int expectedFrames) {
-    var raw = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName() + ".rgb");
+    string path, int width, int height, int expectedFrames)
+    => TryDecodePicturesAs(path, width, height, expectedFrames, "rgb24", checked(width * height * 3));
+
+  /// <summary>
+  /// Decodes the complete first video stream into a named FFmpeg pixel format and hands the samples
+  /// back, so a caller can compare them byte for byte against what it encoded.
+  /// </summary>
+  /// <remarks>
+  /// <see cref="TryDecodePictures"/> asks for RGB24 whatever the codec stores, which is the right
+  /// question for a codec whose samples are RGB anyway and the wrong one for everything else: a
+  /// stream coded as subsampled YUV reaches RGB only through a colour matrix and a chroma
+  /// upsampler, and neither is exact. Comparing after that conversion can only ever assert a
+  /// tolerance, which is precisely the assertion a lossless codec must not settle for. Asking
+  /// FFmpeg for the codec's own layout — <c>yuv422p</c> for CLLC type 0, <c>argb</c> for type 3 —
+  /// puts the coded samples themselves on the wire, and the comparison becomes an equality.
+  /// <para/>
+  /// <paramref name="frameBytes"/> is passed rather than derived because only the caller knows the
+  /// layout's stride: 4:2:2 planar is two bytes a pixel, ARGB four, RGB24 three.
+  /// </remarks>
+  public static (bool Decoded, string Output, byte[] Pictures) TryDecodePicturesAs(
+    string path, int width, int height, int expectedFrames, string pixelFormat, int frameBytes) {
+    var raw = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName() + ".raw");
 
     try {
       var startInfo = new ProcessStartInfo(ExecutablePath!) {
@@ -241,7 +261,7 @@ internal static class FFmpegOracle {
         // -fps_mode, not -vsync: the old spelling was removed in ffmpeg 7 and this machine runs 9, where
         // passing it aborts the whole command before a frame is read.
         "-map", "0:v:0", "-an", "-sn", "-dn", "-fps_mode", "passthrough",
-        "-f", "rawvideo", "-pix_fmt", "rgb24", raw,
+        "-f", "rawvideo", "-pix_fmt", pixelFormat, raw,
       })
         startInfo.ArgumentList.Add(argument);
 
@@ -265,12 +285,11 @@ internal static class FFmpegOracle {
         return (false, "it produced no decoded video bytes", []);
 
       var pictures = File.ReadAllBytes(raw);
-      var frameBytes = checked(width * height * 3);
       if (pictures.Length != checked(frameBytes * expectedFrames))
         return (false,
           pictures.Length % frameBytes == 0
             ? $"it decoded {pictures.Length / frameBytes} frames instead of {expectedFrames}"
-            : $"it produced {pictures.Length} bytes, which is not a whole number of {width}x{height} RGB24 frames",
+            : $"it produced {pictures.Length} bytes, which is not a whole number of {width}x{height} {pixelFormat} frames",
           []);
 
       return (true, $"it decoded all {expectedFrames} {width}x{height} frames", pictures);
