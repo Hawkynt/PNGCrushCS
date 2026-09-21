@@ -43,6 +43,18 @@ internal sealed class ProResFrameHeader {
   internal required int AlphaChannelType { get; init; }
   internal required int MatrixCoefficients { get; init; }
 
+  /// <summary>
+  /// Whether the frame states syntax its own <c>bitstream_version</c> is not supposed to carry.
+  /// </summary>
+  /// <remarks>
+  /// True only for the one deviation there is: a version 0 frame stating 4:4:4 or an alpha channel,
+  /// which RDD 36:2022, 6.4 fixes at 4:2:2 and no alpha. Every ProRes 4444 frame FFmpeg wrote before
+  /// it began stamping version 1 does this, so refusing them would mean refusing real files; the
+  /// frame is read exactly as the version that does carry the syntax, and this records that it was
+  /// not written by the letter of 6.4.
+  /// </remarks>
+  internal required bool DeviatesFromItsStatedVersion { get; init; }
+
   /// <summary>The luma quantisation weights, in raster order, <c>[v * 8 + u]</c>.</summary>
   internal required byte[] LumaMatrix { get; init; }
 
@@ -92,11 +104,20 @@ internal sealed class ProResFrameHeader {
       throw new NotSupportedException(
         "This ProRes frame states interlace_mode 3, which RDD 36 Table 2 reserves.");
 
-    // 6.4: version 0 fixes both of these, and a version 0 frame that states otherwise is describing
-    // itself with syntax its own version does not have.
-    if (version == 0 && (chromaFormat != 2 || alphaChannelType != 0))
-      throw new InvalidDataException(
-        $"This ProRes frame states bitstream version 0 with chroma_format {chromaFormat} and alpha_channel_type {alphaChannelType}. RDD 36 6.4 fixes those at 2 and 0 for version 0.");
+    // 6.4 fixes chroma_format at 2 and alpha_channel_type at 0 for version 0, and this used to be
+    // refused as a frame describing itself with syntax its own version does not have. It is not
+    // refused any more, because the files that do it are real and numerous: every ProRes 4444 frame
+    // FFmpeg wrote before it started stamping version 1 — 6.1, which is what a current Ubuntu ships,
+    // among them — states version 0 with chroma_format 3 and whichever alpha_channel_type was asked
+    // for. FFmpeg's own decoder reads them, and a decoder that refuses what the reference encoder
+    // produces is wrong about the world whatever the specification says.
+    //
+    // Nothing is guessed by accepting them. Version 1 added no field and moved none: the two values
+    // sit where they always sat, and a version 0 header stating them is read exactly as a version 1
+    // header stating them. Only writing keeps to the letter of 6.4 — this package's encoder stamps
+    // version 1 whenever it writes 4:4:4 or alpha, which is what ProResVideoEncoderTests requires —
+    // so the leniency is on the reading side alone, where it costs a caller nothing.
+    var deviatesFromItsStatedVersion = version == 0 && (chromaFormat != 2 || alphaChannelType != 0);
 
     var flags = frame[19];
     var loadLuma = (flags & 2) != 0;
@@ -133,6 +154,7 @@ internal sealed class ProResFrameHeader {
       InterlaceMode = interlaceMode,
       AlphaChannelType = alphaChannelType,
       MatrixCoefficients = frame[16],
+      DeviatesFromItsStatedVersion = deviatesFromItsStatedVersion,
       LumaMatrix = luma,
       ChromaMatrix = chroma,
     };

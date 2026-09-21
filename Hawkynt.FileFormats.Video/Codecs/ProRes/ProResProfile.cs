@@ -12,27 +12,31 @@ namespace FileFormat.Codecs.ProRes;
 /// decoding process and no profiles at all — every frame carries its own weight matrices and its own
 /// per-slice quantisation index, so a decoder never needs to know which of the six names a stream was
 /// written under. What the name selects here is therefore entirely on this side: the two weight
-/// matrices to put in the frame header, and the number of bits a macroblock is allowed, which is what
-/// the quantisation index of each slice is chosen to meet.
+/// matrices to put in the frame header, the sampling precision, and the number of bits a macroblock
+/// is allowed, which is what the quantisation index of each slice is chosen to meet.
 /// <para/>
-/// <b>The weight matrices are copied, not derived.</b> They are the matrices Apple's own encoder
-/// writes, and reading them out of the frame header of a file is the only way to know them — the
-/// specification prints none of them, since a decoder is told them by every frame. The four here were
-/// taken byte for byte out of the frame headers of files written by both of FFmpeg's ProRes encoders
-/// and are the same tables its <c>proresenc_kostya.c</c> carries as constants; see
-/// <c>THIRD-PARTY-NOTICE.FFmpeg.txt</c> beside this file. A matrix worked out afresh would be a
-/// different profile wearing the same four-character code.
+/// <b>The weight matrices are copied, not derived.</b> They are the matrices Apple's profiles are
+/// actually written with, and reading them out of the frame header of a file is the only way to know
+/// them — the specification prints none of them, since a decoder is told them by every frame. The
+/// five distinct tables here are FFmpeg's <c>prores_quant_matrices</c>, and each was read back byte
+/// for byte out of a frame header FFmpeg wrote; see <c>THIRD-PARTY-NOTICE.FFmpeg.txt</c> beside this
+/// file. A matrix worked out afresh would be a different profile wearing the same four-character
+/// code, which is why <c>ProResProfileMatrixTests</c> asserts them against those values a second
+/// time: no decoder can catch a wrong one, since every frame states the matrix it was written with
+/// and every decoder believes it.
 /// <para/>
 /// <b>The data rates are Apple's published ones.</b> The <i>Apple ProRes White Paper</i> states each
 /// profile's target at 1920x1080 and 29.97 frames a second; dividing by the 8160 macroblocks of that
 /// raster and by that frame rate gives a figure in bits per macroblock, which is the form that
-/// carries to any other size and rate unchanged.
+/// carries to any other size and rate unchanged. The 4444 rates are the published values without
+/// alpha, because alpha is lossless and therefore depends on the matte rather than on the colour
+/// profile's rate target.
 /// </remarks>
 /// <param name="Tag">The four-character code a container names this profile by.</param>
 /// <param name="Name">The profile's name as Apple writes it.</param>
 /// <param name="LumaMatrix">The luma quantisation weights, raster order, <c>[v * 8 + u]</c>.</param>
 /// <param name="ChromaMatrix">The chroma quantisation weights, raster order.</param>
-/// <param name="BitsPerMacroblock">The coded size a macroblock is allowed on average.</param>
+/// <param name="BitsPerMacroblock">The coded colour size a macroblock is allowed on average.</param>
 internal sealed record ProResProfile(
   CodecTag Tag,
   string Name,
@@ -140,8 +144,43 @@ internal sealed record ProResProfile(
     ],
     900);
 
+  /// <summary>ProRes 4444 — about 330 Mbit/s at 1920x1080 29.97, excluding alpha.</summary>
+  internal static readonly ProResProfile FourFourFour = new(
+    CodecTag.FromCharacters("ap4h"), "4444",
+    [.. HighQuality.LumaMatrix],
+    [.. HighQuality.ChromaMatrix],
+    1349);
+
+  /// <summary>ProRes 4444 XQ — about 495 Mbit/s at 1920x1080 29.97, excluding alpha.</summary>
+  internal static readonly ProResProfile FourFourFourXq = new(
+    CodecTag.FromCharacters("ap4x"), "4444 XQ",
+    [
+      2, 2, 2, 2, 2, 2, 2, 2,
+      2, 2, 2, 2, 2, 2, 2, 2,
+      2, 2, 2, 2, 2, 2, 2, 2,
+      2, 2, 2, 2, 2, 2, 2, 3,
+      2, 2, 2, 2, 2, 2, 3, 3,
+      2, 2, 2, 2, 2, 3, 3, 3,
+      2, 2, 2, 2, 3, 3, 3, 4,
+      2, 2, 2, 2, 3, 3, 4, 4,
+    ],
+    [.. HighQuality.ChromaMatrix],
+    2024);
+
   /// <summary>The four 4:2:2 profiles, in increasing order of data rate.</summary>
-  internal static readonly ProResProfile[] All = [Proxy, Lt, Standard, HighQuality];
+  internal static readonly ProResProfile[] FourTwoTwo = [Proxy, Lt, Standard, HighQuality];
+
+  /// <summary>All six Apple ProRes profiles, in increasing order within their sampling families.</summary>
+  internal static readonly ProResProfile[] All = [.. FourTwoTwo, FourFourFour, FourFourFourXq];
+
+  /// <summary>Whether this profile codes colour at 4:4:4 rather than 4:2:2.</summary>
+  internal bool IsFourFourFour => this.Tag.EqualsIgnoringCase(FourFourFour.Tag) || this.Tag.EqualsIgnoringCase(FourFourFourXq.Tag);
+
+  /// <summary>The <c>chroma_format</c> value RDD 36 puts in the frame header.</summary>
+  internal int ChromaFormat => this.IsFourFourFour ? 3 : 2;
+
+  /// <summary>The colour precision conventionally reconstructed for this profile.</summary>
+  internal int BitDepth => this.IsFourFourFour ? 12 : 10;
 
   /// <summary>The profile a four-character code names, or <c>null</c> where none of them does.</summary>
   internal static ProResProfile? For(CodecTag tag) {

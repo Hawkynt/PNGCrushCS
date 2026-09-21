@@ -1591,15 +1591,66 @@ folding the two together, moves up to three levels of RGB on a fifth to a third 
 
 What refuses: a bitstream version later than the two RDD 36 describes; a reserved `chroma_format`,
 `interlace_mode` or `alpha_channel_type`; a `quantization_index` outside the permitted 1 to 224; a
-version 0 frame stating syntax its own version does not have; a packet that is not a compressed
-frame; and any structure whose stated size does not fit inside the one containing it.
+packet that is not a compressed frame; any structure whose stated size does not fit inside the one
+containing it; and non-zero frame stuffing where RDD 36 permits only zero bytes.
 
-**Writing it: the four 4:2:2 profiles, and nothing else.** The encoder writes `apco`, `apcs`, `apcn`
-and `apch` — progressive, ten-bit 4:2:2, no alpha, one whole picture a packet at bitstream version 0,
-which is the version 6.4 defines for exactly that combination. `ap4h` and `ap4x` are refused by name:
-they are 4:4:4 at twelve bits with an alpha channel, and none of the three is written here. So is any
-other four-character code, and so is a picture whose size is not the stream's, since every ProRes
-frame restates its own size and a stream cannot carry two.
+What is read although 6.4 says it should not exist: a bitstream version 0 frame stating 4:4:4 or an
+alpha channel. 6.4 fixes both at version 0's values, and this was refused until the read-direction
+oracle was pointed at ffmpeg 6.1 and found that every ProRes 4444 frame ffmpeg wrote before it began
+stamping version 1 is exactly that — and that ffmpeg's own decoder reads them. Version 1 added no
+field to the header and moved none, so the frame is read as the version that does carry the syntax
+and `ProResFrameHeader.DeviatesFromItsStatedVersion` records that it was not written by the letter of
+the clause. The writer here still stamps version 1 whenever it writes 4:4:4 or alpha.
+
+The same oracle run found the second half of it. Those ffmpeg versions also leave the **last sample of
+every alpha slice out of the file**: `encode_alpha_plane` emits the first sample and then
+`num_coeffs - 1` more, and ffmpeg's decoder never notices because reading past the end of its bit
+reader yields zeroes. This decoder reads zeroes there too, so the sample neither file contains is
+reconstructed identically by both and the comparison against ffmpeg stays exact;
+`ProResPlanes.TruncatedAlphaSamples` counts them. The zeroes are a fixed small supply rather than an
+endless one, because a slice that stops a hundred samples short is damaged and a plane of synthesised
+alpha would be exactly the plausible wrong picture the rest of this decoder refuses to produce.
+
+**Writing covers all six profiles and both picture structures the format has.** `apco`, `apcs`,
+`apcn` and `apch` are ten-bit 4:2:2; `ap4h` and `ap4x` are twelve-bit 4:4:4. The 4:2:2/no-alpha
+combination stays at bitstream version 0, while 4:4:4 or alpha uses version 1 as 6.4 requires. A
+32-bit 4444 sample description writes the frame's alpha losslessly, choosing the eight- or sixteen-bit
+alpha syntax from the source representation; a 24-bit description writes colour only. Every packet
+is still a key frame because ProRes has no P or B pictures and no forward or backward references.
+
+Interlace is two independently coded field pictures, not prediction. An existing QuickTime `fiel`
+child selects top-first (`0x0201`) or bottom-first (`0x0206`), which become RDD 36 interlace modes 1
+and 2 and select the interlaced coefficient scan. QuickTime's two orders whose coded and displayed
+orders disagree (`0x0209` and `0x020E`) are refused: the ProRes frame header has no second field-order
+flag with which to preserve that distinction. The writer also refuses an unknown profile tag, a
+picture whose size is not the stream's, and a sample entry whose own size cuts off the child atoms it
+would otherwise be tempting to parse past.
+
+**The outward check runs in both directions, because one direction is not enough.** Twenty-four
+generated frames are muxed and handed to **ffmpeg**: all six profiles progressive, both field orders
+in `apcn` and in `ap4h` at a height whose fields are twenty-five rows, a varying matte at both depths
+in both 4:4:4 profiles, a binary matte, a wholly opaque one, a 4444 stream that states no alpha at
+all, and an interlaced 4444 frame with a matte that changes on every row. Twelve more frames go the
+other way: ffmpeg writes them — every profile, `alpha_bits` 16, 8 and 0, both field orders — and this
+package reads them beside ffmpeg's own decode of the same file. The comparison is on `yuv422p10le`,
+`yuv444p12le` and `yuva444p12le` component planes, and ffmpeg reports no decoding error on any of the
+thirty-six.
+
+Three tolerances, each for a different reason. Between the two decoders over one bitstream, **one
+coded level** — the inverse-transform residue, and nothing else, once the source is band-limited so
+that ringing at a hard edge does not widen it. Between ffmpeg's decode and the *source picture*,
+**the quantisation each profile's data rate buys**: 40 levels for Proxy down to 4 for 422 HQ, and 16
+at twelve bits for both 4444 profiles. And for alpha, **nothing at all** — it is run-length coded
+with no transform and no quantiser, so ffmpeg's plane has to be the matte that went in, sample for
+sample.
+
+That middle comparison is the one a round trip cannot replace and a two-decoder comparison cannot
+either. An encoder that wrote a field picture with the progressive coefficient scan produces a
+perfectly conforming frame of the wrong picture: every decoder reads it with the scan RDD 36 says to,
+they all agree with each other, and the detail is scrambled in all of them identically. Measured
+against the source that defect misses by 271 levels where the tolerance is 6. The same check catches
+a lost field parity at 31, and the alpha check catches a matte replaced by opacity at every sample
+that was not already opaque.
 
 Each half of the encoder sits in the file its decoding half sits in, and the tests assert the pairs
 are inverses rather than merely plausible: the Golomb-Rice/exponential-Golomb writer beside the
@@ -1612,12 +1663,18 @@ every frame carries its own weight matrices and every slice its own quantisation
 selects two things and both of them on this side. The first is the pair of weight matrices in the
 frame header, and those are copied rather than derived — the specification prints none of them,
 because a decoder is told them by every frame, so the only written statement of a profile's matrices
-is in an encoder. The four pairs here are FFmpeg's `prores_quant_matrices` and were additionally read
-back byte for byte out of the frame headers of files written by both of its ProRes encoders;
-provenance is in `Codecs/ProRes/THIRD-PARTY-NOTICE.FFmpeg.txt`. The second is the data rate, taken
-from the *Apple ProRes White Paper* and divided by the 8160 macroblocks of 1920x1080 and by 29.97
-frames a second, which turns each profile's headline figure into bits a macroblock: 184 for Proxy,
-417 for LT, 601 for 422 and 900 for 422 HQ.
+is in an encoder. All five distinct tables are FFmpeg's `prores_quant_matrices` in `proresenc_kostya.c`: the four
+4:2:2 pairs, 422 HQ's again for ProRes 4444, and entry 5 for 4444 XQ's luma, which `prores_ks` writes
+only when it is asked for with `-quant_mat 5`. They are interoperability constants carried in each
+frame rather than executable encoder logic, and every one was read back out of a frame header FFmpeg
+wrote. Provenance is in `Codecs/ProRes/THIRD-PARTY-NOTICE.FFmpeg.txt`. No oracle can check them —
+a frame states the matrix it was written with and every decoder believes it — so they are asserted
+against those values directly instead.
+The second choice is the data rate, taken from the *Apple ProRes White Paper* and divided by the 8160
+macroblocks of 1920x1080 and by 29.97 frames a second. That gives bits per macroblock of 184 for Proxy,
+417 for LT, 601 for 422, 900 for 422 HQ, 1349 for 4444 and 2024 for 4444 XQ. The last two use the
+white paper's 330 and 495 Mbit/s colour-only figures; current Apple support rounds XQ to approximately
+500 Mbit/s. Lossless alpha is outside the colour budget because its size is determined by the matte.
 
 **One quantisation index a picture, bisected against that budget.** The index is the smallest of the
 1 to 224 that 6.3.1 permits whose coded slices together fit, and 1 wherever the picture already does,

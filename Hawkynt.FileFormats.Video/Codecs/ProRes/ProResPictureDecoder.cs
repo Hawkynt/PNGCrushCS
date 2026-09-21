@@ -186,7 +186,7 @@ internal static class ProResPictureDecoder {
     // than leaving it to be inferred.
     var alphaAt = crAt + crSize;
 
-    ProResAlpha.Decode(
+    planes.TruncatedAlphaSamples += ProResAlpha.Decode(
       slice[alphaAt..], header.AlphaChannelType, planes.Alpha!, planes.Width, planes.Height,
       macroblockOffset * 16, macroblockRow * 16, sliceSizeInMacroblocks * 16, sliceHeight,
       fieldOffset, fieldStep);

@@ -49,10 +49,25 @@ namespace FileFormat.Codecs;
 /// <para/>
 /// <b>What refuses.</b> A bitstream version later than 1, whose decoding process this specification
 /// does not describe; a reserved <c>chroma_format</c>, <c>interlace_mode</c> or
-/// <c>alpha_channel_type</c>; a <c>quantization_index</c> outside the permitted 1 to 224; a version 0
-/// frame stating syntax its own version does not have; a packet that is not a compressed frame; and
-/// any structure whose stated size does not fit inside the one containing it. There is no
-/// <c>catch</c> here returning a blank, a copied or a repeated frame.
+/// <c>alpha_channel_type</c>; a <c>quantization_index</c> outside the permitted 1 to 224; a packet
+/// that is not a compressed frame; any structure whose stated size does not fit inside the one
+/// containing it; and non-zero bytes in the frame stuffing that RDD 36 requires to be zero.
+/// <para/>
+/// <b>What is read although 6.4 says it should not exist.</b> A bitstream version 0 frame stating
+/// 4:4:4 or an alpha channel, which 6.4 fixes at 4:2:2 and no alpha for that version. Every ProRes
+/// 4444 frame ffmpeg wrote before it began stamping version 1 is one of these — ffmpeg 6.1, which a
+/// current Ubuntu ships, among them — and ffmpeg's own decoder reads them back, so refusing them
+/// means being unable to read the reference encoder's output. Version 1 added no field to the header
+/// and moved none, so nothing is guessed: <see cref="ProResFrameHeader.DeviatesFromItsStatedVersion"/>
+/// records that the frame was not written by the letter of 6.4, and the frame is read as the version
+/// that does carry the syntax. The writer here keeps to 6.4 either way.
+/// <para/>
+/// And an alpha slice whose coded data stop one sample short of the slice, which is every alpha slice
+/// the same ffmpeg versions write. Both decoders read zeroes past the end of the coded data and
+/// arrive at the same sample, so this is interoperable as well as readable, and
+/// <see cref="ProResPlanes.TruncatedAlphaSamples"/> counts the samples that were not in the file. The
+/// tolerance is a few samples a slice and not a plane's worth: a slice that stops far short is
+/// damaged rather than short, and is refused.
 /// </remarks>
 public sealed class ProResVideoDecoder : IVideoCodecDecoder<ProResVideoDecoder> {
 
@@ -188,13 +203,13 @@ public sealed class ProResVideoDecoder : IVideoCodecDecoder<ProResVideoDecoder> 
     // fields are displayed in. 6.2 gives each picture its own height, which for an odd number of
     // rows differs between the two fields by one.
     if (!header.IsInterlaced) {
-      ProResPictureDecoder.Decode(frame[at..frameSize], header, planes, header.VerticalSize, 0, 1);
+      var pictureSize = ProResPictureDecoder.Decode(frame[at..frameSize], header, planes, header.VerticalSize, 0, 1);
+      _RequireZeroStuffing(frame.Span, at + pictureSize, frameSize);
       return planes;
     }
 
     var topHeight = (header.VerticalSize + 1) / 2;
     var bottomHeight = header.VerticalSize / 2;
-
     // Table 2: interlace_mode 1 makes the first picture the top field, 2 makes the second one the
     // top field. So the first picture's rows land on the even rows of the frame in the first case
     // and on the odd rows in the second.
@@ -202,12 +217,36 @@ public sealed class ProResVideoDecoder : IVideoCodecDecoder<ProResVideoDecoder> 
 
     var firstSize = ProResPictureDecoder.Decode(
       frame[at..frameSize], header, planes, firstIsTop ? topHeight : bottomHeight, firstIsTop ? 0 : 1, 2);
-
-    ProResPictureDecoder.Decode(
-      frame[(at + firstSize)..frameSize], header, planes, firstIsTop ? bottomHeight : topHeight,
+    var secondAt = at + firstSize;
+    var secondSize = ProResPictureDecoder.Decode(
+      frame[secondAt..frameSize], header, planes, firstIsTop ? bottomHeight : topHeight,
       firstIsTop ? 1 : 0, 2);
 
+    _RequireZeroStuffing(frame.Span, secondAt + secondSize, frameSize);
     return planes;
+  }
+
+  /// <summary>
+  /// Refuses a frame whose pictures do not fill it and whose remainder is not stuffing.
+  /// </summary>
+  /// <remarks>
+  /// RDD 36:2022, 5.1 lets a frame carry bytes after its last picture and requires every one of them
+  /// to be zero, which is how an encoder pads a frame to an alignment its container wants. Reading
+  /// them is the only way to notice a picture that claimed fewer bytes than it wrote: the frame
+  /// decodes, the geometry checks out, and the corruption sits in whatever was appended.
+  /// <para/>
+  /// The rule is genuinely permissive rather than a refusal in disguise — the padding real encoders
+  /// write is zero, and the oracles read a dozen FFmpeg-written frames through it.
+  /// </remarks>
+  private static void _RequireZeroStuffing(ReadOnlySpan<byte> frame, int at, int frameSize) {
+    if (at > frameSize)
+      throw new InvalidDataException(
+        $"The ProRes pictures consume {at} bytes although frame_size ends at {frameSize}.");
+
+    for (var i = at; i < frameSize; ++i)
+      if (frame[i] != 0)
+        throw new InvalidDataException(
+          $"ProRes frame stuffing byte {i - at} is 0x{frame[i]:X2}; RDD 36 requires stuffing bytes to be zero.");
   }
 
   /// <summary>

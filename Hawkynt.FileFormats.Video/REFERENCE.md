@@ -2033,7 +2033,7 @@ Implements `IVideoCodecDecoder<ProResVideoDecoder>`, `IVideoFrameDecoder`.
 
 #### `ProResVideoEncoder`
 
-Encodes Apple ProRes at 4:2:2 — the Proxy, LT, Standard and HQ profiles — one whole picture a packet.
+Encodes all six Apple ProRes profiles, including 4:4:4 colour, lossless alpha and field pictures.
 
 Implements `IVideoCodecEncoder<ProResVideoEncoder>`, `IVideoPacketEncoder`.
 
@@ -2041,10 +2041,11 @@ Implements `IVideoCodecEncoder<ProResVideoEncoder>`, `IVideoPacketEncoder`.
 | --- | --- | --- |
 | `CodecName` | `static string CodecName { get; }` |  |
 | `Codec` | `static CodecTag Codec { get; }` | The code the registry routes here: ProRes 422, the profile of the format's own name. |
+| `Accepts` | `static bool Accepts(MediaStreamInfo stream)` | Whether this writer will take the stream, which it does for any of the six profile codes. |
 | `Create` | `static ProResVideoEncoder Create(MediaStreamInfo stream)` | Builds an encoder for the stream described, taking the profile from the code it names. |
 | `DescribeStream` | `MediaStreamInfo DescribeStream()` | The stream as a muxer needs it, including the QuickTime sample entry the picture is described by. |
 | `Flush` | `IEnumerable<CodedPacket> Flush()` | Nothing is ever held back — a frame goes in and its packet comes out. |
-| `TryEncode` | `bool TryEncode(RawImage frame, long? presentationTimestamp, out CodedPacket packet)` | Codes one picture, which for this codec is always one whole frame. |
+| `TryEncode` | `bool TryEncode(RawImage frame, long? presentationTimestamp, out CodedPacket packet)` | Codes one picture, which for this codec is always one frame and always a key frame. |
 
 #### `QpegVideoDecoder`
 

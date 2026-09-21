@@ -34,6 +34,14 @@ internal sealed class ProResBitReader {
   /// <summary>The number of bits consumed so far, which is what <c>byteAligned()</c> is asked about.</summary>
   internal int Position => this._position;
 
+  /// <summary>How many bits of the structure have not been read yet.</summary>
+  /// <remarks>
+  /// For the one caller that has to tell "this structure has ended" from "this codeword is damaged"
+  /// without throwing to find out: the alpha channel, whose coded data a well-known encoder stops
+  /// short of filling. Everything else in ProRes is sized or self-terminating and simply reads.
+  /// </remarks>
+  internal int Remaining => this._sizeInBits - this._position;
+
   /// <summary>Reads one bit.</summary>
   internal int Bit() {
     if (this._position >= this._sizeInBits)

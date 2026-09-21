@@ -1,21 +1,27 @@
-The four pairs of quantisation weight matrices in ProResProfile.cs — one pair
-for each of the 4:2:2 profiles 422 Proxy, 422 LT, 422 and 422 HQ — are the
-tables FFmpeg (https://ffmpeg.org) carries as constants in
-libavcodec/proresenc_kostya.c, under the name prores_quant_matrices.
+The quantisation weight matrices in ProResProfile.cs are the profile tables
+FFmpeg (https://ffmpeg.org) carries as constants in libavcodec/proresenc_kostya.c,
+under the name prores_quant_matrices. All five distinct tables come from there:
 
-SMPTE RDD 36 prints none of them: it describes a decoding process, and a
-decoder is told the matrices by every frame it reads, so the only place a
-profile's own matrices exist in writing is in an encoder. Each of the four
-pairs here was additionally read back byte for byte out of the frame headers of
-files written by both of FFmpeg's ProRes encoders, so the copies are confirmed
-against the bitstream as well as against the source.
+  index 0, 1  422 Proxy, luma and chroma
+  index 2     422 LT
+  index 3     422
+  index 4     422 HQ, which ProRes 4444 is also written with
+  index 5     4444 XQ luma
+
+SMPTE RDD 36 prints none of them: it describes a decoding process, and a decoder
+is told the matrices by every frame it reads, so the only place a profile's own
+matrices exist in writing is in an encoder. Each was additionally read back byte
+for byte out of the frame headers of files FFmpeg writes -- the first five from
+`prores_ks -profile:v 0` to `4`, and the 4444 XQ luma table from
+`prores_ks -quant_mat 5`, which is the entry that profile names and that FFmpeg's
+own profile table does not select. So the copies are confirmed against the
+bitstream as well as against the source.
 
 Nothing else in this directory comes from FFmpeg. The bitstream syntax, the
-entropy codes, the block scans, the transforms and the rate decision are
-written from SMPTE RDD 36:2022 and are cited by clause in the source.
-
-  proresenc_kostya.c   prores_quant_matrices — the four 4:2:2 profiles' luma
-                       and chroma quantisation weight matrices
+entropy codes, the block scans, the transforms, the alpha coding, the
+field-picture layout and the rate decision are written from SMPTE RDD 36:2022
+and are cited by clause in the source. FFmpeg is used as a behavioural oracle in
+both directions, and that is all.
 
 Copyright (c) 2012 Konstantin Shishkov
 
