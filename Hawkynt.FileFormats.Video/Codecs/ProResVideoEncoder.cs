@@ -26,15 +26,51 @@ namespace FileFormat.Codecs;
 /// 0x0206 bottom field first. The two QuickTime orders whose coded and displayed orders disagree are
 /// refused because RDD 36 defines the two ProRes pictures in temporal/display order and has no syntax
 /// with which to preserve that distinction.
+/// <para/>
+/// <b>Lossy in colour, exact in alpha, and both by construction.</b> ProRes quantises transform
+/// coefficients, so only a picture already on the quantiser's own reconstruction grid comes back
+/// unchanged, and at 4:2:2 a picture with per-column chroma does not survive the sampling either.
+/// The alpha channel goes through neither: RDD 36 codes it as runs of differences over the samples
+/// themselves, so a matte is reproduced sample for sample or the writer is wrong.
+/// <para/>
+/// <b>Each half sits beside the half that undoes it.</b> The entropy codes, the block scan, the
+/// quantisation and the transform live in one file apiece with their decoding counterparts, so the
+/// two cannot drift apart unnoticed. What that arrangement cannot catch — a pair that is wrong in
+/// the same way and agrees perfectly — is what the FFmpeg oracles are for, in both directions.
+/// Numbers, and what was compared against what, are in <c>codec-notes.md</c>.
 /// </remarks>
 [VerifiedBy(ConformanceOracle.FFmpeg)]
 public sealed class ProResVideoEncoder : IVideoCodecEncoder<ProResVideoEncoder> {
 
+  /// <summary>The bytes of <c>frame_size</c> and <c>frame_identifier</c> together, RDD 36:2022, 5.1.</summary>
   private const int _FRAME_PREFIX_SIZE = 8;
+
+  /// <summary>Twenty fixed bytes and the two weight matrices, RDD 36:2022, 5.1.1.</summary>
   private const int _FRAME_HEADER_SIZE = 20 + 64 + 64;
+
+  /// <summary>The fixed part of ISO/IEC 14496-12's <c>VisualSampleEntry</c>, before any child atom.</summary>
   private const int _VISUAL_SAMPLE_ENTRY_SIZE = 86;
+
+  /// <summary>A QuickTime <c>fiel</c> atom: its header and the two bytes of field ordering.</summary>
   private const int _FIEL_ATOM_SIZE = 10;
+
+  /// <summary>
+  /// The picture header's <c>log2_desired_slice_size_in_mb</c>: eight macroblocks a slice.
+  /// </summary>
+  /// <remarks>
+  /// The largest of the four values 6.2.1 permits, and what every ProRes file examined here is
+  /// written with. A slice is the unit of both parallelism and rate control, so the choice trades the
+  /// two-byte table entry and the six-byte header of an extra slice against a finer grain for both;
+  /// eight is where the format's own encoders put it.
+  /// </remarks>
   private const int _LOG2_SLICE_SIZE = 3;
+
+  /// <summary>The height above which an unlabelled picture is taken to be BT.709 rather than BT.601.</summary>
+  /// <remarks>
+  /// The same rule <see cref="ProResColorConversion"/> applies when a frame states no matrix, so a
+  /// picture converted here and displayed there goes through one matrix and its inverse rather than
+  /// through two different ones.
+  /// </remarks>
   private const int _STANDARD_DEFINITION_LINES = 576;
 
   private readonly MediaStreamInfo _requested;
@@ -64,8 +100,17 @@ public sealed class ProResVideoEncoder : IVideoCodecEncoder<ProResVideoEncoder> 
 
   public static string CodecName => "Apple ProRes";
 
+  /// <summary>The code the registry routes here: ProRes 422, the profile of the format's own name.</summary>
   public static CodecTag Codec => ProResProfile.Standard.Tag;
 
+  /// <summary>
+  /// Whether this writer will take the stream, which it does for any of the six profile codes.
+  /// </summary>
+  /// <remarks>
+  /// <see cref="Codec"/> can name only one of them, and a registry that matched on it alone would
+  /// route a stream asking for 4444 to whatever else claimed the tag, or to nothing. All six are
+  /// written here, so all six are accepted here.
+  /// </remarks>
   public static bool Accepts(MediaStreamInfo stream) {
     ArgumentNullException.ThrowIfNull(stream);
     if (stream.Kind != MediaStreamKind.Video)
@@ -78,6 +123,7 @@ public sealed class ProResVideoEncoder : IVideoCodecEncoder<ProResVideoEncoder> 
     return false;
   }
 
+  /// <summary>Builds an encoder for the stream described, taking the profile from the code it names.</summary>
   public static ProResVideoEncoder Create(MediaStreamInfo stream) {
     ArgumentNullException.ThrowIfNull(stream);
 
@@ -88,6 +134,8 @@ public sealed class ProResVideoEncoder : IVideoCodecEncoder<ProResVideoEncoder> 
       throw new NotSupportedException(
         $"An Apple ProRes encoder needs the picture size up front; {stream.Width}x{stream.Height} was supplied.");
 
+    // 5.1.1 states horizontal_size and vertical_size in sixteen bits apiece, so a picture larger than
+    // that cannot describe itself and is refused rather than written with a wrapped size.
     if (stream.Width > ushort.MaxValue || stream.Height > ushort.MaxValue)
       throw new NotSupportedException(
         $"A ProRes frame states its size in sixteen bits apiece; {stream.Width}x{stream.Height} does not fit.");
@@ -111,6 +159,7 @@ public sealed class ProResVideoEncoder : IVideoCodecEncoder<ProResVideoEncoder> 
     return new(stream, profile, interlaceMode, alphaEnabled);
   }
 
+  /// <summary>Codes one picture, which for this codec is always one frame and always a key frame.</summary>
   public bool TryEncode(RawImage frame, long? presentationTimestamp, out CodedPacket packet) {
     ArgumentNullException.ThrowIfNull(frame);
 
@@ -134,8 +183,19 @@ public sealed class ProResVideoEncoder : IVideoCodecEncoder<ProResVideoEncoder> 
     return true;
   }
 
+  /// <summary>Nothing is ever held back — a frame goes in and its packet comes out.</summary>
   public IEnumerable<CodedPacket> Flush() => [];
 
+  /// <summary>
+  /// The stream as a muxer needs it, including the QuickTime sample entry the picture is described by.
+  /// </summary>
+  /// <remarks>
+  /// A ProRes sample description carries no codec configuration — every frame restates everything a
+  /// decoder needs — but an ISO-base-media writer still needs a whole sample entry to put in its
+  /// sample table, and only the encoder knows which of the six codes it is writing, whether the
+  /// stream has a matte, and which field order it was asked for. Building it here is what keeps
+  /// <c>Mp4Writer</c> out of the business of synthesising codec configuration.
+  /// </remarks>
   public MediaStreamInfo DescribeStream() => this._stream ??= new() {
     Index = this._requested.Index,
     Kind = MediaStreamKind.Video,
@@ -153,6 +213,12 @@ public sealed class ProResVideoEncoder : IVideoCodecEncoder<ProResVideoEncoder> 
     CodecPrivateData = this._SampleEntry(),
   };
 
+  /// <summary>Codes one picture into the bytes of one compressed frame, RDD 36:2022, 5.1.</summary>
+  /// <remarks>
+  /// One picture for a progressive frame and two for an interlaced one, in the temporal order the
+  /// fields are displayed in, which is the order 5.1 puts them in and the only order it can express.
+  /// The frame header is written once and describes both.
+  /// </remarks>
   internal byte[] EncodeFrame(RawImage frame) {
     var targetFormat = this._profile.IsFourFourFour ? PixelFormat.Yuv444P12 : PixelFormat.Yuv422P10;
     var source = frame.Format == targetFormat
@@ -211,6 +277,22 @@ public sealed class ProResVideoEncoder : IVideoCodecEncoder<ProResVideoEncoder> 
     return bytes;
   }
 
+  /// <summary>
+  /// Codes one whole picture: a progressive frame, or one field of an interlaced one.
+  /// </summary>
+  /// <remarks>
+  /// A field picture is an ordinary picture over every other row of the frame, which is what
+  /// <paramref name="fieldOffset"/> and <paramref name="fieldStep"/> say — 0 and 1 for a frame
+  /// picture, the field's parity and 2 for a field one. Its height is the frame's halved, rounded up
+  /// for the field that carries the extra row, and 6.2 lets the two fields differ by that row.
+  /// </remarks>
+  /// <param name="source">The converted colour planes of the whole frame.</param>
+  /// <param name="alpha">The matte of the whole frame, or <c>null</c> where the stream has none.</param>
+  /// <param name="alphaChannelType">RDD 36 Table 7: 0 none, 1 eight-bit, 2 sixteen-bit.</param>
+  /// <param name="fieldOffset">The frame row this picture's first row is.</param>
+  /// <param name="fieldStep">1 for a frame picture, 2 for a field picture.</param>
+  /// <param name="pictureHeight">The picture's own height in rows.</param>
+  /// <param name="interlaced">Whether this is a field picture, which selects the coefficient scan.</param>
   private byte[] _EncodePicture(
     RawImage source,
     ushort[]? alpha,
@@ -261,6 +343,21 @@ public sealed class ProResVideoEncoder : IVideoCodecEncoder<ProResVideoEncoder> 
       interlaced);
   }
 
+  /// <summary>
+  /// The twenty fixed bytes of RDD 36:2022, 5.1.1 and the two weight matrices behind them.
+  /// </summary>
+  /// <remarks>
+  /// <b>The bitstream version follows the syntax used.</b> 6.4 fixes <c>chroma_format</c> at 2 and
+  /// <c>alpha_channel_type</c> at 0 for version 0, so a 4:2:2 frame with no matte stays at version 0
+  /// where an older decoder can read it, and 4:4:4 or alpha moves to version 1 because version 0 has
+  /// no way to state either.
+  /// <para/>
+  /// <b>The colour description says "unspecified".</b> Table 6's <c>matrix_coefficients</c> value 2,
+  /// with the primaries and transfer characteristic to match, which is what leaves a decoder to fall
+  /// back on the picture height — the same fall-back the conversion into these planes used. Naming a
+  /// matrix here instead would state something about the source that a caller handing over Y′CbCr
+  /// planes never told this encoder.
+  /// </remarks>
   private void _WriteFrameHeader(Span<byte> header, int alphaChannelType) {
     header.Clear();
 
@@ -270,17 +367,29 @@ public sealed class ProResVideoEncoder : IVideoCodecEncoder<ProResVideoEncoder> 
     BinaryPrimitives.WriteUInt16BigEndian(header[8..], (ushort)this._width);
     BinaryPrimitives.WriteUInt16BigEndian(header[10..], (ushort)this._height);
 
+    // chroma_format in the top two bits, interlace_mode in bits 3 and 2.
     header[12] = (byte)((this._profile.ChromaFormat << 6) | (this._interlaceMode << 2));
-    header[14] = 2;
-    header[15] = 2;
-    header[16] = 2;
+    header[14] = 2; // colour_primaries: unknown/unspecified
+    header[15] = 2; // transfer_characteristic: unknown/unspecified
+    header[16] = 2; // matrix_coefficients: unknown/unspecified
     header[17] = (byte)alphaChannelType;
-    header[19] = 3;
+    header[19] = 3; // load_luma_quant_matrix and load_chroma_quant_matrix
 
     this._profile.LumaMatrix.CopyTo(header[20..]);
     this._profile.ChromaMatrix.CopyTo(header[84..]);
   }
 
+  /// <summary>
+  /// Widens one plane of little-endian sixteen-bit slots into this picture's padded plane of samples.
+  /// </summary>
+  /// <remarks>
+  /// Padded by repeating the last column and the last row. The samples past the picture are
+  /// transformed and transmitted like every other sample — a macroblock is coded whole and 7.5.3 has
+  /// the decoder throw the excess away — so repeating the edge is what makes them cost the fewest
+  /// bits and, more to the point, what stops an invented value bleeding back into the block it shares
+  /// a transform with. For a field picture the repeated row is that field's own last row, not the
+  /// frame's, which is why the padding is done through the same field mapping as the picture.
+  /// </remarks>
   private static void _FillPicturePlane(
     ReadOnlySpan<byte> source,
     int sourceWidth,
@@ -319,6 +428,7 @@ public sealed class ProResVideoEncoder : IVideoCodecEncoder<ProResVideoEncoder> 
     }
   }
 
+  /// <summary>The same mapping and the same edge padding, over the matte.</summary>
   private static void _FillPictureAlpha(
     ushort[] source,
     int sourceWidth,
@@ -346,6 +456,15 @@ public sealed class ProResVideoEncoder : IVideoCodecEncoder<ProResVideoEncoder> 
     }
   }
 
+  /// <summary>
+  /// Which of RDD 36 Table 7's alpha codings this frame's matte is written with.
+  /// </summary>
+  /// <remarks>
+  /// The depth follows the source rather than the profile, because the coding is lossless either way
+  /// and the only thing the choice decides is how many bits a sample costs. An eight-bit source
+  /// written at sixteen would cost twice as much to say the same thing; a sixteen-bit source written
+  /// at eight would stop being lossless, which is the one outcome this must not produce.
+  /// </remarks>
   private int _AlphaChannelType(RawImage frame) {
     if (!this._alphaEnabled)
       return 0;
@@ -357,6 +476,15 @@ public sealed class ProResVideoEncoder : IVideoCodecEncoder<ProResVideoEncoder> 
     return traits.IsIndexed || traits.ComponentBitDepth is > 0 and <= 8 ? 1 : 2;
   }
 
+  /// <summary>
+  /// The frame's matte at its coded depth, or full opacity where the frame carries none.
+  /// </summary>
+  /// <remarks>
+  /// A stream whose sample description states alpha keeps stating it, frame by frame, whatever any
+  /// one frame happens to carry: the alternative is a stream whose <c>alpha_channel_type</c> changes
+  /// under a decoder that was told the depth once. A frame with no alpha of its own is therefore
+  /// opaque rather than absent.
+  /// </remarks>
   private ushort[] _AlphaPlane(RawImage frame, int alphaChannelType) {
     var count = checked(this._width * this._height);
     var result = new ushort[count];
@@ -384,18 +512,31 @@ public sealed class ProResVideoEncoder : IVideoCodecEncoder<ProResVideoEncoder> 
     return result;
   }
 
+  /// <summary>
+  /// The QuickTime visual sample entry a picture of this size and profile is described by.
+  /// </summary>
+  /// <remarks>
+  /// The 86 bytes ISO/IEC 14496-12's <c>VisualSampleEntry</c> is, with the four-character code of the
+  /// profile, the picture's size, the 72 dpi both resolutions are conventionally written as, the
+  /// compressor name Apple's own files carry, and a depth of 24 or, for a stream with a matte, 32.
+  /// There is no codec configuration record to write — a ProRes frame carries its own sampling,
+  /// interlacing and quantisation — but a field-coded stream gets a <c>fiel</c> child, because the
+  /// field order is the one thing a container states that the frame header cannot fully express.
+  /// </remarks>
   private byte[] _SampleEntry() {
     var size = _VISUAL_SAMPLE_ENTRY_SIZE + (this._interlaceMode == 0 ? 0 : _FIEL_ATOM_SIZE);
     var entry = new byte[size];
 
     BinaryPrimitives.WriteUInt32BigEndian(entry, (uint)size);
+    // A CodecTag holds its four bytes as one little-endian number — the order they sit in a file —
+    // so writing it little-endian is what puts the characters back in the order they were read in.
     BinaryPrimitives.WriteUInt32LittleEndian(entry.AsSpan(4), this._profile.Tag.Value);
-    BinaryPrimitives.WriteUInt16BigEndian(entry.AsSpan(14), 1);
+    BinaryPrimitives.WriteUInt16BigEndian(entry.AsSpan(14), 1); // data_reference_index
     BinaryPrimitives.WriteUInt16BigEndian(entry.AsSpan(32), (ushort)this._width);
     BinaryPrimitives.WriteUInt16BigEndian(entry.AsSpan(34), (ushort)this._height);
-    BinaryPrimitives.WriteUInt32BigEndian(entry.AsSpan(36), 0x00480000);
-    BinaryPrimitives.WriteUInt32BigEndian(entry.AsSpan(40), 0x00480000);
-    BinaryPrimitives.WriteUInt16BigEndian(entry.AsSpan(48), 1);
+    BinaryPrimitives.WriteUInt32BigEndian(entry.AsSpan(36), 0x00480000); // horizontal resolution, 72 dpi
+    BinaryPrimitives.WriteUInt32BigEndian(entry.AsSpan(40), 0x00480000); // vertical resolution, 72 dpi
+    BinaryPrimitives.WriteUInt16BigEndian(entry.AsSpan(48), 1); // frame_count
 
     ReadOnlySpan<byte> compressor = this._profile.IsFourFourFour ? "Apple ProRes 4444"u8 : "Apple ProRes 422"u8;
     entry[50] = (byte)compressor.Length;
@@ -415,6 +556,16 @@ public sealed class ProResVideoEncoder : IVideoCodecEncoder<ProResVideoEncoder> 
     return entry;
   }
 
+  /// <summary>
+  /// The RDD 36 interlace mode a caller's existing sample entry asks for, by way of its <c>fiel</c>.
+  /// </summary>
+  /// <remarks>
+  /// <see cref="MediaStreamInfo"/> has nowhere to say "code this as fields", so the request has to
+  /// come from the sample entry a caller already holds, and finding it means walking that entry's
+  /// child atoms. Every size in that walk is checked against the entry it is inside before it is
+  /// used as an offset: a sample entry is caller data like any other, and an atom claiming to be
+  /// larger than its parent is how a walk like this reads past its buffer.
+  /// </remarks>
   private static int _InterlaceMode(ReadOnlySpan<byte> sampleEntry) {
     if (sampleEntry.Length < _VISUAL_SAMPLE_ENTRY_SIZE)
       return 0;

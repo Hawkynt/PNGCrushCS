@@ -56,17 +56,29 @@ namespace FileFormat.Codecs;
 /// </remarks>
 public sealed class ProResVideoDecoder : IVideoCodecDecoder<ProResVideoDecoder> {
 
-  /// <summary>The codes the profiles of this codec are named by.</summary>
+  /// <summary>
+  /// The codes the profiles of this codec are named by.
+  /// </summary>
+  /// <remarks>
+  /// One bitstream, six names. The profiles differ in the quantisation an encoder applies and in the
+  /// sampling it writes, both of which a decoder reads out of the frame itself, so the tag chooses
+  /// nothing here except the sample depth — and even that follows from <c>chroma_format</c> rather
+  /// than from the tag. They are all listed because a container names the stream with one of them
+  /// and a decoder that took only some would refuse files it can read.
+  /// </remarks>
   private static readonly CodecTag[] _Tags = [
-    CodecTag.FromCharacters("apco"),
-    CodecTag.FromCharacters("apcs"),
-    CodecTag.FromCharacters("apcn"),
-    CodecTag.FromCharacters("apch"),
-    CodecTag.FromCharacters("ap4h"),
-    CodecTag.FromCharacters("ap4x"),
+    CodecTag.FromCharacters("apco"), // 422 Proxy
+    CodecTag.FromCharacters("apcs"), // 422 LT
+    CodecTag.FromCharacters("apcn"), // 422 Standard
+    CodecTag.FromCharacters("apch"), // 422 HQ
+    CodecTag.FromCharacters("ap4h"), // 4444
+    CodecTag.FromCharacters("ap4x"), // 4444 XQ
   ];
 
+  /// <summary>The four bytes a compressed frame begins with, after its size. RDD 36:2022, 5.1.</summary>
   private static readonly byte[] _FrameIdentifier = "icpf"u8.ToArray();
+
+  /// <summary>The bytes of <c>frame_size</c> and <c>frame_identifier</c> together.</summary>
   private const int _FRAME_PREFIX_SIZE = 8;
 
   private readonly int _width;
@@ -92,6 +104,16 @@ public sealed class ProResVideoDecoder : IVideoCodecDecoder<ProResVideoDecoder> 
     return false;
   }
 
+  /// <summary>
+  /// Builds a decoder from the stream description, which for this codec states only the picture size.
+  /// </summary>
+  /// <remarks>
+  /// There is nothing else in it to read. A ProRes sample description carries no codec configuration
+  /// the way an AVC one does: every frame restates its own dimensions, sampling, interlacing and
+  /// quantisation weights, which is what lets a single frame be cut out of a stream and still decode.
+  /// The container's dimensions are kept only to check the frames against and to size the picture
+  /// that comes out.
+  /// </remarks>
   public static ProResVideoDecoder Create(MediaStreamInfo stream) {
     ArgumentNullException.ThrowIfNull(stream);
 
@@ -116,7 +138,16 @@ public sealed class ProResVideoDecoder : IVideoCodecDecoder<ProResVideoDecoder> 
     return true;
   }
 
-  /// <summary>Decodes one frame as far as its component planes, before narrowing or colour conversion.</summary>
+  /// <summary>
+  /// Decodes one frame as far as its component planes, before any narrowing or colour conversion.
+  /// </summary>
+  /// <remarks>
+  /// This is where a comparison against another decoder has to be made. The planes are the output of
+  /// the decoding process RDD 36:2022, 7 describes; everything after them — narrowing to eight bits,
+  /// choosing a colour matrix, resampling chroma up to every luma column — is a display convention
+  /// that two correct decoders are free to disagree about. Comparing packed colour therefore
+  /// measures the conventions and not the decode, and does so loudly enough to hide a real defect.
+  /// </remarks>
   internal ProResPlanes DecodePlanes(ReadOnlyMemory<byte> frame, out ProResFrameHeader header) {
     var span = frame.Span;
     if (span.Length < _FRAME_PREFIX_SIZE)
@@ -134,6 +165,10 @@ public sealed class ProResVideoDecoder : IVideoCodecDecoder<ProResVideoDecoder> 
 
     header = ProResFrameHeader.Parse(span[_FRAME_PREFIX_SIZE..frameSize]);
 
+    // Table 7 defines 0, 1 and 2 and reserves 3 to 15. A reserved type cannot be read, and it cannot
+    // be skipped either — the alpha data are the tail of every slice, so not knowing their code
+    // means not knowing where they end, and a frame carrying one is refused rather than decoded
+    // without its transparency.
     if (header.AlphaChannelType > 2)
       throw new NotSupportedException(
         $"This ProRes frame states alpha_channel_type {header.AlphaChannelType}, which RDD 36 Table 7 reserves. Its alpha data cannot be read and cannot be stepped over.");
@@ -149,6 +184,9 @@ public sealed class ProResVideoDecoder : IVideoCodecDecoder<ProResVideoDecoder> 
 
     var at = _FRAME_PREFIX_SIZE + header.HeaderSize;
 
+    // 5.1: one picture for a progressive frame, two for an interlaced one, in the temporal order the
+    // fields are displayed in. 6.2 gives each picture its own height, which for an odd number of
+    // rows differs between the two fields by one.
     if (!header.IsInterlaced) {
       var pictureSize = ProResPictureDecoder.Decode(frame[at..frameSize], header, planes, header.VerticalSize, 0, 1);
       _RequireZeroStuffing(frame.Span, at + pictureSize, frameSize);
@@ -157,6 +195,9 @@ public sealed class ProResVideoDecoder : IVideoCodecDecoder<ProResVideoDecoder> 
 
     var topHeight = (header.VerticalSize + 1) / 2;
     var bottomHeight = header.VerticalSize / 2;
+    // Table 2: interlace_mode 1 makes the first picture the top field, 2 makes the second one the
+    // top field. So the first picture's rows land on the even rows of the frame in the first case
+    // and on the odd rows in the second.
     var firstIsTop = header.InterlaceMode == 1;
 
     var firstSize = ProResPictureDecoder.Decode(
@@ -170,7 +211,18 @@ public sealed class ProResVideoDecoder : IVideoCodecDecoder<ProResVideoDecoder> 
     return planes;
   }
 
-  /// <summary>RDD 36, 5.1 permits stuffing after the picture data but requires every byte to be zero.</summary>
+  /// <summary>
+  /// Refuses a frame whose pictures do not fill it and whose remainder is not stuffing.
+  /// </summary>
+  /// <remarks>
+  /// RDD 36:2022, 5.1 lets a frame carry bytes after its last picture and requires every one of them
+  /// to be zero, which is how an encoder pads a frame to an alignment its container wants. Reading
+  /// them is the only way to notice a picture that claimed fewer bytes than it wrote: the frame
+  /// decodes, the geometry checks out, and the corruption sits in whatever was appended.
+  /// <para/>
+  /// The rule is genuinely permissive rather than a refusal in disguise — the padding real encoders
+  /// write is zero, and the oracles read a dozen FFmpeg-written frames through it.
+  /// </remarks>
   private static void _RequireZeroStuffing(ReadOnlySpan<byte> frame, int at, int frameSize) {
     if (at > frameSize)
       throw new InvalidDataException(
@@ -182,6 +234,16 @@ public sealed class ProResVideoDecoder : IVideoCodecDecoder<ProResVideoDecoder> 
           $"ProRes frame stuffing byte {i - at} is 0x{frame[i]:X2}; RDD 36 requires stuffing bytes to be zero.");
   }
 
+  /// <summary>
+  /// Refuses a frame whose own dimensions are not the ones the container described.
+  /// </summary>
+  /// <remarks>
+  /// The frame is believed over the container — every ProRes frame restates its size and that is
+  /// what its slices are laid out for — but a disagreement is still worth refusing rather than
+  /// silently resolving. A container that says one size and frames that say another is a file that
+  /// has been cut or repackaged wrongly, and a caller that asked for a stream of one size should
+  /// hear about it instead of receiving pictures of another.
+  /// </remarks>
   private void _RefuseUnexpectedSize(ProResFrameHeader header) {
     if (header.HorizontalSize == this._width && header.VerticalSize == this._height)
       return;

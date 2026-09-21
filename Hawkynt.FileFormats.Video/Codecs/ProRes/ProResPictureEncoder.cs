@@ -22,9 +22,19 @@ namespace FileFormat.Codecs.ProRes;
 /// colour bits on average (<see cref="ProResProfile.BitsPerMacroblock"/>), which gives the picture a
 /// byte budget; the quantisation index is the smallest one whose coded colour fits it, found by
 /// bisection over the 1 to 224 that 6.3.1 permits and then confirmed, because coded size falls with
-/// the index without being strictly monotone in it. Lossless alpha is deliberately outside that
-/// budget: its size is determined by the matte and Apple's published 4444 rates are stated without
-/// alpha.
+/// the index without being strictly monotone in it.
+/// <para/>
+/// One index rather than one per slice, because the alternative is worse in both directions. Capping
+/// each slice at its own share of the budget leaves the easy slices' unspent share unspent and
+/// quantises the hard ones far past what the picture as a whole could afford — measured, that coded a
+/// detailed 1280x718 picture to under a third of its allowance while pushing the busiest slices to a
+/// quantisation index above a hundred. Spending the budget where the picture needs it is what a
+/// picture-wide index does for nothing.
+/// <para/>
+/// <b>Alpha is deliberately outside that budget.</b> It has no quantiser to choose, so it cannot
+/// participate in choosing one; its size is a property of the matte, and Apple's published 4444 rates
+/// are stated without it. Counting it would make a picture with a busy matte quantise its colour
+/// more, which is not what either the format or the published figure means.
 /// <para/>
 /// The transform runs once per picture and only the quantisation and the entropy coding are repeated,
 /// so the search costs a fraction of the coding it decides.
@@ -124,7 +134,15 @@ internal static class ProResPictureEncoder {
     return picture;
   }
 
-  /// <summary>The smallest quantisation index whose coded colour picture fits the profile's budget.</summary>
+  /// <summary>
+  /// The smallest quantisation index whose coded colour picture fits the profile's budget.
+  /// </summary>
+  /// <remarks>
+  /// Bisection first, on the assumption that a coarser quantiser codes to fewer bytes; then the
+  /// answer is confirmed and raised one step at a time where it was not, because that assumption
+  /// holds overwhelmingly but not universally — a coarser quantiser can lengthen a run of zeroes past
+  /// the point where its codebook adapts and cost a bit more than the finer one did.
+  /// </remarks>
   private static int _ChooseQuantisationIndex(
     Slice[] slices,
     ProResProfile profile,
@@ -248,7 +266,20 @@ internal static class ProResPictureEncoder {
     return new int[largest * 64];
   }
 
-  /// <summary>Quantises transformed blocks straight into the scan order they are coded in.</summary>
+  /// <summary>
+  /// Quantises a component's transformed blocks straight into the scanned order they are coded in.
+  /// </summary>
+  /// <remarks>
+  /// The inverse of the one pass <see cref="ProResBlocks.Reconstruct"/> does: 7.3 gives
+  /// <c>F[v][u] = QF[v][u] · W[v][u] · qScale / 8</c>, so what goes into the bitstream is
+  /// <c>F · 8 / (W · qScale)</c> to nearest, and 7.2.1's index calculation decides where. Doing the
+  /// scan here rather than afterwards means the coefficients are already in the order the run-length
+  /// coding wants them, which is by frequency across the whole slice and not block by block.
+  /// <para/>
+  /// Which scan is the caller's to decide, because it is a property of the picture and not of the
+  /// block: 7.2.2 makes it the progressive pattern for a frame picture and the interlaced one for a
+  /// field picture, and the two are neither each other's transpose nor interchangeable.
+  /// </remarks>
   private static void _Quantise(
     byte[] weights,
     double[] transformed,
