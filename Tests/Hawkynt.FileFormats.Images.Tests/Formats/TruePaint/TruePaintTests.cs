@@ -45,7 +45,7 @@ public sealed class TruePaintReaderTests {
     var bytes = TestHelpers._BuildValidBytes(0x9C00, 0x00, 0x00);
     var result = TruePaintReader.FromBytes(bytes);
 
-    Assert.That(result.Width, Is.EqualTo(160));
+    Assert.That(result.Width, Is.EqualTo(320));
     Assert.That(result.Height, Is.EqualTo(200));
   }
 
@@ -228,10 +228,10 @@ public sealed class TruePaintRoundTripTests {
     var file = TestHelpers._BuildValidTruePaintFile(0x9C00, 0, 0);
     var raw = TruePaintFile.ToRawImage(file);
 
-    Assert.That(raw.Width, Is.EqualTo(160));
+    Assert.That(raw.Width, Is.EqualTo(320));
     Assert.That(raw.Height, Is.EqualTo(200));
     Assert.That(raw.Format, Is.EqualTo(PixelFormat.Rgb24));
-    Assert.That(raw.PixelData.Length, Is.EqualTo(160 * 200 * 3));
+    Assert.That(raw.PixelData.Length, Is.EqualTo(320 * 200 * 3));
   }
 
   [Test]

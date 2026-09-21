@@ -445,7 +445,7 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | IffDeep | `.deep`, `.iff`, `.blk` | ✅ | ✅ | — | — | — | recoil2png, ffmpeg |
 | IffDpan | `.dpan` | ✅ | ✅ | — | — | — | ffmpeg |
 | IffHame | `.hame` | ✅ | ✅ | — | — | — | none |
-| IffMultiPalette | `.mpl`, `.mpal` | ✅ | ✅ | — | — | — | none |
+| IffMultiPalette | `.mpl`, `.mpal` | ✅ | ✅ | — | — | — | ImageMagick |
 | IffPbm | `.lbm`, `.pbm`, `.blk` | ✅ | ✅ | — | — | — | recoil2png, XnView, IrfanView, ffmpeg |
 | IffRgb8 | `.rgb8`, `.iff`, `.blk` | ✅ | ✅ | — | — | — | recoil2png, ffmpeg |
 | IffRgbn | `.rgbn`, `.iff`, `.blk` | ✅ | ✅ | — | — | — | recoil2png, ffmpeg |
@@ -511,7 +511,7 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | LightWorkImage | `.lwi` | ✅ | ✅ | — | — | — | none |
 | LogoPainter | `.lp3` | ✅ | ✅ | — | — | — | recoil2png |
 | LogoSys | `.sys`, `.logo` | ✅ | ✅ | — | — | — | none |
-| Lss16 | `.lss`, `.16` | ✅ | ✅ | — | — | — | none |
+| Lss16 | `.lss`, `.16` | ✅ | ✅ | — | — | — | XnView |
 | LucasFilm | `.lff` | ✅ | ✅ | — | — | — | none |
 | LudekMaker | `.ldm` | ✅ | ✅ | — | — | — | recoil2png, IrfanView |
 | LViewPro | `.lvp` | ✅ | ✅ | — | — | — | XnView, IrfanView, ffmpeg |
@@ -836,7 +836,7 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | Trs80 | `.hr` | ✅ | ✅ | — | — | — | recoil2png |
 | TrsPix | `.pix` | ✅ | ✅ | — | — | — | none |
 | TrueColorImg | `.timg` | ✅ | ✅ | — | — | — | recoil2png, ffmpeg, IrfanView |
-| TruePaint | `.mci` | ✅ | ✅ | — | — | — | none |
+| TruePaint | `.mci` | ✅ | ✅ | — | — | — | recoil2png |
 | TrueType | `.ttf` | ✅ | ✅ | — | — | — | none |
 | TrzmielCompressed | `.cpr` | ✅ | ✅ | — | — | — | recoil2png, IrfanView |
 | TurboRascal | `.flf` | ✅ | ✅ | — | — | — | recoil2png, IrfanView |
@@ -910,7 +910,7 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | Zinc | `.zinc` | ✅ | ✅ | — | — | — | none |
 | ZonerBrush | `.zbr` | ✅ | ✅ | — | — | — | XnView |
 | Zoom4 | `.zm4` | ✅ | ✅ | — | — | — | recoil2png, IrfanView |
-| Zoomatic | `.zom` | ✅ | ✅ | — | — | — | none |
+| Zoomatic | `.zom` | ✅ | ✅ | — | — | — | recoil2png |
 | ZsStaffKid98 | `.zim` | ✅ | ✅ | — | — | — | recoil2png |
 | Zx81 | `.zx81`, `.p81` | ✅ | ✅ | — | — | — | none |
 | ZxArtStudio | `.zas` | ✅ | ✅ | — | — | — | none |
@@ -939,7 +939,7 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | ZxUlaPlus | `.ulp`, `.scr` | ✅ | ✅ | — | — | — | recoil2png |
 | ZzRough | `.rgh` | ✅ | ✅ | — | — | — | recoil2png, XnView, IrfanView |
 
-**Oracle** — the tools outside this repository that have read what the writer produces. `none` means nothing but this package's own reader ever has, and a reader agreeing with the writer beside it proves only that the two share one reading of the format; `—` means there is no writer, so there is nothing for anything to have read. What a name in this column states exactly: handed a file this writer produced, under one of the format's own extensions and at one of the sizes the format declares, that tool rebuilt the picture the file holds — at the geometry the file holds rather than the geometry it was offered, and agreeing pixel for pixel with every palette already resolved to colour. Which reference the pixels are held to is the format's own business. One that can carry the probe unchanged has to hand it back exactly. One that cannot — a gradient is not sixteen fixed hardware colours — is held instead to two things at once: the tool and this package have to agree about the picture, which is not circular because the tool is the independent party, and the file has to have kept what the writer was given, which is what stops two decoders agreeing that a file holds nothing. Geometry alone used to be the whole bar, and the Apple IIgs `$C1` writer is what that cost: every file it produced decoded as solid black at exactly the right size, and nothing noticed. A tool that has no reader for a format is recorded as having no opinion and never as agreeing. Two names are two opinions only where two engines are: ImageMagick reads the PostScript family through Ghostscript, the video containers through ffmpeg, and JPEG 2000, JPEG XL, WebP and the HEIF family through the same libraries `opj_decompress`, `djxl`, `dwebp` and `heif-dec` are, so on those formats a pair of names is one engine wearing two. The tools: [avifdec](https://github.com/AOMediaCodec/libavif) · [djxl](https://github.com/libjxl/libjxl) · [dwebp](https://developers.google.com/speed/webp/docs/dwebp) · [ffmpeg](https://ffmpeg.org/) · [Ghostscript](https://www.ghostscript.com/) · [heif-dec](https://github.com/strukturag/libheif) · [ImageMagick](https://imagemagick.org/) · [IrfanView](https://www.irfanview.com/) · [LibreOffice](https://www.libreoffice.org/) · [opj_decompress](https://www.openjpeg.org/) · [recoil2png](https://recoil.sourceforge.net/) · [XnView](https://www.xnview.com/en/nconvert/).
+**Oracle** — the tools outside this repository that have read what the writer produces. `none` means nothing but this package's own reader ever has, and a reader agreeing with the writer beside it proves only that the two share one reading of the format; `—` means there is no writer, so there is nothing for anything to have read. What a name in this column states exactly: handed a file this writer produced, under one of the format's own extensions and at one of the sizes the format declares, that tool rebuilt the picture the file holds — at the geometry the file holds rather than the geometry it was offered, and agreeing pixel for pixel with every palette already resolved to colour. Which reference the pixels are held to is the format's own business. One that can carry the probe unchanged has to hand it back exactly. One that cannot — a gradient is not sixteen fixed hardware colours — is held instead to two things at once: the tool and this package have to agree about the picture, which is not circular because the tool is the independent party, and the file has to have kept what the writer was given, which is what stops two decoders agreeing that a file holds nothing. Geometry alone used to be the whole bar, and the Apple IIgs `$C1` writer is what that cost: every file it produced decoded as solid black at exactly the right size, and nothing noticed. A tool that has no reader for a format is recorded as having no opinion and never as agreeing. Agreement between tools is evidence about the part of the format each of them reads and about no more than that, so count it only once you know what each one parsed. Three readers of an ILBM carrying a PCHG chunk landed on the same picture and disagreed with this package, which read as three independent loaders reaching one answer; two of them returned that same picture with the chunk deleted from the file, so what they had agreed about was the plain ILBM underneath, which they share for free. The defect was real and the count was not. Deleting the feature in question and decoding again is the whole test: a tool whose answer does not move was never reading it. Two names are two opinions only where two engines are: ImageMagick reads the PostScript family through Ghostscript, the video containers through ffmpeg, and JPEG 2000, JPEG XL, WebP and the HEIF family through the same libraries `opj_decompress`, `djxl`, `dwebp` and `heif-dec` are, so on those formats a pair of names is one engine wearing two. The tools: [avifdec](https://github.com/AOMediaCodec/libavif) · [djxl](https://github.com/libjxl/libjxl) · [dwebp](https://developers.google.com/speed/webp/docs/dwebp) · [ffmpeg](https://ffmpeg.org/) · [Ghostscript](https://www.ghostscript.com/) · [heif-dec](https://github.com/strukturag/libheif) · [ImageMagick](https://imagemagick.org/) · [IrfanView](https://www.irfanview.com/) · [LibreOffice](https://www.libreoffice.org/) · [opj_decompress](https://www.openjpeg.org/) · [recoil2png](https://recoil.sourceforge.net/) · [XnView](https://www.xnview.com/en/nconvert/).
 <!-- IMAGE-FORMATS:END -->
 
 ### Optimizers

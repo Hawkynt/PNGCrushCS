@@ -40196,7 +40196,6 @@ Implements `IEquatable<ZoomaticFile>`, `IImageFormatMetadata<ZoomaticFile>`, `II
 | `ColorData` | `byte[] ColorData { get; init; }` |  |
 | `LoadAddress` | `ushort LoadAddress { get; init; }` |  |
 | `ScreenData` | `byte[] ScreenData { get; init; }` |  |
-| `TrailingData` | `byte[] TrailingData { get; init; }` |  |
 | `FromRawImage` | `static ZoomaticFile FromRawImage(RawImage image)` |  |
 | `ToRawImage` | `static RawImage ToRawImage(ZoomaticFile file)` |  |
 

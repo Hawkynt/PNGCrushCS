@@ -51,10 +51,11 @@ public sealed class RoundTripTests {
       Assert.That(BinaryPrimitives.ReadUInt16BigEndian(pchg.AsSpan(2)), Is.EqualTo(1), "PCHGF_4BIT");
       Assert.That(BinaryPrimitives.ReadInt16BigEndian(pchg.AsSpan(4)), Is.EqualTo(1), "start line");
       Assert.That(BinaryPrimitives.ReadUInt16BigEndian(pchg.AsSpan(6)), Is.EqualTo(2), "line count");
-      Assert.That(BinaryPrimitives.ReadUInt16BigEndian(pchg.AsSpan(8)), Is.EqualTo(2), "minimum changed register");
-      Assert.That(BinaryPrimitives.ReadUInt16BigEndian(pchg.AsSpan(10)), Is.EqualTo(2), "maximum changed register");
-      Assert.That(BinaryPrimitives.ReadUInt16BigEndian(pchg.AsSpan(12)), Is.Zero, "Huffman tree size");
-      Assert.That(BinaryPrimitives.ReadUInt32BigEndian(pchg.AsSpan(16)), Is.EqualTo(8), "uncompressed payload size");
+      Assert.That(BinaryPrimitives.ReadUInt16BigEndian(pchg.AsSpan(8)), Is.EqualTo(1), "changed lines");
+      Assert.That(BinaryPrimitives.ReadUInt16BigEndian(pchg.AsSpan(10)), Is.EqualTo(2), "minimum changed register");
+      Assert.That(BinaryPrimitives.ReadUInt16BigEndian(pchg.AsSpan(12)), Is.EqualTo(2), "maximum changed register");
+      Assert.That(BinaryPrimitives.ReadUInt16BigEndian(pchg.AsSpan(14)), Is.EqualTo(1), "most changes on any one line");
+      Assert.That(BinaryPrimitives.ReadUInt32BigEndian(pchg.AsSpan(16)), Is.EqualTo(1), "total changes");
       Assert.That(pchg.AsSpan(20, 4).ToArray(), Is.EqualTo(new byte[] { 0x80, 0, 0, 0 }), "line mask");
       Assert.That(pchg.AsSpan(24, 4).ToArray(), Is.EqualTo(new byte[] { 1, 0, 0x2F, 0x00 }), "one RGB444 write to register 2");
     });

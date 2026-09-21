@@ -31,17 +31,47 @@ public sealed class FromRawImageTests {
     return new() { Width = _WIDTH, Height = _HEIGHT, Format = PixelFormat.Rgb24, PixelData = pixels };
   }
 
+  /// <summary>
+  /// Every multicolour pixel of a screen the format can hold survives the round trip, and the seams
+  /// between them are the average of the pair they sit between.
+  /// </summary>
+  /// <remarks>
+  /// The picture is 320 across because the two fields are half a multicolour pixel apart, so a
+  /// 160-wide screen cannot come back column for column and it is not a defect that it does not: the
+  /// odd columns are where both fields show the same multicolour pixel, and the even ones are where
+  /// the shifted field is still showing the one to the left. Asserting both is what pins the shift,
+  /// which is the thing a reader and a writer can quietly agree to leave out.
+  /// </remarks>
   [Test]
   [Category("Integration")]
-  public void RoundTrip_ScreenWithinTheCellColourLimit_ReturnsEveryPixelUnchanged() {
+  public void RoundTrip_ScreenWithinTheCellColourLimit_ReturnsEveryMulticolourPixelUnchanged() {
     var source = _MulticolourScreen();
+    var expected = source.PixelData;
 
-    var restored = TruePaintFile.ToRawImage(TruePaintReader.FromBytes(TruePaintWriter.ToBytes(TruePaintFile.FromRawImage(source))));
+    var file = TruePaintFile.FromRawImage(source);
+    var restored = TruePaintFile.ToRawImage(TruePaintReader.FromBytes(TruePaintWriter.ToBytes(file)));
+    var background = Commodore64Graphics.HexColors[file.BackgroundColor];
 
     Assert.Multiple(() => {
-      Assert.That(restored.Width, Is.EqualTo(_WIDTH));
+      Assert.That(restored.Width, Is.EqualTo(_WIDTH * 2));
       Assert.That(restored.Height, Is.EqualTo(_HEIGHT));
-      Assert.That(restored.PixelData, Is.EqualTo(source.PixelData));
+
+      for (var y = 0; y < _HEIGHT; ++y)
+        for (var x = 0; x < _WIDTH; ++x) {
+          var from = (y * _WIDTH + x) * 3;
+          var odd = (y * _WIDTH * 2 + x * 2 + 1) * 3;
+          var even = (y * _WIDTH * 2 + x * 2) * 3;
+
+          for (var channel = 0; channel < 3; ++channel) {
+            var shift = 16 - channel * 8;
+            var left = x > 0 ? expected[from - 3 + channel] : (byte)(background >> shift);
+
+            Assert.That(restored.PixelData[odd + channel], Is.EqualTo(expected[from + channel]),
+              $"column {x * 2 + 1} of line {y}");
+            Assert.That(restored.PixelData[even + channel], Is.EqualTo((byte)((expected[from + channel] + left) / 2)),
+              $"column {x * 2} of line {y}");
+          }
+        }
     });
   }
 
