@@ -22,6 +22,16 @@ namespace FileFormat.Core;
 public sealed class DecodedTemporalFrameGroup {
   private readonly ReadOnlyCollection<DecodedFrame> _frames;
 
+  /// <summary>Groups two or more reconstructed frames that one codec operation produced together.</summary>
+  /// <param name="frames">
+  /// The frames in presentation order. They must come from one stream, share geometry and
+  /// <see cref="PixelFormat"/>, and where two adjacent presentation timestamps are both known the later
+  /// one must be greater.
+  /// </param>
+  /// <exception cref="ArgumentException">
+  /// Fewer than two frames, a frame without a raster, a frame from another stream, a raster whose
+  /// geometry or format differs from the first, or adjacent known timestamps that do not increase.
+  /// </exception>
   public DecodedTemporalFrameGroup(IEnumerable<DecodedFrame> frames) {
     ArgumentNullException.ThrowIfNull(frames);
 
@@ -69,10 +79,19 @@ public sealed class DecodedTemporalFrameGroup {
   /// <summary>Frames in presentation order.</summary>
   public IReadOnlyList<DecodedFrame> Frames => this._frames;
 
+  /// <summary>How many frames the coding operation produced together; always at least two.</summary>
   public int Count => this._frames.Count;
+
+  /// <summary>The one stream every frame in the group belongs to.</summary>
   public int StreamIndex { get; }
+
+  /// <summary>Width shared by every frame in the group.</summary>
   public int Width { get; }
+
+  /// <summary>Height shared by every frame in the group.</summary>
   public int Height { get; }
+
+  /// <summary>Pixel representation shared by every frame in the group.</summary>
   public PixelFormat Format { get; }
 
   /// <summary>Gets the frame at one presentation-order position.</summary>
