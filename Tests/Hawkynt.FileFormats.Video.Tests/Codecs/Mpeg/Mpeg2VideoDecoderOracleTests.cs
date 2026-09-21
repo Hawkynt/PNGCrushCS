@@ -44,14 +44,18 @@ public sealed class Mpeg2VideoDecoderOracleTests {
   [Test]
   [Category("Oracle")]
   public void FFmpegAgreesOnFrameDualPrimePrediction() {
+    // The anchor is banded rather than flat. A flat reference predicts to the same samples from
+    // every vector, so a dual-prime picture over one would agree with any decoder that read any
+    // vector at all; the bands make the half-line offset between the two fields visible.
     const int size = 64;
     var stream = new MpegTestStream()
       .SequenceHeader(size, size).SequenceExtension(progressiveSequence: false)
       .PictureHeader(1).PictureCodingExtension(progressiveFrame: false);
 
+    var bands = new[] { 0, 40, -60, 30 };
     for (var row = 0; row < 4; ++row) {
       stream.SliceHeader(row, 1);
-      _FlatIntraMacroblocks(stream, 4);
+      _FlatIntraMacroblocks(stream, 4, luminanceDifferential: bands[row]);
     }
 
     stream
@@ -63,7 +67,11 @@ public sealed class Mpeg2VideoDecoderOracleTests {
       for (var column = 0; column < 4; ++column) {
         stream.Code("1").Code("001");
         if (row is 1 or 2)
-          stream.Bits(3, 2).Code("1").Code("1").Bits(0, 1).Bits(0, 1);
+          // frame_motion_type 3, then motion_vector(0, 0) of 13818-2 6.2.5.2.1: each component is
+          // followed by its own dmvector, and not both components by both dmvectors. The vertical
+          // differential is +1, so the opposite-parity field is read a field line away and a decoder
+          // that ignores dmvector reconstructs a different picture rather than a broken one.
+          stream.Bits(3, 2).Code("1").Code("0").Code("1").Code("10");
         else
           stream.Bits(2, 2).Code("1").Code("1");
       }
@@ -94,17 +102,55 @@ public sealed class Mpeg2VideoDecoderOracleTests {
       .IntraBlock(false, 24).IntraBlock(false, 0)
       .IntraBlock(false, -16).IntraBlock(false, 0);
 
-    _AssertMatchesFFmpeg(stream.End(), 16, 16);
+    _AssertMatchesFFmpeg(stream.End(), 16, 16, MpegChromaFormat.Yuv444);
   }
 
-  private static void _AssertMatchesFFmpeg(byte[] stream, int width, int height) {
+  /// <summary>
+  /// Decodes a stream twice and requires the two reconstructions to be the same samples.
+  /// </summary>
+  /// <remarks>
+  /// The comparison is made in the codec's own sample space and not in RGB. FFmpeg's scaler rounds
+  /// its Y'CbCr to R'G'B' its own way — a flat luminance of 136 leaves it at 139 where the integer
+  /// conversion here reaches 140 — so comparing RGB would measure the two colour conversions against
+  /// each other and report a disagreement for every picture whose luminance happens to land on a
+  /// rounding boundary, whatever the decoders did. FFmpeg is therefore asked for the planes it
+  /// reconstructed, those planes are put through this package's conversion, and the result has to be
+  /// what this package's decoder produced: equal RGB then means equal Y'CbCr, exactly.
+  /// </remarks>
+  private static void _AssertMatchesFFmpeg(
+    byte[] stream, int width, int height, MpegChromaFormat chromaFormat = MpegChromaFormat.Yuv420) {
     FFmpegOracle.RequireAvailable();
 
+    Assert.That(width % 16, Is.Zero, "the oracle streams are whole macroblocks, so no plane is padded");
+    Assert.That(height % 16, Is.Zero, "the oracle streams are whole macroblocks, so no plane is padded");
+
     var managed = _DecodeManaged(stream);
-    var oracle = _DecodeWithFFmpeg(stream, width, height, managed.Count);
+    var planes = _DecodeWithFFmpeg(stream, width, height, managed.Count, chromaFormat);
+    var oracle = _ToRgb(planes, width, height, chromaFormat, managed.Count);
     var expected = managed.SelectMany(static frame => frame.PixelData).ToArray();
 
     Assert.That(oracle, Is.EqualTo(expected));
+  }
+
+  /// <summary>Rebuilds FFmpeg's planar output into frames and converts them the way this package does.</summary>
+  private static byte[] _ToRgb(
+    byte[] planar, int width, int height, MpegChromaFormat chromaFormat, int frames) {
+    var frame = new MpegFrame(width, height, chromaFormat);
+    var lumaSamples = width * height;
+    var chromaSamples = frame.ChromaWidth * frame.ChromaHeight;
+    var frameSamples = lumaSamples + 2 * chromaSamples;
+    var rgb = new byte[frames * width * height * 3];
+
+    for (var index = 0; index < frames; ++index) {
+      var at = index * frameSamples;
+      Array.Copy(planar, at, frame.Luma, 0, lumaSamples);
+      Array.Copy(planar, at + lumaSamples, frame.Cb, 0, chromaSamples);
+      Array.Copy(planar, at + lumaSamples + chromaSamples, frame.Cr, 0, chromaSamples);
+      MpegColorConversion.ToRgb24(frame, width, height, isMpeg2: true)
+        .CopyTo(rgb, index * width * height * 3);
+    }
+
+    return rgb;
   }
 
   private static List<RawImage> _DecodeManaged(byte[] stream) {
@@ -117,9 +163,22 @@ public sealed class Mpeg2VideoDecoderOracleTests {
     return frames;
   }
 
-  private static byte[] _DecodeWithFFmpeg(byte[] stream, int width, int height, int expectedFrames) {
+  private static byte[] _DecodeWithFFmpeg(
+    byte[] stream, int width, int height, int expectedFrames, MpegChromaFormat chromaFormat) {
+    var pixelFormat = chromaFormat switch {
+      MpegChromaFormat.Yuv420 => "yuv420p",
+      MpegChromaFormat.Yuv422 => "yuv422p",
+      _ => "yuv444p",
+    };
+
+    var frameSamples = chromaFormat switch {
+      MpegChromaFormat.Yuv420 => width * height * 3 / 2,
+      MpegChromaFormat.Yuv422 => width * height * 2,
+      _ => width * height * 3,
+    };
+
     var input = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName() + ".m2v");
-    var output = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName() + ".rgb");
+    var output = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName() + ".yuv");
 
     try {
       File.WriteAllBytes(input, stream);
@@ -132,7 +191,7 @@ public sealed class Mpeg2VideoDecoderOracleTests {
       foreach (var argument in new[] {
         "-hide_banner", "-loglevel", "error", "-y", "-i", input,
         "-map", "0:v:0", "-an", "-sn", "-dn", "-fps_mode", "passthrough",
-        "-f", "rawvideo", "-pix_fmt", "rgb24", output,
+        "-f", "rawvideo", "-pix_fmt", pixelFormat, output,
       })
         startInfo.ArgumentList.Add(argument);
 
@@ -152,7 +211,7 @@ public sealed class Mpeg2VideoDecoderOracleTests {
       Assert.That(File.Exists(output), Is.True, "ffmpeg produced no raw video");
 
       var bytes = File.ReadAllBytes(output);
-      Assert.That(bytes.Length, Is.EqualTo(checked(width * height * 3 * expectedFrames)));
+      Assert.That(bytes.Length, Is.EqualTo(checked(frameSamples * expectedFrames)));
       return bytes;
     } catch (System.ComponentModel.Win32Exception) {
       Assert.Inconclusive("ffmpeg disappeared after the oracle availability check");
