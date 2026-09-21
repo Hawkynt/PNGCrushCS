@@ -1,3 +1,5 @@
+using System;
+using System.Collections.Generic;
 using System.Linq;
 using FileFormat.Core;
 
@@ -116,6 +118,49 @@ public sealed class RawMultiViewImageTests {
       Assert.That(set.Views[0].Index, Is.EqualTo(2));
       Assert.That(set.Views[1].Index, Is.EqualTo(9));
       Assert.That(set.GetView(9).Image, Is.SameAs(view9));
+    });
+  }
+
+  [Test]
+  public void RejectsANullViewAndANullRaster() {
+    var image = _Image(8, 8, PixelFormat.Gray8, 1);
+
+    Assert.Multiple(() => {
+      Assert.That(
+        () => new RawMultiViewImage([new(image, 0), null!]),
+        Throws.ArgumentException.With.Message.Contains("null view"));
+      Assert.That(
+        () => new RawMultiViewImage([new(image, 0), new(null!, 1)]),
+        Throws.ArgumentException.With.Message.Contains("null raster"));
+    });
+  }
+
+  /// <summary>
+  /// The view list is the whole point of the type, so handing out something a caller can append to
+  /// would let a stereo pair grow a third eye after its invariants were checked.
+  /// </summary>
+  [Test]
+  public void TheViewCollectionIsGenuinelyReadOnly() {
+    var first = _Image(8, 8, PixelFormat.Gray8, 1);
+    var set = new RawMultiViewImage([new(first, 0), new(_Image(8, 8, PixelFormat.Gray8, 2), 1)]);
+
+    Assert.That(set.Views, Is.Not.AssignableTo<RawImageView[]>());
+    Assert.That(
+      () => ((IList<RawImageView>)set.Views).Add(new(first, 7)),
+      Throws.TypeOf<NotSupportedException>());
+  }
+
+  [Test]
+  public void AskingForAViewIdentifierOrRoleThatIsNotThereIsRefused() {
+    var set = new RawMultiViewImage([
+      new(_Image(8, 8, PixelFormat.Gray8, 1), 0),
+      new(_Image(8, 8, PixelFormat.Gray8, 2), 1),
+    ]);
+
+    Assert.Multiple(() => {
+      Assert.That(() => set.GetView(4), Throws.TypeOf<ArgumentOutOfRangeException>());
+      Assert.That(() => set.GetView(-1), Throws.TypeOf<ArgumentOutOfRangeException>());
+      Assert.That(() => set.WithRole((RawImageViewRole)99), Throws.TypeOf<ArgumentOutOfRangeException>());
     });
   }
 
