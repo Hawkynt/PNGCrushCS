@@ -16,11 +16,11 @@ namespace FileFormat.Codecs;
 /// which puts the bitstream itself into MPEG decode order. Presentation timestamps stay attached to
 /// their pictures while decode timestamps consume the input timeline in emitted order.
 /// <para/>
-/// P pictures predict from the reconstructed anchor before them. B pictures carry both a forward
-/// prediction from the preceding reconstructed anchor and a backward prediction from the following
-/// reconstructed anchor, average the two predictions as H.262 specifies, and code the remaining
-/// residual. Anchor reconstruction is produced by the decoder this encoder drives with its own
-/// output, so encoder and decoder references are identical by construction rather than merely close.
+/// P pictures predict from the reconstructed anchor before them. A B macroblock searches both the
+/// preceding and the following reconstructed anchor and then codes whichever of Table B.4's three
+/// modes fits its samples best: forward only, backward only, or both averaged the way H.262 rounds
+/// them. Anchor reconstruction is produced by the decoder this encoder drives with its own output,
+/// so encoder and decoder references are identical by construction rather than merely close.
 /// <para/>
 /// Every twelfth display picture is intra. The two pictures immediately before such a boundary are
 /// written as P pictures rather than B pictures: otherwise coding the future I anchor first would
@@ -307,6 +307,8 @@ public sealed class Mpeg2VideoEncoder : IVideoCodecEncoder<Mpeg2VideoEncoder> {
       var predictedBackwardX = 0;
       var predictedBackwardY = 0;
       var pendingSkips = 0;
+      var previousUsedForward = false;
+      var previousUsedBackward = false;
 
       for (var column = 0; column < this._macroblockWidth; ++column) {
         if (codingType == MpegPictureDecoder.IntraCoded) {
@@ -355,10 +357,15 @@ public sealed class Mpeg2VideoEncoder : IVideoCodecEncoder<Mpeg2VideoEncoder> {
           source, forwardReference!, column, row, predictedForwardX, predictedForwardY);
         var (backwardX, backwardY) = this._SearchMotion(
           source, backwardReference!, column, row, predictedBackwardX, predictedBackwardY);
+        var mode = _ChooseBPrediction(
+          source, forwardReference!, backwardReference!, column, row, forwardX, forwardY, backwardX, backwardY);
+
+        var usesForward = mode is BPrediction.Forward or BPrediction.Bidirectional;
+        var usesBackward = mode is BPrediction.Backward or BPrediction.Bidirectional;
         var bidirectionalPattern = this._QuantiseBidirectionalResidual(
           source,
-          forwardReference!,
-          backwardReference!,
+          usesForward ? forwardReference : null,
+          usesBackward ? backwardReference : null,
           column,
           row,
           forwardX,
@@ -368,21 +375,47 @@ public sealed class Mpeg2VideoEncoder : IVideoCodecEncoder<Mpeg2VideoEncoder> {
           quantiserScaleCode,
           levels);
 
-        MpegVlcTables.MacroblockAddressIncrement.Write(writer, 1);
+        // A skipped macroblock of a B picture repeats the previous macroblock's directions and
+        // predicts from the vector predictors as they stand (13818-2, 7.6.6), so it can stand in
+        // only for one that says exactly that and carries no coefficients. The first and last
+        // macroblock of a slice are always coded, and nothing can be repeated before one has been.
+        if (bidirectionalPattern == 0
+            && column != 0
+            && column != this._macroblockWidth - 1
+            && usesForward == previousUsedForward
+            && usesBackward == previousUsedBackward
+            && (!usesForward || (forwardX == predictedForwardX && forwardY == predictedForwardY))
+            && (!usesBackward || (backwardX == predictedBackwardX && backwardY == predictedBackwardY))) {
+          ++pendingSkips;
+          continue;
+        }
+
+        _WriteAddressIncrement(writer, pendingSkips + 1);
+        pendingSkips = 0;
+        previousUsedForward = usesForward;
+        previousUsedBackward = usesBackward;
+
         MpegVlcTables.BidirectionalMacroblockType.Write(
           writer,
-          MpegVlcTables.TypeMotionForward
-          | MpegVlcTables.TypeMotionBackward
+          (usesForward ? MpegVlcTables.TypeMotionForward : 0)
+          | (usesBackward ? MpegVlcTables.TypeMotionBackward : 0)
           | (bidirectionalPattern != 0 ? MpegVlcTables.TypePattern : 0));
 
-        _WriteMotionCode(writer, forwardX - predictedForwardX);
-        _WriteMotionCode(writer, forwardY - predictedForwardY);
-        _WriteMotionCode(writer, backwardX - predictedBackwardX);
-        _WriteMotionCode(writer, backwardY - predictedBackwardY);
-        predictedForwardX = forwardX;
-        predictedForwardY = forwardY;
-        predictedBackwardX = backwardX;
-        predictedBackwardY = backwardY;
+        // Only a direction this macroblock codes moves its predictor: 13818-2 7.6.3.1 leaves the
+        // predictor of a direction the macroblock does not use exactly as it stood.
+        if (usesForward) {
+          _WriteMotionCode(writer, forwardX - predictedForwardX);
+          _WriteMotionCode(writer, forwardY - predictedForwardY);
+          predictedForwardX = forwardX;
+          predictedForwardY = forwardY;
+        }
+
+        if (usesBackward) {
+          _WriteMotionCode(writer, backwardX - predictedBackwardX);
+          _WriteMotionCode(writer, backwardY - predictedBackwardY);
+          predictedBackwardX = backwardX;
+          predictedBackwardY = backwardY;
+        }
 
         _WritePatternAndBlocks(writer, bidirectionalPattern, levels);
       }
@@ -599,7 +632,20 @@ public sealed class Mpeg2VideoEncoder : IVideoCodecEncoder<Mpeg2VideoEncoder> {
     return pattern;
   }
 
-  private int _QuantiseBidirectionalResidual(
+  /// <summary>
+  /// Picks which of a B macroblock's two references to spend, by sum of absolute luminance
+  /// differences against each prediction and against their average.
+  /// </summary>
+  /// <remarks>
+  /// A B picture that always codes both directions is legal and decodes correctly, and is also a B
+  /// picture that has thrown away most of what B pictures are for: a macroblock that a scene change
+  /// has made unpredictable from behind still spends a forward vector on a reference it does not
+  /// resemble, and pays for its residual as well. Table B.4 gives all three modes and this chooses
+  /// between them. The comparison is over luminance alone because chrominance follows the same
+  /// vectors at half resolution and cannot overturn the verdict often enough to be worth four more
+  /// motion compensations per candidate.
+  /// </remarks>
+  private static BPrediction _ChooseBPrediction(
     MpegFrame source,
     MpegFrame forwardReference,
     MpegFrame backwardReference,
@@ -608,9 +654,62 @@ public sealed class Mpeg2VideoEncoder : IVideoCodecEncoder<Mpeg2VideoEncoder> {
     int forwardX,
     int forwardY,
     int backwardX,
+    int backwardY) {
+    var originX = macroblockX * 16;
+    var originY = macroblockY * 16;
+
+    Span<int> fromForward = stackalloc int[256];
+    Span<int> fromBackward = stackalloc int[256];
+    if (!MpegMotionCompensation.TryPredict(
+          fromForward, 16, 0,
+          forwardReference.Luma, forwardReference.LumaWidth, 0,
+          forwardReference.LumaWidth, forwardReference.LumaHeight,
+          originX, originY, 16, 16, forwardX, forwardY)
+        || !MpegMotionCompensation.TryPredict(
+          fromBackward, 16, 0,
+          backwardReference.Luma, backwardReference.LumaWidth, 0,
+          backwardReference.LumaWidth, backwardReference.LumaHeight,
+          originX, originY, 16, 16, backwardX, backwardY))
+      throw new InvalidDataException(
+        "The MPEG-2 B-picture motion search chose a reference outside the picture for macroblock "
+        + $"({macroblockX}, {macroblockY}).");
+
+    var forwardCost = 0;
+    var backwardCost = 0;
+    var bidirectionalCost = 0;
+    for (var y = 0; y < 16; ++y)
+    for (var x = 0; x < 16; ++x) {
+      var at = y * 16 + x;
+      var sample = source.Luma[(originY + y) * source.LumaWidth + originX + x];
+      forwardCost += Math.Abs(sample - fromForward[at]);
+      backwardCost += Math.Abs(sample - fromBackward[at]);
+      bidirectionalCost += Math.Abs(sample - ((fromForward[at] + fromBackward[at] + 1) >> 1));
+    }
+
+    if (bidirectionalCost < forwardCost && bidirectionalCost < backwardCost)
+      return BPrediction.Bidirectional;
+
+    return backwardCost < forwardCost ? BPrediction.Backward : BPrediction.Forward;
+  }
+
+  /// <summary>
+  /// Quantises a B macroblock's residual against whichever of its two references it codes.
+  /// </summary>
+  private int _QuantiseBidirectionalResidual(
+    MpegFrame source,
+    MpegFrame? forwardReference,
+    MpegFrame? backwardReference,
+    int macroblockX,
+    int macroblockY,
+    int forwardX,
+    int forwardY,
+    int backwardX,
     int backwardY,
     int quantiserScaleCode,
     int[] levels) {
+    if (forwardReference == null && backwardReference == null)
+      throw new InvalidOperationException("A bidirectionally coded MPEG-2 macroblock must use at least one reference.");
+
     var quantiserScale = quantiserScaleCode * 2;
     var pattern = 0;
 
@@ -619,32 +718,50 @@ public sealed class Mpeg2VideoEncoder : IVideoCodecEncoder<Mpeg2VideoEncoder> {
     Span<int> residual = stackalloc int[64];
     for (var block = 0; block < 6; ++block) {
       var (plane, planeWidth, originX, originY, component) = _BlockOf(source, macroblockX, macroblockY, block);
-      var (forwardPlane, forwardWidth, forwardHeight) = _PlaneOf(forwardReference, component);
-      var (backwardPlane, backwardWidth, backwardHeight) = _PlaneOf(backwardReference, component);
-      var (forwardBlockX, forwardBlockY) = _VectorFor(component, forwardX, forwardY);
-      var (backwardBlockX, backwardBlockY) = _VectorFor(component, backwardX, backwardY);
 
-      if (!MpegMotionCompensation.TryPredict(
-            prediction, 8, 0,
-            forwardPlane, forwardWidth, 0, forwardWidth, forwardHeight,
-            originX, originY, 8, 8, forwardBlockX, forwardBlockY)
-          || !MpegMotionCompensation.TryPredict(
-            backwardPrediction, 8, 0,
-            backwardPlane, backwardWidth, 0, backwardWidth, backwardHeight,
-            originX, originY, 8, 8, backwardBlockX, backwardBlockY))
-        throw new InvalidDataException(
-          $"The MPEG-2 B-picture motion search chose a reference outside the picture for macroblock "
-          + $"({macroblockX}, {macroblockY}).");
+      // The direction not coded contributes nothing, exactly as in the decoder: one prediction on
+      // its own, or both averaged the way H.262 rounds them.
+      var target = forwardReference != null ? prediction : backwardPrediction;
+      if (forwardReference != null && !_PredictBlock(
+            prediction, forwardReference, component, originX, originY, forwardX, forwardY))
+        throw _OutOfReference(macroblockX, macroblockY);
 
-      MpegMotionCompensation.Average(prediction, backwardPrediction);
+      if (backwardReference != null && !_PredictBlock(
+            backwardPrediction, backwardReference, component, originX, originY, backwardX, backwardY))
+        throw _OutOfReference(macroblockX, macroblockY);
+
+      if (forwardReference != null && backwardReference != null) {
+        MpegMotionCompensation.Average(prediction, backwardPrediction);
+        target = prediction;
+      }
+
       for (var index = 0; index < 64; ++index)
-        residual[index] = plane[(originY + index / 8) * planeWidth + originX + index % 8] - prediction[index];
+        residual[index] = plane[(originY + index / 8) * planeWidth + originX + index % 8] - target[index];
 
       if (MpegInterBlockEncoder.TryQuantise(residual, quantiserScale, isMpeg2: true, levels.AsSpan(block * 64, 64)))
         pattern |= 1 << (5 - block);
     }
 
     return pattern;
+  }
+
+  private static bool _PredictBlock(
+    Span<int> destination, MpegFrame reference, int component, int originX, int originY, int vectorX, int vectorY) {
+    var (plane, width, height) = _PlaneOf(reference, component);
+    var (blockX, blockY) = _VectorFor(component, vectorX, vectorY);
+    return MpegMotionCompensation.TryPredict(
+      destination, 8, 0, plane, width, 0, width, height, originX, originY, 8, 8, blockX, blockY);
+  }
+
+  private static InvalidDataException _OutOfReference(int macroblockX, int macroblockY)
+    => new(
+      "The MPEG-2 B-picture motion search chose a reference outside the picture for macroblock "
+      + $"({macroblockX}, {macroblockY}).");
+
+  private enum BPrediction {
+    Forward,
+    Backward,
+    Bidirectional,
   }
 
   private static int _Sample(byte[] plane, int width, int height, int x, int y)

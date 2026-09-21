@@ -147,6 +147,58 @@ public sealed class Mpeg2VideoEncoderTests {
 
   [Test]
   [Category("Unit")]
+  public void BMacroblocksChooseForwardBackwardAndBidirectionalReferences() {
+    // Four solid pictures per run, so every macroblock of a B picture faces the same choice and the
+    // first one speaks for all of them. Display order is I0 B1 B2 P3 and coding order I0 P3 B1 B2,
+    // so B1 and B2 both see the reconstructed I0 behind them and the reconstructed P3 ahead.
+    //
+    //   16 128  16 240 : B2 is what lies behind it, and nothing like what lies ahead -> forward
+    //   16 128 240 240 : B2 is what lies ahead of it, and nothing like what lies behind -> backward
+    //   in both runs B1 is the average of the two anchors and neither one -> interpolated
+    var toward = _BMacroblockTypes(16, 128, 16, 240);
+    var away = _BMacroblockTypes(16, 128, 240, 240);
+
+    Assert.Multiple(() => {
+      Assert.That(toward[0] & MpegVlcTables.TypeMotionForward, Is.Not.Zero, "the averaged B picture lost its forward reference");
+      Assert.That(toward[0] & MpegVlcTables.TypeMotionBackward, Is.Not.Zero, "the averaged B picture lost its backward reference");
+      Assert.That(toward[1] & MpegVlcTables.TypeMotionForward, Is.Not.Zero, "a B picture matching the anchor behind it must predict forward");
+      Assert.That(toward[1] & MpegVlcTables.TypeMotionBackward, Is.Zero, "a strictly better forward prediction should not spend a backward vector");
+      Assert.That(away[1] & MpegVlcTables.TypeMotionBackward, Is.Not.Zero, "a B picture matching the anchor ahead of it must predict backward");
+      Assert.That(away[1] & MpegVlcTables.TypeMotionForward, Is.Zero, "a strictly better backward prediction should not spend a forward vector");
+    });
+  }
+
+  [Test]
+  [Category("Oracle")]
+  public void FFmpegDecodesBPicturesInEveryPredictionDirection() {
+    FFmpegOracle.RequireAvailable();
+
+    // The same three runs, handed to a decoder that is not this one. A backward-only or interpolated
+    // macroblock that this package writes and reads consistently but writes wrongly would agree with
+    // itself forever; FFmpeg is what can disagree.
+    foreach (var (name, values) in new (string Name, byte[] Values)[] {
+      ("forward", [16, 128, 16, 240]),
+      ("backward", [16, 128, 240, 240]),
+      ("interpolated", [16, 128, 128, 240]),
+    }) {
+      var sources = values.Select(static value => _Solid(32, 32, value)).ToList();
+      var packets = _Encode(sources);
+      var decoded = _DecodeWithFFmpeg(packets, 32, 32, sources.Count);
+
+      for (var index = 0; index < sources.Count; ++index) {
+        var frameBytes = 32 * 32 * 3;
+        var total = 0L;
+        for (var offset = 0; offset < frameBytes; ++offset)
+          total += Math.Abs(sources[index].PixelData[offset] - decoded[index * frameBytes + offset]);
+
+        Assert.That(total / (double)frameBytes, Is.LessThan(10d),
+          $"the {name} run's picture {index} is not the frame that was encoded");
+      }
+    }
+  }
+
+  [Test]
+  [Category("Unit")]
   public void AKeyFrameBoundaryDoesNotLeaveBackwardOrderedPicturesDependingOnThePreviousGop() {
     var encoder = Mpeg2VideoEncoder.Create(_Stream(64, 48));
     var packets = new List<CodedPacket>();
@@ -273,43 +325,15 @@ public sealed class Mpeg2VideoEncoderTests {
     Assert.That(packets.Count, Is.EqualTo(frames), "the encoder dropped a delayed picture");
     Assert.That(packets.Any(static packet => _PictureCodingType(packet.Data.Span) == MpegPictureDecoder.BidirectionallyCoded), Is.True);
 
-    var directory = Directory.CreateTempSubdirectory("mpeg2-oracle");
-    try {
-      var clip = Path.Combine(directory.FullName, "clip.m2v");
-      using (var file = File.Create(clip))
-        foreach (var packet in packets)
-          file.Write(packet.Data.Span);
+    var decoded = _DecodeWithFFmpeg(packets, width, height, frames);
+    var frameBytes = width * height * 3;
+    for (var index = 0; index < frames; ++index) {
+      var total = 0L;
+      for (var offset = 0; offset < frameBytes; ++offset)
+        total += Math.Abs(sources[index].PixelData[offset] - decoded[index * frameBytes + offset]);
 
-      var raw = Path.Combine(directory.FullName, "decoded.rgb");
-      var startInfo = new ProcessStartInfo(FFmpegOracle.ExecutablePath!) {
-        RedirectStandardError = true,
-        UseShellExecute = false,
-      };
-      foreach (var argument in new[] {
-        "-hide_banner", "-loglevel", "error", "-i", clip, "-f", "rawvideo", "-pix_fmt", "rgb24", raw })
-        startInfo.ArgumentList.Add(argument);
-
-      using var process = Process.Start(startInfo)!;
-      var diagnostics = process.StandardError.ReadToEnd();
-      process.WaitForExit(60_000);
-
-      Assert.That(process.ExitCode, Is.Zero, $"ffmpeg refused the stream: {diagnostics}");
-
-      var decoded = File.ReadAllBytes(raw);
-      var frameBytes = width * height * 3;
-      Assert.That(decoded.Length / frameBytes, Is.EqualTo(frames),
-        "ffmpeg read a different number of pictures than were written");
-
-      for (var index = 0; index < frames; ++index) {
-        var total = 0L;
-        for (var offset = 0; offset < frameBytes; ++offset)
-          total += Math.Abs(sources[index].PixelData[offset] - decoded[index * frameBytes + offset]);
-
-        Assert.That(total / (double)frameBytes, Is.LessThan(14d),
-          $"ffmpeg's picture {index} is not the frame that was encoded");
-      }
-    } finally {
-      try { directory.Delete(recursive: true); } catch { }
+      Assert.That(total / (double)frameBytes, Is.LessThan(14d),
+        $"ffmpeg's picture {index} is not the frame that was encoded");
     }
   }
 
@@ -337,6 +361,92 @@ public sealed class Mpeg2VideoEncoderTests {
       Assert.That(VideoFormatRegistry.CreateDecoder(described), Is.InstanceOf<Mpeg2VideoDecoder>());
       Assert.That(VideoFormatRegistry.CreateEncoder(described), Is.InstanceOf<Mpeg2VideoEncoder>());
     });
+  }
+
+  /// <summary>Encodes solid pictures and reports the macroblock_type of each B picture's first macroblock.</summary>
+  /// <remarks>
+  /// The first macroblock of a slice is never skipped, so it is always there to be read, and over a
+  /// solid picture every macroblock of the slice made the same choice it did.
+  /// </remarks>
+  private static int[] _BMacroblockTypes(params byte[] values) {
+    var packets = _Encode(values.Select(static value => _Solid(32, 32, value)).ToList());
+    var bPictures = packets
+      .Where(static packet => _PictureCodingType(packet.Data.Span) == MpegPictureDecoder.BidirectionallyCoded)
+      .ToArray();
+
+    Assert.That(bPictures.Length, Is.EqualTo(2), "the group should hold two B pictures");
+    return bPictures.Select(_FirstBMacroblockType).ToArray();
+  }
+
+  private static int _FirstBMacroblockType(CodedPacket packet) {
+    var data = packet.Data.Span;
+    var slice = _IndexOfStartCode(data, MpegStartCode.FirstSlice);
+    Assert.That(slice, Is.GreaterThanOrEqualTo(0), "the B picture carries a slice");
+
+    var reader = new MpegBitReader(data[(slice + 4)..]);
+    reader.Skip(5); // quantiser_scale_code
+    while (reader.NextBits(1) == 1) {
+      reader.Skip(1); // extra_bit_slice
+      reader.Skip(8); // extra_information_slice
+    }
+
+    reader.Skip(1); // the extra_bit_slice that says there is no more
+    Assert.That(MpegVlcTables.MacroblockAddressIncrement.Read(ref reader), Is.EqualTo(1));
+    return MpegVlcTables.BidirectionalMacroblockType.Read(ref reader);
+  }
+
+  private static List<CodedPacket> _Encode(IReadOnlyList<RawImage> sources) {
+    var encoder = Mpeg2VideoEncoder.Create(_Stream(sources[0].Width, sources[0].Height));
+    var packets = new List<CodedPacket>();
+
+    for (var index = 0; index < sources.Count; ++index)
+      if (encoder.TryEncode(sources[index], index, out var packet))
+        packets.Add(packet);
+
+    packets.AddRange(encoder.Flush());
+    Assert.That(packets.Count, Is.EqualTo(sources.Count), "the encoder dropped a delayed picture");
+    return packets;
+  }
+
+  /// <summary>Writes the packets out as one elementary stream and returns what FFmpeg decoded.</summary>
+  private static byte[] _DecodeWithFFmpeg(IReadOnlyList<CodedPacket> packets, int width, int height, int frames) {
+    var directory = Directory.CreateTempSubdirectory("mpeg2-oracle");
+    try {
+      var clip = Path.Combine(directory.FullName, "clip.m2v");
+      using (var file = File.Create(clip))
+        foreach (var packet in packets)
+          file.Write(packet.Data.Span);
+
+      var raw = Path.Combine(directory.FullName, "decoded.rgb");
+      var startInfo = new ProcessStartInfo(FFmpegOracle.ExecutablePath!) {
+        RedirectStandardError = true,
+        UseShellExecute = false,
+      };
+      foreach (var argument in new[] {
+        "-hide_banner", "-loglevel", "error", "-i", clip, "-f", "rawvideo", "-pix_fmt", "rgb24", raw })
+        startInfo.ArgumentList.Add(argument);
+
+      using var process = Process.Start(startInfo)!;
+      var diagnostics = process.StandardError.ReadToEnd();
+      process.WaitForExit(60_000);
+
+      Assert.That(process.ExitCode, Is.Zero, $"ffmpeg refused the stream: {diagnostics}");
+      Assert.That(diagnostics.Trim(), Is.Empty, "ffmpeg read the stream but complained about it");
+
+      var decoded = File.ReadAllBytes(raw);
+      Assert.That(decoded.Length / (width * height * 3), Is.EqualTo(frames),
+        "ffmpeg read a different number of pictures than were written");
+
+      return decoded;
+    } finally {
+      try { directory.Delete(recursive: true); } catch { /* best effort */ }
+    }
+  }
+
+  private static RawImage _Solid(int width, int height, byte value) {
+    var data = new byte[width * height * 3];
+    Array.Fill(data, value);
+    return new() { Width = width, Height = height, Format = PixelFormat.Rgb24, PixelData = data };
   }
 
   private static int _PictureCodingType(ReadOnlySpan<byte> data) {
