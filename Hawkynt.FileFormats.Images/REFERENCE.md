@@ -8030,7 +8030,7 @@ Implements `IEquatable<ComputerEyesStFile>`, `IImageFormatMetadata<ComputerEyesS
 
 ### Namespace `FileFormat.Core`
 
-[`AdditionalImageFormatAttribute`](#additionalimageformatattribute) · [`AllowedZones`](#allowedzones) · [`AmigaColourMap`](#amigacolourmap) · [`AmigaRgbRuns`](#amigargbruns) · [`AmstradGraphics`](#amstradgraphics) · [`AnticMode`](#anticmode) · [`AppleIIGSGraphics`](#appleiigsgraphics) · [`Atari8BitGraphics`](#atari8bitgraphics) · [`AtariKoalaRle`](#atarikoalarle) · [`AtariStCaRle`](#ataristcarle) · [`AtariStGraphics`](#ataristgraphics) · [`BilevelRows`](#bilevelrows) · [`CaseAttribute`](#caseattribute) · [`ChannelScaling`](#channelscaling) · [`CharacterRoms`](#characterroms) · [`ChunkKind`](#chunkkind) · [`ChunkMobility`](#chunkmobility) · [`ChunkOptimizer`](#chunkoptimizer) · [`ChunkPlacement`](#chunkplacement) · [`ChunkPlacementDirective`](#chunkplacementdirective) · [`ChunkReference`](#chunkreference) · [`ChunkRewriteFailure`](#chunkrewritefailure) · [`ChunkRewritePlan`](#chunkrewriteplan) · [`ChunkRewriteResult`](#chunkrewriteresult) · [`ChunkRewriteRule`](#chunkrewriterule) · [`ChunkSpan`](#chunkspan) · [`ChunkZone`](#chunkzone) · [`CodecTag`](#codectag) · [`CodedPacket`](#codedpacket) · [`ColorQuantizer`](#colorquantizer) · [`ColorQuantizer.Result`](#colorquantizerresult) · [`Commodore16Graphics`](#commodore16graphics) · [`Commodore64Fli`](#commodore64fli) · [`Commodore64Graphics`](#commodore64graphics) · [`ConformanceOracle`](#conformanceoracle) · [`ConformanceOracles`](#conformanceoracles) · [`CoverArt`](#coverart) · [`DecodedFrame`](#decodedframe) · [`DisplayFilter`](#displayfilter) · [`EndianAttribute`](#endianattribute) · [`Endianness`](#endianness) · [`ExifCodec`](#exifcodec) · [`ExifData`](#exifdata) · [`ExifIfd`](#exififd) · [`ExifRational`](#exifrational) · [`ExifSRational`](#exifsrational) · [`ExifTagEntry`](#exiftagentry) · [`ExifTagType`](#exiftagtype) · [`FastRawImageConverter`](#fastrawimageconverter) · [`FieldAttribute`](#fieldattribute) · [`FieldOffsetAttribute`](#fieldoffsetattribute) · [`FillerAttribute`](#fillerattribute) · [`FixedPalette`](#fixedpalette) · [`FixedValue`](#fixedvalue) · [`FormatCapability`](#formatcapability) · [`FormatDetectionPriorityAttribute`](#formatdetectionpriorityattribute) · [`FormatIO`](#formatio) · [`FormatMagicBytesAttribute`](#formatmagicbytesattribute) · [`FormatMimeTypeAttribute`](#formatmimetypeattribute) · [`FrameBlend`](#frameblend) · [`GenerateSerializerAttribute`](#generateserializerattribute) · [`GlyphSheet`](#glyphsheet) · [`GtiaRenderer`](#gtiarenderer) · [`HeaderFieldDescriptor`](#headerfielddescriptor) · [`HeaderFieldMapper`](#headerfieldmapper) · [`HeaderSerializer`](#headerserializer) · [`IBinarySerializable<TSelf>`](#ibinaryserializabletself) · [`IFormatChunkLayout<TSelf>`](#iformatchunklayouttself) · [`IFormatChunkPlanRewriter<TSelf>`](#iformatchunkplanrewritertself) · [`IFormatChunkRewriter<TSelf>`](#iformatchunkrewritertself) · [`IImageFormatMetadata<TSelf>`](#iimageformatmetadatatself) · [`IImageFormatReader<TSelf>`](#iimageformatreadertself) · [`IImageFormatWriter<TSelf>`](#iimageformatwritertself) · [`IImageFromRawImage<TSelf, TPixel>`](#iimagefromrawimagetself-tpixel) · [`IImageFromRawImage<TSelf>`](#iimagefromrawimagetself) · [`IImageInfoReader<TSelf>`](#iimageinforeadertself) · [`IImageToRawImage<TSelf>`](#iimagetorawimagetself) · [`IMultiImageFileFormat<TSelf>`](#imultiimagefileformattself) · [`IRawPixelFormat<TSelf>`](#irawpixelformattself) · [`IVideoCodecDecoder<TSelf>`](#ivideocodecdecodertself) · [`IVideoCodecEncoder<TSelf>`](#ivideocodecencodertself) · [`IVideoContainerReader<TSelf>`](#ivideocontainerreadertself) · [`IVideoContainerWriter<TSelf>`](#ivideocontainerwritertself) · [`IVideoFormatMetadata<TSelf>`](#ivideoformatmetadatatself) · [`IVideoFrameDecoder`](#ivideoframedecoder) · [`IVideoPacketEncoder`](#ivideopacketencoder) · [`IfAttribute`](#ifattribute) · [`ImageInfo`](#imageinfo) · [`ImageMetadata`](#imagemetadata) · [`ImageResampler`](#imageresampler) · [`IndexedPalette`](#indexedpalette) · [`IntegerRange`](#integerrange) · [`IptcCodec`](#iptccodec) · [`IptcData`](#iptcdata) · [`IptcDataSet`](#iptcdataset) · [`LayoutMode`](#layoutmode) · [`Lz4Block`](#lz4block) · [`Lz4Frame`](#lz4frame) · [`MediaStreamInfo`](#mediastreaminfo) · [`MediaStreamKind`](#mediastreamkind) · [`MediaStreamMetadata`](#mediastreammetadata) · [`MonochromePage`](#monochromepage) · [`MsxGraphics`](#msxgraphics) · [`Op`](#op) · [`PackBits`](#packbits) · [`PackBytesStream`](#packbytesstream) · [`PackedRows`](#packedrows) · [`PaletteQuantizer`](#palettequantizer) · [`PaletteSidecar`](#palettesidecar) · [`PixelAspectRatio`](#pixelaspectratio) · [`PixelConverter`](#pixelconverter) · [`PixelFormat`](#pixelformat) · [`PixelRect`](#pixelrect) · [`PlanarConverter`](#planarconverter) · [`Rational`](#rational) · [`RawBytesAttribute`](#rawbytesattribute) · [`RawChromaLocation`](#rawchromalocation) · [`RawColorPrimaries`](#rawcolorprimaries) · [`RawColorRange`](#rawcolorrange) · [`RawImage`](#rawimage) · [`RawImage<TPixel>`](#rawimagetpixel) · [`RawImageColorInfo`](#rawimagecolorinfo) · [`RawImageConverter`](#rawimageconverter) · [`RawImageExactConverter`](#rawimageexactconverter) · [`RawImageExtensions`](#rawimageextensions) · [`RawImageFactory`](#rawimagefactory) · [`RawMatrixCoefficients`](#rawmatrixcoefficients) · [`RawPalette`](#rawpalette) · [`RawPaletteEntry`](#rawpaletteentry) · [`RawPixelAlphaKind`](#rawpixelalphakind) · [`RawPixelFormatKind`](#rawpixelformatkind) · [`RawPixelFormatTraits`](#rawpixelformattraits) · [`RawPixelFormats`](#rawpixelformats) · [`RawTransferCharacteristic`](#rawtransfercharacteristic) · [`RepeatAttribute`](#repeatattribute) · [`RepeatEosAttribute`](#repeateosattribute) · [`RepeatUntilAttribute`](#repeatuntilattribute) · [`Resampling`](#resampling) · [`Rgba32`](#rgba32) · [`SeqFieldAttribute`](#seqfieldattribute) · [`SfdnDecompressor`](#sfdndecompressor) · [`SizedByAttribute`](#sizedbyattribute) · [`StringAttribute`](#stringattribute) · [`StringEncoding`](#stringencoding) · [`StringZAttribute`](#stringzattribute) · [`StructSizeAttribute`](#structsizeattribute) · [`SwitchOnAttribute`](#switchonattribute) · [`TextMetadataEntry`](#textmetadataentry) · [`TypeOverrideAttribute`](#typeoverrideattribute) · [`ValidAnyOfAttribute`](#validanyofattribute) · [`ValidAttribute`](#validattribute) · [`ValidRangeAttribute`](#validrangeattribute) · [`VerifiedByAttribute`](#verifiedbyattribute) · [`VgaPalette`](#vgapalette) · [`Vic20Graphics`](#vic20graphics) · [`VideoIO`](#videoio) · [`VideoMetadata`](#videometadata) · [`VideoMode`](#videomode) · [`WireType`](#wiretype) · [`Zx81Graphics`](#zx81graphics) · [`ZxSpectrumGraphics`](#zxspectrumgraphics)
+[`AdditionalImageFormatAttribute`](#additionalimageformatattribute) · [`AllowedZones`](#allowedzones) · [`AmigaColourMap`](#amigacolourmap) · [`AmigaRgbRuns`](#amigargbruns) · [`AmstradGraphics`](#amstradgraphics) · [`AnticMode`](#anticmode) · [`AppleIIGSGraphics`](#appleiigsgraphics) · [`Atari8BitGraphics`](#atari8bitgraphics) · [`AtariKoalaRle`](#atarikoalarle) · [`AtariStCaRle`](#ataristcarle) · [`AtariStGraphics`](#ataristgraphics) · [`BilevelRows`](#bilevelrows) · [`CaseAttribute`](#caseattribute) · [`ChannelScaling`](#channelscaling) · [`CharacterRoms`](#characterroms) · [`ChunkKind`](#chunkkind) · [`ChunkMobility`](#chunkmobility) · [`ChunkOptimizer`](#chunkoptimizer) · [`ChunkPlacement`](#chunkplacement) · [`ChunkPlacementDirective`](#chunkplacementdirective) · [`ChunkReference`](#chunkreference) · [`ChunkRewriteFailure`](#chunkrewritefailure) · [`ChunkRewritePlan`](#chunkrewriteplan) · [`ChunkRewriteResult`](#chunkrewriteresult) · [`ChunkRewriteRule`](#chunkrewriterule) · [`ChunkSpan`](#chunkspan) · [`ChunkZone`](#chunkzone) · [`CodecTag`](#codectag) · [`CodedPacket`](#codedpacket) · [`ColorQuantizer`](#colorquantizer) · [`ColorQuantizer.Result`](#colorquantizerresult) · [`Commodore16Graphics`](#commodore16graphics) · [`Commodore64Fli`](#commodore64fli) · [`Commodore64Graphics`](#commodore64graphics) · [`ConformanceOracle`](#conformanceoracle) · [`ConformanceOracles`](#conformanceoracles) · [`CoverArt`](#coverart) · [`DecodedFrame`](#decodedframe) · [`DisplayFilter`](#displayfilter) · [`EndianAttribute`](#endianattribute) · [`Endianness`](#endianness) · [`ExifCodec`](#exifcodec) · [`ExifData`](#exifdata) · [`ExifIfd`](#exififd) · [`ExifRational`](#exifrational) · [`ExifSRational`](#exifsrational) · [`ExifTagEntry`](#exiftagentry) · [`ExifTagType`](#exiftagtype) · [`FastRawImageConverter`](#fastrawimageconverter) · [`FieldAttribute`](#fieldattribute) · [`FieldOffsetAttribute`](#fieldoffsetattribute) · [`FillerAttribute`](#fillerattribute) · [`FixedPalette`](#fixedpalette) · [`FixedValue`](#fixedvalue) · [`FormatCapability`](#formatcapability) · [`FormatDetectionPriorityAttribute`](#formatdetectionpriorityattribute) · [`FormatIO`](#formatio) · [`FormatMagicBytesAttribute`](#formatmagicbytesattribute) · [`FormatMimeTypeAttribute`](#formatmimetypeattribute) · [`FrameBlend`](#frameblend) · [`GenerateSerializerAttribute`](#generateserializerattribute) · [`GlyphSheet`](#glyphsheet) · [`GtiaRenderer`](#gtiarenderer) · [`HeaderFieldDescriptor`](#headerfielddescriptor) · [`HeaderFieldMapper`](#headerfieldmapper) · [`HeaderSerializer`](#headerserializer) · [`IBinarySerializable<TSelf>`](#ibinaryserializabletself) · [`IFormatChunkLayout<TSelf>`](#iformatchunklayouttself) · [`IFormatChunkPlanRewriter<TSelf>`](#iformatchunkplanrewritertself) · [`IFormatChunkRewriter<TSelf>`](#iformatchunkrewritertself) · [`IImageFormatMetadata<TSelf>`](#iimageformatmetadatatself) · [`IImageFormatReader<TSelf>`](#iimageformatreadertself) · [`IImageFormatWriter<TSelf>`](#iimageformatwritertself) · [`IImageFromRawImage<TSelf, TPixel>`](#iimagefromrawimagetself-tpixel) · [`IImageFromRawImage<TSelf>`](#iimagefromrawimagetself) · [`IImageInfoReader<TSelf>`](#iimageinforeadertself) · [`IImageToRawImage<TSelf>`](#iimagetorawimagetself) · [`IMultiImageFileFormat<TSelf>`](#imultiimagefileformattself) · [`IRawPixelFormat<TSelf>`](#irawpixelformattself) · [`IVideoCodecDecoder<TSelf>`](#ivideocodecdecodertself) · [`IVideoCodecEncoder<TSelf>`](#ivideocodecencodertself) · [`IVideoContainerReader<TSelf>`](#ivideocontainerreadertself) · [`IVideoContainerWriter<TSelf>`](#ivideocontainerwritertself) · [`IVideoFormatMetadata<TSelf>`](#ivideoformatmetadatatself) · [`IVideoFrameDecoder`](#ivideoframedecoder) · [`IVideoPacketEncoder`](#ivideopacketencoder) · [`IfAttribute`](#ifattribute) · [`ImageInfo`](#imageinfo) · [`ImageMetadata`](#imagemetadata) · [`ImageResampler`](#imageresampler) · [`IndexedPalette`](#indexedpalette) · [`IntegerRange`](#integerrange) · [`IptcCodec`](#iptccodec) · [`IptcData`](#iptcdata) · [`IptcDataSet`](#iptcdataset) · [`LayoutMode`](#layoutmode) · [`Lz4Block`](#lz4block) · [`Lz4Frame`](#lz4frame) · [`MediaStreamInfo`](#mediastreaminfo) · [`MediaStreamKind`](#mediastreamkind) · [`MediaStreamMetadata`](#mediastreammetadata) · [`MonochromePage`](#monochromepage) · [`MsxGraphics`](#msxgraphics) · [`Op`](#op) · [`PackBits`](#packbits) · [`PackBytesStream`](#packbytesstream) · [`PackedRows`](#packedrows) · [`PaletteQuantizer`](#palettequantizer) · [`PaletteSidecar`](#palettesidecar) · [`PixelAspectRatio`](#pixelaspectratio) · [`PixelConverter`](#pixelconverter) · [`PixelFormat`](#pixelformat) · [`PixelRect`](#pixelrect) · [`PlanarConverter`](#planarconverter) · [`Rational`](#rational) · [`RawBytesAttribute`](#rawbytesattribute) · [`RawCfaInfo`](#rawcfainfo) · [`RawCfaPattern`](#rawcfapattern) · [`RawChromaLocation`](#rawchromalocation) · [`RawColorPrimaries`](#rawcolorprimaries) · [`RawColorRange`](#rawcolorrange) · [`RawImage`](#rawimage) · [`RawImage<TPixel>`](#rawimagetpixel) · [`RawImageColorInfo`](#rawimagecolorinfo) · [`RawImageConverter`](#rawimageconverter) · [`RawImageExactConverter`](#rawimageexactconverter) · [`RawImageExtensions`](#rawimageextensions) · [`RawImageFactory`](#rawimagefactory) · [`RawMatrixCoefficients`](#rawmatrixcoefficients) · [`RawPalette`](#rawpalette) · [`RawPaletteEntry`](#rawpaletteentry) · [`RawPixelAlphaKind`](#rawpixelalphakind) · [`RawPixelFormatKind`](#rawpixelformatkind) · [`RawPixelFormatTraits`](#rawpixelformattraits) · [`RawPixelFormats`](#rawpixelformats) · [`RawTransferCharacteristic`](#rawtransfercharacteristic) · [`RepeatAttribute`](#repeatattribute) · [`RepeatEosAttribute`](#repeateosattribute) · [`RepeatUntilAttribute`](#repeatuntilattribute) · [`Resampling`](#resampling) · [`Rgba32`](#rgba32) · [`SeqFieldAttribute`](#seqfieldattribute) · [`SfdnDecompressor`](#sfdndecompressor) · [`SizedByAttribute`](#sizedbyattribute) · [`StringAttribute`](#stringattribute) · [`StringEncoding`](#stringencoding) · [`StringZAttribute`](#stringzattribute) · [`StructSizeAttribute`](#structsizeattribute) · [`SwitchOnAttribute`](#switchonattribute) · [`TextMetadataEntry`](#textmetadataentry) · [`TypeOverrideAttribute`](#typeoverrideattribute) · [`ValidAnyOfAttribute`](#validanyofattribute) · [`ValidAttribute`](#validattribute) · [`ValidRangeAttribute`](#validrangeattribute) · [`VerifiedByAttribute`](#verifiedbyattribute) · [`VgaPalette`](#vgapalette) · [`Vic20Graphics`](#vic20graphics) · [`VideoIO`](#videoio) · [`VideoMetadata`](#videometadata) · [`VideoMode`](#videomode) · [`WireType`](#wiretype) · [`Zx81Graphics`](#zx81graphics) · [`ZxSpectrumGraphics`](#zxspectrumgraphics)
 
 #### `AdditionalImageFormatAttribute`
 
@@ -9661,37 +9661,38 @@ Describes the pixel layout and bit depth of raw image data.
 | `Rgb565` | `15` |  |
 | `Gray10` | `16` | 10-bit grayscale stored right-justified in a 16-bit little-endian container — value range 0..1023, top 6 bits zero. Distinct from `Gray16` so consumers know the source precision and don't render 10-bit data as if it were 16-bit (which would look ~64× darker). |
 | `Rgb30` | `17` | 32-bit packed RGB with 10 bits per channel + 2-bit alpha (or unused). Layout matches `DXGI_FORMAT_R10G10B10A2_UNORM` and Vulkan `VK_FORMAT_A2B10G10R10_UNORM_PACK32`: little-endian uint32 with R in bits 0..9, G in 10..19, B in 20..29, A in 30..31. Default for HDR pipelines, HEIF 10-bit, AVIF main10, ProRes 10-bit RGB. |
-| `GrayF16` | `18` | One IEEE 754 binary16 grey sample per pixel, little-endian. |
-| `GrayAlphaF16` | `19` | IEEE 754 binary16 grey + alpha, interleaved GA, little-endian. |
-| `RgbF16` | `20` | IEEE 754 binary16 RGB, interleaved RGB, little-endian. |
-| `RgbaF16` | `21` | IEEE 754 binary16 RGBA, interleaved RGBA, little-endian. |
-| `GrayF32` | `22` | One IEEE 754 binary32 grey sample per pixel, little-endian. |
-| `GrayAlphaF32` | `23` | IEEE 754 binary32 grey + alpha, interleaved GA, little-endian. |
-| `RgbF32` | `24` | IEEE 754 binary32 RGB, interleaved RGB, little-endian. |
-| `RgbaF32` | `25` | IEEE 754 binary32 RGBA, interleaved RGBA, little-endian. |
-| `Yuv420P8` | `26` | Planar 8-bit YUV 4:2:0: Y, U, V. |
-| `Yuv422P8` | `27` | Planar 8-bit YUV 4:2:2: Y, U, V. |
-| `Yuv440P8` | `28` | Planar 8-bit YUV 4:4:0: Y, U, V. |
-| `Yuv444P8` | `29` | Planar 8-bit YUV 4:4:4: Y, U, V. |
-| `Yuv420P10` | `30` | Planar 10-bit YUV 4:2:0 in right-justified little-endian ushort samples. |
-| `Yuv422P10` | `31` | Planar 10-bit YUV 4:2:2 in right-justified little-endian ushort samples. |
-| `Yuv440P10` | `32` | Planar 10-bit YUV 4:4:0 in right-justified little-endian ushort samples. |
-| `Yuv444P10` | `33` | Planar 10-bit YUV 4:4:4 in right-justified little-endian ushort samples. |
-| `Yuv420P12` | `34` | Planar 12-bit YUV 4:2:0 in right-justified little-endian ushort samples. |
-| `Yuv422P12` | `35` | Planar 12-bit YUV 4:2:2 in right-justified little-endian ushort samples. |
-| `Yuv440P12` | `36` | Planar 12-bit YUV 4:4:0 in right-justified little-endian ushort samples. |
-| `Yuv444P12` | `37` | Planar 12-bit YUV 4:4:4 in right-justified little-endian ushort samples. |
-| `Yuv420P16` | `38` | Planar 16-bit YUV 4:2:0 in little-endian ushort samples. |
-| `Yuv422P16` | `39` | Planar 16-bit YUV 4:2:2 in little-endian ushort samples. |
-| `Yuv440P16` | `40` | Planar 16-bit YUV 4:4:0 in little-endian ushort samples. |
-| `Yuv444P16` | `41` | Planar 16-bit YUV 4:4:4 in little-endian ushort samples. |
-| `Yuv411P8` | `42` | Planar 8-bit YUV 4:1:1: Y, U, V. |
-| `Yuv420P9` | `43` | Planar 9-bit YUV 4:2:0 in right-justified little-endian ushort samples. |
-| `Yuv422P9` | `44` | Planar 9-bit YUV 4:2:2 in right-justified little-endian ushort samples. |
-| `Yuv444P9` | `45` | Planar 9-bit YUV 4:4:4 in right-justified little-endian ushort samples. |
-| `Yuv420P14` | `46` | Planar 14-bit YUV 4:2:0 in right-justified little-endian ushort samples. |
-| `Yuv422P14` | `47` | Planar 14-bit YUV 4:2:2 in right-justified little-endian ushort samples. |
-| `Yuv444P14` | `48` | Planar 14-bit YUV 4:4:4 in right-justified little-endian ushort samples. |
+| `Cfa16` | `18` | One color-filter-array sensor sample per pixel, right-justified in a little-endian ushort. |
+| `GrayF16` | `19` | One IEEE 754 binary16 grey sample per pixel, little-endian. |
+| `GrayAlphaF16` | `20` | IEEE 754 binary16 grey + alpha, interleaved GA, little-endian. |
+| `RgbF16` | `21` | IEEE 754 binary16 RGB, interleaved RGB, little-endian. |
+| `RgbaF16` | `22` | IEEE 754 binary16 RGBA, interleaved RGBA, little-endian. |
+| `GrayF32` | `23` | One IEEE 754 binary32 grey sample per pixel, little-endian. |
+| `GrayAlphaF32` | `24` | IEEE 754 binary32 grey + alpha, interleaved GA, little-endian. |
+| `RgbF32` | `25` | IEEE 754 binary32 RGB, interleaved RGB, little-endian. |
+| `RgbaF32` | `26` | IEEE 754 binary32 RGBA, interleaved RGBA, little-endian. |
+| `Yuv420P8` | `27` | Planar 8-bit YUV 4:2:0: Y, U, V. |
+| `Yuv422P8` | `28` | Planar 8-bit YUV 4:2:2: Y, U, V. |
+| `Yuv440P8` | `29` | Planar 8-bit YUV 4:4:0: Y, U, V. |
+| `Yuv444P8` | `30` | Planar 8-bit YUV 4:4:4: Y, U, V. |
+| `Yuv420P10` | `31` | Planar 10-bit YUV 4:2:0 in right-justified little-endian ushort samples. |
+| `Yuv422P10` | `32` | Planar 10-bit YUV 4:2:2 in right-justified little-endian ushort samples. |
+| `Yuv440P10` | `33` | Planar 10-bit YUV 4:4:0 in right-justified little-endian ushort samples. |
+| `Yuv444P10` | `34` | Planar 10-bit YUV 4:4:4 in right-justified little-endian ushort samples. |
+| `Yuv420P12` | `35` | Planar 12-bit YUV 4:2:0 in right-justified little-endian ushort samples. |
+| `Yuv422P12` | `36` | Planar 12-bit YUV 4:2:2 in right-justified little-endian ushort samples. |
+| `Yuv440P12` | `37` | Planar 12-bit YUV 4:4:0 in right-justified little-endian ushort samples. |
+| `Yuv444P12` | `38` | Planar 12-bit YUV 4:4:4 in right-justified little-endian ushort samples. |
+| `Yuv420P16` | `39` | Planar 16-bit YUV 4:2:0 in little-endian ushort samples. |
+| `Yuv422P16` | `40` | Planar 16-bit YUV 4:2:2 in little-endian ushort samples. |
+| `Yuv440P16` | `41` | Planar 16-bit YUV 4:4:0 in little-endian ushort samples. |
+| `Yuv444P16` | `42` | Planar 16-bit YUV 4:4:4 in little-endian ushort samples. |
+| `Yuv411P8` | `43` | Planar 8-bit YUV 4:1:1: Y, U, V. |
+| `Yuv420P9` | `44` | Planar 9-bit YUV 4:2:0 in right-justified little-endian ushort samples. |
+| `Yuv422P9` | `45` | Planar 9-bit YUV 4:2:2 in right-justified little-endian ushort samples. |
+| `Yuv444P9` | `46` | Planar 9-bit YUV 4:4:4 in right-justified little-endian ushort samples. |
+| `Yuv420P14` | `47` | Planar 14-bit YUV 4:2:0 in right-justified little-endian ushort samples. |
+| `Yuv422P14` | `48` | Planar 14-bit YUV 4:2:2 in right-justified little-endian ushort samples. |
+| `Yuv444P14` | `49` | Planar 14-bit YUV 4:4:4 in right-justified little-endian ushort samples. |
 
 #### `PixelRect`
 
@@ -9755,6 +9756,29 @@ Inherits `Attribute`.
 | --- | --- | --- |
 | `RawBytesAttribute` | `RawBytesAttribute()` |  |
 
+#### `RawCfaInfo`
+
+Semantic interpretation of a `Cfa16` sensor mosaic.
+
+Implements `IEquatable<RawCfaInfo>`.
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `RawCfaInfo` | `RawCfaInfo(RawCfaPattern pattern, int bitDepth)` |  |
+| `BitDepth` | `int BitDepth { get; }` | Number of significant right-justified bits in each stored ushort sample. |
+| `Pattern` | `RawCfaPattern Pattern { get; }` | The two-by-two Bayer phase at image coordinate (0,0). |
+
+#### `RawCfaPattern`
+
+The four two-by-two Bayer color-filter-array phases.
+
+| Value | Numeric | Summary |
+| --- | --- | --- |
+| `Rggb` | `0` | Top row R,G; bottom row G,B. |
+| `Grbg` | `1` | Top row G,R; bottom row B,G. |
+| `Gbrg` | `2` | Top row G,B; bottom row R,G. |
+| `Bggr` | `3` | Top row B,G; bottom row G,R. |
+
 #### `RawChromaLocation`
 
 Where a subsampled chroma sample is located relative to the luma grid.
@@ -9805,11 +9829,13 @@ Platform-independent pixel buffer that serves as the intermediate type for cross
 | --- | --- | --- |
 | `RawImage` | `RawImage()` |  |
 | `AlphaTable` | `byte[] AlphaTable { get; init; }` | Optional per-palette-entry alpha values. Used for PNG tRNS-style transparency on indexed images. |
+| `CfaInfo` | `RawCfaInfo? CfaInfo { get; init; }` | Bayer phase and effective sample precision when `Format` is `Cfa16`. CFA storage deliberately keeps this semantic information out of the pixel-format enum because all four Bayer phases are byte-identical. |
 | `ColorInfo` | `RawImageColorInfo ColorInfo { get; init; }` | Optional interpretation of component values as colour: range, primaries, transfer, matrix and chroma location. Particularly important for planar YUV and HDR formats, where layout alone is insufficient to reconstruct the intended colours. |
 | `Format` | `PixelFormat Format { get; init; }` | The pixel format describing how bytes in `PixelData` are laid out. |
 | `HasAlpha` | `bool HasAlpha { get; }` | Whether this image has an alpha channel (format-based check with alpha table scan for indexed formats). |
 | `HasEnoughPixelData` | `bool HasEnoughPixelData { get; }` | Whether the picture carries enough samples to fill the size it states. |
 | `Height` | `int Height { get; init; }` | The height of the image in pixels. |
+| `IsColorFilterArray` | `bool IsColorFilterArray { get; }` | Whether this image is a single-sample-per-site color-filter-array sensor mosaic. |
 | `IsFloatingPoint` | `bool IsFloatingPoint { get; }` | Whether this image stores IEEE 754 floating-point component samples. |
 | `IsIndexed` | `bool IsIndexed { get; }` | Whether this image uses an indexed pixel format. |
 | `IsPlanarYuv` | `bool IsPlanarYuv { get; }` | Whether this image stores Y, U/Cb and V/Cr as three tightly packed planes. |
@@ -9821,11 +9847,12 @@ Platform-independent pixel buffer that serves as the intermediate type for cross
 | `PlaneCount` | `int PlaneCount { get; }` | Number of physical sample planes in `PixelData`. |
 | `Width` | `int Width { get; init; }` | The width of the image in pixels. |
 | `BitsPerPixel` | `static int BitsPerPixel(PixelFormat format)` | Computes the stored number of bits per pixel for fixed-rate formats. |
-| `BytesPerPixel` | `static int BytesPerPixel(PixelFormat format)` | Computes the number of bytes per pixel for packed formats, or 0 for non-packed formats. |
+| `BytesPerPixel` | `static int BytesPerPixel(PixelFormat format)` | Computes the number of bytes per pixel for whole-byte single-plane formats, or 0 for non-packed formats. |
 | `GetPlaneData` | `ReadOnlySpan<byte> GetPlaneData(int plane)` | Returns a read-only view over one physical plane. |
-| `GetPlaneDimensions` | `ValueTuple<int, int> GetPlaneDimensions(int plane)` | Returns one plane's dimensions. Packed formats have one plane equal to the image size; planar YUV has a full-resolution Y plane followed by chroma planes rounded up at the subsampling edge. |
+| `GetPlaneDimensions` | `ValueTuple<int, int> GetPlaneDimensions(int plane)` | Returns one plane's dimensions. Packed/CFA formats have one plane equal to the image size; planar YUV has a full-resolution Y plane followed by chroma planes rounded up at the subsampling edge. |
 | `GetPlaneLength` | `int GetPlaneLength(int plane)` | Returns the number of bytes occupied by a physical plane. |
 | `GetPlaneOffset` | `int GetPlaneOffset(int plane)` | Returns the byte offset at which a physical plane begins. |
+| `IsColorFilterArrayFormat` | `static bool IsColorFilterArrayFormat(PixelFormat format)` | Whether a format is a raw color-filter-array mosaic. |
 | `IsFloatingPointFormat` | `static bool IsFloatingPointFormat(PixelFormat format)` | Whether a format stores IEEE 754 component samples. |
 | `IsPlanarYuvFormat` | `static bool IsPlanarYuvFormat(PixelFormat format)` | Whether a format is one of the canonical Y/U/V planar layouts. |
 | `ToBgra32` | `byte[] ToBgra32()` | Converts this image to BGRA32 pixel data through the accelerated shared conversion pipeline. |
@@ -9840,13 +9867,15 @@ Compile-time typed view of a `RawImage`. The type parameter declares the semanti
 
 | Member | Signature | Summary |
 | --- | --- | --- |
-| `RawImage` | `RawImage(int width, int height, byte[] pixelData, RawImageColorInfo colorInfo = null, byte[] palette = null, int paletteCount = 0, byte[] alphaTable = null, ImageMetadata metadata = null)` | Creates a typed raw image using the compatibility storage declared by `TPixel`. |
+| `RawImage` | `RawImage(int width, int height, byte[] pixelData, RawImageColorInfo colorInfo = null, byte[] palette = null, int paletteCount = 0, byte[] alphaTable = null, ImageMetadata metadata = null, RawCfaInfo? cfaInfo = null)` | Creates a typed raw image using the compatibility storage declared by `TPixel`. |
 | `AlphaTable` | `byte[] AlphaTable { get; }` |  |
+| `CfaInfo` | `RawCfaInfo? CfaInfo { get; }` |  |
 | `ColorInfo` | `RawImageColorInfo ColorInfo { get; }` |  |
 | `Format` | `PixelFormat Format { get; }` | Compatibility runtime format used by the current non-generic pipeline. |
 | `HasAlpha` | `bool HasAlpha { get; }` |  |
 | `HasEnoughPixelData` | `bool HasEnoughPixelData { get; }` |  |
 | `Height` | `int Height { get; }` |  |
+| `IsColorFilterArray` | `bool IsColorFilterArray { get; }` |  |
 | `IsFloatingPoint` | `bool IsFloatingPoint { get; }` |  |
 | `IsIndexed` | `bool IsIndexed { get; }` |  |
 | `IsPlanarYuv` | `bool IsPlanarYuv { get; }` |  |
@@ -9994,6 +10023,7 @@ Broad storage/interpretation family of a typed raw pixel representation.
 | `Indexed` | `1` |  |
 | `FloatingPoint` | `2` |  |
 | `PlanarYuv` | `3` |  |
+| `ColorFilterArray` | `4` |  |
 
 #### `RawPixelFormatTraits`
 
@@ -10009,8 +10039,9 @@ Implements `IEquatable<RawPixelFormatTraits>`.
 | `CanRepresentAlpha` | `bool CanRepresentAlpha { get; }` |  |
 | `ChromaSubsampleX` | `int ChromaSubsampleX { get; init; }` | Horizontal chroma subsampling factor for planar YUV. |
 | `ChromaSubsampleY` | `int ChromaSubsampleY { get; init; }` | Vertical chroma subsampling factor for planar YUV. |
-| `ComponentBitDepth` | `int ComponentBitDepth { get; init; }` | Nominal component precision where one value describes every component; zero for mixed layouts. |
+| `ComponentBitDepth` | `int ComponentBitDepth { get; init; }` | Nominal component precision where one value describes every component; zero for mixed or image-described layouts. |
 | `IndexBitDepth` | `int IndexBitDepth { get; init; }` | Logical index width for indexed formats, otherwise zero. |
+| `IsColorFilterArray` | `bool IsColorFilterArray { get; }` |  |
 | `IsFloatingPoint` | `bool IsFloatingPoint { get; }` |  |
 | `IsIndexed` | `bool IsIndexed { get; }` |  |
 | `IsPlanarYuv` | `bool IsPlanarYuv { get; }` |  |
@@ -10028,7 +10059,7 @@ Central compatibility map between the legacy runtime enum and typed raw-pixel tr
 | --- | --- | --- |
 | `Get` | `static RawPixelFormatTraits Get(PixelFormat format)` |  |
 | `Indexed` | `static RawPixelFormatTraits Indexed(int bitDepth)` | Describes a logical indexed representation from one through sixteen bits without extending the legacy enum. Widths that have no legacy packed form use the next lossless whole-byte storage type: 2/3/5/6/7-bit indices use `Indexed8`, and 9-15-bit indices use `Indexed16`. |
-| `ValidateDeclaredRepresentation` | `static void ValidateDeclaredRepresentation(RawImage image, RawPixelFormatTraits traits)` | Checks value-level invariants that are stricter than the compatibility storage type. This is currently needed by logical indexed widths such as Indexed6 that are stored as legacy Indexed8. |
+| `ValidateDeclaredRepresentation` | `static void ValidateDeclaredRepresentation(RawImage image, RawPixelFormatTraits traits)` | Checks value-level invariants that are stricter than the compatibility storage type: logical indexed widths and CFA images whose phase/precision live on the image rather than in the enum. |
 
 #### `RawTransferCharacteristic`
 
@@ -10561,7 +10592,7 @@ Decodes PVRTC (PowerVR Texture Compression) 2bpp and 4bpp blocks to RGBA32 pixel
 
 ### Namespace `FileFormat.Core.PixelFormats`
 
-[`Argb32`](#argb32) · [`Bgr24`](#bgr24) · [`Bgra32`](#bgra32) · [`Gray10`](#gray10) · [`Gray16`](#gray16) · [`Gray8`](#gray8) · [`GrayAlpha16`](#grayalpha16) · [`GrayAlpha32`](#grayalpha32) · [`GrayAlphaF16`](#grayalphaf16) · [`GrayAlphaF32`](#grayalphaf32) · [`GrayF16`](#grayf16) · [`GrayF32`](#grayf32) · [`Indexed1`](#indexed1) · [`Indexed10`](#indexed10) · [`Indexed11`](#indexed11) · [`Indexed12`](#indexed12) · [`Indexed13`](#indexed13) · [`Indexed14`](#indexed14) · [`Indexed15`](#indexed15) · [`Indexed16`](#indexed16) · [`Indexed2`](#indexed2) · [`Indexed3`](#indexed3) · [`Indexed4`](#indexed4) · [`Indexed5`](#indexed5) · [`Indexed6`](#indexed6) · [`Indexed7`](#indexed7) · [`Indexed8`](#indexed8) · [`Indexed9`](#indexed9) · [`Rgb24`](#rgb24) · [`Rgb30`](#rgb30) · [`Rgb48`](#rgb48) · [`Rgb565`](#rgb565) · [`RgbF16`](#rgbf16) · [`RgbF32`](#rgbf32) · [`Rgba32`](#rgba32) · [`Rgba64`](#rgba64) · [`RgbaF16`](#rgbaf16) · [`RgbaF32`](#rgbaf32) · [`Yuv411P8`](#yuv411p8) · [`Yuv420P10`](#yuv420p10) · [`Yuv420P12`](#yuv420p12) · [`Yuv420P14`](#yuv420p14) · [`Yuv420P16`](#yuv420p16) · [`Yuv420P8`](#yuv420p8) · [`Yuv420P9`](#yuv420p9) · [`Yuv422P10`](#yuv422p10) · [`Yuv422P12`](#yuv422p12) · [`Yuv422P14`](#yuv422p14) · [`Yuv422P16`](#yuv422p16) · [`Yuv422P8`](#yuv422p8) · [`Yuv422P9`](#yuv422p9) · [`Yuv440P10`](#yuv440p10) · [`Yuv440P12`](#yuv440p12) · [`Yuv440P16`](#yuv440p16) · [`Yuv440P8`](#yuv440p8) · [`Yuv444P10`](#yuv444p10) · [`Yuv444P12`](#yuv444p12) · [`Yuv444P14`](#yuv444p14) · [`Yuv444P16`](#yuv444p16) · [`Yuv444P8`](#yuv444p8) · [`Yuv444P9`](#yuv444p9)
+[`Argb32`](#argb32) · [`Bgr24`](#bgr24) · [`Bgra32`](#bgra32) · [`Cfa16`](#cfa16) · [`Gray10`](#gray10) · [`Gray16`](#gray16) · [`Gray8`](#gray8) · [`GrayAlpha16`](#grayalpha16) · [`GrayAlpha32`](#grayalpha32) · [`GrayAlphaF16`](#grayalphaf16) · [`GrayAlphaF32`](#grayalphaf32) · [`GrayF16`](#grayf16) · [`GrayF32`](#grayf32) · [`Indexed1`](#indexed1) · [`Indexed10`](#indexed10) · [`Indexed11`](#indexed11) · [`Indexed12`](#indexed12) · [`Indexed13`](#indexed13) · [`Indexed14`](#indexed14) · [`Indexed15`](#indexed15) · [`Indexed16`](#indexed16) · [`Indexed2`](#indexed2) · [`Indexed3`](#indexed3) · [`Indexed4`](#indexed4) · [`Indexed5`](#indexed5) · [`Indexed6`](#indexed6) · [`Indexed7`](#indexed7) · [`Indexed8`](#indexed8) · [`Indexed9`](#indexed9) · [`Rgb24`](#rgb24) · [`Rgb30`](#rgb30) · [`Rgb48`](#rgb48) · [`Rgb565`](#rgb565) · [`RgbF16`](#rgbf16) · [`RgbF32`](#rgbf32) · [`Rgba32`](#rgba32) · [`Rgba64`](#rgba64) · [`RgbaF16`](#rgbaf16) · [`RgbaF32`](#rgbaf32) · [`Yuv411P8`](#yuv411p8) · [`Yuv420P10`](#yuv420p10) · [`Yuv420P12`](#yuv420p12) · [`Yuv420P14`](#yuv420p14) · [`Yuv420P16`](#yuv420p16) · [`Yuv420P8`](#yuv420p8) · [`Yuv420P9`](#yuv420p9) · [`Yuv422P10`](#yuv422p10) · [`Yuv422P12`](#yuv422p12) · [`Yuv422P14`](#yuv422p14) · [`Yuv422P16`](#yuv422p16) · [`Yuv422P8`](#yuv422p8) · [`Yuv422P9`](#yuv422p9) · [`Yuv440P10`](#yuv440p10) · [`Yuv440P12`](#yuv440p12) · [`Yuv440P16`](#yuv440p16) · [`Yuv440P8`](#yuv440p8) · [`Yuv444P10`](#yuv444p10) · [`Yuv444P12`](#yuv444p12) · [`Yuv444P14`](#yuv444p14) · [`Yuv444P16`](#yuv444p16) · [`Yuv444P8`](#yuv444p8) · [`Yuv444P9`](#yuv444p9)
 
 #### `Argb32`
 
@@ -10582,6 +10613,14 @@ Implements `IRawPixelFormat<Bgr24>`.
 #### `Bgra32`
 
 Implements `IRawPixelFormat<Bgra32>`.
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `Traits` | `static RawPixelFormatTraits Traits { get; }` |  |
+
+#### `Cfa16`
+
+Implements `IRawPixelFormat<Cfa16>`.
 
 | Member | Signature | Summary |
 | --- | --- | --- |
