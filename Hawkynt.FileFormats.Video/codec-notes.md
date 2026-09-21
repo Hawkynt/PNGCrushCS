@@ -2152,10 +2152,19 @@ is refused, so it refuses — naming `slice_type` and Table 7-7, and saying that
 exact. The code stays in the tree, unreachable, with the reason recorded against it, because the
 distance left to run is small and throwing it away would mean finding it again.
 
-Also refused by name: tiles, dependent slice segments, coding units coded as raw samples, 4:2:2,
-4:4:4, monochrome, more than eight bits a sample, separate colour planes, and the range, screen
-content, multilayer and three-dimensional extensions. There is no `catch` anywhere that returns a
-blank, a copied or a partial frame.
+Also refused by name: tiles, dependent slice segments, 4:2:2, 4:4:4, monochrome, more than eight bits
+a sample, separate colour planes, and the range, screen content, multilayer and three-dimensional
+extensions. There is no `catch` anywhere that returns a blank, a copied or a partial frame.
+
+Coding units coded as raw samples used to be refused there too and are now read. A `pcm_flag` means
+leaving the arithmetic decoder where it stands, taking the luma and chroma samples as raw bits at the
+sequence's own PCM depths, shifting them up to the reconstructed depth, and restarting the arithmetic
+decoder at the byte after them — **keeping the probability contexts it had adapted**, because
+`pcm_sample()` restarts the registers and nothing else. Reinitialising them is the mistake that a
+round trip cannot see: this package's own decoder would be the only decoder reading the stream that
+way, and the `split_cu_flag` in front of the next coding unit is context coded, so every other decoder
+would diverge immediately. The check is therefore ffmpeg's decode of the same slice, required to be
+identical to this decoder's.
 
 **Encoding writes a group of twelve: one IDR picture, then eleven predicted ones.** The IDR is made
 of PCM coding units, which store their samples exactly and need no transform, quantiser or residual
@@ -2185,9 +2194,39 @@ decoder will have rather than from the source. Deblocking and sample-adaptive of
 in the parameter sets, which costs a little quality at block edges and means the encoder does not
 have to run the filters to stay in step.
 
-What the writer does not do: bidirectional pictures, fractional-sample motion, more than one
-reference picture, more than one prediction unit per coding unit, and any rate-distortion search over
-coding unit sizes. Each of those costs compression; none of them costs conformance.
+**Reference index, prediction unit shape and coding unit size are now chosen rather than fixed.**
+Motion is searched to quarter-sample precision against every active reference, by running the
+decoder's own interpolation and measuring what it leaves behind, so the search cannot disagree with
+the decoder about filter rounding or edge extension. Square, horizontal-half and vertical-half
+prediction units compete, as do 32x32 and 16x16 coding units, on distortion plus a quantiser-derived
+estimate of what the syntax costs. It is a bounded search rather than HM's exhaustive one: the rate
+term estimates bins instead of trial-encoding each candidate through a cloned CABAC state.
+
+Half prediction units are only offered where the sequence allows the root transform to stay unsplit.
+Clause 7.4.9.8 infers a transform split for an inter coding unit whose partition is not 2Nx2N when
+`max_transform_hierarchy_depth_inter` is zero, and this writer emits one transform leaf per coding
+unit, so the video sequence parameter set advertises one level of inter transform hierarchy and the
+still-picture one does not offer the shapes it could not write.
+
+**The vertical split is where the shared derivation turned out to be wrong.** Clause 6.4.2 asks first
+whether a neighbour lies inside the coding block being decoded: one that does is available outright,
+and only one that does not is put to the z-scan availability of clause 6.4.1. This package ran
+everything through the z-scan. Prediction blocks are decoded in partition order, which is not the
+z-scan order of the minimum blocks they cover, and for the right-hand block of an `Nx2N` split the two
+disagree — the z-scan places the left neighbour, the bottom of the block decoded immediately before,
+*after* the current block and calls it unavailable. So the A1 candidate vanished from motion vector
+prediction, the written difference was a difference from a predictor no conforming decoder derives,
+and the block came back from somewhere else entirely. A `2NxN` split orders the same way as the
+z-scan and was unaffected, which is why horizontal halves were exact and vertical ones were not.
+
+It was invisible until the encoder emitted the shape: nothing in the decoder's corpus needed the rule,
+and once the encoder did, encoder and decoder read the same wrong derivation and agreed with each other
+perfectly. ffmpeg did not, and drift accumulated down each group of pictures — a mean absolute error
+per frame climbing from nothing to twenty-five while every round trip in this package stayed green.
+
+What the writer still does not do: asymmetric motion partitions, quartered prediction units, and
+trial-encoding candidates through a cloned CABAC state. Each costs compression; none costs
+conformance.
 
 What the writer does produce is ordinary Main profile, not Main Still Picture — the still profile
 permits one picture and a video track is not one picture — with VPS, SPS and PPS carried in an
@@ -2209,6 +2248,17 @@ twenty-four-picture clip crossing two group boundaries goes to **ffmpeg** as a r
 every frame is compared in display order. The two checks answer different questions: ours says the
 two halves of this package agree, ffmpeg's says they are both right -- which is what caught the
 Table 9-30 transcription above. Displacing one written vector by a single sample fails either.
+
+Twice now the round trip has been the check that passed while the stream was wrong, so the outward
+one was made exact rather than approximate. Each shape the writer can emit -- a horizontal half, a
+vertical half, a split coding unit, a second reference index, a bidirectional picture whose two halves
+predict from different lists -- is coded on its own, handed to ffmpeg, and **required to come back
+identical to the encoder's own reconstruction, sample for sample in all three planes**. Decoding HEVC
+is normative, so the encoder's reconstruction is a prediction about what every decoder will do, and
+ffmpeg either confirms it exactly or the stream does not conform. A tolerance would measure quality;
+the question here is agreement. Reinstating the clause 6.4.2 mistake fails three of those cases and
+the twenty-four-picture clip; writing every reference index as zero fails the multi-reference one;
+wiping the CABAC contexts at a PCM restart fails the PCM one.
 
 ### CamStudio Screen Codec
 

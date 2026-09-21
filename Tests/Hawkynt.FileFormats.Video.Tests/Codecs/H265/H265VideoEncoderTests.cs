@@ -88,7 +88,11 @@ public sealed class H265VideoEncoderTests {
         for (var offset = 0; offset < frameBytes; ++offset)
           total += Math.Abs(sources[index].PixelData[offset] - decoded[index * frameBytes + offset]);
 
-        Assert.That(total / (double)frameBytes, Is.LessThan(12d),
+        // Five, against the 2.7 this clip actually reaches. The margin is there for the encoder's
+        // rate-distortion decisions to move within, not for drift: a picture reconstructed from a
+        // reference ffmpeg disagrees about runs to twelve and upwards within a group, and the whole
+        // point of comparing every picture rather than the first is to see that happen.
+        Assert.That(total / (double)frameBytes, Is.LessThan(5d),
           $"ffmpeg's picture {index} is not the frame that was encoded");
       }
     } finally {
