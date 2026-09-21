@@ -83,8 +83,18 @@ public sealed class HapChunkAndSearchTests {
 
     var decoder = HapDecoder.Create(encoder.DescribeStream());
     Assert.That(decoder.TryDecode(packet, out var decoded), Is.True);
+
+    // Hap Q Alpha carries alpha as BC4, which fits one eight-entry ramp between a block's lowest and
+    // highest sample. Alpha here is x*9 + y*5, so every 4x4 block spans 3*9 + 3*5 = 42 and the ramp
+    // steps by six; nothing in the block can land further than three from its source value. That is
+    // also the best any endpoint pair achieves for this block, so three is the format's floor and not
+    // a slack tolerance. What the assertion still catches is alpha being dropped, zeroed, replaced by
+    // the colour image's, or quantised against the wrong block.
     for (var pixel = 0; pixel < width * height; ++pixel)
-      Assert.That(decoded.PixelData[pixel * 4 + 3], Is.EqualTo(pixels[pixel * 4 + 3]), $"alpha at pixel {pixel}");
+      Assert.That(
+        decoded.PixelData[pixel * 4 + 3],
+        Is.EqualTo(pixels[pixel * 4 + 3]).Within(3),
+        $"alpha at pixel {pixel}");
   }
 
   [Test]
@@ -119,16 +129,21 @@ public sealed class HapChunkAndSearchTests {
   [Test]
   [Category("Unit")]
   public void HapHdrUsesTwoSubsetModeWhenItReducesBlockError() {
+    // BC6H mode 0 stores subsets one to three as five-bit deltas from the ten-bit base endpoint, so
+    // the four endpoints must sit within about thirty quantisation steps of each other. A block whose
+    // two halves are far apart therefore cannot be expressed in mode 0 at all, and the one-subset
+    // direct mode — ten-bit endpoints and sixteen index levels — wins on error every time. Where the
+    // two subsets are close but each carries its own ramp, one shared sixteen-level ramp has to span
+    // both and mode 0's two eight-level ramps resolve each half more finely. That is the case the
+    // partition search exists for, so that is the case this fixture builds.
     Span<ushort> rgb = stackalloc ushort[48];
     for (var y = 0; y < 4; ++y)
       for (var x = 0; x < 4; ++x) {
         var at = (y * 4 + x) * 3;
-        var values = x < 2
-          ? ((Half)(0.25f + y * 0.35f), (Half)(0.5f + y * 0.2f), (Half)(0.75f + y * 0.15f))
-          : ((Half)(6.0f - y * 0.6f), (Half)(1.0f + y * 0.8f), (Half)(4.0f - y * 0.5f));
-        rgb[at] = BitConverter.HalfToUInt16Bits(values.Item1);
-        rgb[at + 1] = BitConverter.HalfToUInt16Bits(values.Item2);
-        rgb[at + 2] = BitConverter.HalfToUInt16Bits(values.Item3);
+        var value = 1.0f + (x < 2 ? 0.0f : 0.002f) + y * 0.005f;
+        rgb[at] = BitConverter.HalfToUInt16Bits((Half)value);
+        rgb[at + 1] = BitConverter.HalfToUInt16Bits((Half)(value * 0.9f));
+        rgb[at + 2] = BitConverter.HalfToUInt16Bits((Half)(value * 1.1f));
       }
 
     Span<byte> encoded = stackalloc byte[16];
