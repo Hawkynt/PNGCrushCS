@@ -88,6 +88,64 @@ public sealed class ProResVideoDecoderOracleTests {
   }
 
   /// <summary>
+  /// A 4444 frame stamped bitstream version 0 reads identically to the same frame stamped version 1.
+  /// </summary>
+  /// <remarks>
+  /// RDD 36:2022, 6.4 fixes <c>chroma_format</c> at 2 and <c>alpha_channel_type</c> at 0 for version
+  /// 0, and this package used to refuse a version 0 frame that said otherwise. Every ProRes 4444
+  /// frame ffmpeg wrote before it began stamping version 1 says otherwise — ffmpeg 6.1, which a
+  /// current Ubuntu ships and which the CI oracle leg installs, among them — so the refusal made this
+  /// package unable to read the reference encoder's own output. The read-direction oracle above finds
+  /// it wherever the ffmpeg to hand is old enough.
+  /// <para/>
+  /// Which is the problem this test exists for: on a machine with a current ffmpeg there is nothing
+  /// to find, and a regression would go unnoticed until CI. So the older encoder's output is
+  /// reconstructed exactly — one byte of a real ffmpeg frame, the <c>bitstream_version</c> at offset
+  /// 3 of the frame header, set back to 0 — and the decode has to be unchanged by it. Version 1 added
+  /// no field to the header and moved none, so "unchanged" is the whole claim.
+  /// </remarks>
+  [TestCase(4, 16)]
+  [TestCase(5, 8)]
+  [Category("Oracle")]
+  public void AFourFourFourFrameStampedTheOlderBitstreamVersionReadsTheSame(int profile, int alphaBits) {
+    FFmpegOracle.RequireAvailable();
+
+    var movie = ProResFFmpegFixtures.Write(profile, width: 64, height: 48, alphaBits: alphaBits);
+    try {
+      var container = Mp4Reader.FromBytes(File.ReadAllBytes(movie));
+      var stream = VideoIO.FirstVideoStream(container)!;
+      var frame = Mp4Container.ReadPackets(container, stream.Index).First().Data.ToArray();
+
+      // frame_size and frame_identifier are eight bytes; bitstream_version is byte 3 of the header.
+      const int VERSION_AT = 8 + 3;
+      Assert.That(frame[VERSION_AT], Is.EqualTo(1),
+        "this ffmpeg stamps version 1 for 4444; the older stamping is what is being reconstructed");
+
+      var decoder = ProResVideoDecoder.Create(stream);
+      var asWritten = decoder.DecodePlanes(frame, out var written);
+
+      var older = (byte[])frame.Clone();
+      older[VERSION_AT] = 0;
+      var asOlder = decoder.DecodePlanes(older, out var deviating);
+
+      Assert.Multiple(() => {
+        Assert.That(written.DeviatesFromItsStatedVersion, Is.False);
+        Assert.That(deviating.DeviatesFromItsStatedVersion, Is.True,
+          "a version 0 frame stating 4:4:4 is read, and recorded as not written the way 6.4 says");
+        Assert.That(deviating.ChromaFormat, Is.EqualTo(3));
+        Assert.That(deviating.AlphaChannelType, Is.EqualTo(written.AlphaChannelType));
+        Assert.That(asOlder.BitDepth, Is.EqualTo(asWritten.BitDepth));
+        Assert.That(asOlder.Luma, Is.EqualTo(asWritten.Luma).AsCollection);
+        Assert.That(asOlder.Cb, Is.EqualTo(asWritten.Cb).AsCollection);
+        Assert.That(asOlder.Cr, Is.EqualTo(asWritten.Cr).AsCollection);
+        Assert.That(asOlder.Alpha, Is.EqualTo(asWritten.Alpha).AsCollection);
+      });
+    } finally {
+      ProResFFmpegFixtures.Discard(movie);
+    }
+  }
+
+  /// <summary>
   /// Reads one FFmpeg-written frame with this package and with FFmpeg, and requires the two to agree.
   /// </summary>
   private static ProResFrameHeader _AssertReadsBackWhatFFmpegSees(

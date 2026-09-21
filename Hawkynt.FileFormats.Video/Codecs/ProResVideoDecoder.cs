@@ -49,10 +49,18 @@ namespace FileFormat.Codecs;
 /// <para/>
 /// <b>What refuses.</b> A bitstream version later than 1, whose decoding process this specification
 /// does not describe; a reserved <c>chroma_format</c>, <c>interlace_mode</c> or
-/// <c>alpha_channel_type</c>; a <c>quantization_index</c> outside the permitted 1 to 224; a version 0
-/// frame stating syntax its own version does not have; a packet that is not a compressed frame; any
-/// structure whose stated size does not fit inside the one containing it; and non-zero bytes in the
-/// frame stuffing that RDD 36 requires to be zero.
+/// <c>alpha_channel_type</c>; a <c>quantization_index</c> outside the permitted 1 to 224; a packet
+/// that is not a compressed frame; any structure whose stated size does not fit inside the one
+/// containing it; and non-zero bytes in the frame stuffing that RDD 36 requires to be zero.
+/// <para/>
+/// <b>What is read although 6.4 says it should not exist.</b> A bitstream version 0 frame stating
+/// 4:4:4 or an alpha channel, which 6.4 fixes at 4:2:2 and no alpha for that version. Every ProRes
+/// 4444 frame ffmpeg wrote before it began stamping version 1 is one of these — ffmpeg 6.1, which a
+/// current Ubuntu ships, among them — and ffmpeg's own decoder reads them back, so refusing them
+/// means being unable to read the reference encoder's output. Version 1 added no field to the header
+/// and moved none, so nothing is guessed: <see cref="ProResFrameHeader.DeviatesFromItsStatedVersion"/>
+/// records that the frame was not written by the letter of 6.4, and the frame is read as the version
+/// that does carry the syntax. The writer here keeps to 6.4 either way.
 /// </remarks>
 public sealed class ProResVideoDecoder : IVideoCodecDecoder<ProResVideoDecoder> {
 

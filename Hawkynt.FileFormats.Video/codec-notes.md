@@ -1591,9 +1591,16 @@ folding the two together, moves up to three levels of RGB on a fifth to a third 
 
 What refuses: a bitstream version later than the two RDD 36 describes; a reserved `chroma_format`,
 `interlace_mode` or `alpha_channel_type`; a `quantization_index` outside the permitted 1 to 224; a
-version 0 frame stating syntax its own version does not have; a packet that is not a compressed
-frame; any structure whose stated size does not fit inside the one containing it; and non-zero frame
-stuffing where RDD 36 permits only zero bytes.
+packet that is not a compressed frame; any structure whose stated size does not fit inside the one
+containing it; and non-zero frame stuffing where RDD 36 permits only zero bytes.
+
+What is read although 6.4 says it should not exist: a bitstream version 0 frame stating 4:4:4 or an
+alpha channel. 6.4 fixes both at version 0's values, and this was refused until the read-direction
+oracle was pointed at ffmpeg 6.1 and found that every ProRes 4444 frame ffmpeg wrote before it began
+stamping version 1 is exactly that — and that ffmpeg's own decoder reads them. Version 1 added no
+field to the header and moved none, so the frame is read as the version that does carry the syntax
+and `ProResFrameHeader.DeviatesFromItsStatedVersion` records that it was not written by the letter of
+the clause. The writer here still stamps version 1 whenever it writes 4:4:4 or alpha.
 
 **Writing covers all six profiles and both picture structures the format has.** `apco`, `apcs`,
 `apcn` and `apch` are ten-bit 4:2:2; `ap4h` and `ap4x` are twelve-bit 4:4:4. The 4:2:2/no-alpha

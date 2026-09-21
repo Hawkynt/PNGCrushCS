@@ -316,15 +316,45 @@ public class ProResVideoDecoderTests {
     Assert.That(failure!.Message, Does.Contain("interlace_mode 3"));
   }
 
+  /// <summary>
+  /// A version 0 frame stating 4:4:4 is read, and flagged rather than refused.
+  /// </summary>
+  /// <remarks>
+  /// RDD 36:2022, 6.4 fixes chroma_format at 2 and alpha_channel_type at 0 for version 0, and this
+  /// used to be refused as a frame describing itself with syntax its own version lacks. The files
+  /// that do it are real: every ProRes 4444 frame ffmpeg wrote before it began stamping version 1
+  /// states version 0 with chroma_format 3, ffmpeg 6.1 among them, and ffmpeg's own decoder reads
+  /// them back. Refusing them made this package unable to read the reference encoder's output, which
+  /// the read-direction oracle caught the moment it was pointed at an older ffmpeg.
+  /// <para/>
+  /// Accepting them guesses nothing: version 1 added no field to the header and moved none, so the
+  /// two values are read from where they always sat. Writing still keeps to the letter of 6.4 — see
+  /// <c>ProResVideoEncoderTests</c>, which requires version 1 whenever 4:4:4 or alpha is written.
+  /// </remarks>
   [Test]
   [Category("Unit")]
-  public void AVersionZeroFrameThatStatesFourFourFourIsRefused() {
-    // RDD 36:2022, 6.4 fixes chroma_format at 2 and alpha_channel_type at 0 for version 0, so a
-    // version 0 frame saying otherwise is describing itself with syntax its own version lacks.
+  public void AVersionZeroFrameThatStatesFourFourFourIsReadAndFlagged() {
     var options = new ProResTestStream.Options { Version = 0, ChromaFormat = 3 };
-    var failure = Assert.Throws<InvalidDataException>(() => _Decode(options, _DcOnlyLuma(_FIRST_DC_ZERO), _ChromaAtZero(), _ChromaAtZero()));
+    var planes = _Decode(options, [_DescendingDcs(4), _DescendingDcs(4), _DescendingDcs(4)], out var header);
 
-    Assert.That(failure!.Message, Does.Contain("version 0"));
+    Assert.Multiple(() => {
+      Assert.That(header.BitstreamVersion, Is.Zero);
+      Assert.That(header.ChromaFormat, Is.EqualTo(3));
+      Assert.That(header.DeviatesFromItsStatedVersion, Is.True,
+        "the frame is read, but it is not written the way 6.4 says and that is worth knowing");
+      Assert.That(planes.ChromaWidth, Is.EqualTo(planes.Width), "chroma_format 3 is 4:4:4 whatever the version says");
+      Assert.That(planes.BitDepth, Is.EqualTo(12), "4:4:4 is reconstructed at twelve bits whatever the version says");
+    });
+  }
+
+  /// <summary>A version 1 frame that stays inside version 0's syntax is not flagged.</summary>
+  [Test]
+  [Category("Unit")]
+  public void AFrameWrittenTheWayItsVersionSaysIsNotFlagged() {
+    var options = new ProResTestStream.Options { Version = 0, ChromaFormat = 2 };
+    _Decode(options, [_DcOnlyLuma(_FIRST_DC_ZERO), _ChromaAtZero(), _ChromaAtZero()], out var header);
+
+    Assert.That(header.DeviatesFromItsStatedVersion, Is.False);
   }
 
   [Test]
@@ -461,11 +491,16 @@ public class ProResVideoDecoderTests {
   // Helpers
   // ============================================================================================
 
-  private static ProResPlanes _Decode(ProResTestStream.Options options, params byte[][] components) {
+  private static ProResPlanes _Decode(ProResTestStream.Options options, params byte[][] components)
+    => _Decode(options, components, out _);
+
+  /// <summary>The same decode, handing back the frame header for the tests that assert on it.</summary>
+  private static ProResPlanes _Decode(
+    ProResTestStream.Options options, byte[][] components, out ProResFrameHeader header) {
     var frame = ProResTestStream.Frame(options, components);
     var decoder = ProResVideoDecoder.Create(ProResTestStream.Stream(options.Width, options.Height));
 
-    return decoder.DecodePlanes(frame, out _);
+    return decoder.DecodePlanes(frame, out header);
   }
 
   /// <summary>Four luma blocks whose DCs are all the value the first codeword names.</summary>
