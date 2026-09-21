@@ -27,6 +27,42 @@ internal static class IcoDib {
   /// <summary>The BITMAPINFOHEADER that opens the entry.</summary>
   private const int _InfoHeaderSize = 40;
 
+  /// <summary>
+  /// The BITMAPCOREHEADER, the oldest of the two shapes, which states its sizes in sixteen bits.
+  /// </summary>
+  /// <remarks>
+  /// The two headers share only their first field, the length that tells them apart. After it the
+  /// older one has a sixteen-bit width and height and then the plane and bit counts, all within
+  /// twelve bytes; the newer one spends thirty-two bits on each side, which puts its depth at a
+  /// different place and everything after it four bytes further on. Reading the older shape at the
+  /// newer offsets does not fail — it yields the two sides packed into one number and reads the
+  /// depth out of the palette — so which one it is has to be asked before any field is taken.
+  /// </remarks>
+  public const int CoreHeaderSize = 12;
+
+  /// <summary>Whether the bitmap opens with the older of the two information headers.</summary>
+  public static bool IsCoreHeader(ReadOnlySpan<byte> dib)
+    => dib.Length >= 4 && BinaryPrimitives.ReadUInt32LittleEndian(dib) == CoreHeaderSize;
+
+  /// <summary>
+  /// The bytes one palette entry takes, which the two header shapes disagree about.
+  /// </summary>
+  /// <remarks>
+  /// The older header is followed by RGBTRIPLEs of three bytes and the newer by RGBQUADs of four.
+  /// Reading one as the other is the mistake that produces a picture rather than an error: every
+  /// colour after the first is taken from the wrong place, shifted further along with each entry.
+  /// </remarks>
+  public static int PaletteEntrySize(ReadOnlySpan<byte> dib) => IsCoreHeader(dib) ? 3 : 4;
+
+  /// <summary>Reads the depth from whichever header shape the bitmap opens with.</summary>
+  /// <returns>The bits per pixel, or nought when the bitmap is too short to state one.</returns>
+  public static int ReadBitCount(ReadOnlySpan<byte> dib) {
+    // bcBitCount is the fourth sixteen-bit field of the older header; biBitCount is the second of
+    // the newer one, which by then is four bytes further along.
+    var offset = IsCoreHeader(dib) ? 10 : 14;
+    return dib.Length >= offset + 2 ? BinaryPrimitives.ReadUInt16LittleEndian(dib[offset..]) : 0;
+  }
+
   /// <summary>The longest side an entry can state, its width and height each being one byte.</summary>
   public const int MaximumSide = 256;
 

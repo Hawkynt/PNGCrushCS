@@ -61,13 +61,46 @@ public sealed class IcoFile : IImageFormatReader<IcoFile>, IImageToRawImage<IcoF
       : _DecodeDib(best);
   }
 
+  /// <summary>
+  /// Reads the colour table that follows the information header.
+  /// </summary>
+  /// <remarks>
+  /// Both header shapes store blue, green and red in that order and differ only in whether a
+  /// fourth, unused byte follows each entry. Read at the wrong stride the first colour still comes
+  /// out right and every later one drifts, taking part of one neighbour and part of the next — a
+  /// wrong picture rather than a refusal, which is why the stride has to come from the header.
+  /// </remarks>
+  private static byte[] _ReadPalette(byte[] dib, int paletteOffset, int paletteCount, int paletteEntrySize) {
+    var palette = new byte[paletteCount * 3];
+    for (var i = 0; i < paletteCount && paletteOffset + i * paletteEntrySize + 2 < dib.Length; ++i) {
+      var off = paletteOffset + i * paletteEntrySize;
+      palette[i * 3] = dib[off + 2];     // R
+      palette[i * 3 + 1] = dib[off + 1]; // G
+      palette[i * 3 + 2] = dib[off];     // B
+    }
+
+    return palette;
+  }
+
   private static RawImage _DecodeDib(IcoImage entry) {
     var dib = entry.Data;
+
     if (dib.Length < 40)
       throw new InvalidOperationException("BMP DIB data too small for BITMAPINFOHEADER.");
 
+    // Which of the two information headers this is decides where the depth sits, how wide a palette
+    // entry is, and whether there is a colour count to read at all — so it is asked before any of
+    // those fields is taken.
+    var isCoreHeader = IcoDib.IsCoreHeader(dib);
+
     var biSize = BinaryPrimitives.ReadInt32LittleEndian(dib.AsSpan(0));
-    var biBitCount = BinaryPrimitives.ReadUInt16LittleEndian(dib.AsSpan(14));
+    var biBitCount = IcoDib.ReadBitCount(dib);
+    var paletteEntrySize = IcoDib.PaletteEntrySize(dib);
+
+    // biClrUsed is a BITMAPINFOHEADER field; the older header has no such thing and offset 32 is
+    // already past its end.
+    var biClrUsed = isCoreHeader ? 0 : BinaryPrimitives.ReadInt32LittleEndian(dib.AsSpan(32));
+
     var width = entry.Width;
     var height = entry.Height;
 
@@ -104,15 +137,9 @@ public sealed class IcoFile : IImageFormatReader<IcoFile>, IImageToRawImage<IcoF
       case 8: {
         var paletteCount = 256;
         var paletteOffset = biSize;
-        var palette = new byte[paletteCount * 3];
-        for (var i = 0; i < paletteCount && paletteOffset + i * 4 + 2 < dib.Length; ++i) {
-          var off = paletteOffset + i * 4;
-          palette[i * 3] = dib[off + 2];     // R
-          palette[i * 3 + 1] = dib[off + 1]; // G
-          palette[i * 3 + 2] = dib[off];     // B
-        }
+        var palette = _ReadPalette(dib, paletteOffset, paletteCount, paletteEntrySize);
 
-        var dataOffset = biSize + paletteCount * 4;
+        var dataOffset = biSize + paletteCount * paletteEntrySize;
         var srcStride = ((width + 3) / 4) * 4;
         var pixels = new byte[width * height];
         for (var y = 0; y < height; ++y)
@@ -128,18 +155,11 @@ public sealed class IcoFile : IImageFormatReader<IcoFile>, IImageToRawImage<IcoF
         };
       }
       case 4: {
-        var biClrUsed = BinaryPrimitives.ReadInt32LittleEndian(dib.AsSpan(32));
         var paletteCount = biClrUsed > 0 ? biClrUsed : 16;
         var paletteOffset = biSize;
-        var palette = new byte[paletteCount * 3];
-        for (var i = 0; i < paletteCount && paletteOffset + i * 4 + 2 < dib.Length; ++i) {
-          var off = paletteOffset + i * 4;
-          palette[i * 3] = dib[off + 2];
-          palette[i * 3 + 1] = dib[off + 1];
-          palette[i * 3 + 2] = dib[off];
-        }
+        var palette = _ReadPalette(dib, paletteOffset, paletteCount, paletteEntrySize);
 
-        var dataOffset = biSize + paletteCount * 4;
+        var dataOffset = biSize + paletteCount * paletteEntrySize;
         var srcStride = ((width * 4 + 31) / 32) * 4;
         var packed = new byte[((width + 1) / 2) * height];
         var dstStride = (width + 1) / 2;
@@ -158,17 +178,10 @@ public sealed class IcoFile : IImageFormatReader<IcoFile>, IImageToRawImage<IcoF
       case 1: {
         // The oldest icons and nearly every classic cursor are two colours, which was refused here
         // outright — so a plain black-and-white arrow could not be opened at all.
-        var biClrUsed = BinaryPrimitives.ReadInt32LittleEndian(dib.AsSpan(32));
         var paletteCount = biClrUsed > 0 ? biClrUsed : 2;
-        var palette = new byte[paletteCount * 3];
-        for (var i = 0; i < paletteCount && biSize + i * 4 + 2 < dib.Length; ++i) {
-          var off = biSize + i * 4;
-          palette[i * 3] = dib[off + 2];
-          palette[i * 3 + 1] = dib[off + 1];
-          palette[i * 3 + 2] = dib[off];
-        }
+        var palette = _ReadPalette(dib, biSize, paletteCount, paletteEntrySize);
 
-        var dataOffset = biSize + paletteCount * 4;
+        var dataOffset = biSize + paletteCount * paletteEntrySize;
         var srcStride = (width + 31) / 32 * 4;
         var dstStride = (width + 7) / 8;
         var packed = new byte[dstStride * height];
