@@ -373,11 +373,13 @@ public sealed class H261VideoDecoderTests {
 
   [Test]
   [Category("Unit")]
-  public void StillImageTransmissionIsRefusedByAnnex() {
-    var stream = new H261TestStream().PictureHeader(requestStillImage: true).ToArray();
+  public void AnnexDStillImageTemporalReferenceHighBitsAreRefused() {
+    var stream = new H261TestStream()
+      .PictureHeader(temporalReference: 4, requestStillImage: true)
+      .ToArray();
 
-    var failure = Assert.Throws<NotSupportedException>(() => _Decode(stream));
-    Assert.That(failure.Message, Does.Contain("Annex D"));
+    var failure = Assert.Throws<InvalidDataException>(() => _Decode(stream));
+    Assert.That(failure.Message, Does.Contain("Annex D.3"));
   }
 
   [Test]
@@ -459,7 +461,7 @@ public sealed class H261VideoDecoderTests {
     var second = new H261TestStream().PictureHeader(isCif: true, temporalReference: 1).ToArray();
 
     var failure = Assert.Throws<NotSupportedException>(() => _Decode(first, second));
-    Assert.That(failure.Message, Does.Contain("changes picture size"));
+    Assert.That(failure.Message, Does.Contain("changes coded picture size"));
   }
 
   // ============================================================================================

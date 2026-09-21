@@ -6,7 +6,7 @@ internal sealed class EaCmvFrame {
   internal EaCmvFrame(int width, int height) {
     this.Width = width;
     this.Height = height;
-    this.Indices = new byte[width * height];
+    this.Indices = new byte[checked(width * height)];
   }
 
   internal int Width { get; }

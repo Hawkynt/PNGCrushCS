@@ -37,6 +37,128 @@ internal static class FFmpegOracle {
       Assert.Inconclusive("no ffmpeg on this machine to ask. Set FFMPEG to the binary or put it on PATH.");
   }
 
+  /// <summary>
+  /// The words FFmpeg prints for <c>AVERROR_PATCHWELCOME</c>.
+  /// </summary>
+  /// <remarks>
+  /// This is the one thing FFmpeg can say that is about the binary rather than about the bytes it was
+  /// handed. <c>avpriv_request_sample</c> raises it where a decoder meets a feature the build does not
+  /// implement, and nothing else produces it: a stream that is malformed answers "Invalid data", a
+  /// stream that decodes differently answers nothing at all and is caught by comparing what came out.
+  /// So a check may branch on it without any risk of swallowing a disagreement, which is what makes it
+  /// worth having a named constant instead of a version number — a version number stops being true the
+  /// moment a distribution backports a patch, and this does not.
+  /// </remarks>
+  public const string NOT_IMPLEMENTED = "Not yet implemented in FFmpeg, patches welcome";
+
+  /// <summary>Whether FFmpeg answered that this build has not implemented what the file needs.</summary>
+  public static bool SaysItHasNotImplementedThis(string diagnostics)
+    => diagnostics.Contains(NOT_IMPLEMENTED, StringComparison.Ordinal);
+
+  /// <summary>
+  /// Which feature FFmpeg says it has not implemented, in FFmpeg's own words.
+  /// </summary>
+  /// <remarks>
+  /// <c>avpriv_request_sample</c> names the feature at warning level and the error level beneath it
+  /// carries only the generic <see cref="NOT_IMPLEMENTED"/> sentence, so the decode is run once more
+  /// one level louder purely to quote the name. Only ever on the way to a skip, never on the way to a
+  /// verdict: what is measured stays measured at <c>-loglevel error</c>, where a build that reads the
+  /// file cleanly says nothing whatever.
+  /// </remarks>
+  public static string WhatItSaysIsMissing(string path) {
+    const string BOILERPLATE = ". Update your FFmpeg version";
+
+    var startInfo = new ProcessStartInfo(ExecutablePath!) {
+      RedirectStandardOutput = true,
+      RedirectStandardError = true,
+      UseShellExecute = false,
+    };
+
+    foreach (var argument in new[] {
+      "-hide_banner", "-loglevel", "warning", "-y", "-i", path, "-an", "-f", "null", "-",
+    })
+      startInfo.ArgumentList.Add(argument);
+
+    try {
+      using var process = Process.Start(startInfo);
+      if (process == null)
+        return NOT_IMPLEMENTED;
+
+      var stdout = process.StandardOutput.ReadToEndAsync();
+      var stderr = process.StandardError.ReadToEndAsync();
+      if (!process.WaitForExit(_TIMEOUT_MILLISECONDS)) {
+        try { process.Kill(entireProcessTree: true); } catch { /* already gone */ }
+        return NOT_IMPLEMENTED;
+      }
+
+      var named = string.Concat(stdout.Result, stderr.Result)
+        .Split('\n')
+        .Select(static line => line.Trim())
+        .FirstOrDefault(static line => line.Contains(BOILERPLATE, StringComparison.Ordinal));
+
+      return named == null
+        ? NOT_IMPLEMENTED
+        : _WithoutTheAllocationAddress(named[..named.IndexOf(BOILERPLATE, StringComparison.Ordinal)]);
+    } catch (Exception) {
+      return NOT_IMPLEMENTED;
+    }
+  }
+
+  /// <summary>
+  /// The build that answered, in its own words: the first line of <c>ffmpeg -version</c>.
+  /// </summary>
+  /// <remarks>
+  /// For attributing an answer and for nothing else. No check here decides anything from a version
+  /// number — a build number is a guess at a capability, and a wrong one as soon as somebody backports
+  /// — so what is acted on is always what the binary did when it was asked. This is how a skip says
+  /// which binary it was that could not.
+  /// </remarks>
+  public static string Banner { get; } = _ReadBanner();
+
+  private static string _ReadBanner() {
+    if (ExecutablePath == null)
+      return "no ffmpeg";
+
+    var startInfo = new ProcessStartInfo(ExecutablePath) {
+      RedirectStandardOutput = true,
+      RedirectStandardError = true,
+      UseShellExecute = false,
+    };
+
+    foreach (var argument in new[] { "-hide_banner", "-version" })
+      startInfo.ArgumentList.Add(argument);
+
+    try {
+      using var process = Process.Start(startInfo);
+      if (process == null)
+        return ExecutablePath;
+
+      var stdout = process.StandardOutput.ReadToEndAsync();
+      process.StandardError.ReadToEndAsync();
+      if (!process.WaitForExit(_TIMEOUT_MILLISECONDS)) {
+        try { process.Kill(entireProcessTree: true); } catch { /* already gone */ }
+        return ExecutablePath;
+      }
+
+      var first = stdout.Result.Split('\n').Select(static line => line.Trim()).FirstOrDefault(static line => line.Length != 0);
+
+      return string.IsNullOrEmpty(first) ? ExecutablePath : first;
+    } catch (Exception) {
+      return ExecutablePath;
+    }
+  }
+
+  /// <summary>Drops the <c>@ 0x…</c> out of a decoder tag, which changes every run and says nothing.</summary>
+  private static string _WithoutTheAllocationAddress(string line) {
+    var at = line.IndexOf(" @ 0x", StringComparison.Ordinal);
+    if (at < 0)
+      return line;
+
+    var close = line.IndexOf(']', at);
+
+    return close < 0 ? line : line[..at] + line[close..];
+  }
+
   /// <summary>Decodes the first frame and says whether it came back at the size it went in at.</summary>
   public static (bool Decoded, string Output) TryDecodeFirstFrame(string path, int width, int height) {
     var png = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName() + ".png");
@@ -190,11 +312,58 @@ internal static class FFmpegOracle {
     diagnostics
       .Split('\n')
       .Select(static line => line.Trim())
-      .Where(static line => line.Length != 0 && !_IsAboutFFmpegsOwnVersion(line)));
+      .Where(static line => line.Length != 0
+                            && !_IsAboutFFmpegsOwnVersion(line)
+                            && !_IsAnOlderProbePassMisreadingAFieldPair(line)
+                            && !_IsWestwoodVqaReachingTheEndOfItsFile(line)));
 
   private static bool _IsAboutFFmpegsOwnVersion(string line)
     => line.StartsWith("[h261 @ ", StringComparison.Ordinal)
        && line.EndsWith("warning: first frame is no keyframe", StringComparison.Ordinal);
+
+  /// <summary>
+  /// <c>[mjpeg @ …] No JPEG data found in image</c>, which older FFmpeg prints while working out what
+  /// the stream is and then contradicts by decoding it.
+  /// </summary>
+  /// <remarks>
+  /// An Avid Meridien frame is two JPEG field pictures in one sample, and FFmpeg meets it twice: once
+  /// in the throwaway decoder <c>avformat_find_stream_info</c> runs to learn what the stream holds,
+  /// and then in the one that decodes it. On 6.0.1 the first of those loses the field pair's opening
+  /// <c>EOI</c> — its marker trace steps from the first field's <c>SOS</c> straight to the second
+  /// field's <c>SOI</c> — and gives up with these words; the second parses both <c>EOI</c>s and
+  /// decodes the clip. On 9.0.1 neither says anything.
+  /// <para/>
+  /// Measured rather than reasoned about, and this is the measurement that decides it: handed the
+  /// 720x486 and the 720x576 clips this package writes, FFmpeg 6.0.1 exits zero and produces decoded
+  /// video <b>byte-identical</b> to FFmpeg 9.0.1's, every frame of it, while printing this line once
+  /// per file. A line that accompanies an identical decode reports which FFmpeg is on the machine and
+  /// nothing whatever about the bytes handed to it, exactly as the H.261 line above does.
+  /// <para/>
+  /// <b>What it cannot hide.</b> These same words from a real decode mean FFmpeg found no picture, and
+  /// a run that found no picture has none to hand back: <see cref="TryDecodeFirstFrame"/> fails on the
+  /// PNG that was never written and <see cref="TryDecodePictures"/> on a byte count that is not the
+  /// frames that were asked for, neither of which needs a complaint to fail. Tolerating the line
+  /// therefore cannot turn a decode that did not happen into a pass — only one that did happen and was
+  /// grumbled about.
+  /// </remarks>
+  private static bool _IsAnOlderProbePassMisreadingAFieldPair(string line)
+    => line.StartsWith("[mjpeg @ ", StringComparison.Ordinal)
+       && line.EndsWith("No JPEG data found in image", StringComparison.Ordinal);
+
+  /// <summary>
+  /// The line FFmpeg's Westwood VQA demuxer prints when it runs out of file.
+  /// </summary>
+  /// <remarks>
+  /// <c>wsvqa_read_packet</c> opens with <c>int ret = -1</c> and reads chunks until the read comes up
+  /// short; having nothing left to hand back it returns that -1, which is <c>AVERROR(EPERM)</c> and is
+  /// printed as "Operation not permitted". It is the demuxer's end of stream, not a judgement on the
+  /// bytes: FFmpeg prints it having already decoded every picture in the file and exits zero. What the
+  /// file was is still decided by the pictures it produced and by how many — a truncated or malformed
+  /// VQA fails on those, and on the chunk errors the demuxer raises before it gets here.
+  /// </remarks>
+  private static bool _IsWestwoodVqaReachingTheEndOfItsFile(string line)
+    => line.Contains("/wsvqa @ ", StringComparison.Ordinal)
+       && line.EndsWith("Error during demuxing: Operation not permitted", StringComparison.Ordinal);
 
   private static (int Width, int Height)? _PngSize(string path) {
     try {

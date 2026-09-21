@@ -219,7 +219,7 @@ public sealed class UtVideoEncoder : IVideoCodecEncoder<UtVideoEncoder> {
         $"Stream {stream.Index} asks for {name}, one of the ten-bit Ut Video Pro codes, whose bitstream is not published. The eight-bit codes are written; use ULRG, ULRA, ULY0, ULY2, ULY4 or their ULH* spellings.");
     if (family.StartsWith("UM", StringComparison.Ordinal))
       throw new NotSupportedException(
-        $"Stream {stream.Index} asks for {name}, one of the Ut Video T2 codes, which is a different codec whose bitstream is not published. The eight-bit codes are written; use ULRG, ULRA, ULY0, ULY2, ULY4 or their ULH* spellings.");
+        $"Stream {stream.Index} asks the classic Ut Video encoder for {name}, one of the Ut Video T2 codes. Use UtVideoT2Encoder for UMRG, UMRA, UMY2, UMY4, UMH2 or UMH4.");
 
     return _DefaultTag;
   }

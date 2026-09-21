@@ -26,7 +26,14 @@ internal sealed class H263PictureHeader {
 
   internal required bool HasGroupLayer { get; init; }
 
+  /// <summary>Whether motion compensation may extend the reference picture by repeating edge samples.</summary>
   internal required bool AllowsVectorsOutsidePicture { get; init; }
+
+  /// <summary>Whether Annex D.2's extended motion-vector component range is active.</summary>
+  internal bool UsesExtendedMotionVectorRange { get; init; }
+
+  /// <summary>Whether Annex F four-vector prediction and overlapped motion compensation are active.</summary>
+  internal bool UsesAdvancedPrediction { get; init; }
 
   internal required int TemporalReference { get; init; }
 
@@ -66,8 +73,9 @@ internal sealed class H263PictureHeader {
       throw new InvalidDataException(
         "Bit 2 of PTYPE in this H.263 picture header is one; ITU-T H.263 5.1.3 fixes it at zero to distinguish H.263 from H.261.");
 
-    // Split-screen, document-camera and freeze-release are display instructions, not coding tools.
-    reader.ReadBits(3);
+    _ = reader.ReadBit(); // split screen
+    _ = reader.ReadBit(); // document camera
+    _ = reader.ReadBit(); // freeze picture release
     var sourceFormat = reader.ReadBits(3);
 
     if (sourceFormat == 7)
@@ -80,15 +88,24 @@ internal sealed class H263PictureHeader {
     var advancedPrediction = reader.ReadBit() == 1;
     var pbFrames = reader.ReadBit() == 1;
 
+    // The shared picture decoder below implements these two modes for H.263-derived codecs such as
+    // RV10. The public baseline-H.263 parser deliberately keeps its existing advertised scope in this
+    // PR; widening that surface needs its own corpus/oracle pass rather than piggy-backing on RV10.
     if (unrestrictedMotionVectors)
       throw new NotSupportedException(
-        "This H.263 picture uses the Unrestricted Motion Vector mode of Annex D, which is not implemented for baseline P-pictures.");
+        "This H.263 picture uses the Unrestricted Motion Vector mode of ITU-T H.263 Annex D (PTYPE bit 10). "
+        + "The shared motion engine supports its reconstruction rules, but baseline-H.263 Annex-D streams are not "
+        + "enabled by this parser yet.");
+
     if (arithmeticCoding)
       throw new NotSupportedException(
         "This H.263 picture uses Syntax-based Arithmetic Coding (Annex E), which is not implemented.");
     if (advancedPrediction)
       throw new NotSupportedException(
-        "This H.263 picture uses Advanced Prediction (Annex F), including four-vector macroblocks and OBMC, which is not implemented.");
+        "This H.263 picture uses the Advanced Prediction mode of ITU-T H.263 Annex F (PTYPE bit 12). The shared "
+        + "picture decoder implements four-vector prediction and OBMC for H.263-derived codecs, but Annex-F H.263 "
+        + "streams are not enabled by this baseline parser yet.");
+
     if (pbFrames)
       throw new NotSupportedException(
         "This H.263 picture is a PB-frame (Annex G). Separate Annex O B-pictures are supported, but the combined PB macroblock syntax is not.");
@@ -319,8 +336,7 @@ internal sealed class H263PictureHeader {
       _ => throw new InvalidDataException("This Sorenson Spark picture states reserved picture type 3."),
     };
 
-    // Display-only deblocking flag.
-    reader.ReadBit();
+    _ = reader.ReadBit(); // deblocking/display flag
     var quantiser = _ReadQuantiser(ref reader, "the Sorenson Spark quantiser");
     _ReadExtraPictureInformation(ref reader);
 

@@ -25,6 +25,7 @@ internal static class CineFormTags {
   internal const int InterlacedFlags = 63;
   internal const int SampleFlags = 68;
   internal const int Precision = 70;
+  internal const int InputFormat = 71;
   internal const int PrescaleTable = 83;
   internal const int EncodedFormat = 84;
 

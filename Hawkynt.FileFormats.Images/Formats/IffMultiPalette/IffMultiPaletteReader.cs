@@ -57,10 +57,6 @@ public static class IffMultiPaletteReader {
     if ((flags & _PCHGF_4BIT) == 0)
       throw new InvalidDataException("Invalid PCHG chunk: no supported palette-change format is selected.");
 
-    var originalSize = BinaryPrimitives.ReadUInt32BigEndian(pchg[16..]);
-    if (originalSize != pchg.Length - _PCHG_HEADER_SIZE)
-      throw new InvalidDataException("Invalid uncompressed PCHG chunk: OriginalSize does not match the line data.");
-
     var ilbm = IlbmReader.FromSpan(data[..formEnd]);
     if (ilbm.Palette is not { Length: > 0 } palette)
       throw new InvalidDataException("Invalid MultiPalette picture: PCHG requires an initial CMAP palette.");
@@ -104,10 +100,20 @@ public static class IffMultiPaletteReader {
   }
 
   /// <summary>Expands an uncompressed PCHGF_4BIT change stream to one 16-register RGB palette per line.</summary>
+  /// <remarks>
+  /// The header is <c>Compression</c>, <c>Flags</c>, <c>StartLine</c>, <c>LineCount</c>,
+  /// <c>ChangedLines</c>, <c>MinReg</c>, <c>MaxReg</c>, <c>MaxChanges</c> and a long
+  /// <c>TotalChanges</c>, which is where every other reader of this chunk looks for them. This one
+  /// used to take <c>MinReg</c> for the highest register and the long for a byte count of the
+  /// payload, and the writer beside it stated them in those places, so the two agreed with each
+  /// other and with nothing else.
+  /// </remarks>
   private static byte[] _DecodePaletteChanges(ReadOnlySpan<byte> pchg, ReadOnlySpan<byte> cmap, int height) {
     var startLine = BinaryPrimitives.ReadInt16BigEndian(pchg[4..]);
     var lineCount = BinaryPrimitives.ReadUInt16BigEndian(pchg[6..]);
-    var maxRegister = BinaryPrimitives.ReadUInt16BigEndian(pchg[10..]);
+    var maxRegister = BinaryPrimitives.ReadUInt16BigEndian(pchg[12..]);
+    var totalChanges = BinaryPrimitives.ReadUInt32BigEndian(pchg[16..]);
+    var seenChanges = 0L;
     if (maxRegister >= IffMultiPaletteFile.PaletteEntries)
       throw new NotSupportedException($"PCHG uses colour register {maxRegister}; this MultiPalette representation supports registers 0..{IffMultiPaletteFile.PaletteEntries - 1}.");
 
@@ -144,6 +150,7 @@ public static class IffMultiPaletteReader {
         if (recordAt + bytes > pchg.Length)
           throw new InvalidDataException("Invalid PCHG chunk: palette-change data is truncated.");
 
+        seenChanges += small;
         for (var i = 0; i < small; ++i, recordAt += 2) {
           var change = BinaryPrimitives.ReadUInt16BigEndian(pchg[recordAt..]);
           var register = change >> 12;
@@ -167,6 +174,10 @@ public static class IffMultiPaletteReader {
 
     if (recordAt != pchg.Length)
       throw new InvalidDataException("Invalid PCHG chunk: change records do not consume the declared payload.");
+    // Only the shortfall is fatal, which is where netpbm stops too: a header claiming more changes
+    // than the records hold costs nothing to read past, and ilbmtoppm merely remarks on it.
+    if (seenChanges > totalChanges)
+      throw new InvalidDataException($"Invalid PCHG chunk: the header states {totalChanges} palette changes and the line records hold {seenChanges}.");
 
     return result;
   }

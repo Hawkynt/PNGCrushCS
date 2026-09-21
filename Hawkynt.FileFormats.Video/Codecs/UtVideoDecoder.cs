@@ -16,6 +16,9 @@ namespace FileFormat.Codecs;
 /// difference is Huffman coded with one table a plane, and the plane is cut into horizontal bands
 /// that share the table but nothing else, so that a decoder with four cores can use them.
 /// <para/>
+/// The separate T2 <c>UM*</c> family is handled by <see cref="UtVideoT2Decoder"/>, because it has a
+/// different packet format and optional temporal references.
+/// <para/>
 /// <b>What the format's own description gives, and what it does not.</b> The author publishes the
 /// four-character codes and their colour spaces, and the community write-up gives the sixteen bytes
 /// of stream description, the order of a plane's parts, the rule that a slice starts at
@@ -50,10 +53,10 @@ namespace FileFormat.Codecs;
 /// chroma siting of the subsampled formats cannot hide anything — and every sample of every plane of
 /// every frame is identical.
 /// <para/>
-/// <b>What refuses.</b> The ten-bit Pro codes, the T2 codes, a frame coded with finite state entropy
-/// coding rather than Huffman, an interlaced stream, a code-length table that does not describe a
-/// complete code, a plane whose slices do not cover it, and a frame whose parts do not add up to its
-/// length. There is no <c>catch</c> here handing back a blank or a repeated frame.
+/// <b>What refuses.</b> The ten-bit Pro codes, a frame coded with finite state entropy coding rather
+/// than Huffman, an interlaced stream, a code-length table that does not describe a complete code, a
+/// plane whose slices do not cover it, and a frame whose parts do not add up to its length. There is
+/// no <c>catch</c> here handing back a blank or a repeated frame.
 /// </remarks>
 public sealed class UtVideoDecoder : IVideoCodecDecoder<UtVideoDecoder> {
 
@@ -83,12 +86,6 @@ public sealed class UtVideoDecoder : IVideoCodecDecoder<UtVideoDecoder> {
     CodecTag.FromCharacters("UQRA"),
     CodecTag.FromCharacters("UQY0"),
     CodecTag.FromCharacters("UQY2"),
-    CodecTag.FromCharacters("UMRG"),
-    CodecTag.FromCharacters("UMRA"),
-    CodecTag.FromCharacters("UMY2"),
-    CodecTag.FromCharacters("UMY4"),
-    CodecTag.FromCharacters("UMH2"),
-    CodecTag.FromCharacters("UMH4"),
   ];
 
   private readonly int _width;

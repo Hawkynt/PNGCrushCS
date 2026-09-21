@@ -28,10 +28,23 @@ internal ref struct H263BitReader {
   private readonly bool _realVideoExtendedEscapeLevel;
   private int _bitPosition;
 
+  private bool _hasRealVideoPredictiveIntraDc;
+  private int _realVideoIntraBlock;
+  private byte _realVideoFirstDcMask;
+  private int _realVideoLumaDc;
+  private int _realVideoCbDc;
+  private int _realVideoCrDc;
+
   public H263BitReader(ReadOnlySpan<byte> data, bool realVideoExtendedEscapeLevel = false) {
     this._data = data;
     this._realVideoExtendedEscapeLevel = realVideoExtendedEscapeLevel;
     this._bitPosition = 0;
+    this._hasRealVideoPredictiveIntraDc = false;
+    this._realVideoIntraBlock = 0;
+    this._realVideoFirstDcMask = 0;
+    this._realVideoLumaDc = 0;
+    this._realVideoCbDc = 0;
+    this._realVideoCrDc = 0;
   }
 
   /// <summary>The bit the next read will take, counted from the first bit of the first byte.</summary>
@@ -44,6 +57,62 @@ internal ref struct H263BitReader {
   /// Whether the H.263-compatible block syntax uses RealVideo 1's extension of the escape level.
   /// </summary>
   internal readonly bool HasRealVideoExtendedEscapeLevel => this._realVideoExtendedEscapeLevel;
+
+  /// <summary>Whether intra DC values are being reconstructed with RealVideo 1's predictive VLC.</summary>
+  internal readonly bool HasRealVideoPredictiveIntraDc => this._hasRealVideoPredictiveIntraDc;
+
+  /// <summary>
+  /// Starts RealVideo 1's predictive intra-DC coding for one independently coded run.
+  /// </summary>
+  /// <remarks>
+  /// A non-zero RV10 micro revision seeds Y, Cb and Cr in the run header. The first block of each
+  /// component consumes no DC bits at all and uses its seed; every later block carries a VLC-coded
+  /// difference which wraps modulo 256. Keeping that state in the reader matters because the block
+  /// decoder is deliberately shared with ordinary H.263, whose INTRADC is instead one literal byte
+  /// per block.
+  /// </remarks>
+  internal void UseRealVideoPredictiveIntraDc(int luma, int cb, int cr) {
+    if ((uint)luma > byte.MaxValue || (uint)cb > byte.MaxValue || (uint)cr > byte.MaxValue)
+      throw new ArgumentOutOfRangeException(nameof(luma), "RealVideo intra-DC predictors are eight-bit values.");
+
+    this._hasRealVideoPredictiveIntraDc = true;
+    this._realVideoIntraBlock = 0;
+    this._realVideoFirstDcMask = 0;
+    this._realVideoLumaDc = luma;
+    this._realVideoCbDc = cb;
+    this._realVideoCrDc = cr;
+  }
+
+  /// <summary>
+  /// Reads the DC value of one intra block in the syntax selected for this bitstream.
+  /// </summary>
+  internal int ReadIntraDc() {
+    if (!this._hasRealVideoPredictiveIntraDc)
+      return this.ReadBits(8);
+
+    var block = this._realVideoIntraBlock++ % 6;
+    var component = block < 4 ? 0 : block - 3;
+    var mask = (byte)(1 << component);
+    var value = component switch {
+      0 => this._realVideoLumaDc,
+      1 => this._realVideoCbDc,
+      _ => this._realVideoCrDc,
+    };
+
+    if ((this._realVideoFirstDcMask & mask) == 0) {
+      this._realVideoFirstDcMask |= mask;
+      return value;
+    }
+
+    value = (value + this._ReadRealVideoDcDifference(component == 0)) & 0xFF;
+    switch (component) {
+      case 0: this._realVideoLumaDc = value; break;
+      case 1: this._realVideoCbDc = value; break;
+      default: this._realVideoCrDc = value; break;
+    }
+
+    return value;
+  }
 
   /// <summary>Takes one bit.</summary>
   public int ReadBit() {
@@ -121,5 +190,70 @@ internal ref struct H263BitReader {
       throw new InvalidDataException(
         $"An H.263 start code was expected but only {zeroes} zero bit(s) preceded the terminating one; the start code "
         + "of ITU-T H.263 5.2.2 is sixteen zeroes and a one.");
+  }
+
+  /// <summary>
+  /// Reads the canonical RealVideo 1 DC VLC used by non-zero RV10 micro revisions.
+  /// </summary>
+  /// <remarks>
+  /// The length counts and run-compressed symbol ordering are interoperability data from RealVideo's
+  /// public decoder behaviour. Codes are generated canonically here instead of copying a generated
+  /// lookup table. The two all-one prefixes are the format's deliberately redundant -1/255 escape
+  /// spellings; their remaining bits are ignored but still consumed.
+  /// </remarks>
+  private int _ReadRealVideoDcDifference(bool luminance) {
+    ReadOnlySpan<ushort> counts = luminance
+      ? [1, 0, 2, 4, 8, 16, 32, 0, 64, 0, 128, 0, 256, 0, 512]
+      : [1, 2, 4, 0, 8, 0, 16, 0, 32, 0, 64, 0, 128, 0, 256];
+
+    var code = this.ReadBits(2);
+    var firstCode = 0;
+    var firstSymbol = 0;
+
+    for (var length = 2; length <= 16; ++length) {
+      if (luminance && length == 7 && code == 0x7F) {
+        _ = this.ReadBits(11);
+        return 255;
+      }
+
+      if (!luminance && length == 9 && code == 0x1FE) {
+        _ = this.ReadBits(9);
+        return 255;
+      }
+
+      var count = counts[length - 2];
+      var offset = code - firstCode;
+      if ((uint)offset < count)
+        return _RealVideoDcSymbol(firstSymbol + offset, luminance);
+
+      firstSymbol += count;
+      if (length == 16)
+        break;
+
+      firstCode = (firstCode + count) << 1;
+      code = (code << 1) | this.ReadBit();
+    }
+
+    throw new InvalidDataException("The RealVideo 1 predictive intra-DC field contains no valid VLC codeword.");
+  }
+
+  private static int _RealVideoDcSymbol(int index, bool luminance) {
+    ReadOnlySpan<byte> runs = [
+      0, 0, 1, 0, 255, 0, 3, 1, 254, 1,
+      7, 3, 252, 3, 15, 7, 248, 7, 31, 15,
+      240, 15, 63, 31, 224, 31, 127, 63, 192, 63,
+      255, 127, 128, 127, 127, 255, 128, 255,
+    ];
+
+    var pairCount = runs.Length / 2 - (luminance ? 0 : 2);
+    for (var pair = 0; pair < pairCount; ++pair) {
+      var count = runs[pair * 2 + 1] + 1;
+      if (index < count)
+        return (runs[pair * 2] - index) & 0xFF;
+
+      index -= count;
+    }
+
+    throw new InvalidDataException("The RealVideo 1 predictive intra-DC VLC resolved outside its symbol table.");
   }
 }

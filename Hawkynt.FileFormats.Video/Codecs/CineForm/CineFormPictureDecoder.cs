@@ -5,11 +5,22 @@ namespace FileFormat.Codecs.CineForm;
 
 /// <summary>Decodes one CineForm frame into its component channels.</summary>
 /// <remarks>
+/// A packet is a sequence of tag-value pairs followed by, for each channel in turn, that channel's
+/// ten subbands. The older CineForm framing used by GoPro and FFmpeg also places a raw channel-size
+/// index after tag 2; that payload is skipped explicitly rather than accidentally interpreted as more
+/// tags. Optional DisplayHeight (negative tag 85) crops the vertical padding real encoders add.
+/// <para/>
 /// A progressive CFHD sample uses three spatial levels. A legacy interlaced YUV sample can keep the
 /// same transform type and ten-subband layout while clearing SampleFlags' progressive bit: the two
 /// coarser levels remain spatial and the finest level becomes horizontal plus an adjacent-field
 /// low/high pair. This decoder implements that layout and deliberately still refuses transform types
 /// 1/2, which are the separate 14/17-subband field/field-plus organizations.
+/// <para/>
+/// Real CFHD frames name their colour layout with tag 84: 1 is ten-bit YUV 4:2:2, 2 is twelve-bit
+/// Bayer RAW, 3 is twelve-bit RGB 4:4:4 and 4 is twelve-bit RGBA 4:4:4:4. Bayer is unusual: all four
+/// coded channels are half the final image width and height and carry decorrelated CFA components;
+/// the public FFmpeg decoder likewise doubles the header geometry after recognizing format 2.
+/// Older sparse fixtures which omit tag 84 retain the measured channel-width fallback for YUV/RGB[A].
 /// </remarks>
 internal static class CineFormPictureDecoder {
 
@@ -33,6 +44,11 @@ internal static class CineFormPictureDecoder {
     internal bool? UpperFieldFirst { get; init; }
 
     internal bool IsYuv => this.EncodedFormat == CineFormEncodedFormat.Yuv422;
+
+    /// <summary><see langword="true"/> for four decorrelated half-resolution CFA channels.</summary>
+    internal bool IsBayer => this.EncodedFormat == CineFormEncodedFormat.Bayer;
+
+    /// <summary><see langword="true"/> when channel 3 carries the decoded alpha component.</summary>
     internal bool HasAlpha => this.EncodedFormat == CineFormEncodedFormat.Rgba4444;
   }
 
@@ -66,7 +82,7 @@ internal static class CineFormPictureDecoder {
 
     if (channelCount is < 3 or > 4)
       throw new NotSupportedException(
-        $"This decoder reads CineForm's three-channel YUV/RGB and four-channel RGBA layouts; this frame states ChannelCount {channelCount}.");
+        $"This decoder reads CineForm's three-channel YUV/RGB and four-channel Bayer/RGBA layouts; this frame states ChannelCount {channelCount}.");
 
     _ValidateHeaderLayout(encodedFormat, precision, channelCount);
 
@@ -107,9 +123,10 @@ internal static class CineFormPictureDecoder {
       planes[i] = new(samples, width, height);
     }
 
+    var geometryScale = format == CineFormEncodedFormat.Bayer ? 2 : 1;
     return new() {
-      ImageWidth = imageWidth,
-      ImageHeight = imageHeight,
+      ImageWidth = checked(imageWidth * geometryScale),
+      ImageHeight = checked(imageHeight * geometryScale),
       Channels = planes,
       EncodedFormat = format,
       Precision = codedPrecision,
@@ -189,8 +206,11 @@ internal static class CineFormPictureDecoder {
       case CineFormEncodedFormat.Unspecified:
         return;
       case CineFormEncodedFormat.Bayer:
-        throw new NotSupportedException(
-          "CineForm Bayer/CFA frames need the format's four-channel CFA reconstruction stage; treating those channels as RGBA would produce a plausible but wrong picture.");
+        if (channelCount != 4)
+          throw new InvalidDataException($"CineForm Bayer RAW needs four decorrelated channels, but the frame states {channelCount}.");
+        if (precision != 0 && precision != 12)
+          throw new InvalidDataException($"CineForm Bayer RAW is compressed at 12 bits, but the frame states Precision {precision}.");
+        return;
       case CineFormEncodedFormat.Yuv422:
         if (channelCount != 3)
           throw new InvalidDataException($"CineForm YUV 4:2:2 needs three channels, but the frame states {channelCount}.");

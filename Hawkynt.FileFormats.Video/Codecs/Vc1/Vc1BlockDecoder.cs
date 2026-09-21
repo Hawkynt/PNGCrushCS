@@ -3,16 +3,7 @@ using System.IO;
 
 namespace FileFormat.Codecs.Vc1;
 
-/// <summary>
-/// The state escape mode 3 carries across a whole picture (7.1.4.10, 7.1.4.11).
-/// </summary>
-/// <remarks>
-/// A class rather than a value because it genuinely is picture-wide state. The first block of a
-/// picture that escapes into mode 3 states how wide the fixed-length run and level fields are, and
-/// every mode 3 escape after it in that picture uses the same two widths without restating them — so a
-/// decoder that reset this per block would read the second escape at the wrong width and everything
-/// after it out of step.
-/// </remarks>
+/// <summary>The state escape mode 3 carries across a whole picture (7.1.4.10, 7.1.4.11).</summary>
 internal sealed class Vc1EscapeState {
 
   internal bool First { get; set; } = true;
@@ -28,10 +19,7 @@ internal sealed class Vc1EscapeState {
   }
 }
 
-/// <summary>
-/// Decodes the block layer of an intra-coded VC-1 block: the DC differential, then the run-level
-/// coded AC coefficients (8.1.3.1, 8.1.3.4, 8.1.3.5).
-/// </summary>
+/// <summary>Decodes intra and inter run-level coefficient syntax.</summary>
 internal static class Vc1BlockDecoder {
 
   private static readonly Vc1VlcTable _LowMotionLumaDc = new("Low-motion Luma DC Differential", Vc1Tables.LowMotionLumaDc);
@@ -39,26 +27,12 @@ internal static class Vc1BlockDecoder {
   private static readonly Vc1VlcTable _HighMotionLumaDc = new("High-motion Luma DC Differential", Vc1Tables.HighMotionLumaDc);
   private static readonly Vc1VlcTable _HighMotionChromaDc = new("High-motion Colour-difference DC Differential", Vc1Tables.HighMotionChromaDc);
 
-  /// <summary>The index the DC tables use to say the differential did not fit them.</summary>
-  /// <remarks>
-  /// One past the hundred and nineteen values each table names, which is how every one of the four is
-  /// built; the escape row is the last of the printed table and carries no differential of its own.
-  /// </remarks>
   private const int _DC_ESCAPE_INDEX = 119;
 
-  /// <summary>Picks the DC differential table for a block (8.1.1.2).</summary>
   internal static Vc1VlcTable DcTable(bool highMotion, bool luma) => highMotion
     ? luma ? _HighMotionLumaDc : _HighMotionChromaDc
     : luma ? _LowMotionLumaDc : _LowMotionChromaDc;
 
-  /// <summary>
-  /// Reads the DC differential of an intra block (Figure 37).
-  /// </summary>
-  /// <remarks>
-  /// The coarser the quantiser the fewer bits the escape needs, because the differential it has to
-  /// carry is smaller — which is why the escape width and the extra bits below it both depend on the
-  /// quantiser rather than being fixed.
-  /// </remarks>
   internal static int ReadDcDifferential(ref Vc1BitReader reader, Vc1VlcTable table, int quantiser) {
     var differential = table.Read(ref reader);
     if (differential == 0)
@@ -76,15 +50,26 @@ internal static class Vc1BlockDecoder {
     return reader.ReadBit() == 1 ? -differential : differential;
   }
 
-  /// <summary>
-  /// Fills a block's sixty-four coefficients from the run-level coded AC symbols (Figures 41 and 42).
-  /// </summary>
-  /// <param name="coefficients">The block, in scan order; entry nought is left for the DC.</param>
+  /// <summary>Reads the AC part of an intra block; scan position zero belongs to its separately coded DC.</summary>
   internal static void ReadAcCoefficients(
     ref Vc1BitReader reader, Vc1AcCodingSet set, Vc1EscapeState escape, int pictureQuantiser, bool conservativeEscape,
-    scoped Span<int> coefficients) {
-    var position = 1;
+    scoped Span<int> coefficients)
+    => _ReadCoefficients(ref reader, set, escape, pictureQuantiser, conservativeEscape, coefficients, 1);
 
+  /// <summary>Reads an inter block, where run-level coding includes coefficient position zero.</summary>
+  internal static void ReadInterCoefficients(
+    ref Vc1BitReader reader, Vc1AcCodingSet set, Vc1EscapeState escape, int pictureQuantiser, bool conservativeEscape,
+    scoped Span<int> coefficients)
+    => _ReadCoefficients(ref reader, set, escape, pictureQuantiser, conservativeEscape, coefficients, 0);
+
+  private static void _ReadCoefficients(
+    ref Vc1BitReader reader,
+    Vc1AcCodingSet set,
+    Vc1EscapeState escape,
+    int pictureQuantiser,
+    bool conservativeEscape,
+    scoped Span<int> coefficients,
+    int position) {
     while (true) {
       var (run, level, last) = _ReadSymbol(ref reader, set, escape, pictureQuantiser, conservativeEscape);
 
@@ -115,12 +100,9 @@ internal static class Vc1BlockDecoder {
       return (run, reader.ReadBit() == 1 ? -level : level, last);
     }
 
-    // Table 58: one bit for the first mode, two for the second, two for the third.
     var mode = reader.ReadBit() == 1 ? 1 : reader.ReadBit() == 1 ? 2 : 3;
 
     if (mode == 1) {
-      // The symbol is in the table but its level is larger than the table's, by the amount the delta
-      // table attaches to its run.
       var second = set.Codes.Read(ref reader);
       if (second == set.EscapeIndex)
         throw new InvalidDataException($"{set.Name}: an escaped symbol escaped again, which the standard does not define.");
@@ -132,8 +114,6 @@ internal static class Vc1BlockDecoder {
     }
 
     if (mode == 2) {
-      // The mirror of mode 1: the level is in the table and the run is larger, by the amount the delta
-      // table attaches to its level, plus one.
       var second = set.Codes.Read(ref reader);
       if (second == set.EscapeIndex)
         throw new InvalidDataException($"{set.Name}: an escaped symbol escaped again, which the standard does not define.");
@@ -148,8 +128,6 @@ internal static class Vc1BlockDecoder {
       return (run, reader.ReadBit() == 1 ? -level : level, last);
     }
 
-    // Mode 3: the run and the level as plain fixed-length fields, at widths the first escape of the
-    // picture states and every later one reuses.
     var lastFlag = reader.ReadBit() == 1;
     if (escape.First) {
       escape.First = false;
@@ -163,17 +141,8 @@ internal static class Vc1BlockDecoder {
     return (escapedRun, sign == 1 ? -escapedLevel : escapedLevel, lastFlag);
   }
 
-  /// <summary>
-  /// Reads how many bits a mode 3 level occupies, from whichever of Tables 59 and 60 applies.
-  /// </summary>
-  /// <remarks>
-  /// Two tables for the same field, chosen by how finely the picture is quantised. A finely quantised
-  /// picture has larger levels to carry, so it uses the table that can reach eleven bits; a coarsely
-  /// quantised one uses the shorter table, whose codes are one bit long where the other's are three.
-  /// </remarks>
   private static int _ReadLevelCodeSize(ref Vc1BitReader reader, bool conservative) {
     if (!conservative) {
-      // Table 60: a run of zeroes counts, 1b through 000001b, with 000000b sharing the last length.
       for (var length = 0; length < 5; ++length)
         if (reader.ReadBit() == 1)
           return length + 2;
@@ -181,21 +150,16 @@ internal static class Vc1BlockDecoder {
       return reader.ReadBit() == 1 ? 7 : 8;
     }
 
-    // Table 59: three bits, where 000b means the size is stated by two more.
     var code = reader.ReadBits(3);
     return code != 0 ? code : 8 + reader.ReadBits(2);
   }
 
-  /// <summary>
-  /// Scatters a block's coefficients from scan order into the 8x8 array (Figure 43, Table 73).
-  /// </summary>
   internal static void InverseScan(ReadOnlySpan<int> ordered, ReadOnlySpan<byte> scan, Span<int> block) {
     block.Clear();
     for (var i = 0; i < 64; ++i)
       block[scan[i]] = ordered[i];
   }
 
-  /// <summary>The scan a block takes, from whether it carried AC prediction and where from (Table 73).</summary>
   internal static ReadOnlySpan<byte> ScanFor(bool acPrediction, bool fromTop) => !acPrediction
     ? Vc1Tables.NormalScan
     : fromTop

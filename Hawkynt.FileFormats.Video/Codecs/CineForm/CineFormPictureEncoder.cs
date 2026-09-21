@@ -56,6 +56,7 @@ internal static class CineFormPictureEncoder {
   private const int _SAMPLE_FLAGS = 68;
   private const int _FRAME_NUMBER = 69;
   private const int _PRECISION = 70;
+  private const int _INPUT_FORMAT = 71;
   private const int _BAND_CODING_FLAGS = 72;
   private const int _PRESCALE_TABLE = 83;
   private const int _ENCODED_FORMAT = 84;
@@ -67,6 +68,7 @@ internal static class CineFormPictureEncoder {
   private const int _SAMPLE_FLAGS_PROGRESSIVE = 1;
   private const int _INTERLACED = 1;
   private const int _FIELD1_FIRST = 2;
+  private const int _INPUT_FORMAT_BYR4 = 104;
 
   private const int _LOWPASS_SEGMENT = 0x1A4A;
   private const int _LOWPASS_END_SEGMENT = 0x1B4B;
@@ -94,6 +96,10 @@ internal static class CineFormPictureEncoder {
       [y, v, u], [lumaWidth, chromaWidth, chromaWidth], encodedHeight, displayHeight,
       CineFormEncodedFormat.Yuv422, 10, 0x2000, CineFormPrescale.TenBit, frameNumber, interlaced, upperFieldFirst);
 
+  /// <summary>
+  /// Encodes already padded channel planes in CineForm's coded order: Y,V,U for 4:2:2; G,R,B[,A]
+  /// for RGB[A]; and G,(R-G),(B-G),(G1-G2) decorrelated half-resolution components for Bayer.
+  /// </summary>
   internal static byte[] Encode(
     int[][] planes,
     int[] widths,
@@ -112,7 +118,7 @@ internal static class CineFormPictureEncoder {
 
     var expectedChannels = encodedFormat switch {
       CineFormEncodedFormat.Yuv422 or CineFormEncodedFormat.Rgb444 => 3,
-      CineFormEncodedFormat.Rgba4444 => 4,
+      CineFormEncodedFormat.Bayer or CineFormEncodedFormat.Rgba4444 => 4,
       _ => throw new NotSupportedException($"This CineForm writer does not encode {encodedFormat}."),
     };
 
@@ -139,7 +145,7 @@ internal static class CineFormPictureEncoder {
     } else {
       for (var i = 1; i < widths.Length; ++i)
         if (widths[i] != imageWidth)
-          throw new ArgumentException("CineForm RGB and RGBA channels must all have the full image width.");
+          throw new ArgumentException("CineForm RGB, RGBA and Bayer coded channels must all have the same width.");
     }
 
     var channels = new ChannelTransform[expectedChannels];
@@ -161,6 +167,8 @@ internal static class CineFormPictureEncoder {
     writer.Tag(_NUM_FRAMES, 1);
     writer.Tag(_CHANNEL_COUNT, channels.Length);
     writer.Tag(_ENCODED_FORMAT, (int)encodedFormat);
+    if (encodedFormat == CineFormEncodedFormat.Bayer)
+      writer.Tag(_INPUT_FORMAT, _INPUT_FORMAT_BYR4);
     writer.Tag(_WAVELET_COUNT, 3);
     writer.Tag(_SUBBAND_COUNT, 10);
     writer.Tag(_NUM_SPATIAL, 2);

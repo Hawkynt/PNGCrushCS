@@ -54,6 +54,16 @@ jobs:
             9.x
             10.x
 
+      # The viewer draws through native widgets rather than bundling a renderer, so on Linux it needs
+      # GTK 3 on the machine. The runner image ships it for the browsers it preinstalls, but that is
+      # their dependency and not a promise to us; asking for it explicitly costs a no-op when present.
+      - name: Install GTK 3 (Linux)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends libgtk-3-0 || sudo apt-get install -y --no-install-recommends libgtk-3-0t64
+
       - name: Build viewer
         working-directory: PNGCrushCS
         run: dotnet build Crush.Viewer/Crush.Viewer.csproj -c Debug --nologo -p:EnableSingleFileBundle=false

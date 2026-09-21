@@ -188,22 +188,40 @@ internal static class H265MotionPrediction {
   /// Whether a neighbouring prediction block may be consulted — clause 6.4.2.
   /// </summary>
   /// <remarks>
-  /// The z-scan availability of clause 6.4.1, plus two things it does not cover. An intra coded
-  /// neighbour has no motion to lend. And the second prediction block of a quartered coding block may
-  /// not consult the block below-left of it, which belongs to the same coding block and has not been
-  /// decoded — the z-scan alone would allow it, because the two are at the same depth.
+  /// Clause 6.4.2 asks first whether the neighbour lies in the coding block being decoded, because
+  /// the two cases are answered by different rules and the wrong one is silently wrong rather than
+  /// out of range.
+  /// <para/>
+  /// A neighbour <b>outside</b> the coding block is available exactly when clause 6.4.1 says its
+  /// z-scan address has already been decoded.
+  /// <para/>
+  /// A neighbour <b>inside</b> it is available outright, without consulting the z-scan at all — with
+  /// the single exception of the second prediction block of a quartered coding block looking below
+  /// left, into a block that genuinely has not been decoded. Prediction blocks are decoded in
+  /// partition order, which is not the z-scan order of the minimum blocks they cover, so the z-scan
+  /// is the wrong question to ask inside a coding block and answers it wrongly: for the right-hand
+  /// block of an <c>Nx2N</c> split it places the left neighbour — the bottom of the block decoded
+  /// immediately before — after the current block and calls it unavailable. That drops the A1
+  /// candidate from the merge list and from motion vector prediction, so the vector this writer
+  /// states is a difference from a predictor no conforming decoder derives, and the block is
+  /// reconstructed from somewhere else entirely. A <c>2NxN</c> split happens to order the same way
+  /// as the z-scan and is unaffected, which is why only the vertical split showed it.
   /// </remarks>
   private static bool _IsPredictionBlockAvailable(
     IH265MotionContext frame, int xCb, int yCb, int nCbS, int xPb, int yPb, int nPbW, int nPbH,
     int partIdx, int xNb, int yNb) {
-    if (nPbW << 1 == nCbS && nPbH << 1 == nCbS && partIdx == 1
-        && yCb + nPbH <= yNb && xCb + nPbW > xNb)
-      return false;
+    var sameCodingBlock = xCb <= xNb && yCb <= yNb && xCb + nCbS > xNb && yCb + nCbS > yNb;
 
-    if (!frame.IsAvailableAt(xPb, yPb, xNb, yNb))
-      return false;
+    bool available;
+    if (!sameCodingBlock)
+      available = frame.IsAvailableAt(xPb, yPb, xNb, yNb);
+    else if (nPbW << 1 == nCbS && nPbH << 1 == nCbS && partIdx == 1
+             && yCb + nPbH <= yNb && xCb + nPbW > xNb)
+      available = false;
+    else
+      available = true;
 
-    return !frame.IsIntraAt(frame.BlockIndexAt(xNb, yNb));
+    return available && !frame.IsIntraAt(frame.BlockIndexAt(xNb, yNb));
   }
 
   /// <summary>

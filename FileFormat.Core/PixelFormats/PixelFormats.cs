@@ -34,6 +34,7 @@ public readonly struct Rgb48 : IRawPixelFormat<Rgb48> { public static RawPixelFo
 public readonly struct Rgb565 : IRawPixelFormat<Rgb565> { public static RawPixelFormatTraits Traits => RawPixelFormats.Get(PixelFormat.Rgb565); }
 public readonly struct Gray10 : IRawPixelFormat<Gray10> { public static RawPixelFormatTraits Traits => RawPixelFormats.Get(PixelFormat.Gray10); }
 public readonly struct Rgb30 : IRawPixelFormat<Rgb30> { public static RawPixelFormatTraits Traits => RawPixelFormats.Get(PixelFormat.Rgb30); }
+public readonly struct Cfa16 : IRawPixelFormat<Cfa16> { public static RawPixelFormatTraits Traits => RawPixelFormats.Get(PixelFormat.Cfa16); }
 
 public readonly struct GrayF16 : IRawPixelFormat<GrayF16> { public static RawPixelFormatTraits Traits => RawPixelFormats.Get(PixelFormat.GrayF16); }
 public readonly struct GrayAlphaF16 : IRawPixelFormat<GrayAlphaF16> { public static RawPixelFormatTraits Traits => RawPixelFormats.Get(PixelFormat.GrayAlphaF16); }
@@ -44,10 +45,14 @@ public readonly struct GrayAlphaF32 : IRawPixelFormat<GrayAlphaF32> { public sta
 public readonly struct RgbF32 : IRawPixelFormat<RgbF32> { public static RawPixelFormatTraits Traits => RawPixelFormats.Get(PixelFormat.RgbF32); }
 public readonly struct RgbaF32 : IRawPixelFormat<RgbaF32> { public static RawPixelFormatTraits Traits => RawPixelFormats.Get(PixelFormat.RgbaF32); }
 
+public readonly struct Yuv411P8 : IRawPixelFormat<Yuv411P8> { public static RawPixelFormatTraits Traits => RawPixelFormats.Get(PixelFormat.Yuv411P8); }
 public readonly struct Yuv420P8 : IRawPixelFormat<Yuv420P8> { public static RawPixelFormatTraits Traits => RawPixelFormats.Get(PixelFormat.Yuv420P8); }
 public readonly struct Yuv422P8 : IRawPixelFormat<Yuv422P8> { public static RawPixelFormatTraits Traits => RawPixelFormats.Get(PixelFormat.Yuv422P8); }
 public readonly struct Yuv440P8 : IRawPixelFormat<Yuv440P8> { public static RawPixelFormatTraits Traits => RawPixelFormats.Get(PixelFormat.Yuv440P8); }
 public readonly struct Yuv444P8 : IRawPixelFormat<Yuv444P8> { public static RawPixelFormatTraits Traits => RawPixelFormats.Get(PixelFormat.Yuv444P8); }
+public readonly struct Yuv420P9 : IRawPixelFormat<Yuv420P9> { public static RawPixelFormatTraits Traits => RawPixelFormats.Get(PixelFormat.Yuv420P9); }
+public readonly struct Yuv422P9 : IRawPixelFormat<Yuv422P9> { public static RawPixelFormatTraits Traits => RawPixelFormats.Get(PixelFormat.Yuv422P9); }
+public readonly struct Yuv444P9 : IRawPixelFormat<Yuv444P9> { public static RawPixelFormatTraits Traits => RawPixelFormats.Get(PixelFormat.Yuv444P9); }
 public readonly struct Yuv420P10 : IRawPixelFormat<Yuv420P10> { public static RawPixelFormatTraits Traits => RawPixelFormats.Get(PixelFormat.Yuv420P10); }
 public readonly struct Yuv422P10 : IRawPixelFormat<Yuv422P10> { public static RawPixelFormatTraits Traits => RawPixelFormats.Get(PixelFormat.Yuv422P10); }
 public readonly struct Yuv440P10 : IRawPixelFormat<Yuv440P10> { public static RawPixelFormatTraits Traits => RawPixelFormats.Get(PixelFormat.Yuv440P10); }
@@ -56,6 +61,9 @@ public readonly struct Yuv420P12 : IRawPixelFormat<Yuv420P12> { public static Ra
 public readonly struct Yuv422P12 : IRawPixelFormat<Yuv422P12> { public static RawPixelFormatTraits Traits => RawPixelFormats.Get(PixelFormat.Yuv422P12); }
 public readonly struct Yuv440P12 : IRawPixelFormat<Yuv440P12> { public static RawPixelFormatTraits Traits => RawPixelFormats.Get(PixelFormat.Yuv440P12); }
 public readonly struct Yuv444P12 : IRawPixelFormat<Yuv444P12> { public static RawPixelFormatTraits Traits => RawPixelFormats.Get(PixelFormat.Yuv444P12); }
+public readonly struct Yuv420P14 : IRawPixelFormat<Yuv420P14> { public static RawPixelFormatTraits Traits => RawPixelFormats.Get(PixelFormat.Yuv420P14); }
+public readonly struct Yuv422P14 : IRawPixelFormat<Yuv422P14> { public static RawPixelFormatTraits Traits => RawPixelFormats.Get(PixelFormat.Yuv422P14); }
+public readonly struct Yuv444P14 : IRawPixelFormat<Yuv444P14> { public static RawPixelFormatTraits Traits => RawPixelFormats.Get(PixelFormat.Yuv444P14); }
 public readonly struct Yuv420P16 : IRawPixelFormat<Yuv420P16> { public static RawPixelFormatTraits Traits => RawPixelFormats.Get(PixelFormat.Yuv420P16); }
 public readonly struct Yuv422P16 : IRawPixelFormat<Yuv422P16> { public static RawPixelFormatTraits Traits => RawPixelFormats.Get(PixelFormat.Yuv422P16); }
 public readonly struct Yuv440P16 : IRawPixelFormat<Yuv440P16> { public static RawPixelFormatTraits Traits => RawPixelFormats.Get(PixelFormat.Yuv440P16); }

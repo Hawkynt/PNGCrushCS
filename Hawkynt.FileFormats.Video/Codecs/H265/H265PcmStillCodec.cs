@@ -552,7 +552,8 @@ internal static class H265PcmStillCodec {
 
   internal static byte[] _BuildSps(
     int width, int height, int displayWidth, int displayHeight, byte level,
-    int maxDecPicBufferingMinus1 = 0, int log2MaxPocLsbMinus4 = 0, int maxNumReorderPics = 0) {
+    int maxDecPicBufferingMinus1 = 0, int log2MaxPocLsbMinus4 = 0, int maxNumReorderPics = 0,
+    int maxTransformHierarchyDepthInter = 0) {
     var w = new Bits();
     w.WriteBits(0, 4); // sps_video_parameter_set_id
     w.WriteBits(0, 3); // sps_max_sub_layers_minus1
@@ -584,7 +585,7 @@ internal static class H265PcmStillCodec {
     w.WriteUe((uint)(_CTB_LOG2 - 3)); // log2_diff_max_min_luma_coding_block_size
     w.WriteUe(0); // log2_min_luma_transform_block_size_minus2 => 4
     w.WriteUe(3); // log2_diff_max_min_luma_transform_block_size => 32
-    w.WriteUe(0); // max_transform_hierarchy_depth_inter
+    w.WriteUe((uint)maxTransformHierarchyDepthInter); // max_transform_hierarchy_depth_inter
     w.WriteUe(0); // max_transform_hierarchy_depth_intra
     w.WriteBit(0); // scaling_list_enabled_flag
     w.WriteBit(0); // amp_enabled_flag
@@ -605,7 +606,7 @@ internal static class H265PcmStillCodec {
     return w.ToArray();
   }
 
-  internal static byte[] _BuildPps(bool cabacInitPresent = false) {
+  internal static byte[] _BuildPps(bool cabacInitPresent = false, bool listsModificationPresent = false) {
     var w = new Bits();
     w.WriteUe(0); // pps_pic_parameter_set_id
     w.WriteUe(0); // pps_seq_parameter_set_id
@@ -633,7 +634,7 @@ internal static class H265PcmStillCodec {
     w.WriteBit(0); // deblocking_filter_override_enabled_flag
     w.WriteBit(1); // pps_deblocking_filter_disabled_flag
     w.WriteBit(0); // pps_scaling_list_data_present_flag
-    w.WriteBit(0); // lists_modification_present_flag
+    w.WriteBit(listsModificationPresent ? 1 : 0); // lists_modification_present_flag
     w.WriteUe(0); // log2_parallel_merge_level_minus2
     w.WriteBit(0); // slice_segment_header_extension_present_flag
     w.WriteBit(0); // pps_extension_present_flag

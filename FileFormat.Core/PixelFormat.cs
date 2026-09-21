@@ -42,6 +42,17 @@ public enum PixelFormat {
   /// HDR pipelines, HEIF 10-bit, AVIF main10, ProRes 10-bit RGB.</summary>
   Rgb30,
 
+  /// <summary>
+  /// One color-filter-array sensor sample per pixel, right-justified in a little-endian ushort.
+  /// </summary>
+  /// <remarks>
+  /// Storage alone cannot say which colour filter covers a site or how many of the sixteen container
+  /// bits are significant. A <see cref="RawImage"/> using this format therefore carries
+  /// <see cref="RawImage.CfaInfo"/> with the Bayer phase and effective precision. Keeping phase out of
+  /// the storage enum avoids four byte-identical formats and leaves room for future CFA semantics.
+  /// </remarks>
+  Cfa16,
+
   // Floating-point formats. Samples are interleaved in channel order and stored little-endian.
   // Unlike the integer formats above, values are not implicitly clamped to 0..1: negative values,
   // values above one, infinities and NaNs are representable because HDR/scientific formats use them.
@@ -98,4 +109,21 @@ public enum PixelFormat {
   Yuv440P16,
   /// <summary>Planar 16-bit YUV 4:4:4 in little-endian ushort samples.</summary>
   Yuv444P16,
+
+  // Less common planar layouts are appended rather than inserted above so the public enum values of
+  // the long-standing formats remain stable.
+  /// <summary>Planar 8-bit YUV 4:1:1: Y, U, V.</summary>
+  Yuv411P8,
+  /// <summary>Planar 9-bit YUV 4:2:0 in right-justified little-endian ushort samples.</summary>
+  Yuv420P9,
+  /// <summary>Planar 9-bit YUV 4:2:2 in right-justified little-endian ushort samples.</summary>
+  Yuv422P9,
+  /// <summary>Planar 9-bit YUV 4:4:4 in right-justified little-endian ushort samples.</summary>
+  Yuv444P9,
+  /// <summary>Planar 14-bit YUV 4:2:0 in right-justified little-endian ushort samples.</summary>
+  Yuv420P14,
+  /// <summary>Planar 14-bit YUV 4:2:2 in right-justified little-endian ushort samples.</summary>
+  Yuv422P14,
+  /// <summary>Planar 14-bit YUV 4:4:4 in right-justified little-endian ushort samples.</summary>
+  Yuv444P14,
 }

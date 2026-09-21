@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using FileFormat.Zoomatic;
 
@@ -51,11 +52,11 @@ public sealed class ZoomaticReaderTests {
   [Test]
   [Category("Unit")]
   public void FromBytes_ValidFile_ParsesBitmapData() {
-    var data = _BuildValidFile(0x4000, 0x03);
-    data[2] = 0xAB;
-    data[8001] = 0xCD;
+    var screen = _BuildScreen(0x03);
+    screen[0] = 0xAB;
+    screen[7999] = 0xCD;
 
-    var result = ZoomaticReader.FromBytes(data);
+    var result = ZoomaticReader.FromBytes(_Pack(screen, 0x4000));
 
     Assert.That(result.BitmapData.Length, Is.EqualTo(8000));
     Assert.That(result.BitmapData[0], Is.EqualTo(0xAB));
@@ -114,30 +115,77 @@ public sealed class ZoomaticReaderTests {
 
   [Test]
   [Category("Unit")]
-  public void FromBytes_MinPayloadOnly_BackgroundColorDefaultsToZero() {
-    var data = new byte[ZoomaticFile.LoadAddressSize + ZoomaticFile.MinPayloadSize];
-    var result = ZoomaticReader.FromBytes(data);
+  public void FromBytes_BlankScreen_BackgroundColorDefaultsToZero() {
+    var result = ZoomaticReader.FromBytes(_Pack(new byte[10001], 0x2000));
 
     Assert.That(result.BackgroundColor, Is.EqualTo(0));
   }
 
-  private static byte[] _BuildValidFile(ushort loadAddress, byte backgroundColor) {
-    // LoadAddress(2) + Bitmap(8000) + Screen(1000) + Color(1000) + BackgroundColor(1)
-    var data = new byte[ZoomaticFile.LoadAddressSize + ZoomaticFile.MinPayloadSize + 1];
-    data[0] = (byte)(loadAddress & 0xFF);
-    data[1] = (byte)(loadAddress >> 8);
+  [Test]
+  [Category("Unit")]
+  public void FromBytes_StreamEndingBeforeTheScreenIsFull_ThrowsInvalidDataException() {
+    var truncated = _Pack(new byte[10001], 0x2000)[..8];
 
+    Assert.Throws<InvalidDataException>(() => ZoomaticReader.FromBytes(truncated));
+  }
+
+  private static byte[] _BuildValidFile(ushort loadAddress, byte backgroundColor)
+    => _Pack(_BuildScreen(backgroundColor), loadAddress);
+
+  /// <summary>The depacked screen: bitmap, video matrix, colour RAM, then the background register.</summary>
+  private static byte[] _BuildScreen(byte backgroundColor) {
+    var screen = new byte[10001];
     for (var i = 0; i < 8000; ++i)
-      data[2 + i] = (byte)(i % 256);
+      screen[i] = (byte)(i % 256);
 
     for (var i = 0; i < 1000; ++i)
-      data[8002 + i] = (byte)(i % 16);
+      screen[8000 + i] = (byte)(i % 16);
 
     for (var i = 0; i < 1000; ++i)
-      data[9002 + i] = (byte)((i + 3) % 16);
+      screen[9000 + i] = (byte)((i + 3) % 16);
 
-    data[10002] = backgroundColor;
+    screen[10000] = backgroundColor;
+    return screen;
+  }
 
-    return data;
+  /// <summary>
+  /// Packs a screen the way a Zoomatic file carries one, written out here rather than called from
+  /// the library so that the reader is held to the format and not to its own writer.
+  /// </summary>
+  /// <remarks>
+  /// The depacker starts at the last byte of the file, which states the escape, and walks down
+  /// towards the front while filling the screen from its last byte downwards. Everything before the
+  /// load address is therefore laid out back to front.
+  /// </remarks>
+  private static byte[] _Pack(byte[] screen, ushort loadAddress) {
+    const byte escape = 0xFE;
+    var body = new List<byte>();
+
+    for (var at = screen.Length - 1; at >= 0;) {
+      var value = screen[at];
+      var run = 1;
+      while (run < 256 && at - run >= 0 && screen[at - run] == value)
+        ++run;
+
+      if (run > 3 || value == escape) {
+        body.Add(escape);
+        body.Add((byte)(run & 0xFF));
+        body.Add(value);
+      } else {
+        for (var i = 0; i < run; ++i)
+          body.Add(value);
+      }
+
+      at -= run;
+    }
+
+    body.Reverse();
+
+    var file = new byte[2 + body.Count + 1];
+    file[0] = (byte)(loadAddress & 0xFF);
+    file[1] = (byte)(loadAddress >> 8);
+    body.CopyTo(file, 2);
+    file[^1] = escape;
+    return file;
   }
 }
