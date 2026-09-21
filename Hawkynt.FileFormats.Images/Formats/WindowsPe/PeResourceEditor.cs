@@ -196,8 +196,11 @@ internal static class PeResourceEditor {
     groupEntryOffset = checked(6 + index * 14);
 
     if (isCursor) {
+      // CURSORDIR carries the DIB's height rather than the displayed one -- the XOR bitmap and the
+      // AND mask are stacked in one DIB, so biHeight is twice what is shown and the group directory
+      // repeats that. ICONRESDIR below keeps the undoubled height.
       BinaryPrimitives.WriteUInt16LittleEndian(updatedGroupData.AsSpan(groupEntryOffset), checked((ushort)replacementImage.Width));
-      BinaryPrimitives.WriteUInt16LittleEndian(updatedGroupData.AsSpan(groupEntryOffset + 2), checked((ushort)replacementImage.Height));
+      BinaryPrimitives.WriteUInt16LittleEndian(updatedGroupData.AsSpan(groupEntryOffset + 2), checked((ushort)(replacementImage.Height * 2)));
       BinaryPrimitives.WriteUInt16LittleEndian(updatedGroupData.AsSpan(groupEntryOffset + 4), 1);
       BinaryPrimitives.WriteUInt16LittleEndian(updatedGroupData.AsSpan(groupEntryOffset + 6), checked((ushort)replacementImage.BitsPerPixel));
       BinaryPrimitives.WriteUInt32LittleEndian(updatedGroupData.AsSpan(groupEntryOffset + 8), checked((uint)replacementPayload.Length));

@@ -1,0 +1,27 @@
+// Provenance of oracle.dll -- the external oracle for the PE cursor/icon group height convention.
+//
+// oracle-cursor.cur and oracle-icon.ico are synthetic 1bpp images, 128x128 and 32x32, whose own
+// file directories state the DISPLAY height (128 and 32) and whose DIBs state twice that
+// (biHeight 256 and 64), because a cursor or icon DIB stacks its XOR bitmap on top of its AND
+// mask. oracle.dll is what the Microsoft toolchain makes of them:
+//
+//   rc.exe   /nologo /fo oracle.res oracle.rc
+//   link.exe /nologo /DLL /NOENTRY /MACHINE:X64 /OUT:oracle.dll oracle.res
+//
+//   rc.exe   Windows SDK 10.0.26100.0 (Resource Compiler 10.0.10011.16384)
+//   link.exe Microsoft Incremental Linker 14.51.36248.0 (MSVC 14.51.36231)
+//
+// What it emits, and the whole point of keeping it:
+//
+//   RT_GROUP_CURSOR entries  dirW=128 dirH=256   dirW=32 dirH=64    <- height DOUBLED
+//   RT_GROUP_ICON   entries  dirW=128 dirH=128   dirW=32 dirH=32    <- height NOT doubled
+//
+// One tool run, one pair of geometries, both conventions side by side. The same doubling appears
+// in the cursor groups of shipped Windows binaries (user32.dll, comctl32.dll), which no rc.exe
+// run of ours produced.
+//
+// Note rc.exe refuses a PNG-payload cursor outright ("error RC2176: old DIB ... pass it through
+// SDKPAINT"), so there is no Microsoft convention for one and the doubling is unconditional.
+
+1 CURSOR "oracle-cursor.cur"
+1 ICON "oracle-icon.ico"

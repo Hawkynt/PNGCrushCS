@@ -154,8 +154,21 @@ public static class PeResourceWriter {
         BinaryPrimitives.WriteUInt16LittleEndian(cursorData.AsSpan(2), hotspotY);
         imageData.CopyTo(cursorData.AsSpan(4));
 
+        // RT_GROUP_CURSOR's CURSORDIR states the DIB's height, not the displayed one: a cursor
+        // image stacks its XOR bitmap on top of its AND mask in one DIB, so BITMAPINFOHEADER
+        // .biHeight is twice the display height and the group directory repeats that doubled
+        // value. The .cur directory this is built from states the display height, hence the
+        // doubling here; PeResourceReader._AssembleCur halves it again on the way out and carries
+        // the evidence, which is measured rather than documented -- Microsoft's own CURSORDIR
+        // reference describes the field as the plain height and is wrong about what its tools
+        // emit. RT_GROUP_ICON's ICONRESDIR really does keep the undoubled height, which is why
+        // the icon branch below copies its width/height bytes across verbatim.
+        //
+        // Doubling is unconditional because there is nothing else it could be: rc.exe refuses a
+        // PNG-payload cursor outright ("old DIB ... pass it through SDKPAINT"), so Microsoft has
+        // no convention for one to match.
         BinaryPrimitives.WriteUInt16LittleEndian(groupDirectory.AsSpan(groupOffset), (ushort)width);
-        BinaryPrimitives.WriteUInt16LittleEndian(groupDirectory.AsSpan(groupOffset + 2), (ushort)height);
+        BinaryPrimitives.WriteUInt16LittleEndian(groupDirectory.AsSpan(groupOffset + 2), checked((ushort)(height * 2)));
         BinaryPrimitives.WriteUInt16LittleEndian(groupDirectory.AsSpan(groupOffset + 4), planes);
         BinaryPrimitives.WriteUInt16LittleEndian(groupDirectory.AsSpan(groupOffset + 6), bitCount);
         BinaryPrimitives.WriteUInt32LittleEndian(groupDirectory.AsSpan(groupOffset + 8), (uint)cursorData.Length);

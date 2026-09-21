@@ -102,8 +102,20 @@ public sealed class PeResourceWriterTests {
     });
   }
 
+  /// <summary>
+  /// A cursor group states the DIB's height; the .cur lifted out of it states half that, which is
+  /// the displayed height, alongside the hotspot the RT_CURSOR component carries.
+  /// </summary>
+  /// <remarks>
+  /// The builder writes CURSORDIR.wHeight as 22 for the 11-pixel cursor asked for here, because
+  /// that is what every producer of an RT_GROUP_CURSOR emits -- see MinimalPeBuilder. Both numbers
+  /// are asserted rather than only the second, so that the relation is pinned rather than being
+  /// satisfied accidentally by a fixture and a reader making the same mistake: that is precisely
+  /// how a missing halve survived here before. CursorGroupHeightTests holds the same relation to
+  /// producers outside this repository.
+  /// </remarks>
   [Test]
-  public void Reader_CursorGroup_PreservesCursordirHeightAndHotspot() {
+  public void Reader_CursorGroup_HalvesCursordirHeightAndKeepsHotspot() {
     var dib = MinimalPeBuilder.CreateMinimalIconEntry(16, 11);
     var pe = MinimalPeBuilder.BuildWithCursorGroup(dib, width: 16, height: 11, hotspotX: 3, hotspotY: 7, groupId: 23);
 
@@ -114,10 +126,37 @@ public sealed class PeResourceWriterTests {
       Assert.That(parsed.IconGroups[0].IsCursor, Is.True);
       Assert.That(parsed.IconGroups[0].GroupId, Is.EqualTo(23));
       Assert.That(parsed.IconGroups[0].IcoData[6], Is.EqualTo(16));
-      Assert.That(parsed.IconGroups[0].IcoData[7], Is.EqualTo(11));
+      Assert.That(parsed.IconGroups[0].IcoData[7], Is.EqualTo(11), "the .cur directory states the displayed height");
       Assert.That(BinaryPrimitives.ReadUInt16LittleEndian(parsed.IconGroups[0].IcoData.AsSpan(10)), Is.EqualTo(3));
       Assert.That(BinaryPrimitives.ReadUInt16LittleEndian(parsed.IconGroups[0].IcoData.AsSpan(12)), Is.EqualTo(7));
+
+      // The other half of the relation: what the group directory the reader was handed said.
+      var group = _FindGroupCursorDirectory(pe);
+      Assert.That(BinaryPrimitives.ReadUInt16LittleEndian(group.AsSpan(6)), Is.EqualTo(16));
+      Assert.That(BinaryPrimitives.ReadUInt16LittleEndian(group.AsSpan(8)), Is.EqualTo(22), "CURSORDIR states the DIB height");
     });
+  }
+
+  /// <summary>Locates the single RT_GROUP_CURSOR leaf a <see cref="MinimalPeBuilder"/> PE holds.</summary>
+  private static byte[] _FindGroupCursorDirectory(byte[] pe) {
+    // The builder emits a 0x200-aligned .rsrc at a known file offset with one language per
+    // resource, so the tree can be walked without a general-purpose parser.
+    const int rsrcOffset = 0x200;
+    var typeCount = BinaryPrimitives.ReadUInt16LittleEndian(pe.AsSpan(rsrcOffset + 14));
+    for (var i = 0; i < typeCount; ++i) {
+      var entry = rsrcOffset + 16 + i * 8;
+      if (BinaryPrimitives.ReadUInt32LittleEndian(pe.AsSpan(entry)) != 12)
+        continue;
+
+      var names = rsrcOffset + (int)(BinaryPrimitives.ReadUInt32LittleEndian(pe.AsSpan(entry + 4)) & 0x7FFFFFFF);
+      var languages = rsrcOffset + (int)(BinaryPrimitives.ReadUInt32LittleEndian(pe.AsSpan(names + 20)) & 0x7FFFFFFF);
+      var leaf = rsrcOffset + (int)(BinaryPrimitives.ReadUInt32LittleEndian(pe.AsSpan(languages + 20)) & 0x7FFFFFFF);
+      var rva = BinaryPrimitives.ReadUInt32LittleEndian(pe.AsSpan(leaf));
+      var size = BinaryPrimitives.ReadInt32LittleEndian(pe.AsSpan(leaf + 4));
+      return pe.AsSpan(rsrcOffset + (int)(rva - 0x1000), size).ToArray();
+    }
+
+    throw new InvalidDataException("The built PE carries no RT_GROUP_CURSOR.");
   }
 
   [Test]

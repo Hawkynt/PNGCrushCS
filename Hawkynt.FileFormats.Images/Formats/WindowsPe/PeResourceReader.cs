@@ -602,10 +602,28 @@ public static class PeResourceReader {
     for (var i = 0; i < count; ++i) {
       var entryBase = grpOffset + 6 + i * grpEntrySize;
 
-      // CURSORDIR stores the display width/height as WORDs. The doubled height belongs to the DIB
-      // carried by RT_CURSOR (XOR bitmap plus AND mask), not to this resource-directory field.
+      // CURSORDIR stores the width as a WORD, but its height is the DIB's height rather than the
+      // displayed one: a cursor image stacks the XOR bitmap on top of the AND mask inside a single
+      // DIB, so BITMAPINFOHEADER.biHeight is twice what is shown -- documented, that part: "The
+      // biHeight member of the icHeader structure represents the combined height of the XOR and
+      // AND masks. Remember to divide this number by two" -- and the resource compiler repeats
+      // that doubled value in the group directory. A standalone .cur file's directory entry
+      // carries the plain display height instead, so lifting one out of the other has to halve it.
+      //
+      // That last step is measured, not documented. Microsoft's CURSORDIR reference calls the
+      // field "the height of the cursor, in pixels" and says nothing about doubling, which is how
+      // this package came to drop the halving in the first place. What every producer actually
+      // emits says otherwise: rc.exe 10.0.26100 with link.exe 14.51 turns a .cur stating 128 into
+      // a group stating 256, and the cursor groups shipped in user32.dll and comctl32.dll state
+      // dirH == biHeight throughout. The fixture DLL under Tests/.../WindowsPe/Fixtures is that
+      // evidence kept, because this convention cannot be checked by a round trip through our own
+      // writer -- an inverse mistake in the two halves cancels and passes.
+      //
+      // RT_GROUP_ICON is deliberately not like this: ICONRESDIR carries the undoubled height, as
+      // the same rc.exe run over the same geometry shows. So only the cursor path halves. See
+      // _AddIconGroup in PeResourceWriter for the inverse.
       var width = BinaryPrimitives.ReadUInt16LittleEndian(data.AsSpan(entryBase));
-      var height = BinaryPrimitives.ReadUInt16LittleEndian(data.AsSpan(entryBase + 2));
+      var height = BinaryPrimitives.ReadUInt16LittleEndian(data.AsSpan(entryBase + 2)) / 2;
       var planes = BinaryPrimitives.ReadUInt16LittleEndian(data.AsSpan(entryBase + 4));
       var bitCount = BinaryPrimitives.ReadUInt16LittleEndian(data.AsSpan(entryBase + 6));
       var resourceId = BinaryPrimitives.ReadUInt16LittleEndian(data.AsSpan(entryBase + 12));
