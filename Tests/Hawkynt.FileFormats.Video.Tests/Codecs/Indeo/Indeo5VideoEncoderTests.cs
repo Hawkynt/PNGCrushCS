@@ -9,6 +9,37 @@ namespace FileFormat.Codecs.Indeo.Tests;
 [TestFixture]
 public sealed class Indeo5VideoEncoderTests {
 
+  /// <summary>
+  /// The worst a luminance sample comes back from an intra picture, which is what quantising the
+  /// eight-by-eight slant coefficients costs and nothing else.
+  /// </summary>
+  /// <remarks>
+  /// These are the measured extremes and not round numbers: luminance reaches exactly twelve on the
+  /// two larger geometries below and five and seven on the two smaller ones, chrominance never more
+  /// than two. Before this was measured the luminance assertion asked for ten, which no geometry
+  /// larger than seventeen samples across has ever produced.
+  /// </remarks>
+  private const int _INTRA_LUMA_TOLERANCE = 12;
+
+  /// <summary>The same for a chrominance sample, which the four-by-four slant treats far more gently.</summary>
+  private const int _INTRA_CHROMA_TOLERANCE = 2;
+
+  /// <summary>The worst a luminance sample comes back from a scalable intra picture.</summary>
+  /// <remarks>
+  /// A scalable picture puts the five-three decomposition in front of the same slant transforms, so
+  /// it can only be as good as those are - and it is: eight where a non-scalable intra picture of
+  /// the same source reaches twelve, because the four bands quantise more evenly than one does.
+  /// <para/>
+  /// These were forty and forty-eight while the encoder's analysis was not the inverse of the
+  /// decoder's recomposition, which let a scalable intra picture miss by seventy-eight and still
+  /// pass. Numbers that loose are how a broken transform hides, so they are the measured extremes
+  /// now and nothing more.
+  /// </remarks>
+  private const int _SCALABLE_INTRA_TOLERANCE = 8;
+
+  /// <summary>The same for a scalable predicted picture, which also carries its prediction error.</summary>
+  private const int _SCALABLE_PREDICTED_TOLERANCE = 10;
+
   private static MediaStreamInfo _Stream(int width, int height) => new() {
     Index = 5,
     Kind = MediaStreamKind.Video,
@@ -66,13 +97,13 @@ public sealed class Indeo5VideoEncoderTests {
       Assert.That(packet.DecodeTimestamp, Is.EqualTo(17));
       Assert.That(packet.IsKeyFrame, Is.True);
       Assert.That(_FrameType(packet), Is.EqualTo(Indeo5Decoder.FrameTypeIntra));
-      Assert.That(_MaximumDifference(decoded.Luma, _ExpectedLuma(frame)), Is.LessThanOrEqualTo(10));
+      Assert.That(_MaximumDifference(decoded.Luma, _ExpectedLuma(frame)), Is.LessThanOrEqualTo(_INTRA_LUMA_TOLERANCE));
     });
 
     var (expectedBlue, expectedRed) = _ExpectedChroma(frame);
     Assert.Multiple(() => {
-      Assert.That(_MaximumDifference(decoded!.ChromaBlue, expectedBlue), Is.LessThanOrEqualTo(10));
-      Assert.That(_MaximumDifference(decoded.ChromaRed, expectedRed), Is.LessThanOrEqualTo(10));
+      Assert.That(_MaximumDifference(decoded!.ChromaBlue, expectedBlue), Is.LessThanOrEqualTo(_INTRA_CHROMA_TOLERANCE));
+      Assert.That(_MaximumDifference(decoded.ChromaRed, expectedRed), Is.LessThanOrEqualTo(_INTRA_CHROMA_TOLERANCE));
     });
   }
 
@@ -173,10 +204,10 @@ public sealed class Indeo5VideoEncoderTests {
       Assert.That(decodedA, Is.Not.Null);
       Assert.That(decodedB, Is.Not.Null);
       Assert.That(afterScalable, Is.Not.Null);
-      Assert.That(_MaximumDifference(decodedFirst!.Luma, _ExpectedLuma(_Picture(width, height, 1))), Is.LessThanOrEqualTo(40));
-      Assert.That(_MaximumDifference(decodedA!.Luma, _ExpectedLuma(_Picture(width, height, 7))), Is.LessThanOrEqualTo(48));
-      Assert.That(_MaximumDifference(decodedB!.Luma, _ExpectedLuma(_Picture(width, height, 11))), Is.LessThanOrEqualTo(48));
-      Assert.That(_MaximumDifference(afterScalable!.Luma, _ExpectedLuma(_Picture(width, height, 3))), Is.LessThanOrEqualTo(48));
+      Assert.That(_MaximumDifference(decodedFirst!.Luma, _ExpectedLuma(_Picture(width, height, 1))), Is.LessThanOrEqualTo(_SCALABLE_INTRA_TOLERANCE));
+      Assert.That(_MaximumDifference(decodedA!.Luma, _ExpectedLuma(_Picture(width, height, 7))), Is.LessThanOrEqualTo(_SCALABLE_PREDICTED_TOLERANCE));
+      Assert.That(_MaximumDifference(decodedB!.Luma, _ExpectedLuma(_Picture(width, height, 11))), Is.LessThanOrEqualTo(_SCALABLE_PREDICTED_TOLERANCE));
+      Assert.That(_MaximumDifference(afterScalable!.Luma, _ExpectedLuma(_Picture(width, height, 3))), Is.LessThanOrEqualTo(_SCALABLE_PREDICTED_TOLERANCE));
     });
 
     var skipped = new Indeo5Decoder(width, height);
