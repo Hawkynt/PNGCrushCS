@@ -469,10 +469,8 @@ internal sealed class MpegPictureDecoder {
     }
 
     if (motionType == _MOTION_DUAL_PRIME) {
-      this._ReadMotionVector(ref reader, r: 0, direction, isFieldFormat: true);
+      this._ReadMotionVector(ref reader, r: 0, direction, isFieldFormat: true, readsDmVector: true);
       this._CopyFirstPredictorToSecond(direction);
-      this._dmVector[0] = _ReadDmVector(ref reader);
-      this._dmVector[1] = _ReadDmVector(ref reader);
       return;
     }
 
@@ -506,14 +504,28 @@ internal sealed class MpegPictureDecoder {
     this._predictor[1, direction, 1] = this._predictor[0, direction, 1];
   }
 
-  private void _ReadMotionVector(ref MpegBitReader reader, int r, int direction, bool isFieldFormat) {
+  /// <summary>Reads one motion_vector(r, s) of ISO/IEC 13818-2 6.2.5.2.1.</summary>
+  /// <remarks>
+  /// The dual-prime differential follows each component of the vector, not the whole vector: the
+  /// syntax is motion_code[0], motion_residual[0], dmvector[0], motion_code[1], motion_residual[1],
+  /// dmvector[1]. Reading both dmvectors after both components consumes exactly the same number of
+  /// bits whenever every dmvector is zero, so a decoder that gets the order wrong still decodes the
+  /// common case and only desynchronises on a picture that actually moves between its fields.
+  /// </remarks>
+  private void _ReadMotionVector(
+    ref MpegBitReader reader, int r, int direction, bool isFieldFormat, bool readsDmVector = false) {
     this._ReadMotionVectorComponent(ref reader, r, direction, component: 0, halveThePrediction: false);
+    if (readsDmVector)
+      this._dmVector[0] = _ReadDmVector(ref reader);
 
     // Only field-format vectors in a FRAME picture scale the vertical PMV between frame-line and
     // field-line units. In a field picture both PMV and vector are already counted in field lines.
     this._ReadMotionVectorComponent(
       ref reader, r, direction, component: 1,
       halveThePrediction: isFieldFormat && !this._isFieldPicture);
+
+    if (readsDmVector)
+      this._dmVector[1] = _ReadDmVector(ref reader);
   }
 
   private void _ReadMotionVectorComponent(

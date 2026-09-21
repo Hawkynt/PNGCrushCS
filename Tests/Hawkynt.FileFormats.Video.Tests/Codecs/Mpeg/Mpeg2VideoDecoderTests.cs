@@ -200,18 +200,46 @@ public sealed class Mpeg2VideoDecoderTests {
   [Test]
   [Category("Unit")]
   public void DualPrimePredictionDecodesWithoutApproximatingItAsOrdinaryFieldMotion() {
-    // Four macroblock rows give the derived +/- half-field-line vectors room to stay inside the
-    // reference. The two interior rows use dual-prime; the outer rows use ordinary frame prediction.
-    // The reference is flat, so every legal prediction must remain bit-exactly flat regardless of
-    // which of its two field predictions supplied a sample.
+    // The same picture twice, differing only in what its two interior macroblock rows say they are:
+    // dual-prime with a vertical dmvector of +1, or ordinary frame prediction with the same coded
+    // vector of (0, 0). Dual-prime averages the same-parity field with the opposite-parity one read
+    // a field line away, so over a banded reference the two cannot reconstruct the same samples. A
+    // decoder that read the syntax and then predicted as though it were frame motion would return
+    // equal pictures here, which is the failure this is watching for; the flat reference the test
+    // used to build could not tell the two apart, because every vector over a flat picture predicts
+    // the same samples.
+    var dualPrime = _Decode(_DualPrimeStream(useDualPrime: true));
+    var frameMotion = _Decode(_DualPrimeStream(useDualPrime: false));
+
+    Assert.Multiple(() => {
+      Assert.That(dualPrime, Has.Count.EqualTo(2));
+      Assert.That(frameMotion, Has.Count.EqualTo(2));
+      Assert.That(dualPrime[0].PixelData, Is.EqualTo(frameMotion[0].PixelData),
+        "the intra anchor is the same picture in both streams");
+      Assert.That(dualPrime[1].PixelData, Is.Not.EqualTo(frameMotion[1].PixelData),
+        "dual-prime prediction was approximated as ordinary frame motion");
+    });
+  }
+
+  /// <summary>
+  /// A banded 64x64 intra anchor followed by a predicted picture whose interior rows use either
+  /// dual-prime or frame motion.
+  /// </summary>
+  /// <remarks>
+  /// Four macroblock rows give the derived plus and minus half-field-line vectors room to stay
+  /// inside the reference. The dmvector follows the component of motion_vector() it belongs to and
+  /// not the whole vector, per ISO/IEC 13818-2 6.2.5.2.1.
+  /// </remarks>
+  private static byte[] _DualPrimeStream(bool useDualPrime) {
     const int size = 64;
     var stream = new MpegTestStream()
       .SequenceHeader(size, size).SequenceExtension(progressiveSequence: false)
       .PictureHeader(1).PictureCodingExtension(progressiveFrame: false);
 
+    var bands = new[] { 0, 40, -60, 30 };
     for (var row = 0; row < 4; ++row) {
       stream.SliceHeader(row, 1);
-      _FlatIntraMacroblocks(stream, 4);
+      _FlatIntraMacroblocks(stream, 4, luminanceDifferential: bands[row]);
     }
 
     stream
@@ -222,22 +250,19 @@ public sealed class Mpeg2VideoDecoderTests {
       stream.SliceHeader(row, 1);
       for (var column = 0; column < 4; ++column) {
         stream.Code("1").Code("001");
-        if (row is 1 or 2) {
+        if (row is 1 or 2 && useDualPrime)
           stream
-            .Bits(3, 2) // frame_motion_type = dual-prime
-            .Code("1").Code("1") // coded vector (0,0)
-            .Bits(0, 1).Bits(0, 1); // dmvector (0,0)
-        } else {
+            .Bits(3, 2)                   // frame_motion_type = dual-prime
+            .Code("1").Code("0")          // horizontal motion_code 0, dmvector[0] = 0
+            .Code("1").Code("10");        // vertical motion_code 0, dmvector[1] = +1
+        else
           stream
-            .Bits(2, 2) // frame_motion_type = frame
+            .Bits(2, 2)                   // frame_motion_type = frame
             .Code("1").Code("1");
-        }
       }
     }
 
-    var frames = _Decode(stream.End());
-    Assert.That(frames, Has.Count.EqualTo(2));
-    Assert.That(frames[1].PixelData.Distinct().ToArray(), Is.EqualTo(new byte[] { 130 }));
+    return stream.End();
   }
 
   [Test]
