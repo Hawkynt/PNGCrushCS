@@ -4,9 +4,10 @@ using System.Linq;
 namespace FileFormat.Core.Tests;
 
 /// <summary>
-/// Exercises every packed integer <see cref="PixelFormat"/> pair through <see cref="PixelConverter.Convert"/>.
-/// The hub-based fallback used to recurse forever for targets with no direct route from BGRA32,
-/// overflowing the stack — an uncatchable crash reachable from the public encode API.
+/// Exercises every display-oriented packed integer <see cref="PixelFormat"/> pair through
+/// <see cref="PixelConverter.Convert"/>. The hub-based fallback used to recurse forever for targets
+/// with no direct route from BGRA32, overflowing the stack — an uncatchable crash reachable from the
+/// public encode API.
 /// </summary>
 /// <remarks>
 /// Planar YUV and floating-point formats deliberately live one layer above this converter in
@@ -14,12 +15,21 @@ namespace FileFormat.Core.Tests;
 /// coverage: <c>RawImageExtendedFormatTests</c> exercises those routes and their colour interpretation.
 /// In particular, RGB-to-YUV cannot be a context-free byte shuffle: a writer has to choose a matrix,
 /// signal range and chroma siting rather than have this low-level converter invent those semantics.
+/// <para/>
+/// CFA sensor mosaics are excluded for the same semantic reason, but more strongly: converting RGB to
+/// CFA would require inventing a camera sampling model, while converting CFA to RGB is a demosaic
+/// operation whose algorithm and quality policy are explicit image-processing choices. Neither belongs
+/// in the packed pixel-shuffle matrix merely because <see cref="PixelFormat.Cfa16"/> occupies two bytes
+/// per sensor site.
 /// </remarks>
 [TestFixture]
 public sealed class PixelConverterMatrixTests {
 
   private static PixelFormat[] PackedIntegerFormats => Enum.GetValues<PixelFormat>()
-    .Where(format => !RawImage.IsPlanarYuvFormat(format) && !RawImage.IsFloatingPointFormat(format))
+    .Where(format =>
+      !RawImage.IsPlanarYuvFormat(format)
+      && !RawImage.IsFloatingPointFormat(format)
+      && !RawImage.IsColorFilterArrayFormat(format))
     .ToArray();
 
   private static readonly PixelFormat[] _IndexedFormats = [
