@@ -21,6 +21,7 @@ namespace FileFormat.Codecs;
 /// solid/cell/raw coding. There are no B-frames or future-picture references in Interplay Video:
 /// every reference is backward in display time or backward within the picture being built.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.FFmpeg)]
 public sealed class MveVideoEncoder : IVideoCodecEncoder<MveVideoEncoder> {
 
   private static readonly CodecTag _Tag = CodecTag.FromCharacters("IMVE");

@@ -18,6 +18,7 @@ public sealed class MveVideoEncoderTests {
   private const byte _VIDEO_DATA_06 = 0x06;
   private const byte _VIDEO_DATA_10 = 0x10;
   private const byte _VIDEO_DATA_11 = 0x11;
+  private const byte _SEND_BUFFER = 0x07;
 
   [Test]
   [Category("Unit")]
@@ -78,7 +79,7 @@ public sealed class MveVideoEncoderTests {
 
     Assert.That(decoder.TryDecode(new(0, _Opcode(_SET_PALETTE_COMPRESSED, compressed.ToArray())), out _), Is.False);
     Assert.That(decoder.TryDecode(new(0, _Opcode(_DECODING_MAP, [0x0E])), out _), Is.False);
-    Assert.That(decoder.TryDecode(new(0, _Opcode(_VIDEO_DATA_11, _VideoPayload(1, 1, [8]))), out var picture), Is.True);
+    Assert.That(decoder.TryDecode(new(0, _Presented(_VIDEO_DATA_11, _VideoPayload(1, 1, [8]))), out var picture), Is.True);
 
     Assert.That(picture.Palette![8 * 3], Is.EqualTo(255));
     Assert.That(picture.Palette[8 * 3 + 1], Is.Zero);
@@ -96,7 +97,7 @@ public sealed class MveVideoEncoderTests {
     BinaryPrimitives.WriteInt16LittleEndian(payload.AsSpan(14), 0);
     pixels.CopyTo(payload, 16);
 
-    Assert.That(decoder.TryDecode(new(0, _Opcode(_VIDEO_DATA_06, payload)), out var picture), Is.True);
+    Assert.That(decoder.TryDecode(new(0, _Presented(_VIDEO_DATA_06, payload)), out var picture), Is.True);
     Assert.That(picture.PixelData, Is.EqualTo(pixels));
   }
 
@@ -108,28 +109,150 @@ public sealed class MveVideoEncoderTests {
 
     Assert.That(decoder.TryDecode(new(0, _Opcode(_SKIP_MAP, [0xFF, 0xFF])), out _), Is.False); // signed -1: changed
     Assert.That(decoder.TryDecode(new(0, _Opcode(_DECODING_MAP, [0, 0])), out _), Is.False);
-    Assert.That(decoder.TryDecode(new(0, _Opcode(_VIDEO_DATA_10, _VideoPayload(1, 1, pixels))), out var picture), Is.True);
+    Assert.That(decoder.TryDecode(new(0, _Presented(_VIDEO_DATA_10, _VideoPayload(1, 1, pixels))), out var picture), Is.True);
     Assert.That(picture.PixelData, Is.EqualTo(pixels));
   }
 
+  // ============================================================================================
+  // The external oracle
+  // ============================================================================================
+
+  private const int _ORACLE_WIDTH = 64;
+  private const int _ORACLE_HEIGHT = 48;
+  private const int _ORACLE_FRAMES = 6;
+  private const int _ORACLE_BAND = 8;
+
+  /// <summary>Which rows the moving band covers in a given frame.</summary>
+  /// <remarks>
+  /// It moves rather than grows, and that is the whole design of this clip. A sequence whose changed
+  /// region only ever grows leaves the untouched region identical in every frame before it, so it
+  /// stops mattering which earlier picture a temporal opcode referenced — every wrong reference
+  /// happens to hold the right bytes, and a broken predictor passes. Interplay Video has two
+  /// temporal references, the previous picture and the one two back, and block opcodes that reach
+  /// each; a band that moves one block-row per frame differs from both of them in different places,
+  /// so picking the wrong one shows up as wrong pixels rather than as luck.
+  /// </remarks>
+  private static bool _InBand(int y, int frame) {
+    var start = frame * _ORACLE_BAND % _ORACLE_HEIGHT;
+    return y >= start && y < start + _ORACLE_BAND;
+  }
+
+  /// <summary>A six-bit VGA component as the decoder widens it back to eight bits.</summary>
+  private static byte _SixBitWidened(int sixBit) => (byte)(sixBit << 2 | sixBit >> 4);
+
+  /// <summary>A five-bit RGB555 component as the decoder widens it back to eight bits.</summary>
+  private static byte _FiveBitWidened(int fiveBit) => (byte)(fiveBit << 3 | fiveBit >> 2);
+
+  /// <summary>
+  /// Hands FFmpeg a multi-picture MVE this package wrote and requires every pixel back, at both
+  /// depths.
+  /// </summary>
+  /// <remarks>
+  /// The check this replaces called <c>TryDecodeFirstFrame</c> on a one-picture clip and compared no
+  /// samples at all, so it proved that FFmpeg's demuxer accepted the file and nothing whatever about
+  /// the pictures in it — an encoder that got every temporal reference backwards would have passed
+  /// it. It also could not see the defect it was best placed to catch: FFmpeg decoded that clip and
+  /// then printed "Invalid data found when processing input" with an exit status of zero, because
+  /// the writer closed the file with an END chunk holding the closing opcodes instead of the
+  /// shutdown-then-empty-end pair every shipped MVE uses.
+  /// <para/>
+  /// So the clip now runs six pictures through both coded depths, is decoded whole, and every pixel
+  /// of every picture is compared. Both palettes and colours are chosen on the grid the format
+  /// actually stores — six bits a component for the VGA palette, five for RGB555 — so the comparison
+  /// is an equality and not a tolerance: nothing here is lossy except the quantisation this clip
+  /// avoids by construction.
+  /// </remarks>
   [Test]
   [Category("Conformance")]
-  public void EncoderAndMveWriterProduceAFileFFmpegCanDecode() {
+  [TestCase(8, TestName = "{m}(8-bit palettised)")]
+  [TestCase(16, TestName = "{m}(16-bit RGB555)")]
+  public void FFmpegReadsBackEveryPictureOfAnMveThisPackageWrote(int bitsPerPixel) {
     FFmpegOracle.RequireAvailable();
-    var requested = _Stream(64, 48, 8);
-    var encoder = MveVideoEncoder.Create(requested);
-    encoder.TryEncode(_IndexedBlocks(64, 48, 1, 2), 0, out var packet);
-    var stream = encoder.DescribeStream();
-    var file = VideoIO.Mux<MveWriter>([stream], [packet]);
-    var path = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName() + ".mve");
 
-    try {
-      File.WriteAllBytes(path, file);
-      var (decoded, detail) = FFmpegOracle.TryDecodeFirstFrame(path, 64, 48);
-      Assert.That(decoded, Is.True, detail);
-    } finally {
-      try { File.Delete(path); } catch { /* best effort */ }
+    var encoder = MveVideoEncoder.Create(_Stream(_ORACLE_WIDTH, _ORACLE_HEIGHT, bitsPerPixel));
+    var expected = new byte[_ORACLE_FRAMES][];
+    var packets = new CodedPacket[_ORACLE_FRAMES];
+
+    for (var i = 0; i < _ORACLE_FRAMES; ++i) {
+      var picture = bitsPerPixel == 8 ? _OraclePalettised(i) : _OracleTrueColour(i);
+      expected[i] = _ExpectedRgb24(picture);
+      Assert.That(encoder.TryEncode(picture, i, out packets[i]), Is.True, $"picture {i} was not encoded");
     }
+
+    var directory = Directory.CreateTempSubdirectory("mveoracle");
+    try {
+      var path = Path.Combine(directory.FullName, "clip.mve");
+      File.WriteAllBytes(path, VideoIO.Mux<MveWriter>([encoder.DescribeStream()], packets));
+
+      var frameBytes = _ORACLE_WIDTH * _ORACLE_HEIGHT * 3;
+      var (decoded, detail, samples) = FFmpegOracle.TryDecodePictures(
+        path, _ORACLE_WIDTH, _ORACLE_HEIGHT, _ORACLE_FRAMES);
+
+      Assert.That(decoded, Is.True, $"ffmpeg did not read the {bitsPerPixel}-bit MVE back: {detail}");
+
+      for (var i = 0; i < _ORACLE_FRAMES; ++i)
+        Assert.That(
+          samples.AsSpan(i * frameBytes, frameBytes).ToArray(),
+          Is.EqualTo(expected[i]),
+          $"ffmpeg decoded picture {i} to pixels other than the ones encoded");
+    } finally {
+      try { directory.Delete(recursive: true); } catch { /* best effort */ }
+    }
+  }
+
+  /// <summary>A palettised picture whose two indices swap over a moving band.</summary>
+  private static RawImage _OraclePalettised(int frame) {
+    var palette = new byte[256 * 3];
+    for (var i = 0; i < 256; ++i) {
+      palette[i * 3] = _SixBitWidened(i * 7 % 64);
+      palette[i * 3 + 1] = _SixBitWidened(i * 11 % 64);
+      palette[i * 3 + 2] = _SixBitWidened(i * 23 % 64);
+    }
+
+    var pixels = new byte[_ORACLE_WIDTH * _ORACLE_HEIGHT];
+    for (var y = 0; y < _ORACLE_HEIGHT; ++y)
+    for (var x = 0; x < _ORACLE_WIDTH; ++x)
+      pixels[y * _ORACLE_WIDTH + x] = (byte)(_InBand(y, frame) ? 40 + x / 8 : 3 + (x / 8 + y / 8) % 5);
+
+    return new() {
+      Width = _ORACLE_WIDTH,
+      Height = _ORACLE_HEIGHT,
+      Format = PixelFormat.Indexed8,
+      PixelData = pixels,
+      Palette = palette,
+      PaletteCount = 256,
+    };
+  }
+
+  /// <summary>An RGB picture whose colours already sit on the RGB555 grid.</summary>
+  private static RawImage _OracleTrueColour(int frame) {
+    var pixels = new byte[_ORACLE_WIDTH * _ORACLE_HEIGHT * 3];
+    for (var y = 0; y < _ORACLE_HEIGHT; ++y)
+    for (var x = 0; x < _ORACLE_WIDTH; ++x) {
+      var at = (y * _ORACLE_WIDTH + x) * 3;
+      var band = _InBand(y, frame);
+      pixels[at] = _FiveBitWidened(band ? 31 - x / 8 * 3 : x / 4 % 32);
+      pixels[at + 1] = _FiveBitWidened(band ? 7 : y / 4 % 32);
+      pixels[at + 2] = _FiveBitWidened(band ? x / 8 * 2 : (x / 8 + y / 8) % 32);
+    }
+
+    return new() { Width = _ORACLE_WIDTH, Height = _ORACLE_HEIGHT, Format = PixelFormat.Rgb24, PixelData = pixels };
+  }
+
+  /// <summary>What the picture looks like once a palette, if any, has been applied.</summary>
+  private static byte[] _ExpectedRgb24(RawImage picture) {
+    if (picture.Format == PixelFormat.Rgb24)
+      return (byte[])picture.PixelData.Clone();
+
+    var result = new byte[picture.Width * picture.Height * 3];
+    for (var i = 0; i < picture.Width * picture.Height; ++i) {
+      var entry = picture.PixelData[i] * 3;
+      result[i * 3] = picture.Palette![entry];
+      result[i * 3 + 1] = picture.Palette[entry + 1];
+      result[i * 3 + 2] = picture.Palette[entry + 2];
+    }
+
+    return result;
   }
 
   private static MediaStreamInfo _Stream(int width, int height, int bitsPerPixel) => new() {
@@ -163,6 +286,15 @@ public sealed class MveVideoEncoderTests {
     }
     return new() { Width = width, Height = height, Format = PixelFormat.Rgb24, PixelData = pixels };
   }
+
+  /// <summary>A video-data opcode plus the SEND_BUFFER that presents what it built.</summary>
+  /// <remarks>
+  /// VIDEO_DATA reconstructs a page and does not display one; opcode 0x07 is the display boundary in
+  /// the public MVE description, in FFmpeg and in ScummVM, and the decoder returns a picture only
+  /// when it arrives. Every real file carries exactly one per video chunk.
+  /// </remarks>
+  private static byte[] _Presented(byte type, byte[] payload)
+    => [.. _Opcode(type, payload), .. _Opcode(_SEND_BUFFER, [])];
 
   private static byte[] _Opcode(byte type, byte[] payload) {
     var result = new byte[payload.Length + 4];
