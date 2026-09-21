@@ -60,6 +60,47 @@ public class ProResVideoEncoderAdvancedTests {
     });
   }
 
+  /// <summary>
+  /// The 4:4:4 profiles over the geometries the 4:2:2 ones are walked over.
+  /// </summary>
+  /// <remarks>
+  /// Sizes that are and are not a whole number of macroblocks, because right and bottom padding are
+  /// where an encoder and a decoder most easily lay a picture out differently and still produce
+  /// something that decodes. 4:4:4 reaches it by a different route than 4:2:2 — four chroma blocks a
+  /// macroblock instead of two, and no horizontal subsampling to round the chroma width up from.
+  /// </remarks>
+  [TestCase("ap4h")]
+  [TestCase("ap4x")]
+  [Category("Unit")]
+  public void EveryFourFourFourProfileCodesEveryGeometryThisPackagesOwnDecoderReadsBack(string codec) {
+    foreach (var (width, height) in new[] { (16, 16), (41, 25), (64, 48), (160, 82) }) {
+      var source = new ushort[width * height];
+      for (var y = 0; y < height; ++y)
+        for (var x = 0; x < width; ++x)
+          source[y * width + x] = (ushort)(512 + (x * 9 + y * 17) % 2048);
+
+      var picture = _Planes(width, height, PixelFormat.Yuv444P12, source, source, source);
+      var stream = _Stream(width, height, codec, bitsPerPixel: 24);
+      var planes = _EncodeAndDecode(stream, picture, out var header);
+
+      Assert.Multiple(() => {
+        Assert.That(header.HorizontalSize, Is.EqualTo(width), $"{codec} {width}x{height}");
+        Assert.That(header.VerticalSize, Is.EqualTo(height), $"{codec} {width}x{height}");
+        Assert.That(header.ChromaFormat, Is.EqualTo(3), $"{codec} {width}x{height}");
+        Assert.That(planes.BitDepth, Is.EqualTo(12), $"{codec} {width}x{height}");
+        Assert.That(planes.Width, Is.GreaterThanOrEqualTo(width), $"{codec} {width}x{height}");
+        Assert.That(planes.ChromaWidth, Is.EqualTo(planes.Width), $"{codec} {width}x{height}");
+      });
+
+      var worst = 0;
+      for (var y = 0; y < height; ++y)
+        for (var x = 0; x < width; ++x)
+          worst = Math.Max(worst, Math.Abs(planes.Luma[y * planes.Width + x] - source[y * width + x]));
+
+      Assert.That(worst, Is.LessThan(256), $"{codec} {width}x{height} lost the picture entirely");
+    }
+  }
+
   [Test]
   [Category("Unit")]
   public void EightBitAlphaSurvives4444Exactly() {
