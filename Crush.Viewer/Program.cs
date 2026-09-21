@@ -153,7 +153,9 @@ internal static class Program {
     var captured = WindowCapture.Capture(origin.X, origin.Y, size.Width, size.Height);
     if (captured == null) {
       if (reportFailure)
-        Console.Error.WriteLine($"The platform returned no pixels for {size.Width} x {size.Height} at {origin.X},{origin.Y}.");
+        Console.Error.WriteLine(
+          $"No pixels came back for {size.Width} x {size.Height} at {origin.X},{origin.Y}: either the platform "
+          + "refused the read, or the window in front there belongs to another application.");
       return false;
     }
 

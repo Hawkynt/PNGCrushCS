@@ -15,10 +15,14 @@ namespace Crush.Viewer;
 /// window, not a reconstruction of one.
 /// </para>
 /// <para>
-/// Both implementations read the screen at the window's client rectangle rather than addressing the
-/// window itself, because the only handle the toolkit exposes is the screen position of a control's
-/// client origin. The window therefore has to be unobscured, which it is on a machine running nothing
-/// else — a capture session, or a headless X server with a single client.
+/// The toolkit exposes no window handle — only the screen position of a control's client origin —
+/// so the window has to be found from outside it. On Windows it is, by asking the platform which
+/// top-level windows this process owns, and the capture is then the window drawing itself into a
+/// bitmap: a window that is behind something else still yields its own pixels. On X11 there is no
+/// equivalent, so the capture reads the screen at the client rectangle, and the window has to be
+/// unobscured — which it is on a machine running nothing else, or a headless server with a single
+/// client. Wherever the screen is read, the rectangle is checked to be this process's window first,
+/// because a screen read that lands on someone else's window looks exactly like a good one.
 /// </para>
 /// </remarks>
 internal static class WindowCapture {
@@ -111,7 +115,7 @@ internal static class WindowCapture {
   }
 
   // ============================================================================================
-  // Windows — GDI blit out of the screen device context.
+  // Windows — ask the window to draw itself, and read the screen only if it will not.
   // ============================================================================================
 
   private const int _SM_CXSCREEN = 0;
@@ -120,6 +124,15 @@ internal static class WindowCapture {
   private const int _CAPTUREBLT = 0x40000000;
   private const int _BI_RGB = 0;
   private const int _DIB_RGB_COLORS = 0;
+
+  /// <summary>Renders only the client area, which is what the capture is of.</summary>
+  private const int _PW_CLIENTONLY = 1;
+
+  /// <summary>Includes what the compositor draws, which plain PrintWindow leaves blank.</summary>
+  private const int _PW_RENDERFULLCONTENT = 2;
+
+  /// <summary>How far inside the rectangle the ownership samples sit.</summary>
+  private const int _OWNERSHIP_INSET = 4;
 
   [StructLayout(LayoutKind.Sequential)]
   private struct BitmapInfoHeader {
@@ -136,9 +149,31 @@ internal static class WindowCapture {
     public int ClrImportant;
   }
 
+  [StructLayout(LayoutKind.Sequential)]
+  private struct WindowPoint {
+    public int X;
+    public int Y;
+  }
+
+  [StructLayout(LayoutKind.Sequential)]
+  private struct WindowRect {
+    public int Left;
+    public int Top;
+    public int Right;
+    public int Bottom;
+  }
+
+  private delegate bool EnumWindowsProc(IntPtr window, IntPtr state);
+
   [DllImport("user32.dll")] private static extern int GetSystemMetrics(int index);
   [DllImport("user32.dll")] private static extern IntPtr GetDC(IntPtr window);
   [DllImport("user32.dll")] private static extern int ReleaseDC(IntPtr window, IntPtr dc);
+  [DllImport("user32.dll")] private static extern IntPtr WindowFromPoint(WindowPoint point);
+  [DllImport("user32.dll")] private static extern int GetWindowThreadProcessId(IntPtr window, out int processId);
+  [DllImport("user32.dll")] private static extern bool EnumWindows(EnumWindowsProc callback, IntPtr state);
+  [DllImport("user32.dll")] private static extern bool IsWindowVisible(IntPtr window);
+  [DllImport("user32.dll")] private static extern bool GetClientRect(IntPtr window, out WindowRect rect);
+  [DllImport("user32.dll")] private static extern bool PrintWindow(IntPtr window, IntPtr dc, int flags);
   [DllImport("gdi32.dll")] private static extern IntPtr CreateCompatibleDC(IntPtr dc);
   [DllImport("gdi32.dll")] private static extern bool DeleteDC(IntPtr dc);
   [DllImport("gdi32.dll")] private static extern IntPtr SelectObject(IntPtr dc, IntPtr obj);
@@ -147,20 +182,105 @@ internal static class WindowCapture {
   [DllImport("gdi32.dll")] private static extern IntPtr CreateDIBSection(IntPtr dc, ref BitmapInfoHeader header, int usage, out IntPtr bits, IntPtr section, int offset);
   [DllImport("gdi32.dll")] private static extern bool GdiFlush();
 
+  /// <summary>
+  /// Asks the window for its own pixels, and only reads the screen when it will not give them.
+  /// </summary>
+  /// <remarks>
+  /// <para>
+  /// Reading the screen was the whole of this, and it is wrong in a way no check on the pixels can
+  /// see: a blit copies whatever is in front of those coordinates, so on a desktop with anything
+  /// else open it writes a picture of another application's window and calls it a screenshot. It
+  /// also needs the rectangle to be right, and the one the toolkit reports is in its own units —
+  /// on a scaled display it does not line up with the physical pixels a blit addresses.
+  /// </para>
+  /// <para>
+  /// <c>PrintWindow</c> has neither problem: it asks the window to render into a device context, so
+  /// what comes back is that window whether or not it is in front, at the size its client area
+  /// actually is. The screen blit stays as the fallback for a window that refuses to draw itself,
+  /// and there it is guarded by an ownership check rather than trusted.
+  /// </para>
+  /// </remarks>
   private static RawImage? _CaptureWindows(int x, int y, int width, int height) {
+    var own = _OwnTopLevelWindow();
+    if (own != IntPtr.Zero && _RenderWindow(own) is { } rendered && !IsBlank(rendered))
+      return rendered;
+
+    if (!_IsOwnWindowAt(x, y, width, height))
+      return null;
+
     var screen = GetDC(IntPtr.Zero);
     if (screen == IntPtr.Zero)
+      return null;
+
+    try {
+      return _IntoDibSection(width, height, dc => BitBlt(dc, 0, 0, width, height, screen, x, y, _SRCCOPY | _CAPTUREBLT));
+    } finally {
+      ReleaseDC(IntPtr.Zero, screen);
+    }
+  }
+
+  /// <summary>The largest visible top-level window this process owns, or zero when it has none.</summary>
+  /// <remarks>
+  /// The toolkit exposes no window handle, so the window has to be found from the outside. Largest
+  /// rather than first: a process owns several top-level windows it never shows anyone — the
+  /// message-only, tooltip and input-method helpers a toolkit creates — and the one worth
+  /// photographing is the one with a client area to photograph.
+  /// </remarks>
+  private static IntPtr _OwnTopLevelWindow() {
+    var self = Environment.ProcessId;
+    var best = IntPtr.Zero;
+    var bestArea = 0L;
+
+    EnumWindows((window, _) => {
+      if (!IsWindowVisible(window))
+        return true;
+
+      GetWindowThreadProcessId(window, out var owner);
+      if (owner != self || !GetClientRect(window, out var client))
+        return true;
+
+      var area = (long)client.Right * client.Bottom;
+      if (area <= bestArea)
+        return true;
+
+      bestArea = area;
+      best = window;
+      return true;
+    }, IntPtr.Zero);
+
+    return best;
+  }
+
+  /// <summary>Has a window draw its client area into a bitmap, or answers null when it will not.</summary>
+  private static RawImage? _RenderWindow(IntPtr window) {
+    if (!GetClientRect(window, out var client))
+      return null;
+
+    var width = client.Right - client.Left;
+    var height = client.Bottom - client.Top;
+    return width < 1 || height < 1
+      ? null
+      : _IntoDibSection(width, height, dc => PrintWindow(window, dc, _PW_CLIENTONLY | _PW_RENDERFULLCONTENT));
+  }
+
+  /// <summary>Runs a drawing operation into a top-down 32-bit bitmap and hands back its pixels.</summary>
+  /// <remarks>
+  /// A negative height asks GDI for a top-down bitmap, which is the row order the writers want, so
+  /// nothing has to be flipped afterwards.
+  /// </remarks>
+  private static RawImage? _IntoDibSection(int width, int height, Func<IntPtr, bool> draw) {
+    var reference = GetDC(IntPtr.Zero);
+    if (reference == IntPtr.Zero)
       return null;
 
     var memory = IntPtr.Zero;
     var bitmap = IntPtr.Zero;
     var previous = IntPtr.Zero;
     try {
-      memory = CreateCompatibleDC(screen);
+      memory = CreateCompatibleDC(reference);
       if (memory == IntPtr.Zero)
         return null;
 
-      // A negative height asks GDI for a top-down bitmap, which is the row order the writers want.
       var header = new BitmapInfoHeader {
         Size = Marshal.SizeOf<BitmapInfoHeader>(),
         Width = width,
@@ -170,12 +290,12 @@ internal static class WindowCapture {
         Compression = _BI_RGB,
       };
 
-      bitmap = CreateDIBSection(screen, ref header, _DIB_RGB_COLORS, out var bits, IntPtr.Zero, 0);
+      bitmap = CreateDIBSection(reference, ref header, _DIB_RGB_COLORS, out var bits, IntPtr.Zero, 0);
       if (bitmap == IntPtr.Zero || bits == IntPtr.Zero)
         return null;
 
       previous = SelectObject(memory, bitmap);
-      if (!BitBlt(memory, 0, 0, width, height, screen, x, y, _SRCCOPY | _CAPTUREBLT))
+      if (!draw(memory))
         return null;
 
       // GDI batches its drawing, and a DIB section's memory is only guaranteed to hold the result
@@ -185,7 +305,8 @@ internal static class WindowCapture {
       var pixels = new byte[width * height * 4];
       Marshal.Copy(bits, pixels, 0, pixels.Length);
 
-      // A screen blit carries no alpha; the writers would otherwise see a fully transparent picture.
+      // Neither a screen blit nor a window's own painting carries alpha; the writers would otherwise
+      // see a fully transparent picture.
       for (var i = 3; i < pixels.Length; i += 4)
         pixels[i] = 255;
 
@@ -194,8 +315,51 @@ internal static class WindowCapture {
       if (previous != IntPtr.Zero) SelectObject(memory, previous);
       if (bitmap != IntPtr.Zero) DeleteObject(bitmap);
       if (memory != IntPtr.Zero) DeleteDC(memory);
-      ReleaseDC(IntPtr.Zero, screen);
+      ReleaseDC(IntPtr.Zero, reference);
     }
+  }
+
+  /// <summary>Whether the corners and the middle of a screen rectangle all belong to this process.</summary>
+  /// <remarks>
+  /// <para>
+  /// Only the fallback needs this: a blit copies whatever is in front, and nothing about the pixels
+  /// says whose window that was. Without it, a capture on a busy desktop is somebody else's window
+  /// reported as a success — the silent wrong answer <see cref="IsBlank"/> exists to prevent,
+  /// arriving by the one route it cannot see.
+  /// </para>
+  /// <para>
+  /// The samples sit a few pixels inside the rectangle. Its last row and column are exactly where a
+  /// rounding difference — a scaled display, a border counted on one side only — hit-tests to the
+  /// neighbouring window instead of ours, and a few pixels in is still inside any corner worth the
+  /// name. Our own dialogs pass, because the test is the owning process and not the owning window.
+  /// </para>
+  /// </remarks>
+  private static bool _IsOwnWindowAt(int x, int y, int width, int height) {
+    var inset = Math.Min(_OWNERSHIP_INSET, (Math.Min(width, height) - 1) / 2);
+    var left = x + inset;
+    var top = y + inset;
+    var right = x + width - 1 - inset;
+    var bottom = y + height - 1 - inset;
+    ReadOnlySpan<WindowPoint> samples = [
+      new() { X = left, Y = top },
+      new() { X = right, Y = top },
+      new() { X = left, Y = bottom },
+      new() { X = right, Y = bottom },
+      new() { X = x + width / 2, Y = y + height / 2 },
+    ];
+
+    var self = Environment.ProcessId;
+    foreach (var sample in samples) {
+      var window = WindowFromPoint(sample);
+      if (window == IntPtr.Zero)
+        return false;
+
+      GetWindowThreadProcessId(window, out var owner);
+      if (owner != self)
+        return false;
+    }
+
+    return true;
   }
 
   // ============================================================================================
