@@ -1,40 +1,44 @@
-The quantisation weight matrices in ProResProfile.cs are the profile tables carried
-by FFmpeg (https://ffmpeg.org) in its LGPL ProRes encoders. The original four 4:2:2
-pairs match libavcodec/proresenc_kostya.c's prores_quant_matrices. The 4444 profile
-uses the HQ matrix for luma and chroma, and 4444 XQ uses FFmpeg's XQ luma table with
-the HQ chroma table; those choices are also present in libavcodec/proresenc_anatoliy.c
-as QMAT_LUMA/QMAT_CHROMA.
+The quantisation weight matrices in ProResProfile.cs are the profile tables
+FFmpeg (https://ffmpeg.org) carries as constants in libavcodec/proresenc_kostya.c,
+under the name prores_quant_matrices. All five distinct tables come from there:
 
-SMPTE RDD 36 prints none of these profile matrices: it describes the bitstream and
-decoding process, and a decoder is told the matrices by every frame it reads. The
-matrix values are therefore interoperability constants rather than an implementation
-of FFmpeg's encoder. They have additionally been checked against frame headers written
-by FFmpeg where an encoder exposes the corresponding profile.
+  index 0, 1  422 Proxy, luma and chroma
+  index 2     422 LT
+  index 3     422
+  index 4     422 HQ, which ProRes 4444 is also written with
+  index 5     4444 XQ luma
 
-Nothing else in this directory is copied or translated from FFmpeg. The bitstream
-syntax, entropy codes, block scans, transforms, alpha coding and field-picture handling
-are implemented from SMPTE RDD 36:2022 and are cited by clause in the source. FFmpeg is
-used as a behavioural oracle.
+SMPTE RDD 36 prints none of them: it describes a decoding process, and a decoder
+is told the matrices by every frame it reads, so the only place a profile's own
+matrices exist in writing is in an encoder. Each was additionally read back byte
+for byte out of the frame headers of files FFmpeg writes -- the first five from
+`prores_ks -profile:v 0` to `4`, and the 4444 XQ luma table from
+`prores_ks -quant_mat 5`, which is the entry that profile names and that FFmpeg's
+own profile table does not select. So the copies are confirmed against the
+bitstream as well as against the source.
 
-Relevant FFmpeg sources:
+Nothing else in this directory comes from FFmpeg. The bitstream syntax, the
+entropy codes, the block scans, the transforms, the alpha coding, the
+field-picture layout and the rate decision are written from SMPTE RDD 36:2022
+and are cited by clause in the source. FFmpeg is used as a behavioural oracle in
+both directions, and that is all.
 
-  libavcodec/proresenc_kostya.c    prores_quant_matrices for the 4:2:2 profiles
-  libavcodec/proresenc_anatoliy.c  QMAT_LUMA/QMAT_CHROMA, including 4444/XQ tables
-
-Copyright (c) 2011 Anatoliy Wasserman
 Copyright (c) 2012 Konstantin Shishkov
 
-FFmpeg is free software; you can redistribute it and/or modify it under the terms of
-the GNU Lesser General Public License as published by the Free Software Foundation;
-either version 2.1 of the License, or (at your option) any later version.
+FFmpeg is free software; you can redistribute it and/or modify it under the
+terms of the GNU Lesser General Public License as published by the Free
+Software Foundation; either version 2.1 of the License, or (at your option)
+any later version.
 
-FFmpeg is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
-without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR
-PURPOSE. See the GNU Lesser General Public License for more details.
+FFmpeg is distributed in the hope that it will be useful, but WITHOUT ANY
+WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
+A PARTICULAR PURPOSE.  See the GNU Lesser General Public License for more
+details.
 
-You should have received a copy of the GNU Lesser General Public License along with
-FFmpeg; if not, write to the Free Software Foundation, Inc., 51 Franklin Street,
-Fifth Floor, Boston, MA 02110-1301 USA.
+You should have received a copy of the GNU Lesser General Public License along
+with FFmpeg; if not, write to the Free Software Foundation, Inc., 51 Franklin
+Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
-This library is licensed LGPL-3.0-or-later, which is a permitted "any later version"
-of the LGPL-2.1 FFmpeg offers, so the two are compatible in this direction.
+This library is licensed LGPL-3.0-or-later, which is a permitted "any later
+version" of the LGPL-2.1 FFmpeg offers, so the two are compatible in this
+direction and in no other.

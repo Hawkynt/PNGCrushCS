@@ -18,9 +18,12 @@ namespace FileFormat.Codecs.ProRes;
 /// <b>The weight matrices are copied, not derived.</b> They are the matrices Apple's profiles are
 /// actually written with, and reading them out of the frame header of a file is the only way to know
 /// them — the specification prints none of them, since a decoder is told them by every frame. The
-/// tables here match FFmpeg's LGPL ProRes encoders and were checked against frames those encoders
-/// write; see <c>THIRD-PARTY-NOTICE.FFmpeg.txt</c> beside this file. A matrix worked out afresh would
-/// be a different profile wearing the same four-character code.
+/// five distinct tables here are FFmpeg's <c>prores_quant_matrices</c>, and each was read back byte
+/// for byte out of a frame header FFmpeg wrote; see <c>THIRD-PARTY-NOTICE.FFmpeg.txt</c> beside this
+/// file. A matrix worked out afresh would be a different profile wearing the same four-character
+/// code, which is why <c>ProResProfileMatrixTests</c> asserts them against those values a second
+/// time: no decoder can catch a wrong one, since every frame states the matrix it was written with
+/// and every decoder believes it.
 /// <para/>
 /// <b>The data rates are Apple's published ones.</b> The <i>Apple ProRes White Paper</i> states each
 /// profile's target at 1920x1080 and 29.97 frames a second; dividing by the 8160 macroblocks of that
