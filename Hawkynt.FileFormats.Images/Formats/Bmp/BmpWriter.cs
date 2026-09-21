@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using FileFormat.Core;
 
 namespace FileFormat.Bmp;
 
@@ -198,29 +199,6 @@ public static class BmpWriter {
   /// other over a sixty-nine pixel wide four-bit bitmap and both disagreed with what went in, which is
   /// what says the fault was on this side.
   /// </remarks>
-  private static byte[] _AddRowPadding(byte[] pixelData, int width, int height, int bitsPerPixel) {
-    if (bitsPerPixel >= 8)
-      return pixelData;
-
-    var bytesPerRow = (width * bitsPerPixel + 7) / 8;
-    if (bytesPerRow * 8 == width * bitsPerPixel)
-      return pixelData;
-
-    var result = new byte[bytesPerRow * height];
-    var mask = (1 << bitsPerPixel) - 1;
-
-    for (var y = 0; y < height; ++y)
-      for (var x = 0; x < width; ++x) {
-        var sourceBit = (y * width + x) * bitsPerPixel;
-        var sourceByte = sourceBit >> 3;
-        if (sourceByte >= pixelData.Length)
-          return result;
-
-        var value = (pixelData[sourceByte] >> (8 - bitsPerPixel - (sourceBit & 7))) & mask;
-        var targetBit = y * bytesPerRow * 8 + x * bitsPerPixel;
-        result[targetBit >> 3] |= (byte)(value << (8 - bitsPerPixel - (targetBit & 7)));
-      }
-
-    return result;
-  }
+  private static byte[] _AddRowPadding(byte[] pixelData, int width, int height, int bitsPerPixel)
+    => bitsPerPixel >= 8 ? pixelData : PackedRows.AddRowPadding(pixelData, width, height, bitsPerPixel);
 }

@@ -113,11 +113,18 @@ public sealed class CcittFile :
     return false;
   }
 
+  /// <summary>Draws the page as a picture.</summary>
+  /// <remarks>
+  /// A fax row starts on a byte, because that is what the coders read and write; an
+  /// <see cref="Core.PixelFormat.Indexed1"/> picture has nothing between its rows. The two agree at
+  /// the 1728-pixel scan line and at every other width a fax machine uses, and part company as soon
+  /// as <see cref="CcittG3Decoder.MeasureWidth"/> takes the width from the coding instead.
+  /// </remarks>
   public static RawImage ToRawImage(CcittFile file) => new() {
     Width = file.Width,
     Height = file.Height,
     Format = Core.PixelFormat.Indexed1,
-    PixelData = file.PixelData[..],
+    PixelData = PackedRows.DropRowPadding(file.PixelData, file.Width, file.Height, 1),
     Palette = _BlackWhitePalette[..],
     PaletteCount = 2,
   };
@@ -133,7 +140,7 @@ public sealed class CcittFile :
       Width = image.Width,
       Height = image.Height,
       Format = CcittFormat.Group4,
-      PixelData = image.PixelData[..],
+      PixelData = PackedRows.AddRowPadding(image.PixelData, image.Width, image.Height, 1),
     };
   }
 }

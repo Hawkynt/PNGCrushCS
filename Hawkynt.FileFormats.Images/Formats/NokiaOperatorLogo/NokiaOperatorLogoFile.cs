@@ -63,11 +63,14 @@ public readonly record struct NokiaOperatorLogoFile : IImageFormatReader<NokiaOp
       var pal = image.Palette ?? [0, 0, 0, 255, 255, 255];
       var entry0Luma = pal.Length >= 3 ? (pal[0] + pal[1] + pal[2]) / 3 : 0;
       var bitForIndex1 = entry0Luma >= 128 ? 1 : 0; // entry 0 light => index 1 is dark
-      var srcStride = (w + 7) / 8;
+      // The source indices run straight on across the picture; only the logo's own rows start on a
+      // byte. Reading the source at the destination's stride slid every row after the first by the
+      // padding and ran off the end of the buffer.
       for (var y = 0; y < h; ++y) {
         for (var x = 0; x < w; ++x) {
-          var srcByteIndex = y * srcStride + (x >> 3);
-          var srcBitIndex = 7 - (x & 7);
+          var at = y * w + x;
+          var srcByteIndex = at >> 3;
+          var srcBitIndex = 7 - (at & 7);
           var idx = (image.PixelData[srcByteIndex] >> srcBitIndex) & 1;
           var dark = idx == bitForIndex1;
           if (dark) {

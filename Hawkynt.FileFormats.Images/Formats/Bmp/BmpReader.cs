@@ -2,6 +2,7 @@ using System;
 using System.Buffers.Binary;
 using System.IO;
 using System.Numerics;
+using FileFormat.Core;
 
 namespace FileFormat.Bmp;
 
@@ -247,31 +248,8 @@ public static class BmpReader {
   }
 
   /// <summary>Restacks sub-byte rows from BMP's byte-aligned layout to the continuous one.</summary>
-  private static byte[] _RemoveRowPadding(byte[] padded, int width, int height, int bitsPerPixel) {
-    if (bitsPerPixel >= 8)
-      return padded;
-
-    var paddedStride = (width * bitsPerPixel + 7) / 8;
-    if (paddedStride * 8 == width * bitsPerPixel)
-      return padded;
-
-    var result = new byte[(width * height * bitsPerPixel + 7) / 8];
-    var mask = (1 << bitsPerPixel) - 1;
-
-    for (var y = 0; y < height; ++y)
-    for (var x = 0; x < width; ++x) {
-      var sourceBit = y * paddedStride * 8 + x * bitsPerPixel;
-      var sourceByte = sourceBit >> 3;
-      if (sourceByte >= padded.Length)
-        return result;
-
-      var value = (padded[sourceByte] >> (8 - bitsPerPixel - (sourceBit & 7))) & mask;
-      var targetBit = (y * width + x) * bitsPerPixel;
-      result[targetBit >> 3] |= (byte)(value << (8 - bitsPerPixel - (targetBit & 7)));
-    }
-
-    return result;
-  }
+  private static byte[] _RemoveRowPadding(byte[] padded, int width, int height, int bitsPerPixel)
+    => bitsPerPixel >= 8 ? padded : PackedRows.DropRowPadding(padded, width, height, bitsPerPixel);
 
   /// <summary>Decides whether a 16- or 32-bit file's spare bits are an alpha channel or padding.</summary>
   /// <remarks>

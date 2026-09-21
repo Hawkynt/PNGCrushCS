@@ -58,7 +58,10 @@ public readonly record struct MspFile : IImageFormatReader<MspFile>, IImageToRaw
       Width = file.Width,
       Height = file.Height,
       Format = PixelFormat.Indexed1,
-      PixelData = file.PixelData[..],
+      // An MSP row starts on a byte and an Indexed1 picture's does not, so the stored rows cannot be
+      // handed over as they are: at any width not a multiple of eight every row after the first
+      // would sit further left than it belongs.
+      PixelData = PackedRows.DropRowPadding(file.PixelData, file.Width, file.Height, 1),
       Palette = _BlackWhitePalette[..],
       PaletteCount = 2,
     };
@@ -81,7 +84,9 @@ public readonly record struct MspFile : IImageFormatReader<MspFile>, IImageToRaw
       YAspectPrinter = height,
       PrinterWidth = width,
       PrinterHeight = height,
-      PixelData = image.PixelData[..],
+      // Back to a byte a row, which is what Validate insists on and what the run-length coding
+      // reads. Without this the buffer was simply the wrong length and every odd width was refused.
+      PixelData = PackedRows.AddRowPadding(image.PixelData, image.Width, image.Height, 1),
     };
   }
 
