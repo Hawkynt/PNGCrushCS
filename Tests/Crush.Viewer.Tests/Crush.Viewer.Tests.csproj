@@ -1,0 +1,42 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <Description>Unit tests for the viewer's decision-making: naming, walking, paging and pixels.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="coverlet.collector" Version="6.0.4" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.0" />
+    <PackageReference Include="NUnit" Version="4.3.2" />
+    <PackageReference Include="NUnit.Analyzers" Version="4.7.0" />
+    <PackageReference Include="NUnit3TestAdapter" Version="5.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\Hawkynt.FileFormats.Images\Hawkynt.FileFormats.Images.csproj" />
+    <ProjectReference Include="..\..\FileFormat.Core\FileFormat.Core.csproj" />
+  </ItemGroup>
+
+  <!--
+    The viewer is a WinExe pinned to a Windows runtime identifier and built as a self-contained
+    single file, which a test assembly cannot reference as a project. Its decision-making does not
+    need the toolkit, though, so the files that carry it are compiled into this assembly directly —
+    the same cross-boundary source link the JPEG tests use against the sibling repository. Only the
+    files with no dependency on Hawkynt.NativeForms are listed; a compile error here means logic
+    worth testing has grown a dependency on the widget toolkit and should be moved back out of it.
+  -->
+  <ItemGroup>
+    <Compile Include="..\..\Crush.Viewer\ConversionService.cs" Link="Viewer\ConversionService.cs" />
+    <Compile Include="..\..\Crush.Viewer\FolderModel.cs" Link="Viewer\FolderModel.cs" />
+    <Compile Include="..\..\Crush.Viewer\ImageTransforms.cs" Link="Viewer\ImageTransforms.cs" />
+    <Compile Include="..\..\Crush.Viewer\PageService.cs" Link="Viewer\PageService.cs" />
+    <Compile Include="..\..\Crush.Viewer\ViewerLaunchOptions.cs" Link="Viewer\ViewerLaunchOptions.cs" />
+    <Compile Include="..\..\Crush.Viewer\WindowCapture.cs" Link="Viewer\WindowCapture.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="NUnit.Framework" />
+  </ItemGroup>
+</Project>
