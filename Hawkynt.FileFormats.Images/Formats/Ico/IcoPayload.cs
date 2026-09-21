@@ -108,7 +108,9 @@ public static class IcoPayload {
         paletteEntries = statedEntries;
     }
 
-    var coloursAt = (int)headerSize + paletteEntries * 4;
+    // The older header is followed by three-byte entries and the newer by four. Spending four on a
+    // core header's palette put the start of the colours past where they actually began.
+    var coloursAt = (int)headerSize + paletteEntries * IcoDib.PaletteEntrySize(iconDib);
     var colourBytes = (width * bitsPerPixel + 31) / 32 * 4 * height;
 
     // A truncated entry is kept rather than refused: everything up to where it stops is a picture,

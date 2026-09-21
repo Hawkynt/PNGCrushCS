@@ -134,17 +134,32 @@ public static class IcoReader {
   /// The bitmap header carries the real width, and a height of twice the picture — the second half
   /// being the mask that says which pixels show through. The PNG-bodied entries already had their
   /// size read from the body this way; the bitmap-bodied ones now do too.
+  /// <para/>
+  /// The directory entry remains the fallback rather than the answer. It states each side in one
+  /// byte, so it cannot describe anything over 256 and says nought where it means it, while the
+  /// header describes the bitmap that is actually there. Where the two disagree the bitmap is what
+  /// a decoder will find.
   /// </remarks>
   private static (int Width, int Height) _ReadDibDimensions(byte[] dibData, int directoryWidth, int directoryHeight) {
-    if (dibData.Length < 12)
+    if (dibData.Length < IcoDib.CoreHeaderSize)
       return (directoryWidth, directoryHeight);
 
     var headerSize = BinaryPrimitives.ReadUInt32LittleEndian(dibData);
-    if (headerSize < 12)
+    if (headerSize < IcoDib.CoreHeaderSize)
       return (directoryWidth, directoryHeight);
 
-    var width = BinaryPrimitives.ReadInt32LittleEndian(dibData.AsSpan(4));
-    var height = BinaryPrimitives.ReadInt32LittleEndian(dibData.AsSpan(8));
+    // Each header states its sides in its own width and at its own offsets. Taking the older one at
+    // the newer one's offsets reads its width and height as a single thirty-two-bit number, so a
+    // 8-by-16 core header came back as a width of 1048584.
+    int width, height;
+    if (headerSize == IcoDib.CoreHeaderSize) {
+      width = BinaryPrimitives.ReadUInt16LittleEndian(dibData.AsSpan(4));
+      height = BinaryPrimitives.ReadUInt16LittleEndian(dibData.AsSpan(6));
+    } else {
+      width = BinaryPrimitives.ReadInt32LittleEndian(dibData.AsSpan(4));
+      height = BinaryPrimitives.ReadInt32LittleEndian(dibData.AsSpan(8));
+    }
+
     if (width <= 0 || height == 0 || height == int.MinValue)
       return (directoryWidth, directoryHeight);
 
@@ -155,13 +170,12 @@ public static class IcoReader {
   }
 
   private static int _ReadDibBitsPerPixel(byte[] dibData, int directoryBitCount) {
-    // BMP DIB: BITMAPINFOHEADER starts at offset 0
-    // Offset 14 in the DIB header = biBitCount (2 bytes LE)
-    if (dibData.Length >= 16) {
-      var dibBpp = BinaryPrimitives.ReadUInt16LittleEndian(dibData.AsSpan(14));
-      if (dibBpp > 0)
-        return dibBpp;
-    }
+    // Which offset the depth sits at depends on which header this is. Offset 14 is biBitCount in a
+    // BITMAPINFOHEADER and the third byte of the first palette entry in a BITMAPCOREHEADER, so
+    // reading it unconditionally gave a core-header icon a depth taken from its own colours.
+    var dibBpp = IcoDib.ReadBitCount(dibData);
+    if (dibBpp > 0)
+      return dibBpp;
 
     return directoryBitCount > 0 ? directoryBitCount : 32;
   }
