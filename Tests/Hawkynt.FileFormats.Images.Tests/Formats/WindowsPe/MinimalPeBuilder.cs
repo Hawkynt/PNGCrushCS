@@ -209,6 +209,15 @@ internal static class MinimalPeBuilder {
     return (groupId, dir);
   }
 
+  /// <param name="height">
+  /// The displayed height. It is written into CURSORDIR doubled, because that is what every
+  /// producer of an RT_GROUP_CURSOR emits: a cursor DIB stacks its XOR bitmap on its AND mask, so
+  /// BITMAPINFOHEADER.biHeight is twice the display height and the group directory repeats that
+  /// doubled value, where a standalone .cur file's CURSORDIRENTRY carries the plain one. Confirmed
+  /// against rc.exe/link.exe output and against the cursor groups shipped in user32.dll and
+  /// comctl32.dll. Fixtures built here therefore have to state the doubled height, or every test
+  /// standing on them pins a convention no Windows tool uses.
+  /// </param>
   private static (int GroupId, byte[] GroupDirData) _BuildGroupCursorDir(
     byte[] cursorImageData,
     int width,
@@ -219,7 +228,7 @@ internal static class MinimalPeBuilder {
     BinaryPrimitives.WriteUInt16LittleEndian(dir.AsSpan(2), 2);
     BinaryPrimitives.WriteUInt16LittleEndian(dir.AsSpan(4), 1);
     BinaryPrimitives.WriteUInt16LittleEndian(dir.AsSpan(6), checked((ushort)width));
-    BinaryPrimitives.WriteUInt16LittleEndian(dir.AsSpan(8), checked((ushort)height));
+    BinaryPrimitives.WriteUInt16LittleEndian(dir.AsSpan(8), checked((ushort)(height * 2)));
     BinaryPrimitives.WriteUInt16LittleEndian(dir.AsSpan(10), BinaryPrimitives.ReadUInt16LittleEndian(cursorImageData.AsSpan(12)));
     BinaryPrimitives.WriteUInt16LittleEndian(dir.AsSpan(12), BinaryPrimitives.ReadUInt16LittleEndian(cursorImageData.AsSpan(14)));
     BinaryPrimitives.WriteInt32LittleEndian(dir.AsSpan(14), checked(cursorImageData.Length + 4));

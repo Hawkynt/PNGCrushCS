@@ -10,3 +10,13 @@ Hawkynt.FileFormats.Images/README.md text eol=crlf
 *.pbm binary
 *.pnm binary
 *.pam binary
+
+# The PE resource oracle: a DLL rc.exe and link.exe built, and the cursor and icon it was built
+# from. Their whole value is that the bytes are Microsoft's rather than ours, so nothing may be
+# allowed to rewrite them on the way through a checkout. Git's own heuristic would almost
+# certainly call all three binary -- each begins with a NUL -- but almost is not the standard a
+# fixture used as evidence should be held to.
+*.dll binary
+*.exe binary
+*.cur binary
+*.ico binary

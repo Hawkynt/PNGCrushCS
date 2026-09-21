@@ -105,6 +105,16 @@
     </None>
   </ItemGroup>
 
+  <!-- A DLL the Microsoft toolchain produced, and the .cur/.ico it was produced from, so the PE
+       resource reader and writer can be held to what rc.exe and link.exe emit rather than to each
+       other. See Formats\WindowsPe\Fixtures\oracle.rc for the exact command line. -->
+  <ItemGroup>
+    <None Include="Formats\WindowsPe\Fixtures\*">
+      <Link>Fixtures\WindowsPe\%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
   <ItemGroup>
     <Using Include="NUnit.Framework" />
   </ItemGroup>

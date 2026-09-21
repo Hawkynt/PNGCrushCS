@@ -179,8 +179,8 @@ public sealed class PeResourceSafetyTests {
     dib.CopyTo(cursor.AsSpan(4));
     var pe = _BuildPe(
       new ResourceLeaf(1, 1, 0x0409, cursor),
-      new ResourceLeaf(12, 20, 0x0409, _GroupCursor(1, cursor.Length, 16, 16)),
-      new ResourceLeaf(12, 21, 0x0409, _GroupCursor(1, cursor.Length, 16, 16))
+      new ResourceLeaf(12, 20, 0x0409, _GroupCursor(1, cursor.Length, 16, 32)),
+      new ResourceLeaf(12, 21, 0x0409, _GroupCursor(1, cursor.Length, 16, 32))
     );
     var editable = PeResourceFile.ReadEditable(pe);
     var replacement = _Image(8, 8);
@@ -323,6 +323,10 @@ public sealed class PeResourceSafetyTests {
     return group;
   }
 
+  /// <param name="height">
+  /// The CURSORDIR value, which is the DIB's height and so twice the displayed one -- a cursor
+  /// stacks its XOR bitmap on its AND mask. A 16-pixel cursor is written here as 32.
+  /// </param>
   private static byte[] _GroupCursor(ushort componentId, int componentSize, ushort width, ushort height) {
     var group = new byte[20];
     BinaryPrimitives.WriteUInt16LittleEndian(group.AsSpan(2), 2);
