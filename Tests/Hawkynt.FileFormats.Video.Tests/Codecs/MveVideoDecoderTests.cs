@@ -28,6 +28,7 @@ public sealed class MveVideoDecoderTests {
   private const byte _SET_PALETTE = 0x0C;
   private const byte _DECODING_MAP = 0x0F;
   private const byte _VIDEO_DATA = 0x11;
+  private const byte _SEND_BUFFER = 0x07;
 
   // ============================================================================================
   // Which streams it takes
@@ -95,26 +96,86 @@ public sealed class MveVideoDecoderTests {
     Assert.Throws<InvalidDataException>(() => decoder.TryDecode(new(0, _VideoData(1, 1, [0])), out _));
   }
 
+  /// <summary>
+  /// A second INIT_VIDEO_BUFFERS restates the geometry, and the decoder starts again at it.
+  /// </summary>
+  /// <remarks>
+  /// This used to require a refusal, on the reasoning that a film does not change size part way
+  /// through. FFmpeg disagrees and is the reference: <c>ipmovie.c</c> compares the stated width and
+  /// height against the ones it holds, counts a change and adopts it, and has no path that rejects
+  /// the opcode for differing. Refusing therefore made this package stricter than the only decoder
+  /// there is, on a case neither of us has a sample of — all four films on
+  /// <c>samples.ffmpeg.org</c> carry exactly one INIT_VIDEO_BUFFERS — so the stricter reading could
+  /// only ever have turned a file FFmpeg plays into an exception.
+  /// <para/>
+  /// Adopting the new geometry means starting over, not resizing: both page buffers, the decoding
+  /// and skip maps, the pending picture and both history frames all belong to the old size and none
+  /// of them can be carried across. The assertions below are that the next picture arrives at the
+  /// new geometry rather than the old one.
+  /// </remarks>
   [Test]
   [Category("Unit")]
-  public void APictureSizeThatChangesPartWayThroughRefuses() {
+  public void APictureSizeThatChangesPartWayThroughStartsAgainAtTheNewSize() {
     var decoder = MveVideoDecoder.Create(_Stream());
     decoder.TryDecode(new(0, _InitVideoBuffers(1, 1)), out _);
+    decoder.TryDecode(new(0, _DecodingMap([0xE])), out _);
+    Assert.That(decoder.TryDecode(new(0, _VideoData(1, 1, [42])), out var first), Is.True);
+    Assert.That(first.Width, Is.EqualTo(8));
 
-    Assert.Throws<NotSupportedException>(() => decoder.TryDecode(new(0, _InitVideoBuffers(2, 1)), out _));
+    Assert.That(decoder.TryDecode(new(0, _InitVideoBuffers(2, 1)), out _), Is.False);
+
+    decoder.TryDecode(new(0, _DecodingMap([0xE, 0xE])), out _);
+    Assert.That(decoder.TryDecode(new(0, _VideoData(2, 1, [7, 9])), out var second), Is.True);
+
+    Assert.Multiple(() => {
+      Assert.That(second.Width, Is.EqualTo(16));
+      Assert.That(second.Height, Is.EqualTo(8));
+      Assert.That(_Index(second, 0, 0), Is.EqualTo(7));
+      Assert.That(_Index(second, 8, 0), Is.EqualTo(9));
+    });
   }
 
+  /// <summary>
+  /// A version-2 buffer opcode whose true-colour flag is set gives an RGB picture, not a refusal.
+  /// </summary>
+  /// <remarks>
+  /// Refusing here is what this decoder used to do, and it is why a true-colour film could not be
+  /// read at all. The flag is the only thing that distinguishes the RGB555 form from the palettised
+  /// one, and the form is real: <c>descent3-level5-16bit.mve</c> on <c>samples.ffmpeg.org</c> sets
+  /// it, and every one of its 1,624 pictures now decodes here byte for byte as FFmpeg decodes them.
+  /// So the flag is read rather than rejected, and what comes back is RGB rather than palette
+  /// indices, because a true-colour stream carries no palette to index into.
+  /// </remarks>
   [Test]
   [Category("Unit")]
-  public void ATrueColourBufferRefuses() {
+  public void ATrueColourBufferDecodesAsRgbRatherThanRefusing() {
     var decoder = MveVideoDecoder.Create(_Stream());
-    var payload = new byte[8];
-    BinaryPrimitives.WriteUInt16LittleEndian(payload, 1);
-    BinaryPrimitives.WriteUInt16LittleEndian(payload.AsSpan(2), 1);
-    BinaryPrimitives.WriteUInt16LittleEndian(payload.AsSpan(4), 1);
-    BinaryPrimitives.WriteUInt16LittleEndian(payload.AsSpan(6), 1); // true_color != 0
 
-    Assert.Throws<NotSupportedException>(() => decoder.TryDecode(new(0, _Opcode(_INIT_VIDEO_BUFFERS, 2, payload)), out _));
+    Assert.That(decoder.TryDecode(new(0, _TrueColourVideoBuffers(1, 1)), out _), Is.False);
+
+    var encoder = MveVideoEncoder.Create(new MediaStreamInfo {
+      Index = 0,
+      Kind = MediaStreamKind.Video,
+      Codec = CodecTag.FromCharacters("IMVE"),
+      Width = 8,
+      Height = 8,
+      BitsPerPixel = 16,
+    });
+    var red = new byte[8 * 8 * 3];
+    for (var i = 0; i < 8 * 8; ++i)
+      red[i * 3] = 0xFF;
+
+    Assert.That(
+      encoder.TryEncode(
+        new() { Width = 8, Height = 8, Format = PixelFormat.Rgb24, PixelData = red }, 0, out var packet),
+      Is.True);
+    Assert.That(decoder.TryDecode(packet, out var picture), Is.True);
+
+    Assert.Multiple(() => {
+      Assert.That(picture.Format, Is.EqualTo(PixelFormat.Rgb24));
+      Assert.That(picture.Palette, Is.Null);
+      Assert.That(picture.PixelData, Is.EqualTo(red));
+    });
   }
 
   // ============================================================================================
@@ -311,6 +372,58 @@ public sealed class MveVideoDecoderTests {
     Assert.That(_Index(picture, 7, 7), Is.EqualTo(0));
   }
 
+  /// <summary>
+  /// Encoding two takes its block from two pictures back at a positive offset, not from the picture
+  /// immediately before.
+  /// </summary>
+  /// <remarks>
+  /// Encodings <c>0x2</c> and <c>0x3</c> share a vector table and differ only in sign and in which
+  /// picture they read, which makes them easy to conflate — and conflating them is invisible to
+  /// every other check here. FFmpeg names the two references outright: <c>0x2</c> is
+  /// <c>copy_from(second_last_frame, …, +x, +y)</c> and <c>0x3</c> is
+  /// <c>copy_from(frame, …, -x, -y)</c>.
+  /// <para/>
+  /// Both read the buffer being built, and that is not a contradiction: the two page buffers
+  /// alternate, so the buffer a picture is painted into still holds the picture two back everywhere
+  /// it has not yet been written. Blocks are decoded in raster order, so a positive offset lands on
+  /// content not yet overwritten — two pictures back — while a negative one lands on content already
+  /// written this picture. One source, two meanings, decided by the sign of the offset.
+  /// <para/>
+  /// The clip below is three blocks wide so a positive vector has somewhere to point. Its first
+  /// picture fills the blocks with 10, 11, 12 and is copied into both buffers; the second overwrites
+  /// them with 20, 21, 22; the third codes block 0 as <c>0x2</c> with motion byte 0, which the table
+  /// reads as +8, +0 — one block to the right. That lands on block 1 of the buffer being painted,
+  /// which still holds 11. Reading the previous picture instead would give 21, and reading with the
+  /// sign flipped would run off the left edge, so this fails on either confusion.
+  /// <para/>
+  /// Worth a test of its own because nothing else catches it: pointing encoding <c>0x2</c> at the
+  /// previous picture leaves all 5,276 tests in this assembly passing, and is caught only by the
+  /// opt-in comparison against real films, where it shows up at picture 2 of baldursgate-logo.
+  /// </remarks>
+  [Test]
+  [Category("Unit")]
+  public void EncodingTwoReadsTwoPicturesBackAtAPositiveOffset() {
+    var decoder = MveVideoDecoder.Create(_Stream());
+    decoder.TryDecode(new(0, _InitVideoBuffers(3, 1)), out _);
+
+    decoder.TryDecode(new(0, _DecodingMap([0xE, 0xE, 0xE])), out _);
+    decoder.TryDecode(new(0, _VideoData(3, 1, [10, 11, 12])), out _);
+
+    decoder.TryDecode(new(0, _DecodingMap([0xE, 0xE, 0xE])), out _);
+    decoder.TryDecode(new(0, _VideoData(3, 1, [20, 21, 22])), out _);
+
+    // Motion byte 0 is +8, +0 in the shared table: one block to the right, same row.
+    decoder.TryDecode(new(0, _DecodingMap([0x2, 0xE, 0xE])), out _);
+    Assert.That(decoder.TryDecode(new(0, _VideoData(3, 1, [0, 31, 32])), out var picture), Is.True);
+
+    Assert.Multiple(() => {
+      Assert.That(_Index(picture, 0, 0), Is.EqualTo(11), "block 0 must come from two pictures back, not from 21");
+      Assert.That(_Index(picture, 7, 7), Is.EqualTo(11));
+      Assert.That(_Index(picture, 8, 0), Is.EqualTo(31));
+      Assert.That(_Index(picture, 16, 0), Is.EqualTo(32));
+    });
+  }
+
   [Test]
   [Category("Unit")]
   public void EncodingZeroExplicitlyCopiesFromTheReferencePicture() {
@@ -366,6 +479,16 @@ public sealed class MveVideoDecoderTests {
     return _Opcode(_INIT_VIDEO_BUFFERS, 0, payload);
   }
 
+  /// <summary>A version-2 buffer opcode with the true-colour flag set.</summary>
+  private static byte[] _TrueColourVideoBuffers(int widthBlocks, int heightBlocks) {
+    var payload = new byte[8];
+    BinaryPrimitives.WriteUInt16LittleEndian(payload, (ushort)widthBlocks);
+    BinaryPrimitives.WriteUInt16LittleEndian(payload.AsSpan(2), (ushort)heightBlocks);
+    BinaryPrimitives.WriteUInt16LittleEndian(payload.AsSpan(4), 1);
+    BinaryPrimitives.WriteUInt16LittleEndian(payload.AsSpan(6), 1); // true_color
+    return _Opcode(_INIT_VIDEO_BUFFERS, 2, payload);
+  }
+
   private static byte[] _Palette(int start, byte[] sixBitRgbTriplets) {
     var count = sixBitRgbTriplets.Length / 3;
     var payload = new byte[4 + sixBitRgbTriplets.Length];
@@ -388,12 +511,27 @@ public sealed class MveVideoDecoderTests {
     return _Opcode(_DECODING_MAP, 0, payload);
   }
 
+  /// <summary>
+  /// A video-data opcode followed by the SEND_BUFFER that displays what it built, which is what a
+  /// real MVE video chunk carries.
+  /// </summary>
+  /// <remarks>
+  /// VIDEO_DATA reconstructs a page; it does not present one. Opcode 0x07 SEND_BUFFER is the display
+  /// boundary in the public MVE description, in FFmpeg's demuxer and in ScummVM, and the decoder now
+  /// returns a picture only when that opcode arrives — which is what lets a chunk hold a palette, a
+  /// skip map, a decoding map and its data and still present exactly once.
+  /// <para/>
+  /// Every real file agrees: across the four samples on <c>samples.ffmpeg.org</c> there is exactly
+  /// one SEND_BUFFER per video chunk and never one inside a chunk that also holds a second picture.
+  /// So the opcode belongs here, in the helper that stands for "a chunk that codes a picture",
+  /// rather than in each test. What each test asserts about the pixels it gets back is untouched.
+  /// </remarks>
   private static byte[] _VideoData(int widthBlocks, int heightBlocks, byte[] blockData) {
     var payload = new byte[14 + blockData.Length];
     BinaryPrimitives.WriteUInt16LittleEndian(payload.AsSpan(8), (ushort)widthBlocks);
     BinaryPrimitives.WriteUInt16LittleEndian(payload.AsSpan(10), (ushort)heightBlocks);
     blockData.CopyTo(payload, 14);
-    return _Opcode(_VIDEO_DATA, 0, payload);
+    return [.. _Opcode(_VIDEO_DATA, 0, payload), .. _Opcode(_SEND_BUFFER, 1, [])];
   }
 
   private static byte _Index(RawImage picture, int x, int y) => picture.PixelData[y * picture.Width + x];

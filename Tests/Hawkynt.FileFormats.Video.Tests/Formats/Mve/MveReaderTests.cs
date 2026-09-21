@@ -27,6 +27,7 @@ public sealed class MveReaderTests {
   private const byte _SET_PALETTE = 0x0C;
   private const byte _DECODING_MAP = 0x0F;
   private const byte _VIDEO_DATA = 0x11;
+  private const byte _SEND_BUFFER = 0x07;
   private const byte _AUDIO_FRAME = 0x08;
   private const byte _INIT_AUDIO_BUFFERS = 0x03;
 
@@ -99,11 +100,11 @@ public sealed class MveReaderTests {
 
   [Test]
   [Category("Unit")]
-  public void TheDeclaredFrameCountIsHowManyVideoDataOpcodesTheFileHolds() {
+  public void TheDeclaredFrameCountIsHowManyPicturesTheFileDisplays() {
     var file = _File([
       _Chunk(_CHUNK_INIT_VIDEO, _InitVideoBuffers(1, 1)),
-      _Chunk(_CHUNK_VIDEO, [.. _Opcode(_DECODING_MAP, 0, [0]), .. _Opcode(_VIDEO_DATA, 0, _VideoDataPayload(1, 1, []))]),
-      _Chunk(_CHUNK_VIDEO, [.. _Opcode(_DECODING_MAP, 0, [0]), .. _Opcode(_VIDEO_DATA, 0, _VideoDataPayload(1, 1, []))]),
+      _Chunk(_CHUNK_VIDEO, _DisplayedPicture()),
+      _Chunk(_CHUNK_VIDEO, _DisplayedPicture()),
     ]);
     var container = MveContainer.FromBytes(file);
 
@@ -132,7 +133,7 @@ public sealed class MveReaderTests {
   [Test]
   [Category("Unit")]
   public void OnlyTheFirstPictureIsReportedAsAKeyFrame() {
-    var picture = (byte[])[.. _Opcode(_DECODING_MAP, 0, [0]), .. _Opcode(_VIDEO_DATA, 0, _VideoDataPayload(1, 1, []))];
+    var picture = _DisplayedPicture();
     var file = _File([
       _Chunk(_CHUNK_INIT_VIDEO, _InitVideoBuffers(1, 1)),
       _Chunk(_CHUNK_VIDEO, picture),
@@ -140,7 +141,10 @@ public sealed class MveReaderTests {
     ]);
     var container = MveContainer.FromBytes(file);
 
-    var pictures = MveContainer.ReadPackets(container).Where(p => p.StreamIndex == 0 && _IsVideoData(p.Data.Span)).ToArray();
+    // A picture is the SEND_BUFFER that displays it, not the VIDEO_DATA that built the page: a page
+    // may be rebuilt without being shown and shown without being rebuilt, so the entry-point flag
+    // and the timestamp belong to the opcode that puts it on the screen.
+    var pictures = MveContainer.ReadPackets(container).Where(p => p.StreamIndex == 0 && _IsSendBuffer(p.Data.Span)).ToArray();
     Assert.That(pictures, Has.Length.EqualTo(2));
     Assert.That(pictures[0].IsKeyFrame, Is.True);
     Assert.That(pictures[1].IsKeyFrame, Is.False);
@@ -211,6 +215,25 @@ public sealed class MveReaderTests {
     return _Opcode(_INIT_VIDEO_BUFFERS, 0, payload);
   }
 
+  /// <summary>
+  /// One video chunk's worth of opcodes: a decoding map, its data, and the SEND_BUFFER that puts the
+  /// result on the screen.
+  /// </summary>
+  /// <remarks>
+  /// SEND_BUFFER is not decoration here. VIDEO_DATA reconstructs a page; opcode 0x07 is what says
+  /// that page is now a picture, and the reader counts and timestamps displayed pictures rather than
+  /// video opcodes because that is what the original player, FFmpeg and ScummVM all do — a chunk may
+  /// rebuild a page without showing it, and a chunk may show a page it did not rebuild. Every one of
+  /// the four films on <c>samples.ffmpeg.org</c> carries exactly one SEND_BUFFER per video chunk, and
+  /// in two of them some of those chunks carry no video data at all: baldursgate-logo holds 23 such
+  /// chunks and descent3-level5-16bit holds 78, each one a held frame.
+  /// </remarks>
+  private static byte[] _DisplayedPicture() => [
+    .. _Opcode(_DECODING_MAP, 0, [0]),
+    .. _Opcode(_VIDEO_DATA, 0, _VideoDataPayload(1, 1, [])),
+    .. _Opcode(_SEND_BUFFER, 1, []),
+  ];
+
   private static byte[] _VideoDataPayload(int widthBlocks, int heightBlocks, byte[] blockData) {
     var payload = new byte[14 + blockData.Length];
     BinaryPrimitives.WriteUInt16LittleEndian(payload.AsSpan(8), (ushort)widthBlocks);
@@ -219,7 +242,7 @@ public sealed class MveReaderTests {
     return payload;
   }
 
-  private static bool _IsVideoData(ReadOnlySpan<byte> opcode) => opcode[2] == _VIDEO_DATA;
+  private static bool _IsSendBuffer(ReadOnlySpan<byte> opcode) => opcode[2] == _SEND_BUFFER;
 
   private static byte[] _Chunk(ushort type, byte[] opcodes) {
     var chunk = new byte[4 + opcodes.Length];

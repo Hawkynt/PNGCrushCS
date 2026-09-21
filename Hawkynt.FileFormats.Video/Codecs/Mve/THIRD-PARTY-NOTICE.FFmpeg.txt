@@ -1,0 +1,15 @@
+The Interplay MVE true-colour and legacy video decoding rules in this directory are based on the public Interplay MVE/Video bitstream descriptions and on FFmpeg's Interplay decoder as a behavioral/reference implementation for rules the public description does not specify completely.
+
+Reference implementation:
+
+  FFmpeg libavcodec/interplayvideo.c
+  Copyright (C) 2003 The FFmpeg project
+
+FFmpeg distributes that decoder under the GNU Lesser General Public License, version 2.1 or (at your option) any later version. This repository is distributed under LGPL-3.0-or-later, which is compatible with that "or later" grant.
+
+The implementation here is written to this repository's C# architecture rather than mechanically copied from the C source. Required bitstream behavior was carried across: block-mode meanings, motion-vector mappings, the separate true-colour motion stream, RGB555 control-bit conventions, and the 0x06/0x10 page-update behavior. The public format description and FFmpeg are also used as behavioral oracles for tests.
+
+FFmpeg project: https://ffmpeg.org/
+FFmpeg legal information: https://ffmpeg.org/legal.html
+MultimediaWiki Interplay MVE: https://wiki.multimedia.cx/index.php/Interplay_MVE
+MultimediaWiki Interplay Video: https://wiki.multimedia.cx/index.php/Interplay_Video

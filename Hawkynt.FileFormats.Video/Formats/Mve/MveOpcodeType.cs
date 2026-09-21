@@ -2,7 +2,7 @@ namespace FileFormat.InterplayMve;
 
 /// <summary>
 /// The one-byte opcode identifiers an Interplay MVE chunk's opcode stream names itself with, from
-/// Mike Melanson's <c>interplay-mve.txt</c> and confirmed against every sample this was built against.
+/// Mike Melanson's <c>interplay-mve.txt</c> and confirmed against FFmpeg's demuxer/decoder.
 /// </summary>
 internal static class MveOpcodeType {
 
@@ -12,6 +12,10 @@ internal static class MveOpcodeType {
   internal const byte INIT_AUDIO_BUFFERS = 0x03;
   internal const byte START_STOP_AUDIO = 0x04;
   internal const byte INIT_VIDEO_BUFFERS = 0x05;
+
+  /// <summary>The oldest video-data form. Its 16-bit decoding map lives inside the payload.</summary>
+  internal const byte VIDEO_DATA_06 = 0x06;
+
   internal const byte SEND_BUFFER = 0x07;
   internal const byte AUDIO_FRAME = 0x08;
   internal const byte AUDIO_SILENCE = 0x09;
@@ -20,10 +24,21 @@ internal static class MveOpcodeType {
   internal const byte SET_PALETTE = 0x0C;
   internal const byte SET_PALETTE_COMPRESSED = 0x0D;
 
-  /// <summary>Packs one four-bit block encoding per 8x8 block into the picture's decoding map, read by
-  /// <see cref="VIDEO_DATA"/>. Present in every video chunk that carries a new picture.</summary>
+  /// <summary>The skip/page map consumed by <see cref="VIDEO_DATA_10"/>.</summary>
+  internal const byte SKIP_MAP = 0x0E;
+
+  /// <summary>
+  /// The external decoding map. Format 0x11 packs one four-bit block encoding per 8x8 block;
+  /// format 0x10 consumes signed 16-bit entries only for blocks its skip map marks as changed.
+  /// </summary>
   internal const byte DECODING_MAP = 0x0F;
 
-  /// <summary>The quadtree-coded picture: the only opcode that ever produces a frame.</summary>
-  internal const byte VIDEO_DATA = 0x11;
+  /// <summary>The three-stream page-update video form using skip map, decoding map and raw data.</summary>
+  internal const byte VIDEO_DATA_10 = 0x10;
+
+  /// <summary>The normal Interplay Video block-coded picture.</summary>
+  internal const byte VIDEO_DATA_11 = 0x11;
+
+  /// <summary>Compatibility name for the normal 0x11 video-data opcode.</summary>
+  internal const byte VIDEO_DATA = VIDEO_DATA_11;
 }

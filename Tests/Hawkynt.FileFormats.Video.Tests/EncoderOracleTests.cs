@@ -9,6 +9,7 @@ using FileFormat.Ea;
 using FileFormat.FlicVideo;
 using FileFormat.Flv;
 using FileFormat.Matroska;
+using FileFormat.InterplayMve;
 using FileFormat.Mjpeg;
 using FileFormat.Ogg;
 using FileFormat.RealMedia;
@@ -282,6 +283,7 @@ public sealed class EncoderOracleTests {
     ("Ea", ".cmv", static (streams, packets) => VideoIO.Mux<EaWriter>(streams, packets)),
     ("Vqa", ".vqa", static (streams, packets) => VideoIO.Mux<VqaWriter>(streams, packets)),
     ("Rpl", ".rpl", static (streams, packets) => VideoIO.Mux<RplWriter>(streams, packets)),
+    ("Mve", ".mve", static (streams, packets) => VideoIO.Mux<MveWriter>(streams, packets)),
     ("Mjpeg", ".mjpg", static (streams, packets) => VideoIO.Mux<MjpegWriter>(streams, packets)),
     ("Ogg", ".ogv", static (streams, packets) => VideoIO.Mux<OggWriter>(streams, packets)),
   ];
