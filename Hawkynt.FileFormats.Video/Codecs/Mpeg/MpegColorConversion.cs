@@ -47,8 +47,12 @@ internal static class MpegColorConversion {
     var rgb = new byte[width * height * 3];
 
     // 4:2:2 has a chrominance sample on every line, so there is nothing to interpolate vertically;
-    // and MPEG-2 puts its chrominance on the even luminance column whichever format it is in.
+    // and MPEG-2 puts its chrominance on the even luminance column whichever format it is in. 4:4:4
+    // has a chrominance sample on every column as well, so there is nothing to interpolate at all:
+    // reading it at x >> 1 would show the left half of every macroblock twice and never read the
+    // right half, which is a picture rather than an error and is why this is a flag and not a case.
     var fullHeight = frame.ChromaFormat != MpegChromaFormat.Yuv420;
+    var fullWidth = frame.ChromaFormat == MpegChromaFormat.Yuv444;
     var coSitedHorizontally = isMpeg2;
 
     // How far the interpolation may reach, which is the displayed picture and not the coded one. The
@@ -67,9 +71,9 @@ internal static class MpegColorConversion {
       for (var x = 0; x < width; ++x) {
         var luma = frame.Luma[lumaRow + x];
         var cb = _Chroma(
-          frame.Cb, frame.ChromaWidth, chromaWidth, chromaHeight, x, y, coSitedHorizontally, fullHeight);
+          frame.Cb, frame.ChromaWidth, chromaWidth, chromaHeight, x, y, coSitedHorizontally, fullWidth, fullHeight);
         var cr = _Chroma(
-          frame.Cr, frame.ChromaWidth, chromaWidth, chromaHeight, x, y, coSitedHorizontally, fullHeight);
+          frame.Cr, frame.ChromaWidth, chromaWidth, chromaHeight, x, y, coSitedHorizontally, fullWidth, fullHeight);
 
         // ITU-R BT.601 with studio swing, in 8-bit fixed point:
         // 1.164 = 298/256, 1.596 = 409/256, 0.391 = 100/256, 0.813 = 208/256, 2.017 = 516/256.
@@ -98,16 +102,18 @@ internal static class MpegColorConversion {
   /// </remarks>
   private static int _Chroma(
     byte[] plane, int stride, int chromaWidth, int chromaHeight, int x, int y, bool coSitedHorizontally,
-    bool fullHeight) {
-    var nearX = x >> 1;
-    var farX = _Neighbour(nearX, x, chromaWidth);
+    bool fullWidth, bool fullHeight) {
+    var nearX = fullWidth ? x : x >> 1;
+    var farX = fullWidth ? nearX : _Neighbour(nearX, x, chromaWidth);
 
     // Three parts of the near sample to one of the far one is a quarter-step offset written as
     // weights; four to nothing is a sample that sits exactly on the luminance one; two to two is a
     // sample that sits exactly between two of them.
-    var (nearWeightX, farWeightX) = coSitedHorizontally
-      ? (x & 1) == 0 ? (4, 0) : (2, 2)
-      : (3, 1);
+    var (nearWeightX, farWeightX) = fullWidth
+      ? (4, 0)
+      : coSitedHorizontally
+        ? (x & 1) == 0 ? (4, 0) : (2, 2)
+        : (3, 1);
 
     var nearY = fullHeight ? y : y >> 1;
     var farY = fullHeight ? nearY : _Neighbour(nearY, y, chromaHeight);

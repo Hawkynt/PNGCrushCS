@@ -345,7 +345,7 @@ public sealed class Mpeg1VideoDecoderTests {
 
     var failure = Assert.Throws<InvalidDataException>(() => _Decode(stream.End()));
     Assert.That(failure!.Message, Does.Contain("1 of its 3 macroblocks"));
-    Assert.That(failure.Message, Does.Contain("cover it completely"));
+    Assert.That(failure.Message, Does.Contain("cover the picture completely"));
   }
 
   [Test]
@@ -355,7 +355,7 @@ public sealed class Mpeg1VideoDecoderTests {
       .SequenceHeader(16, 16).GroupOfPictures().PictureHeader(2).SliceHeader(0, 1).Code("1").End();
 
     Assert.That(Assert.Throws<InvalidDataException>(() => _Decode(stream))!.Message,
-      Does.Contain("before any intra picture"));
+      Does.Contain("before any reference picture"));
   }
 
   [Test]

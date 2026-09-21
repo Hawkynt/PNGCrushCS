@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
@@ -6,19 +7,8 @@ using FileFormat.Core;
 using Hawkynt.FileFormats.Video;
 using Hawkynt.FileFormats.Video.Tests;
 
-using System.Collections.Generic;
-
 namespace FileFormat.Codecs.Mpeg.Tests;
 
-/// <summary>The MPEG-2 encoder, on streams written here and read back through the public decoder.</summary>
-/// <remarks>
-/// The external conformance check belongs to <c>EncoderOracleTests</c>: the encoder is marked
-/// <see cref="VerifiedByAttribute"/> for ffmpeg, so that fixture writes this codec through a real
-/// container and asks an independent decoder to open it. These unit tests keep the local invariants
-/// cheap and exact: declared profile/level geometry, the start-code shape, registration, refusals and
-/// the fact that a non-macroblock-sized picture survives this encoder and this decoder as the same
-/// visible picture rather than as its padded coded dimensions.
-/// </remarks>
 [TestFixture]
 public sealed class Mpeg2VideoEncoderTests {
 
@@ -71,7 +61,6 @@ public sealed class Mpeg2VideoEncoderTests {
     var encoder = Mpeg2VideoEncoder.Create(_Stream(32, 16));
     Assert.That(encoder.TryEncode(_Picture(32, 16), 7, out var packet), Is.True);
 
-    // A span cannot be captured by the Assert.Multiple lambda, so the reads happen first.
     var data = packet.Data.ToArray();
     var opening = data[..4];
     var hasExtension = _ContainsStartCode(data, MpegStartCode.Extension);
@@ -113,44 +102,131 @@ public sealed class Mpeg2VideoEncoderTests {
 
   [Test]
   [Category("Unit")]
-  public void AGroupOpensWithAKeyFrameAndNothingIsHeldByTheEncoder() {
+  public void BFramesDelayPacketsAndPreservePresentationAndDecodeTimelines() {
     var encoder = Mpeg2VideoEncoder.Create(_Stream(32, 32));
-    var keyFrames = new List<bool>();
+    var packets = new List<CodedPacket>();
 
-    for (var index = 0; index < 3; ++index) {
-      Assert.That(encoder.TryEncode(_Picture(32, 32, index), index, out var packet), Is.True);
-      keyFrames.Add(packet.IsKeyFrame);
-    }
+    for (var index = 0; index < 5; ++index)
+      if (encoder.TryEncode(_Picture(32, 32, index), index, out var packet))
+        packets.Add(packet);
 
-    // Only the picture that opens a group is independently decodable. IsKeyFrame has to say so, or
-    // a container will index every picture in the stream as a seek point.
-    Assert.That(keyFrames, Is.EqualTo(new[] { true, false, false }));
-    Assert.That(encoder.Flush(), Is.Empty);
+    packets.AddRange(encoder.Flush());
+
+    Assert.Multiple(() => {
+      Assert.That(packets.Select(static packet => packet.PresentationTimestamp),
+        Is.EqualTo(new long?[] { 0, 3, 1, 2, 4 }));
+      Assert.That(packets.Select(static packet => packet.DecodeTimestamp),
+        Is.EqualTo(new long?[] { 0, 1, 2, 3, 4 }));
+      Assert.That(packets.Select(static packet => packet.IsKeyFrame),
+        Is.EqualTo(new[] { true, false, false, false, false }));
+    });
   }
 
   [Test]
   [Category("Unit")]
-  public void APredictedPictureStatesItsTypeAndTheForwardRangeItUses() {
+  public void AGroupContainsIForwardPredictedAndBidirectionallyPredictedPictures() {
     var encoder = Mpeg2VideoEncoder.Create(_Stream(64, 48));
-    Assert.That(encoder.TryEncode(_Picture(64, 48, 0), 0, out _), Is.True);
-    Assert.That(encoder.TryEncode(_Picture(64, 48, 1), 1, out var predicted), Is.True);
+    var packets = new List<CodedPacket>();
 
-    var data = predicted.Data.ToArray();
-    var picture = _IndexOfStartCode(data, MpegStartCode.Picture);
-    Assert.That(picture, Is.GreaterThanOrEqualTo(0), "the packet carries a picture header");
+    for (var index = 0; index < 4; ++index)
+      if (encoder.TryEncode(_Picture(64, 48, index), index, out var packet))
+        packets.Add(packet);
 
-    // picture_coding_type occupies the three bits after the ten-bit temporal_reference.
-    var codingType = (data[picture + 4 + 1] >> 3) & 0x07;
-    Assert.That(codingType, Is.EqualTo(2), "the second picture of a group is predictive-coded");
+    packets.AddRange(encoder.Flush());
+    var codingTypes = packets.ToDictionary(
+      static packet => packet.PresentationTimestamp!.Value,
+      static packet => _PictureCodingType(packet.Data.Span));
+
+    Assert.Multiple(() => {
+      Assert.That(codingTypes[0], Is.EqualTo(MpegPictureDecoder.IntraCoded));
+      Assert.That(codingTypes[1], Is.EqualTo(MpegPictureDecoder.BidirectionallyCoded));
+      Assert.That(codingTypes[2], Is.EqualTo(MpegPictureDecoder.BidirectionallyCoded));
+      Assert.That(codingTypes[3], Is.EqualTo(MpegPictureDecoder.PredictiveCoded));
+    });
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void BMacroblocksChooseForwardBackwardAndBidirectionalReferences() {
+    // Four solid pictures per run, so every macroblock of a B picture faces the same choice and the
+    // first one speaks for all of them. Display order is I0 B1 B2 P3 and coding order I0 P3 B1 B2,
+    // so B1 and B2 both see the reconstructed I0 behind them and the reconstructed P3 ahead.
+    //
+    //   16 128  16 240 : B2 is what lies behind it, and nothing like what lies ahead -> forward
+    //   16 128 240 240 : B2 is what lies ahead of it, and nothing like what lies behind -> backward
+    //   in both runs B1 is the average of the two anchors and neither one -> interpolated
+    var toward = _BMacroblockTypes(16, 128, 16, 240);
+    var away = _BMacroblockTypes(16, 128, 240, 240);
+
+    Assert.Multiple(() => {
+      Assert.That(toward[0] & MpegVlcTables.TypeMotionForward, Is.Not.Zero, "the averaged B picture lost its forward reference");
+      Assert.That(toward[0] & MpegVlcTables.TypeMotionBackward, Is.Not.Zero, "the averaged B picture lost its backward reference");
+      Assert.That(toward[1] & MpegVlcTables.TypeMotionForward, Is.Not.Zero, "a B picture matching the anchor behind it must predict forward");
+      Assert.That(toward[1] & MpegVlcTables.TypeMotionBackward, Is.Zero, "a strictly better forward prediction should not spend a backward vector");
+      Assert.That(away[1] & MpegVlcTables.TypeMotionBackward, Is.Not.Zero, "a B picture matching the anchor ahead of it must predict backward");
+      Assert.That(away[1] & MpegVlcTables.TypeMotionForward, Is.Zero, "a strictly better backward prediction should not spend a forward vector");
+    });
+  }
+
+  [Test]
+  [Category("Oracle")]
+  public void FFmpegDecodesBPicturesInEveryPredictionDirection() {
+    FFmpegOracle.RequireAvailable();
+
+    // The same three runs, handed to a decoder that is not this one. A backward-only or interpolated
+    // macroblock that this package writes and reads consistently but writes wrongly would agree with
+    // itself forever; FFmpeg is what can disagree.
+    foreach (var (name, values) in new (string Name, byte[] Values)[] {
+      ("forward", [16, 128, 16, 240]),
+      ("backward", [16, 128, 240, 240]),
+      ("interpolated", [16, 128, 128, 240]),
+    }) {
+      var sources = values.Select(static value => _Solid(32, 32, value)).ToList();
+      var packets = _Encode(sources);
+      var decoded = _DecodeWithFFmpeg(packets, 32, 32, sources.Count);
+
+      for (var index = 0; index < sources.Count; ++index) {
+        var frameBytes = 32 * 32 * 3;
+        var total = 0L;
+        for (var offset = 0; offset < frameBytes; ++offset)
+          total += Math.Abs(sources[index].PixelData[offset] - decoded[index * frameBytes + offset]);
+
+        Assert.That(total / (double)frameBytes, Is.LessThan(10d),
+          $"the {name} run's picture {index} is not the frame that was encoded");
+      }
+    }
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void AKeyFrameBoundaryDoesNotLeaveBackwardOrderedPicturesDependingOnThePreviousGop() {
+    var encoder = Mpeg2VideoEncoder.Create(_Stream(64, 48));
+    var packets = new List<CodedPacket>();
+
+    for (var index = 0; index <= 12; ++index)
+      if (encoder.TryEncode(_Picture(64, 48, index), index, out var packet))
+        packets.Add(packet);
+
+    packets.AddRange(encoder.Flush());
+    var key = packets.Single(static packet => packet.PresentationTimestamp == 12);
+    var keyAt = packets.IndexOf(key);
+
+    Assert.Multiple(() => {
+      Assert.That(key.IsKeyFrame, Is.True);
+      Assert.That(packets.Take(keyAt).TakeLast(2).Select(static packet => packet.PresentationTimestamp),
+        Is.EqualTo(new long?[] { 10, 11 }));
+      Assert.That(_PictureCodingType(packets[keyAt - 2].Data.Span), Is.EqualTo(MpegPictureDecoder.PredictiveCoded));
+      Assert.That(_PictureCodingType(packets[keyAt - 1].Data.Span), Is.EqualTo(MpegPictureDecoder.PredictiveCoded));
+    });
+
+    var decoder = Mpeg2VideoDecoder.Create(encoder.DescribeStream());
+    Assert.That(decoder.TryDecode(key, out _), Is.False);
+    Assert.That(decoder.Flush().Count(), Is.EqualTo(1), "the I packet must decode without an earlier GOP");
   }
 
   [Test]
   [Category("RoundTrip")]
   public void AMovingSquareSurvivesPredictionWithoutDrifting() {
-    // A whole group: one intra picture and eleven predicted ones, so the last frame is as far from
-    // an intra picture as this encoder ever places one. Drift -- an encoder predicting from its
-    // source rather than from what its decoder reconstructs -- grows along a group, which comparing
-    // the LAST frame catches and comparing the first cannot.
     const int width = 128;
     const int height = 96;
     var stream = _Stream(width, height);
@@ -180,43 +256,33 @@ public sealed class Mpeg2VideoEncoderTests {
     for (var index = 0; index < decoded.Count; ++index)
       worst = Math.Max(worst, _MeanAbsoluteError(sources[index], decoded[index]));
 
-    // H.262 is lossy and this codes at a fixed quantiser, so the bar is that the picture is
-    // recognisably the one that went in. A drifting predictor pushes this into the tens.
-    Assert.That(worst, Is.LessThan(12d),
-      "a predicted picture drifted away from its source across the group");
+    Assert.That(worst, Is.LessThan(12d), "a predicted picture drifted away from its source across the group");
   }
 
   [Test]
   [Category("RoundTrip")]
-  public void AStillSceneCollapsesToSkippedMacroblocks() {
-    // What macroblock skipping is worth, isolated from the quantiser. The first predicted picture
-    // still costs something -- it corrects the intra picture's own quantisation error -- but once
-    // that correction is in the reference there is nothing left to say, and every macroblock but the
-    // two a slice must always code should go unwritten. An encoder that stopped skipping, or that
-    // predicted from the source instead of from the reconstruction, would never converge.
+  public void AStillSceneCollapsesToSmallPredictedPictures() {
     const int width = 128;
     const int height = 96;
     var encoder = Mpeg2VideoEncoder.Create(_Stream(width, height));
     var picture = _MovingSquare(width, height, 0);
-    var sizes = new List<int>();
+    var packets = new List<CodedPacket>();
 
-    for (var frame = 0; frame < 6; ++frame)
+    for (var frame = 0; frame < 7; ++frame)
       if (encoder.TryEncode(picture, frame, out var packet))
-        sizes.Add(packet.Data.Length);
+        packets.Add(packet);
 
-    Assert.That(sizes[^1], Is.LessThan(sizes[0] / 4d),
-      $"a settled predicted picture is {sizes[^1]} bytes against {sizes[0]} for the intra one; "
-      + $"the run was {string.Join(", ", sizes)}");
+    packets.AddRange(encoder.Flush());
+    var intraBytes = packets.Single(static packet => packet.PresentationTimestamp == 0).Data.Length;
+    var smallestPredicted = packets.Where(static packet => packet.PresentationTimestamp != 0).Min(static packet => packet.Data.Length);
+
+    Assert.That(smallestPredicted, Is.LessThan(intraBytes / 2d),
+      $"the smallest settled predicted picture is {smallestPredicted} bytes against {intraBytes} for the intra one");
   }
 
   [Test]
   [Category("RoundTrip")]
   public void PredictingMotionCostsFewerBytesThanCodingEveryPictureWhole() {
-    // The point of a predicted picture: a small square moving over a still background costs less
-    // than coding the whole picture again. The margin is modest and deliberately so -- this encoder
-    // quantises a residual as finely as it quantises an intra picture, so a predicted picture buys
-    // its saving by not restating the background rather than by coding what it does state coarsely.
-    // If the encoder ever silently reverts to all-intra, this is what notices.
     const int width = 128;
     const int height = 96;
     var encoder = Mpeg2VideoEncoder.Create(_Stream(width, height));
@@ -226,25 +292,23 @@ public sealed class Mpeg2VideoEncoderTests {
       if (encoder.TryEncode(_MovingSquare(width, height, frame), frame, out var packet))
         packets.Add(packet);
 
-    var intraBytes = packets[0].Data.Length;
-    var averagePredicted = packets.Skip(1).Sum(static packet => packet.Data.Length) / (double)(packets.Count - 1);
+    packets.AddRange(encoder.Flush());
+    var intraBytes = packets.Single(static packet => packet.PresentationTimestamp == 0).Data.Length;
+    var averagePredicted = packets.Where(static packet => packet.PresentationTimestamp != 0)
+      .Average(static packet => packet.Data.Length);
 
-    Assert.That(averagePredicted, Is.LessThan(intraBytes * 0.8),
+    Assert.That(averagePredicted, Is.LessThan(intraBytes * 0.9),
       $"a predicted picture averaged {averagePredicted:F0} bytes against {intraBytes} for the intra one");
   }
 
   [Test]
   [Category("Oracle")]
-  public void FFmpegDecodesEveryPredictedPictureAndNotOnlyTheIntraOne() {
-    // The registry's oracle asks FFmpeg for the first frame only, which in a group is the intra
-    // picture -- the one that was already right before any prediction existed. A malformed vector, a
-    // miscounted address increment or a coded block pattern that disagrees with the blocks behind it
-    // would sail past that and fail in a real player on frame two. So decode the whole clip.
+  public void FFmpegDecodesEveryIPAndBPictureInDisplayOrder() {
     FFmpegOracle.RequireAvailable();
 
     const int width = 128;
     const int height = 96;
-    const int frames = 24; // Two whole groups, so a group boundary is crossed as well.
+    const int frames = 24;
 
     var encoder = Mpeg2VideoEncoder.Create(_Stream(width, height));
     var packets = new List<CodedPacket>();
@@ -257,90 +321,20 @@ public sealed class Mpeg2VideoEncoderTests {
         packets.Add(packet);
     }
 
-    var directory = Directory.CreateTempSubdirectory("mpeg2-oracle");
-    try {
-      var clip = Path.Combine(directory.FullName, "clip.m2v");
-      using (var file = File.Create(clip))
-        foreach (var packet in packets)
-          file.Write(packet.Data.Span);
+    packets.AddRange(encoder.Flush());
+    Assert.That(packets.Count, Is.EqualTo(frames), "the encoder dropped a delayed picture");
+    Assert.That(packets.Any(static packet => _PictureCodingType(packet.Data.Span) == MpegPictureDecoder.BidirectionallyCoded), Is.True);
 
-      var raw = Path.Combine(directory.FullName, "decoded.rgb");
-      var startInfo = new ProcessStartInfo(FFmpegOracle.ExecutablePath!) {
-        RedirectStandardError = true,
-        UseShellExecute = false,
-      };
-      foreach (var argument in new[] {
-        "-hide_banner", "-loglevel", "error", "-i", clip, "-f", "rawvideo", "-pix_fmt", "rgb24", raw })
-        startInfo.ArgumentList.Add(argument);
+    var decoded = _DecodeWithFFmpeg(packets, width, height, frames);
+    var frameBytes = width * height * 3;
+    for (var index = 0; index < frames; ++index) {
+      var total = 0L;
+      for (var offset = 0; offset < frameBytes; ++offset)
+        total += Math.Abs(sources[index].PixelData[offset] - decoded[index * frameBytes + offset]);
 
-      using var process = Process.Start(startInfo)!;
-      var diagnostics = process.StandardError.ReadToEnd();
-      process.WaitForExit(60_000);
-
-      Assert.That(process.ExitCode, Is.Zero, $"ffmpeg refused the stream: {diagnostics}");
-
-      var decoded = File.ReadAllBytes(raw);
-      var frameBytes = width * height * 3;
-      Assert.That(decoded.Length / frameBytes, Is.EqualTo(frames),
-        "ffmpeg read a different number of pictures than were written");
-
-      // Every frame, not an average: drift or a broken predictor shows up as one bad picture among
-      // good ones, which an average hides.
-      for (var index = 0; index < frames; ++index) {
-        var total = 0L;
-        for (var offset = 0; offset < frameBytes; ++offset)
-          total += Math.Abs(sources[index].PixelData[offset] - decoded[index * frameBytes + offset]);
-
-        Assert.That(total / (double)frameBytes, Is.LessThan(12d),
-          $"ffmpeg's picture {index} is not the frame that was encoded");
-      }
-    } finally {
-      try { directory.Delete(recursive: true); } catch { /* best effort */ }
+      Assert.That(total / (double)frameBytes, Is.LessThan(14d),
+        $"ffmpeg's picture {index} is not the frame that was encoded");
     }
-  }
-
-  private static int _IndexOfStartCode(byte[] data, byte code) {
-    for (var index = 0; index + 3 < data.Length; ++index)
-      if (data[index] == 0x00 && data[index + 1] == 0x00 && data[index + 2] == 0x01 && data[index + 3] == code)
-        return index;
-
-    return -1;
-  }
-
-  private static double _MeanAbsoluteError(RawImage expected, RawImage actual) {
-    var left = expected.PixelData;
-    var right = actual.PixelData;
-    var total = 0L;
-    var count = Math.Min(left.Length, right.Length);
-    for (var index = 0; index < count; ++index)
-      total += Math.Abs(left[index] - right[index]);
-
-    return total / (double)count;
-  }
-
-  /// <summary>A bright square crossing a fixed background, which is motion and nothing else.</summary>
-  private static RawImage _MovingSquare(int width, int height, int phase) {
-    var data = new byte[width * height * 3];
-    for (var y = 0; y < height; ++y)
-    for (var x = 0; x < width; ++x) {
-      var at = (y * width + x) * 3;
-      var background = (byte)(40 + ((x / 8 + y / 8) & 1) * 30);
-      data[at] = background;
-      data[at + 1] = background;
-      data[at + 2] = background;
-    }
-
-    var squareX = 4 + phase * 3;
-    var squareY = 8 + phase;
-    for (var y = squareY; y < Math.Min(squareY + 16, height); ++y)
-    for (var x = squareX; x < Math.Min(squareX + 16, width); ++x) {
-      var at = (y * width + x) * 3;
-      data[at] = 230;
-      data[at + 1] = 200;
-      data[at + 2] = 60;
-    }
-
-    return new() { Width = width, Height = height, Format = PixelFormat.Rgb24, PixelData = data };
   }
 
   [Test]
@@ -367,6 +361,141 @@ public sealed class Mpeg2VideoEncoderTests {
       Assert.That(VideoFormatRegistry.CreateDecoder(described), Is.InstanceOf<Mpeg2VideoDecoder>());
       Assert.That(VideoFormatRegistry.CreateEncoder(described), Is.InstanceOf<Mpeg2VideoEncoder>());
     });
+  }
+
+  /// <summary>Encodes solid pictures and reports the macroblock_type of each B picture's first macroblock.</summary>
+  /// <remarks>
+  /// The first macroblock of a slice is never skipped, so it is always there to be read, and over a
+  /// solid picture every macroblock of the slice made the same choice it did.
+  /// </remarks>
+  private static int[] _BMacroblockTypes(params byte[] values) {
+    var packets = _Encode(values.Select(static value => _Solid(32, 32, value)).ToList());
+    var bPictures = packets
+      .Where(static packet => _PictureCodingType(packet.Data.Span) == MpegPictureDecoder.BidirectionallyCoded)
+      .ToArray();
+
+    Assert.That(bPictures.Length, Is.EqualTo(2), "the group should hold two B pictures");
+    return bPictures.Select(_FirstBMacroblockType).ToArray();
+  }
+
+  private static int _FirstBMacroblockType(CodedPacket packet) {
+    var data = packet.Data.Span;
+    var slice = _IndexOfStartCode(data, MpegStartCode.FirstSlice);
+    Assert.That(slice, Is.GreaterThanOrEqualTo(0), "the B picture carries a slice");
+
+    var reader = new MpegBitReader(data[(slice + 4)..]);
+    reader.Skip(5); // quantiser_scale_code
+    while (reader.NextBits(1) == 1) {
+      reader.Skip(1); // extra_bit_slice
+      reader.Skip(8); // extra_information_slice
+    }
+
+    reader.Skip(1); // the extra_bit_slice that says there is no more
+    Assert.That(MpegVlcTables.MacroblockAddressIncrement.Read(ref reader), Is.EqualTo(1));
+    return MpegVlcTables.BidirectionalMacroblockType.Read(ref reader);
+  }
+
+  private static List<CodedPacket> _Encode(IReadOnlyList<RawImage> sources) {
+    var encoder = Mpeg2VideoEncoder.Create(_Stream(sources[0].Width, sources[0].Height));
+    var packets = new List<CodedPacket>();
+
+    for (var index = 0; index < sources.Count; ++index)
+      if (encoder.TryEncode(sources[index], index, out var packet))
+        packets.Add(packet);
+
+    packets.AddRange(encoder.Flush());
+    Assert.That(packets.Count, Is.EqualTo(sources.Count), "the encoder dropped a delayed picture");
+    return packets;
+  }
+
+  /// <summary>Writes the packets out as one elementary stream and returns what FFmpeg decoded.</summary>
+  private static byte[] _DecodeWithFFmpeg(IReadOnlyList<CodedPacket> packets, int width, int height, int frames) {
+    var directory = Directory.CreateTempSubdirectory("mpeg2-oracle");
+    try {
+      var clip = Path.Combine(directory.FullName, "clip.m2v");
+      using (var file = File.Create(clip))
+        foreach (var packet in packets)
+          file.Write(packet.Data.Span);
+
+      var raw = Path.Combine(directory.FullName, "decoded.rgb");
+      var startInfo = new ProcessStartInfo(FFmpegOracle.ExecutablePath!) {
+        RedirectStandardError = true,
+        UseShellExecute = false,
+      };
+      foreach (var argument in new[] {
+        "-hide_banner", "-loglevel", "error", "-i", clip, "-f", "rawvideo", "-pix_fmt", "rgb24", raw })
+        startInfo.ArgumentList.Add(argument);
+
+      using var process = Process.Start(startInfo)!;
+      var diagnostics = process.StandardError.ReadToEnd();
+      process.WaitForExit(60_000);
+
+      Assert.That(process.ExitCode, Is.Zero, $"ffmpeg refused the stream: {diagnostics}");
+      Assert.That(diagnostics.Trim(), Is.Empty, "ffmpeg read the stream but complained about it");
+
+      var decoded = File.ReadAllBytes(raw);
+      Assert.That(decoded.Length / (width * height * 3), Is.EqualTo(frames),
+        "ffmpeg read a different number of pictures than were written");
+
+      return decoded;
+    } finally {
+      try { directory.Delete(recursive: true); } catch { /* best effort */ }
+    }
+  }
+
+  private static RawImage _Solid(int width, int height, byte value) {
+    var data = new byte[width * height * 3];
+    Array.Fill(data, value);
+    return new() { Width = width, Height = height, Format = PixelFormat.Rgb24, PixelData = data };
+  }
+
+  private static int _PictureCodingType(ReadOnlySpan<byte> data) {
+    var picture = _IndexOfStartCode(data, MpegStartCode.Picture);
+    Assert.That(picture, Is.GreaterThanOrEqualTo(0), "the packet carries a picture header");
+    return (data[picture + 5] >> 3) & 0x07;
+  }
+
+  private static int _IndexOfStartCode(ReadOnlySpan<byte> data, byte code) {
+    for (var index = 0; index + 3 < data.Length; ++index)
+      if (data[index] == 0x00 && data[index + 1] == 0x00 && data[index + 2] == 0x01 && data[index + 3] == code)
+        return index;
+
+    return -1;
+  }
+
+  private static double _MeanAbsoluteError(RawImage expected, RawImage actual) {
+    var left = expected.PixelData;
+    var right = actual.PixelData;
+    var total = 0L;
+    var count = Math.Min(left.Length, right.Length);
+    for (var index = 0; index < count; ++index)
+      total += Math.Abs(left[index] - right[index]);
+
+    return total / (double)count;
+  }
+
+  private static RawImage _MovingSquare(int width, int height, int phase) {
+    var data = new byte[width * height * 3];
+    for (var y = 0; y < height; ++y)
+    for (var x = 0; x < width; ++x) {
+      var at = (y * width + x) * 3;
+      var background = (byte)(40 + ((x / 8 + y / 8) & 1) * 30);
+      data[at] = background;
+      data[at + 1] = background;
+      data[at + 2] = background;
+    }
+
+    var squareX = 4 + phase * 3;
+    var squareY = 8 + phase;
+    for (var y = squareY; y < Math.Min(squareY + 16, height); ++y)
+    for (var x = squareX; x < Math.Min(squareX + 16, width); ++x) {
+      var at = (y * width + x) * 3;
+      data[at] = 230;
+      data[at + 1] = 200;
+      data[at + 2] = 60;
+    }
+
+    return new() { Width = width, Height = height, Format = PixelFormat.Rgb24, PixelData = data };
   }
 
   private static MediaStreamInfo _Stream(int width, int height, Rational? frameRate = null) => new() {

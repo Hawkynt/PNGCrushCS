@@ -418,12 +418,22 @@ chrominance siting, and 4:2:2; `intra_dc_precision`, so a picture may code its D
 eleven bits; the non-linear quantiser scale; the alternate scan; the second intra coefficient table
 (Table B.15); loadable chrominance quantiser matrices; concealment motion vectors; 13818-2's own
 dequantisation, which corrects each block's parity once at the end rather than forcing every
-coefficient odd; and interlaced coding within a frame picture — field DCT, and field-based motion
+coefficient odd; interlaced coding within a frame picture — field DCT, and field-based motion
 compensation where the two fields of a macroblock are predicted separately from either field of the
-reference.
+reference; field pictures, where each field is its own coded picture reconstructing into one parity of
+a shared frame buffer and the first field of a P-coded frame is immediately a reference for the second;
+16x8 motion compensation; dual-prime prediction; and the 4:4:4 syntax H.262 defines and Annex D.2
+assigns to no profile.
 
-What it refuses, by name and with the clause: field pictures, dual-prime prediction, 4:4:4, and the
-three scalability extensions.
+What it refuses, by name and with the clause: the three scalability extensions.
+
+Two of those were found by asking ffmpeg rather than by asking this package twice. The dual-prime
+differential belongs after each *component* of motion_vector() and not after the whole vector
+(6.2.5.2.1); reading it in the wrong place costs the same bits for as long as every dmvector is zero,
+which is what the test stream coded, over a flat anchor, where every vector predicts the same samples.
+ffmpeg answered `ac-tex damaged` on exactly the rows that used dual prime. And 4:4:4 chrominance is not
+subsampled horizontally, so reading it at half the luminance column showed the left half of every
+macroblock twice — a picture, not an error.
 
 Thirty-seven encoded streams, eleven hundred frames in all, were compared with ffmpeg's decode of the
 same bitstreams — every frame, every sample. Progressive and interlaced; 4:2:0 and 4:2:2; 64×48 up to
@@ -441,11 +451,29 @@ same streams ffmpeg's own two inverse transforms differ from each other by tens 
 per frame. The residual is the transform's, which both standards specify as a formula with an accuracy
 bound rather than as an algorithm, and not a disagreement about the bitstream.
 
-**Encoding writes I and P pictures, Main Profile at Main Level.** The arrangement is MPEG-1's and for
-the same reasons — groups of twelve, prediction taken from a decoder this encoder drives with its own
-output rather than from the source, macroblocks that neither moved nor left a residual not written at
-all, and a search whose incumbent is the zero vector so that a background macroblock can reach that
-state. What is not shared is the vector arithmetic. MPEG-2 has no `full_pel_forward_vector`: every
+**Encoding writes I, P and B pictures, Main Profile at Main Level.** The arrangement is MPEG-1's and
+for the same reasons — groups of twelve, prediction taken from a decoder this encoder drives with its
+own output rather than from the source, macroblocks that neither moved nor left a residual not written
+at all, and a search whose incumbent is the zero vector so that a background macroblock can reach that
+state.
+
+Two B pictures sit between anchors, and that is what puts coding order and display order apart. The
+encoder holds three display pictures, codes the future anchor first and emits it before the two that
+display in front of it, so the bitstream a caller receives is already in decode order; presentation
+timestamps stay attached to their own pictures. The two pictures before a key frame are written as P
+instead, because the alternative is a packet flagged as a key frame followed by B pictures that still
+need the anchor from before the seek — a random-access point that is not one. A short tail with no
+following anchor is flushed as P pictures rather than dropped.
+
+A B macroblock is not automatically an interpolated one. Table B.4 gives forward, backward and
+interpolated, and coding all three as interpolated is legal, round-trips perfectly, and agrees with
+ffmpeg perfectly — which is exactly why nothing would have caught it. The choice is made by summing
+absolute luminance differences against the forward prediction, the backward prediction and their
+rounded average and coding the cheapest; only a direction the macroblock actually codes moves its
+motion vector predictor (7.6.3.1), and a macroblock that would repeat the previous one's directions on
+the vectors already predicted with no coefficients is left to macroblock_address_increment as a skip.
+Three solid-colour runs pin the three modes, and the same three go through ffmpeg, because a backward
+path that is wrong in the writer and the reader alike agrees with itself forever. What is not shared is the vector arithmetic. MPEG-2 has no `full_pel_forward_vector`: every
 vector counts half-samples, and f_code 3 is what buys a range of [-32, 31] whole pixels, because
 7.6.3.1 folds the *reconstructed* vector into the range the f_code states and a vector beyond it comes
 back as a different vector rather than as an expensive one.
@@ -471,9 +499,16 @@ must always code goes unwritten.
 
 Verification runs outward as well as in a circle. A twenty-four frame clip crossing a group boundary is
 written as an elementary stream and decoded by **ffmpeg**, with every frame compared rather than only
-the first: the registry's own oracle asks for frame one, which in a group is the intra picture, so a
-malformed vector or a miscounted address increment would pass it and fail in a real player on frame
-two.
+the first, and compared against the *source* in display order rather than against this package's own
+decode: the registry's own oracle asks for frame one, which in a group is the intra picture, so a
+malformed vector, a miscounted address increment or an anchor emitted after the B pictures that
+display before it would pass it and fail in a real player on frame two.
+
+Where a stream is compared sample for sample with ffmpeg, the comparison is made on the planes both
+decoders reconstructed and not on converted colour. ffmpeg's scaler rounds Y'CbCr to R'G'B' its own
+way — a flat luminance of 136 leaves it at 139 where the integer conversion here reaches 140 — so an
+RGB comparison reports a disagreement for every picture whose luminance lands on a rounding boundary,
+whichever decoder is right.
 
 ### Microsoft RLE
 
