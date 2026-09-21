@@ -64,6 +64,7 @@ public sealed class Indeo5VideoEncoder : IVideoCodecEncoder<Indeo5VideoEncoder> 
   private const int _MIN_ESCAPED_VALUE = -2047;
   private const int _MAX_ESCAPED_VALUE = 2048;
 
+
   private static readonly int _BLOCK_ESCAPE = IviRunValueMap.Defaults[8].EscapeSymbol;
   private static readonly int _BLOCK_END = IviRunValueMap.Defaults[8].EndOfBlockSymbol;
 
@@ -198,7 +199,7 @@ public sealed class Indeo5VideoEncoder : IVideoCodecEncoder<Indeo5VideoEncoder> 
 
     var planes = this._ToYvu9(frame);
     var luma = this._scalable
-      ? _DecomposeFiveThree(planes.Luma, this._width, this._height)
+      ? IviWavelet.Decompose(planes.Luma, this._width, this._height)
       : [planes.Luma];
 
     var writer = new _BitWriter();
@@ -877,73 +878,6 @@ public sealed class Indeo5VideoEncoder : IVideoCodecEncoder<Indeo5VideoEncoder> 
         return false;
 
     return true;
-  }
-
-  private static short[][] _DecomposeFiveThree(short[] source, int width, int height) {
-    var halfWidth = width >> 1;
-    var halfHeight = height >> 1;
-    var lowRows = new int[halfWidth * height];
-    var highRows = new int[halfWidth * height];
-    var row = new int[width];
-    var low = new int[halfWidth];
-    var high = new int[halfWidth];
-
-    for (var y = 0; y < height; ++y) {
-      for (var x = 0; x < width; ++x)
-        row[x] = source[y * width + x];
-
-      _AnalyseFiveThree(row, low, high);
-      Array.Copy(low, 0, lowRows, y * halfWidth, halfWidth);
-      Array.Copy(high, 0, highRows, y * halfWidth, halfWidth);
-    }
-
-    var result = new[] {
-      new short[halfWidth * halfHeight],
-      new short[halfWidth * halfHeight],
-      new short[halfWidth * halfHeight],
-      new short[halfWidth * halfHeight],
-    };
-    var column = new int[height];
-    var lowColumn = new int[halfHeight];
-    var highColumn = new int[halfHeight];
-
-    for (var x = 0; x < halfWidth; ++x) {
-      for (var y = 0; y < height; ++y)
-        column[y] = lowRows[y * halfWidth + x];
-
-      _AnalyseFiveThree(column, lowColumn, highColumn);
-      for (var y = 0; y < halfHeight; ++y) {
-        result[0][y * halfWidth + x] = checked((short)lowColumn[y]);
-        result[1][y * halfWidth + x] = checked((short)highColumn[y]);
-      }
-
-      for (var y = 0; y < height; ++y)
-        column[y] = highRows[y * halfWidth + x];
-
-      _AnalyseFiveThree(column, lowColumn, highColumn);
-      for (var y = 0; y < halfHeight; ++y) {
-        result[2][y * halfWidth + x] = checked((short)lowColumn[y]);
-        result[3][y * halfWidth + x] = checked((short)highColumn[y]);
-      }
-    }
-
-    return result;
-  }
-
-  private static void _AnalyseFiveThree(ReadOnlySpan<int> source, Span<int> low, Span<int> high) {
-    var count = source.Length >> 1;
-
-    for (var i = 0; i < count; ++i) {
-      var even = source[i << 1];
-      var nextEven = source[i + 1 < count ? (i + 1) << 1 : i << 1];
-      var odd = source[(i << 1) + 1];
-      high[i] = _Round((even + nextEven) * 0.5) - odd;
-    }
-
-    for (var i = 0; i < count; ++i) {
-      var previousHigh = high[i == 0 ? 0 : i - 1];
-      low[i] = 2 * source[i << 1] - _Round((previousHigh + high[i]) * 0.5);
-    }
   }
 
   private static void _WriteBlock(_BitWriter writer, ReadOnlySpan<int> coefficients, int coefficientCount, byte[] scan) {
