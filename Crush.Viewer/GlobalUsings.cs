@@ -1,2 +1,2 @@
 global using ImageFormat = Hawkynt.FileFormats.Images.ImageFormat;
-global using PixelRect = FileFormat.Core.PixelRect;
+global using Timer = Hawkynt.NativeForms.Timer;

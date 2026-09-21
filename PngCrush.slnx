@@ -46,6 +46,7 @@
     <Project Path="Tests/Compression.Tests/Compression.Tests.csproj" />
     <Project Path="Tests/Conformance.Recoil.Tests/Conformance.Recoil.Tests.csproj" />
     <Project Path="Tests/Crush.Image.Tests/Crush.Image.Tests.csproj" />
+    <Project Path="Tests/Crush.Viewer.Tests/Crush.Viewer.Tests.csproj" />
     <Project Path="Tests/Hawkynt.ColorProcessing.Adapter.Tests/Hawkynt.ColorProcessing.Adapter.Tests.csproj" />
     <Project Path="Tests/Hawkynt.FileFormats.Images.Tests/Hawkynt.FileFormats.Images.Tests.csproj" />
     <Project Path="Tests/Hawkynt.FileFormats.Video.Tests/Hawkynt.FileFormats.Video.Tests.csproj" />
