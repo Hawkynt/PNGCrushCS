@@ -4638,7 +4638,9 @@ Rows of pixels narrower than a byte, each row starting on a fresh byte.
 
 | Member | Signature | Summary |
 | --- | --- | --- |
+| `AddRowPadding` | `static byte[] AddRowPadding(ReadOnlySpan<byte> pixels, int width, int height, int bitsPerPixel, int stride = 0)` | Restacks a continuous stream into rows that each start on a byte boundary. |
 | `Compact` | `static byte[] Compact(ReadOnlySpan<byte> packed, int width, int height, int bytesPerPixel, int stride)` | Drops the padding between rows of whole bytes, leaving them back to back. |
+| `DropRowPadding` | `static byte[] DropRowPadding(ReadOnlySpan<byte> padded, int width, int height, int bitsPerPixel, int stride = 0)` | Restacks rows that each start on a byte boundary into the continuous stream behind them. |
 | `Pack` | `static byte[] Pack(ReadOnlySpan<byte> pixels, int width, int height, int bitsPerPixel, int stride = 0, bool mostSignificantFirst = true)` | Packs one index a pixel back into rows, clamping each index to the depth. |
 | `Stride` | `static int Stride(int width, int bitsPerPixel)` | The tightest row stride for a width at a given depth. |
 | `Unpack` | `static byte[] Unpack(ReadOnlySpan<byte> packed, int width, int height, int bitsPerPixel, int stride = 0, bool mostSignificantFirst = true)` | Spreads packed rows to one index a pixel. |

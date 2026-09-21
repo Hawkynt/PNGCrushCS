@@ -261,52 +261,12 @@ public readonly partial record struct PngFile :
   /// a multiple of eight pixels — which is nearly every picture, and why this went unnoticed — and
   /// diverge by the padding bits for the rest, throwing every row after the first out of step.
   /// </remarks>
-  private static byte[] _RemoveRowPadding(byte[] padded, int width, int height, int bitsPerPixel) {
-    var paddedStride = (width * bitsPerPixel + 7) / 8;
-    if (paddedStride * 8 == width * bitsPerPixel)
-      return padded;
-
-    var result = new byte[(width * height * bitsPerPixel + 7) / 8];
-    var mask = (1 << bitsPerPixel) - 1;
-
-    for (var y = 0; y < height; ++y)
-    for (var x = 0; x < width; ++x) {
-      var sourceBit = y * paddedStride * 8 + x * bitsPerPixel;
-      var sourceByte = sourceBit >> 3;
-      if (sourceByte >= padded.Length)
-        return result;
-
-      var value = (padded[sourceByte] >> (8 - bitsPerPixel - (sourceBit & 7))) & mask;
-      var targetBit = (y * width + x) * bitsPerPixel;
-      result[targetBit >> 3] |= (byte)(value << (8 - bitsPerPixel - (targetBit & 7)));
-    }
-
-    return result;
-  }
+  private static byte[] _RemoveRowPadding(byte[] padded, int width, int height, int bitsPerPixel)
+    => PackedRows.DropRowPadding(padded, width, height, bitsPerPixel);
 
   /// <summary>Restacks continuous sub-byte rows into the byte-aligned layout PNG stores.</summary>
-  private static byte[] _AddRowPadding(byte[] continuous, int width, int height, int bitsPerPixel) {
-    var paddedStride = (width * bitsPerPixel + 7) / 8;
-    if (paddedStride * 8 == width * bitsPerPixel)
-      return continuous;
-
-    var result = new byte[paddedStride * height];
-    var mask = (1 << bitsPerPixel) - 1;
-
-    for (var y = 0; y < height; ++y)
-    for (var x = 0; x < width; ++x) {
-      var sourceBit = (y * width + x) * bitsPerPixel;
-      var sourceByte = sourceBit >> 3;
-      if (sourceByte >= continuous.Length)
-        return result;
-
-      var value = (continuous[sourceByte] >> (8 - bitsPerPixel - (sourceBit & 7))) & mask;
-      var targetBit = y * paddedStride * 8 + x * bitsPerPixel;
-      result[targetBit >> 3] |= (byte)(value << (8 - bitsPerPixel - (targetBit & 7)));
-    }
-
-    return result;
-  }
+  private static byte[] _AddRowPadding(byte[] continuous, int width, int height, int bitsPerPixel)
+    => PackedRows.AddRowPadding(continuous, width, height, bitsPerPixel);
 
   private static byte[] _Unpack2BitTo8Bit(byte[] packed, int width, int height) {
     var result = new byte[width * height];

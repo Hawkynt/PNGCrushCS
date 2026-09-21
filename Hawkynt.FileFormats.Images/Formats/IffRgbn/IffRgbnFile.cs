@@ -53,11 +53,14 @@ public readonly record struct IffRgbnFile : IImageFormatReader<IffRgbnFile>, IIm
       var paletteCount = image.PaletteCount;
       pixels = new byte[image.Width * image.Height * 3];
       if (image.Format == PixelFormat.Indexed1) {
-        var stride = (image.Width + 7) / 8;
+        // The indices run straight on across the picture, so a row does not start on a byte of its
+        // own. Reading at a per-row stride costs nothing on the first row, slides every row after it
+        // by the padding, and walks off the end of a buffer that never held the padding to begin with.
         for (var y = 0; y < image.Height; ++y)
           for (var x = 0; x < image.Width; ++x) {
-            var b = image.PixelData[y * stride + (x >> 3)];
-            var idx = (b >> (7 - (x & 7))) & 1;
+            var at = y * image.Width + x;
+            var b = image.PixelData[at >> 3];
+            var idx = (b >> (7 - (at & 7))) & 1;
             if (idx >= paletteCount) idx = 0;
             var dst = (y * image.Width + x) * 3;
             pixels[dst] = palette[idx * 3];

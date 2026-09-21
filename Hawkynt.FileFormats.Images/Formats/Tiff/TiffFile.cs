@@ -195,31 +195,8 @@ public sealed class TiffFile :
   /// byte of nothing at the end of each. The indexed formats here are a continuous bit stream with no
   /// such gap, so leaving it in shears every row after the first.
   /// </remarks>
-  private static byte[] _Unpad(byte[] pixelData, int width, int height, int bitsPerSample) {
-    var bytesPerRow = (width * bitsPerSample + 7) / 8;
-    var bitsPerRow = width * bitsPerSample;
-    if (bitsPerRow % 8 == 0 || height <= 1)
-      return pixelData[..];
-
-    var packed = new byte[(bitsPerRow * height + 7) / 8];
-    var bit = 0;
-    for (var row = 0; row < height; ++row) {
-      var rowStart = row * bytesPerRow;
-      for (var i = 0; i < bitsPerRow; ++i) {
-        var sourceBit = rowStart * 8 + i;
-        var sourceByte = sourceBit >> 3;
-        if (sourceByte >= pixelData.Length)
-          break;
-
-        if ((pixelData[sourceByte] & (0x80 >> (sourceBit & 7))) != 0)
-          packed[bit >> 3] |= (byte)(0x80 >> (bit & 7));
-
-        ++bit;
-      }
-    }
-
-    return packed;
-  }
+  private static byte[] _Unpad(byte[] pixelData, int width, int height, int bitsPerSample)
+    => PackedRows.DropRowPadding(pixelData, width, height, bitsPerSample);
 
   /// <summary>Spreads two-bit indices one to a nibble so a four-bit palette can draw them.</summary>
   private static byte[] _WidenPairsToNibbles(byte[] pairs, int width, int height) {
@@ -384,7 +361,12 @@ public sealed class TiffFile :
       Height = image.Height,
       SamplesPerPixel = samplesPerPixel,
       BitsPerSample = bitsPerSample,
-      PixelData = image.PixelData[..],
+      // The read side has undone TIFF's row padding since the four-bit palette case was added; the
+      // write side never put it back, so every bilevel picture whose width was not a multiple of
+      // eight was written sheared — and read back sheared by anything, this reader included.
+      PixelData = bitsPerSample == 1
+        ? PackedRows.AddRowPadding(image.PixelData, image.Width, image.Height, 1)
+        : image.PixelData[..],
       ColorMap = colorMap,
       ColorMode = colorMode,
       Metadata = image.Metadata,

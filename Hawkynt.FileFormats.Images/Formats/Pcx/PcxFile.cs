@@ -107,11 +107,23 @@ public readonly record struct PcxFile : IImageFormatReader<PcxFile>, IImageToRaw
         throw new ArgumentException($"Unsupported PcxColorMode: {mode}", nameof(file));
     }
 
+    // A PCX scanline starts on a byte — on the byte the header's own stride names, in fact — where
+    // an Indexed1 or Indexed4 picture runs its indices straight on. Above a byte a pixel the two
+    // layouts are the same thing and the data passes through untouched.
+    // The depth comes from the format rather than the header: the four-plane EGA case states one bit
+    // a pixel and produces a byte-a-pixel picture, so the header's own number describes the planes
+    // and not what PixelData holds.
+    var pixelData = format switch {
+      PixelFormat.Indexed4 => PackedRows.DropRowPadding(file.PixelData, file.Width, file.Height, 4),
+      PixelFormat.Indexed1 => PackedRows.DropRowPadding(file.PixelData, file.Width, file.Height, 1),
+      _ => file.PixelData,
+    };
+
     return new RawImage {
       Width = file.Width,
       Height = file.Height,
       Format = format,
-      PixelData = file.PixelData,
+      PixelData = pixelData,
       Palette = palette,
       PaletteCount = paletteCount
     };
@@ -159,7 +171,9 @@ public readonly record struct PcxFile : IImageFormatReader<PcxFile>, IImageToRaw
       Width = image.Width,
       Height = image.Height,
       BitsPerPixel = bpp,
-      PixelData = image.PixelData,
+      PixelData = bpp is 1 or 4
+        ? PackedRows.AddRowPadding(image.PixelData, image.Width, image.Height, bpp)
+        : image.PixelData,
       Palette = palette,
       PaletteColorCount = paletteCount,
       ColorMode = colorMode,

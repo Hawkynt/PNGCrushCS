@@ -65,7 +65,9 @@ public readonly record struct ClpFile : IImageFormatReader<ClpFile>, IImageToRaw
           Width = width,
           Height = height,
           Format = file.BitsPerPixel == 4 ? PixelFormat.Indexed4 : PixelFormat.Indexed1,
-          PixelData = pixels,
+          // Dropping the four-byte padding leaves rows that still start on a byte each, which is one
+          // boundary short of what a sub-byte picture is: its indices run straight on.
+          PixelData = PackedRows.DropRowPadding(pixels, width, height, file.BitsPerPixel),
           Palette = palette,
           PaletteCount = file.Palette.Length / 4,
         };

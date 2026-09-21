@@ -25,11 +25,18 @@ public readonly record struct BennetYeeFaceFile : IImageFormatReader<BennetYeeFa
   /// <summary>Computes the row stride: ((width + 15) / 16) * 2 bytes.</summary>
   internal static int ComputeStride(int width) => ((width + 15) / 16) * 2;
 
+  /// <summary>Draws the face as a picture.</summary>
+  /// <remarks>
+  /// A .ybm row is padded out to a whole word, where an <see cref="PixelFormat.Indexed1"/> picture
+  /// has nothing between its rows at all. Handing the stored rows over unchanged left every row
+  /// after the first out of step by up to fifteen pixels, which for the width this format is
+  /// usually written at — a face, not a multiple of sixteen — is most of the picture.
+  /// </remarks>
   public static RawImage ToRawImage(BennetYeeFaceFile file) => new() {
     Width = file.Width,
     Height = file.Height,
     Format = PixelFormat.Indexed1,
-    PixelData = file.PixelData[..],
+    PixelData = PackedRows.DropRowPadding(file.PixelData, file.Width, file.Height, 1, ComputeStride(file.Width)),
     Palette = _BlackWhitePalette[..],
     PaletteCount = 2,
   };
@@ -38,22 +45,12 @@ public readonly record struct BennetYeeFaceFile : IImageFormatReader<BennetYeeFa
     ArgumentNullException.ThrowIfNull(image);
     image = image.EnsureFormat(PixelFormat.Indexed1);
 
-    var srcStride = (image.Width + 7) / 8;
-    var dstStride = ComputeStride(image.Width);
-
-    byte[] pixelData;
-    if (srcStride == dstStride) {
-      pixelData = image.PixelData[..];
-    } else {
-      pixelData = new byte[dstStride * image.Height];
-      for (var y = 0; y < image.Height; ++y)
-        image.PixelData.AsSpan(y * srcStride, srcStride).CopyTo(pixelData.AsSpan(y * dstStride));
-    }
-
+    // The picture's rows run into one another; the file's start on a word. Copying row for row at
+    // the file's stride, as this used to, only happens to be right where the two strides agree.
     return new() {
       Width = image.Width,
       Height = image.Height,
-      PixelData = pixelData,
+      PixelData = PackedRows.AddRowPadding(image.PixelData, image.Width, image.Height, 1, ComputeStride(image.Width)),
     };
   }
 }

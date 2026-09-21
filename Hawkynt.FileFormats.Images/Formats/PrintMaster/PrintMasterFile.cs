@@ -38,18 +38,23 @@ public readonly record struct PrintMasterFile : IImageFormatReader<PrintMasterFi
       Width = file.Width,
       Height = file.Height,
       Format = PixelFormat.Indexed1,
-      PixelData = pixelData,
+      PixelData = PackedRows.DropRowPadding(pixelData, file.Width, file.Height, 1),
       Palette = _BlackWhitePalette[..],
       PaletteCount = 2,
     };
   }
 
   /// <summary>Creates a Print Master image from an Indexed1 raw image.</summary>
+  /// <remarks>
+  /// The file states its width in whole bytes and lays its rows out that way, so the continuous
+  /// stream a picture carries has to be spread back over them. Storing it unspread wrote every row
+  /// after the first up to seven pixels early, and the file said nothing was wrong.
+  /// </remarks>
   public static PrintMasterFile FromRawImage(RawImage image) {
     ArgumentNullException.ThrowIfNull(image);
     image = image.EnsureFormat(PixelFormat.Indexed1);
 
-    var pixelData = image.PixelData[..];
+    var pixelData = PackedRows.AddRowPadding(image.PixelData, image.Width, image.Height, 1);
 
     return new() { Width = image.Width, Height = image.Height, PixelData = pixelData };
   }

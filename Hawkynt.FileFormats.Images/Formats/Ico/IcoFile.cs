@@ -82,6 +82,16 @@ public sealed class IcoFile : IImageFormatReader<IcoFile>, IImageToRawImage<IcoF
     return palette;
   }
 
+  /// <summary>Turns one bitmap entry into the picture it draws.</summary>
+  /// <remarks>
+  /// Every row an icon stores starts on a four-byte boundary, whatever the depth. Above a byte a
+  /// pixel that is only a matter of copying the row and leaving the padding behind; below one the
+  /// row has to be taken apart, because an <c>Indexed1</c> or <c>Indexed4</c>
+  /// <see cref="RawImage"/> runs its indices straight on across the picture with nothing between
+  /// the rows. The padding was previously carried over as if it were picture, which costs nothing
+  /// on the first row and slides every row after it — a two by two monochrome icon came out with
+  /// its second row six pixels late.
+  /// </remarks>
   private static RawImage _DecodeDib(IcoImage entry) {
     var dib = entry.Data;
 
@@ -161,8 +171,8 @@ public sealed class IcoFile : IImageFormatReader<IcoFile>, IImageToRawImage<IcoF
 
         var dataOffset = biSize + paletteCount * paletteEntrySize;
         var srcStride = ((width * 4 + 31) / 32) * 4;
-        var packed = new byte[((width + 1) / 2) * height];
         var dstStride = (width + 1) / 2;
+        var packed = new byte[dstStride * height];
         for (var y = 0; y < height; ++y)
           dib.AsSpan(dataOffset + (height - 1 - y) * srcStride, dstStride).CopyTo(packed.AsSpan(y * dstStride));
 
@@ -170,7 +180,7 @@ public sealed class IcoFile : IImageFormatReader<IcoFile>, IImageToRawImage<IcoF
           Width = width,
           Height = height,
           Format = PixelFormat.Indexed4,
-          PixelData = packed,
+          PixelData = PackedRows.DropRowPadding(packed, width, height, 4),
           Palette = palette,
           PaletteCount = paletteCount,
         };
@@ -195,7 +205,7 @@ public sealed class IcoFile : IImageFormatReader<IcoFile>, IImageToRawImage<IcoF
           Width = width,
           Height = height,
           Format = PixelFormat.Indexed1,
-          PixelData = packed,
+          PixelData = PackedRows.DropRowPadding(packed, width, height, 1),
           Palette = palette,
           PaletteCount = paletteCount,
         };

@@ -80,9 +80,11 @@ public readonly record struct SunRasterFile : IImageFormatReader<SunRasterFile>,
         };
       }
       case SunRasterColorMode.Monochrome: {
-        var bytesPerRow = (width + 7) / 8;
-        var paddedBytesPerRow = _PadTo2(bytesPerRow);
-        var stripped = _StripRowPadding(file.PixelData, bytesPerRow, paddedBytesPerRow, height);
+        // Two paddings sit between the stored rows and the picture: the word the raster aligns each
+        // row to, and the byte the row itself ends on. _StripRowPadding took away only the first,
+        // so a width that was not a multiple of eight still leaned — and where the byte count was
+        // already even it took away nothing at all and the misalignment passed straight through.
+        var stripped = PackedRows.DropRowPadding(file.PixelData, width, height, 1, _PadTo2((width + 7) / 8));
         // B/W palette: index 0 = white (255,255,255), index 1 = black (0,0,0)
         // In Sun Raster 1bpp, bit=1 means black, bit=0 means white (standard)
         var palette = new byte[] { 255, 255, 255, 0, 0, 0 };
@@ -99,9 +101,7 @@ public readonly record struct SunRasterFile : IImageFormatReader<SunRasterFile>,
       default: {
         switch (file.Depth) {
           case 1: {
-            var bytesPerRow = (width + 7) / 8;
-            var paddedBytesPerRow = _PadTo2(bytesPerRow);
-            var stripped = _StripRowPadding(file.PixelData, bytesPerRow, paddedBytesPerRow, height);
+            var stripped = PackedRows.DropRowPadding(file.PixelData, width, height, 1, _PadTo2((width + 7) / 8));
             var palette = new byte[] { 255, 255, 255, 0, 0, 0 };
             return new() {
               Width = width,
@@ -230,9 +230,9 @@ public readonly record struct SunRasterFile : IImageFormatReader<SunRasterFile>,
         };
       }
       case PixelFormat.Indexed1: {
-        var bytesPerRow = (width + 7) / 8;
-        var paddedBytesPerRow = _PadTo2(bytesPerRow);
-        var padded = _AddRowPadding(image.PixelData, bytesPerRow, paddedBytesPerRow, height);
+        // Straight on to word-aligned rows in one step. Copying row for row out of a continuous
+        // buffer, as this used to, read past its end as soon as the width was not a multiple of eight.
+        var padded = PackedRows.AddRowPadding(image.PixelData, width, height, 1, _PadTo2((width + 7) / 8));
         return new() {
           Width = width,
           Height = height,
