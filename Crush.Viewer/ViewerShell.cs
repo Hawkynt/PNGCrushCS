@@ -48,6 +48,7 @@ internal sealed class ViewerShell : Form {
   private readonly RibbonToggleButton _showInformation = new("Information", RibbonItemSize.Small) { Checked = true };
   private readonly RibbonToggleButton _showRulers = new("Rulers", RibbonItemSize.Small);
   private readonly List<(RibbonToggleButton Button, DisplayFilter? Filter)> _filterButtons = [];
+  private readonly RibbonButton _save = new("Save", RibbonItemSize.Large);
   private readonly RibbonButton _previousPage = new("Previous page", RibbonItemSize.Large);
   private readonly RibbonButton _nextPage = new("Next page", RibbonItemSize.Large);
   private readonly RibbonButton _extractPages = new("Extract pages…", RibbonItemSize.Large);
@@ -60,6 +61,7 @@ internal sealed class ViewerShell : Form {
   private int _page;
   private int _pageCount = 1;
   private double _pixelAspect = 1;
+  private bool _edited;
   private DisplayFilter _formatFilter = DisplayFilter.None;
   private DisplayFilter? _filterOverride;
   private string? _notice;
@@ -124,6 +126,9 @@ internal sealed class ViewerShell : Form {
     tab.Groups.Add(open);
 
     var save = new RibbonGroup("Save");
+    this._save.ToolTipText = "Writes the edited picture back over the file it came from.";
+    this._save.Click += (_, _) => this._Save();
+    save.Items.Add(this._save);
     save.Items.Add(_Button("Save as…", this._SaveAs, RibbonItemSize.Large));
     tab.Groups.Add(save);
 
@@ -131,6 +136,10 @@ internal sealed class ViewerShell : Form {
     convert.Items.Add(_Button("One file…", this._ConvertCurrent, RibbonItemSize.Large));
     convert.Items.Add(_Button("Whole folder…", this._ConvertFolder, RibbonItemSize.Large));
     tab.Groups.Add(convert);
+
+    var about = new RibbonGroup("Help");
+    about.Items.Add(_Button("About", this._About, RibbonItemSize.Small));
+    tab.Groups.Add(about);
 
     return tab;
   }
@@ -235,8 +244,14 @@ internal sealed class ViewerShell : Form {
 
     var adjust = new RibbonGroup("Adjust");
     adjust.Items.Add(_Button("Resize…", this._Resize, RibbonItemSize.Large));
+    adjust.Items.Add(_Button("Crop…", this._Crop, RibbonItemSize.Large));
     adjust.Items.Add(_Button("Reduce colours…", this._ReduceColours, RibbonItemSize.Large));
     tab.Groups.Add(adjust);
+
+    var colour = new RibbonGroup("Colour");
+    colour.Items.Add(_Button("Greyscale", () => this._Apply(ImageTransforms.Grayscale), RibbonItemSize.Small));
+    colour.Items.Add(_Button("Invert", () => this._Apply(ImageTransforms.Invert), RibbonItemSize.Small));
+    tab.Groups.Add(colour);
 
     return tab;
   }
@@ -406,6 +421,7 @@ internal sealed class ViewerShell : Form {
       this._entry = entry;
       this._raw = raw;
       this._page = 0;
+      this._edited = false;
       this._pageCount = PageService.PageCount(file, entry);
       this._PickVideoMode();
       this._Render();
@@ -436,6 +452,7 @@ internal sealed class ViewerShell : Form {
 
       this._raw = raw;
       this._page = page;
+      this._edited = false;
       this._PickVideoMode();
       this._Render();
       this._UpdatePageButtons();
@@ -550,12 +567,25 @@ internal sealed class ViewerShell : Form {
 
     try {
       this._raw = transform(this._raw);
+      this._edited = true;
       this._Render();
       this._UpdateInformation();
       this._UpdateStatus();
     } catch (Exception ex) {
       this._Complain("Picture", ex.Message);
     }
+  }
+
+  private void _Crop() {
+    if (this._raw == null)
+      return;
+
+    var dialog = new CropOptionsDialog(this._raw.Width, this._raw.Height);
+    if (dialog.ShowDialog(this) != DialogResult.OK)
+      return;
+
+    var region = dialog.Region;
+    this._Apply(i => ImageTransformer.Crop(i, region));
   }
 
   private void _Resize() {
@@ -584,6 +614,42 @@ internal sealed class ViewerShell : Form {
   // ============================================================================================
   // Writing
   // ============================================================================================
+
+  /// <summary>Writes the edited picture back over the file it came from.</summary>
+  /// <remarks>
+  /// <para>
+  /// Falls through to Save as whenever writing in place would not be writing the same picture back:
+  /// nothing has been edited, the picture did not come from a file, or no registered writer can
+  /// produce the format it was read from. That is the rule the viewer this replaces used, and it is
+  /// what keeps Save from quietly being the only way to lose a read-only format's file.
+  /// </para>
+  /// <para>
+  /// A file holding several pages falls through too, and that part is new. Every writer encodes one
+  /// picture, so writing back what is on screen would replace a twelve-page document with its
+  /// seventh page and report it as saved — a one-keystroke way to destroy eleven pages that no
+  /// dialog warned about.
+  /// </para>
+  /// </remarks>
+  private void _Save() {
+    if (this._raw == null)
+      return;
+
+    if (!this._edited || this._file == null || this._pageCount > 1 || this._entry?.SupportsWrite != true) {
+      this._SaveAs();
+      return;
+    }
+
+    var result = ConversionService.Write(this._raw, this._entry, this._file, this._file);
+    if (!result.Succeeded) {
+      this._Complain("Save picture", result.Message);
+      return;
+    }
+
+    this._edited = false;
+    this._file.Refresh();
+    this._UpdateInformation();
+    this._UpdateStatus();
+  }
 
   private void _SaveAs() {
     if (this._raw == null)
@@ -619,14 +685,34 @@ internal sealed class ViewerShell : Form {
       return;
     }
 
+    // What was just written is now the picture on screen, so Save from here on writes back to it
+    // rather than to the file it was read from. Leaving the old file as the target would make a
+    // converted picture's next Save overwrite the original in its original format.
+    target.Refresh();
+    this._file = target;
+    this._entry = entry;
+    this._format = entry.Format;
+    this._edited = false;
+
     if (this._folder.Folder != null && target.Directory != null
         && string.Equals(this._folder.Folder.FullName, target.Directory.FullName, StringComparison.OrdinalIgnoreCase)) {
       this._folder.Refresh();
+      this._folder.Select(target);
       this._RefreshBrowser();
     }
 
+    this._UpdateInformation();
     this._UpdateStatus();
   }
+
+  private void _About()
+    => MessageBox.Show(
+      this,
+      "Crush Viewer\n\nBrowser, viewer, converter and page extractor for the PNGCrushCS format suite, "
+      + "built on NativeForms over the platform's own widgets.",
+      "About Crush Viewer",
+      MessageBoxButtons.OK,
+      MessageBoxIcon.Information);
 
   private void _ConvertCurrent() {
     if (this._file == null || this._raw == null) {
@@ -749,7 +835,8 @@ internal sealed class ViewerShell : Form {
       : $"picture {this._folder.Index + 1}/{this._folder.Files.Count}, {walk}";
     this._statusPosition.Text = this._pageCount > 1 ? $"{position} — page {this._page + 1}/{this._pageCount}" : position;
 
-    this.Text = this._file == null ? _TITLE : $"{this._file.Name} — {_TITLE}";
+    this._save.Enabled = this._raw != null;
+    this.Text = this._file == null ? _TITLE : $"{(this._edited ? "* " : "")}{this._file.Name} — {_TITLE}";
   }
 
   private void _UpdateInformation() {
