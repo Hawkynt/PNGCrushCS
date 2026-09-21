@@ -51,6 +51,9 @@ public enum ConformanceOracle {
   /// <summary>FFmpeg, as <c>ffmpeg</c> or <c>ffprobe</c>.</summary>
   FFmpeg,
 
+  /// <summary>Vidvox Hap reference decoder paired with bcdec for BC7/BC6H texture decoding.</summary>
+  VidvoxHap,
+
   /// <summary>ExifTool.</summary>
   ExifTool,
 
@@ -257,6 +260,7 @@ public static class ConformanceOracles {
     ConformanceOracle.HeifDec => "heif-dec",
     ConformanceOracle.AvifDec => "avifdec",
     ConformanceOracle.FFmpeg => "ffmpeg",
+    ConformanceOracle.VidvoxHap => "Vidvox Hap + bcdec",
     ConformanceOracle.ExifTool => "ExifTool",
     ConformanceOracle.PyEmbroidery => "pyembroidery",
     ConformanceOracle.LibreOffice => "LibreOffice",
@@ -336,6 +340,7 @@ public static class ConformanceOracles {
     ConformanceOracle.HeifDec => "https://github.com/strukturag/libheif",
     ConformanceOracle.AvifDec => "https://github.com/AOMediaCodec/libavif",
     ConformanceOracle.FFmpeg => "https://ffmpeg.org/",
+    ConformanceOracle.VidvoxHap => "https://github.com/Vidvox/hap",
     ConformanceOracle.ExifTool => "https://exiftool.org/",
     ConformanceOracle.PyEmbroidery => "https://github.com/EmbroidePy/pyembroidery",
     ConformanceOracle.LibreOffice => "https://www.libreoffice.org/",

@@ -31,8 +31,8 @@ namespace Hawkynt.FileFormats.Video.Tests;
 /// registry says has read one, and the frame the tool hands back has to be the picture that went in.
 /// <para/>
 /// The two checks that need no tool run everywhere — a codec cannot claim an oracle nothing here can
-/// run, and a codec with no encoder cannot claim one at all. The one that runs FFmpeg reports
-/// inconclusive on a machine without it.
+/// run, and a codec with no encoder cannot claim one at all. External runners report inconclusive
+/// on a machine where their executable is not installed.
 /// </remarks>
 [TestFixture]
 [Category("Conformance")]
@@ -42,7 +42,7 @@ public sealed class EncoderOracleTests {
   private const string _SURVEY_VARIABLE = "ORACLE_SURVEY";
 
   /// <summary>The oracles this fixture knows how to run.</summary>
-  private static readonly ConformanceOracle[] _Runnable = [ConformanceOracle.FFmpeg];
+  private static readonly ConformanceOracle[] _Runnable = [ConformanceOracle.FFmpeg, ConformanceOracle.VidvoxHap];
 
   // ============================================================================================
   // Checks that need no tool
@@ -77,7 +77,7 @@ public sealed class EncoderOracleTests {
   }
 
   // ============================================================================================
-  // The check that runs FFmpeg
+  // The checks that run external codec oracles
   // ============================================================================================
 
   private static IEnumerable<TestCaseData> Claims() {
@@ -101,15 +101,31 @@ public sealed class EncoderOracleTests {
     if (oracle == ConformanceOracle.None)
       Assert.Pass("No encoder claims an oracle, so there is nothing to hold to one.");
 
-    FFmpegOracle.RequireAvailable();
-
     var encoder = VideoFormatRegistry.AllEncoders.FirstOrDefault(e => e.CodecName == codecName);
     Assert.That(encoder, Is.Not.Null, $"no encoder is registered under '{codecName}'");
 
-    var (accepted, detail) = _AskFFmpegAbout(encoder!);
+    bool accepted;
+    string detail;
+    switch (oracle) {
+      case ConformanceOracle.FFmpeg:
+        FFmpegOracle.RequireAvailable();
+        (accepted, detail) = _AskFFmpegAbout(encoder!);
+        break;
+
+      case ConformanceOracle.VidvoxHap:
+        Assert.That(codecName, Is.EqualTo("Hap"),
+          "the Vidvox/bcdec oracle is specific to the Hap encoder and must not be claimed by another codec");
+        HapReferenceOracle.RequireAvailable();
+        (accepted, detail) = HapReferenceOracle.TryValidate();
+        break;
+
+      default:
+        Assert.Fail($"no runner is implemented for {oracle}");
+        return;
+    }
 
     Assert.That(accepted, Is.True,
-      $"{codecName} says ffmpeg has read what it writes, and it has not: {detail}");
+      $"{codecName} says {oracle.DisplayName()} has read what it writes, and it has not: {detail}");
   }
 
   private static IEnumerable<TestCaseData> ContainerClaims() {
