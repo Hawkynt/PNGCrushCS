@@ -1185,10 +1185,92 @@ no intra picture to reset it. That residual is the transform's, which H.263 Anne
 accuracy bound rather than as an algorithm; ffmpeg's own two transforms differ from each other by an
 order of magnitude more on the same streams.
 
-What is not implemented refuses and says so, naming the annex and the field: the extended picture
-header of clause 5.1.4 and everything it signals, unrestricted motion vectors (Annex D), arithmetic
-coding (Annex E), advanced prediction and its four vectors per macroblock (Annex F), PB-frames
-(Annex G), continuous presence multipoint (Annex C), and the escape level Annex T reserves.
+#### H.263+ custom picture formats
+
+The extended picture header of clause 5.1.4 is read in the one shape that is self-contained:
+UFEP=001, which carries the whole optional part in every picture. UFEP=000 says "the modes are the
+ones the last picture stated", and honouring it means carrying coding-mode state across packet
+boundaries; that is refused by name rather than guessed at, because a packet whose modes were set by
+a packet that never arrived decodes to something plausible and wrong.
+
+Source format 110 is the custom one. CPFMT states the width in units of four pixels and the height
+as a picture height indication, also in fours, and the parser holds PHI to the 1..288 the
+Recommendation gives it — a stream stating 289 asks for 1156 lines, which is past the format's own
+maximum, and is refused rather than allocated. A pixel aspect ratio of 15 adds EPAR, whose two
+components must both be non-zero and relatively prime; a ratio of 0 or 6 through 14 is reserved and
+refused.
+
+A custom size need not be a whole number of macroblocks, and the ones that are not are the reason
+this is more than a different width. The picture is *coded* as the next complete macroblock grid —
+180x100 is coded as 192x112, twelve by seven macroblocks — and cropped only when it is handed out.
+The rows and columns past the edge are coded, transmitted and reconstructed like any others, and a
+later picture's motion vector may point into them, so they are kept in the reference and dropped at
+display. The writer fills them by repeating the nearest real edge sample, which is what makes those
+macroblocks cheap rather than noise.
+
+What the custom-format work does not cover, and says so where the bit is read, is the custom picture
+*clock* frequency: CPCFC and the extended temporal reference that goes with it are refused by name.
+The number of GOB rows a custom picture gets follows the height rather than a format name — one row
+per group up to 400 lines, two to 800, four above — which is clause 5.1.4.6's rule and not an
+invention.
+
+#### Annex O temporal B-pictures
+
+B-pictures are the temporal half of Annex O and are off unless asked for: the writer stays I/P and
+one packet per input picture until a count of B-pictures between references is set, which must
+happen before the first picture because changing it later would change what the pictures already
+buffered mean. Asked for, the writer buffers display order, sends the future anchor ahead of the
+pictures that display before it, and records the difference in the packet's presentation and decode
+timestamps the way the MPEG-1 writer here already does. A B-picture is an enhancement-layer picture
+that nothing predicts from, so it never enters the reference chain and its error cannot accumulate.
+The decoder holds a reference whose timestamps say it was decoded early and releases it when the
+next reference arrives, so a container that carries both timestamps gets display order back; a bare
+elementary stream, which gives a packet-at-a-time interface no warning that B-pictures are coming,
+gets coding order with every picture still correctly predicted.
+
+All five prediction types of Table O.1 are decoded — direct, forward, backward, bidirectional and
+intra — with the separate forward and backward vector predictor fields of O.5, in which a neighbour
+that carries no vector in the direction being predicted contributes zero and a direct macroblock's
+derived vectors feed neither field. COD=1 in a B-picture is not "copy the reference" but direct mode
+with no coefficients (O.4.1), and direct mode scales the vector of the co-located macroblock of the
+*temporally subsequent* reference, which is why a reconstructed picture carries its motion field
+beside its samples rather than leaving it in the picture decoder that read it. The temporal distances
+are taken modulo 256, so a group that straddles a temporal-reference wraparound scales by the same
+numbers as one that does not.
+
+The writer uses less of that table than the decoder reads: every B macroblock it writes is an
+explicit bidirectional one with zero transmitted vectors, coding its residual against the average of
+the two co-located anchors. That is conformant Annex O and costs compression rather than
+interoperability — direct mode would tie a B macroblock to the future anchor's motion field, which is
+a rate decision. Forward-only, backward-only and non-zero-vector bidirectional macroblocks are
+therefore decoder-side only, and are measured as such: a B-picture whose macroblocks cycle through
+forward, backward and bidirectional prediction with non-zero vectors is built by hand in the test
+suite and handed to ffmpeg, whose reconstruction of the forward and backward ones — which average
+nothing and code nothing — is identical to this decoder's on every sample.
+
+#### Where ffmpeg and the Recommendation disagree
+
+Clause O.4 is explicit about the bidirectional average: "the prediction pixel values are calculated
+by averaging the forward and backward prediction pixels. The average is calculated by dividing the
+sum of the two predictions by two (division by truncation)" — the same wording Annex M uses for
+Improved PB-frames. ffmpeg predicts those macroblocks through the MPEG-style averaging it shares
+across its codecs, which carries a rounding term, so wherever the two predictions sum to an odd
+number ffmpeg's sample is one level higher than the Recommendation's. On a 176x144 clip that is
+between 1900 and 2500 samples of every bidirectional picture, every one of them high by one and none
+low, against an intra and a predicted picture of the same clip that match ffmpeg on every sample.
+
+The normative text wins, so the truncation stays and the disagreement is recorded here instead. The
+test that pins it down chooses its two references so that the predictions sum to an odd number and
+asserts that they do, because with an even sum truncating and rounding give the same answer and the
+test would be measuring nothing — which is what it had been doing.
+
+What is not implemented refuses and says so, naming the annex and the field. From baseline PTYPE:
+continuous presence multipoint (Annex C), unrestricted motion vectors (Annex D), arithmetic coding
+(Annex E), advanced prediction and its four vectors per macroblock (Annex F), PB-frames (Annex G),
+and the escape level Annex T reserves. From PLUSPTYPE, each named where its bit is read: UFEP=000,
+the custom picture clock, Annexes D, E, F, I, J, K, N, P, Q, R, S and T, continuous presence
+multipoint, Improved PB-frames (Annex M), and Annex O's spatial and SNR scalability — EI and EP
+pictures — of which only the temporal B-picture half is implemented.
 
 ### RealVideo 1
 

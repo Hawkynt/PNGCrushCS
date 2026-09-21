@@ -344,9 +344,13 @@ public sealed class H263VideoDecoderTests {
 
   [Test]
   [Category("Unit")]
-  public void TheExtendedPictureHeaderIsRefusedByName() {
+  public void AnExtendedPictureHeaderWithoutItsOptionalStateIsRefusedByName() {
+    // The extended PTYPE of 5.1.4 used to be refused outright. It is read now, and the custom
+    // formats and Annex O pictures it carries are covered by H263PlusAndAnnexOTests; what this
+    // fixture still states is UFEP=000, which puts that state in an earlier packet rather than in
+    // this one, and that is what is refused.
     var failure = Assert.Throws<NotSupportedException>(() => _Decode(_HeaderOnly(sourceFormat: 7)));
-    Assert.That(failure.Message, Does.Contain("5.1.4"));
+    Assert.That(failure.Message, Does.Contain("UFEP=000"));
   }
 
   [TestCase(0)]

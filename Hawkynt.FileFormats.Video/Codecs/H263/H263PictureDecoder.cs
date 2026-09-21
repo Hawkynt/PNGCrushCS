@@ -70,6 +70,7 @@ internal sealed class H263PictureDecoder {
     this._macroblockKind = new MacroblockKind[this._macroblockWidth * this._macroblockHeight];
     this._groupHasHeader = new bool[this._macroblockHeight];
     this._quantiser = header.Quantiser;
+    target.TemporalReference = header.TemporalReference;
   }
 
   internal H263Frame Target => this._target;
@@ -78,10 +79,12 @@ internal sealed class H263PictureDecoder {
     ArgumentNullException.ThrowIfNull(header);
     ArgumentNullException.ThrowIfNull(target);
 
+    if (header.IsBidirectional)
+      throw new ArgumentException("An Annex O B-picture must be decoded by the bidirectional picture decoder.", nameof(header));
+
     if (!header.IsIntra && reference == null)
       throw new InvalidDataException(
-        "An H.263 predicted picture arrived before any intra picture, so there is nothing for it to be predicted from. "
-        + "Decoding must begin at an intra picture.");
+        "An H.263 predicted picture arrived before any intra picture, so there is nothing for it to be predicted from. Decoding must begin at an intra picture.");
 
     return new(header, target, header.IsIntra ? null : reference);
   }
@@ -99,7 +102,6 @@ internal sealed class H263PictureDecoder {
     for (var address = 0; address < count; ++address) {
       var row = address / this._macroblockWidth;
       var isGroupStart = address % this._macroblockWidth == 0 && row % groupRows == 0;
-
       if (this._header.HasGroupLayer && isGroupStart && row != 0 && reader.AtStartCode())
         this._ReadGroupHeader(ref reader, row / groupRows, row);
 
@@ -170,6 +172,7 @@ internal sealed class H263PictureDecoder {
       if (!this._header.IsIntra && reader.ReadBit() == 1) {
         this._macroblockKind[address] = MacroblockKind.Skipped;
         this._SetMacroblockVector(address, 0, 0);
+        this._RecordMotionField(address, hasMotion: true);
         this._CopyFromReference(address);
         return;
       }
@@ -220,6 +223,8 @@ internal sealed class H263PictureDecoder {
       vectorY[1] = vectorY[2] = vectorY[3] = vectorY[0];
       this._SetMacroblockVector(address, vectorX[0], vectorY[0]);
     }
+
+    this._RecordMotionField(address, hasMotion: !isIntra);
 
     var pattern = (luminancePattern << 2) | chromaPattern;
     if (isIntra) {
@@ -272,7 +277,6 @@ internal sealed class H263PictureDecoder {
       vector += 64;
     else if (predictor > 32 && vector > 63)
       vector -= 64;
-
     return vector;
   }
 
@@ -344,6 +348,25 @@ internal sealed class H263PictureDecoder {
     this._vectorY[at] = checked((short)y);
   }
 
+  /// <summary>
+  /// Copies the macroblock's vector into the reconstructed picture, where a later Annex O
+  /// direct-mode B-picture looks for the co-located one.
+  /// </summary>
+  /// <remarks>
+  /// ITU-T H.263 O.4.1 scales the vector of the co-located macroblock of the temporally subsequent
+  /// reference, so this field has to outlive the picture decoder that read it. An intra macroblock
+  /// predicts from nothing and is marked as carrying no vector; a skipped one carries a real zero
+  /// vector and is not. Annex F's four vectors have no single value for direct mode to scale, and
+  /// the first block's is recorded so that the field stays defined — the H.263 parser refuses
+  /// Annex F, so no Annex O picture can reach a four-vector anchor through it.
+  /// </remarks>
+  private void _RecordMotionField(int address, bool hasMotion) {
+    var (x, y) = this._BlockVector(address, 0);
+    this._target.MotionX[address] = checked((short)(hasMotion ? x : 0));
+    this._target.MotionY[address] = checked((short)(hasMotion ? y : 0));
+    this._target.HasMotion[address] = hasMotion;
+  }
+
   private (int X, int Y) _BlockVector(int address, int block) {
     var mbX = address % this._macroblockWidth;
     var mbY = address / this._macroblockWidth;
@@ -365,7 +388,6 @@ internal sealed class H263PictureDecoder {
 
   private void _ReconstructIntra(ref H263BitReader reader, int address, int pattern) {
     Span<int> block = stackalloc int[64];
-
     for (var index = 0; index < 6; ++index) {
       H263BlockDecoder.ReadIntra(
         ref reader, block, this._quantiser, _IsCoded(pattern, index), this._header.HasWideEscapeLevel);
@@ -567,19 +589,22 @@ internal sealed class H263PictureDecoder {
     var (referencePlane, planeWidth) = isChroma
       ? (index == 4 ? reference.Cb : reference.Cr, reference.ChromaWidth)
       : (reference.Luma, reference.LumaWidth);
-
     var (left, top) = this._BlockOrigin(address, index);
+
     if (H263MotionCompensation.TryPredict(
-          prediction, referencePlane, planeWidth, left, top, vectorX, vectorY,
-          this._header.AllowsVectorsOutsidePicture))
+          prediction,
+          referencePlane,
+          planeWidth,
+          left,
+          top,
+          vectorX,
+          vectorY,
+          this._header.AllowsVectorsOutsidePicture,
+          this._header.RoundingType))
       return;
 
     throw new InvalidDataException(
-      $"Block {index} of macroblock {address} (column {address % this._macroblockWidth}, row "
-      + $"{address / this._macroblockWidth}) of this H.263 picture has a motion vector of ({vectorX}, {vectorY}) "
-      + $"half-pixels from ({left}, {top}), which reads outside the {planeWidth}x"
-      + $"{referencePlane.Length / planeWidth} reference plane. ITU-T H.263 6.1.1 permits a vector outside the "
-      + "picture only in the Unrestricted Motion Vector mode of Annex D, which this picture does not use.");
+      $"Block {index} of macroblock {address} has vector ({vectorX}, {vectorY}) half-pixels, which reads outside its reference plane without Annex D.");
   }
 
   private void _Store(int address, int index, ReadOnlySpan<int> samples) {
@@ -600,7 +625,6 @@ internal sealed class H263PictureDecoder {
   private (int Left, int Top) _BlockOrigin(int address, int index) {
     var column = address % this._macroblockWidth;
     var row = address / this._macroblockWidth;
-
     return index < 4
       ? (column * 16 + (index & 1) * 8, row * 16 + (index >> 1) * 8)
       : (column * 8, row * 8);
