@@ -1,7 +1,12 @@
 using System;
 using System.Buffers.Binary;
+using System.Diagnostics;
+using System.IO;
+using FileFormat.Avi;
 using FileFormat.Codecs.CineForm;
 using FileFormat.Core;
+using Hawkynt.FileFormats.Video;
+using Hawkynt.FileFormats.Video.Tests;
 using NUnit.Framework;
 
 namespace FileFormat.Codecs.CineForm.Tests;
@@ -148,8 +153,107 @@ public sealed class CineFormMultiViewTests {
     });
   }
 
+  /// <summary>
+  /// Holds the framing against something outside this repository, which the round-trip tests above
+  /// cannot do: they run our writer into our reader, so any misplaced byte the two agree on is
+  /// invisible to them.
+  /// </summary>
+  /// <remarks>
+  /// ffmpeg cannot be asked about the whole packet. Its <c>cfhd</c> decoder has no CineForm 3-D or
+  /// multicam support at all -- it does not know tags 92-94, and returns one frame per packet -- so a
+  /// concatenation of complete samples makes it try to allocate a second picture into a buffer it is
+  /// already holding, and it fails. That is a documented gap in ffmpeg, not a verdict on the framing,
+  /// and asserting on it here would pin this suite to a limitation we would rather see removed.
+  /// <para/>
+  /// What ffmpeg can settle is the part this codec actually claims: that a multi-view packet is outer
+  /// framing around complete, ordinary CFHD samples, and that the boundaries between them come from
+  /// the channel-size index rather than from hunting the entropy-coded payload for bytes that look
+  /// like markers. So each view is split out and handed to ffmpeg on its own. A boundary off by even
+  /// one byte, a group trailer landing in the wrong place, or view tags inserted somewhere that
+  /// disturbs ordinary tag parsing all turn into an ffmpeg that either refuses the sample or returns
+  /// the wrong picture. Four views rather than two, because two views cannot show that the ordinals
+  /// and the pictures stay paired.
+  /// </remarks>
+  [Test]
+  [Category("Conformance")]
+  public void FfmpegDecodesEveryViewSplitOutOfAMulticamPacket() {
+    FFmpegOracle.RequireAvailable();
+
+    const int WIDTH = 64;
+    const int HEIGHT = 48;
+    ushort[] lumas = [180, 420, 660, 900];
+
+    var encoder = CineFormMultiViewEncoder.Create(_Stream(WIDTH, HEIGHT));
+    var source = new RawMultiViewImage([
+      new(_Flat(WIDTH, HEIGHT, lumas[0]), 0, QualityRank: 1),
+      new(_Flat(WIDTH, HEIGHT, lumas[1]), 1, QualityRank: 2),
+      new(_Flat(WIDTH, HEIGHT, lumas[2]), 2, QualityRank: 3),
+      new(_Flat(WIDTH, HEIGHT, lumas[3]), 3, QualityRank: 4),
+    ]);
+
+    Assert.That(encoder.TryEncode(source, 0, out var packet), Is.True);
+    var samples = CineFormMultiViewFraming.Split(packet.Data);
+    Assert.That(samples, Has.Count.EqualTo(lumas.Length));
+
+    var stream = encoder.DescribeStream();
+    Assert.Multiple(() => {
+      for (var i = 0; i < samples.Count; ++i) {
+        var (sample, info) = samples[i];
+        Assert.That(info.ViewNumber, Is.EqualTo(i), $"view {i} ordinal");
+
+        var raw = _DecodeLoneViewWithFfmpeg(stream, packet with { Data = sample }, WIDTH, HEIGHT);
+        Assert.That(
+          BinaryPrimitives.ReadUInt16LittleEndian(raw),
+          Is.EqualTo(lumas[i]),
+          $"ffmpeg decoded view {i} to the wrong picture");
+      }
+    });
+  }
+
+  private static byte[] _DecodeLoneViewWithFfmpeg(MediaStreamInfo stream, CodedPacket view, int width, int height) {
+    var avi = VideoIO.Mux<AviWriter>([stream], [view]);
+    var inputPath = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName() + ".avi");
+    var outputPath = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName() + ".raw");
+
+    try {
+      File.WriteAllBytes(inputPath, avi);
+      var startInfo = new ProcessStartInfo(FFmpegOracle.ExecutablePath!) {
+        RedirectStandardOutput = true,
+        RedirectStandardError = true,
+        UseShellExecute = false,
+      };
+      foreach (var argument in new[] {
+        "-hide_banner", "-loglevel", "error", "-y", "-i", inputPath,
+        "-frames:v", "1", "-f", "rawvideo", "-pix_fmt", "yuv422p10le", outputPath,
+      })
+        startInfo.ArgumentList.Add(argument);
+
+      using var process = Process.Start(startInfo);
+      Assert.That(process, Is.Not.Null, "ffmpeg would not start");
+      var stdout = process!.StandardOutput.ReadToEndAsync();
+      var stderr = process.StandardError.ReadToEndAsync();
+      if (!process.WaitForExit(60_000)) {
+        try { process.Kill(entireProcessTree: true); } catch { /* already gone */ }
+        Assert.Fail("ffmpeg timed out while decoding a CineForm multi-view sample");
+      }
+
+      var diagnostics = string.Concat(stdout.Result, stderr.Result).Trim();
+      Assert.That(process.ExitCode, Is.Zero, diagnostics);
+      Assert.That(diagnostics, Is.Empty, diagnostics);
+
+      var raw = File.ReadAllBytes(outputPath);
+      Assert.That(raw, Has.Length.EqualTo(width * height * 2 * 2));
+      return raw;
+    } finally {
+      try { File.Delete(inputPath); } catch { /* best effort */ }
+      try { File.Delete(outputPath); } catch { /* best effort */ }
+    }
+  }
+
   private static MediaStreamInfo _Stream(int width, int height) => new() {
-    Index = 13,
+    // Zero, because these go through the AVI writer and an AVI's stream index is not a label: it is
+    // written into every chunk identifier, so the streams have to run densely from nought.
+    Index = 0,
     Kind = MediaStreamKind.Video,
     Codec = _Cfhd,
     Handler = _Cfhd,
