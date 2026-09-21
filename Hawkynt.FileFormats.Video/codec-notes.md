@@ -3349,23 +3349,54 @@ picture has no second buffer to have been built into two pictures ago, so its re
 both buffer slots once it is painted — the same bootstrap RoQ's decoder needs and for the identical
 reason.
 
-**Measured.** Two files from `samples.ffmpeg.org/game-formats/interplay-mve/` — 432x320 and 640x272,
-225 and 330 pictures, 555 in all, covering every block encoding this reads and confirming encoding
-`0x6` (which the format's own description doubts) never appears — were decoded here and by ffmpeg and
-compared sample for sample against ffmpeg's own `pal8` output, index and installed palette both: every
-picture is identical. This is paletted throughout, so the comparison is a direct one on samples with no
-RGB conversion and no chroma-siting convention to get wrong — worth stating plainly here because for
-several codecs elsewhere in this package that comparison would not mean what it appears to.
+**Measured.** Four files from `samples.ffmpeg.org/game-formats/interplay-mve/` — interplay-logo at
+432x320, baldursgate-logo at 640x272, MARIO1 at 320x200 and descent3-level5-16bit at 640x320, 2,648
+pictures in all — were decoded here and by ffmpeg and compared picture for picture. Every picture is
+identical.
+
+That set is chosen to spread the vocabulary rather than to be large. The three that use the ordinary
+`0x11` video-data form exercise fifteen of the sixteen block encodings between them; the sixteenth,
+`0x6`, appears in none of them, which is the same answer the format's own description reaches by
+doubting its own reading of it. MARIO1 uses the legacy `0x10` page-update form throughout instead —
+skip map, decoding map and raw data as three separate streams — so it covers the older path the other
+three never touch. descent3-level5-16bit is the true-colour one, and is the only evidence here for the
+RGB555 block decoder; all 1,624 of its pictures match.
+
+Two of the four also settle what counts as a picture. baldursgate-logo carries 353 `SEND_BUFFER`
+opcodes against 330 video-data ones, and descent3-level5-16bit 1,702 against 1,624: the difference is
+chunks that redisplay a page without rebuilding it. This package presents a picture on every
+`SEND_BUFFER`, held frames included, which is what the original player does and why its frame counts
+here exceed ffmpeg's by exactly those 23 and 78 — ffmpeg emits no packet for a chunk carrying no video
+data. The comparison above is therefore over the pictures ffmpeg produces; the extra ones are held
+repeats of the picture before them.
 
 Palette entries are six-bit VGA precision, widened to eight bits by repeating the top two bits into the
 bottom rather than shifting — the same rule this project's other six-bit channels use, and the one that
 reproduces ffmpeg's installed palette exactly where a plain multiply by four does not.
 
-What is not implemented refuses and says so: a true-colour video buffer, which the format's own
-sixteen-bit block encodings are documented as differing in ways not fully stated and which no sample
-here carries; block encoding `0x6`, which the format's own description doubts its own reading of and
-which no sample states; a compressed palette opcode; and a picture size that changes part way through
-a stream.
+Most of what this used to refuse is now read. The true-colour video buffer a version-2
+`INIT_VIDEO_BUFFERS` selects is decoded as RGB555, with its own block decoder: the sixteen-bit form
+keeps its motion bytes in a second stream rather than inline, and gives encoding `0x6` a defined
+second-previous signed-vector meaning the eight-bit form does not have. The compressed palette opcode
+is decoded, installing only the entries its mask names. The legacy `0x06` and `0x10` page-update forms
+are decoded. And a picture size that changes part way through is adopted rather than refused, because
+ffmpeg adopts it — `ipmovie.c` compares the stated geometry against the one it holds, counts the
+change and takes it, and has no path that rejects the opcode for differing — so refusing made this
+package stricter than the only decoder there is, on a case no sample carries. Adopting it means
+starting over: both page buffers, both maps, the pending picture and both history frames belong to the
+old geometry and none of them survive it.
+
+What still refuses is block encoding `0x6` in the eight-bit form, and it refuses rather than guessing
+because there is nothing to guess from: the published description doubts its own reading of it, and
+none of the four samples contains one.
+
+**Writing.** The muxer closes a file the way every shipped MVE closes it — a `SHUTDOWN` chunk holding
+`END_OF_STREAM` and `END_OF_CHUNK`, then an `END` chunk of length zero — and that is not cosmetic.
+Putting the closing opcodes in the `END` chunk instead produces a file ffmpeg decodes completely and
+then complains about: its chunk loop tests `avio_feof` before each opcode header, so a chunk running to
+the last byte of the file yields `CHUNK_EOF`, which `ipmovie_read_packet` maps to `AVERROR_INVALIDDATA`
+rather than to a clean end. The exit status stays zero and every picture is right, so only a check that
+reads what ffmpeg says — rather than counting the frames it produced — ever sees it.
 
 ### Lossless Codec Library (ZLIB)
 
