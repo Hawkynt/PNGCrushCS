@@ -11,11 +11,25 @@ namespace FileFormat.WindowsPe;
 
 /// <summary>Managed editor for resources already present in a PE image.</summary>
 /// <remarks>
+/// <para>
 /// The resource directory itself is left intact. A replacement that fits in the old leaf overwrites
 /// only that leaf; a larger replacement is appended to the resource section and the corresponding
 /// IMAGE_RESOURCE_DATA_ENTRY is redirected to it. If the section has to grow on disk, later raw data
 /// is shifted and every PE field that contains a file offset is adjusted. RVAs outside the resource
 /// section never move.
+/// </para>
+/// <para>
+/// <b>Editing a signed binary removes its Authenticode signature.</b> An Authenticode digest covers
+/// the whole file apart from the checksum field, the security data directory and the certificate
+/// table itself, so replacing any resource -- in place or by growing the section -- changes bytes
+/// the signature is over and there is no edit that leaves it valid. The certificate is therefore
+/// dropped deliberately: <see cref="_StripAuthenticodeSignature"/> zeroes the security data
+/// directory and truncates the certificate table before anything else is touched, and what comes
+/// back is an honestly unsigned executable. Carrying the certificate through instead would produce
+/// a binary that still advertises a signature and no longer verifies, which is worse than either
+/// refusing or stripping: every tool and every user reads a present certificate as a signed file.
+/// Re-sign the result if it has to stay signed.
+/// </para>
 /// </remarks>
 internal static class PeResourceEditor {
 
@@ -25,6 +39,8 @@ internal static class PeResourceEditor {
   private const int _ResourceDirectoryEntrySize = 8;
   private const int _ResourceDataEntrySize = 16;
   private const int _DebugDirectoryEntrySize = 28;
+  private const int _SecurityDirectoryIndex = 4;
+  private const int _DataDirectoryEntrySize = 8;
 
   private readonly record struct ResourceIdentifier(int? Id, string? Name);
 
@@ -127,9 +143,82 @@ internal static class PeResourceEditor {
     if (languageId < 0)
       throw new ArgumentOutOfRangeException(nameof(languageId));
 
+    source = _StripAuthenticodeSignature(source);
     var layout = _Parse(source);
     var leaf = _FindNumeric(layout, typeId, resourceId, languageId);
     return _ReplaceLeaf(source, layout, leaf, replacement);
+  }
+
+  /// <summary>
+  /// Drops an Authenticode certificate table, because no resource edit can leave the signature it
+  /// carries valid.
+  /// </summary>
+  /// <remarks>
+  /// <para>
+  /// The digest covers every byte of the file except the optional header's CheckSum field, the
+  /// security data directory entry and the certificate table -- so an in-place leaf overwrite
+  /// invalidates it just as surely as growing the section does. Dropping it is the honest outcome:
+  /// the alternative, leaving a certificate on a file that no longer verifies, hands the caller a
+  /// binary that lies about itself while reporting success.
+  /// </para>
+  /// <para>
+  /// The table lives past the last section, so removing it moves nothing: the directory entry is
+  /// zeroed and the bytes are cut off the end. Where something has been appended after the
+  /// certificate -- an installer payload, say -- the bytes are left where they are and only the
+  /// directory is cleared, because truncating there would take the appended data with it. Either
+  /// way the result is a file with no certificate table. A malformed or unsigned header is handed
+  /// back untouched, so that <see cref="_Parse"/> produces the real diagnosis rather than this.
+  /// </para>
+  /// </remarks>
+  private static byte[] _StripAuthenticodeSignature(byte[] source) {
+    if (source.Length < 64 || source[0] != (byte)'M' || source[1] != (byte)'Z')
+      return source;
+
+    var peOffset = BinaryPrimitives.ReadInt32LittleEndian(source.AsSpan(60));
+    if (peOffset < 0 || peOffset > source.Length - 24
+        || source[peOffset] != (byte)'P' || source[peOffset + 1] != (byte)'E'
+        || source[peOffset + 2] != 0 || source[peOffset + 3] != 0)
+      return source;
+
+    var optionalOffset = peOffset + 4 + 20;
+    var optionalSize = BinaryPrimitives.ReadUInt16LittleEndian(source.AsSpan(peOffset + 4 + 16));
+    if (optionalSize < 68 || optionalOffset > source.Length - optionalSize)
+      return source;
+
+    var magic = BinaryPrimitives.ReadUInt16LittleEndian(source.AsSpan(optionalOffset));
+    var dataDirectoryOffset = magic switch {
+      0x10B => optionalOffset + 96,
+      0x20B => optionalOffset + 112,
+      _ => -1,
+    };
+    if (dataDirectoryOffset < 0)
+      return source;
+
+    var countOffset = magic == 0x10B ? optionalOffset + 92 : optionalOffset + 108;
+    if (countOffset > optionalOffset + optionalSize - 4)
+      return source;
+
+    if (BinaryPrimitives.ReadUInt32LittleEndian(source.AsSpan(countOffset)) <= _SecurityDirectoryIndex)
+      return source;
+
+    var securityOffset = dataDirectoryOffset + _SecurityDirectoryIndex * _DataDirectoryEntrySize;
+    if (securityOffset > optionalOffset + optionalSize - _DataDirectoryEntrySize
+        || securityOffset > source.Length - _DataDirectoryEntrySize)
+      return source;
+
+    // Uniquely among the data directories this field is a file offset, not an RVA.
+    var certificateOffset = BinaryPrimitives.ReadUInt32LittleEndian(source.AsSpan(securityOffset));
+    var certificateSize = BinaryPrimitives.ReadUInt32LittleEndian(source.AsSpan(securityOffset + 4));
+    if (certificateOffset == 0 || certificateSize == 0)
+      return source; // Already unsigned.
+
+    var end = (ulong)certificateOffset + certificateSize;
+    var truncate = certificateOffset <= (ulong)source.Length && end == (ulong)source.Length;
+
+    var result = truncate ? source[..(int)certificateOffset] : source[..];
+    BinaryPrimitives.WriteUInt32LittleEndian(result.AsSpan(securityOffset), 0);
+    BinaryPrimitives.WriteUInt32LittleEndian(result.AsSpan(securityOffset + 4), 0);
+    return result;
   }
 
   internal static byte[] ReplaceGroupImage(
@@ -145,6 +234,7 @@ internal static class PeResourceEditor {
 
     var groupType = isCursor ? 12 : 14;
     var componentType = isCursor ? 1 : 3;
+    source = _StripAuthenticodeSignature(source);
     var layout = _Parse(source);
     var group = _FindNumeric(layout, groupType, groupId, languageId);
     var groupData = source.AsSpan(group.DataOffset, group.DataSize);
@@ -376,8 +466,12 @@ internal static class PeResourceEditor {
     }
 
     // IMAGE_DIRECTORY_ENTRY_SECURITY is exceptional: its first field is a file offset, not an RVA.
-    if (layout.DataDirectoryCount > 4) {
-      var securityOffset = layout.DataDirectoryOffset + 4 * 8;
+    // Every edit reaches here past _StripAuthenticodeSignature, so the entry is normally already
+    // zero and Shift leaves it alone; the case that survives is a certificate table with foreign
+    // bytes appended behind it, whose directory is cleared but whose offset field may have been
+    // left non-zero by a producer this editor has not seen. Shifting it correctly costs nothing.
+    if (layout.DataDirectoryCount > _SecurityDirectoryIndex) {
+      var securityOffset = layout.DataDirectoryOffset + _SecurityDirectoryIndex * _DataDirectoryEntrySize;
       if (securityOffset <= layout.OptionalOffset + layout.OptionalSize - 8) {
         var certificate = BinaryPrimitives.ReadUInt32LittleEndian(result.AsSpan(securityOffset));
         BinaryPrimitives.WriteUInt32LittleEndian(result.AsSpan(securityOffset), Shift(certificate, insertionOffset, delta));
