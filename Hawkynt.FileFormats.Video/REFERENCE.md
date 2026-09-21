@@ -1756,12 +1756,12 @@ Implements `IVideoCodecDecoder<Mpeg2VideoDecoder>`, `IVideoFrameDecoder`.
 | `CodecName` | `static string CodecName { get; }` |  |
 | `Accepts` | `static bool Accepts(MediaStreamInfo stream)` |  |
 | `Create` | `static Mpeg2VideoDecoder Create(MediaStreamInfo stream)` | Builds a decoder for one stream. |
-| `Flush` | `IEnumerable<RawImage> Flush()` | The pictures still held when the packets run out: the last anchor, and anything queued behind it. |
-| `TryDecode` | `bool TryDecode(CodedPacket packet, out RawImage frame)` | Decodes one packet — one coded picture — and hands back whichever picture is due for display. |
+| `Flush` | `IEnumerable<RawImage> Flush()` | The complete pictures still held when the packets run out. |
+| `TryDecode` | `bool TryDecode(CodedPacket packet, out RawImage frame)` | Decodes one packet and hands back whichever complete frame is due for display. |
 
 #### `Mpeg2VideoEncoder`
 
-Encodes progressive MPEG-2 video (ITU-T H.262 / ISO/IEC 13818-2) as Main Profile at Main Level, 8-bit 4:2:0 I and P pictures.
+Encodes progressive MPEG-2 video (ITU-T H.262 / ISO/IEC 13818-2) as Main Profile at Main Level, 8-bit 4:2:0 I, P and B pictures.
 
 Implements `IVideoCodecEncoder<Mpeg2VideoEncoder>`, `IVideoPacketEncoder`.
 
@@ -1769,10 +1769,10 @@ Implements `IVideoCodecEncoder<Mpeg2VideoEncoder>`, `IVideoPacketEncoder`.
 | --- | --- | --- |
 | `CodecName` | `static string CodecName { get; }` |  |
 | `Codec` | `static CodecTag Codec { get; }` |  |
-| `Create` | `static Mpeg2VideoEncoder Create(MediaStreamInfo stream)` | Builds an intra-only Main-Profile/Main-Level MPEG-2 encoder. |
+| `Create` | `static Mpeg2VideoEncoder Create(MediaStreamInfo stream)` | Builds a progressive Main-Profile/Main-Level MPEG-2 encoder. |
 | `DescribeStream` | `MediaStreamInfo DescribeStream()` | The stream description required by MPEG elementary streams and ordinary containers. |
-| `Flush` | `IEnumerable<CodedPacket> Flush()` | Nothing is reordered or held back. |
-| `TryEncode` | `bool TryEncode(RawImage frame, long? presentationTimestamp, out CodedPacket packet)` | Codes one picture: intra at the head of a group, forward-predicted otherwise. |
+| `Flush` | `IEnumerable<CodedPacket> Flush()` | Emits delayed packets, then turns a short tail with no following anchor into ordinary P pictures. |
+| `TryEncode` | `bool TryEncode(RawImage frame, long? presentationTimestamp, out CodedPacket packet)` | Accepts one display-order picture and returns the next coding-order packet when one is ready. |
 
 #### `Mpeg4VideoDecoder`
 
