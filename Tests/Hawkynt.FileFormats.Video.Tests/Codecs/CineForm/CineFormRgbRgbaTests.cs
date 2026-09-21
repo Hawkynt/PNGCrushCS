@@ -92,16 +92,16 @@ public sealed class CineFormRgbRgbaTests {
 
   [Test]
   [Category("Unit")]
-  public void BayerIsRefusedByNameInsteadOfBeingMisreadAsRgba() {
+  public void BayerHeaderRequiresFourChannels() {
     const int WIDTH = 64;
     const int HEIGHT = 48;
-    var encoder = CineFormVideoEncoder.Create(_Stream(WIDTH, HEIGHT), CineFormEncodingFormat.Rgba4444);
-    var packet = encoder.EncodeFrame(_Rgba64(WIDTH, HEIGHT, 1000, 2000, 3000, 4095));
+    var encoder = CineFormVideoEncoder.Create(_Stream(WIDTH, HEIGHT), CineFormEncodingFormat.Rgb444);
+    var packet = encoder.EncodeFrame(_Rgb48(WIDTH, HEIGHT, 1000, 2000, 3000));
     _PatchHeaderValue(packet, CineFormTags.EncodedFormat, (ushort)CineFormEncodedFormat.Bayer);
 
     var decoder = CineFormVideoDecoder.Create(encoder.DescribeStream());
-    var failure = Assert.Throws<NotSupportedException>(() => decoder.DecodeChannels(packet));
-    Assert.That(failure!.Message, Does.Contain("Bayer"));
+    var failure = Assert.Throws<InvalidDataException>(() => decoder.DecodeChannels(packet));
+    Assert.That(failure!.Message, Does.Contain("four"));
   }
 
   [Test]

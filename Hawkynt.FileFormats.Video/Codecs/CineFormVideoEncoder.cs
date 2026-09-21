@@ -15,6 +15,11 @@ public enum CineFormEncodingFormat {
   Rgb444,
   /// <summary>Twelve-bit RGBA 4:4:4:4, encoded as G, R, B, A with CineForm alpha companding.</summary>
   Rgba4444,
+  /// <summary>
+  /// Twelve-bit RGGB CFA Bayer RAW. Non-RGGB phases require CineForm's BFMT metadata and are refused
+  /// until that metadata path is represented explicitly rather than silently permuting sensor sites.
+  /// </summary>
+  BayerRggb12,
 }
 
 /// <summary>How scan lines are organized in a CineForm sample.</summary>
@@ -34,6 +39,18 @@ public enum CineFormScanMode {
 /// uses the ordinary three-level spatial transform. Legacy interlaced YUV uses CineForm's documented
 /// non-progressive first level, which combines adjacent field rows before the two coarser spatial
 /// levels; it still has ten subbands and one independently decodable picture per packet.
+/// <para/>
+/// The default <see cref="Create(MediaStreamInfo)"/> remains the historical ten-bit 4:2:2 writer;
+/// <see cref="Create(MediaStreamInfo,CineFormEncodingFormat)"/> additionally exposes twelve-bit RGB,
+/// RGBA and canonical RGGB Bayer RAW.
+/// <para/>
+/// Bayer is not demosaiced. A two-by-two RGGB sensor cell is decorrelated into CineForm's four
+/// half-resolution channels G, (R-G), (B-G), and (G1-G2), each centered as the public GoPro SDK and
+/// FFmpeg decoder require, then those four channels use the same managed three-level wavelet path.
+/// <para/>
+/// Source pictures are otherwise converted through the repository's raw-image converter to canonical
+/// planar ten-bit 4:2:2 or packed sixteen-bit RGB[A], then narrowed to CineForm's coded precision.
+/// No native SDK, P/Invoke or third-party package is involved.
 /// </remarks>
 [VerifiedBy(ConformanceOracle.FFmpeg)]
 public sealed class CineFormVideoEncoder : IVideoCodecEncoder<CineFormVideoEncoder> {
@@ -65,11 +82,16 @@ public sealed class CineFormVideoEncoder : IVideoCodecEncoder<CineFormVideoEncod
       throw new NotSupportedException($"A CineForm encoder needs a positive picture height; {stream.Height} was supplied.");
     if (scanMode != CineFormScanMode.Progressive && (stream.Height & 1) != 0)
       throw new NotSupportedException($"An interlaced CineForm picture needs an even height; {stream.Height} was supplied.");
+    if (encodingFormat == CineFormEncodingFormat.BayerRggb12 && (stream.Height & 1) != 0)
+      throw new NotSupportedException("CineForm Bayer RAW is represented as complete two-row CFA cells, so this writer requires an even image height.");
     if (stream.Width > 65_520 || stream.Height > 65_528)
       throw new NotSupportedException(
         $"CineForm's picture dimensions are sixteen-bit values after padding; {stream.Width}x{stream.Height} does not fit this writer's frame header.");
 
-    this._encodedHeight = Math.Max(32, (stream.Height + 7) & ~7);
+    this._encodedHeight = encodingFormat == CineFormEncodingFormat.BayerRggb12
+      ? Math.Max(48, (stream.Height + 15) & ~15)
+      : Math.Max(32, (stream.Height + 7) & ~7);
+
     if ((long)stream.Width * this._encodedHeight > Array.MaxLength)
       throw new NotSupportedException(
         $"A padded CineForm frame of {stream.Width}x{this._encodedHeight} samples is too large for a managed plane.");
@@ -92,6 +114,7 @@ public sealed class CineFormVideoEncoder : IVideoCodecEncoder<CineFormVideoEncod
         CineFormEncodingFormat.Yuv422 => 20,
         CineFormEncodingFormat.Rgb444 => 36,
         CineFormEncodingFormat.Rgba4444 => 48,
+        CineFormEncodingFormat.BayerRggb12 => 12,
         _ => throw new ArgumentOutOfRangeException(nameof(encodingFormat)),
       },
       Language = stream.Language,
@@ -152,6 +175,7 @@ public sealed class CineFormVideoEncoder : IVideoCodecEncoder<CineFormVideoEncod
       CineFormEncodingFormat.Yuv422 => this._EncodeYuv422(frame, frameNumber),
       CineFormEncodingFormat.Rgb444 => this._EncodeRgb(frame, withAlpha: false, frameNumber),
       CineFormEncodingFormat.Rgba4444 => this._EncodeRgb(frame, withAlpha: true, frameNumber),
+      CineFormEncodingFormat.BayerRggb12 => this._EncodeBayer(frame, frameNumber),
       _ => throw new InvalidOperationException($"Unsupported CineForm encoding format {this._encodingFormat}."),
     };
 
@@ -218,6 +242,67 @@ public sealed class CineFormVideoEncoder : IVideoCodecEncoder<CineFormVideoEncod
       prescaleTable: 0x2800,
       CineFormPrescale.TwelveBit,
       frameNumber);
+  }
+
+  private byte[] _EncodeBayer(RawImage frame, ushort frameNumber) {
+    if (frame.Format != PixelFormat.Cfa16 || frame.CfaInfo is not { } cfa)
+      throw new InvalidDataException("CineForm Bayer RAW input must use PixelFormat.Cfa16 with CfaInfo.");
+    if (cfa.Pattern != RawCfaPattern.Rggb)
+      throw new NotSupportedException(
+        $"CineForm Bayer phase {cfa.Pattern} requires BFMT metadata, which this writer does not yet emit; RGGB is the canonical interoperable path.");
+    if (cfa.BitDepth != 12)
+      throw new NotSupportedException(
+        $"CineForm RAW is compressed at 12 bits; this writer currently requires a 12-bit Cfa16 source rather than inventing a transfer curve for {cfa.BitDepth}-bit data.");
+
+    var width = this._stream.Width;
+    var height = this._stream.Height;
+    var componentWidth = width >> 1;
+    var componentHeight = height >> 1;
+    var codedComponentHeight = this._encodedHeight >> 1;
+    var planeLength = checked(componentWidth * codedComponentHeight);
+    int[][] planes = [new int[planeLength], new int[planeLength], new int[planeLength], new int[planeLength]];
+    const int CENTER_BEFORE_HALF = 1 << 12;
+
+    var source = frame.PixelData.AsSpan();
+    for (var y = 0; y < height; y += 2) {
+      var targetRow = (y >> 1) * componentWidth;
+      var row0 = y * width * 2;
+      var row1 = (y + 1) * width * 2;
+      for (var x = 0; x < width; x += 2) {
+        var r = _ReadCfa12(source, row0 + x * 2);
+        var g1 = _ReadCfa12(source, row0 + (x + 1) * 2);
+        var g2 = _ReadCfa12(source, row1 + x * 2);
+        var b = _ReadCfa12(source, row1 + (x + 1) * 2);
+        var g = (g1 + g2) >> 1;
+        var at = targetRow + (x >> 1);
+
+        planes[0][at] = g;
+        planes[1][at] = (r - g + CENTER_BEFORE_HALF) >> 1;
+        planes[2][at] = (b - g + CENTER_BEFORE_HALF) >> 1;
+        planes[3][at] = (g1 - g2 + CENTER_BEFORE_HALF) >> 1;
+      }
+    }
+
+    foreach (var plane in planes)
+      _PadRows(plane, componentWidth, componentHeight, codedComponentHeight, interlaced: false);
+
+    return CineFormPictureEncoder.Encode(
+      planes,
+      [componentWidth, componentWidth, componentWidth, componentWidth],
+      codedComponentHeight,
+      componentHeight,
+      CineFormEncodedFormat.Bayer,
+      precision: 12,
+      prescaleTable: 0x2800,
+      CineFormPrescale.TwelveBit,
+      frameNumber);
+  }
+
+  private static int _ReadCfa12(ReadOnlySpan<byte> source, int offset) {
+    var sample = BinaryPrimitives.ReadUInt16LittleEndian(source[offset..]);
+    if (sample > 4095)
+      throw new InvalidDataException($"A 12-bit CFA sample cannot contain {sample}.");
+    return sample;
   }
 
   private static void _FillTenBitPlane(

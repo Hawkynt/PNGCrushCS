@@ -21,9 +21,12 @@ namespace FileFormat.Codecs;
 /// coarser spatial levels.
 /// <para/>
 /// <b>Scope.</b> The decoder reads ten-bit YUV 4:2:2 progressive and legacy interlaced samples, plus
-/// twelve-bit RGB 4:4:4 and RGBA 4:4:4:4 progressive samples. Bayer/CFA and the separate 14/17-subband
-/// field/field-plus transforms remain distinct extensions and are refused explicitly rather than
-/// silently interpreted as the ten-subband picture layout.
+/// twelve-bit RGB 4:4:4, RGBA 4:4:4:4 and Bayer RAW progressive samples. Bayer remains raw: its four
+/// decorrelated half-resolution channels are rebuilt into <see cref="PixelFormat.Cfa16"/> RGGB sensor
+/// samples and are not demosaiced into display RGB. The separate 14/17-subband field/field-plus
+/// transforms, and the layered, stereoscopic and legacy 3-D wavelet organizations, remain distinct
+/// extensions outside this single-picture decoder and are refused explicitly rather than silently
+/// interpreted as the ten-subband picture layout.
 /// </remarks>
 public sealed class CineFormVideoDecoder : IVideoCodecDecoder<CineFormVideoDecoder> {
 
@@ -58,6 +61,11 @@ public sealed class CineFormVideoDecoder : IVideoCodecDecoder<CineFormVideoDecod
   public bool TryDecode(CodedPacket packet, out RawImage frame) {
     var channels = this.DecodeChannels(packet.Data);
 
+    if (channels.IsBayer) {
+      frame = CineFormBayerConversion.ToRggb12(channels);
+      return true;
+    }
+
     frame = channels.HasAlpha
       ? new() {
         Width = channels.ImageWidth,
@@ -78,13 +86,14 @@ public sealed class CineFormVideoDecoder : IVideoCodecDecoder<CineFormVideoDecod
   }
 
   /// <summary>
-  /// Decodes one frame as far as its component channels, before any narrowing or colour conversion.
+  /// Decodes one frame as far as its component channels, before any narrowing, CFA reconstruction or
+  /// display colour conversion.
   /// </summary>
   /// <remarks>
   /// This is where a comparison against another decoder has to be made — see
   /// <see cref="CineFormChannelDecoder"/>'s remarks for what was measured and how. Narrowing to eight
-  /// bits and choosing a colour matrix are display conventions in <see cref="CineFormColorConversion"/>
-  /// that a comparison on the channels themselves never has to touch.
+  /// bits, choosing a colour matrix, or rebuilding a Bayer mosaic are representation steps that a
+  /// comparison on the coded channels themselves never has to touch.
   /// </remarks>
   internal CineFormPictureDecoder.Result DecodeChannels(ReadOnlyMemory<byte> packet)
     => CineFormPictureDecoder.Decode(packet);

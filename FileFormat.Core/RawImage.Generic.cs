@@ -20,7 +20,8 @@ public sealed class RawImage<TPixel> where TPixel : IRawPixelFormat<TPixel> {
     byte[]? palette = null,
     int paletteCount = 0,
     byte[]? alphaTable = null,
-    ImageMetadata? metadata = null
+    ImageMetadata? metadata = null,
+    RawCfaInfo? cfaInfo = null
   ) {
     ArgumentNullException.ThrowIfNull(pixelData);
 
@@ -30,6 +31,7 @@ public sealed class RawImage<TPixel> where TPixel : IRawPixelFormat<TPixel> {
       Format = TPixel.Traits.LegacyFormat,
       PixelData = pixelData,
       ColorInfo = colorInfo,
+      CfaInfo = cfaInfo,
       Palette = palette,
       PaletteCount = paletteCount,
       AlphaTable = alphaTable,
@@ -54,12 +56,14 @@ public sealed class RawImage<TPixel> where TPixel : IRawPixelFormat<TPixel> {
   public int Height => this._image.Height;
   public byte[] PixelData => this._image.PixelData;
   public RawImageColorInfo? ColorInfo => this._image.ColorInfo;
+  public RawCfaInfo? CfaInfo => this._image.CfaInfo;
   public byte[]? Palette => this._image.Palette;
   public int PaletteCount => this._image.PaletteCount;
   public byte[]? AlphaTable => this._image.AlphaTable;
   public ImageMetadata? Metadata => this._image.Metadata;
   public bool IsIndexed => TPixel.Traits.IsIndexed;
   public bool IsPlanarYuv => TPixel.Traits.IsPlanarYuv;
+  public bool IsColorFilterArray => TPixel.Traits.IsColorFilterArray;
   public bool IsFloatingPoint => TPixel.Traits.IsFloatingPoint;
   public bool HasAlpha => this._image.HasAlpha;
   public int PlaneCount => this._image.PlaneCount;
