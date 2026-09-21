@@ -372,6 +372,58 @@ public sealed class MveVideoDecoderTests {
     Assert.That(_Index(picture, 7, 7), Is.EqualTo(0));
   }
 
+  /// <summary>
+  /// Encoding two takes its block from two pictures back at a positive offset, not from the picture
+  /// immediately before.
+  /// </summary>
+  /// <remarks>
+  /// Encodings <c>0x2</c> and <c>0x3</c> share a vector table and differ only in sign and in which
+  /// picture they read, which makes them easy to conflate — and conflating them is invisible to
+  /// every other check here. FFmpeg names the two references outright: <c>0x2</c> is
+  /// <c>copy_from(second_last_frame, …, +x, +y)</c> and <c>0x3</c> is
+  /// <c>copy_from(frame, …, -x, -y)</c>.
+  /// <para/>
+  /// Both read the buffer being built, and that is not a contradiction: the two page buffers
+  /// alternate, so the buffer a picture is painted into still holds the picture two back everywhere
+  /// it has not yet been written. Blocks are decoded in raster order, so a positive offset lands on
+  /// content not yet overwritten — two pictures back — while a negative one lands on content already
+  /// written this picture. One source, two meanings, decided by the sign of the offset.
+  /// <para/>
+  /// The clip below is three blocks wide so a positive vector has somewhere to point. Its first
+  /// picture fills the blocks with 10, 11, 12 and is copied into both buffers; the second overwrites
+  /// them with 20, 21, 22; the third codes block 0 as <c>0x2</c> with motion byte 0, which the table
+  /// reads as +8, +0 — one block to the right. That lands on block 1 of the buffer being painted,
+  /// which still holds 11. Reading the previous picture instead would give 21, and reading with the
+  /// sign flipped would run off the left edge, so this fails on either confusion.
+  /// <para/>
+  /// Worth a test of its own because nothing else catches it: pointing encoding <c>0x2</c> at the
+  /// previous picture leaves all 5,276 tests in this assembly passing, and is caught only by the
+  /// opt-in comparison against real films, where it shows up at picture 2 of baldursgate-logo.
+  /// </remarks>
+  [Test]
+  [Category("Unit")]
+  public void EncodingTwoReadsTwoPicturesBackAtAPositiveOffset() {
+    var decoder = MveVideoDecoder.Create(_Stream());
+    decoder.TryDecode(new(0, _InitVideoBuffers(3, 1)), out _);
+
+    decoder.TryDecode(new(0, _DecodingMap([0xE, 0xE, 0xE])), out _);
+    decoder.TryDecode(new(0, _VideoData(3, 1, [10, 11, 12])), out _);
+
+    decoder.TryDecode(new(0, _DecodingMap([0xE, 0xE, 0xE])), out _);
+    decoder.TryDecode(new(0, _VideoData(3, 1, [20, 21, 22])), out _);
+
+    // Motion byte 0 is +8, +0 in the shared table: one block to the right, same row.
+    decoder.TryDecode(new(0, _DecodingMap([0x2, 0xE, 0xE])), out _);
+    Assert.That(decoder.TryDecode(new(0, _VideoData(3, 1, [0, 31, 32])), out var picture), Is.True);
+
+    Assert.Multiple(() => {
+      Assert.That(_Index(picture, 0, 0), Is.EqualTo(11), "block 0 must come from two pictures back, not from 21");
+      Assert.That(_Index(picture, 7, 7), Is.EqualTo(11));
+      Assert.That(_Index(picture, 8, 0), Is.EqualTo(31));
+      Assert.That(_Index(picture, 16, 0), Is.EqualTo(32));
+    });
+  }
+
   [Test]
   [Category("Unit")]
   public void EncodingZeroExplicitlyCopiesFromTheReferencePicture() {
