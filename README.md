@@ -91,11 +91,13 @@ The complete image support table (read, write, metadata-only, multi-image, optim
 
 ## 🖥️ Viewer
 
-`Crush.Viewer` is the desktop front end for the same format registry used by the libraries, built on [NativeForms](https://github.com/Hawkynt/NativeForms) over native widgets on Windows and GTK. A ribbon drives it: open a picture or a folder, browse the folder as thumbnails, walk it with the arrow keys — with a **Wrap around** toggle deciding whether the ends join up or stop you — page through multi-image files, extract every page to its own file, rotate, flip, resize, reduce colours, and convert one file or a whole folder into any registered writer's format.
+`Crush.Viewer` is the desktop front end for the same format registry used by the libraries, built on [NativeForms](https://github.com/Hawkynt/NativeForms) over native widgets on Windows and GTK. A ribbon drives it: open a picture or a folder, browse the folder as thumbnails, walk it with the arrow keys — with a **Wrap around** toggle deciding whether the ends join up or stop you — page through multi-image files, extract every page to its own file, rotate, flip, resize, crop, greyscale, invert, reduce colours, save in place or **Save as**, and convert one file or a whole folder into any registered writer's format. Assembling several pictures back into one multi-page file is the one thing it does not do, and the ribbon says why: the format layer reads multi-page files but has no writer that takes more than one picture.
 
 ![Crush Viewer showing the deterministic screenshot fixture](docs/screenshots/crush-viewer.png)
 
-The screenshot is not maintained by hand. Every push to a branch other than `main` builds the viewer on Windows, opens a folder of deterministic PNG fixtures through the real decoder, reads the window's client area back off the screen, and commits a changed screenshot back to that branch. Screenshot-only commits do not recursively trigger another capture. NativeForms has no capture of its own, so `--screenshot` asks the platform for the pixels — GDI on Windows, `XGetImage` on X11 — and refuses rather than writing a blank picture when the window is not there to be read.
+The screenshot is not maintained by hand. Every push to a branch other than `main` builds the viewer on Windows, opens a folder of deterministic PNG fixtures through the real decoder, captures the window, and commits a changed screenshot back to that branch. Screenshot-only commits do not recursively trigger another capture.
+
+NativeForms has no capture of its own, so `--screenshot` goes to the platform. On Windows it asks the window itself to draw into a bitmap (`PrintWindow`), which is the window whether or not it is in front; on X11 it reads the screen with `XGetImage`, where the job runs against a headless server with a single client. It refuses rather than writing a picture it cannot vouch for: a flat-colour capture is retried and then reported as a failure, Wayland is rejected outright because a client cannot read back a compositor's screen, and where the screen has to be read the rectangle is declined unless the window in front of it belongs to this process.
 
 ## ⌨️ CLI usage
 
