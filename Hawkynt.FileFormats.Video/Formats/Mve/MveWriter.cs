@@ -18,6 +18,7 @@ namespace FileFormat.InterplayMve;
 /// as separate chunks lets the demuxer hand the coded picture to its decoder before the display flag
 /// exists, producing a perfectly parseable file with no displayed frame.
 /// </remarks>
+[VerifiedBy(ConformanceOracle.FFmpeg)]
 public sealed class MveWriter : IVideoContainerWriter<MveWriter> {
 
   private static ReadOnlySpan<byte> _Header => "Interplay MVE File\x1A\0\x1A\0\0\x01\x33\x11"u8;
@@ -78,9 +79,41 @@ public sealed class MveWriter : IVideoContainerWriter<MveWriter> {
     if (this._pendingVideo.Length != 0)
       this._FlushVideoChunk();
 
-    var end = _Opcode(MveOpcodeType.END_OF_STREAM, 0, ReadOnlySpan<byte>.Empty);
-    this._WriteChunk(MveChunkType.END, end);
+    this._WriteTrailer();
     return this._output.ToArray();
+  }
+
+  /// <summary>
+  /// Closes the file the way every shipped MVE closes: a shutdown chunk carrying the end-of-stream
+  /// and end-of-chunk opcodes, then an empty end chunk.
+  /// </summary>
+  /// <remarks>
+  /// This used to be one <c>END</c> chunk with an <c>END_OF_STREAM</c> opcode inside it, which reads
+  /// as the same statement and is not the same file. FFmpeg decoded every picture of such a file and
+  /// then reported "Invalid data found when processing input" once, at the end, with an exit status
+  /// of zero — so the pictures were right, the diagnostic was real, and nothing that merely counted
+  /// frames would ever have seen it.
+  /// <para/>
+  /// The mechanism is in <c>ipmovie.c</c>. Its chunk loop checks <c>avio_feof</c> before reading each
+  /// opcode header, and a chunk that runs to the last byte of the file makes that check true while
+  /// opcodes are still being read, which yields <c>CHUNK_EOF</c> — and <c>ipmovie_read_packet</c>
+  /// maps <c>CHUNK_EOF</c> to <c>AVERROR_INVALIDDATA</c>, not to a clean end. A clean end needs the
+  /// chunk that carries the closing opcodes to have something after it. Every real file arranges
+  /// exactly that: the opcodes sit in a shutdown chunk and an empty end chunk follows, so the opcode
+  /// loop never runs against the end of the file, and the demuxer returns on the chunk type instead.
+  /// <para/>
+  /// Measured rather than reasoned about. The four samples on <c>samples.ffmpeg.org</c> —
+  /// interplay-logo, baldursgate-logo, MARIO1 and descent3-level5-16bit — all end with a
+  /// <c>SHUTDOWN</c> chunk of eight bytes holding <c>END_OF_STREAM</c> and <c>END_OF_CHUNK</c>,
+  /// followed by an <c>END</c> chunk of length zero, and FFmpeg reads all four without a word.
+  /// Writing that trailer here makes FFmpeg read ours without a word too.
+  /// </remarks>
+  private void _WriteTrailer() {
+    Span<byte> shutdown = stackalloc byte[8];
+    _Opcode(MveOpcodeType.END_OF_STREAM, 0, ReadOnlySpan<byte>.Empty).CopyTo(shutdown);
+    _Opcode(MveOpcodeType.END_OF_CHUNK, 0, ReadOnlySpan<byte>.Empty).CopyTo(shutdown[4..]);
+    this._WriteChunk(MveChunkType.SHUTDOWN, shutdown);
+    this._WriteChunk(MveChunkType.END, ReadOnlySpan<byte>.Empty);
   }
 
   private void _WriteVideoOpcode(ReadOnlySpan<byte> opcode) {
