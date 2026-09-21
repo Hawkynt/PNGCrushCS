@@ -193,11 +193,22 @@ public sealed class H263PlusAndAnnexOTests {
     Assert.That(_Luma(target, 4, 4), Is.EqualTo(_Luma(future, 3, 4)));
   }
 
+  /// <summary>
+  /// ITU-T H.263 O.4: "the average is calculated by dividing the sum of the two predictions by two
+  /// (division by truncation)".
+  /// </summary>
+  /// <remarks>
+  /// The two references are chosen so that the predictions sum to an odd number, which is the only
+  /// case in which truncating and rounding differ at all — and the assertion below checks that they
+  /// do, because with an even sum this test would pass against either rule and would be measuring
+  /// nothing. FFmpeg rounds here, so a reader who trusts it rather than the Recommendation will
+  /// change this and find out from this test rather than from a stream.
+  /// </remarks>
   [Test]
   [Category("Unit")]
   public void BidirectionalMacroblockAveragesForwardAndBackwardPredictionsByTruncation() {
     var past = _GradientReference(16, temporalReference: 10, offset: 10);
-    var future = _GradientReference(16, temporalReference: 12, offset: 100);
+    var future = _GradientReference(16, temporalReference: 12, offset: 101);
     var bits = new H263TestStream()
       .Coded()
       .Code("00100") // Table O.1: Bi-dir, no texture
@@ -207,9 +218,71 @@ public sealed class H263PlusAndAnnexOTests {
       .Code("1")     // MVDBW y = 0
       .ToArray();
 
+    var forward = _Luma(past, 5, 4);
+    var backward = _Luma(future, 3, 4);
+    Assert.That((forward + backward) % 2, Is.EqualTo(1),
+      "the two predictions must sum to an odd number or truncation and rounding agree and this test proves nothing");
+
     var target = _DecodeBMacroblocks(bits, _BHeader(16, 16, temporalReference: 11), past, future);
-    var expected = (_Luma(past, 5, 4) + _Luma(future, 3, 4)) >> 1;
-    Assert.That(_Luma(target, 4, 4), Is.EqualTo(expected));
+    Assert.That(_Luma(target, 4, 4), Is.EqualTo((forward + backward) >> 1));
+    Assert.That(_Luma(target, 4, 4), Is.Not.EqualTo((forward + backward + 1) >> 1),
+      "a rounded average is FFmpeg's behaviour, not the Recommendation's");
+  }
+
+  /// <summary>
+  /// A decoded reference picture keeps the macroblock vectors an Annex O direct-mode B-picture
+  /// scales (O.5.2).
+  /// </summary>
+  /// <remarks>
+  /// The direct-mode tests above hand the decoder a motion field they wrote themselves, so nothing
+  /// among them notices if a real predicted picture leaves that field empty — and the writer never
+  /// selects direct mode, so no round trip notices either. Every macroblock of a real P-picture is
+  /// checked here instead: an intra macroblock carries no vector, and a skipped one carries a real
+  /// zero vector rather than no vector, because O.5.2 scales the former to nothing and the latter to
+  /// a zero prediction and the two are not the same picture.
+  /// </remarks>
+  [Test]
+  [Category("Unit")]
+  public void APredictedPictureKeepsTheMotionFieldDirectModeScales() {
+    const int width = 176;
+    const int height = 144;
+    var stream = _Stream(width, height);
+    var encoder = H263VideoEncoder.Create(stream);
+
+    var packets = new List<CodedPacket>();
+    for (var index = 0; index < 3; ++index)
+      if (encoder.TryEncode(_Shifted(width, height, index), index, out var packet))
+        packets.Add(packet);
+
+    packets.AddRange(encoder.Flush());
+    Assert.That(packets, Has.Count.EqualTo(3));
+
+    H263Frame? reference = null;
+    H263Frame? predicted = null;
+    foreach (var packet in packets) {
+      var reader = new H263BitReader(packet.Data.Span);
+      Assert.That(reader.ReadBits(22), Is.EqualTo(_PICTURE_START_CODE));
+      var header = H263PictureHeader.Parse(ref reader);
+      var target = new H263Frame(header.MacroblockWidth, header.MacroblockHeight);
+      var picture = H263PictureDecoder.BeginPicture(header, target, reference);
+      picture.DecodePicture(ref reader);
+      reference = target;
+      if (!header.IsIntra)
+        predicted = target;
+    }
+
+    Assert.That(predicted, Is.Not.Null);
+    Assert.That(predicted!.HasMotion.Length, Is.EqualTo(11 * 9));
+    Assert.That(predicted.HasMotion, Has.Some.True,
+      "a predicted picture must leave a motion field behind for a direct-mode B-picture to scale");
+    Assert.That(predicted.MotionX.Zip(predicted.MotionY, static (x, y) => x != 0 || y != 0).Any(static moved => moved),
+      Is.True,
+      "the recorded field must hold the vectors the picture was predicted with, not zero everywhere");
+
+    for (var address = 0; address < predicted.HasMotion.Length; ++address)
+      if (!predicted.HasMotion[address])
+        Assert.That((predicted.MotionX[address], predicted.MotionY[address]), Is.EqualTo(((short)0, (short)0)),
+          $"macroblock {address} carries no vector and so must record none");
   }
 
   [Test]
@@ -332,6 +405,22 @@ public sealed class H263PlusAndAnnexOTests {
     EnhancementLayerNumber = 2,
     ReferenceLayerNumber = 1,
   };
+
+  /// <summary>A picture whose content moves by whole pixels, so the encoder has vectors worth coding.</summary>
+  private static RawImage _Shifted(int width, int height, int phase) {
+    var pixels = new byte[width * height * 3];
+    var left = 24 + phase * 6;
+    for (var y = 0; y < height; ++y)
+      for (var x = 0; x < width; ++x) {
+        var at = (y * width + x) * 3;
+        var inBox = x >= left && x < left + 48 && y >= 32 && y < 96;
+        pixels[at] = (byte)(inBox ? 210 : 60);
+        pixels[at + 1] = (byte)(inBox ? 80 : 120);
+        pixels[at + 2] = (byte)(inBox ? 150 : 170);
+      }
+
+    return new() { Width = width, Height = height, Format = PixelFormat.Rgb24, PixelData = pixels };
+  }
 
   private static H263Frame _GradientReference(int width, int temporalReference, int offset) {
     var frame = new H263Frame(width / 16, 1) { TemporalReference = temporalReference };
