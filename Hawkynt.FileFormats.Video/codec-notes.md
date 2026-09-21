@@ -1610,14 +1610,31 @@ flag with which to preserve that distinction. The writer also refuses an unknown
 picture whose size is not the stream's, and a sample entry whose own size cuts off the child atoms it
 would otherwise be tempting to parse past.
 
-The outward check is executable rather than a round trip through the same implementation. Seven
-generated frames are muxed and decoded by **ffmpeg**: progressive `apcn`, `ap4h` and `ap4x`, both
-interlaced field orders with partial final field macroblock rows, `ap4h` with eight-bit alpha and
-`ap4x` with sixteen-bit alpha. The comparison is on `yuv422p10le`, `yuv444p12le` and
-`yuva444p12le` component planes. Every colour sample is within one coded level of this package's
-decode — the same inverse-transform residue measured in the read direction — and both alpha planes
-are exact after ffmpeg's specified 8/16-to-12-bit normalization. ffmpeg reports no decoding error on
-any of the seven.
+**The outward check runs in both directions, because one direction is not enough.** Twenty-four
+generated frames are muxed and handed to **ffmpeg**: all six profiles progressive, both field orders
+in `apcn` and in `ap4h` at a height whose fields are twenty-five rows, a varying matte at both depths
+in both 4:4:4 profiles, a binary matte, a wholly opaque one, a 4444 stream that states no alpha at
+all, and an interlaced 4444 frame with a matte that changes on every row. Twelve more frames go the
+other way: ffmpeg writes them — every profile, `alpha_bits` 16, 8 and 0, both field orders — and this
+package reads them beside ffmpeg's own decode of the same file. The comparison is on `yuv422p10le`,
+`yuv444p12le` and `yuva444p12le` component planes, and ffmpeg reports no decoding error on any of the
+thirty-six.
+
+Three tolerances, each for a different reason. Between the two decoders over one bitstream, **one
+coded level** — the inverse-transform residue, and nothing else, once the source is band-limited so
+that ringing at a hard edge does not widen it. Between ffmpeg's decode and the *source picture*,
+**the quantisation each profile's data rate buys**: 40 levels for Proxy down to 4 for 422 HQ, and 16
+at twelve bits for both 4444 profiles. And for alpha, **nothing at all** — it is run-length coded
+with no transform and no quantiser, so ffmpeg's plane has to be the matte that went in, sample for
+sample.
+
+That middle comparison is the one a round trip cannot replace and a two-decoder comparison cannot
+either. An encoder that wrote a field picture with the progressive coefficient scan produces a
+perfectly conforming frame of the wrong picture: every decoder reads it with the scan RDD 36 says to,
+they all agree with each other, and the detail is scrambled in all of them identically. Measured
+against the source that defect misses by 271 levels where the tolerance is 6. The same check catches
+a lost field parity at 31, and the alpha check catches a matte replaced by opacity at every sample
+that was not already opaque.
 
 Each half of the encoder sits in the file its decoding half sits in, and the tests assert the pairs
 are inverses rather than merely plausible: the Golomb-Rice/exponential-Golomb writer beside the
@@ -1630,9 +1647,13 @@ every frame carries its own weight matrices and every slice its own quantisation
 selects two things and both of them on this side. The first is the pair of weight matrices in the
 frame header, and those are copied rather than derived — the specification prints none of them,
 because a decoder is told them by every frame, so the only written statement of a profile's matrices
-is in an encoder. The four 4:2:2 pairs are FFmpeg's `prores_quant_matrices`; the 4444 and 4444 XQ pairs match its
-`QMAT_LUMA`/`QMAT_CHROMA` tables, and all six are interoperability constants carried in each frame
-rather than executable encoder logic. Provenance is in `Codecs/ProRes/THIRD-PARTY-NOTICE.FFmpeg.txt`.
+is in an encoder. All five distinct tables are FFmpeg's `prores_quant_matrices` in `proresenc_kostya.c`: the four
+4:2:2 pairs, 422 HQ's again for ProRes 4444, and entry 5 for 4444 XQ's luma, which `prores_ks` writes
+only when it is asked for with `-quant_mat 5`. They are interoperability constants carried in each
+frame rather than executable encoder logic, and every one was read back out of a frame header FFmpeg
+wrote. Provenance is in `Codecs/ProRes/THIRD-PARTY-NOTICE.FFmpeg.txt`. No oracle can check them —
+a frame states the matrix it was written with and every decoder believes it — so they are asserted
+against those values directly instead.
 The second choice is the data rate, taken from the *Apple ProRes White Paper* and divided by the 8160
 macroblocks of 1920x1080 and by 29.97 frames a second. That gives bits per macroblock of 184 for Proxy,
 417 for LT, 601 for 422, 900 for 422 HQ, 1349 for 4444 and 2024 for 4444 XQ. The last two use the
