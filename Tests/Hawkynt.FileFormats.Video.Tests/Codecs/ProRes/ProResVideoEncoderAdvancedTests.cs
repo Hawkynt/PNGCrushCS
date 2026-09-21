@@ -69,6 +69,80 @@ public class ProResVideoEncoderAdvancedTests {
   /// something that decodes. 4:4:4 reaches it by a different route than 4:2:2 — four chroma blocks a
   /// macroblock instead of two, and no horizontal subsampling to round the chroma width up from.
   /// </remarks>
+  /// <summary>
+  /// A slice whose coded alpha stops early is read as far as it goes, and says how far that was.
+  /// </summary>
+  /// <remarks>
+  /// FFmpeg's ProRes 4444 encoder leaves the last sample of every alpha slice out of the file, up to
+  /// and including 6.1, and refusing those frames would mean refusing years of real ProRes over one
+  /// sample in a thousand. What is read instead is what FFmpeg's own decoder reads: zeroes past the
+  /// end of the coded data, which both arrive at the same value from.
+  /// <para/>
+  /// Pinned here rather than only through the oracle, because whether the oracle can see it depends
+  /// on which FFmpeg the machine has — a current one writes whole slices and the case never arises.
+  /// The truncation is therefore made directly: a slice is coded, its tail is cut, and what comes
+  /// back has to be the coded samples exactly, the count of the missing ones exactly, and the value
+  /// a zero tail decodes to for those.
+  /// </remarks>
+  [TestCase(8)]
+  [TestCase(16)]
+  [Category("Unit")]
+  public void AlphaCodedShortOfItsSliceIsReadAsFarAsItGoesAndCounted(int bitDepth) {
+    const int WIDTH = 64;
+    const int HEIGHT = 16;
+    var maximum = bitDepth == 8 ? 0xFF : 0xFFFF;
+    var source = new ushort[WIDTH * HEIGHT];
+    for (var i = 0; i < source.Length; ++i)
+      source[i] = (ushort)((100 + i * 3) & maximum);
+
+    var coded = ProResAlpha.Encode(source, bitDepth, WIDTH, 0, 0, WIDTH, HEIGHT);
+
+    var whole = new ushort[source.Length];
+    var intact = ProResAlpha.Decode(coded, bitDepth == 8 ? 1 : 2, whole, WIDTH, HEIGHT, 0, 0, WIDTH, HEIGHT, 0, 1);
+
+    Assert.Multiple(() => {
+      Assert.That(intact, Is.Zero, "a whole slice is missing nothing");
+      Assert.That(whole, Is.EqualTo(source).AsCollection);
+    });
+
+    // Every sample here is its own run, so cutting a byte cuts samples off the end rather than
+    // corrupting a run in the middle. One byte, because the quirk this reads through is one missing
+    // sample and the tolerance is deliberately not wide enough to paper over a damaged slice.
+    var cut = coded[..^1];
+    var partial = new ushort[source.Length];
+    var missing = ProResAlpha.Decode(cut, bitDepth == 8 ? 1 : 2, partial, WIDTH, HEIGHT, 0, 0, WIDTH, HEIGHT, 0, 1);
+
+    Assert.Multiple(() => {
+      Assert.That(missing, Is.InRange(1, 4), "a byte off the end is a sample or two, and has to be counted");
+
+      for (var i = 0; i < source.Length - missing; ++i)
+        Assert.That(partial[i], Is.EqualTo(source[i]), $"sample {i} was in the coded data");
+    });
+  }
+
+  /// <summary>A slice cut far enough back to be damaged rather than short is still refused.</summary>
+  /// <remarks>
+  /// The tolerance above exists for one absent sample per slice. It must not become a licence to
+  /// invent a matte: a reader that answered a truncated slice with a plane of synthesised samples
+  /// would produce a picture that looks decoded and is not, which is the failure this whole decoder
+  /// is written against.
+  /// </remarks>
+  [Test]
+  [Category("Unit")]
+  public void AlphaCutFarBackIsRefusedRatherThanInvented() {
+    const int WIDTH = 64;
+    const int HEIGHT = 16;
+    var source = new ushort[WIDTH * HEIGHT];
+    for (var i = 0; i < source.Length; ++i)
+      source[i] = (ushort)((100 + i * 3) & 0xFF);
+
+    var coded = ProResAlpha.Encode(source, 8, WIDTH, 0, 0, WIDTH, HEIGHT);
+    var target = new ushort[source.Length];
+
+    Assert.Throws<InvalidDataException>(
+      () => ProResAlpha.Decode(coded[..(coded.Length / 2)], 1, target, WIDTH, HEIGHT, 0, 0, WIDTH, HEIGHT, 0, 1));
+  }
+
   [TestCase("ap4h")]
   [TestCase("ap4x")]
   [Category("Unit")]

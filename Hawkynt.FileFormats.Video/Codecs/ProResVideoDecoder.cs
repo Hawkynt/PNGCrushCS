@@ -61,6 +61,13 @@ namespace FileFormat.Codecs;
 /// and moved none, so nothing is guessed: <see cref="ProResFrameHeader.DeviatesFromItsStatedVersion"/>
 /// records that the frame was not written by the letter of 6.4, and the frame is read as the version
 /// that does carry the syntax. The writer here keeps to 6.4 either way.
+/// <para/>
+/// And an alpha slice whose coded data stop one sample short of the slice, which is every alpha slice
+/// the same ffmpeg versions write. Both decoders read zeroes past the end of the coded data and
+/// arrive at the same sample, so this is interoperable as well as readable, and
+/// <see cref="ProResPlanes.TruncatedAlphaSamples"/> counts the samples that were not in the file. The
+/// tolerance is a few samples a slice and not a plane's worth: a slice that stops far short is
+/// damaged rather than short, and is refused.
 /// </remarks>
 public sealed class ProResVideoDecoder : IVideoCodecDecoder<ProResVideoDecoder> {
 

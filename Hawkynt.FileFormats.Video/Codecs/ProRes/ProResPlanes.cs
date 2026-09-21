@@ -38,6 +38,19 @@ internal sealed class ProResPlanes {
   /// <summary>The depth <see cref="Alpha"/> was coded at — 8 or 16 — or zero when there is none.</summary>
   internal int AlphaBitDepth { get; init; }
 
+  /// <summary>
+  /// How many alpha samples of this picture the bitstream did not actually contain.
+  /// </summary>
+  /// <remarks>
+  /// Zero for every frame written by anything that writes a whole alpha slice, which is what this
+  /// package's own writer does. It is not zero for ProRes 4444 written by FFmpeg before 7.0, whose
+  /// <c>encode_alpha_plane</c> stops one sample short of each slice; the missing samples hold the
+  /// last value the slice did carry, and this counts them so that a caller comparing against another
+  /// decoder knows exactly how many samples it is allowed to disagree about. See
+  /// <see cref="ProResAlpha.Decode"/>.
+  /// </remarks>
+  internal int TruncatedAlphaSamples { get; set; }
+
   internal static ProResPlanes Allocate(int width, int height, int chromaShift, int bitDepth, int alphaChannelType) {
     var chromaWidth = width >> chromaShift;
 

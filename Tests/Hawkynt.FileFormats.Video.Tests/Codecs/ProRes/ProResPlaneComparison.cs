@@ -123,6 +123,12 @@ internal static class ProResPlaneComparison {
   /// <remarks>
   /// The read direction, where the frame came from FFmpeg and neither side of it is ours, so the two
   /// decodes are independent and comparing them is evidence.
+  /// <para/>
+  /// <b>Exact, including the samples the encoder never wrote.</b> FFmpeg's ProRes 4444 encoder, up to
+  /// and including 6.1, stops one sample short of every alpha slice — see
+  /// <see cref="ProResPlanes.TruncatedAlphaSamples"/>. Neither decoder can produce the matte for
+  /// those, because the matte is not in the file; both read zeroes past the end of the coded data and
+  /// arrive at the same value, so there is still nothing to allow for here.
   /// </remarks>
   internal static void AssertAlphaAgreesWithFFmpeg(
     byte[] decoded,

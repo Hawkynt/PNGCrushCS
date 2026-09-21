@@ -27,6 +27,19 @@ internal static class ProResAlpha {
   private const int _MAXIMUM_RUN = 2048;
 
   /// <summary>
+  /// Zero bytes kept behind a slice's coded alpha, so that a tail which is not there reads as zeroes.
+  /// </summary>
+  /// <remarks>
+  /// This is deliberately a small number and not an unbounded supply of zeroes. A slice that stops
+  /// one sample short is an encoder quirk to read through — see <see cref="Decode"/> — while a slice
+  /// that stops a hundred short is damaged, and answering that with a plane of synthesised samples
+  /// would be the quiet wrong picture this decoder exists to avoid. Sixteen bytes reconstruct several
+  /// samples at either depth, which covers the quirk with room to spare; past them the slice runs out
+  /// of bits and is refused as before.
+  /// </remarks>
+  private const int _PADDING_BYTES = 16;
+
+  /// <summary>
   /// Encodes the alpha rectangle belonging to one slice.
   /// </summary>
   /// <remarks>
@@ -112,7 +125,8 @@ internal static class ProResAlpha {
   /// <param name="sliceHeight">The slice's height in samples: 16, or less in the last macroblock row.</param>
   /// <param name="fieldOffset">The plane row picture row 0 maps to.</param>
   /// <param name="fieldStep">1 for a frame picture, 2 for a field picture.</param>
-  internal static void Decode(
+  /// <returns>How many of the slice's samples the coded data did not actually contain.</returns>
+  internal static int Decode(
     ReadOnlyMemory<byte> data,
     int alphaChannelType,
     ushort[] target,
@@ -124,7 +138,24 @@ internal static class ProResAlpha {
     int sliceHeight,
     int fieldOffset,
     int fieldStep) {
-    var bits = new ProResBitReader(data);
+    // The coded alpha of a slice may stop before the slice is full, and reading it is then a question
+    // of what the absent bits are rather than whether to refuse the frame. FFmpeg's ProRes 4444
+    // encoder does this to every slice it writes, up to and including 6.1: its encode_alpha_plane
+    // emits the first sample and then num_coeffs − 1 more, so the last sample of every alpha slice is
+    // simply not in the file. Refusing over one sample in a thousand would mean being unable to read
+    // years of ProRes 4444.
+    //
+    // FFmpeg's own decoder does not notice, because reading past the end of a GetBitContext yields
+    // zeroes. Zeroes are what is read here too — the data are copied behind enough zero bytes for any
+    // tail the syntax can ask for — so the samples neither file contains are reconstructed the same
+    // way by both, and a comparison against FFmpeg stays exact. How many of them there were goes back
+    // to the caller, because "the encoder left one out" and "this slice is damaged" look identical
+    // from inside and only the count tells them apart.
+    var realBits = data.Length * 8;
+    var padded = new byte[data.Length + _PADDING_BYTES];
+    data.Span.CopyTo(padded);
+
+    var bits = new ProResBitReader(padded);
     var eightBit = alphaChannelType == 1;
     var mask = eightBit ? 0xFF : 0xFFFF;
     var count = sliceWidth * sliceHeight;
@@ -133,6 +164,7 @@ internal static class ProResAlpha {
     // difference of one modulo the alpha width rather than a difference of 255 or 65535.
     var previous = -1;
     var at = 0;
+    var truncated = 0;
 
     while (at < count) {
       var difference = eightBit ? _ReadDifference(bits, 3, 8) : _ReadDifference(bits, 6, 16);
@@ -140,7 +172,12 @@ internal static class ProResAlpha {
       previous = alpha;
 
       var run = _ReadRun(bits);
+      var synthesised = bits.Position > realBits;
+
       for (var m = 0; m < run && at < count; ++m, ++at) {
+        if (synthesised)
+          ++truncated;
+
         var y = at / sliceWidth;
         var x = at - y * sliceWidth;
 
@@ -157,6 +194,8 @@ internal static class ProResAlpha {
         target[row * planeWidth + column] = (ushort)alpha;
       }
     }
+
+    return truncated;
   }
 
   private static ushort _Sample(

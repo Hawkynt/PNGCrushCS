@@ -88,26 +88,25 @@ public sealed class ProResVideoDecoderOracleTests {
   }
 
   /// <summary>
-  /// A 4444 frame stamped bitstream version 0 reads identically to the same frame stamped version 1.
+  /// The two bitstream stampings a real 4444 frame is found with read to the same picture.
   /// </summary>
   /// <remarks>
   /// RDD 36:2022, 6.4 fixes <c>chroma_format</c> at 2 and <c>alpha_channel_type</c> at 0 for version
   /// 0, and this package used to refuse a version 0 frame that said otherwise. Every ProRes 4444
   /// frame ffmpeg wrote before it began stamping version 1 says otherwise — ffmpeg 6.1, which a
   /// current Ubuntu ships and which the CI oracle leg installs, among them — so the refusal made this
-  /// package unable to read the reference encoder's own output. The read-direction oracle above finds
-  /// it wherever the ffmpeg to hand is old enough.
+  /// package unable to read the reference encoder's own output.
   /// <para/>
-  /// Which is the problem this test exists for: on a machine with a current ffmpeg there is nothing
-  /// to find, and a regression would go unnoticed until CI. So the older encoder's output is
-  /// reconstructed exactly — one byte of a real ffmpeg frame, the <c>bitstream_version</c> at offset
-  /// 3 of the frame header, set back to 0 — and the decode has to be unchanged by it. Version 1 added
-  /// no field to the header and moved none, so "unchanged" is the whole claim.
+  /// Which stamping the ffmpeg to hand produces is therefore not something to assert; it is the thing
+  /// that varies. The frame is taken as written, the <c>bitstream_version</c> byte is flipped to the
+  /// other stamping, and the two decodes have to be identical, plane for plane. Version 1 added no
+  /// field to the header and moved none, so "identical" is the whole claim — and the test makes it on
+  /// a current ffmpeg, where the read-direction oracle above has nothing to catch.
   /// </remarks>
   [TestCase(4, 16)]
   [TestCase(5, 8)]
   [Category("Oracle")]
-  public void AFourFourFourFrameStampedTheOlderBitstreamVersionReadsTheSame(int profile, int alphaBits) {
+  public void BothBitstreamStampingsOfAFourFourFourFrameReadTheSame(int profile, int alphaBits) {
     FFmpegOracle.RequireAvailable();
 
     var movie = ProResFFmpegFixtures.Write(profile, width: 64, height: 48, alphaBits: alphaBits);
@@ -118,27 +117,27 @@ public sealed class ProResVideoDecoderOracleTests {
 
       // frame_size and frame_identifier are eight bytes; bitstream_version is byte 3 of the header.
       const int VERSION_AT = 8 + 3;
-      Assert.That(frame[VERSION_AT], Is.EqualTo(1),
-        "this ffmpeg stamps version 1 for 4444; the older stamping is what is being reconstructed");
+      var stamped = frame[VERSION_AT];
+      Assert.That(stamped, Is.AnyOf(0, 1), "a ProRes frame states version 0 or 1 and nothing else");
+
+      var other = (byte[])frame.Clone();
+      other[VERSION_AT] = (byte)(1 - stamped);
 
       var decoder = ProResVideoDecoder.Create(stream);
       var asWritten = decoder.DecodePlanes(frame, out var written);
-
-      var older = (byte[])frame.Clone();
-      older[VERSION_AT] = 0;
-      var asOlder = decoder.DecodePlanes(older, out var deviating);
+      var asOther = decoder.DecodePlanes(other, out var reStamped);
 
       Assert.Multiple(() => {
-        Assert.That(written.DeviatesFromItsStatedVersion, Is.False);
-        Assert.That(deviating.DeviatesFromItsStatedVersion, Is.True,
+        Assert.That(written.DeviatesFromItsStatedVersion, Is.EqualTo(stamped == 0),
           "a version 0 frame stating 4:4:4 is read, and recorded as not written the way 6.4 says");
-        Assert.That(deviating.ChromaFormat, Is.EqualTo(3));
-        Assert.That(deviating.AlphaChannelType, Is.EqualTo(written.AlphaChannelType));
-        Assert.That(asOlder.BitDepth, Is.EqualTo(asWritten.BitDepth));
-        Assert.That(asOlder.Luma, Is.EqualTo(asWritten.Luma).AsCollection);
-        Assert.That(asOlder.Cb, Is.EqualTo(asWritten.Cb).AsCollection);
-        Assert.That(asOlder.Cr, Is.EqualTo(asWritten.Cr).AsCollection);
-        Assert.That(asOlder.Alpha, Is.EqualTo(asWritten.Alpha).AsCollection);
+        Assert.That(reStamped.DeviatesFromItsStatedVersion, Is.EqualTo(stamped == 1));
+        Assert.That(reStamped.ChromaFormat, Is.EqualTo(3));
+        Assert.That(reStamped.AlphaChannelType, Is.EqualTo(written.AlphaChannelType));
+        Assert.That(asOther.BitDepth, Is.EqualTo(asWritten.BitDepth));
+        Assert.That(asOther.Luma, Is.EqualTo(asWritten.Luma).AsCollection);
+        Assert.That(asOther.Cb, Is.EqualTo(asWritten.Cb).AsCollection);
+        Assert.That(asOther.Cr, Is.EqualTo(asWritten.Cr).AsCollection);
+        Assert.That(asOther.Alpha, Is.EqualTo(asWritten.Alpha).AsCollection);
       });
     } finally {
       ProResFFmpegFixtures.Discard(movie);
@@ -175,9 +174,18 @@ public sealed class ProResVideoDecoderOracleTests {
       ProResPlaneComparison.AssertColour(
         decoded, planes, stream.Width, stream.Height, chromaShift, maximumDelta: 1);
 
-      if (alphaChannelType != 0)
+      if (alphaChannelType != 0) {
+        // FFmpeg through 6.1 leaves the last sample of every alpha slice out of the file; this
+        // geometry is three slices, so three is the most that can legitimately be missing. The bound
+        // matters because the tolerance for a short alpha slice would otherwise let a reader that
+        // synthesised the whole matte out of zeroes pass — it would agree with FFmpeg, which
+        // synthesises it the same way, about a picture neither of them read.
+        Assert.That(planes.TruncatedAlphaSamples, Is.InRange(0, 3),
+          "at most one alpha sample per slice may be absent from the coded data");
+
         ProResPlaneComparison.AssertAlphaAgreesWithFFmpeg(
           decoded, planes, stream.Width, stream.Height, alphaChannelType == 1 ? 8 : 16);
+      }
 
       return header;
     } finally {

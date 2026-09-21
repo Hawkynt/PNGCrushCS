@@ -1602,6 +1602,15 @@ field to the header and moved none, so the frame is read as the version that doe
 and `ProResFrameHeader.DeviatesFromItsStatedVersion` records that it was not written by the letter of
 the clause. The writer here still stamps version 1 whenever it writes 4:4:4 or alpha.
 
+The same oracle run found the second half of it. Those ffmpeg versions also leave the **last sample of
+every alpha slice out of the file**: `encode_alpha_plane` emits the first sample and then
+`num_coeffs - 1` more, and ffmpeg's decoder never notices because reading past the end of its bit
+reader yields zeroes. This decoder reads zeroes there too, so the sample neither file contains is
+reconstructed identically by both and the comparison against ffmpeg stays exact;
+`ProResPlanes.TruncatedAlphaSamples` counts them. The zeroes are a fixed small supply rather than an
+endless one, because a slice that stops a hundred samples short is damaged and a plane of synthesised
+alpha would be exactly the plausible wrong picture the rest of this decoder refuses to produce.
+
 **Writing covers all six profiles and both picture structures the format has.** `apco`, `apcs`,
 `apcn` and `apch` are ten-bit 4:2:2; `ap4h` and `ap4x` are twelve-bit 4:4:4. The 4:2:2/no-alpha
 combination stays at bitstream version 0, while 4:4:4 or alpha uses version 1 as 6.4 requires. A
