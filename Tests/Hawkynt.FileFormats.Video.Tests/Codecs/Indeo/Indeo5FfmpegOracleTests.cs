@@ -66,6 +66,20 @@ public sealed class Indeo5FfmpegOracleTests {
     FrameRate = new(25, 1),
   };
 
+  /// <summary>
+  /// Hands the muxed clip to FFmpeg, asks for the YVU9 samples the codec actually carries, and
+  /// requires them to be the same bytes this package's own decoder produces.
+  /// </summary>
+  /// <remarks>
+  /// FFmpeg is asked for <c>yuv410p</c> because that is Indeo 5's own layout, so nothing converts
+  /// colour on either side and a single sample of difference is a real disagreement about the
+  /// bitstream rather than a rounding difference between two YUV-to-RGB matrices.
+  /// <para/>
+  /// The frame count is still checked, because the byte length has to match before the samples can
+  /// be compared at all, but it is no longer the whole claim. A count cannot see a coefficient in
+  /// the wrong band or a prediction from the wrong buffer, and those are exactly the mistakes an
+  /// encoder written against this repository's own decoder makes without either half noticing.
+  /// </remarks>
   private static void _AssertFfmpegDecodes(
     Indeo5VideoEncoder encoder,
     IReadOnlyList<CodedPacket> packets,
@@ -73,16 +87,48 @@ public sealed class Indeo5FfmpegOracleTests {
 
     FFmpegOracle.RequireAvailable();
 
+    const int width = 64;
+    const int height = 48;
+    var chromaWidth = (width + 3) >> 2;
+    var chromaHeight = (height + 3) >> 2;
+    var lumaBytes = width * height;
+    var chromaBytes = chromaWidth * chromaHeight;
+    var frameBytes = lumaBytes + 2 * chromaBytes;
+
     var avi = VideoIO.Mux<AviWriter>([encoder.DescribeStream()], packets);
     var path = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName() + ".avi");
 
+    bool decoded;
+    string detail;
+    byte[] samples;
     try {
       File.WriteAllBytes(path, avi);
-      var (decoded, detail) = FFmpegOracle.TryDecodeFrameCount(path, 64, 48, expectedFrames);
-      Assert.That(decoded, Is.True, detail);
+      (decoded, detail, samples) =
+        FFmpegOracle.TryDecodePicturesAs(path, width, height, expectedFrames, "yuv410p", frameBytes);
     } finally {
       try { File.Delete(path); } catch { /* best effort */ }
     }
+
+    Assert.That(decoded, Is.True, detail);
+
+    var ours = new Indeo5Decoder(width, height);
+    for (var frame = 0; frame < expectedFrames; ++frame) {
+      var picture = ours.Decode(packets[frame].Data);
+      Assert.That(picture, Is.Not.Null, $"our decoder produced no picture for frame {frame}");
+
+      var at = frame * frameBytes;
+      _AssertPlane(samples, at, picture!.Luma, frame, "luma");
+      _AssertPlane(samples, at + lumaBytes, picture.ChromaBlue, frame, "blue chroma");
+      _AssertPlane(samples, at + lumaBytes + chromaBytes, picture.ChromaRed, frame, "red chroma");
+    }
+  }
+
+  private static void _AssertPlane(byte[] reference, int at, byte[] ours, int frame, string plane) {
+    for (var i = 0; i < ours.Length; ++i)
+      if (reference[at + i] != ours[i])
+        Assert.Fail(
+          $"the {plane} plane of frame {frame} differs from FFmpeg's at sample {i}: "
+          + $"FFmpeg decoded {reference[at + i]} and this package decoded {ours[i]}");
   }
 
   private static RawImage _Picture(int width, int height, int frame) {
