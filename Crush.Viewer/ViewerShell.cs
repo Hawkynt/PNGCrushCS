@@ -215,12 +215,12 @@ internal sealed class ViewerShell : Form {
     this._save.Click += (_, _) => this._Save();
     this._icons.Apply(this._save, "document-save", RibbonItemSize.Large);
     save.Items.Add(this._save);
-    save.Items.Add(this._Button("Save as…", this._SaveAs, RibbonItemSize.Large, "document-save-as"));
+    save.Items.Add(this._Button("Save as…", this._SaveAs, RibbonItemSize.Small, "document-save-as"));
     tab.Groups.Add(save);
 
     var convert = new RibbonGroup("Convert");
-    convert.Items.Add(this._Button("One file…", this._ConvertCurrent, RibbonItemSize.Large, "document-export"));
-    convert.Items.Add(this._Button("Whole folder…", this._ConvertFolder, RibbonItemSize.Large, "folder-sync"));
+    convert.Items.Add(this._Button("One file…", this._ConvertCurrent, RibbonItemSize.Small, "document-export"));
+    convert.Items.Add(this._Button("Whole folder…", this._ConvertFolder, RibbonItemSize.Small, "folder-sync"));
     tab.Groups.Add(convert);
 
     var devices = new RibbonGroup("Print and scan");
@@ -230,7 +230,7 @@ internal sealed class ViewerShell : Form {
     this._print.Click += (_, _) => this._Print();
     devices.Items.Add(this._print);
 
-    var acquire = new RibbonButton("From scanner…", RibbonItemSize.Large) {
+    var acquire = new RibbonButton("Scan…", RibbonItemSize.Large) {
       Enabled = false,
       ToolTipText = PlannedCommands.AcquireUnavailable,
     };
@@ -256,7 +256,7 @@ internal sealed class ViewerShell : Form {
 
     var zoom = new RibbonGroup("Zoom");
     zoom.Items.Add(this._Button("Fit", this._FitToWindow, RibbonItemSize.Large, "zoom-fit-best"));
-    zoom.Items.Add(this._Button("Actual size", this._ActualSize, RibbonItemSize.Large, "zoom-original"));
+    zoom.Items.Add(this._Button("Actual size", this._ActualSize, RibbonItemSize.Small, "zoom-original"));
     zoom.Items.Add(this._Button("Zoom out", () => this._ZoomBy(1 / Math.Sqrt(2)), RibbonItemSize.Small, "zoom_out"));
     zoom.Items.Add(this._Button("Zoom in", () => this._ZoomBy(Math.Sqrt(2)), RibbonItemSize.Small, "zoom_in"));
     tab.Groups.Add(zoom);
