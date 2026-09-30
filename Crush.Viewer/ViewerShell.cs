@@ -22,9 +22,13 @@ internal sealed class ViewerShell : Form {
   private const int _RIBBON_HEIGHT = 148;
   private const string _TITLE = "Crush Viewer";
 
+  /// <summary>How many thumbnails around the shown picture are decoded ahead of the rest.</summary>
+  private const int _THUMBNAIL_LOOKAHEAD = 24;
+
   private readonly IPlatformBackend _backend;
   private readonly FolderModel _folder = new();
   private readonly ThumbnailLoader _thumbnailLoader;
+  private readonly ShortcutTable _shortcuts = new();
 
   private readonly Ribbon _ribbon = new() { Dock = DockStyle.Top };
   private readonly StatusStrip _statusBar = new() { Dock = DockStyle.Bottom, Height = _STATUS_HEIGHT };
@@ -67,6 +71,12 @@ internal sealed class ViewerShell : Form {
   private string? _notice;
   private bool _suppressBrowserSelection;
   private bool _suppressFilterButtons;
+  private ZoomMode _zoomMode = ZoomMode.Fit;
+  private double _freeZoom = 1;
+  private int _zoomGuard;
+  private bool _fullScreen;
+  private FormBorderStyle _framedBorderStyle;
+  private FormWindowState _framedWindowState;
 
   internal ViewerShell(IPlatformBackend backend) {
     this._backend = backend;
@@ -79,17 +89,24 @@ internal sealed class ViewerShell : Form {
     this._browser.LargeImageList = this._thumbnails;
     this._browser.SelectedIndexChanged += this._OnBrowserSelectionChanged;
     this._viewport.WalkRequested += (_, delta) => this.Walk(delta);
-    this._viewport.PageRequested += (_, delta) => this._GoPage(delta);
-    this._viewport.ZoomChanged += (_, _) => this._UpdateStatus();
+    this._viewport.ZoomChanged += (_, _) => this._OnZoomChanged();
     this._slideshow.Tick += (_, _) => this._OnSlideshowTick();
 
     this._BuildRibbon();
     this._BuildBody();
     this._BuildStatusBar();
+    this._BuildShortcuts();
 
     this.Controls.Add(this._ribbon);
     this.Controls.Add(this._statusBar);
     this.Controls.Add(this._outer);
+    this.Controls.Add(this._shortcuts.Carrier);
+
+    // The canvas rather than the ribbon, which is what a window otherwise gives its first tab stop
+    // to. A focused ribbon claims Left and Right for walking its tabs — the one place the toolkit
+    // takes a key before the form-wide table can see it — so the ribbon holds the focus only while
+    // somebody is actually using it.
+    this.ActiveControl = this._viewport;
 
     this.Load += (_, _) => this._OnLoad();
     this.FormClosing += (_, _) => this._thumbnailLoader.Cancel();
@@ -112,33 +129,33 @@ internal sealed class ViewerShell : Form {
     this._ribbon.PreferredHeightChanged += (_, _) => this._SizeRibbon();
     this._SizeRibbon();
 
-    this._ribbon.QuickAccessItems.Add(_Button("Open", () => this._OpenPicturePicker()));
-    this._ribbon.QuickAccessItems.Add(_Button("Previous", () => this.Walk(-1)));
-    this._ribbon.QuickAccessItems.Add(_Button("Next", () => this.Walk(1)));
+    this._ribbon.QuickAccessItems.Add(this._Button("Open", () => this._OpenPicturePicker()));
+    this._ribbon.QuickAccessItems.Add(this._Button("Previous", () => this.Walk(-1)));
+    this._ribbon.QuickAccessItems.Add(this._Button("Next", () => this.Walk(1)));
   }
 
   private RibbonTab _BuildFileTab() {
     var tab = new RibbonTab("File");
 
     var open = new RibbonGroup("Open");
-    open.Items.Add(_Button("Picture…", this._OpenPicturePicker, RibbonItemSize.Large));
-    open.Items.Add(_Button("Folder…", this._OpenFolderPicker, RibbonItemSize.Large));
+    open.Items.Add(this._Button("Picture…", this._OpenPicturePicker, RibbonItemSize.Large));
+    open.Items.Add(this._Button("Folder…", this._OpenFolderPicker, RibbonItemSize.Large));
     tab.Groups.Add(open);
 
     var save = new RibbonGroup("Save");
     this._save.ToolTipText = "Writes the edited picture back over the file it came from.";
     this._save.Click += (_, _) => this._Save();
     save.Items.Add(this._save);
-    save.Items.Add(_Button("Save as…", this._SaveAs, RibbonItemSize.Large));
+    save.Items.Add(this._Button("Save as…", this._SaveAs, RibbonItemSize.Large));
     tab.Groups.Add(save);
 
     var convert = new RibbonGroup("Convert");
-    convert.Items.Add(_Button("One file…", this._ConvertCurrent, RibbonItemSize.Large));
-    convert.Items.Add(_Button("Whole folder…", this._ConvertFolder, RibbonItemSize.Large));
+    convert.Items.Add(this._Button("One file…", this._ConvertCurrent, RibbonItemSize.Large));
+    convert.Items.Add(this._Button("Whole folder…", this._ConvertFolder, RibbonItemSize.Large));
     tab.Groups.Add(convert);
 
     var about = new RibbonGroup("Help");
-    about.Items.Add(_Button("About", this._About, RibbonItemSize.Small));
+    about.Items.Add(this._Button("About", this._About, RibbonItemSize.Small));
     tab.Groups.Add(about);
 
     return tab;
@@ -148,10 +165,10 @@ internal sealed class ViewerShell : Form {
     var tab = new RibbonTab("Navigate");
 
     var walk = new RibbonGroup("Folder");
-    walk.Items.Add(_Button("First", () => this._OpenIndex(0), RibbonItemSize.Small));
-    walk.Items.Add(_Button("Previous", () => this.Walk(-1), RibbonItemSize.Large));
-    walk.Items.Add(_Button("Next", () => this.Walk(1), RibbonItemSize.Large));
-    walk.Items.Add(_Button("Last", () => this._OpenIndex(this._folder.Files.Count - 1), RibbonItemSize.Small));
+    walk.Items.Add(this._Button("First", () => this._OpenIndex(0), RibbonItemSize.Small));
+    walk.Items.Add(this._Button("Previous", () => this.Walk(-1), RibbonItemSize.Large));
+    walk.Items.Add(this._Button("Next", () => this.Walk(1), RibbonItemSize.Large));
+    walk.Items.Add(this._Button("Last", () => this._OpenIndex(this._folder.Files.Count - 1), RibbonItemSize.Small));
     tab.Groups.Add(walk);
 
     var ends = new RibbonGroup("At the ends");
@@ -201,10 +218,10 @@ internal sealed class ViewerShell : Form {
     var tab = new RibbonTab("View");
 
     var zoom = new RibbonGroup("Zoom");
-    zoom.Items.Add(_Button("Fit", () => this._viewport.FitToWindow(), RibbonItemSize.Large));
-    zoom.Items.Add(_Button("Actual size", () => this._viewport.ActualSize(), RibbonItemSize.Large));
-    zoom.Items.Add(_Button("Zoom out", () => this._ZoomBy(1 / Math.Sqrt(2)), RibbonItemSize.Small));
-    zoom.Items.Add(_Button("Zoom in", () => this._ZoomBy(Math.Sqrt(2)), RibbonItemSize.Small));
+    zoom.Items.Add(this._Button("Fit", this._FitToWindow, RibbonItemSize.Large));
+    zoom.Items.Add(this._Button("Actual size", this._ActualSize, RibbonItemSize.Large));
+    zoom.Items.Add(this._Button("Zoom out", () => this._ZoomBy(1 / Math.Sqrt(2)), RibbonItemSize.Small));
+    zoom.Items.Add(this._Button("Zoom in", () => this._ZoomBy(Math.Sqrt(2)), RibbonItemSize.Small));
     tab.Groups.Add(zoom);
 
     var panes = new RibbonGroup("Panes");
@@ -232,25 +249,25 @@ internal sealed class ViewerShell : Form {
     var tab = new RibbonTab("Picture");
 
     var rotate = new RibbonGroup("Rotate");
-    rotate.Items.Add(_Button("Right", () => this._Apply(i => ImageTransformer.Rotate(i, RotateAngle.CW90)), RibbonItemSize.Small));
-    rotate.Items.Add(_Button("Left", () => this._Apply(i => ImageTransformer.Rotate(i, RotateAngle.CW270)), RibbonItemSize.Small));
-    rotate.Items.Add(_Button("Half turn", () => this._Apply(i => ImageTransformer.Rotate(i, RotateAngle.CW180)), RibbonItemSize.Small));
+    rotate.Items.Add(this._Button("Right", () => this._Apply(i => ImageTransformer.Rotate(i, RotateAngle.CW90)), RibbonItemSize.Small));
+    rotate.Items.Add(this._Button("Left", () => this._Apply(i => ImageTransformer.Rotate(i, RotateAngle.CW270)), RibbonItemSize.Small));
+    rotate.Items.Add(this._Button("Half turn", () => this._Apply(i => ImageTransformer.Rotate(i, RotateAngle.CW180)), RibbonItemSize.Small));
     tab.Groups.Add(rotate);
 
     var flip = new RibbonGroup("Flip");
-    flip.Items.Add(_Button("Horizontally", () => this._Apply(i => ImageTransformer.Flip(i, FlipDirection.Horizontal)), RibbonItemSize.Small));
-    flip.Items.Add(_Button("Vertically", () => this._Apply(i => ImageTransformer.Flip(i, FlipDirection.Vertical)), RibbonItemSize.Small));
+    flip.Items.Add(this._Button("Horizontally", () => this._Apply(i => ImageTransformer.Flip(i, FlipDirection.Horizontal)), RibbonItemSize.Small));
+    flip.Items.Add(this._Button("Vertically", () => this._Apply(i => ImageTransformer.Flip(i, FlipDirection.Vertical)), RibbonItemSize.Small));
     tab.Groups.Add(flip);
 
     var adjust = new RibbonGroup("Adjust");
-    adjust.Items.Add(_Button("Resize…", this._Resize, RibbonItemSize.Large));
-    adjust.Items.Add(_Button("Crop…", this._Crop, RibbonItemSize.Large));
-    adjust.Items.Add(_Button("Reduce colours…", this._ReduceColours, RibbonItemSize.Large));
+    adjust.Items.Add(this._Button("Resize…", this._Resize, RibbonItemSize.Large));
+    adjust.Items.Add(this._Button("Crop…", this._Crop, RibbonItemSize.Large));
+    adjust.Items.Add(this._Button("Reduce colours…", this._ReduceColours, RibbonItemSize.Large));
     tab.Groups.Add(adjust);
 
     var colour = new RibbonGroup("Colour");
-    colour.Items.Add(_Button("Greyscale", () => this._Apply(ImageTransforms.Grayscale), RibbonItemSize.Small));
-    colour.Items.Add(_Button("Invert", () => this._Apply(ImageTransforms.Invert), RibbonItemSize.Small));
+    colour.Items.Add(this._Button("Greyscale", () => this._Apply(ImageTransforms.Grayscale), RibbonItemSize.Small));
+    colour.Items.Add(this._Button("Invert", () => this._Apply(ImageTransforms.Invert), RibbonItemSize.Small));
     tab.Groups.Add(colour);
 
     return tab;
@@ -306,9 +323,74 @@ internal sealed class ViewerShell : Form {
     this._statusBar.Items.Add(this._statusZoom);
   }
 
-  private static RibbonButton _Button(string text, Action action, RibbonItemSize size = RibbonItemSize.Small) {
+  /// <summary>The keys a picture viewer is expected to answer to, wherever the focus sits.</summary>
+  /// <remarks>
+  /// <para>
+  /// The bindings are the ones a user of the viewer this replaces reaches for, with two departures
+  /// worth naming. PageUp and PageDown walk the folder rather than the pages of a document, because
+  /// that is what they do in every picture viewer and almost no picture has a second page; paging
+  /// within a file moved onto Control with them. And the toolkit's canvas already answers Control+0
+  /// and Control+9 for actual size and fit, so both are bound here too — not for the sake of a
+  /// second way to do it, but so that every route to a zoom goes through the one place that records
+  /// what kind of zoom it was.
+  /// </para>
+  /// <para>
+  /// Nothing is bound to a bare letter. A viewer that will grow a "go to file" box wants the letters
+  /// left alone, and a bare letter swallowed window-wide is the kind of binding that later turns out
+  /// to have been eating somebody's typing.
+  /// </para>
+  /// </remarks>
+  private void _BuildShortcuts() {
+    this._shortcuts.Bind("Next picture", () => this.Walk(1), Keys.Right, Keys.Space, Keys.PageDown);
+    this._shortcuts.Bind("Previous picture", () => this.Walk(-1), Keys.Left, Keys.Back, Keys.PageUp);
+    this._shortcuts.Bind("First picture", () => this._OpenIndex(0), Keys.Home);
+    this._shortcuts.Bind("Last picture", () => this._OpenIndex(this._folder.Files.Count - 1), Keys.End);
+
+    this._shortcuts.Bind("Next page", () => this._GoPage(1), Keys.Control | Keys.PageDown);
+    this._shortcuts.Bind("Previous page", () => this._GoPage(-1), Keys.Control | Keys.PageUp);
+
+    // Every shape a plus and a minus arrive in. The keypad has codes of its own; the number row's
+    // plus needs Shift on most layouts, and which key code that leaves behind depends on the
+    // platform — Windows reports the physical key and X11 reports the character it produced — so
+    // both, with and without Shift, are bound rather than guessed at.
+    this._shortcuts.Bind(
+      "Zoom in",
+      () => this._ZoomBy(Math.Sqrt(2)),
+      Keys.Oemplus, Keys.Shift | Keys.Oemplus, Keys.Add, Keys.Shift | Keys.Add);
+    this._shortcuts.Bind(
+      "Zoom out",
+      () => this._ZoomBy(1 / Math.Sqrt(2)),
+      Keys.OemMinus, Keys.Shift | Keys.OemMinus, Keys.Subtract, Keys.Shift | Keys.Subtract);
+    this._shortcuts.Bind("Fit to window", this._FitToWindow, Keys.Control | Keys.F, Keys.Control | Keys.D9);
+    this._shortcuts.Bind("Actual size", this._ActualSize, Keys.Control | Keys.D1, Keys.Control | Keys.D0);
+
+    this._shortcuts.Bind("Thumbnails", () => this._showBrowser.Checked = !this._showBrowser.Checked, Keys.Control | Keys.T);
+    this._shortcuts.Bind("Information", () => this._showInformation.Checked = !this._showInformation.Checked, Keys.Control | Keys.I);
+    this._shortcuts.Bind("Wrap around", () => this._wrapToggle.Checked = !this._wrapToggle.Checked, Keys.Control | Keys.W);
+
+    this._shortcuts.Bind("Re-read the folder", this._RefreshFolder, Keys.F5);
+    this._shortcuts.Bind("Full screen", this._ToggleFullScreen, Keys.F11);
+    this._shortcuts.Bind("Leave full screen", () => this._SetFullScreen(false), Keys.Escape);
+
+    this._shortcuts.Bind("Open picture", this._OpenPicturePicker, Keys.Control | Keys.O);
+    this._shortcuts.Bind("Open folder", this._OpenFolderPicker, Keys.Control | Keys.Shift | Keys.O);
+    this._shortcuts.Bind("Save", this._Save, Keys.Control | Keys.S);
+    this._shortcuts.Bind("Save as", this._SaveAs, Keys.Control | Keys.Shift | Keys.S);
+  }
+
+  /// <summary>A ribbon command that hands the keyboard back to the picture when it is done.</summary>
+  /// <remarks>
+  /// A toolbar that keeps the focus after a click is a toolbar that has quietly taken the arrow keys
+  /// away — the ribbon walks its own tabs with them — so every command returns the focus to the
+  /// canvas, the same way pressing a button on a toolbar does everywhere else.
+  /// </remarks>
+  private RibbonButton _Button(string text, Action action, RibbonItemSize size = RibbonItemSize.Small) {
     var button = new RibbonButton(text, size);
-    button.Click += (_, _) => action();
+    button.Click += (_, _) => {
+      action();
+      this._viewport.Focus();
+    };
+
     return button;
   }
 
@@ -394,7 +476,55 @@ internal sealed class ViewerShell : Form {
 
     this._folder.SelectIndex(index);
     this._SyncBrowserSelection();
+    this._thumbnailLoader.Prioritise(index, _THUMBNAIL_LOOKAHEAD);
     this._Load(this._folder.Files[index]);
+  }
+
+  /// <summary>Lists the folder again, in case it changed under the window.</summary>
+  private void _RefreshFolder() {
+    if (this._folder.Folder == null)
+      return;
+
+    this._folder.Refresh();
+    this._RefreshBrowser();
+    if (this._folder.Index < 0 && this._folder.Files.Count > 0)
+      this._OpenIndex(0);
+  }
+
+  private void _ToggleFullScreen() => this._SetFullScreen(!this._fullScreen);
+
+  /// <summary>Gives the picture the whole screen, or gives the window its chrome back.</summary>
+  /// <remarks>
+  /// The chrome is hidden rather than the window merely maximised: a full screen that still shows a
+  /// ribbon and a thumbnail strip is not one. The pane toggles are restored from the buttons that own
+  /// them rather than from what the panes happened to be doing, so leaving full screen cannot turn a
+  /// pane back on that the user had switched off.
+  /// </remarks>
+  private void _SetFullScreen(bool on) {
+    if (on == this._fullScreen)
+      return;
+
+    if (on) {
+      this._framedBorderStyle = this.FormBorderStyle;
+      this._framedWindowState = this.WindowState;
+      this._ribbon.Visible = false;
+      this._statusBar.Visible = false;
+      this._outer.Panel1Collapsed = true;
+      this._inner.Panel2Collapsed = true;
+      this.FormBorderStyle = FormBorderStyle.None;
+      this.WindowState = FormWindowState.Maximized;
+    } else {
+      this.FormBorderStyle = this._framedBorderStyle;
+      this.WindowState = this._framedWindowState;
+      this._ribbon.Visible = true;
+      this._statusBar.Visible = true;
+      this._outer.Panel1Collapsed = !this._showBrowser.Checked;
+      this._inner.Panel2Collapsed = !this._showInformation.Checked;
+    }
+
+    this._fullScreen = on;
+    this._viewport.Focus();
+    this._ApplyZoomMode();
   }
 
   /// <summary>Moves to the neighbouring picture, honouring the wrap setting.</summary>
@@ -425,7 +555,7 @@ internal sealed class ViewerShell : Form {
       this._pageCount = PageService.PageCount(file, entry);
       this._PickVideoMode();
       this._Render();
-      this._viewport.FitToWindow();
+      this._ApplyZoomMode();
       this._UpdatePageButtons();
       this._UpdateInformation();
       this._notice = null;
@@ -480,6 +610,8 @@ internal sealed class ViewerShell : Form {
     this._browser.SelectedIndex = this._folder.Index;
     this._suppressBrowserSelection = false;
     this._thumbnailLoader.Start(this._folder.Files);
+    if (this._folder.Index > 0)
+      this._thumbnailLoader.Prioritise(this._folder.Index, _THUMBNAIL_LOOKAHEAD);
   }
 
   private void _SyncBrowserSelection() {
@@ -506,6 +638,7 @@ internal sealed class ViewerShell : Form {
       return;
 
     this._folder.SelectIndex(index);
+    this._thumbnailLoader.Prioritise(index, _THUMBNAIL_LOOKAHEAD);
     this._Load(this._folder.Files[index]);
   }
 
@@ -524,19 +657,30 @@ internal sealed class ViewerShell : Form {
     this._formatFilter = mode.DisplayFilter;
   }
 
+  /// <remarks>
+  /// Guarded, because handing the canvas an image makes it fit that image to the window, and a fit
+  /// this window asked for is not the user choosing a scale — which is what an unguarded
+  /// <see cref="ZoomPanel.ZoomChanged"/> is taken to mean.
+  /// </remarks>
   private void _Render() {
-    if (this._raw == null) {
-      this._ReleaseDisplayed();
-      return;
+    ++this._zoomGuard;
+    try {
+      if (this._raw == null) {
+        this._ReleaseDisplayed();
+        return;
+      }
+
+      var shown = DisplayFilterPipeline.Apply(this._raw, this._filterOverride ?? this._formatFilter);
+      shown = _ApplyPixelAspect(shown, this._pixelAspect);
+
+      var previous = this._displayed;
+      this._displayed = ImageBridge.ToImage(this._backend, shown);
+      this._viewport.Image = this._displayed;
+      previous?.Dispose();
+    } finally {
+      --this._zoomGuard;
     }
 
-    var shown = DisplayFilterPipeline.Apply(this._raw, this._filterOverride ?? this._formatFilter);
-    shown = _ApplyPixelAspect(shown, this._pixelAspect);
-
-    var previous = this._displayed;
-    this._displayed = ImageBridge.ToImage(this._backend, shown);
-    this._viewport.Image = this._displayed;
-    previous?.Dispose();
     this._UpdateStatus();
   }
 
@@ -554,6 +698,60 @@ internal sealed class ViewerShell : Form {
   private void _ZoomBy(double factor) {
     var zoom = Math.Clamp(this._viewport.Zoom * factor, this._viewport.MinZoom, this._viewport.MaxZoom);
     this._viewport.ZoomTo(zoom, this._viewport.Width / 2, this._viewport.Height / 2);
+  }
+
+  private void _FitToWindow() => this._SetZoomMode(ZoomMode.Fit);
+
+  private void _ActualSize() => this._SetZoomMode(ZoomMode.Actual);
+
+  /// <summary>Scales the picture the way the mode says, and remembers that this is how it was asked for.</summary>
+  private void _SetZoomMode(ZoomMode mode) {
+    this._zoomMode = mode;
+    this._ApplyZoomMode();
+    this._UpdateStatus();
+  }
+
+  /// <summary>Scales the picture that has just arrived the way the last one was being looked at.</summary>
+  /// <remarks>
+  /// Assigning the canvas an image fits it to the window, which is the right answer for the fit mode
+  /// and wrong for the other two: somebody comparing a detail across a folder at 400% wants the next
+  /// picture at 400%, and somebody at actual size wants actual size. So the mode is re-applied after
+  /// every load, and the free scale is remembered rather than read back off the canvas, which by then
+  /// holds the fit it computed for itself.
+  /// </remarks>
+  private void _ApplyZoomMode() {
+    ++this._zoomGuard;
+    try {
+      switch (this._zoomMode) {
+        case ZoomMode.Actual:
+          this._viewport.ActualSize();
+          break;
+        case ZoomMode.Free:
+          this._viewport.Zoom = this._freeZoom;
+          break;
+        default:
+          this._viewport.FitToWindow();
+          break;
+      }
+    } finally {
+      --this._zoomGuard;
+    }
+  }
+
+  /// <summary>Notes a zoom nobody here asked for as the scale the user wants to keep.</summary>
+  /// <remarks>
+  /// There are four ways to change the scale that do not go through this class — Control with the
+  /// wheel, the slider the canvas draws in its corner, dragging that slider's ends, and the canvas's
+  /// own keys — and every one of them means the same thing: the user has chosen a scale, and it is to
+  /// survive the next picture. Rather than intercept each, anything that is not this window loading a
+  /// picture or applying a mode is taken as that choice. The guard is what tells the two apart.
+  /// </remarks>
+  private void _OnZoomChanged() {
+    if (this._zoomGuard == 0) {
+      this._zoomMode = ZoomMode.Free;
+      this._freeZoom = this._viewport.Zoom;
+    }
+
     this._UpdateStatus();
   }
 
@@ -893,7 +1091,13 @@ internal sealed class ViewerShell : Form {
   }
 
   private void _ReleaseDisplayed() {
-    this._viewport.Image = null;
+    ++this._zoomGuard;
+    try {
+      this._viewport.Image = null;
+    } finally {
+      --this._zoomGuard;
+    }
+
     this._displayed?.Dispose();
     this._displayed = null;
   }
