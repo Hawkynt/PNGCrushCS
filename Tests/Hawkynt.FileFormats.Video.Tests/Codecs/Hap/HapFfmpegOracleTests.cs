@@ -178,7 +178,7 @@ public sealed class HapFfmpegOracleTests {
       };
       foreach (var argument in new[] {
         "-hide_banner", "-loglevel", "error", "-y", "-i", path,
-        "-map", "0:v:0", "-an", "-sn", "-dn", "-vsync", "0",
+        "-map", "0:v:0", "-an", "-sn", "-dn", "-fps_mode", "passthrough",
         "-f", "rawvideo", "-pix_fmt", pixelFormat, raw,
       })
         startInfo.ArgumentList.Add(argument);
