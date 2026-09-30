@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using FileFormat.Core;
+using Hawkynt.ColorProcessing.Adapter;
 using Hawkynt.FileFormats.Images;
 using Hawkynt.NativeForms;
 using Hawkynt.NativeForms.Backends;
@@ -47,16 +48,17 @@ internal sealed class ViewerShell : Form {
   private readonly ToolStripStatusLabel _statusPosition = new("") { Spring = true };
   private readonly ToolStripStatusLabel _statusZoom = new("100%");
 
-  private readonly RibbonToggleButton _wrapToggle = new("Wrap around", RibbonItemSize.Large);
+  private readonly RibbonToggleButton _wrapToggle = new("Wrap around", RibbonItemSize.Small);
   private readonly RibbonToggleButton _slideshowToggle = new("Slideshow", RibbonItemSize.Large);
-  private readonly RibbonToggleButton _showBrowser = new("Browser", RibbonItemSize.Small) { Checked = true };
+  private readonly RibbonToggleButton _showBrowser = new("Thumbnails", RibbonItemSize.Small) { Checked = true };
   private readonly RibbonToggleButton _showInformation = new("Information", RibbonItemSize.Small) { Checked = true };
   private readonly RibbonToggleButton _showRulers = new("Rulers", RibbonItemSize.Small);
   private readonly List<(RibbonToggleButton Button, DisplayFilter? Filter)> _filterButtons = [];
   private readonly RibbonButton _save = new("Save", RibbonItemSize.Large);
-  private readonly RibbonButton _previousPage = new("Previous page", RibbonItemSize.Large);
-  private readonly RibbonButton _nextPage = new("Next page", RibbonItemSize.Large);
-  private readonly RibbonButton _extractPages = new("Extract pages…", RibbonItemSize.Large);
+  private readonly RibbonButton _print = new("Print…", RibbonItemSize.Large);
+  private readonly RibbonButton _previousPage = new("Previous page", RibbonItemSize.Small);
+  private readonly RibbonButton _nextPage = new("Next page", RibbonItemSize.Small);
+  private readonly RibbonButton _extractPages = new("Extract pages…", RibbonItemSize.Small);
 
   private IImage? _displayed;
   private RawImage? _raw;
@@ -120,12 +122,31 @@ internal sealed class ViewerShell : Form {
   // Chrome
   // ============================================================================================
 
+  /// <summary>Lays the commands out in six tabs, by what a command does to or with the picture.</summary>
+  /// <remarks>
+  /// <para>
+  /// The split is the one an image application is expected to have: the file and the pictures around
+  /// it, then how this one is being looked at and shaped, then colour, then size, then repairs, then
+  /// effects. Walking the folder and paging through a document both live on File rather than on a tab
+  /// of their own, because both are about which picture is on screen rather than about the picture —
+  /// the same reason the thumbnail browser's toggle sits next to them instead of next to the other
+  /// pane toggles on View.
+  /// </para>
+  /// <para>
+  /// Geometry is on View with the zoom for the same reason the other way round: rotating, mirroring,
+  /// cropping, adding a margin and letterboxing all change where the picture's own pixels sit in the
+  /// frame, and somebody who has just turned a photograph upright reaches for the fit button next.
+  /// Resizing is not there but on its own tab, because that one resamples and the resampler is a
+  /// choice in its own right.
+  /// </para>
+  /// </remarks>
   private void _BuildRibbon() {
     this._ribbon.Tabs.Add(this._BuildFileTab());
-    this._ribbon.Tabs.Add(this._BuildNavigateTab());
-    this._ribbon.Tabs.Add(this._BuildPagesTab());
     this._ribbon.Tabs.Add(this._BuildViewTab());
-    this._ribbon.Tabs.Add(this._BuildPictureTab());
+    this._ribbon.Tabs.Add(this._BuildColourTab());
+    this._ribbon.Tabs.Add(this._BuildResizeTab());
+    this._ribbon.Tabs.Add(this._BuildCorrectionsTab());
+    this._ribbon.Tabs.Add(this._BuildEffectsTab());
     this._ribbon.SelectedIndex = 0;
     this._ribbon.PreferredHeightChanged += (_, _) => this._SizeRibbon();
     this._SizeRibbon();
@@ -143,6 +164,52 @@ internal sealed class ViewerShell : Form {
     open.Items.Add(this._Button("Folder…", this._OpenFolderPicker, RibbonItemSize.Large, "document-open-folder"));
     tab.Groups.Add(open);
 
+    var browse = new RibbonGroup("Browse");
+    this._icons.Apply(this._slideshowToggle, "media-playback-start", RibbonItemSize.Large);
+    this._slideshowToggle.ToolTipText = "Steps through the folder on a timer, at a rate it asks for.";
+    this._slideshowToggle.CheckedChanged += (_, _) => this._ToggleSlideshow();
+    browse.Items.Add(this._slideshowToggle);
+
+    this._icons.Apply(this._showBrowser, "application_view_gallery");
+    this._showBrowser.ToolTipText = "Shows or hides the thumbnails of the folder down the left-hand side.";
+    this._showBrowser.CheckedChanged += (_, _) => this._outer.Panel1Collapsed = !this._showBrowser.Checked;
+    browse.Items.Add(this._showBrowser);
+
+    this._icons.Apply(this._wrapToggle, "media-playlist-repeat");
+    this._wrapToggle.ToolTipText = "On: the last picture is followed by the first. Off: walking stops at the ends.";
+    this._wrapToggle.CheckedChanged += (_, _) => {
+      this._folder.WalkMode = this._wrapToggle.Checked ? WalkMode.Wrap : WalkMode.Stop;
+      this._UpdateStatus();
+    };
+    browse.Items.Add(this._wrapToggle);
+
+    browse.Items.Add(this._Button("First", () => this._OpenIndex(0), RibbonItemSize.Small, "resultset_first"));
+    browse.Items.Add(this._Button("Previous", () => this.Walk(-1), RibbonItemSize.Small, "resultset_previous"));
+    browse.Items.Add(this._Button("Next", () => this.Walk(1), RibbonItemSize.Small, "resultset_next"));
+    browse.Items.Add(this._Button("Last", () => this._OpenIndex(this._folder.Files.Count - 1), RibbonItemSize.Small, "resultset_last"));
+    tab.Groups.Add(browse);
+
+    var pages = new RibbonGroup("Pages");
+    this._icons.Apply(this._previousPage, "go-previous-view-page");
+    this._icons.Apply(this._nextPage, "go-next-view-page");
+    this._previousPage.Click += (_, _) => this._GoPage(-1);
+    this._nextPage.Click += (_, _) => this._GoPage(1);
+    pages.Items.Add(this._previousPage);
+    pages.Items.Add(this._nextPage);
+
+    this._icons.Apply(this._extractPages, "split");
+    this._extractPages.ToolTipText = "Writes every page of this file into its own picture file.";
+    this._extractPages.Click += (_, _) => this._ExtractPages();
+    pages.Items.Add(this._extractPages);
+
+    var assemble = new RibbonButton("Assemble pages…", RibbonItemSize.Small) {
+      Enabled = false,
+      ToolTipText = PageService.AssemblyUnavailable,
+    };
+    this._icons.Apply(assemble, "merge");
+    pages.Items.Add(assemble);
+    tab.Groups.Add(pages);
+
     var save = new RibbonGroup("Save");
     this._save.ToolTipText = "Writes the edited picture back over the file it came from.";
     this._save.Click += (_, _) => this._Save();
@@ -156,72 +223,34 @@ internal sealed class ViewerShell : Form {
     convert.Items.Add(this._Button("Whole folder…", this._ConvertFolder, RibbonItemSize.Large, "folder-sync"));
     tab.Groups.Add(convert);
 
+    var devices = new RibbonGroup("Print and scan");
+    this._icons.Apply(this._print, "document-print", RibbonItemSize.Large);
+    this._print.ToolTipText = PrintService.Unavailable
+      ?? "Writes the picture as a PDF with this suite's own writer and hands it to the platform to print.";
+    this._print.Click += (_, _) => this._Print();
+    devices.Items.Add(this._print);
+
+    var acquire = new RibbonButton("From scanner…", RibbonItemSize.Large) {
+      Enabled = false,
+      ToolTipText = PlannedCommands.AcquireUnavailable,
+    };
+    this._icons.Apply(acquire, "scanner", RibbonItemSize.Large);
+    devices.Items.Add(acquire);
+    tab.Groups.Add(devices);
+
     var about = new RibbonGroup("Help");
     about.Items.Add(this._Button("About", this._About, RibbonItemSize.Small, "help"));
     tab.Groups.Add(about);
-
-    return tab;
-  }
-
-  private RibbonTab _BuildNavigateTab() {
-    var tab = new RibbonTab("Navigate");
-
-    var walk = new RibbonGroup("Folder");
-    walk.Items.Add(this._Button("First", () => this._OpenIndex(0), RibbonItemSize.Small, "resultset_first"));
-    walk.Items.Add(this._Button("Previous", () => this.Walk(-1), RibbonItemSize.Large, "go-previous-view"));
-    walk.Items.Add(this._Button("Next", () => this.Walk(1), RibbonItemSize.Large, "go-next-view"));
-    walk.Items.Add(this._Button("Last", () => this._OpenIndex(this._folder.Files.Count - 1), RibbonItemSize.Small, "resultset_last"));
-    tab.Groups.Add(walk);
-
-    var ends = new RibbonGroup("At the ends");
-    this._icons.Apply(this._wrapToggle, "media-playlist-repeat", RibbonItemSize.Large);
-    this._wrapToggle.ToolTipText = "On: the last picture is followed by the first. Off: walking stops at the ends.";
-    this._wrapToggle.CheckedChanged += (_, _) => {
-      this._folder.WalkMode = this._wrapToggle.Checked ? WalkMode.Wrap : WalkMode.Stop;
-      this._UpdateStatus();
-    };
-    ends.Items.Add(this._wrapToggle);
-    tab.Groups.Add(ends);
-
-    var show = new RibbonGroup("Slideshow");
-    this._icons.Apply(this._slideshowToggle, "media-playback-start", RibbonItemSize.Large);
-    this._slideshowToggle.CheckedChanged += (_, _) => this._ToggleSlideshow();
-    show.Items.Add(this._slideshowToggle);
-    tab.Groups.Add(show);
-
-    return tab;
-  }
-
-  private RibbonTab _BuildPagesTab() {
-    var tab = new RibbonTab("Pages");
-
-    var page = new RibbonGroup("Page");
-    this._icons.Apply(this._previousPage, "go-previous-view-page", RibbonItemSize.Large);
-    this._icons.Apply(this._nextPage, "go-next-view-page", RibbonItemSize.Large);
-    this._previousPage.Click += (_, _) => this._GoPage(-1);
-    this._nextPage.Click += (_, _) => this._GoPage(1);
-    page.Items.Add(this._previousPage);
-    page.Items.Add(this._nextPage);
-    tab.Groups.Add(page);
-
-    var files = new RibbonGroup("Files");
-    this._icons.Apply(this._extractPages, "split", RibbonItemSize.Large);
-    this._extractPages.ToolTipText = "Write every page of this file into its own picture file.";
-    this._extractPages.Click += (_, _) => this._ExtractPages();
-    files.Items.Add(this._extractPages);
-
-    var assemble = new RibbonButton("Assemble pages…", RibbonItemSize.Large) {
-      Enabled = false,
-      ToolTipText = PageService.AssemblyUnavailable,
-    };
-    this._icons.Apply(assemble, "merge", RibbonItemSize.Large);
-    files.Items.Add(assemble);
-    tab.Groups.Add(files);
 
     this._UpdatePageButtons();
     return tab;
   }
 
+  /// <remarks>
+  /// The three signal standards among the display filters go without artwork on purpose: no icon set
+  /// draws NTSC, S-Video and PAL as three different things, and one television on all three would be
+  /// a picture of the group rather than of the choice.
+  /// </remarks>
   private RibbonTab _BuildViewTab() {
     var tab = new RibbonTab("View");
 
@@ -233,20 +262,38 @@ internal sealed class ViewerShell : Form {
     tab.Groups.Add(zoom);
 
     var panes = new RibbonGroup("Panes");
-    this._icons.Apply(this._showBrowser, "application_view_gallery");
     this._icons.Apply(this._showInformation, "information");
     this._icons.Apply(this._showRulers, "measure");
-    this._showBrowser.CheckedChanged += (_, _) => this._outer.Panel1Collapsed = !this._showBrowser.Checked;
     this._showInformation.CheckedChanged += (_, _) => this._inner.Panel2Collapsed = !this._showInformation.Checked;
     this._showRulers.CheckedChanged += (_, _) => this._viewport.ShowRulers = this._showRulers.Checked;
-    panes.Items.Add(this._showBrowser);
     panes.Items.Add(this._showInformation);
     panes.Items.Add(this._showRulers);
+
+    // A plain button rather than a toggle: full screen hides the ribbon, so a checked state nobody
+    // can see is state to keep in step for nothing. Escape and F11 both come back out.
+    panes.Items.Add(this._Button("Full screen", this._ToggleFullScreen, RibbonItemSize.Small, "view-fullscreen"));
     tab.Groups.Add(panes);
 
+    var rotate = new RibbonGroup("Rotate");
+    rotate.Items.Add(this._Button("Right", () => this._Apply(i => ImageTransformer.Rotate(i, RotateAngle.CW90)), RibbonItemSize.Small, "arrow_rotate_clockwise"));
+    rotate.Items.Add(this._Button("Left", () => this._Apply(i => ImageTransformer.Rotate(i, RotateAngle.CW270)), RibbonItemSize.Small, "arrow_rotate_anticlockwise"));
+    rotate.Items.Add(this._Button("Half turn", () => this._Apply(i => ImageTransformer.Rotate(i, RotateAngle.CW180)), RibbonItemSize.Small, "transform_rotate_180"));
+    tab.Groups.Add(rotate);
+
+    var mirror = new RibbonGroup("Mirror");
+    mirror.Items.Add(this._Button("Horizontally", () => this._Apply(i => ImageTransformer.Flip(i, FlipDirection.Horizontal)), RibbonItemSize.Small, "shape_flip_horizontal"));
+    mirror.Items.Add(this._Button("Vertically", () => this._Apply(i => ImageTransformer.Flip(i, FlipDirection.Vertical)), RibbonItemSize.Small, "shape_flip_vertical"));
+    tab.Groups.Add(mirror);
+
+    var frame = new RibbonGroup("Frame");
+    frame.Items.Add(this._Button("Crop…", this._Crop, RibbonItemSize.Large, "transform-crop"));
+    frame.Items.Add(this._Button("Margin…", this._Margin, RibbonItemSize.Large, "page-4sides"));
+    frame.Items.Add(this._Button("Letterbox…", this._Letterbox, RibbonItemSize.Large, "picture_position"));
+    tab.Groups.Add(frame);
+
     var filters = new RibbonGroup("Display filter");
-    this._AddFilterButton(filters, "As the format says", null);
-    this._AddFilterButton(filters, "Off", DisplayFilter.None);
+    this._AddFilterButton(filters, "As the format says", null, "video_mode");
+    this._AddFilterButton(filters, "Off", DisplayFilter.None, "television_off");
     this._AddFilterButton(filters, "NTSC composite", DisplayFilter.NtscComposite);
     this._AddFilterButton(filters, "NTSC S-Video", DisplayFilter.NtscSvideo);
     this._AddFilterButton(filters, "PAL", DisplayFilter.Pal);
@@ -256,39 +303,95 @@ internal sealed class ViewerShell : Form {
     return tab;
   }
 
-  private RibbonTab _BuildPictureTab() {
-    var tab = new RibbonTab("Picture");
+  /// <remarks>
+  /// Reducing colours is the one command here with a whole library behind it, so it gets the tab's
+  /// large button and a chooser of its own. Everything to the right of Channels is waiting on the
+  /// pixel operations and says so.
+  /// </remarks>
+  private RibbonTab _BuildColourTab() {
+    var tab = new RibbonTab("Colour");
 
-    // Half turn, Invert and the display filters go without artwork on purpose: neither set has an
-    // honest glyph for them, and a rotate icon on a half turn or a contrast icon on an inversion is
-    // a picture of a different command.
-    var rotate = new RibbonGroup("Rotate");
-    rotate.Items.Add(this._Button("Right", () => this._Apply(i => ImageTransformer.Rotate(i, RotateAngle.CW90)), RibbonItemSize.Small, "arrow_rotate_clockwise"));
-    rotate.Items.Add(this._Button("Left", () => this._Apply(i => ImageTransformer.Rotate(i, RotateAngle.CW270)), RibbonItemSize.Small, "arrow_rotate_anticlockwise"));
-    rotate.Items.Add(this._Button("Half turn", () => this._Apply(i => ImageTransformer.Rotate(i, RotateAngle.CW180)), RibbonItemSize.Small));
-    tab.Groups.Add(rotate);
+    var palette = new RibbonGroup("Palette");
+    palette.Items.Add(this._Button("Reduce colours…", this._ReduceColours, RibbonItemSize.Large, "color-management"));
+    tab.Groups.Add(palette);
 
-    var flip = new RibbonGroup("Flip");
-    flip.Items.Add(this._Button("Horizontally", () => this._Apply(i => ImageTransformer.Flip(i, FlipDirection.Horizontal)), RibbonItemSize.Small, "shape_flip_horizontal"));
-    flip.Items.Add(this._Button("Vertically", () => this._Apply(i => ImageTransformer.Flip(i, FlipDirection.Vertical)), RibbonItemSize.Small, "shape_flip_vertical"));
-    tab.Groups.Add(flip);
+    var channels = new RibbonGroup("Channels");
+    channels.Items.Add(this._Button("Greyscale", () => this._Apply(ImageTransforms.Grayscale), RibbonItemSize.Small, "convert_color_to_gray"));
+    channels.Items.Add(this._Button("Invert", () => this._Apply(ImageTransforms.Invert), RibbonItemSize.Small, "film_photo"));
+    tab.Groups.Add(channels);
 
-    var adjust = new RibbonGroup("Adjust");
-    adjust.Items.Add(this._Button("Resize…", this._Resize, RibbonItemSize.Large, "transform-scale"));
-    adjust.Items.Add(this._Button("Crop…", this._Crop, RibbonItemSize.Large, "transform-crop"));
-    adjust.Items.Add(this._Button("Reduce colours…", this._ReduceColours, RibbonItemSize.Large, "color-management"));
-    tab.Groups.Add(adjust);
-
-    var colour = new RibbonGroup("Colour");
-    colour.Items.Add(this._Button("Greyscale", () => this._Apply(ImageTransforms.Grayscale), RibbonItemSize.Small, "contrast"));
-    colour.Items.Add(this._Button("Invert", () => this._Apply(ImageTransforms.Invert), RibbonItemSize.Small));
-    tab.Groups.Add(colour);
+    tab.Groups.Add(this._PlannedGroup("Tone", PlannedCommands.Tone));
+    tab.Groups.Add(this._PlannedGroup("Colour", PlannedCommands.Colour));
 
     return tab;
   }
 
-  private void _AddFilterButton(RibbonGroup group, string text, DisplayFilter? filter) {
+  private RibbonTab _BuildResizeTab() {
+    var tab = new RibbonTab("Resize");
+
+    var scale = new RibbonGroup("Scale");
+    scale.Items.Add(this._Button("Resize…", this._Resize, RibbonItemSize.Large, "transform-scale"));
+    scale.Items.Add(this._Button("Half", () => this._ScaleBy(0.5), RibbonItemSize.Small, "arrow_in"));
+    scale.Items.Add(this._Button("Double", () => this._ScaleBy(2), RibbonItemSize.Small, "arrow_out"));
+    tab.Groups.Add(scale);
+
+    tab.Groups.Add(this._PlannedGroup("Resample", PlannedCommands.Resample));
+    tab.Groups.Add(this._PlannedGroup("Regenerate", PlannedCommands.Regenerate));
+
+    return tab;
+  }
+
+  private RibbonTab _BuildCorrectionsTab() {
+    var tab = new RibbonTab("Corrections");
+
+    var repair = new RibbonGroup("Repair");
+    repair.Items.Add(this._Planned(PlannedCommands.Repair[0], RibbonItemSize.Large));
+    for (var i = 1; i < PlannedCommands.Repair.Length; ++i)
+      repair.Items.Add(this._Planned(PlannedCommands.Repair[i]));
+    tab.Groups.Add(repair);
+
+    tab.Groups.Add(this._PlannedGroup("Sharpness", PlannedCommands.Sharpness));
+    tab.Groups.Add(this._PlannedGroup("Automatic", PlannedCommands.Automatic));
+
+    return tab;
+  }
+
+  private RibbonTab _BuildEffectsTab() {
+    var tab = new RibbonTab("Effects");
+
+    tab.Groups.Add(this._PlannedGroup("Blur", PlannedCommands.Blur));
+    tab.Groups.Add(this._PlannedGroup("Stylise", PlannedCommands.Stylise));
+    tab.Groups.Add(this._PlannedGroup("Tint", PlannedCommands.Tint));
+
+    return tab;
+  }
+
+  private RibbonGroup _PlannedGroup(string text, PlannedCommand[] commands) {
+    var group = new RibbonGroup(text);
+    foreach (var command in commands)
+      group.Items.Add(this._Planned(command));
+
+    return group;
+  }
+
+  /// <summary>Builds the button a command that does not exist yet gets: off, iconed, and explained.</summary>
+  private RibbonButton _Planned(PlannedCommand command, RibbonItemSize size = RibbonItemSize.Small) {
+    var button = new RibbonButton(command.Text, size) {
+      Enabled = false,
+      ToolTipText = command.ToolTipText,
+    };
+
+    if (command.Icon != null)
+      this._icons.Apply(button, command.Icon, size);
+
+    return button;
+  }
+
+  private void _AddFilterButton(RibbonGroup group, string text, DisplayFilter? filter, string? icon = null) {
     var button = new RibbonToggleButton(text, RibbonItemSize.Small);
+    if (icon != null)
+      this._icons.Apply(button, icon);
+
     button.CheckedChanged += (_, _) => {
       if (this._suppressFilterButtons)
         return;
@@ -395,6 +498,7 @@ internal sealed class ViewerShell : Form {
     this._shortcuts.Bind("Open folder", this._OpenFolderPicker, Keys.Control | Keys.Shift | Keys.O);
     this._shortcuts.Bind("Save", this._Save, Keys.Control | Keys.S);
     this._shortcuts.Bind("Save as", this._SaveAs, Keys.Control | Keys.Shift | Keys.S);
+    this._shortcuts.Bind("Print", this._Print, Keys.Control | Keys.P);
   }
 
   /// <summary>A ribbon command that hands the keyboard back to the picture when it is done.</summary>
@@ -437,6 +541,20 @@ internal sealed class ViewerShell : Form {
   // ============================================================================================
   // Opening
   // ============================================================================================
+
+  /// <summary>The ribbon's tabs, by the name each shows.</summary>
+  internal IEnumerable<string> TabNames => this._ribbon.Tabs.Select(t => t.Text);
+
+  /// <summary>Brings the named ribbon tab to the front; false when no tab has that name.</summary>
+  internal bool SelectTab(string name) {
+    for (var i = 0; i < this._ribbon.Tabs.Count; ++i)
+      if (string.Equals(this._ribbon.Tabs[i].Text, name, StringComparison.OrdinalIgnoreCase)) {
+        this._ribbon.SelectedIndex = i;
+        return true;
+      }
+
+    return false;
+  }
 
   /// <summary>Opens a file or a folder, whichever the path names.</summary>
   internal void OpenPath(string path) {
@@ -819,16 +937,69 @@ internal sealed class ViewerShell : Form {
     this._Apply(i => ImageTransformer.Resize(i, dialog.TargetWidth, dialog.TargetHeight, dialog.Mode, dialog.Interpolation));
   }
 
+  private void _Margin() {
+    if (this._raw == null)
+      return;
+
+    var dialog = new MarginOptionsDialog(this._raw.Width, this._raw.Height);
+    if (dialog.ShowDialog(this) != DialogResult.OK)
+      return;
+
+    var margin = dialog.MarginWidth;
+    var fill = dialog.Fill;
+    this._Apply(i => ImageTransformer.ExtendCanvas(
+      i, i.Width + margin * 2, i.Height + margin * 2, AnchorPosition.Center, fill));
+  }
+
+  private void _Letterbox() {
+    if (this._raw == null)
+      return;
+
+    var dialog = new LetterboxOptionsDialog(
+      this._raw.Width, this._raw.Height, ImageTransformer.GuessInterpolation(this._raw));
+    if (dialog.ShowDialog(this) != DialogResult.OK)
+      return;
+
+    this._Apply(i => ImageTransformer.Resize(
+      i, dialog.FrameWidth, dialog.FrameHeight, ResizeMode.Fit, dialog.Interpolation, dialog.Bars));
+  }
+
+  /// <summary>Scales the picture by a fixed factor, with the filter the picture itself suggests.</summary>
+  /// <remarks>
+  /// Halving and doubling are the two scales that need no dialog, and both are clamped to the range
+  /// the resize dialog offers: a picture already at one pixel cannot be halved, and one at the far end
+  /// cannot be doubled, so the factor is applied to whatever room is left rather than refused.
+  /// </remarks>
+  private void _ScaleBy(double factor) {
+    if (this._raw == null)
+      return;
+
+    const int largest = 16384;
+    var width = Math.Clamp((int)Math.Round(this._raw.Width * factor), 1, largest);
+    var height = Math.Clamp((int)Math.Round(this._raw.Height * factor), 1, largest);
+    if (width == this._raw.Width && height == this._raw.Height)
+      return;
+
+    var hint = ImageTransformer.GuessInterpolation(this._raw);
+    this._Apply(i => ImageTransformer.Resize(i, width, height, ResizeMode.Stretch, hint));
+  }
+
   private void _ReduceColours() {
     if (this._raw == null)
       return;
 
     var current = this._raw.IsIndexed ? Math.Clamp(this._raw.PaletteCount, 2, 256) : 256;
-    var dialog = new NumberDialog("Reduce colours", "Median Cut with Floyd-Steinberg dithering.", "Colours", 2, 256, current, "Reduce");
+    var describe = this._raw.IsIndexed
+      ? $"The picture holds {this._raw.PaletteCount} colour(s) in a palette."
+      : "The picture is not palettised; reducing it builds a palette and maps every pixel onto it.";
+    var dialog = new ReduceColoursDialog(describe, current);
     if (dialog.ShowDialog(this) != DialogResult.OK)
       return;
 
-    this._Apply(i => BitmapConverter.QuantizeRawImage(i, dialog.Value));
+    var quantizer = dialog.Quantizer;
+    var ditherer = dialog.Ditherer;
+    var colours = dialog.Colours;
+    this._Apply(i => ColorReductionDispatch.Reduce(i, quantizer, ditherer, colours));
   }
 
   // ============================================================================================
@@ -932,6 +1103,12 @@ internal sealed class ViewerShell : Form {
       + "built on NativeForms over the platform's own widgets.\n\n"
       + "Icons: Silk icon set 1.3 by Mark James, http://www.famfamfam.com/lab/icons/silk/, "
       + "licensed under Creative Commons Attribution 2.5.\n"
+      + "Silk Companion #1 by Damien Guard, http://damieng.com/creative/icons/silk-companion-1-icons, "
+      + "licensed under Creative Commons Attribution 2.5.\n"
+      + "Fugue Icons (C) 2013 Yusuke Kamiyamane, http://p.yusukekamiyamane.com/, "
+      + "licensed under Creative Commons Attribution 3.0.\n"
+      + "FatCow Farm-Fresh Web Icons, http://www.fatcow.com/free-icons, "
+      + "licensed under Creative Commons Attribution 3.0.\n"
       + "Oxygen Icon Theme, (C) 2007 The Oxygen Team, https://github.com/KDE/oxygen-icons5, "
       + "under the GNU Lesser General Public License, version 3 or later.",
       "About Crush Viewer",
@@ -1000,6 +1177,37 @@ internal sealed class ViewerShell : Form {
     ConvertOptionsDialog.ShowReport(this, "Extract pages", results);
   }
 
+  /// <summary>Puts the picture on paper, by way of a PDF and the platform's own print path.</summary>
+  /// <remarks>
+  /// What is printed is what is on screen, edits and all, and not the file on disk — which is the
+  /// answer somebody who has just straightened a scan expects. The picture is handed over as it
+  /// stands rather than re-read.
+  /// </remarks>
+  private void _Print() {
+    if (this._raw == null)
+      return;
+
+    if (PrintService.Unavailable is { } why) {
+      this._Complain("Print picture", why);
+      return;
+    }
+
+    var dialog = new PrintOptionsDialog(this._file?.Name ?? "The picture");
+    if (dialog.ShowDialog(this) != DialogResult.OK)
+      return;
+
+    var destination = dialog.Destination;
+    var failure = PrintService.Send(this._raw, this._file?.Name ?? "picture", destination);
+    if (failure != null) {
+      this._Complain("Print picture", failure);
+      return;
+    }
+
+    this._Note(destination.Route == PrintRoute.Printer
+      ? "Sent to the printer."
+      : "Handed to the application that opens a PDF here.");
+  }
+
   // ============================================================================================
   // Slideshow
   // ============================================================================================
@@ -1060,6 +1268,7 @@ internal sealed class ViewerShell : Form {
     this._statusPosition.Text = this._pageCount > 1 ? $"{position} — page {this._page + 1}/{this._pageCount}" : position;
 
     this._save.Enabled = this._raw != null;
+    this._print.Enabled = this._raw != null && PrintService.Unavailable == null;
     this.Text = this._file == null ? _TITLE : $"{(this._edited ? "* " : "")}{this._file.Name} — {_TITLE}";
   }
 

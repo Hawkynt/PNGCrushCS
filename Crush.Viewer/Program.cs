@@ -61,6 +61,7 @@ internal static class Program {
 
   private static int _RunInteractive(IPlatformBackend backend, ViewerLaunchOptions options) {
     var shell = new ViewerShell(backend);
+    _SelectTab(shell, options);
     if (options.InitialPath != null)
       shell.Load += (_, _) => shell.OpenPath(options.InitialPath);
 
@@ -87,6 +88,9 @@ internal static class Program {
       }
 
       var shell = new ViewerShell(backend);
+      if (!_SelectTab(shell, options))
+        return 2;
+
       _FitToScreen(shell);
       var opened = path;
       shell.Load += (_, _) => shell.OpenPath(opened);
@@ -174,6 +178,19 @@ internal static class Program {
       return true;
 
     Console.Error.WriteLine("The PNG writer refused the captured window.");
+    return false;
+  }
+
+  /// <summary>Opens the ribbon on the tab the command line named, and says so when it names none.</summary>
+  /// <remarks>
+  /// A capture of the wrong tab looks exactly like a successful capture, so a name that matches no
+  /// tab is an error rather than a quiet fall back to the first.
+  /// </remarks>
+  private static bool _SelectTab(ViewerShell shell, ViewerLaunchOptions options) {
+    if (options.Tab == null || shell.SelectTab(options.Tab))
+      return true;
+
+    Console.Error.WriteLine($"--tab '{options.Tab}' names no ribbon tab; the tabs are {string.Join(", ", shell.TabNames)}.");
     return false;
   }
 

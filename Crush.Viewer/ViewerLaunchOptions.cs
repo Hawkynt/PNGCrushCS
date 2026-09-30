@@ -4,11 +4,19 @@ using System.IO;
 namespace Crush.Viewer;
 
 /// <summary>What the command line asked the viewer to do.</summary>
-internal sealed record ViewerLaunchOptions(string? InitialPath, string? ScreenshotPath, bool SmokeTest) {
+/// <param name="InitialPath">The picture or folder to open, or <c>null</c> to open nothing.</param>
+/// <param name="ScreenshotPath">Where to write a capture of the window, or <c>null</c> to run normally.</param>
+/// <param name="SmokeTest">Whether to open the window, prove it paints and close it again.</param>
+/// <param name="Tab">
+/// Which ribbon tab to open on, by name. There for the capture: a ribbon is six tabs and a
+/// screenshot shows one, so a capture run has to be able to say which.
+/// </param>
+internal sealed record ViewerLaunchOptions(string? InitialPath, string? ScreenshotPath, bool SmokeTest, string? Tab) {
 
   internal static ViewerLaunchOptions Parse(string[] args) {
     string? initialPath = null;
     string? screenshotPath = null;
+    string? tab = null;
     var smokeTest = false;
 
     for (var i = 0; i < args.Length; ++i)
@@ -19,6 +27,9 @@ internal sealed record ViewerLaunchOptions(string? InitialPath, string? Screensh
         case "--smoke-test":
           smokeTest = true;
           break;
+        case "--tab" when i + 1 < args.Length:
+          tab = args[++i];
+          break;
         case "--open" when i + 1 < args.Length:
           initialPath = _FullPath(args[++i]);
           break;
@@ -28,7 +39,7 @@ internal sealed record ViewerLaunchOptions(string? InitialPath, string? Screensh
           break;
       }
 
-    return new(initialPath, screenshotPath, smokeTest);
+    return new(initialPath, screenshotPath, smokeTest, tab);
   }
 
   /// <summary>Resolves a path argument, treating an unusable one as though it were not given.</summary>

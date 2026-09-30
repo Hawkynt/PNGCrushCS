@@ -56,6 +56,21 @@ public sealed class ViewerLaunchOptionsTests {
   }
 
   [Test]
+  public void Parse_TabTakesTheFollowingArgumentAndIsNotAPath() {
+    var options = ViewerLaunchOptions.Parse(["--tab", "Colour", "picture.png"]);
+
+    Assert.That(options.Tab, Is.EqualTo("Colour"));
+    Assert.That(options.InitialPath, Is.EqualTo(Path.GetFullPath("picture.png")));
+  }
+
+  [Test]
+  public void Parse_TabWithNothingAfterIt_NamesNoTab() {
+    var options = ViewerLaunchOptions.Parse(["--tab"]);
+
+    Assert.That(options.Tab, Is.Null);
+  }
+
+  [Test]
   public void Parse_AnUnknownFlagIsIgnoredAndDoesNotBecomeAPath() {
     var options = ViewerLaunchOptions.Parse(["--no-such-option", "picture.png"]);
 
