@@ -1,12 +1,15 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Threading.Tasks;
 using FileFormat.Core;
 using Hawkynt.ColorProcessing.Adapter;
 using Hawkynt.FileFormats.Images;
+using Hawkynt.ImageProcessing;
 using Hawkynt.NativeForms;
 using Hawkynt.NativeForms.Backends;
 using Hawkynt.NativeForms.Drawing;
@@ -59,6 +62,7 @@ internal sealed class ViewerShell : Form {
   private readonly RibbonButton _previousPage = new("Previous page", RibbonItemSize.Small);
   private readonly RibbonButton _nextPage = new("Next page", RibbonItemSize.Small);
   private readonly RibbonButton _extractPages = new("Extract pages…", RibbonItemSize.Small);
+  private readonly RibbonButton _redEye = new("Red-eye…", RibbonItemSize.Large);
 
   private IImage? _displayed;
   private RawImage? _raw;
@@ -78,6 +82,8 @@ internal sealed class ViewerShell : Form {
   private double _freeZoom = 1;
   private int _zoomGuard;
   private bool _fullScreen;
+  private bool _busy;
+  private Form? _openDialog;
   private FormBorderStyle _framedBorderStyle;
   private FormWindowState _framedWindowState;
 
@@ -93,6 +99,7 @@ internal sealed class ViewerShell : Form {
     this._browser.SelectedIndexChanged += this._OnBrowserSelectionChanged;
     this._viewport.WalkRequested += (_, delta) => this.Walk(delta);
     this._viewport.ZoomChanged += (_, _) => this._OnZoomChanged();
+    this._viewport.AreaSelected += (_, area) => this._OnRedEyeArea(area);
     this._slideshow.Tick += (_, _) => this._OnSlideshowTick();
 
     this._BuildRibbon();
@@ -304,24 +311,24 @@ internal sealed class ViewerShell : Form {
   }
 
   /// <remarks>
-  /// Reducing colours is the one command here with a whole library behind it, so it gets the tab's
-  /// large button and a chooser of its own. Everything to the right of Channels is waiting on the
-  /// pixel operations and says so.
+  /// Reducing colours sits with Greyscale and Invert as three small buttons rather than on a large
+  /// one of its own: a large button's label is one line under its icon, and "Reduce colours…" broke
+  /// over two. White balance is the one command here neither library can serve, and says so.
   /// </remarks>
   private RibbonTab _BuildColourTab() {
     var tab = new RibbonTab("Colour");
 
-    var palette = new RibbonGroup("Palette");
-    palette.Items.Add(this._Button("Reduce colours…", this._ReduceColours, RibbonItemSize.Large, "color-management"));
+    var palette = new RibbonGroup("Palette and channels");
+    palette.Items.Add(this._Button("Reduce colours…", this._ReduceColours, RibbonItemSize.Small, "color-management"));
+    palette.Items.Add(this._Button("Greyscale", () => this._Apply(ImageTransforms.Grayscale), RibbonItemSize.Small, "convert_color_to_gray"));
+    palette.Items.Add(this._Button("Invert", () => this._Apply(ImageTransforms.Invert), RibbonItemSize.Small, "film_photo"));
     tab.Groups.Add(palette);
 
-    var channels = new RibbonGroup("Channels");
-    channels.Items.Add(this._Button("Greyscale", () => this._Apply(ImageTransforms.Grayscale), RibbonItemSize.Small, "convert_color_to_gray"));
-    channels.Items.Add(this._Button("Invert", () => this._Apply(ImageTransforms.Invert), RibbonItemSize.Small, "film_photo"));
-    tab.Groups.Add(channels);
-
-    tab.Groups.Add(this._PlannedGroup("Tone", PlannedCommands.Tone));
-    tab.Groups.Add(this._PlannedGroup("Colour", PlannedCommands.Colour));
+    tab.Groups.Add(this._CommandGroup("Tone", PixelCommands.Tone));
+    var colour = this._CommandGroup("Colour", PixelCommands.Colour);
+    foreach (var planned in PlannedCommands.Colour)
+      colour.Items.Add(this._Planned(planned));
+    tab.Groups.Add(colour);
 
     return tab;
   }
@@ -335,8 +342,14 @@ internal sealed class ViewerShell : Form {
     scale.Items.Add(this._Button("Double", () => this._ScaleBy(2), RibbonItemSize.Small, "arrow_out"));
     tab.Groups.Add(scale);
 
-    tab.Groups.Add(this._PlannedGroup("Resample", PlannedCommands.Resample));
-    tab.Groups.Add(this._PlannedGroup("Regenerate", PlannedCommands.Regenerate));
+    var resample = new RibbonGroup("Resample");
+    var resampleButton = this._Button("Resample…", this._Resample, RibbonItemSize.Small);
+    resampleButton.ToolTipText = "Resamples the picture through one of six kernels, to a pixel size, into a box, or to a new density at the same print size.";
+    resample.Items.Add(resampleButton);
+    resample.Items.Add(this._CommandButton(PixelCommands.Regenerate));
+    tab.Groups.Add(resample);
+
+    tab.Groups.Add(this._CommandGroup("Pixel art", PixelCommands.PixelArt));
 
     return tab;
   }
@@ -345,13 +358,20 @@ internal sealed class ViewerShell : Form {
     var tab = new RibbonTab("Corrections");
 
     var repair = new RibbonGroup("Repair");
-    repair.Items.Add(this._Planned(PlannedCommands.Repair[0], RibbonItemSize.Large));
-    for (var i = 1; i < PlannedCommands.Repair.Length; ++i)
-      repair.Items.Add(this._Planned(PlannedCommands.Repair[i]));
+    this._redEye.ToolTipText = "Drains the red out of a flash reflection inside an area you drag over the picture, "
+      + "leaving the pupil dark. Nothing outside the ellipse that area bounds is touched.";
+    this._redEye.Click += (_, _) => this._StartRedEye();
+    this._icons.Apply(this._redEye, "eye_red", RibbonItemSize.Large);
+    repair.Items.Add(this._redEye);
+    foreach (var planned in PlannedCommands.Repair)
+      repair.Items.Add(this._Planned(planned));
     tab.Groups.Add(repair);
 
-    tab.Groups.Add(this._PlannedGroup("Sharpness", PlannedCommands.Sharpness));
-    tab.Groups.Add(this._PlannedGroup("Automatic", PlannedCommands.Automatic));
+    tab.Groups.Add(this._CommandGroup("Sharpness", PixelCommands.Sharpness));
+    var automatic = this._CommandGroup("Automatic", PixelCommands.Automatic);
+    foreach (var planned in PlannedCommands.Automatic)
+      automatic.Items.Add(this._Planned(planned));
+    tab.Groups.Add(automatic);
 
     return tab;
   }
@@ -359,22 +379,29 @@ internal sealed class ViewerShell : Form {
   private RibbonTab _BuildEffectsTab() {
     var tab = new RibbonTab("Effects");
 
-    tab.Groups.Add(this._PlannedGroup("Blur", PlannedCommands.Blur));
-    tab.Groups.Add(this._PlannedGroup("Stylise", PlannedCommands.Stylise));
-    tab.Groups.Add(this._PlannedGroup("Tint", PlannedCommands.Tint));
+    tab.Groups.Add(this._CommandGroup("Blur", PixelCommands.Blur));
+    tab.Groups.Add(this._CommandGroup("Stylise", PixelCommands.Stylise));
+    tab.Groups.Add(this._CommandGroup("Tint", PixelCommands.Tint));
 
     return tab;
   }
 
-  private RibbonGroup _PlannedGroup(string text, PlannedCommand[] commands) {
+  private RibbonGroup _CommandGroup(string text, PixelCommand[] commands) {
     var group = new RibbonGroup(text);
     foreach (var command in commands)
-      group.Items.Add(this._Planned(command));
+      group.Items.Add(this._CommandButton(command));
 
     return group;
   }
 
-  /// <summary>Builds the button a command that does not exist yet gets: off, iconed, and explained.</summary>
+  /// <summary>Builds a pixel command's button: its dialog when it asks for anything, the operation when not.</summary>
+  private RibbonButton _CommandButton(PixelCommand command) {
+    var button = this._Button(command.Text, () => this.RunCommand(command), RibbonItemSize.Small, command.Icon);
+    button.ToolTipText = command.Does;
+    return button;
+  }
+
+  /// <summary>Builds the button a command no library can serve gets: off, iconed, and explained.</summary>
   private RibbonButton _Planned(PlannedCommand command, RibbonItemSize size = RibbonItemSize.Small) {
     var button = new RibbonButton(command.Text, size) {
       Enabled = false,
@@ -492,7 +519,7 @@ internal sealed class ViewerShell : Form {
 
     this._shortcuts.Bind("Re-read the folder", this._RefreshFolder, Keys.F5);
     this._shortcuts.Bind("Full screen", this._ToggleFullScreen, Keys.F11);
-    this._shortcuts.Bind("Leave full screen", () => this._SetFullScreen(false), Keys.Escape);
+    this._shortcuts.Bind("Leave full screen or stop marking an area", this._Escape, Keys.Escape);
 
     this._shortcuts.Bind("Open picture", this._OpenPicturePicker, Keys.Control | Keys.O);
     this._shortcuts.Bind("Open folder", this._OpenFolderPicker, Keys.Control | Keys.Shift | Keys.O);
@@ -632,6 +659,16 @@ internal sealed class ViewerShell : Form {
   }
 
   private void _ToggleFullScreen() => this._SetFullScreen(!this._fullScreen);
+
+  /// <summary>Backs out of whatever mode the window is in: marking an area first, then full screen.</summary>
+  private void _Escape() {
+    if (this._viewport.SelectingArea) {
+      this._StopRedEye();
+      return;
+    }
+
+    this._SetFullScreen(false);
+  }
 
   /// <summary>Gives the picture the whole screen, or gives the window its chrome back.</summary>
   /// <remarks>
@@ -912,6 +949,239 @@ internal sealed class ViewerShell : Form {
     } catch (Exception ex) {
       this._Complain("Picture", ex.Message);
     }
+  }
+
+  /// <summary>Whether a pixel operation is running on the picture in the background.</summary>
+  internal bool IsBusy => this._busy;
+
+  /// <summary>The dialog a command has open over the window, if any.</summary>
+  internal Form? OpenDialog => this._openDialog;
+
+  /// <summary>Runs the pixel command with this button text; false when there is no such command.</summary>
+  /// <param name="text">The button's text, with or without its ellipsis.</param>
+  /// <param name="withoutAsking">
+  /// Run straight away on the values the dialog would open on, instead of opening the dialog.
+  /// </param>
+  internal bool RunCommand(string text, bool withoutAsking) {
+    if (_IsResample(text)) {
+      this._Resample();
+      return true;
+    }
+
+    if (PixelCommands.Find(text) is not { } command)
+      return false;
+
+    if (withoutAsking)
+      this._ApplyInBackground(command.Text.TrimEnd('…'), command.RunWithInitialValues);
+    else
+      this.RunCommand(command);
+
+    return true;
+  }
+
+  /// <summary>Whether <see cref="RunCommand(string,bool)"/> knows a command by this text.</summary>
+  internal static bool KnowsCommand(string text) => _IsResample(text) || PixelCommands.Find(text) != null;
+
+  private static bool _IsResample(string text)
+    => string.Equals(text.TrimEnd('…', '.').Trim(), "Resample", StringComparison.OrdinalIgnoreCase);
+
+  /// <summary>Opens a command's dialog, or runs it at once when it has nothing to ask.</summary>
+  private void RunCommand(PixelCommand command) {
+    if (this._raw == null || this._busy)
+      return;
+
+    var name = command.Text.TrimEnd('…');
+    if (!command.AsksFirst) {
+      this._ApplyInBackground(name, command.RunWithInitialValues);
+      return;
+    }
+
+    var (stand, description) = this._StandIn(command.Preview);
+    var dialog = new PixelCommandDialog(this._backend, name, command.Does, command.Settings, stand, description, command.Run);
+    if (this._ShowDialog(dialog) != DialogResult.OK)
+      return;
+
+    var values = dialog.Values;
+    this._ApplyInBackground(name, image => command.Run(image, values));
+  }
+
+  private DialogResult _ShowDialog(Form dialog) {
+    this._openDialog = dialog;
+    try {
+      return dialog.ShowDialog(this);
+    } finally {
+      this._openDialog = null;
+    }
+  }
+
+  /// <summary>
+  /// What a preview runs on instead of the picture: small enough that any effect answers at once.
+  /// </summary>
+  /// <remarks>
+  /// Both come from library calls — the shrink is the engine's box filter, which averages every
+  /// source pixel a preview pixel covers, and the crop is the transform library's — so nothing here
+  /// reads a pixel. A picture already smaller than the preview is used as it is.
+  /// </remarks>
+  private (RawImage Stand, string Description) _StandIn(PreviewExtent extent) {
+    var raw = this._raw!;
+    const int width = PixelCommandDialog.PREVIEW_WIDTH;
+    const int height = PixelCommandDialog.PREVIEW_HEIGHT;
+    if (raw.Width <= width && raw.Height <= height)
+      return (raw, "The whole picture.");
+
+    if (extent == PreviewExtent.Whole)
+      return (ImageScaler.Fit(raw, width, height, ResampleKernel.Box), "The whole picture, shrunk to fit.");
+
+    var cropWidth = Math.Min(width, raw.Width);
+    var cropHeight = Math.Min(height, raw.Height);
+    var crop = ImageTransformer.Crop(raw, new PixelRect((raw.Width - cropWidth) / 2, (raw.Height - cropHeight) / 2, cropWidth, cropHeight));
+    return (crop, "The middle of the picture at actual size.");
+  }
+
+  /// <summary>Runs a pixel operation on the picture off the interface thread and shows the result.</summary>
+  /// <remarks>
+  /// <para>
+  /// A Gaussian blur on a twelve-megapixel photograph takes long enough that doing it on the thread
+  /// that paints the window would freeze the window for all of it, so every pixel command runs on the
+  /// thread pool and the window stays responsive. One runs at a time; a second command while one is
+  /// running is ignored rather than queued, because the second was chosen looking at a picture that
+  /// is about to change under it.
+  /// </para>
+  /// <para>
+  /// The result is kept only if the picture it was computed from is still the one on screen. Walking
+  /// to the next picture while a blur runs must not end with the blurred previous picture shown under
+  /// the next one's name.
+  /// </para>
+  /// <para>
+  /// The operation hands back a new picture and leaves the one it was given alone — every library
+  /// call behind these commands is written that way — which is the same contract Rotate and Resize
+  /// keep. The viewer has no undo; the file on disk is untouched until Save.
+  /// </para>
+  /// </remarks>
+  private void _ApplyInBackground(string name, Func<RawImage, RawImage> transform) {
+    if (this._raw == null || this._busy)
+      return;
+
+    var source = this._raw;
+    this._busy = true;
+    this._Note($"{name}: working…");
+    this.Cursor = Cursors.Wait;
+
+    Task.Run(() => {
+      var clock = Stopwatch.StartNew();
+      try {
+        var result = transform(source);
+        var elapsed = clock.Elapsed;
+        this.BeginInvoke(() => this._FinishBackground(name, source, result, elapsed, null));
+      } catch (Exception ex) {
+        this.BeginInvoke(() => this._FinishBackground(name, source, null, clock.Elapsed, ex.Message));
+      }
+    });
+  }
+
+  private void _FinishBackground(string name, RawImage source, RawImage? result, TimeSpan elapsed, string? failure) {
+    this._busy = false;
+    this.ResetCursor();
+    if (failure != null || result == null) {
+      this._Note($"{name} failed.");
+      this._Complain(name, failure ?? "The operation returned no picture.");
+      return;
+    }
+
+    if (!ReferenceEquals(source, this._raw)) {
+      this._Note($"{name} finished after the picture changed, so its result was dropped.");
+      return;
+    }
+
+    this._raw = result;
+    this._edited = true;
+    this._Render();
+    this._UpdateInformation();
+    this._Note($"{name} took {elapsed.TotalSeconds:0.00} s.");
+  }
+
+  // ============================================================================================
+  // Red-eye
+  // ============================================================================================
+
+  /// <summary>Puts the canvas into marking an area, for the red-eye retouch.</summary>
+  private void _StartRedEye() {
+    if (this._raw == null)
+      return;
+
+    this._viewport.SelectingArea = true;
+    this._viewport.Focus();
+    this._Note("Red-eye: drag a box around an eye. Escape stops marking.");
+  }
+
+  private void _StopRedEye() {
+    this._viewport.SelectingArea = false;
+    this._Note("Red-eye: done.");
+  }
+
+  /// <summary>Asks how hard to apply the red-eye rule inside a dragged area, previewing that area.</summary>
+  /// <remarks>
+  /// <para>
+  /// The area comes in the canvas's coordinates, which are the shown picture's; a picture with
+  /// non-square pixels is shown widened, so the area is mapped back onto the stored picture's pixels
+  /// first. The preview is the area with a margin around it, cut out at full size and enlarged by the
+  /// preview box — an eye is a few dozen pixels, and it is exactly the pixels that have to be seen.
+  /// </para>
+  /// <para>
+  /// Marking stays on afterwards, because a face has two eyes. Escape, or any command, ends it.
+  /// </para>
+  /// </remarks>
+  private void _OnRedEyeArea(System.Drawing.RectangleF area) {
+    if (this._raw == null || this._displayed == null || this._busy)
+      return;
+
+    var region = MarkedArea.ToPicture(
+      area.X, area.Y, area.Width, area.Height,
+      this._displayed.Width, this._displayed.Height, this._raw.Width, this._raw.Height);
+    this.ReduceRedEye(region);
+  }
+
+  /// <summary>Asks for the red-eye threshold inside an area of the picture, and applies it.</summary>
+  /// <param name="region">The area, in the picture's own pixels; clipped to the picture.</param>
+  /// <remarks>Also what the capture run marks an eye through, since a capture cannot drag.</remarks>
+  internal void ReduceRedEye(PixelRect region) {
+    if (this._raw == null || this._busy)
+      return;
+
+    var raw = this._raw;
+    region = region.ClampTo(raw.Width, raw.Height);
+    if (region.IsEmpty)
+      return;
+
+    var around = MarkedArea.WithSurroundings(region, raw.Width, raw.Height);
+    var stand = ImageTransformer.Crop(raw, around);
+
+    PixelSetting[] settings = [new("Threshold (%)", 0, 80, 40)];
+    var dialog = new PixelCommandDialog(
+      this._backend,
+      "Red-eye",
+      $"Drains the red out of the ellipse inside the {region.Width} x {region.Height} area marked at {region.X}, {region.Y}. "
+        + "A higher threshold catches pixels that are less clearly red.",
+      settings,
+      stand,
+      "The marked area and its surroundings, enlarged.",
+      (image, values) => MarkedArea.ReduceRedEye(image, region, (around.X, around.Y), values[0] / 100));
+    if (this._ShowDialog(dialog) != DialogResult.OK)
+      return;
+
+    var threshold = dialog.Values[0] / 100;
+    this._ApplyInBackground("Red-eye", image => MarkedArea.ReduceRedEye(image, region, (0, 0), threshold));
+  }
+
+  private void _Resample() {
+    if (this._raw == null || this._busy)
+      return;
+
+    var dialog = new ResampleDialog(this._backend, this._raw);
+    if (this._ShowDialog(dialog) != DialogResult.OK)
+      return;
+
+    this._ApplyInBackground("Resample", dialog.Operation);
   }
 
   private void _Crop() {

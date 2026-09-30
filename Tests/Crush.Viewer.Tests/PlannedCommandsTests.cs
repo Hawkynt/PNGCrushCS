@@ -6,7 +6,7 @@ using System.Reflection;
 
 namespace Crush.Viewer.Tests;
 
-/// <summary>The ribbon's commands that are placed but not yet backed by an operation.</summary>
+/// <summary>The ribbon's commands that are placed but that neither image library can serve.</summary>
 [TestFixture]
 public sealed class PlannedCommandsTests {
 
@@ -34,30 +34,51 @@ public sealed class PlannedCommandsTests {
       .ToHashSet(StringComparer.Ordinal)!;
   }
 
+  /// <summary>Every command on the ribbon that names an icon, live or not, with its text.</summary>
+  private static IEnumerable<(string Text, string Icon)> _AllIcons()
+    => _All().Where(c => c.Icon != null).Select(c => (c.Text, c.Icon!))
+      .Concat(PixelCommands.All.Where(c => c.Icon != null).Select(c => (c.Text, c.Icon!)));
+
   [Test]
-  public void EveryCommand_SaysWhatItWillDoAndWhyItIsOff() {
+  public void EveryCommand_SaysWhatItWouldDoAndWhyItIsOff() {
     var all = _All();
 
     Assert.That(all, Is.Not.Empty);
     foreach (var command in all) {
       Assert.That(command.Text, Is.Not.Empty);
       Assert.That(command.Does, Does.EndWith("."), command.Text);
-      Assert.That(command.ToolTipText, Does.StartWith(command.Does).And.EndWith(PlannedCommands.NotYet), command.Text);
+      Assert.That(command.Why, Does.EndWith("."), command.Text);
+      Assert.That(command.ToolTipText, Is.EqualTo($"{command.Does} {command.Why}"), command.Text);
     }
+  }
+
+  /// <summary>
+  /// A reason that only says "not yet" is the one this table used to give for everything, and it
+  /// stopped being true for most of it; every reason now has to name what is missing.
+  /// </summary>
+  [Test]
+  public void NoReason_IsAPlainNotYet() {
+    foreach (var command in _All())
+      Assert.That(command.Why, Does.Not.Contain("not in the image library yet"), command.Text);
+  }
+
+  [Test]
+  public void NoDisabledCommand_IsAlsoALiveOne() {
+    foreach (var command in _All())
+      Assert.That(PixelCommands.Find(command.Text), Is.Null, command.Text);
   }
 
   [Test]
   public void EveryNamedIcon_IsEmbeddedInTheViewer() {
     var embedded = _EmbeddedIcons();
 
-    foreach (var command in _All().Where(c => c.Icon != null))
-      Assert.That(embedded, Does.Contain(command.Icon), command.Text);
+    foreach (var (text, icon) in _AllIcons())
+      Assert.That(embedded, Does.Contain(icon), text);
   }
 
   [Test]
   public void NoTwoCommands_ShareAnIcon() {
-    var shared = _All()
-      .Where(c => c.Icon != null)
+    var shared = _AllIcons()
       .GroupBy(c => c.Icon)
       .Where(g => g.Count() > 1)
       .Select(g => $"{g.Key}: {string.Join(", ", g.Select(c => c.Text))}");
