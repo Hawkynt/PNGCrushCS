@@ -1,11 +1,15 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Threading.Tasks;
 using FileFormat.Core;
+using Hawkynt.ColorProcessing.Adapter;
 using Hawkynt.FileFormats.Images;
+using Hawkynt.ImageProcessing;
 using Hawkynt.NativeForms;
 using Hawkynt.NativeForms.Backends;
 using Hawkynt.NativeForms.Drawing;
@@ -22,9 +26,14 @@ internal sealed class ViewerShell : Form {
   private const int _RIBBON_HEIGHT = 148;
   private const string _TITLE = "Crush Viewer";
 
+  /// <summary>How many thumbnails around the shown picture are decoded ahead of the rest.</summary>
+  private const int _THUMBNAIL_LOOKAHEAD = 24;
+
   private readonly IPlatformBackend _backend;
   private readonly FolderModel _folder = new();
   private readonly ThumbnailLoader _thumbnailLoader;
+  private readonly ShortcutTable _shortcuts = new();
+  private readonly IconSet _icons = new();
 
   private readonly Ribbon _ribbon = new() { Dock = DockStyle.Top };
   private readonly StatusStrip _statusBar = new() { Dock = DockStyle.Bottom, Height = _STATUS_HEIGHT };
@@ -42,16 +51,18 @@ internal sealed class ViewerShell : Form {
   private readonly ToolStripStatusLabel _statusPosition = new("") { Spring = true };
   private readonly ToolStripStatusLabel _statusZoom = new("100%");
 
-  private readonly RibbonToggleButton _wrapToggle = new("Wrap around", RibbonItemSize.Large);
+  private readonly RibbonToggleButton _wrapToggle = new("Wrap around", RibbonItemSize.Small);
   private readonly RibbonToggleButton _slideshowToggle = new("Slideshow", RibbonItemSize.Large);
-  private readonly RibbonToggleButton _showBrowser = new("Browser", RibbonItemSize.Small) { Checked = true };
+  private readonly RibbonToggleButton _showBrowser = new("Thumbnails", RibbonItemSize.Small) { Checked = true };
   private readonly RibbonToggleButton _showInformation = new("Information", RibbonItemSize.Small) { Checked = true };
   private readonly RibbonToggleButton _showRulers = new("Rulers", RibbonItemSize.Small);
   private readonly List<(RibbonToggleButton Button, DisplayFilter? Filter)> _filterButtons = [];
   private readonly RibbonButton _save = new("Save", RibbonItemSize.Large);
-  private readonly RibbonButton _previousPage = new("Previous page", RibbonItemSize.Large);
-  private readonly RibbonButton _nextPage = new("Next page", RibbonItemSize.Large);
-  private readonly RibbonButton _extractPages = new("Extract pages…", RibbonItemSize.Large);
+  private readonly RibbonButton _print = new("Print…", RibbonItemSize.Large);
+  private readonly RibbonButton _previousPage = new("Previous page", RibbonItemSize.Small);
+  private readonly RibbonButton _nextPage = new("Next page", RibbonItemSize.Small);
+  private readonly RibbonButton _extractPages = new("Extract pages…", RibbonItemSize.Small);
+  private readonly RibbonButton _redEye = new("Red-eye…", RibbonItemSize.Large);
 
   private IImage? _displayed;
   private RawImage? _raw;
@@ -67,6 +78,14 @@ internal sealed class ViewerShell : Form {
   private string? _notice;
   private bool _suppressBrowserSelection;
   private bool _suppressFilterButtons;
+  private ZoomMode _zoomMode = ZoomMode.Fit;
+  private double _freeZoom = 1;
+  private int _zoomGuard;
+  private bool _fullScreen;
+  private bool _busy;
+  private Form? _openDialog;
+  private FormBorderStyle _framedBorderStyle;
+  private FormWindowState _framedWindowState;
 
   internal ViewerShell(IPlatformBackend backend) {
     this._backend = backend;
@@ -79,17 +98,25 @@ internal sealed class ViewerShell : Form {
     this._browser.LargeImageList = this._thumbnails;
     this._browser.SelectedIndexChanged += this._OnBrowserSelectionChanged;
     this._viewport.WalkRequested += (_, delta) => this.Walk(delta);
-    this._viewport.PageRequested += (_, delta) => this._GoPage(delta);
-    this._viewport.ZoomChanged += (_, _) => this._UpdateStatus();
+    this._viewport.ZoomChanged += (_, _) => this._OnZoomChanged();
+    this._viewport.AreaSelected += (_, area) => this._OnRedEyeArea(area);
     this._slideshow.Tick += (_, _) => this._OnSlideshowTick();
 
     this._BuildRibbon();
     this._BuildBody();
     this._BuildStatusBar();
+    this._BuildShortcuts();
 
     this.Controls.Add(this._ribbon);
     this.Controls.Add(this._statusBar);
     this.Controls.Add(this._outer);
+    this.Controls.Add(this._shortcuts.Carrier);
+
+    // The canvas rather than the ribbon, which is what a window otherwise gives its first tab stop
+    // to. A focused ribbon claims Left and Right for walking its tabs — the one place the toolkit
+    // takes a key before the form-wide table can see it — so the ribbon holds the focus only while
+    // somebody is actually using it.
+    this.ActiveControl = this._viewport;
 
     this.Load += (_, _) => this._OnLoad();
     this.FormClosing += (_, _) => this._thumbnailLoader.Cancel();
@@ -102,123 +129,178 @@ internal sealed class ViewerShell : Form {
   // Chrome
   // ============================================================================================
 
+  /// <summary>Lays the commands out in six tabs, by what a command does to or with the picture.</summary>
+  /// <remarks>
+  /// <para>
+  /// The split is the one an image application is expected to have: the file and the pictures around
+  /// it, then how this one is being looked at and shaped, then colour, then size, then repairs, then
+  /// effects. Walking the folder and paging through a document both live on File rather than on a tab
+  /// of their own, because both are about which picture is on screen rather than about the picture —
+  /// the same reason the thumbnail browser's toggle sits next to them instead of next to the other
+  /// pane toggles on View.
+  /// </para>
+  /// <para>
+  /// Geometry is on View with the zoom for the same reason the other way round: rotating, mirroring,
+  /// cropping, adding a margin and letterboxing all change where the picture's own pixels sit in the
+  /// frame, and somebody who has just turned a photograph upright reaches for the fit button next.
+  /// Resizing is not there but on its own tab, because that one resamples and the resampler is a
+  /// choice in its own right.
+  /// </para>
+  /// </remarks>
   private void _BuildRibbon() {
     this._ribbon.Tabs.Add(this._BuildFileTab());
-    this._ribbon.Tabs.Add(this._BuildNavigateTab());
-    this._ribbon.Tabs.Add(this._BuildPagesTab());
     this._ribbon.Tabs.Add(this._BuildViewTab());
-    this._ribbon.Tabs.Add(this._BuildPictureTab());
+    this._ribbon.Tabs.Add(this._BuildColourTab());
+    this._ribbon.Tabs.Add(this._BuildResizeTab());
+    this._ribbon.Tabs.Add(this._BuildCorrectionsTab());
+    this._ribbon.Tabs.Add(this._BuildEffectsTab());
     this._ribbon.SelectedIndex = 0;
     this._ribbon.PreferredHeightChanged += (_, _) => this._SizeRibbon();
     this._SizeRibbon();
 
-    this._ribbon.QuickAccessItems.Add(_Button("Open", () => this._OpenPicturePicker()));
-    this._ribbon.QuickAccessItems.Add(_Button("Previous", () => this.Walk(-1)));
-    this._ribbon.QuickAccessItems.Add(_Button("Next", () => this.Walk(1)));
+    this._ribbon.QuickAccessItems.Add(this._Button("Open", () => this._OpenPicturePicker(), icon: "folder_image"));
+    this._ribbon.QuickAccessItems.Add(this._Button("Previous", () => this.Walk(-1), icon: "resultset_previous"));
+    this._ribbon.QuickAccessItems.Add(this._Button("Next", () => this.Walk(1), icon: "resultset_next"));
   }
 
   private RibbonTab _BuildFileTab() {
     var tab = new RibbonTab("File");
 
     var open = new RibbonGroup("Open");
-    open.Items.Add(_Button("Picture…", this._OpenPicturePicker, RibbonItemSize.Large));
-    open.Items.Add(_Button("Folder…", this._OpenFolderPicker, RibbonItemSize.Large));
+    open.Items.Add(this._Button("Picture…", this._OpenPicturePicker, RibbonItemSize.Large, "document-open"));
+    open.Items.Add(this._Button("Folder…", this._OpenFolderPicker, RibbonItemSize.Large, "document-open-folder"));
     tab.Groups.Add(open);
 
-    var save = new RibbonGroup("Save");
-    this._save.ToolTipText = "Writes the edited picture back over the file it came from.";
-    this._save.Click += (_, _) => this._Save();
-    save.Items.Add(this._save);
-    save.Items.Add(_Button("Save as…", this._SaveAs, RibbonItemSize.Large));
-    tab.Groups.Add(save);
+    var browse = new RibbonGroup("Browse");
+    this._icons.Apply(this._slideshowToggle, "media-playback-start", RibbonItemSize.Large);
+    this._slideshowToggle.ToolTipText = "Steps through the folder on a timer, at a rate it asks for.";
+    this._slideshowToggle.CheckedChanged += (_, _) => this._ToggleSlideshow();
+    browse.Items.Add(this._slideshowToggle);
 
-    var convert = new RibbonGroup("Convert");
-    convert.Items.Add(_Button("One file…", this._ConvertCurrent, RibbonItemSize.Large));
-    convert.Items.Add(_Button("Whole folder…", this._ConvertFolder, RibbonItemSize.Large));
-    tab.Groups.Add(convert);
+    this._icons.Apply(this._showBrowser, "application_view_gallery");
+    this._showBrowser.ToolTipText = "Shows or hides the thumbnails of the folder down the left-hand side.";
+    this._showBrowser.CheckedChanged += (_, _) => this._outer.Panel1Collapsed = !this._showBrowser.Checked;
+    browse.Items.Add(this._showBrowser);
 
-    var about = new RibbonGroup("Help");
-    about.Items.Add(_Button("About", this._About, RibbonItemSize.Small));
-    tab.Groups.Add(about);
-
-    return tab;
-  }
-
-  private RibbonTab _BuildNavigateTab() {
-    var tab = new RibbonTab("Navigate");
-
-    var walk = new RibbonGroup("Folder");
-    walk.Items.Add(_Button("First", () => this._OpenIndex(0), RibbonItemSize.Small));
-    walk.Items.Add(_Button("Previous", () => this.Walk(-1), RibbonItemSize.Large));
-    walk.Items.Add(_Button("Next", () => this.Walk(1), RibbonItemSize.Large));
-    walk.Items.Add(_Button("Last", () => this._OpenIndex(this._folder.Files.Count - 1), RibbonItemSize.Small));
-    tab.Groups.Add(walk);
-
-    var ends = new RibbonGroup("At the ends");
+    this._icons.Apply(this._wrapToggle, "media-playlist-repeat");
     this._wrapToggle.ToolTipText = "On: the last picture is followed by the first. Off: walking stops at the ends.";
     this._wrapToggle.CheckedChanged += (_, _) => {
       this._folder.WalkMode = this._wrapToggle.Checked ? WalkMode.Wrap : WalkMode.Stop;
       this._UpdateStatus();
     };
-    ends.Items.Add(this._wrapToggle);
-    tab.Groups.Add(ends);
+    browse.Items.Add(this._wrapToggle);
 
-    var show = new RibbonGroup("Slideshow");
-    this._slideshowToggle.CheckedChanged += (_, _) => this._ToggleSlideshow();
-    show.Items.Add(this._slideshowToggle);
-    tab.Groups.Add(show);
+    browse.Items.Add(this._Button("First", () => this._OpenIndex(0), RibbonItemSize.Small, "resultset_first"));
+    browse.Items.Add(this._Button("Previous", () => this.Walk(-1), RibbonItemSize.Small, "resultset_previous"));
+    browse.Items.Add(this._Button("Next", () => this.Walk(1), RibbonItemSize.Small, "resultset_next"));
+    browse.Items.Add(this._Button("Last", () => this._OpenIndex(this._folder.Files.Count - 1), RibbonItemSize.Small, "resultset_last"));
+    tab.Groups.Add(browse);
 
-    return tab;
-  }
-
-  private RibbonTab _BuildPagesTab() {
-    var tab = new RibbonTab("Pages");
-
-    var page = new RibbonGroup("Page");
+    var pages = new RibbonGroup("Pages");
+    this._icons.Apply(this._previousPage, "go-previous-view-page");
+    this._icons.Apply(this._nextPage, "go-next-view-page");
     this._previousPage.Click += (_, _) => this._GoPage(-1);
     this._nextPage.Click += (_, _) => this._GoPage(1);
-    page.Items.Add(this._previousPage);
-    page.Items.Add(this._nextPage);
-    tab.Groups.Add(page);
+    pages.Items.Add(this._previousPage);
+    pages.Items.Add(this._nextPage);
 
-    var files = new RibbonGroup("Files");
-    this._extractPages.ToolTipText = "Write every page of this file into its own picture file.";
+    this._icons.Apply(this._extractPages, "split");
+    this._extractPages.ToolTipText = "Writes every page of this file into its own picture file.";
     this._extractPages.Click += (_, _) => this._ExtractPages();
-    files.Items.Add(this._extractPages);
+    pages.Items.Add(this._extractPages);
 
-    var assemble = new RibbonButton("Assemble pages…", RibbonItemSize.Large) {
+    var assemble = new RibbonButton("Assemble pages…", RibbonItemSize.Small) {
       Enabled = false,
       ToolTipText = PageService.AssemblyUnavailable,
     };
-    files.Items.Add(assemble);
-    tab.Groups.Add(files);
+    this._icons.Apply(assemble, "merge");
+    pages.Items.Add(assemble);
+    tab.Groups.Add(pages);
+
+    var save = new RibbonGroup("Save");
+    this._save.ToolTipText = "Writes the edited picture back over the file it came from.";
+    this._save.Click += (_, _) => this._Save();
+    this._icons.Apply(this._save, "document-save", RibbonItemSize.Large);
+    save.Items.Add(this._save);
+    save.Items.Add(this._Button("Save as…", this._SaveAs, RibbonItemSize.Small, "document-save-as"));
+    tab.Groups.Add(save);
+
+    var convert = new RibbonGroup("Convert");
+    convert.Items.Add(this._Button("One file…", this._ConvertCurrent, RibbonItemSize.Small, "document-export"));
+    convert.Items.Add(this._Button("Whole folder…", this._ConvertFolder, RibbonItemSize.Small, "folder-sync"));
+    tab.Groups.Add(convert);
+
+    var devices = new RibbonGroup("Print and scan");
+    this._icons.Apply(this._print, "document-print", RibbonItemSize.Large);
+    this._print.ToolTipText = PrintService.Unavailable
+      ?? "Writes the picture as a PDF with this suite's own writer and hands it to the platform to print.";
+    this._print.Click += (_, _) => this._Print();
+    devices.Items.Add(this._print);
+
+    var acquire = new RibbonButton("Scan…", RibbonItemSize.Large) {
+      Enabled = false,
+      ToolTipText = PlannedCommands.AcquireUnavailable,
+    };
+    this._icons.Apply(acquire, "scanner", RibbonItemSize.Large);
+    devices.Items.Add(acquire);
+    tab.Groups.Add(devices);
+
+    var about = new RibbonGroup("Help");
+    about.Items.Add(this._Button("About", this._About, RibbonItemSize.Small, "help"));
+    tab.Groups.Add(about);
 
     this._UpdatePageButtons();
     return tab;
   }
 
+  /// <remarks>
+  /// The three signal standards among the display filters go without artwork on purpose: no icon set
+  /// draws NTSC, S-Video and PAL as three different things, and one television on all three would be
+  /// a picture of the group rather than of the choice.
+  /// </remarks>
   private RibbonTab _BuildViewTab() {
     var tab = new RibbonTab("View");
 
     var zoom = new RibbonGroup("Zoom");
-    zoom.Items.Add(_Button("Fit", () => this._viewport.FitToWindow(), RibbonItemSize.Large));
-    zoom.Items.Add(_Button("Actual size", () => this._viewport.ActualSize(), RibbonItemSize.Large));
-    zoom.Items.Add(_Button("Zoom out", () => this._ZoomBy(1 / Math.Sqrt(2)), RibbonItemSize.Small));
-    zoom.Items.Add(_Button("Zoom in", () => this._ZoomBy(Math.Sqrt(2)), RibbonItemSize.Small));
+    zoom.Items.Add(this._Button("Fit", this._FitToWindow, RibbonItemSize.Large, "zoom-fit-best"));
+    zoom.Items.Add(this._Button("Actual size", this._ActualSize, RibbonItemSize.Small, "zoom-original"));
+    zoom.Items.Add(this._Button("Zoom out", () => this._ZoomBy(1 / Math.Sqrt(2)), RibbonItemSize.Small, "zoom_out"));
+    zoom.Items.Add(this._Button("Zoom in", () => this._ZoomBy(Math.Sqrt(2)), RibbonItemSize.Small, "zoom_in"));
     tab.Groups.Add(zoom);
 
     var panes = new RibbonGroup("Panes");
-    this._showBrowser.CheckedChanged += (_, _) => this._outer.Panel1Collapsed = !this._showBrowser.Checked;
+    this._icons.Apply(this._showInformation, "information");
+    this._icons.Apply(this._showRulers, "measure");
     this._showInformation.CheckedChanged += (_, _) => this._inner.Panel2Collapsed = !this._showInformation.Checked;
     this._showRulers.CheckedChanged += (_, _) => this._viewport.ShowRulers = this._showRulers.Checked;
-    panes.Items.Add(this._showBrowser);
     panes.Items.Add(this._showInformation);
     panes.Items.Add(this._showRulers);
+
+    // A plain button rather than a toggle: full screen hides the ribbon, so a checked state nobody
+    // can see is state to keep in step for nothing. Escape and F11 both come back out.
+    panes.Items.Add(this._Button("Full screen", this._ToggleFullScreen, RibbonItemSize.Small, "view-fullscreen"));
     tab.Groups.Add(panes);
 
+    var rotate = new RibbonGroup("Rotate");
+    rotate.Items.Add(this._Button("Right", () => this._Apply(i => ImageTransformer.Rotate(i, RotateAngle.CW90)), RibbonItemSize.Small, "arrow_rotate_clockwise"));
+    rotate.Items.Add(this._Button("Left", () => this._Apply(i => ImageTransformer.Rotate(i, RotateAngle.CW270)), RibbonItemSize.Small, "arrow_rotate_anticlockwise"));
+    rotate.Items.Add(this._Button("Half turn", () => this._Apply(i => ImageTransformer.Rotate(i, RotateAngle.CW180)), RibbonItemSize.Small, "transform_rotate_180"));
+    tab.Groups.Add(rotate);
+
+    var mirror = new RibbonGroup("Mirror");
+    mirror.Items.Add(this._Button("Horizontally", () => this._Apply(i => ImageTransformer.Flip(i, FlipDirection.Horizontal)), RibbonItemSize.Small, "shape_flip_horizontal"));
+    mirror.Items.Add(this._Button("Vertically", () => this._Apply(i => ImageTransformer.Flip(i, FlipDirection.Vertical)), RibbonItemSize.Small, "shape_flip_vertical"));
+    tab.Groups.Add(mirror);
+
+    var frame = new RibbonGroup("Frame");
+    frame.Items.Add(this._Button("Crop…", this._Crop, RibbonItemSize.Large, "transform-crop"));
+    frame.Items.Add(this._Button("Margin…", this._Margin, RibbonItemSize.Large, "page-4sides"));
+    frame.Items.Add(this._Button("Letterbox…", this._Letterbox, RibbonItemSize.Large, "picture_position"));
+    tab.Groups.Add(frame);
+
     var filters = new RibbonGroup("Display filter");
-    this._AddFilterButton(filters, "As the format says", null);
-    this._AddFilterButton(filters, "Off", DisplayFilter.None);
+    this._AddFilterButton(filters, "As the format says", null, "video_mode");
+    this._AddFilterButton(filters, "Off", DisplayFilter.None, "television_off");
     this._AddFilterButton(filters, "NTSC composite", DisplayFilter.NtscComposite);
     this._AddFilterButton(filters, "NTSC S-Video", DisplayFilter.NtscSvideo);
     this._AddFilterButton(filters, "PAL", DisplayFilter.Pal);
@@ -228,36 +310,115 @@ internal sealed class ViewerShell : Form {
     return tab;
   }
 
-  private RibbonTab _BuildPictureTab() {
-    var tab = new RibbonTab("Picture");
+  /// <remarks>
+  /// Reducing colours sits with Greyscale and Invert as three small buttons rather than on a large
+  /// one of its own: a large button's label is one line under its icon, and "Reduce colours…" broke
+  /// over two. White balance is the one command here neither library can serve, and says so.
+  /// </remarks>
+  private RibbonTab _BuildColourTab() {
+    var tab = new RibbonTab("Colour");
 
-    var rotate = new RibbonGroup("Rotate");
-    rotate.Items.Add(_Button("Right", () => this._Apply(i => ImageTransformer.Rotate(i, RotateAngle.CW90)), RibbonItemSize.Small));
-    rotate.Items.Add(_Button("Left", () => this._Apply(i => ImageTransformer.Rotate(i, RotateAngle.CW270)), RibbonItemSize.Small));
-    rotate.Items.Add(_Button("Half turn", () => this._Apply(i => ImageTransformer.Rotate(i, RotateAngle.CW180)), RibbonItemSize.Small));
-    tab.Groups.Add(rotate);
+    var palette = new RibbonGroup("Palette and channels");
+    palette.Items.Add(this._Button("Reduce colours…", this._ReduceColours, RibbonItemSize.Small, "color-management"));
+    palette.Items.Add(this._Button("Greyscale", () => this._Apply(ImageTransforms.Grayscale), RibbonItemSize.Small, "convert_color_to_gray"));
+    palette.Items.Add(this._Button("Invert", () => this._Apply(ImageTransforms.Invert), RibbonItemSize.Small, "film_photo"));
+    tab.Groups.Add(palette);
 
-    var flip = new RibbonGroup("Flip");
-    flip.Items.Add(_Button("Horizontally", () => this._Apply(i => ImageTransformer.Flip(i, FlipDirection.Horizontal)), RibbonItemSize.Small));
-    flip.Items.Add(_Button("Vertically", () => this._Apply(i => ImageTransformer.Flip(i, FlipDirection.Vertical)), RibbonItemSize.Small));
-    tab.Groups.Add(flip);
-
-    var adjust = new RibbonGroup("Adjust");
-    adjust.Items.Add(_Button("Resize…", this._Resize, RibbonItemSize.Large));
-    adjust.Items.Add(_Button("Crop…", this._Crop, RibbonItemSize.Large));
-    adjust.Items.Add(_Button("Reduce colours…", this._ReduceColours, RibbonItemSize.Large));
-    tab.Groups.Add(adjust);
-
-    var colour = new RibbonGroup("Colour");
-    colour.Items.Add(_Button("Greyscale", () => this._Apply(ImageTransforms.Grayscale), RibbonItemSize.Small));
-    colour.Items.Add(_Button("Invert", () => this._Apply(ImageTransforms.Invert), RibbonItemSize.Small));
+    tab.Groups.Add(this._CommandGroup("Tone", PixelCommands.Tone));
+    var colour = this._CommandGroup("Colour", PixelCommands.Colour);
+    foreach (var planned in PlannedCommands.Colour)
+      colour.Items.Add(this._Planned(planned));
     tab.Groups.Add(colour);
 
     return tab;
   }
 
-  private void _AddFilterButton(RibbonGroup group, string text, DisplayFilter? filter) {
+  private RibbonTab _BuildResizeTab() {
+    var tab = new RibbonTab("Resize");
+
+    var scale = new RibbonGroup("Scale");
+    scale.Items.Add(this._Button("Resize…", this._Resize, RibbonItemSize.Large, "transform-scale"));
+    scale.Items.Add(this._Button("Half", () => this._ScaleBy(0.5), RibbonItemSize.Small, "arrow_in"));
+    scale.Items.Add(this._Button("Double", () => this._ScaleBy(2), RibbonItemSize.Small, "arrow_out"));
+    tab.Groups.Add(scale);
+
+    var resample = new RibbonGroup("Resample");
+    var resampleButton = this._Button("Resample…", this._Resample, RibbonItemSize.Small);
+    resampleButton.ToolTipText = "Resamples the picture through one of six kernels, to a pixel size, into a box, or to a new density at the same print size.";
+    resample.Items.Add(resampleButton);
+    resample.Items.Add(this._CommandButton(PixelCommands.Regenerate));
+    tab.Groups.Add(resample);
+
+    tab.Groups.Add(this._CommandGroup("Pixel art", PixelCommands.PixelArt));
+
+    return tab;
+  }
+
+  private RibbonTab _BuildCorrectionsTab() {
+    var tab = new RibbonTab("Corrections");
+
+    var repair = new RibbonGroup("Repair");
+    this._redEye.ToolTipText = "Drains the red out of a flash reflection inside an area you drag over the picture, "
+      + "leaving the pupil dark. Nothing outside the ellipse that area bounds is touched.";
+    this._redEye.Click += (_, _) => this._StartRedEye();
+    this._icons.Apply(this._redEye, "eye_red", RibbonItemSize.Large);
+    repair.Items.Add(this._redEye);
+    foreach (var planned in PlannedCommands.Repair)
+      repair.Items.Add(this._Planned(planned));
+    tab.Groups.Add(repair);
+
+    tab.Groups.Add(this._CommandGroup("Sharpness", PixelCommands.Sharpness));
+    var automatic = this._CommandGroup("Automatic", PixelCommands.Automatic);
+    foreach (var planned in PlannedCommands.Automatic)
+      automatic.Items.Add(this._Planned(planned));
+    tab.Groups.Add(automatic);
+
+    return tab;
+  }
+
+  private RibbonTab _BuildEffectsTab() {
+    var tab = new RibbonTab("Effects");
+
+    tab.Groups.Add(this._CommandGroup("Blur", PixelCommands.Blur));
+    tab.Groups.Add(this._CommandGroup("Stylise", PixelCommands.Stylise));
+    tab.Groups.Add(this._CommandGroup("Tint", PixelCommands.Tint));
+
+    return tab;
+  }
+
+  private RibbonGroup _CommandGroup(string text, PixelCommand[] commands) {
+    var group = new RibbonGroup(text);
+    foreach (var command in commands)
+      group.Items.Add(this._CommandButton(command));
+
+    return group;
+  }
+
+  /// <summary>Builds a pixel command's button: its dialog when it asks for anything, the operation when not.</summary>
+  private RibbonButton _CommandButton(PixelCommand command) {
+    var button = this._Button(command.Text, () => this.RunCommand(command), RibbonItemSize.Small, command.Icon);
+    button.ToolTipText = command.Does;
+    return button;
+  }
+
+  /// <summary>Builds the button a command no library can serve gets: off, iconed, and explained.</summary>
+  private RibbonButton _Planned(PlannedCommand command, RibbonItemSize size = RibbonItemSize.Small) {
+    var button = new RibbonButton(command.Text, size) {
+      Enabled = false,
+      ToolTipText = command.ToolTipText,
+    };
+
+    if (command.Icon != null)
+      this._icons.Apply(button, command.Icon, size);
+
+    return button;
+  }
+
+  private void _AddFilterButton(RibbonGroup group, string text, DisplayFilter? filter, string? icon = null) {
     var button = new RibbonToggleButton(text, RibbonItemSize.Small);
+    if (icon != null)
+      this._icons.Apply(button, icon);
+
     button.CheckedChanged += (_, _) => {
       if (this._suppressFilterButtons)
         return;
@@ -299,6 +460,11 @@ internal sealed class ViewerShell : Form {
   }
 
   private void _BuildStatusBar() {
+    this._icons.Apply(this._statusFormat, "image");
+    this._icons.Apply(this._statusDimensions, "shape_handles");
+    this._icons.Apply(this._statusBytes, "disk");
+    this._icons.Apply(this._statusPosition, "images");
+    this._icons.Apply(this._statusZoom, "magnifier");
     this._statusBar.Items.Add(this._statusFormat);
     this._statusBar.Items.Add(this._statusDimensions);
     this._statusBar.Items.Add(this._statusBytes);
@@ -306,9 +472,78 @@ internal sealed class ViewerShell : Form {
     this._statusBar.Items.Add(this._statusZoom);
   }
 
-  private static RibbonButton _Button(string text, Action action, RibbonItemSize size = RibbonItemSize.Small) {
+  /// <summary>The keys a picture viewer is expected to answer to, wherever the focus sits.</summary>
+  /// <remarks>
+  /// <para>
+  /// The bindings are the ones a user of the viewer this replaces reaches for, with two departures
+  /// worth naming. PageUp and PageDown walk the folder rather than the pages of a document, because
+  /// that is what they do in every picture viewer and almost no picture has a second page; paging
+  /// within a file moved onto Control with them. And the toolkit's canvas already answers Control+0
+  /// and Control+9 for actual size and fit, so both are bound here too — not for the sake of a
+  /// second way to do it, but so that every route to a zoom goes through the one place that records
+  /// what kind of zoom it was.
+  /// </para>
+  /// <para>
+  /// Nothing is bound to a bare letter. A viewer that will grow a "go to file" box wants the letters
+  /// left alone, and a bare letter swallowed window-wide is the kind of binding that later turns out
+  /// to have been eating somebody's typing.
+  /// </para>
+  /// </remarks>
+  private void _BuildShortcuts() {
+    this._shortcuts.Bind("Next picture", () => this.Walk(1), Keys.Right, Keys.Space, Keys.PageDown);
+    this._shortcuts.Bind("Previous picture", () => this.Walk(-1), Keys.Left, Keys.Back, Keys.PageUp);
+    this._shortcuts.Bind("First picture", () => this._OpenIndex(0), Keys.Home);
+    this._shortcuts.Bind("Last picture", () => this._OpenIndex(this._folder.Files.Count - 1), Keys.End);
+
+    this._shortcuts.Bind("Next page", () => this._GoPage(1), Keys.Control | Keys.PageDown);
+    this._shortcuts.Bind("Previous page", () => this._GoPage(-1), Keys.Control | Keys.PageUp);
+
+    // Every shape a plus and a minus arrive in. The keypad has codes of its own; the number row's
+    // plus needs Shift on most layouts, and which key code that leaves behind depends on the
+    // platform — Windows reports the physical key and X11 reports the character it produced — so
+    // both, with and without Shift, are bound rather than guessed at.
+    this._shortcuts.Bind(
+      "Zoom in",
+      () => this._ZoomBy(Math.Sqrt(2)),
+      Keys.Oemplus, Keys.Shift | Keys.Oemplus, Keys.Add, Keys.Shift | Keys.Add);
+    this._shortcuts.Bind(
+      "Zoom out",
+      () => this._ZoomBy(1 / Math.Sqrt(2)),
+      Keys.OemMinus, Keys.Shift | Keys.OemMinus, Keys.Subtract, Keys.Shift | Keys.Subtract);
+    this._shortcuts.Bind("Fit to window", this._FitToWindow, Keys.Control | Keys.F, Keys.Control | Keys.D9);
+    this._shortcuts.Bind("Actual size", this._ActualSize, Keys.Control | Keys.D1, Keys.Control | Keys.D0);
+
+    this._shortcuts.Bind("Thumbnails", () => this._showBrowser.Checked = !this._showBrowser.Checked, Keys.Control | Keys.T);
+    this._shortcuts.Bind("Information", () => this._showInformation.Checked = !this._showInformation.Checked, Keys.Control | Keys.I);
+    this._shortcuts.Bind("Wrap around", () => this._wrapToggle.Checked = !this._wrapToggle.Checked, Keys.Control | Keys.W);
+
+    this._shortcuts.Bind("Re-read the folder", this._RefreshFolder, Keys.F5);
+    this._shortcuts.Bind("Full screen", this._ToggleFullScreen, Keys.F11);
+    this._shortcuts.Bind("Leave full screen or stop marking an area", this._Escape, Keys.Escape);
+
+    this._shortcuts.Bind("Open picture", this._OpenPicturePicker, Keys.Control | Keys.O);
+    this._shortcuts.Bind("Open folder", this._OpenFolderPicker, Keys.Control | Keys.Shift | Keys.O);
+    this._shortcuts.Bind("Save", this._Save, Keys.Control | Keys.S);
+    this._shortcuts.Bind("Save as", this._SaveAs, Keys.Control | Keys.Shift | Keys.S);
+    this._shortcuts.Bind("Print", this._Print, Keys.Control | Keys.P);
+  }
+
+  /// <summary>A ribbon command that hands the keyboard back to the picture when it is done.</summary>
+  /// <remarks>
+  /// A toolbar that keeps the focus after a click is a toolbar that has quietly taken the arrow keys
+  /// away — the ribbon walks its own tabs with them — so every command returns the focus to the
+  /// canvas, the same way pressing a button on a toolbar does everywhere else.
+  /// </remarks>
+  private RibbonButton _Button(string text, Action action, RibbonItemSize size = RibbonItemSize.Small, string? icon = null) {
     var button = new RibbonButton(text, size);
-    button.Click += (_, _) => action();
+    button.Click += (_, _) => {
+      action();
+      this._viewport.Focus();
+    };
+
+    if (icon != null)
+      this._icons.Apply(button, icon, size);
+
     return button;
   }
 
@@ -333,6 +568,20 @@ internal sealed class ViewerShell : Form {
   // ============================================================================================
   // Opening
   // ============================================================================================
+
+  /// <summary>The ribbon's tabs, by the name each shows.</summary>
+  internal IEnumerable<string> TabNames => this._ribbon.Tabs.Select(t => t.Text);
+
+  /// <summary>Brings the named ribbon tab to the front; false when no tab has that name.</summary>
+  internal bool SelectTab(string name) {
+    for (var i = 0; i < this._ribbon.Tabs.Count; ++i)
+      if (string.Equals(this._ribbon.Tabs[i].Text, name, StringComparison.OrdinalIgnoreCase)) {
+        this._ribbon.SelectedIndex = i;
+        return true;
+      }
+
+    return false;
+  }
 
   /// <summary>Opens a file or a folder, whichever the path names.</summary>
   internal void OpenPath(string path) {
@@ -394,7 +643,65 @@ internal sealed class ViewerShell : Form {
 
     this._folder.SelectIndex(index);
     this._SyncBrowserSelection();
+    this._thumbnailLoader.Prioritise(index, _THUMBNAIL_LOOKAHEAD);
     this._Load(this._folder.Files[index]);
+  }
+
+  /// <summary>Lists the folder again, in case it changed under the window.</summary>
+  private void _RefreshFolder() {
+    if (this._folder.Folder == null)
+      return;
+
+    this._folder.Refresh();
+    this._RefreshBrowser();
+    if (this._folder.Index < 0 && this._folder.Files.Count > 0)
+      this._OpenIndex(0);
+  }
+
+  private void _ToggleFullScreen() => this._SetFullScreen(!this._fullScreen);
+
+  /// <summary>Backs out of whatever mode the window is in: marking an area first, then full screen.</summary>
+  private void _Escape() {
+    if (this._viewport.SelectingArea) {
+      this._StopRedEye();
+      return;
+    }
+
+    this._SetFullScreen(false);
+  }
+
+  /// <summary>Gives the picture the whole screen, or gives the window its chrome back.</summary>
+  /// <remarks>
+  /// The chrome is hidden rather than the window merely maximised: a full screen that still shows a
+  /// ribbon and a thumbnail strip is not one. The pane toggles are restored from the buttons that own
+  /// them rather than from what the panes happened to be doing, so leaving full screen cannot turn a
+  /// pane back on that the user had switched off.
+  /// </remarks>
+  private void _SetFullScreen(bool on) {
+    if (on == this._fullScreen)
+      return;
+
+    if (on) {
+      this._framedBorderStyle = this.FormBorderStyle;
+      this._framedWindowState = this.WindowState;
+      this._ribbon.Visible = false;
+      this._statusBar.Visible = false;
+      this._outer.Panel1Collapsed = true;
+      this._inner.Panel2Collapsed = true;
+      this.FormBorderStyle = FormBorderStyle.None;
+      this.WindowState = FormWindowState.Maximized;
+    } else {
+      this.FormBorderStyle = this._framedBorderStyle;
+      this.WindowState = this._framedWindowState;
+      this._ribbon.Visible = true;
+      this._statusBar.Visible = true;
+      this._outer.Panel1Collapsed = !this._showBrowser.Checked;
+      this._inner.Panel2Collapsed = !this._showInformation.Checked;
+    }
+
+    this._fullScreen = on;
+    this._viewport.Focus();
+    this._ApplyZoomMode();
   }
 
   /// <summary>Moves to the neighbouring picture, honouring the wrap setting.</summary>
@@ -425,7 +732,7 @@ internal sealed class ViewerShell : Form {
       this._pageCount = PageService.PageCount(file, entry);
       this._PickVideoMode();
       this._Render();
-      this._viewport.FitToWindow();
+      this._ApplyZoomMode();
       this._UpdatePageButtons();
       this._UpdateInformation();
       this._notice = null;
@@ -480,6 +787,8 @@ internal sealed class ViewerShell : Form {
     this._browser.SelectedIndex = this._folder.Index;
     this._suppressBrowserSelection = false;
     this._thumbnailLoader.Start(this._folder.Files);
+    if (this._folder.Index > 0)
+      this._thumbnailLoader.Prioritise(this._folder.Index, _THUMBNAIL_LOOKAHEAD);
   }
 
   private void _SyncBrowserSelection() {
@@ -506,6 +815,7 @@ internal sealed class ViewerShell : Form {
       return;
 
     this._folder.SelectIndex(index);
+    this._thumbnailLoader.Prioritise(index, _THUMBNAIL_LOOKAHEAD);
     this._Load(this._folder.Files[index]);
   }
 
@@ -524,19 +834,30 @@ internal sealed class ViewerShell : Form {
     this._formatFilter = mode.DisplayFilter;
   }
 
+  /// <remarks>
+  /// Guarded, because handing the canvas an image makes it fit that image to the window, and a fit
+  /// this window asked for is not the user choosing a scale — which is what an unguarded
+  /// <see cref="ZoomPanel.ZoomChanged"/> is taken to mean.
+  /// </remarks>
   private void _Render() {
-    if (this._raw == null) {
-      this._ReleaseDisplayed();
-      return;
+    ++this._zoomGuard;
+    try {
+      if (this._raw == null) {
+        this._ReleaseDisplayed();
+        return;
+      }
+
+      var shown = DisplayFilterPipeline.Apply(this._raw, this._filterOverride ?? this._formatFilter);
+      shown = _ApplyPixelAspect(shown, this._pixelAspect);
+
+      var previous = this._displayed;
+      this._displayed = ImageBridge.ToImage(this._backend, shown);
+      this._viewport.Image = this._displayed;
+      previous?.Dispose();
+    } finally {
+      --this._zoomGuard;
     }
 
-    var shown = DisplayFilterPipeline.Apply(this._raw, this._filterOverride ?? this._formatFilter);
-    shown = _ApplyPixelAspect(shown, this._pixelAspect);
-
-    var previous = this._displayed;
-    this._displayed = ImageBridge.ToImage(this._backend, shown);
-    this._viewport.Image = this._displayed;
-    previous?.Dispose();
     this._UpdateStatus();
   }
 
@@ -554,6 +875,60 @@ internal sealed class ViewerShell : Form {
   private void _ZoomBy(double factor) {
     var zoom = Math.Clamp(this._viewport.Zoom * factor, this._viewport.MinZoom, this._viewport.MaxZoom);
     this._viewport.ZoomTo(zoom, this._viewport.Width / 2, this._viewport.Height / 2);
+  }
+
+  private void _FitToWindow() => this._SetZoomMode(ZoomMode.Fit);
+
+  private void _ActualSize() => this._SetZoomMode(ZoomMode.Actual);
+
+  /// <summary>Scales the picture the way the mode says, and remembers that this is how it was asked for.</summary>
+  private void _SetZoomMode(ZoomMode mode) {
+    this._zoomMode = mode;
+    this._ApplyZoomMode();
+    this._UpdateStatus();
+  }
+
+  /// <summary>Scales the picture that has just arrived the way the last one was being looked at.</summary>
+  /// <remarks>
+  /// Assigning the canvas an image fits it to the window, which is the right answer for the fit mode
+  /// and wrong for the other two: somebody comparing a detail across a folder at 400% wants the next
+  /// picture at 400%, and somebody at actual size wants actual size. So the mode is re-applied after
+  /// every load, and the free scale is remembered rather than read back off the canvas, which by then
+  /// holds the fit it computed for itself.
+  /// </remarks>
+  private void _ApplyZoomMode() {
+    ++this._zoomGuard;
+    try {
+      switch (this._zoomMode) {
+        case ZoomMode.Actual:
+          this._viewport.ActualSize();
+          break;
+        case ZoomMode.Free:
+          this._viewport.Zoom = this._freeZoom;
+          break;
+        default:
+          this._viewport.FitToWindow();
+          break;
+      }
+    } finally {
+      --this._zoomGuard;
+    }
+  }
+
+  /// <summary>Notes a zoom nobody here asked for as the scale the user wants to keep.</summary>
+  /// <remarks>
+  /// There are four ways to change the scale that do not go through this class — Control with the
+  /// wheel, the slider the canvas draws in its corner, dragging that slider's ends, and the canvas's
+  /// own keys — and every one of them means the same thing: the user has chosen a scale, and it is to
+  /// survive the next picture. Rather than intercept each, anything that is not this window loading a
+  /// picture or applying a mode is taken as that choice. The guard is what tells the two apart.
+  /// </remarks>
+  private void _OnZoomChanged() {
+    if (this._zoomGuard == 0) {
+      this._zoomMode = ZoomMode.Free;
+      this._freeZoom = this._viewport.Zoom;
+    }
+
     this._UpdateStatus();
   }
 
@@ -574,6 +949,239 @@ internal sealed class ViewerShell : Form {
     } catch (Exception ex) {
       this._Complain("Picture", ex.Message);
     }
+  }
+
+  /// <summary>Whether a pixel operation is running on the picture in the background.</summary>
+  internal bool IsBusy => this._busy;
+
+  /// <summary>The dialog a command has open over the window, if any.</summary>
+  internal Form? OpenDialog => this._openDialog;
+
+  /// <summary>Runs the pixel command with this button text; false when there is no such command.</summary>
+  /// <param name="text">The button's text, with or without its ellipsis.</param>
+  /// <param name="withoutAsking">
+  /// Run straight away on the values the dialog would open on, instead of opening the dialog.
+  /// </param>
+  internal bool RunCommand(string text, bool withoutAsking) {
+    if (_IsResample(text)) {
+      this._Resample();
+      return true;
+    }
+
+    if (PixelCommands.Find(text) is not { } command)
+      return false;
+
+    if (withoutAsking)
+      this._ApplyInBackground(command.Text.TrimEnd('…'), command.RunWithInitialValues);
+    else
+      this.RunCommand(command);
+
+    return true;
+  }
+
+  /// <summary>Whether <see cref="RunCommand(string,bool)"/> knows a command by this text.</summary>
+  internal static bool KnowsCommand(string text) => _IsResample(text) || PixelCommands.Find(text) != null;
+
+  private static bool _IsResample(string text)
+    => string.Equals(text.TrimEnd('…', '.').Trim(), "Resample", StringComparison.OrdinalIgnoreCase);
+
+  /// <summary>Opens a command's dialog, or runs it at once when it has nothing to ask.</summary>
+  private void RunCommand(PixelCommand command) {
+    if (this._raw == null || this._busy)
+      return;
+
+    var name = command.Text.TrimEnd('…');
+    if (!command.AsksFirst) {
+      this._ApplyInBackground(name, command.RunWithInitialValues);
+      return;
+    }
+
+    var (stand, description) = this._StandIn(command.Preview);
+    var dialog = new PixelCommandDialog(this._backend, name, command.Does, command.Settings, stand, description, command.Run);
+    if (this._ShowDialog(dialog) != DialogResult.OK)
+      return;
+
+    var values = dialog.Values;
+    this._ApplyInBackground(name, image => command.Run(image, values));
+  }
+
+  private DialogResult _ShowDialog(Form dialog) {
+    this._openDialog = dialog;
+    try {
+      return dialog.ShowDialog(this);
+    } finally {
+      this._openDialog = null;
+    }
+  }
+
+  /// <summary>
+  /// What a preview runs on instead of the picture: small enough that any effect answers at once.
+  /// </summary>
+  /// <remarks>
+  /// Both come from library calls — the shrink is the engine's box filter, which averages every
+  /// source pixel a preview pixel covers, and the crop is the transform library's — so nothing here
+  /// reads a pixel. A picture already smaller than the preview is used as it is.
+  /// </remarks>
+  private (RawImage Stand, string Description) _StandIn(PreviewExtent extent) {
+    var raw = this._raw!;
+    const int width = PixelCommandDialog.PREVIEW_WIDTH;
+    const int height = PixelCommandDialog.PREVIEW_HEIGHT;
+    if (raw.Width <= width && raw.Height <= height)
+      return (raw, "The whole picture.");
+
+    if (extent == PreviewExtent.Whole)
+      return (ImageScaler.Fit(raw, width, height, ResampleKernel.Box), "The whole picture, shrunk to fit.");
+
+    var cropWidth = Math.Min(width, raw.Width);
+    var cropHeight = Math.Min(height, raw.Height);
+    var crop = ImageTransformer.Crop(raw, new PixelRect((raw.Width - cropWidth) / 2, (raw.Height - cropHeight) / 2, cropWidth, cropHeight));
+    return (crop, "The middle of the picture at actual size.");
+  }
+
+  /// <summary>Runs a pixel operation on the picture off the interface thread and shows the result.</summary>
+  /// <remarks>
+  /// <para>
+  /// A Gaussian blur on a twelve-megapixel photograph takes long enough that doing it on the thread
+  /// that paints the window would freeze the window for all of it, so every pixel command runs on the
+  /// thread pool and the window stays responsive. One runs at a time; a second command while one is
+  /// running is ignored rather than queued, because the second was chosen looking at a picture that
+  /// is about to change under it.
+  /// </para>
+  /// <para>
+  /// The result is kept only if the picture it was computed from is still the one on screen. Walking
+  /// to the next picture while a blur runs must not end with the blurred previous picture shown under
+  /// the next one's name.
+  /// </para>
+  /// <para>
+  /// The operation hands back a new picture and leaves the one it was given alone — every library
+  /// call behind these commands is written that way — which is the same contract Rotate and Resize
+  /// keep. The viewer has no undo; the file on disk is untouched until Save.
+  /// </para>
+  /// </remarks>
+  private void _ApplyInBackground(string name, Func<RawImage, RawImage> transform) {
+    if (this._raw == null || this._busy)
+      return;
+
+    var source = this._raw;
+    this._busy = true;
+    this._Note($"{name}: working…");
+    this.Cursor = Cursors.Wait;
+
+    Task.Run(() => {
+      var clock = Stopwatch.StartNew();
+      try {
+        var result = transform(source);
+        var elapsed = clock.Elapsed;
+        this.BeginInvoke(() => this._FinishBackground(name, source, result, elapsed, null));
+      } catch (Exception ex) {
+        this.BeginInvoke(() => this._FinishBackground(name, source, null, clock.Elapsed, ex.Message));
+      }
+    });
+  }
+
+  private void _FinishBackground(string name, RawImage source, RawImage? result, TimeSpan elapsed, string? failure) {
+    this._busy = false;
+    this.ResetCursor();
+    if (failure != null || result == null) {
+      this._Note($"{name} failed.");
+      this._Complain(name, failure ?? "The operation returned no picture.");
+      return;
+    }
+
+    if (!ReferenceEquals(source, this._raw)) {
+      this._Note($"{name} finished after the picture changed, so its result was dropped.");
+      return;
+    }
+
+    this._raw = result;
+    this._edited = true;
+    this._Render();
+    this._UpdateInformation();
+    this._Note($"{name} took {elapsed.TotalSeconds:0.00} s.");
+  }
+
+  // ============================================================================================
+  // Red-eye
+  // ============================================================================================
+
+  /// <summary>Puts the canvas into marking an area, for the red-eye retouch.</summary>
+  private void _StartRedEye() {
+    if (this._raw == null)
+      return;
+
+    this._viewport.SelectingArea = true;
+    this._viewport.Focus();
+    this._Note("Red-eye: drag a box around an eye. Escape stops marking.");
+  }
+
+  private void _StopRedEye() {
+    this._viewport.SelectingArea = false;
+    this._Note("Red-eye: done.");
+  }
+
+  /// <summary>Asks how hard to apply the red-eye rule inside a dragged area, previewing that area.</summary>
+  /// <remarks>
+  /// <para>
+  /// The area comes in the canvas's coordinates, which are the shown picture's; a picture with
+  /// non-square pixels is shown widened, so the area is mapped back onto the stored picture's pixels
+  /// first. The preview is the area with a margin around it, cut out at full size and enlarged by the
+  /// preview box — an eye is a few dozen pixels, and it is exactly the pixels that have to be seen.
+  /// </para>
+  /// <para>
+  /// Marking stays on afterwards, because a face has two eyes. Escape, or any command, ends it.
+  /// </para>
+  /// </remarks>
+  private void _OnRedEyeArea(System.Drawing.RectangleF area) {
+    if (this._raw == null || this._displayed == null || this._busy)
+      return;
+
+    var region = MarkedArea.ToPicture(
+      area.X, area.Y, area.Width, area.Height,
+      this._displayed.Width, this._displayed.Height, this._raw.Width, this._raw.Height);
+    this.ReduceRedEye(region);
+  }
+
+  /// <summary>Asks for the red-eye threshold inside an area of the picture, and applies it.</summary>
+  /// <param name="region">The area, in the picture's own pixels; clipped to the picture.</param>
+  /// <remarks>Also what the capture run marks an eye through, since a capture cannot drag.</remarks>
+  internal void ReduceRedEye(PixelRect region) {
+    if (this._raw == null || this._busy)
+      return;
+
+    var raw = this._raw;
+    region = region.ClampTo(raw.Width, raw.Height);
+    if (region.IsEmpty)
+      return;
+
+    var around = MarkedArea.WithSurroundings(region, raw.Width, raw.Height);
+    var stand = ImageTransformer.Crop(raw, around);
+
+    PixelSetting[] settings = [new("Threshold (%)", 0, 80, 40)];
+    var dialog = new PixelCommandDialog(
+      this._backend,
+      "Red-eye",
+      $"Drains the red out of the ellipse inside the {region.Width} x {region.Height} area marked at {region.X}, {region.Y}. "
+        + "A higher threshold catches pixels that are less clearly red.",
+      settings,
+      stand,
+      "The marked area and its surroundings, enlarged.",
+      (image, values) => MarkedArea.ReduceRedEye(image, region, (around.X, around.Y), values[0] / 100));
+    if (this._ShowDialog(dialog) != DialogResult.OK)
+      return;
+
+    var threshold = dialog.Values[0] / 100;
+    this._ApplyInBackground("Red-eye", image => MarkedArea.ReduceRedEye(image, region, (0, 0), threshold));
+  }
+
+  private void _Resample() {
+    if (this._raw == null || this._busy)
+      return;
+
+    var dialog = new ResampleDialog(this._backend, this._raw);
+    if (this._ShowDialog(dialog) != DialogResult.OK)
+      return;
+
+    this._ApplyInBackground("Resample", dialog.Operation);
   }
 
   private void _Crop() {
@@ -599,16 +1207,69 @@ internal sealed class ViewerShell : Form {
     this._Apply(i => ImageTransformer.Resize(i, dialog.TargetWidth, dialog.TargetHeight, dialog.Mode, dialog.Interpolation));
   }
 
+  private void _Margin() {
+    if (this._raw == null)
+      return;
+
+    var dialog = new MarginOptionsDialog(this._raw.Width, this._raw.Height);
+    if (dialog.ShowDialog(this) != DialogResult.OK)
+      return;
+
+    var margin = dialog.MarginWidth;
+    var fill = dialog.Fill;
+    this._Apply(i => ImageTransformer.ExtendCanvas(
+      i, i.Width + margin * 2, i.Height + margin * 2, AnchorPosition.Center, fill));
+  }
+
+  private void _Letterbox() {
+    if (this._raw == null)
+      return;
+
+    var dialog = new LetterboxOptionsDialog(
+      this._raw.Width, this._raw.Height, ImageTransformer.GuessInterpolation(this._raw));
+    if (dialog.ShowDialog(this) != DialogResult.OK)
+      return;
+
+    this._Apply(i => ImageTransformer.Resize(
+      i, dialog.FrameWidth, dialog.FrameHeight, ResizeMode.Fit, dialog.Interpolation, dialog.Bars));
+  }
+
+  /// <summary>Scales the picture by a fixed factor, with the filter the picture itself suggests.</summary>
+  /// <remarks>
+  /// Halving and doubling are the two scales that need no dialog, and both are clamped to the range
+  /// the resize dialog offers: a picture already at one pixel cannot be halved, and one at the far end
+  /// cannot be doubled, so the factor is applied to whatever room is left rather than refused.
+  /// </remarks>
+  private void _ScaleBy(double factor) {
+    if (this._raw == null)
+      return;
+
+    const int largest = 16384;
+    var width = Math.Clamp((int)Math.Round(this._raw.Width * factor), 1, largest);
+    var height = Math.Clamp((int)Math.Round(this._raw.Height * factor), 1, largest);
+    if (width == this._raw.Width && height == this._raw.Height)
+      return;
+
+    var hint = ImageTransformer.GuessInterpolation(this._raw);
+    this._Apply(i => ImageTransformer.Resize(i, width, height, ResizeMode.Stretch, hint));
+  }
+
   private void _ReduceColours() {
     if (this._raw == null)
       return;
 
     var current = this._raw.IsIndexed ? Math.Clamp(this._raw.PaletteCount, 2, 256) : 256;
-    var dialog = new NumberDialog("Reduce colours", "Median Cut with Floyd-Steinberg dithering.", "Colours", 2, 256, current, "Reduce");
+    var describe = this._raw.IsIndexed
+      ? $"The picture holds {this._raw.PaletteCount} colour(s) in a palette."
+      : "The picture is not palettised; reducing it builds a palette and maps every pixel onto it.";
+    var dialog = new ReduceColoursDialog(describe, current);
     if (dialog.ShowDialog(this) != DialogResult.OK)
       return;
 
-    this._Apply(i => BitmapConverter.QuantizeRawImage(i, dialog.Value));
+    var quantizer = dialog.Quantizer;
+    var ditherer = dialog.Ditherer;
+    var colours = dialog.Colours;
+    this._Apply(i => ColorReductionDispatch.Reduce(i, quantizer, ditherer, colours));
   }
 
   // ============================================================================================
@@ -709,7 +1370,17 @@ internal sealed class ViewerShell : Form {
     => MessageBox.Show(
       this,
       "Crush Viewer\n\nBrowser, viewer, converter and page extractor for the PNGCrushCS format suite, "
-      + "built on NativeForms over the platform's own widgets.",
+      + "built on NativeForms over the platform's own widgets.\n\n"
+      + "Icons: Silk icon set 1.3 by Mark James, http://www.famfamfam.com/lab/icons/silk/, "
+      + "licensed under Creative Commons Attribution 2.5.\n"
+      + "Silk Companion #1 by Damien Guard, http://damieng.com/creative/icons/silk-companion-1-icons, "
+      + "licensed under Creative Commons Attribution 2.5.\n"
+      + "Fugue Icons (C) 2013 Yusuke Kamiyamane, http://p.yusukekamiyamane.com/, "
+      + "licensed under Creative Commons Attribution 3.0.\n"
+      + "FatCow Farm-Fresh Web Icons, http://www.fatcow.com/free-icons, "
+      + "licensed under Creative Commons Attribution 3.0.\n"
+      + "Oxygen Icon Theme, (C) 2007 The Oxygen Team, https://github.com/KDE/oxygen-icons5, "
+      + "under the GNU Lesser General Public License, version 3 or later.",
       "About Crush Viewer",
       MessageBoxButtons.OK,
       MessageBoxIcon.Information);
@@ -776,6 +1447,37 @@ internal sealed class ViewerShell : Form {
     ConvertOptionsDialog.ShowReport(this, "Extract pages", results);
   }
 
+  /// <summary>Puts the picture on paper, by way of a PDF and the platform's own print path.</summary>
+  /// <remarks>
+  /// What is printed is what is on screen, edits and all, and not the file on disk — which is the
+  /// answer somebody who has just straightened a scan expects. The picture is handed over as it
+  /// stands rather than re-read.
+  /// </remarks>
+  private void _Print() {
+    if (this._raw == null)
+      return;
+
+    if (PrintService.Unavailable is { } why) {
+      this._Complain("Print picture", why);
+      return;
+    }
+
+    var dialog = new PrintOptionsDialog(this._file?.Name ?? "The picture");
+    if (dialog.ShowDialog(this) != DialogResult.OK)
+      return;
+
+    var destination = dialog.Destination;
+    var failure = PrintService.Send(this._raw, this._file?.Name ?? "picture", destination);
+    if (failure != null) {
+      this._Complain("Print picture", failure);
+      return;
+    }
+
+    this._Note(destination.Route == PrintRoute.Printer
+      ? "Sent to the printer."
+      : "Handed to the application that opens a PDF here.");
+  }
+
   // ============================================================================================
   // Slideshow
   // ============================================================================================
@@ -836,6 +1538,7 @@ internal sealed class ViewerShell : Form {
     this._statusPosition.Text = this._pageCount > 1 ? $"{position} — page {this._page + 1}/{this._pageCount}" : position;
 
     this._save.Enabled = this._raw != null;
+    this._print.Enabled = this._raw != null && PrintService.Unavailable == null;
     this.Text = this._file == null ? _TITLE : $"{(this._edited ? "* " : "")}{this._file.Name} — {_TITLE}";
   }
 
@@ -890,10 +1593,17 @@ internal sealed class ViewerShell : Form {
   private void _ReleaseImages() {
     this._ReleaseDisplayed();
     this._thumbnails.Dispose();
+    this._icons.Dispose();
   }
 
   private void _ReleaseDisplayed() {
-    this._viewport.Image = null;
+    ++this._zoomGuard;
+    try {
+      this._viewport.Image = null;
+    } finally {
+      --this._zoomGuard;
+    }
+
     this._displayed?.Dispose();
     this._displayed = null;
   }
