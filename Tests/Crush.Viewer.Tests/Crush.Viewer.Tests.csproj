@@ -32,6 +32,7 @@
     <Compile Include="..\..\Crush.Viewer\FolderModel.cs" Link="Viewer\FolderModel.cs" />
     <Compile Include="..\..\Crush.Viewer\ImageTransforms.cs" Link="Viewer\ImageTransforms.cs" />
     <Compile Include="..\..\Crush.Viewer\PageService.cs" Link="Viewer\PageService.cs" />
+    <Compile Include="..\..\Crush.Viewer\PrintService.cs" Link="Viewer\PrintService.cs" />
     <Compile Include="..\..\Crush.Viewer\ViewerLaunchOptions.cs" Link="Viewer\ViewerLaunchOptions.cs" />
     <Compile Include="..\..\Crush.Viewer\WindowCapture.cs" Link="Viewer\WindowCapture.cs" />
   </ItemGroup>
