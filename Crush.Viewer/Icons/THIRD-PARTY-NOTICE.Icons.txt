@@ -1,0 +1,59 @@
+Third-party artwork shipped with Crush.Viewer
+=============================================
+
+The icons under this directory were not drawn for this project. They come from two
+published sets, unchanged, and each carries its own licence. Both licences require
+that the notice travel with the artwork, which is what this file is for.
+
+
+Silk icon set 1.3 — Icons/Silk/*.png
+------------------------------------
+
+    Silk icon set 1.3 by Mark James
+    http://www.famfamfam.com/lab/icons/silk/
+    Licensed under Creative Commons Attribution 2.5
+    http://creativecommons.org/licenses/by/2.5/
+
+Taken from https://github.com/legacy-icons/famfamfam-silk, path dist/png/, commit
+d6056f5c28e46c28403888ab7c013aced3928ec8, on 2026-09-30. Twenty of the set's one
+thousand 16x16 files are used here; every one is byte-for-byte upstream's. The
+author's own readme, which is the licence statement, is beside them in
+Icons/Silk/LICENSE.txt.
+
+The attribution above is the credit the licence asks for, and it appears in the
+viewer's About box as well as here.
+
+
+Oxygen Icon Theme — Icons/Oxygen/*.png
+--------------------------------------
+
+    Oxygen Icon Theme, Copyright (C) 2007 The Oxygen Team
+    https://github.com/KDE/oxygen-icons5
+    GNU Lesser General Public License, version 3 or later
+
+Taken from https://github.com/KDE/oxygen-icons5, the 32x32 tree, commit
+8e9d99c4666d24fd44639524aede174079437bfe, on 2026-09-30. Twenty of its 32x32 files
+are used here, byte-for-byte upstream's. The project's own COPYING, which states
+the grant and its explicit extension to the artwork, is beside them in
+Icons/Oxygen/LICENSE.txt, and the contributor list in Icons/Oxygen/AUTHORS.txt.
+
+LGPL-3.0-or-later is the licence this repository itself ships under, so the set
+needs nothing of the application beyond keeping these files with it.
+
+
+Why these two
+-------------
+
+Silk is the mid-2000s Windows look the viewer is going for and covers a picture
+browser's whole vocabulary, but it exists only at 16x16, which is the size the
+ribbon's small items and the status bar draw at. The ribbon's large items draw at
+32x32, so they are Oxygen's, which is the same era's glossy style at that size
+under a licence this repository can absorb without a second thought. Neither set is
+scaled up: an icon is used at the size it was drawn for, and the one 32x32 icon
+borrowed for a 16x16 slot (measure.png, for the rulers toggle) is box-filtered down
+rather than sampled.
+
+Commands with no honest icon in either set — a half-turn rotation, inverting the
+colours, and the four display-filter choices, which name signal standards no icon
+set distinguishes — are left as text rather than given a glyph that means something
+else.

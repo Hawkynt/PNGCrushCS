@@ -29,6 +29,7 @@ internal sealed class ViewerShell : Form {
   private readonly FolderModel _folder = new();
   private readonly ThumbnailLoader _thumbnailLoader;
   private readonly ShortcutTable _shortcuts = new();
+  private readonly IconSet _icons = new();
 
   private readonly Ribbon _ribbon = new() { Dock = DockStyle.Top };
   private readonly StatusStrip _statusBar = new() { Dock = DockStyle.Bottom, Height = _STATUS_HEIGHT };
@@ -129,33 +130,34 @@ internal sealed class ViewerShell : Form {
     this._ribbon.PreferredHeightChanged += (_, _) => this._SizeRibbon();
     this._SizeRibbon();
 
-    this._ribbon.QuickAccessItems.Add(this._Button("Open", () => this._OpenPicturePicker()));
-    this._ribbon.QuickAccessItems.Add(this._Button("Previous", () => this.Walk(-1)));
-    this._ribbon.QuickAccessItems.Add(this._Button("Next", () => this.Walk(1)));
+    this._ribbon.QuickAccessItems.Add(this._Button("Open", () => this._OpenPicturePicker(), icon: "folder_image"));
+    this._ribbon.QuickAccessItems.Add(this._Button("Previous", () => this.Walk(-1), icon: "resultset_previous"));
+    this._ribbon.QuickAccessItems.Add(this._Button("Next", () => this.Walk(1), icon: "resultset_next"));
   }
 
   private RibbonTab _BuildFileTab() {
     var tab = new RibbonTab("File");
 
     var open = new RibbonGroup("Open");
-    open.Items.Add(this._Button("Picture…", this._OpenPicturePicker, RibbonItemSize.Large));
-    open.Items.Add(this._Button("Folder…", this._OpenFolderPicker, RibbonItemSize.Large));
+    open.Items.Add(this._Button("Picture…", this._OpenPicturePicker, RibbonItemSize.Large, "document-open"));
+    open.Items.Add(this._Button("Folder…", this._OpenFolderPicker, RibbonItemSize.Large, "document-open-folder"));
     tab.Groups.Add(open);
 
     var save = new RibbonGroup("Save");
     this._save.ToolTipText = "Writes the edited picture back over the file it came from.";
     this._save.Click += (_, _) => this._Save();
+    this._icons.Apply(this._save, "document-save", RibbonItemSize.Large);
     save.Items.Add(this._save);
-    save.Items.Add(this._Button("Save as…", this._SaveAs, RibbonItemSize.Large));
+    save.Items.Add(this._Button("Save as…", this._SaveAs, RibbonItemSize.Large, "document-save-as"));
     tab.Groups.Add(save);
 
     var convert = new RibbonGroup("Convert");
-    convert.Items.Add(this._Button("One file…", this._ConvertCurrent, RibbonItemSize.Large));
-    convert.Items.Add(this._Button("Whole folder…", this._ConvertFolder, RibbonItemSize.Large));
+    convert.Items.Add(this._Button("One file…", this._ConvertCurrent, RibbonItemSize.Large, "document-export"));
+    convert.Items.Add(this._Button("Whole folder…", this._ConvertFolder, RibbonItemSize.Large, "folder-sync"));
     tab.Groups.Add(convert);
 
     var about = new RibbonGroup("Help");
-    about.Items.Add(this._Button("About", this._About, RibbonItemSize.Small));
+    about.Items.Add(this._Button("About", this._About, RibbonItemSize.Small, "help"));
     tab.Groups.Add(about);
 
     return tab;
@@ -165,13 +167,14 @@ internal sealed class ViewerShell : Form {
     var tab = new RibbonTab("Navigate");
 
     var walk = new RibbonGroup("Folder");
-    walk.Items.Add(this._Button("First", () => this._OpenIndex(0), RibbonItemSize.Small));
-    walk.Items.Add(this._Button("Previous", () => this.Walk(-1), RibbonItemSize.Large));
-    walk.Items.Add(this._Button("Next", () => this.Walk(1), RibbonItemSize.Large));
-    walk.Items.Add(this._Button("Last", () => this._OpenIndex(this._folder.Files.Count - 1), RibbonItemSize.Small));
+    walk.Items.Add(this._Button("First", () => this._OpenIndex(0), RibbonItemSize.Small, "resultset_first"));
+    walk.Items.Add(this._Button("Previous", () => this.Walk(-1), RibbonItemSize.Large, "go-previous-view"));
+    walk.Items.Add(this._Button("Next", () => this.Walk(1), RibbonItemSize.Large, "go-next-view"));
+    walk.Items.Add(this._Button("Last", () => this._OpenIndex(this._folder.Files.Count - 1), RibbonItemSize.Small, "resultset_last"));
     tab.Groups.Add(walk);
 
     var ends = new RibbonGroup("At the ends");
+    this._icons.Apply(this._wrapToggle, "media-playlist-repeat", RibbonItemSize.Large);
     this._wrapToggle.ToolTipText = "On: the last picture is followed by the first. Off: walking stops at the ends.";
     this._wrapToggle.CheckedChanged += (_, _) => {
       this._folder.WalkMode = this._wrapToggle.Checked ? WalkMode.Wrap : WalkMode.Stop;
@@ -181,6 +184,7 @@ internal sealed class ViewerShell : Form {
     tab.Groups.Add(ends);
 
     var show = new RibbonGroup("Slideshow");
+    this._icons.Apply(this._slideshowToggle, "media-playback-start", RibbonItemSize.Large);
     this._slideshowToggle.CheckedChanged += (_, _) => this._ToggleSlideshow();
     show.Items.Add(this._slideshowToggle);
     tab.Groups.Add(show);
@@ -192,6 +196,8 @@ internal sealed class ViewerShell : Form {
     var tab = new RibbonTab("Pages");
 
     var page = new RibbonGroup("Page");
+    this._icons.Apply(this._previousPage, "go-previous-view-page", RibbonItemSize.Large);
+    this._icons.Apply(this._nextPage, "go-next-view-page", RibbonItemSize.Large);
     this._previousPage.Click += (_, _) => this._GoPage(-1);
     this._nextPage.Click += (_, _) => this._GoPage(1);
     page.Items.Add(this._previousPage);
@@ -199,6 +205,7 @@ internal sealed class ViewerShell : Form {
     tab.Groups.Add(page);
 
     var files = new RibbonGroup("Files");
+    this._icons.Apply(this._extractPages, "split", RibbonItemSize.Large);
     this._extractPages.ToolTipText = "Write every page of this file into its own picture file.";
     this._extractPages.Click += (_, _) => this._ExtractPages();
     files.Items.Add(this._extractPages);
@@ -207,6 +214,7 @@ internal sealed class ViewerShell : Form {
       Enabled = false,
       ToolTipText = PageService.AssemblyUnavailable,
     };
+    this._icons.Apply(assemble, "merge", RibbonItemSize.Large);
     files.Items.Add(assemble);
     tab.Groups.Add(files);
 
@@ -218,13 +226,16 @@ internal sealed class ViewerShell : Form {
     var tab = new RibbonTab("View");
 
     var zoom = new RibbonGroup("Zoom");
-    zoom.Items.Add(this._Button("Fit", this._FitToWindow, RibbonItemSize.Large));
-    zoom.Items.Add(this._Button("Actual size", this._ActualSize, RibbonItemSize.Large));
-    zoom.Items.Add(this._Button("Zoom out", () => this._ZoomBy(1 / Math.Sqrt(2)), RibbonItemSize.Small));
-    zoom.Items.Add(this._Button("Zoom in", () => this._ZoomBy(Math.Sqrt(2)), RibbonItemSize.Small));
+    zoom.Items.Add(this._Button("Fit", this._FitToWindow, RibbonItemSize.Large, "zoom-fit-best"));
+    zoom.Items.Add(this._Button("Actual size", this._ActualSize, RibbonItemSize.Large, "zoom-original"));
+    zoom.Items.Add(this._Button("Zoom out", () => this._ZoomBy(1 / Math.Sqrt(2)), RibbonItemSize.Small, "zoom_out"));
+    zoom.Items.Add(this._Button("Zoom in", () => this._ZoomBy(Math.Sqrt(2)), RibbonItemSize.Small, "zoom_in"));
     tab.Groups.Add(zoom);
 
     var panes = new RibbonGroup("Panes");
+    this._icons.Apply(this._showBrowser, "application_view_gallery");
+    this._icons.Apply(this._showInformation, "information");
+    this._icons.Apply(this._showRulers, "measure");
     this._showBrowser.CheckedChanged += (_, _) => this._outer.Panel1Collapsed = !this._showBrowser.Checked;
     this._showInformation.CheckedChanged += (_, _) => this._inner.Panel2Collapsed = !this._showInformation.Checked;
     this._showRulers.CheckedChanged += (_, _) => this._viewport.ShowRulers = this._showRulers.Checked;
@@ -248,25 +259,28 @@ internal sealed class ViewerShell : Form {
   private RibbonTab _BuildPictureTab() {
     var tab = new RibbonTab("Picture");
 
+    // Half turn, Invert and the display filters go without artwork on purpose: neither set has an
+    // honest glyph for them, and a rotate icon on a half turn or a contrast icon on an inversion is
+    // a picture of a different command.
     var rotate = new RibbonGroup("Rotate");
-    rotate.Items.Add(this._Button("Right", () => this._Apply(i => ImageTransformer.Rotate(i, RotateAngle.CW90)), RibbonItemSize.Small));
-    rotate.Items.Add(this._Button("Left", () => this._Apply(i => ImageTransformer.Rotate(i, RotateAngle.CW270)), RibbonItemSize.Small));
+    rotate.Items.Add(this._Button("Right", () => this._Apply(i => ImageTransformer.Rotate(i, RotateAngle.CW90)), RibbonItemSize.Small, "arrow_rotate_clockwise"));
+    rotate.Items.Add(this._Button("Left", () => this._Apply(i => ImageTransformer.Rotate(i, RotateAngle.CW270)), RibbonItemSize.Small, "arrow_rotate_anticlockwise"));
     rotate.Items.Add(this._Button("Half turn", () => this._Apply(i => ImageTransformer.Rotate(i, RotateAngle.CW180)), RibbonItemSize.Small));
     tab.Groups.Add(rotate);
 
     var flip = new RibbonGroup("Flip");
-    flip.Items.Add(this._Button("Horizontally", () => this._Apply(i => ImageTransformer.Flip(i, FlipDirection.Horizontal)), RibbonItemSize.Small));
-    flip.Items.Add(this._Button("Vertically", () => this._Apply(i => ImageTransformer.Flip(i, FlipDirection.Vertical)), RibbonItemSize.Small));
+    flip.Items.Add(this._Button("Horizontally", () => this._Apply(i => ImageTransformer.Flip(i, FlipDirection.Horizontal)), RibbonItemSize.Small, "shape_flip_horizontal"));
+    flip.Items.Add(this._Button("Vertically", () => this._Apply(i => ImageTransformer.Flip(i, FlipDirection.Vertical)), RibbonItemSize.Small, "shape_flip_vertical"));
     tab.Groups.Add(flip);
 
     var adjust = new RibbonGroup("Adjust");
-    adjust.Items.Add(this._Button("Resize…", this._Resize, RibbonItemSize.Large));
-    adjust.Items.Add(this._Button("Crop…", this._Crop, RibbonItemSize.Large));
-    adjust.Items.Add(this._Button("Reduce colours…", this._ReduceColours, RibbonItemSize.Large));
+    adjust.Items.Add(this._Button("Resize…", this._Resize, RibbonItemSize.Large, "transform-scale"));
+    adjust.Items.Add(this._Button("Crop…", this._Crop, RibbonItemSize.Large, "transform-crop"));
+    adjust.Items.Add(this._Button("Reduce colours…", this._ReduceColours, RibbonItemSize.Large, "color-management"));
     tab.Groups.Add(adjust);
 
     var colour = new RibbonGroup("Colour");
-    colour.Items.Add(this._Button("Greyscale", () => this._Apply(ImageTransforms.Grayscale), RibbonItemSize.Small));
+    colour.Items.Add(this._Button("Greyscale", () => this._Apply(ImageTransforms.Grayscale), RibbonItemSize.Small, "contrast"));
     colour.Items.Add(this._Button("Invert", () => this._Apply(ImageTransforms.Invert), RibbonItemSize.Small));
     tab.Groups.Add(colour);
 
@@ -316,6 +330,11 @@ internal sealed class ViewerShell : Form {
   }
 
   private void _BuildStatusBar() {
+    this._icons.Apply(this._statusFormat, "image");
+    this._icons.Apply(this._statusDimensions, "shape_handles");
+    this._icons.Apply(this._statusBytes, "disk");
+    this._icons.Apply(this._statusPosition, "images");
+    this._icons.Apply(this._statusZoom, "magnifier");
     this._statusBar.Items.Add(this._statusFormat);
     this._statusBar.Items.Add(this._statusDimensions);
     this._statusBar.Items.Add(this._statusBytes);
@@ -384,12 +403,15 @@ internal sealed class ViewerShell : Form {
   /// away — the ribbon walks its own tabs with them — so every command returns the focus to the
   /// canvas, the same way pressing a button on a toolbar does everywhere else.
   /// </remarks>
-  private RibbonButton _Button(string text, Action action, RibbonItemSize size = RibbonItemSize.Small) {
+  private RibbonButton _Button(string text, Action action, RibbonItemSize size = RibbonItemSize.Small, string? icon = null) {
     var button = new RibbonButton(text, size);
     button.Click += (_, _) => {
       action();
       this._viewport.Focus();
     };
+
+    if (icon != null)
+      this._icons.Apply(button, icon, size);
 
     return button;
   }
@@ -907,7 +929,11 @@ internal sealed class ViewerShell : Form {
     => MessageBox.Show(
       this,
       "Crush Viewer\n\nBrowser, viewer, converter and page extractor for the PNGCrushCS format suite, "
-      + "built on NativeForms over the platform's own widgets.",
+      + "built on NativeForms over the platform's own widgets.\n\n"
+      + "Icons: Silk icon set 1.3 by Mark James, http://www.famfamfam.com/lab/icons/silk/, "
+      + "licensed under Creative Commons Attribution 2.5.\n"
+      + "Oxygen Icon Theme, (C) 2007 The Oxygen Team, https://github.com/KDE/oxygen-icons5, "
+      + "under the GNU Lesser General Public License, version 3 or later.",
       "About Crush Viewer",
       MessageBoxButtons.OK,
       MessageBoxIcon.Information);
@@ -1088,6 +1114,7 @@ internal sealed class ViewerShell : Form {
   private void _ReleaseImages() {
     this._ReleaseDisplayed();
     this._thumbnails.Dispose();
+    this._icons.Dispose();
   }
 
   private void _ReleaseDisplayed() {
