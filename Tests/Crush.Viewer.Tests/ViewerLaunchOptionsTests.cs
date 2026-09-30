@@ -100,6 +100,27 @@ public sealed class ViewerLaunchOptionsTests {
   }
 
   [Test]
+  public void Parse_CommandOpensTheDialog_ApplyRunsWithoutAsking() {
+    var asking = ViewerLaunchOptions.Parse(["--command", "Gaussian blur", "picture.png"]);
+    var applying = ViewerLaunchOptions.Parse(["--apply", "Posterise"]);
+
+    Assert.That((asking.Command, asking.CommandWithoutAsking), Is.EqualTo(("Gaussian blur", false)));
+    Assert.That(asking.InitialPath, Is.EqualTo(Path.GetFullPath("picture.png")), "the command name was taken as a picture");
+    Assert.That((applying.Command, applying.CommandWithoutAsking), Is.EqualTo(("Posterise", true)));
+  }
+
+  [TestCase("30,150,70,110", 30, 150, 70, 110)]
+  [TestCase(" 1 , 2 , 3 , 4 ", 1, 2, 3, 4)]
+  public void Parse_RedEyeTakesFourNumbers(string value, int x, int y, int width, int height)
+    => Assert.That(ViewerLaunchOptions.Parse(["--red-eye", value]).RedEyeArea, Is.EqualTo(new FileFormat.Core.PixelRect(x, y, width, height)));
+
+  [TestCase("30,150,70")]
+  [TestCase("a,b,c,d")]
+  [TestCase("0,0,0,5")]
+  public void Parse_RedEyeThatIsNotAnArea_IsNotGiven(string value)
+    => Assert.That(ViewerLaunchOptions.Parse(["--red-eye", value]).RedEyeArea, Is.Null);
+
+  [Test]
   public void Parse_EverythingAtOnce() {
     var options = ViewerLaunchOptions.Parse(["--smoke-test", "--open", "picture.png", "--screenshot", "shot.png"]);
 
