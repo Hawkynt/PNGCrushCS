@@ -26,6 +26,9 @@
   <ItemGroup>
     <EmbeddedResource Include="Icons\Silk\*.png" LogicalName="Icons.Silk.%(Filename)%(Extension)" />
     <EmbeddedResource Include="Icons\Oxygen\*.png" LogicalName="Icons.Oxygen.%(Filename)%(Extension)" />
+    <EmbeddedResource Include="Icons\SilkCompanion\*.png" LogicalName="Icons.SilkCompanion.%(Filename)%(Extension)" />
+    <EmbeddedResource Include="Icons\Fugue\*.png" LogicalName="Icons.Fugue.%(Filename)%(Extension)" />
+    <EmbeddedResource Include="Icons\FatCow\*.png" LogicalName="Icons.FatCow.%(Filename)%(Extension)" />
   </ItemGroup>
 
   <ItemGroup>
