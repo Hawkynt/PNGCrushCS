@@ -21,6 +21,13 @@
     <PackageReference Include="Hawkynt.NativeForms.Backends.MacOS" Version="1.0.0.92" />
   </ItemGroup>
 
+  <!-- The ribbon's artwork, carried inside the assembly so a single-file build keeps it. The logical
+       name is stated rather than inferred, because IconSet keys an icon by the last segment of it. -->
+  <ItemGroup>
+    <EmbeddedResource Include="Icons\Silk\*.png" LogicalName="Icons.Silk.%(Filename)%(Extension)" />
+    <EmbeddedResource Include="Icons\Oxygen\*.png" LogicalName="Icons.Oxygen.%(Filename)%(Extension)" />
+  </ItemGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\Optimizers\Optimizer.Image\Optimizer.Image.csproj" />
     <ProjectReference Include="..\Hawkynt.FileFormats.Images\Hawkynt.FileFormats.Images.csproj" />

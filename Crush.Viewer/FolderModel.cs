@@ -42,8 +42,16 @@ internal sealed class FolderModel {
   /// <summary>Every extension any registered reader claims.</summary>
   internal static IReadOnlySet<string> ReadableExtensions => _readableExtensions.Value;
 
-  /// <summary>Whether a registered reader claims this file's extension.</summary>
-  internal static bool IsReadable(FileInfo file) => _readableExtensions.Value.Contains(file.Extension);
+  /// <summary>Whether a registered reader could open this file.</summary>
+  /// <remarks>
+  /// A file is what its bytes say it is, not what its name says: <see cref="FormatRegistry.Read(FileInfo)"/>
+  /// identifies a picture by its magic bytes and only falls back to the extension, so a PNG saved as
+  /// <c>.dat</c> opens perfectly well. Listing by extension alone would hide exactly the files the
+  /// reader is happiest with. The order here is the cheap test first — a name a reader claims needs
+  /// no disk access at all — and a header read only for the ones it does not.
+  /// </remarks>
+  internal static bool IsReadable(FileInfo file)
+    => _readableExtensions.Value.Contains(file.Extension) || _HasReadableHeader(file);
 
   /// <summary>Lists a folder and selects <paramref name="select"/> in it if it is there.</summary>
   internal void Open(DirectoryInfo folder, FileInfo? select = null) {
@@ -89,6 +97,33 @@ internal sealed class FolderModel {
     return next < 0 || next >= this._files.Length ? -1 : next;
   }
 
+  /// <summary>How much of a file the signature table is offered. Every known signature fits.</summary>
+  private const int _HEADER_BYTES = 1024;
+
+  /// <summary>Whether the first bytes of the file name a format some registered reader handles.</summary>
+  private static bool _HasReadableHeader(FileInfo file) {
+    if (file.Length < 2)
+      return false;
+
+    try {
+      using var stream = file.OpenRead();
+      var header = new byte[(int)Math.Min(_HEADER_BYTES, file.Length)];
+      var read = stream.ReadAtLeast(header, header.Length, throwOnEndOfStream: false);
+      var format = FormatRegistry.DetectFromBytes(header.AsSpan(0, read));
+      return format != ImageFormat.Unknown && FormatRegistry.GetEntry(format)?.SupportsRead == true;
+    } catch (IOException) {
+      return false;
+    } catch (UnauthorizedAccessException) {
+      return false;
+    }
+  }
+
+  /// <remarks>
+  /// The header reads run in parallel: a folder holding a few hundred files a reader does not claim
+  /// costs one small read each, and doing them one after another is what would make opening such a
+  /// folder feel slow. <c>AsOrdered</c> is deliberately absent — the sort that follows decides the
+  /// order, so the partitions may finish in any order they like.
+  /// </remarks>
   private static FileInfo[] _Enumerate(DirectoryInfo folder) {
     if (!folder.Exists)
       return [];
@@ -96,12 +131,17 @@ internal sealed class FolderModel {
     try {
       return folder
         .EnumerateFiles()
+        .AsParallel()
         .Where(IsReadable)
         .OrderBy(f => f.Name, NaturalStringComparer.Instance)
         .ToArray();
     } catch (UnauthorizedAccessException) {
       return [];
     } catch (IOException) {
+      return [];
+    } catch (AggregateException) {
+      // A refusal from the directory walk itself arrives wrapped once it is behind a partitioner,
+      // so the same answer as the unwrapped case has to be given to the wrapped one.
       return [];
     }
   }
