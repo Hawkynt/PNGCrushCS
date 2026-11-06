@@ -88,9 +88,12 @@ that adding one does not silently lengthen the fast tier.
   covers the other two operating systems for the parts that do build there.
 - **Viewer screenshots come from the viewer itself.** The `screenshot` job opens a generated PNG
   through the real decoder and captures the window instead of using brittle mouse-coordinate
-  automation. Its commit is made with `GITHUB_TOKEN`, which starts no `pull_request` run, and the CI
-  it dispatches for the new head arrives as `workflow_dispatch`, where the job is skipped, so it
-  cannot loop. It runs only for pull requests from this repository: a fork's token cannot write.
+  automation. The capture is deterministic, fixture folder name included, so a commit appears only
+  when the UI really changed. That commit is made with `GITHUB_TOKEN`; GitHub holds the pull
+  request's CI run for it as `action_required`, and only that run counts toward the required checks,
+  so the job approves it. It approves at most once per human push, so a capture that stopped being
+  deterministic cannot loop. It runs only for pull requests from this repository: a fork's token
+  cannot write.
 - **Push stays small, the pull request carries the rest.** The viewer matrix and the screenshot used
   to run on every push. Running them once, on the pull request, also ends the old push-plus-PR
   double run, whose superseded copy landed as a CANCELLED check and blocked the merge box.

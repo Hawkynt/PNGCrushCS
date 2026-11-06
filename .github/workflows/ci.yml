@@ -185,9 +185,9 @@ jobs:
         run: dotnet run --project Crush.Viewer/Crush.Viewer.csproj -c Debug --no-build --no-restore -p:EnableSingleFileBundle=false -- --smoke-test
 
   # Pull requests from this repository only: a fork's token cannot write, and a release calls this
-  # workflow from main, where nothing may be committed. The bot commit cannot re-trigger this job --
-  # a GITHUB_TOKEN commit starts no pull_request run, and the dispatch below arrives as
-  # workflow_dispatch -- so generation cannot loop.
+  # workflow from main, where nothing may be committed. The bot commit's own CI run is held until
+  # approved, and the job approves it at most once per human push (see the last step), so generation
+  # cannot loop even if a capture ever stops being deterministic.
   screenshot:
     name: Refresh viewer screenshot
     if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
@@ -249,13 +249,13 @@ jobs:
           file: docs/screenshots/crush-viewer.png
           message: '* refresh viewer screenshot'
 
-      # A GITHUB_TOKEN commit does not trigger another workflow, which is what stops generation
-      # looping. The cost is that for a branch that already has an open pull request, GitHub parks
-      # the pull_request/synchronize run for the bot commit in `action_required` and the required
-      # checks never attach to the generated head -- the pull request then shows no checks at all
-      # and cannot merge. workflow_dispatch is the documented exception that MAY start a workflow
-      # with GITHUB_TOKEN, so dispatch CI explicitly when generation actually advanced the branch.
-      - name: Run CI on the generated head
+      # The commit above is made with GITHUB_TOKEN, so it starts no workflow run that would loop. For a
+      # pull request, GitHub still creates the pull_request run for that bot commit but holds it as
+      # `action_required`. Only that run counts toward the required checks. A workflow_dispatch run
+      # on the same sha does not: its checks never attach to the pull request, which then shows no
+      # checks and cannot merge. So the job approves the held run itself. If the token may not, a
+      # maintainer approves it once from the pull request's Checks tab.
+      - name: Approve the CI run held for the generated head
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
@@ -269,5 +269,29 @@ jobs:
             exit 0
           fi
 
-          echo "Dispatching CI for generated head $generated_head."
-          gh workflow run ci.yml --ref "$branch"
+          # At most one generation per human push. If this run is already the approved run for a bot
+          # commit and the capture changed again, the capture is not deterministic; approving again
+          # would loop, so stop and leave it for a maintainer to look at.
+          if [ "$(gh api "repos/$GITHUB_REPOSITORY/commits/$PR_HEAD_SHA" --jq '.author.login // empty')" = "github-actions[bot]" ]; then
+            echo "::warning::The screenshot changed again on its own regenerated head, so the capture is not deterministic. Not approving another run."
+            exit 0
+          fi
+
+          # GitHub creates the held run a few seconds after the commit, so wait for it to appear.
+          for attempt in $(seq 1 18); do
+            run_id=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs?head_sha=$generated_head&event=pull_request" \
+              --jq '[.workflow_runs[] | select(.conclusion == "action_required")][0].id // empty')
+            [ -n "$run_id" ] && break
+            sleep 10
+          done
+
+          if [ -z "$run_id" ]; then
+            echo "::warning::No held pull_request run appeared for $generated_head; approve it from the pull request if one shows up."
+            exit 0
+          fi
+
+          if gh api -X POST "repos/$GITHUB_REPOSITORY/actions/runs/$run_id/approve" >/dev/null; then
+            echo "Approved held CI run $run_id for generated head $generated_head."
+          else
+            echo "::warning::Could not approve held CI run $run_id with the workflow token; approve it from the pull request's Checks tab."
+          fi
