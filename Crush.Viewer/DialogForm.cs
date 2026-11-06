@@ -56,6 +56,30 @@ internal abstract class DialogForm : Form {
   protected Label AddNote(string text, int height = 40)
     => this.AddWide(new Label { Text = text, TextAlign = Hawkynt.NativeForms.Drawing.ContentAlignment.TopLeft }, height);
 
+  /// <summary>Adds a paragraph across the whole width, broken into lines at word boundaries.</summary>
+  /// <remarks>
+  /// The toolkit's label draws one line and cuts the rest off with an ellipsis, so a sentence longer
+  /// than the dialog is wide is broken here, one label per line. The line length is a count of
+  /// characters rather than a measurement: the dialog is a fixed width, and a proportional font's
+  /// average glyph at the default size fits this many with room to spare.
+  /// </remarks>
+  protected void AddParagraph(string text, int charactersPerLine = 62) {
+    var line = new System.Text.StringBuilder();
+    foreach (var word in text.Split(' ', StringSplitOptions.RemoveEmptyEntries)) {
+      if (line.Length > 0 && line.Length + 1 + word.Length > charactersPerLine) {
+        this.AddWide(new Label { Text = line.ToString(), TextAlign = Hawkynt.NativeForms.Drawing.ContentAlignment.TopLeft }, 18);
+        line.Clear();
+      }
+
+      if (line.Length > 0)
+        line.Append(' ');
+      line.Append(word);
+    }
+
+    if (line.Length > 0)
+      this.AddWide(new Label { Text = line.ToString(), TextAlign = Hawkynt.NativeForms.Drawing.ContentAlignment.TopLeft }, 18);
+  }
+
   /// <summary>Closes the rows off with the buttons and sizes the window around everything.</summary>
   /// <remarks>
   /// The accept button deliberately carries no <see cref="Button.DialogResult"/>. A button that has

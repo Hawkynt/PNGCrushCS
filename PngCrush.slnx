@@ -12,6 +12,7 @@
     <Project Path="FileFormat.Core/FileFormat.Core.csproj" />
     <Project Path="Hawkynt.ColorProcessing.Adapter.Generators/Hawkynt.ColorProcessing.Adapter.Generators.csproj" />
     <Project Path="Hawkynt.ColorProcessing.Adapter/Hawkynt.ColorProcessing.Adapter.csproj" />
+    <Project Path="Hawkynt.ImageProcessing/Hawkynt.ImageProcessing.csproj" />
     <Project Path="FileFormat.TextMode/FileFormat.TextMode.csproj" />
     <Project Path="FileFormat.Registry.Generator/FileFormat.Registry.Generator.csproj" />
   </Folder>
@@ -48,6 +49,7 @@
     <Project Path="Tests/Crush.Image.Tests/Crush.Image.Tests.csproj" />
     <Project Path="Tests/Crush.Viewer.Tests/Crush.Viewer.Tests.csproj" />
     <Project Path="Tests/Hawkynt.ColorProcessing.Adapter.Tests/Hawkynt.ColorProcessing.Adapter.Tests.csproj" />
+    <Project Path="Tests/Hawkynt.ImageProcessing.Tests/Hawkynt.ImageProcessing.Tests.csproj" />
     <Project Path="Tests/Hawkynt.FileFormats.Images.Tests/Hawkynt.FileFormats.Images.Tests.csproj" />
     <Project Path="Tests/Hawkynt.FileFormats.Video.Tests/Hawkynt.FileFormats.Video.Tests.csproj" />
     <Project Path="Tests/EndToEnd.Tests/EndToEnd.Tests.csproj" />

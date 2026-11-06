@@ -12,13 +12,14 @@ namespace Crush.Viewer;
 /// <para>
 /// Two lists, because the ribbon draws a large item's icon at 32 pixels and everything else — a small
 /// item, a quick-access button, a status panel — at 16, and an icon looks its best at the size it was
-/// drawn for. The files are the two sets' own, at their own sizes: Silk at 16, Oxygen at 32, neither
-/// scaled up. Where a 32-pixel icon is wanted in a 16-pixel slot it is box-filtered down, which is
-/// what <see cref="ImageBridge.ToThumbnailArgb"/> already does for a picture.
+/// drawn for. The files are their sets' own, at their own sizes — Silk, its companion, Fugue and
+/// FatCow at 16, Oxygen and FatCow at 32 — and none is scaled up. Where a 32-pixel icon is wanted in
+/// a 16-pixel slot it is box-filtered down, which is what <see cref="ImageBridge.ToThumbnailArgb"/>
+/// already does for a picture.
 /// </para>
 /// <para>
 /// Decoding goes through the repository's own PNG reader rather than the toolkit's, which documents
-/// itself as handling a subset. The whole set is forty small files, so it is read once at start-up
+/// itself as handling a subset. The whole set is a few dozen small files, so it is read once at start-up
 /// rather than on demand: the cost is a few milliseconds and the alternative is a ribbon that fills
 /// in as the user notices it.
 /// </para>

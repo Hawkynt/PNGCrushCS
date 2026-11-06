@@ -61,6 +61,7 @@ internal static class Program {
 
   private static int _RunInteractive(IPlatformBackend backend, ViewerLaunchOptions options) {
     var shell = new ViewerShell(backend);
+    _SelectTab(shell, options);
     if (options.InitialPath != null)
       shell.Load += (_, _) => shell.OpenPath(options.InitialPath);
 
@@ -87,25 +88,56 @@ internal static class Program {
       }
 
       var shell = new ViewerShell(backend);
+      if (!_SelectTab(shell, options))
+        return 2;
+
+      if (options.Command != null && !ViewerShell.KnowsCommand(options.Command)) {
+        Console.Error.WriteLine(
+          $"--command '{options.Command}' names no pixel command; they are Resample, {string.Join(", ", Array.ConvertAll(PixelCommands.All, c => c.Text.TrimEnd('…')))}.");
+        return 2;
+      }
+
       _FitToScreen(shell);
       var opened = path;
       shell.Load += (_, _) => shell.OpenPath(opened);
 
+      // Posted rather than run from Load: a command with settings opens a modal dialog, and a modal
+      // loop started before the window's own loop exists never gets to paint.
+      if (options.Command is { } command)
+        shell.Load += (_, _) => shell.BeginInvoke(() => shell.RunCommand(command, options.CommandWithoutAsking));
+      else if (options.RedEyeArea is { } eye)
+        shell.Load += (_, _) => shell.BeginInvoke(() => shell.ReduceRedEye(eye));
+
       // The window has to be mapped and painted before the screen holds anything worth reading, and
       // the thumbnail decoder needs a moment to fill the browser, so the capture waits rather than
       // firing from Load. How long that takes is not something to guess at once: a capture that
-      // comes back empty is tried again before it is called a failure.
+      // comes back empty is tried again before it is called a failure. A command still running in
+      // the background is waited for the same way, so the capture shows its result.
       var attempts = 0;
       var timer = new Timer { Interval = _CAPTURE_DELAY_MS };
       timer.Tick += (_, _) => {
         ++attempts;
         var last = attempts >= _CAPTURE_ATTEMPTS;
-        var captured = _Capture(shell, options.ScreenshotPath!, reportFailure: last);
+        if (shell.IsBusy && !last)
+          return;
+
+        var dialog = shell.OpenDialog;
+        var captured = dialog != null
+          ? _Capture(dialog, options.ScreenshotPath!, reportFailure: last)
+          : _Capture(shell, options.ScreenshotPath!, reportFailure: last);
         if (!captured && !last)
           return;
 
         timer.Stop();
         status = captured ? 0 : 5;
+        if (dialog != null) {
+          // The window is closed from its own loop once the dialog's has ended; closing it from
+          // inside the dialog's loop would leave that loop running over a closed owner.
+          dialog.DialogResult = DialogResult.Cancel;
+          shell.BeginInvoke(shell.Close);
+          return;
+        }
+
         shell.Close();
       };
       timer.Start();
@@ -145,9 +177,9 @@ internal static class Program {
 
   private const int _TITLE_BAR_ALLOWANCE = 48;
   private const int _CAPTURE_DELAY_MS = 1500;
-  private const int _CAPTURE_ATTEMPTS = 3;
+  private const int _CAPTURE_ATTEMPTS = 6;
 
-  private static bool _Capture(ViewerShell shell, string path, bool reportFailure) {
+  private static bool _Capture(Form shell, string path, bool reportFailure) {
     var origin = shell.PointToScreen(new Point(0, 0));
     var size = shell.ClientSize;
     var captured = WindowCapture.Capture(origin.X, origin.Y, size.Width, size.Height);
@@ -174,6 +206,19 @@ internal static class Program {
       return true;
 
     Console.Error.WriteLine("The PNG writer refused the captured window.");
+    return false;
+  }
+
+  /// <summary>Opens the ribbon on the tab the command line named, and says so when it names none.</summary>
+  /// <remarks>
+  /// A capture of the wrong tab looks exactly like a successful capture, so a name that matches no
+  /// tab is an error rather than a quiet fall back to the first.
+  /// </remarks>
+  private static bool _SelectTab(ViewerShell shell, ViewerLaunchOptions options) {
+    if (options.Tab == null || shell.SelectTab(options.Tab))
+      return true;
+
+    Console.Error.WriteLine($"--tab '{options.Tab}' names no ribbon tab; the tabs are {string.Join(", ", shell.TabNames)}.");
     return false;
   }
 
