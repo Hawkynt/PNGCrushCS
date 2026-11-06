@@ -95,7 +95,7 @@ The complete image support table (read, write, metadata-only, multi-image, optim
 
 ![Crush Viewer showing the deterministic screenshot fixture](docs/screenshots/crush-viewer.png)
 
-The screenshot is not maintained by hand. Every push to a branch other than `main` builds the viewer on Windows, opens a folder of deterministic PNG fixtures through the real decoder, captures the window, and commits a changed screenshot back to that branch. Screenshot-only commits do not recursively trigger another capture.
+The screenshot is not maintained by hand. Every pull request from a branch of this repository builds the viewer on Windows, opens a folder of deterministic PNG fixtures through the real decoder, captures the window, and commits a changed screenshot back to the pull request's branch. That commit does not trigger another capture.
 
 NativeForms has no capture of its own, so `--screenshot` goes to the platform. On Windows it asks the window itself to draw into a bitmap (`PrintWindow`), which is the window whether or not it is in front; on X11 it reads the screen with `XGetImage`, where the job runs against a headless server with a single client. It refuses rather than writing a picture it cannot vouch for: a flat-colour capture is retried and then reported as a failure, Wayland is rejected outright because a client cannot read back a compositor's screen, and where the screen has to be read the rectangle is declined unless the window in front of it belongs to this process.
 
@@ -127,7 +127,7 @@ Every optimizer follows the same basic pipeline:
 
 ## 🤖 CI
 
-`ci.yml` is the merge gate and runs on pull requests only — nothing runs on a push to `main`, because a pull request has to be green to merge and re-running the same matrix on the merge commit proves nothing. `smoke.yml` gives a working branch the fast tier on one runner, `viewer-platforms.yml` builds the viewer on all three operating systems, and `viewer-screenshot.yml` refreshes the README screenshot, all on pushes to non-`main` branches. `coverage.yml` reports coverage on a daily schedule, gating nobody. `release.yml` handles coordinated releases and NuGet publishing. Version stamping is performed by `.github/workflows/scripts/version.pl --stamp` during CI.
+`ci.yml` is the merge gate and runs on pull requests only — nothing runs on a push to `main`, because a pull request has to be green to merge and re-running the same matrix on the merge commit proves nothing. The same pull-request run also builds the viewer on all three operating systems and refreshes the README screenshot. A push to a working branch gets only `smoke.yml`, the fast tier on one runner. `coverage.yml` reports coverage on a daily schedule, gating nobody. `release.yml` handles coordinated releases and NuGet publishing. Version stamping is performed by `.github/workflows/scripts/version.pl --stamp` during CI.
 
 Stable releases are manual. Nightlies are built from `main`, which only ever receives merges of green pull requests. The pipeline is documented in full in [`.github/workflows/README.md`](.github/workflows/README.md).
 

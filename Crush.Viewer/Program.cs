@@ -234,8 +234,15 @@ internal static class Program {
   }
 
   /// <summary>Writes a handful of deterministic pictures so a capture shows a populated window.</summary>
+  /// <remarks>
+  /// The folder name is fixed because the window shows the path. A random name made every capture
+  /// differ from the committed one, so CI committed a fresh screenshot on every pull-request run.
+  /// </remarks>
   private static DirectoryInfo _CreateScreenshotFixture() {
-    var folder = new DirectoryInfo(Path.Combine(Path.GetTempPath(), $"crush-viewer-{Guid.NewGuid():N}"));
+    var folder = new DirectoryInfo(Path.Combine(Path.GetTempPath(), "crush-viewer-screenshot"));
+    if (folder.Exists)
+      folder.Delete(true);
+
     folder.Create();
 
     (string Name, int Width, int Height, int Tile)[] plan = [

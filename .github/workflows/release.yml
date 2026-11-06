@@ -20,6 +20,12 @@ env:
 jobs:
   test:
     uses: ./.github/workflows/ci.yml
+    # The ceiling ci.yml's jobs may ask for. Its screenshot job needs actions + contents write and is
+    # skipped outside a pull request, but GitHub validates a called workflow's permissions before
+    # evaluating any `if`, so the release has to grant them or fail to start.
+    permissions:
+      actions: write
+      contents: write
     with:
       # Both OS legs still run the whole suite; only the coverage report is skipped. It takes about
       # two hours on its own and every job below waits on this one, so a release spent longer

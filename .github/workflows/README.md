@@ -5,14 +5,13 @@
 
 ## What this does
 
-Seven workflows, one shared build block, three helper scripts:
+Five workflows, one shared build block, three helper scripts. The three stages are push (`smoke.yml`),
+pull request (`ci.yml`) and release (`release.yml`); `nightly.yml` and `coverage.yml` run on their own.
 
 | File                            | Trigger                                  | Purpose                                          |
 |---------------------------------|------------------------------------------|--------------------------------------------------|
-| `ci.yml`                        | pull request + `workflow_call`           | The merge gate: build + tests on ubuntu + windows |
+| `ci.yml`                        | pull request + `workflow_call`           | The merge gate: full tests on ubuntu + windows, oracles, viewer on ubuntu + windows + macos, README screenshot refresh |
 | `smoke.yml`                     | push to branches other than `main`       | Fast tier on one runner: "did I just break it?"  |
-| `viewer-platforms.yml`          | push to non-`main`, viewer paths only    | Viewer builds on ubuntu + windows + macos        |
-| `viewer-screenshot.yml`         | push to branches other than `main`       | Build viewer + refresh README screenshot         |
 | `coverage.yml`                  | daily cron 03:41 UTC + manual            | Coverage report, gating nobody                   |
 | `nightly.yml`                   | push to `main`                           | Publish `nightly-YYYYMMDD` prerelease            |
 | `release.yml`                   | manual dispatch only                     | Cut a release, push the NuGet packages, tag it   |
@@ -24,36 +23,23 @@ Seven workflows, one shared build block, three helper scripts:
 ## How it works
 
 ```text
-    push to a working branch            pull request
-             │                                │
-    ┌────────┼────────────┐                   ▼
-    ▼        ▼            ▼           ┌───────────────┐
- smoke   viewer-      viewer-         │    ci.yml     │──► solution build + filtered
- .yml    platforms    screenshot      └───────┬───────┘    tests on ubuntu + windows
-    │      .yml         .yml                  │
-    │        │            │                   │ merge
-    │        │            └──► commit changed │
-    │        │                 docs/screen-   ▼
-    │        │                 shots/*.png   push to main
-    │        │                                │
-    └────────┴────────────┐                   ▼
-                          │            ┌─────────────┐
-   manual dispatch        │            │  nightly    │
-          │               │            │   .yml      │
-          ▼               │            └─────┬───────┘
-   ┌──────────┐           │                  │
-   │ release  │           │                  ▼
-   │  .yml    │           │       nightly-YYYYMMDD (prerelease)
-   └────┬─────┘           │                  │
-        │                 │                  ▼
-        ▼                 │        scripts/prune-nightlies.mjs
-  ci.yml (workflow_call)  │        (GFS: 7 daily + 4 weekly + 3 monthly)
-        │                 │
-        ▼                 │        ┌──────────────┐
-  GH Release v1.2.3       └───────►│ coverage.yml │◄── daily cron
-  + three NuGet packages           └──────────────┘
-        │
-        └──► both release and nightly call _build.yml
+  push to a working branch          pull request                  manual dispatch
+            │                             │                              │
+            ▼                             ▼                              ▼
+     ┌────────────┐              ┌─────────────────┐              ┌─────────────┐
+     │ smoke.yml  │              │     ci.yml      │◄─────────────│ release.yml │
+     └────────────┘              │ tests (ubuntu + │ workflow_call└──────┬──────┘
+   fast tests, one runner        │ windows), hap   │                     │
+                                 │ oracle, viewer  │                     ▼
+                                 │ on 3 OSes,      │            GH Release v1.2.3
+                                 │ screenshot ──► commit to PR  + three NuGet packages
+                                 └────────┬────────┘
+                                          │ merge
+                                          ▼
+                                    push to main ──► nightly.yml ──► nightly-YYYYMMDD
+                                                                     + prune (GFS 7/4/3)
+
+  daily cron ──► coverage.yml          release + nightly both call _build.yml
 ```
 
 ## Test tiers
@@ -76,7 +62,8 @@ that adding one does not silently lengthen the fast tier.
 
 - Every pull request is built and tested on ubuntu + windows before it can merge.
 - Every push to a working branch gets the fast tier back in minutes, on one runner.
-- Every non-`main` branch push refreshes the checked-in viewer screenshot when the rendered UI changes.
+- Every pull request builds the viewer on all three operating systems and refreshes the checked-in
+  screenshot when the rendered UI changes.
 - Every merge to `main` produces a **tested** nightly prerelease.
 - A stable release is cut by hand, and pushes `Hawkynt.FileFormats.Images`,
   `Hawkynt.FileFormats.Video` and `Hawkynt.ImageTransformUI` to nuget.org before it tags anything.
@@ -97,16 +84,19 @@ that adding one does not silently lengthen the fast tier.
 - **`publish` waits on `nuget`.** A release tagged `v<version>` whose packages never reached
   nuget.org is a release in name only, and until that dependency existed it could happen silently.
 - **`_build.yml` runs on windows-latest.** `Crush.Viewer` is WinForms (net10.0-windows), so
-  cross-platform publish isn't possible for the viewer. `viewer-platforms.yml` covers the other two
-  operating systems for the parts that do build there.
-- **Viewer screenshots come from the viewer itself.** The workflow opens a generated PNG through the
-  real decoder and uses the WinForms rendering path instead of brittle mouse-coordinate automation.
-  Screenshot-only pushes are excluded from the screenshot workflow, so its own commit cannot loop.
-- **`viewer-platforms.yml` triggers on push and not on pull request.** With both, every commit on a
-  branch that had a pull request ran the whole matrix twice on the same sha. Collapsing the pair
-  with a shared concurrency group was worse: the superseded run lands as a CANCELLED check, GitHub
-  rolls the head up to FAILURE, and the merge box goes BLOCKED. Not scheduling the duplicate is the
-  fix; cancelling it only moves the cost.
+  cross-platform publish isn't possible for the viewer. The `viewer-platforms` job in `ci.yml`
+  covers the other two operating systems for the parts that do build there.
+- **Viewer screenshots come from the viewer itself.** The `screenshot` job opens a generated PNG
+  through the real decoder and captures the window instead of using brittle mouse-coordinate
+  automation. The capture is deterministic, fixture folder name included, so a commit appears only
+  when the UI really changed. That commit is made with `GITHUB_TOKEN`; GitHub holds the pull
+  request's CI run for it as `action_required`, and only that run counts toward the required checks,
+  so the job approves it. It approves at most once per human push, so a capture that stopped being
+  deterministic cannot loop. It runs only for pull requests from this repository: a fork's token
+  cannot write.
+- **Push stays small, the pull request carries the rest.** The viewer matrix and the screenshot used
+  to run on every push. Running them once, on the pull request, also ends the old push-plus-PR
+  double run, whose superseded copy landed as a CANCELLED check and blocked the merge box.
 - **3-generation (GFS) retention**, not "keep last N". GFS guarantees at least one build per week
   for a month and one per month for a quarter.
 
