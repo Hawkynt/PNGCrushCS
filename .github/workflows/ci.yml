@@ -1,8 +1,10 @@
 name: CI
 
-# The gate a pull request has to pass. Nothing runs on a push to main: a pull request must be green
-# to merge, so re-running the same matrix on the merge commit proves nothing and costs a machine —
-# nightly.yml builds main after the merge instead.
+# The pull-request stage: the gate a pull request has to pass, plus everything that prepares it to
+# merge — the full test battery on ubuntu + windows, the oracles, the viewer on all three desktop
+# platforms, and the refreshed README screenshot. A push to a working branch only gets smoke.yml.
+# Nothing runs on a push to main: a pull request must be green to merge, so re-running the same
+# matrix on the merge commit proves nothing and costs a machine — nightly.yml builds main instead.
 on:
   pull_request:
     branches: [main, master]
@@ -19,6 +21,9 @@ on:
         type: boolean
         required: false
         default: false
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
 
 jobs:
   ci:
@@ -119,3 +124,150 @@ jobs:
           name: hap-reference-oracle
           path: ${{ runner.temp }}/hap-reference-artifacts
           if-no-files-found: warn
+
+  # Once on the pull request, not on every push: the matrix is three machines, and the old
+  # push-plus-pull_request pair ran it twice per sha, with the superseded run landing as a
+  # CANCELLED check that rolled the head up to FAILURE.
+  viewer-platforms:
+    name: Viewer (${{ matrix.os }})
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    steps:
+      - name: Checkout PNGCrushCS
+        uses: actions/checkout@v4
+        with:
+          path: PNGCrushCS
+          fetch-depth: 1
+
+      - name: Checkout CompressionWorkbench sibling
+        uses: actions/checkout@v4
+        with:
+          repository: Hawkynt/CompressionWorkbench
+          path: CompressionWorkbench
+          fetch-depth: 1
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.x
+            9.x
+            10.x
+
+      # The viewer draws through native widgets rather than bundling a renderer, so on Linux it needs
+      # GTK 3 on the machine. The runner image ships it for the browsers it preinstalls, but that is
+      # their dependency and not a promise to us; asking for it explicitly costs a no-op when present.
+      - name: Install GTK 3 (Linux)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends libgtk-3-0 || sudo apt-get install -y --no-install-recommends libgtk-3-0t64
+
+      - name: Build viewer
+        working-directory: PNGCrushCS
+        run: dotnet build Crush.Viewer/Crush.Viewer.csproj -c Debug --nologo -p:EnableSingleFileBundle=false
+
+      - name: Smoke-test empty startup (Linux)
+        if: runner.os == 'Linux'
+        shell: bash
+        working-directory: PNGCrushCS
+        run: xvfb-run -a dotnet run --project Crush.Viewer/Crush.Viewer.csproj -c Debug --no-build --no-restore -p:EnableSingleFileBundle=false -- --smoke-test
+
+      - name: Smoke-test empty startup (Windows/macOS)
+        if: runner.os != 'Linux'
+        working-directory: PNGCrushCS
+        run: dotnet run --project Crush.Viewer/Crush.Viewer.csproj -c Debug --no-build --no-restore -p:EnableSingleFileBundle=false -- --smoke-test
+
+  # Pull requests from this repository only: a fork's token cannot write, and a release calls this
+  # workflow from main, where nothing may be committed. The bot commit cannot re-trigger this job --
+  # a GITHUB_TOKEN commit starts no pull_request run, and the dispatch below arrives as
+  # workflow_dispatch -- so generation cannot loop.
+  screenshot:
+    name: Refresh viewer screenshot
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: windows-latest
+    permissions:
+      actions: write
+      contents: write
+    concurrency:
+      group: viewer-screenshot-${{ github.head_ref }}
+      cancel-in-progress: true
+    timeout-minutes: 15
+    steps:
+      # The repository sits at the workspace root here, unlike every other job, because the commit
+      # action below runs from the root and uses one path both for `git status` and for the contents
+      # API. Nested under PNGCrushCS/ the git call failed outside any repository, that failure read as
+      # "unchanged", and so no screenshot was ever committed. actions/checkout cannot write outside
+      # the workspace, so the sibling CompressionWorkbench is cloned beside it by hand.
+      - name: Checkout PNGCrushCS
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+          fetch-depth: 1
+
+      - name: Clone CompressionWorkbench sibling
+        shell: bash
+        run: git clone --quiet --depth 1 https://github.com/Hawkynt/CompressionWorkbench.git ../CompressionWorkbench
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.x
+            9.x
+            10.x
+
+      - name: Build viewer
+        run: dotnet build Crush.Viewer/Crush.Viewer.csproj -c Release --nologo -p:EnableSingleFileBundle=false
+
+      - name: Capture viewer
+        run: dotnet run --project Crush.Viewer/Crush.Viewer.csproj -c Release --no-build --no-restore -p:EnableSingleFileBundle=false -- --screenshot docs/screenshots/crush-viewer.png
+
+      - name: Validate screenshot
+        shell: pwsh
+        run: |
+          $path = "docs/screenshots/crush-viewer.png"
+          if (!(Test-Path $path)) { throw "Viewer screenshot was not created." }
+          $bytes = [IO.File]::ReadAllBytes($path)
+          if ($bytes.Length -lt 10000) { throw "Viewer screenshot is unexpectedly small ($($bytes.Length) bytes)." }
+          $png = [byte[]](0x89,0x50,0x4E,0x47,0x0D,0x0A,0x1A,0x0A)
+          for ($i = 0; $i -lt $png.Length; ++$i) {
+            if ($bytes[$i] -ne $png[$i]) { throw "Viewer screenshot is not a PNG file." }
+          }
+
+      # Committed through the contents API rather than `git commit` on the runner: a commit git
+      # makes here is unsigned, and DontDelete requires signatures, so the refreshed screenshot
+      # would block its own pull request forever. The action also no-ops when nothing changed.
+      - name: Commit refreshed screenshot
+        uses: Hawkynt/RepositoryTemplate/commit-generated-file@v1
+        with:
+          file: docs/screenshots/crush-viewer.png
+          message: '* refresh viewer screenshot'
+
+      # A GITHUB_TOKEN commit does not trigger another workflow, which is what stops generation
+      # looping. The cost is that for a branch that already has an open pull request, GitHub parks
+      # the pull_request/synchronize run for the bot commit in `action_required` and the required
+      # checks never attach to the generated head -- the pull request then shows no checks at all
+      # and cannot merge. workflow_dispatch is the documented exception that MAY start a workflow
+      # with GITHUB_TOKEN, so dispatch CI explicitly when generation actually advanced the branch.
+      - name: Run CI on the generated head
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          # Not GITHUB_SHA: on a pull request that is the synthetic merge commit, never a branch head.
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          branch="$GITHUB_HEAD_REF"
+          generated_head=$(gh api "repos/$GITHUB_REPOSITORY/branches/$branch" --jq '.commit.sha')
+          if [ "$generated_head" = "$PR_HEAD_SHA" ]; then
+            echo "::notice::The viewer screenshot was already current; this run covers this head."
+            exit 0
+          fi
+
+          echo "Dispatching CI for generated head $generated_head."
+          gh workflow run ci.yml --ref "$branch"
