@@ -1,15 +1,19 @@
 # What we do not read that XnView says it does
 
-Generated from XnView's own `Formats.txt` against `Decode --extensions`. RECOIL's catalogue is
-covered but for `.gr10p`, which RECOIL comments out of its own list for having a five-character
-extension, so this is the whole of the known coverage gap.
+Generated from XnView's own `Formats.txt` against `Decode --extensions`. This is XnView's gap and
+not the whole of the known one. An earlier line here said RECOIL's catalogue was covered, and counted
+by extension it nearly is — `.gr10p` is read now too — but by format it is not: RECOIL also reads
+`.mcm` and `.tcu`, which nothing here claims, and some thirty of its formats share an extension
+(`.art`, `.pic`, `.rgb`, `.fnt`, `.spr`, …) with a reader here that decodes a different format under
+the name. Those, and everything else known to be missing from any catalogue, are tracked one issue
+each in [`docs/MISSING-FORMATS.md`](../../docs/MISSING-FORMATS.md).
 
 A name here is a file we cannot open. That is counted and closed rather than explained — unlike
 the rendering differences in [the report beside this](README.md), which are cases of the tool giving
 something up and are correct as they stand.
 
 **Every count in this file was measured on 2026-08-09 and has not been re-measured since.** The
-registry has grown from 741 entries to 884 in the meantime, and the formats added since — Aseprite,
+registry has grown from 741 entries to 893 (as of 2026-11-23) in the meantime, and the formats added since — Aseprite,
 Garmin JNX, Brother PES, AVCI, Canon CR3 — came out of a comparison against ImageMagick rather than
 against this catalogue, so none of them closes a row here. Re-measure before quoting a number:
 `Decode --extensions` against XnView's own `Formats.txt` is where the gap list comes from, and this
