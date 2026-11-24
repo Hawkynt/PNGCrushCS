@@ -3025,7 +3025,11 @@ equal-probability literal bits where AV1 uses context-indexed CDFs and carries n
 default tables, so it desynchronises at the first partition decision: on a 32x32 still it returns a
 flat 130 across the plane where the reference has structure, 1024 samples of 1024 wrong. That path
 now refuses. A real AV1 decoder has to be built from the specification, and that is a job on the
-scale of this package's H.265 work rather than a gap to be filled in passing.
+scale of this package's H.265 work rather than a gap to be filled in passing. *(Superseded for stills: the AVIF reader's
+decoder was rewritten from the specification afterwards — context-indexed CDFs, the normative default
+tables, tile decoding — and decodes key frames; see `Hawkynt.FileFormats.Images/Formats/Avif/Codec/`.
+The video registry still has no AV1 codec: inter prediction, reference frames and film grain are
+what remains.)*
 
 **Windows Media before VC-1** — `wmv1`, `wmv2`, `msmpeg4v1`, `msmpeg4` (that is version 3), `msp2`,
 `mss1`, `mss2`, `msa1`, `mts2`. Version 2 is done. Versions 1 and 3 are argued in `README.md` to be

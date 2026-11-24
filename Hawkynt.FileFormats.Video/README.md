@@ -240,6 +240,15 @@ none is waiting on a decision — they are waiting on a fact that is not publish
 one stops precisely, and what would change the answer, is in
 [`codec-investigations.md`](https://github.com/Hawkynt/PNGCrushCS/blob/main/Hawkynt.FileFormats.Video/codec-investigations.md).
 
+That verdict predates the sourcing ladder in
+[`AGENTS.md`](https://github.com/Hawkynt/PNGCrushCS/blob/main/AGENTS.md#sourcing-an-implementation),
+which counts a licence-compatible implementation as the first rung rather than a barred one. Every
+codec in the table has an FFmpeg decoder under LGPL-2.1-or-later, and converting those decoders is how
+the sixteen in [Adapted from somebody else's code, and named](#adapted-from-somebody-elses-code-and-named)
+were closed. Each row is therefore an open issue, not a settled one. This table, the decoders with no
+encoder, and every container and codec the package does not register at all are tracked one issue
+each in [`docs/MISSING-FORMATS.md`](https://github.com/Hawkynt/PNGCrushCS/blob/main/docs/MISSING-FORMATS.md).
+
 Three walls account for nearly all of them. **The tables are in the binary, not in the files** — the
 smallest frame in a corpus cannot hold a quantisation table, so a table the format needs and never
 transmits can only come from an implementation. **The only description is a paraphrase of a decoder**
@@ -263,7 +272,7 @@ nothing could be verified even with a description in hand.
 | NewTek SpeedHQ | Container, framing and DC coding match ISO/IEC 13818-2 exactly; some unknown number of AC codewords are reassigned, and the one source printing the reassignment copied it from FFmpeg |
 | Canopus HQ, HQA, HQX | The vendor's papers are marketing; the one bitstream write-up is the decoder author's own account of reverse-engineering the format |
 | Dxtory | The one page states only that frames hold YV12 blocks behind a 16-byte header, and was written by the decoder's author on the day of his decoder commit |
-| HuffYUV MT (`HYMT`) | The multithreaded slice table is described only by the fork's own GPL source, which is both an implementation and licence-incompatible with this package |
+| HuffYUV MT (`HYMT`) | The multithreaded slice table is described by the fork's own GPL source and by FFmpeg's LGPL `huffyuvdec.c`, and by no document; no sample has been found anywhere and no encoder can make one |
 | Brooktree ProSumer (`BT20`) | One sentence, written four years after the decoder, names a codebook needed for delta-pair replacement and prints not one entry of it |
 | SheerVideo | The properly sourced frame-format document names but never prints a dozen static VLC codesets and seed predictors — and because they are static rather than transmitted, no file can ever reveal them |
 | YLC | Complete and well-sourced except for one clause naming a 225-entry constant table of YUYV quads that is printed nowhere; one 100-frame sample cannot demonstrate every entry was exercised |
@@ -439,7 +448,9 @@ Every public and protected member of all 541 types, generated from the built ass
 - Large RealVideo pictures require preserved slice offsets when they must be split across 16-bit RealMedia packet lengths, and RoQ sound requires its original predictor argument.
 - Several advanced codecs intentionally implement well-defined subsets (for example H.264 progressive 8-bit 4:2:0, HEVC without the range and screen-content extensions, and VC-1 Simple/Main intra pictures). Every row marked ⚠️ in the codec table names its own subset. Unsupported profiles/features are refused by name rather than silently misdecoded.
 - Codec support is more precise than a single green check can express; consult [`codec-notes.md`](https://github.com/Hawkynt/PNGCrushCS/blob/main/Hawkynt.FileFormats.Video/codec-notes.md) before relying on a profile/level/feature not named in this README.
-- Encoding is a smaller domain than decoding on purpose: 86 codecs of the 105 read can also be written. Most are lossless; thirty are not, and each says so in its own row. Motion JPEG writes baseline JPEG, whose loss is a matter of degree, and DV's fixed-length frames, Microsoft Video 1's two-colours-to-a-block coding, Cinepak's vector quantisation, Microsoft's MPEG-4 transform, the ASUS codecs' quantised DCT, Apple Video's 15-bit blocks, H.261's, H.263's, MPEG-1 video's, MPEG-2 video's, MPEG-4 Part 2's, VP3's, VP8's, VC-1's, Theora's and Apple ProRes's quantised transforms, CineForm's quantised wavelet, H.264's and H.265's 4:2:0 conversion, Hap's texture blocks, id RoQ's vector quantisation Intel Indeo 4's and Indeo 5's YVU9 chroma subsampling and Escape 124's two-RGB555-colours-per-2x2-block coding have no lossless form at all — a picture that codec can hold exactly comes back exactly, and one it cannot does not. What is still not written back is the modern lossy codecs: a stream read as H.264 cannot be written back as H.264.
+- Encoding is a smaller domain than decoding on purpose: 86 codecs of the 105 read can also be written. Most are lossless; thirty are not, and each says so in its own row. Motion JPEG writes baseline JPEG, whose loss is a matter of degree, and DV's fixed-length frames, Microsoft Video 1's two-colours-to-a-block coding, Cinepak's vector quantisation, Microsoft's MPEG-4 transform, the ASUS codecs' quantised DCT, Apple Video's 15-bit blocks, H.261's, H.263's, MPEG-1 video's, MPEG-2 video's, MPEG-4 Part 2's, VP3's, VP8's, VC-1's, Theora's and Apple ProRes's quantised transforms, CineForm's quantised wavelet, H.264's and H.265's 4:2:0 conversion, Hap's texture blocks, id RoQ's vector quantisation Intel Indeo 4's and Indeo 5's YVU9 chroma subsampling and Escape 124's two-RGB555-colours-per-2x2-block coding have no lossless form at all — a picture that codec can hold exactly comes back exactly, and one it cannot does not. The nineteen read and not written are the rows with no `Encode` tick, and each has an issue of its own in [`docs/MISSING-FORMATS.md`](https://github.com/Hawkynt/PNGCrushCS/blob/main/docs/MISSING-FORMATS.md).
+- Containers and codecs this package does not register at all — AV1, VVC, RealVideo 2–6, Bink, MXF and NUT among the better-known ones, and some four hundred game, legacy and camera formats beside them — are listed by category in [`docs/MISSING-FORMATS.md`](https://github.com/Hawkynt/PNGCrushCS/blob/main/docs/MISSING-FORMATS.md), one issue each.
+- `Crush.Viewer` has no video path yet; [#512](https://github.com/Hawkynt/PNGCrushCS/issues/512) adds one.
 - Video correctness depends on real-world packetization as much as codec math. The project therefore validates packet counts, sizes, timestamps, and key-frame flags against external tools where samples are available.
 
 ## 📚 References
