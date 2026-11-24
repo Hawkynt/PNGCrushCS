@@ -724,6 +724,40 @@ whose blocks account for a different number of bytes than it states, a frame pre
 buffer the picture layout does not have, and an empty frame opening a stream or standing in for wavelet
 bands no buffer still holds.
 
+### Duck TrueMotion 1
+
+Adapted from FFmpeg's `libavcodec/truemotion1.c` (LGPL-2.1-or-later), with the delta and vector
+tables of `truemotion1data.h` copied value for value. None of those tables is in the stream — the
+smallest frame in the corpus is empty — which is why this codec waited in `codec-investigations.md`
+until a licence-compatible implementation counted as a source.
+
+Measured over the eleven films in `samples.ffmpeg.org/V-codecs/DUCK/`: nine sixteen-bit AVIs and
+QuickTime films from 288x144 to 336x168, `salsa.avi`, whose frames switch between 288 and 192 wide
+part-way through, and `sonic3dblast_intro.avi`, the one twenty-four-bit film. FFmpeg is asked for its
+native layout — `rgb555le`, or `bgr0` for the twenty-four-bit form — with `-noautoscale`, so that a
+change of size reaches the comparison as the coded pictures rather than through a scaler, and every
+coded bit is compared. 16,369 of 16,395 pictures are identical.
+
+The other 26 are all in `sonic3dblast_intro.avi`, and the disagreement is FFmpeg's. That film has 23
+frames whose compression type, 0, codes no picture. FFmpeg sizes such a frame as sixteen-bit at the
+header's unhalved width, which in a twenty-four-bit film is a change of format: it drops its picture,
+emits a blank one, drops it again on the next coded frame, and decodes the following inter frames onto
+that blank picture until the next key frame. This decoder repeats the previous picture for a frame that
+codes nothing, which is what such a frame is for. The comparison skips exactly the pictures FFmpeg
+decodes onto its blank one, and requires each empty frame here to repeat the picture before it.
+
+Two further points where the decoder does not follow the reference: where FFmpeg stops decoding a
+frame part-way because the index stream has run out or an index has run off its table, keeping the
+rest of the previous picture, this decoder refuses the frame; and the predictor tables are rebuilt when
+the depth changes as well as when the delta set or vector table does. Neither occurs in the corpus.
+
+The encoder is original — FFmpeg has none to adapt. It replays the decoder's walk and, at every byte
+the decoder would read, tries every byte and every escape pair, keeping the one whose reconstructed
+pixels come closest; each key frame is coded under all twelve delta-set and vector-table pairs and the
+best kept. On a 64x48 textured gradient that gives 34.0 dB at sixteen bits and 37.8 dB at twenty-four.
+FFmpeg decodes fourteen-picture clips it writes, at both depths, to exactly the pictures this decoder
+does (`TrueMotion1VideoCodecTests`).
+
 ### QuickTime Animation (RLE)
 
 Lossless, and line-based rather than block-based: a frame names the band of lines it touches and

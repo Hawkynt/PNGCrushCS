@@ -303,6 +303,62 @@ internal static class FFmpegOracle {
   }
 
   /// <summary>
+  /// Decodes the first video stream into a named pixel format at every picture's own size, and hands
+  /// back the bytes as FFmpeg wrote them.
+  /// </summary>
+  /// <remarks>
+  /// FFmpeg's command line scales every picture to the first one's size when a stream changes size
+  /// part-way, so a stream that legitimately does — TrueMotion 1's interpolated frames are coded
+  /// narrower than the key frames around them — reaches a fixed-size comparison through a scaler.
+  /// <c>-noautoscale</c> turns that off and the raw output becomes a run of pictures of varying size,
+  /// which only a caller that knows each picture's size can cut apart.
+  /// </remarks>
+  public static (bool Decoded, string Output, byte[] Pictures) TryDecodeUnscaled(string path, string pixelFormat) {
+    var raw = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName() + ".raw");
+
+    try {
+      var startInfo = new ProcessStartInfo(ExecutablePath!) {
+        RedirectStandardOutput = true,
+        RedirectStandardError = true,
+        UseShellExecute = false,
+      };
+
+      foreach (var argument in new[] {
+        "-hide_banner", "-loglevel", "error", "-y", "-i", path,
+        "-map", "0:v:0", "-an", "-sn", "-dn", "-fps_mode", "passthrough", "-noautoscale",
+        "-f", "rawvideo", "-pix_fmt", pixelFormat, raw,
+      })
+        startInfo.ArgumentList.Add(argument);
+
+      using var process = Process.Start(startInfo);
+      if (process == null)
+        return (false, "ffmpeg would not start", []);
+
+      var stdout = process.StandardOutput.ReadToEndAsync();
+      var stderr = process.StandardError.ReadToEndAsync();
+
+      if (!process.WaitForExit(_TIMEOUT_MILLISECONDS * 4)) {
+        try { process.Kill(entireProcessTree: true); } catch { /* already gone */ }
+        return (false, "ffmpeg timed out", []);
+      }
+
+      var diagnostics = SignificantDiagnostics(string.Concat(stdout.Result, stderr.Result));
+      if (diagnostics.Length != 0)
+        return (false, diagnostics, []);
+
+      return File.Exists(raw)
+        ? (true, "decoded", File.ReadAllBytes(raw))
+        : (false, "it produced no decoded video bytes", []);
+    } catch (Win32Exception) {
+      return (false, "no ffmpeg on this machine", []);
+    } catch (Exception exception) {
+      return (false, $"{exception.GetType().Name}: {exception.Message}", []);
+    } finally {
+      try { File.Delete(raw); } catch { /* best effort */ }
+    }
+  }
+
+  /// <summary>
   /// What FFmpeg said that is about the file, with the one line that is about FFmpeg's own version
   /// dropped.
   /// </summary>

@@ -106,8 +106,9 @@ route was recovering the tables from files. The route actually taken was to copy
 whose sources are LGPL and therefore the first rung of `AGENTS.md`'s ladder, where constants are
 copied exactly rather than re-derived. What the frame sizes ruled out was reverse-engineering, not
 implementation. Indeo 4 and 5 now agree with FFmpeg on 2,846,698,740 samples across 22,777 pictures
-with nothing differing; the codec table says so and `codec-notes.md` has the detail. The two
-TrueMotion entries are untouched by this and remain where they are.
+with nothing differing; the codec table says so and `codec-notes.md` has the detail. The same
+route later closed TrueMotion 1, whose tables FFmpeg's `truemotion1data.h` carries; it is decoded
+and measured in `codec-notes.md`.
 
 Indeo 3 was mapped anyway, because it was first and because the mapping is worth having if the
 question is ever revisited. Its header is fully recovered and verified over roughly 3000 frames in
