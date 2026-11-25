@@ -5,7 +5,7 @@
     "comment": null,
     "review": null
   },
-  "expiresAt": "2026-12-02T07:34:23Z",
+  "expiresAt": "2026-12-02T07:36:41Z",
   "generation": 1,
   "holder": {
     "manager": "DE05PCI025-28e1",
@@ -14,7 +14,7 @@
   "issue": 512,
   "model": "Claude Opus 5.5",
   "pausedUntil": null,
-  "renewedAt": "2026-11-25T07:34:23Z",
+  "renewedAt": "2026-11-25T07:36:41Z",
   "state": "working",
   "step": "understand",
   "takeovers": 0
