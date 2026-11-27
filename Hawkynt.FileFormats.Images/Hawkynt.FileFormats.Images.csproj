@@ -66,6 +66,15 @@
     <Compile Include="$(CwSiblingPath)\Entropy\Huffman\HuffmanNode.cs" LinkBase="External\Cw\Entropy\Huffman" />
   </ItemGroup>
 
+  <!-- Substitute outlines for non-embedded standard PDF fonts: Liberation 2.1.5 (SIL OFL 1.1),
+       unmodified, Brotli-compressed; the licence travels inside the assembly beside them. -->
+  <ItemGroup>
+    <EmbeddedResource Include="Formats\Pdf\Fonts\Data\Substitutes\*.ttf.br"
+                      LogicalName="FileFormat.Pdf.Fonts.Data.Substitutes.%(Filename)%(Extension)" />
+    <EmbeddedResource Include="Formats\Pdf\Fonts\Data\Substitutes\OFL-Liberation.txt"
+                      LogicalName="FileFormat.Pdf.Fonts.Data.Substitutes.OFL-Liberation.txt" />
+  </ItemGroup>
+
   <ItemGroup>
     <None Include="README.md" Pack="true" PackagePath="\" />
     <!-- Expose <FileFormatRegistryNamespace> to the source generator's AnalyzerConfigOptions. -->

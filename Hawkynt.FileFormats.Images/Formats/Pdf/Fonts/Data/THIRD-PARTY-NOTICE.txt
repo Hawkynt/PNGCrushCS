@@ -1,0 +1,91 @@
+Third-party material in Formats/Pdf/Fonts/Data
+==============================================
+
+1. pdf.js (Apache License 2.0)
+------------------------------
+Copyright 2012 Mozilla Foundation
+https://github.com/mozilla/pdf.js
+
+Converted from pdf.js:
+- PdfEncodings.cs: the encoding tables of src/core/encodings.js, and the
+  PDFDocEncoding code points of src/core/string_utils.js
+  (PDFStringTranslateTable), named through the Adobe Glyph List.
+- StandardFontMetrics.cs: the glyph widths of src/core/metrics.js.
+- StandardFontNames.cs: the name tables getStdFontMap, getNonStdFontMap and
+  getSerifFonts of src/core/standard_fonts.js, and normalizeFontName of
+  src/core/fonts_utils.js.
+- GlyphList.cs: the uniXXXX / uXXXX[XX] rule of getUnicodeForGlyph in
+  src/core/unicode.js.
+
+Licensed under the Apache License, Version 2.0 (the "License"); you may not
+use these files except in compliance with the License. You may obtain a copy
+of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+License for the specific language governing permissions and limitations under
+the License.
+
+
+2. Adobe Glyph List 2.0 and ITC Zapf Dingbats Glyph List (BSD 3-Clause)
+-----------------------------------------------------------------------
+GlyphList.cs carries glyphlist.txt and zapfdingbats.txt from
+https://github.com/adobe-type-tools/agl-aglfn unchanged in content.
+
+Copyright 2002-2019 Adobe (http://www.adobe.com/).
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+
+Redistributions of source code must retain the above copyright notice, this
+list of conditions and the following disclaimer.
+
+Redistributions in binary form must reproduce the above copyright notice,
+this list of conditions and the following disclaimer in the documentation
+and/or other materials provided with the distribution.
+
+Neither the name of Adobe nor the names of its contributors may be used to
+endorse or promote products derived from this software without specific prior
+written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+
+3. Adobe Core 14 AFM files
+--------------------------
+The widths in StandardFontMetrics.cs are the WX values of the Core 14 AFM
+files (Helvetica.afm and the rest), reached through pdf.js's metrics.js and
+checked against the AFM files. Modification note: only the advance widths are
+carried, re-expressed as a table keyed by glyph name; nothing else of the AFM
+files is included. Each AFM file carries a copyright line of the form
+
+  Copyright (c) 1985, 1987, 1989, 1990, 1997 Adobe Systems Incorporated.
+  All Rights Reserved.
+
+(that one is Helvetica.afm's; the years differ from file to file), and the
+ReadMe that accompanies them reads:
+
+  This file and the 14 PostScript(R) AFM files it accompanies may be used,
+  copied, and distributed for any purpose and without charge, with or without
+  modification, provided that all copyright notices are retained; that the AFM
+  files are not distributed without this file; that all modifications to this
+  file or any of the AFM files are prominently noted in the modified file(s);
+  and that this paragraph is not modified. Adobe Systems has no responsibility
+  or obligation to support the use of the AFM files.
+
+
+4. Liberation fonts 2.1.5 (SIL Open Font License 1.1)
+----------------------------------------------------
+See THIRD-PARTY-NOTICE.Liberation.txt and Substitutes/OFL-Liberation.txt.
