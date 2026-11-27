@@ -1,0 +1,30 @@
+The On2 VP6 decoder in this directory is converted from FFmpeg (https://github.com/FFmpeg/FFmpeg):
+
+  libavcodec/vp6.c              frame header, vector and coefficient models, both coefficient
+                                codings, the bicubic and bilinear prediction filters
+  libavcodec/vp6data.h          VP6's own tables
+  libavcodec/vp56.c             macroblock types and statistics, motion-vector prediction, the
+                                direct-current predictor, motion compensation, the reconstruction
+                                loop and the VP6A alpha bitstream
+  libavcodec/vp56data.c         the tables VP6 shares with VP5 (taken from ../Vp5)
+  libavcodec/vp6dsp.c           the two-dimensional four-tap filter
+  libavcodec/vp3dsp.c           the inverse DCT in its full, ten-coefficient and DC-only forms, and
+                                the loop filter with its bounding values
+  libavcodec/h264chroma_template.c  the eighth-sample bilinear filter
+  libavcodec/huffman.c          the Huffman tree construction VP6's Huffman mode uses
+
+  Copyright (C) 2006  Aurelien Jacobs <aurel@gnuage.org>   (vp6.c, vp56.c)
+  and the FFmpeg developers named in the files above.
+
+FFmpeg distributes those sources under the GNU Lesser General Public License, version 2.1 or (at
+your option) any later version. This work is distributed under the GNU Lesser General Public
+License version 3 or later, which the "or later" clause permits; the licence text is in LICENSE at
+the root of this repository.
+
+The algorithms are carried across into managed C#, not vendored. The tables in Vp6Tables.cs were
+transcribed mechanically, by a script that parsed vp6data.h's C initialisers, and are reproduced
+exactly because they are fixed codec data required for interoperability.
+
+The encoder (Vp6Encoder.cs, ../Vp6VideoEncoder.cs) is an original inverse of this decoder. FFmpeg has
+no VP6 encoder, so nothing of an encoder is translated; FFmpeg's decoder is the oracle that reads what
+it writes.

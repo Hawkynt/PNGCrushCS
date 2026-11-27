@@ -176,6 +176,11 @@ time removing from other readers.
 
 # VP6, where the tables are published and the decode still does not come out
 
+*Closed.* VP6 is decoded now, converted from FFmpeg's LGPL-2.1-or-later `vp6.c` and `vp56.c`, and agrees
+with FFmpeg on every one of 15,194 pictures across all three of its forms; `codec-notes.md` has the
+measurement. The record below is kept for what it shows about building a decoder from the
+specification alone.
+
 VP6 — `VP60`, `VP61` and `VP62` in an AVI, code 4 in Flash Video — is the odd one out here, and it is
 worth separating from the five above for exactly that reason. It has a specification, the On2 *VP6
 Bitstream & Decoder Specification* version 1.02 of 17 August 2006, mirrored at

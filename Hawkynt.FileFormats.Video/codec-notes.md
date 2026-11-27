@@ -857,6 +857,43 @@ frame, so a miscounted coded-block run, a mode written for a macro block that ca
 in the wrong units would pass it and fail in a real player on frame two. A still scene is also required
 to converge, which is what demonstrates the coded-block flags firing at all.
 
+### On2 VP6
+
+Converted from FFmpeg's `libavcodec/vp6.c` and `vp56.c` with the DSP they lean on — `vp6dsp.c`,
+VP3's IDCT and loop filter, H.264's bilinear chroma filter and `huffman.c`'s tree builder — all
+LGPL-2.1-or-later; the VP6 tables were parsed mechanically out of `vp6data.h`, and the tables VP6
+shares with VP5 are the VP5 decoder's. `codec-investigations.md` records how far a decoder built from
+On2's published specification got; converted from FFmpeg, it follows every film.
+
+Measured over thirteen films: `samples.ffmpeg.org/V-codecs/VP6/` (VP60 and VP61 `predator2`, VP61
+`vid.avi` and `Xmen-avc-500`, VP62 `harry3-40` and `wagner-700`, and the Huffman-coded VP6F
+`backcountry_bombshells`, of which the first 2,439 pictures are compared to keep the decode under
+.NET's two-gigabyte file limit) and the FATE suite's `vp6/interlaced32x32`, `interlaced32x64` and
+`flash-vp6/clip1024` and `300x180-Scr-f8-056alpha`. FFmpeg is asked for `yuv420p`, or `yuva420p` for
+VP6A, at each picture's own size, and the planes are compared byte for byte: all 15,194 pictures are
+identical. That covers the bottom-up AVI form and the top-down Flash form, sub-versions 0 to 8, field-
+coded macroblocks, both coefficient codings, the separate partition, the bicubic filter sets with the
+variance and vector-length switch, and the alpha bitstream. The NSV sample `size_change.nsv` is not
+read because this package has no NSV demuxer (a missing-format issue of its own).
+
+Two choices differ from FFmpeg where FFmpeg patches over damage: a frame whose coefficient data runs
+out is refused rather than concealed with copied macroblocks, and an inter frame with no reference
+picture is refused rather than decoded onto a blank one. Neither occurs in the corpus.
+
+The encoder is original. It writes a single range-coded partition with the default models, bilinear
+filtering and no loop filter: intra key frames every twelfth picture, and inter frames whose
+macroblocks are copied, moved by a whole-sample vector from a ±8-sample search — named by the
+neighbour that already carries it where one does — or intra-coded, by whichever leaves the least error.
+Its residuals are coded against the prediction the decoder will form, obtained from the decoder
+itself, and its reference is the decoder's reconstruction of what it has just written. A 48x32 textured
+gradient comes back at 35.8 dB at quantiser 56. FFmpeg decodes fourteen-picture clips it writes as
+VP6F and VP6A in FLV and as VP60 and VP62 in AVI to exactly the planes this decoder produces
+(`Vp6VideoCodecTests`).
+
+FLV carries a VP6 frame's crop byte between the tag header and the bitstream. The FLV reader now hands
+it over as the packet's container data rather than as the first byte of the frame, as FFmpeg's FLV
+demuxer moves it into extradata, and the writer puts it back.
+
 ### On2 VP5
 
 VP5 (`VP50`) is the step between VP3 and VP6: VP3's 4:2:0 block structure and VP3's 8x8 integer

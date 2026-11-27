@@ -313,7 +313,7 @@ internal static class FFmpegOracle {
   /// <c>-noautoscale</c> turns that off and the raw output becomes a run of pictures of varying size,
   /// which only a caller that knows each picture's size can cut apart.
   /// </remarks>
-  public static (bool Decoded, string Output, byte[] Pictures) TryDecodeUnscaled(string path, string pixelFormat) {
+  public static (bool Decoded, string Output, byte[] Pictures) TryDecodeUnscaled(string path, string pixelFormat, int? maxFrames = null) {
     var raw = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName() + ".raw");
 
     try {
@@ -326,6 +326,7 @@ internal static class FFmpegOracle {
       foreach (var argument in new[] {
         "-hide_banner", "-loglevel", "error", "-y", "-i", path,
         "-map", "0:v:0", "-an", "-sn", "-dn", "-fps_mode", "passthrough", "-noautoscale",
+        "-frames:v", (maxFrames ?? int.MaxValue).ToString(System.Globalization.CultureInfo.InvariantCulture),
         "-f", "rawvideo", "-pix_fmt", pixelFormat, raw,
       })
         startInfo.ArgumentList.Add(argument);
