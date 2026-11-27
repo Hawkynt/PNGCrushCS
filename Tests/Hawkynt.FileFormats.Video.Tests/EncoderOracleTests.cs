@@ -290,6 +290,8 @@ public sealed class EncoderOracleTests {
     ("Tmv", ".tmv", static (streams, packets) => VideoIO.Mux<FileFormat.Tmv.TmvWriter>(streams, packets)),
     // Nor has DFA's.
     ("Dfa", ".dfa", static (streams, packets) => VideoIO.Mux<FileFormat.Dfa.DfaWriter>(streams, packets)),
+    // Nor has Deluxe Paint Animation's.
+    ("DeluxePaintAnm", ".anm", static (streams, packets) => VideoIO.Mux<FileFormat.DeluxePaintAnm.DeluxePaintAnmWriter>(streams, packets)),
   ];
 
   /// <summary>

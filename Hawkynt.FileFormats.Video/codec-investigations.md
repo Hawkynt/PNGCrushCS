@@ -2211,6 +2211,11 @@ three-byte form's true bit layout is not yet pinned down by even a second occurr
 # Deluxe Paint Animation (ANM), where the container is Electronic Arts' own documentation and the
 codec is only their source code
 
+*Closed.* ANM is demuxed, muxed, decoded and encoded now, converted from FFmpeg's LGPL-2.1-or-later
+`libavformat/anm.c` and `libavcodec/anm.c`, which settles the RunSkipDump opcodes this section could find
+only in Electronic Arts' unlicensed source. Every picture of five real films decodes exactly as FFmpeg
+decodes it; `codec-notes.md` has the measurement.
+
 ANM (`anm`, FourCC-less, magic `LPF `) was investigated because it looked like the cheapest of the
 remaining game formats on the same promise several already-decoded ones had: a container recovered from
 prose, a small alphabet of frame-to-frame operations, and real samples to check either against. The

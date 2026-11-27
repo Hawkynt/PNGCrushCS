@@ -2251,6 +2251,44 @@ a fixed six-seven-six colour cube. Re-encoding the decoded real films gives ever
 `LOGOS.DFA`'s 5,082,797. FFmpeg reads the container and the codec this writes, to exactly this decoder's
 pictures.
 
+### Deluxe Paint Animation
+
+Container and codec converted from FFmpeg's `libavformat/anm.c` and `libavcodec/anm.c`, LGPL-2.1-or-later.
+The film is Electronic Arts' large-page file: a 128-byte `LPF ` header naming `ANIM`, the picture size, the
+record count, the frame rate and a flag for a looping last delta; 128 bytes of colour-cycling ranges; a
+palette of 256 little-endian `0x00RRGGBB` entries; a table of 256 pages; and the pages, 64 KiB apart, each
+stating the first record it holds, how many and their bytes, then their sizes and the records. The cycling
+ranges and palette reach the decoder as codec private data, as FFmpeg's extradata.
+
+FFmpeg's demuxer is followed exactly where it is particular. A page is found by the number of the record
+after the last page's, so pages need not lie in order, and every record a page lists is read from its
+first. The header's record count, one less where there is a last delta, is consulted only when the next
+page is looked for, so a last delta is left out only where it opens a page of its own: `Vrs.anm` has one
+page and all 26 of its records are read.
+
+A record is `0x42`, a zero, two bytes nobody reads and RunSkipDump operations on one persistent picture: a
+count byte dumps or, with its top bit, skips; a zero byte is followed by a count and a pixel to fill; and
+`0x80` is followed by a word whose top two bits choose a skip, a skip of 0x4000 more, a dump or a fill, a
+zero count with type zero ending the record. Operations run line by line, and one that passes the end of
+the picture, or a dump the record cannot supply, ends the record where it stands. An empty record holds
+the last picture; FFmpeg yields no picture for it, and neither does this decoder. `Hyytel__in_space_by_MukaSmarts.anm` has
+2,194 of them among its 4,696 records.
+
+Measured against FFmpeg n9.1 with `-flags +bitexact`: all 2,848 pictures of `CINEOV2.ANM`, `INTRO1.ANM`,
+`SW.ANM`, `Vrs.anm` and `Hyytel__in_space_by_MukaSmarts.anm` are identical.
+
+The encoder is this package's own, FFmpeg having none. The film has one palette, in its header: the first
+picture's when that is `Indexed8`, a six-seven-six colour cube otherwise, and a later picture in other
+colours is taken to the nearest in it. The stream's description carries the palette once the first
+picture is encoded, which is when the Viewer and the tests ask for it. The first record writes every pixel;
+later ones skip what has not changed, fill runs of three or more and dump the rest. The writer packs the
+records in order into pages, padding every page but the last to its 64 KiB as Deluxe Paint does, and a
+record must fit one page, which bounds a picture at about 65,000 pixels. Re-encoding the decoded real
+films, picture for picture, gives every picture back exactly and comes out smaller than every original:
+642,724 bytes against `CINEOV2.ANM`'s 655,497, 428,293 against `INTRO1.ANM`'s 452,911, 411,361 against
+`SW.ANM`'s 418,832 and 27,233 against `Vrs.anm`'s 32,498. FFmpeg reads the container and the codec this
+writes, to exactly this decoder's pictures, a film of several pages included.
+
 ### Electronic Arts TQI, TGQ, Madcow and TGV
 
 Converted from FFmpeg's `libavcodec/eatqi.c`, `eatgq.c`, `eamad.c`, `eatgv.c` and the inverse DCT the first

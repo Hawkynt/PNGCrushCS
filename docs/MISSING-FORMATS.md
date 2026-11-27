@@ -43,13 +43,13 @@ issue quotes the recorded blocker and the route around it.
 | [Editor & application native](#editor--application-native) | [#521](https://github.com/Hawkynt/PNGCrushCS/issues/521) | 49 | 0 | 0 | 0 | 49 |
 | [Embroidery & industrial](#embroidery--industrial) | [#522](https://github.com/Hawkynt/PNGCrushCS/issues/522) | 20 | 0 | 0 | 0 | 20 |
 | [Standard & broadcast video](#standard--broadcast-video) | [#523](https://github.com/Hawkynt/PNGCrushCS/issues/523) | 0 | 35 | 16 | 0 | 51 |
-| [Game & multimedia-title video](#game--multimedia-title-video) | [#524](https://github.com/Hawkynt/PNGCrushCS/issues/524) | 0 | 42 | 199 | 6 | 247 |
+| [Game & multimedia-title video](#game--multimedia-title-video) | [#524](https://github.com/Hawkynt/PNGCrushCS/issues/524) | 0 | 41 | 198 | 6 | 245 |
 | [Legacy PC & capture-card video](#legacy-pc--capture-card-video) | [#525](https://github.com/Hawkynt/PNGCrushCS/issues/525) | 0 | 51 | 36 | 2 | 89 |
 | [Screen-capture video](#screen-capture-video) | [#526](https://github.com/Hawkynt/PNGCrushCS/issues/526) | 0 | 16 | 0 | 9 | 25 |
 | [Lossless & uncompressed video](#lossless--uncompressed-video) | [#527](https://github.com/Hawkynt/PNGCrushCS/issues/527) | 0 | 12 | 0 | 2 | 14 |
 | [Cinema camera RAW video](#cinema-camera-raw-video) | [#528](https://github.com/Hawkynt/PNGCrushCS/issues/528) | 0 | 6 | 7 | 0 | 13 |
 | [Elementary streams & streaming manifests](#elementary-streams--streaming-manifests) | [#529](https://github.com/Hawkynt/PNGCrushCS/issues/529) | 0 | 0 | 18 | 0 | 18 |
-| **All** | | **578** | **162** | **276** | **19** | **1035** |
+| **All** | | **578** | **161** | **275** | **19** | **1033** |
 
 Each issue carries the labels `cat: <category>`, its kind (`image-format`, `video-codec`, `video-container`, `video-encoder`), `priority: high|medium|low`, and `documented-blocker` where that applies.
 
@@ -784,7 +784,6 @@ Codecs/containers from games, consoles, CD-ROM titles and animation tools. Track
 | CRI P256 | Codec | `P256`, `B256` | decode + encode | missing | low | [#1220](https://github.com/Hawkynt/PNGCrushCS/issues/1220) |
 | Cryo HNM4 video | Codec | `.hnm` | decode + encode | missing | low | [#1225](https://github.com/Hawkynt/PNGCrushCS/issues/1225) |
 | Delphine Software CIN video | Codec | `.cin` | decode + encode | missing | low | [#1235](https://github.com/Hawkynt/PNGCrushCS/issues/1235) |
-| Deluxe Paint Animation (ANM) | Codec | `.anm` | decode + encode | blocked | low | [#1237](https://github.com/Hawkynt/PNGCrushCS/issues/1237) |
 | Digital Pictures SGA Video | Codec | `.sga` | decode + encode | missing | low | [#1241](https://github.com/Hawkynt/PNGCrushCS/issues/1241) |
 | Discworld II BMV video | Codec | `.bmv` | decode + encode | missing | low | [#1243](https://github.com/Hawkynt/PNGCrushCS/issues/1243) |
 | Eidos Escape 122 | Codec | `ESCP 122` | decode + encode | missing | low | [#1251](https://github.com/Hawkynt/PNGCrushCS/issues/1251) |
@@ -860,7 +859,6 @@ Codecs/containers from games, consoles, CD-ROM titles and animation tools. Track
 | Death Rally HAF | Container | `.haf` | demux + mux | missing | low | [#1233](https://github.com/Hawkynt/PNGCrushCS/issues/1233) |
 | Defcon 5 VID | Container | `defcon5` | demux + mux | missing | low | [#1234](https://github.com/Hawkynt/PNGCrushCS/issues/1234) |
 | Delphine Software International CIN | Container | `.cin` | demux + mux | missing | low | [#1236](https://github.com/Hawkynt/PNGCrushCS/issues/1236) |
-| Deluxe Paint Animation (LPF ANM) | Container | `.anm` | demux + mux | blocked | low | [#1238](https://github.com/Hawkynt/PNGCrushCS/issues/1238) |
 | Digital Integration Q3 (Hind) | Container | `.q3` | demux + mux | missing | low | [#1239](https://github.com/Hawkynt/PNGCrushCS/issues/1239) |
 | Digital Pictures SGA | Container | `.sga` | demux + mux | missing | low | [#1240](https://github.com/Hawkynt/PNGCrushCS/issues/1240) |
 | Discworld II BMV | Container | `.bmv` | demux + mux | missing | low | [#1242](https://github.com/Hawkynt/PNGCrushCS/issues/1242) |
