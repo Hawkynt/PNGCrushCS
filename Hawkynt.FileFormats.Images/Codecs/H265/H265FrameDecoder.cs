@@ -57,7 +57,11 @@ internal sealed class H265FrameDecoder : IH265MotionContext {
   private readonly byte[] _wavefrontContexts = new byte[H265CabacContexts.COUNT];
   private bool _wavefrontContextsStored;
   private int _sliceOrdinal = -1;
-  private int _segmentStartTs;
+  /// <summary>
+  /// <c>SliceAddrRs</c>: the raster address of the first coding tree block of the slice — of its
+  /// independent segment, which every dependent segment after it belongs to.
+  /// </summary>
+  private int _sliceAddressRs;
   private IReadOnlyList<H265Picture>[] _referenceLists = [[], []];
 
   private int _previousQuantisationGroupQp;
@@ -145,6 +149,7 @@ internal sealed class H265FrameDecoder : IH265MotionContext {
       this._sliceLoopFilterAcross.Add(header.LoopFilterAcrossSlicesEnabled);
       this._sliceDeblocking.Add((header.DeblockingFilterDisabled, header.BetaOffsetDiv2, header.TcOffsetDiv2));
       this._wavefrontContextsStored = false;
+      this._sliceAddressRs = header.SegmentAddress;
     } else if (this._sliceOrdinal < 0)
       throw new InvalidDataException(
         "An H.265 dependent slice segment reached the picture decoder without an independent segment first.");
@@ -154,7 +159,6 @@ internal sealed class H265FrameDecoder : IH265MotionContext {
     var width = this._sps.PicWidthInCtbsY;
     var total = this._sps.PicSizeInCtbsY;
     var startTs = this._tiles.ToTileScan(header.SegmentAddress);
-    this._segmentStartTs = startTs;
     var substream = 0;
 
     var initType = H265CabacContexts.InitializationType(header.SliceType, header.CabacInitFlag);
@@ -291,15 +295,20 @@ internal sealed class H265FrameDecoder : IH265MotionContext {
     var mergeUp = false;
     var width = this._sps.PicWidthInCtbsY;
 
+    // Clause 7.3.8.3 decides whether a merge candidate exists by the slice, not the slice segment:
+    // leftCtbInSliceSeg is CtbAddrInRs > SliceAddrRs, and SliceAddrRs is the address of the slice's
+    // independent segment. Measuring from the start of the segment instead asks no merge flag of the
+    // first coding tree block of every dependent segment that continues a row, and every bin after
+    // it is then read out of step.
     if (column > 0) {
       var left = ctb - 1;
-      if (this._tiles.SameTile(ctb, left) && this._tiles.ToTileScan(left) >= this._segmentStartTs)
+      if (this._tiles.SameTile(ctb, left) && ctb > this._sliceAddressRs)
         mergeLeft = this._cabac.DecodeBin(H265CabacContexts.SAO_MERGE) != 0;
     }
 
     if (!mergeLeft && row > 0) {
       var up = ctb - width;
-      if (this._tiles.SameTile(ctb, up) && this._tiles.ToTileScan(up) >= this._segmentStartTs)
+      if (this._tiles.SameTile(ctb, up) && up >= this._sliceAddressRs)
         mergeUp = this._cabac.DecodeBin(H265CabacContexts.SAO_MERGE) != 0;
     }
 
