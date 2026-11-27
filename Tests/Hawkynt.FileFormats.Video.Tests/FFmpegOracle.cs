@@ -320,8 +320,10 @@ internal static class FFmpegOracle {
   /// </remarks>
   /// <param name="tolerateDiagnostics">Hand the pictures back even when FFmpeg complained, for a damaged film
   /// whose undamaged part is what is being compared; the complaint is returned as the output.</param>
+  /// <param name="withoutSimd">Decode with FFmpeg's plain C routines (<c>-cpuflags 0</c>), for the rare decoder
+  /// whose vector routine writes past a row into one already decoded.</param>
   public static (bool Decoded, string Output, byte[] Pictures) TryDecodeUnscaled(
-    string path, string pixelFormat, int? maxFrames = null, bool tolerateDiagnostics = false) {
+    string path, string pixelFormat, int? maxFrames = null, bool tolerateDiagnostics = false, bool withoutSimd = false) {
     var raw = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName() + ".raw");
 
     try {
@@ -331,6 +333,10 @@ internal static class FFmpegOracle {
         UseShellExecute = false,
       };
 
+      if (withoutSimd) {
+        startInfo.ArgumentList.Add("-cpuflags");
+        startInfo.ArgumentList.Add("0");
+      }
       foreach (var argument in new[] {
         "-hide_banner", "-loglevel", "error", "-y", "-flags", "+bitexact", "-i", path,
         "-map", "0:v:0", "-an", "-sn", "-dn", "-fps_mode", "passthrough", "-noautoscale",

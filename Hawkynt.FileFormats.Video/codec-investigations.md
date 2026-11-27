@@ -2699,6 +2699,11 @@ and from what, the way this project would need for LOCO or Canopus Lossless abov
 
 # HuffYUV MT (HYMT), where the only thing missing is the only thing not written down
 
+*Closed.* HYMT is decoded and encoded now: the slice table, the trailer and the slices' placement are
+converted from FFmpeg's LGPL-2.1-or-later `libavcodec/huffyuvdec.c`, and each slice is this package's HuffYUV.
+Still no real file has been found; FFmpeg reads the slices this package writes back to the pictures given, and
+`codec-notes.md` records the one place it needs its vector routines turned off to do so.
+
 HYMT is a community fork of Ben Rudiak-Gould's HuffYUV, made multithreadable. This package already
 decodes HuffYUV and FFVHUFF exactly — the median, left and gradient predictors, the Huffman tables in
 the stream description, the word-swapped bit order, the longest-length-down code assignment, all of it

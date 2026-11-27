@@ -5323,6 +5323,27 @@ The encoder is this package's own, FFmpeg having none, and lossless at eight bit
 given, in the order the decoder reads them. FFmpeg decodes what it writes, odd widths included, to exactly
 the pictures given.
 
+### HuffYUV MT
+
+The slice handling is converted from FFmpeg's `libavcodec/huffyuvdec.c`, LGPL-2.1-or-later; each slice is
+decoded by this package's HuffYUV decoder at the slice's height. A frame ends in sixteen bytes — zero, the
+slice count, the slice height and the offset of a table of each slice's offset and length — and a frame without
+them is plain HuffYUV. Where the frame carries its own code tables FFmpeg reads them once from its start, and
+each slice then starts that many bytes into its own data; so does this decoder. FFmpeg places slice `s` at row
+`height - (s + 1) * slice_height`, so slice 0 is the bottom one, except in its median-predicted 4:2:2 and
+version 3 row loops, which ignore the offset and stack every slice at the top; that is followed too. Rows above
+the last slice are left empty, as FFmpeg leaves them.
+
+No real file has been found. The encoder is this package's own and lossless: slices of equal height, the count
+the smallest from two up that divides the height so the slices cover the picture, each written by this
+package's HuffYUV encoder with left prediction, whose row loops honour the offset; a height no count divides
+goes as plain HuffYUV. FFmpeg n9.1 reads those films back to exactly the pictures given — 4:2:2 directly, packed
+colour with `-cpuflags 0`. With its vector routines on, FFmpeg's x86 BGR32 left prediction, given the
+`width - 1` pixels after a slice's first one, writes a whole block and so one pixel past the row; in plain
+HuffYUV that pixel is padding or a row about to be overwritten, but between slices, where FFmpeg's rows have
+no padding — widths whose four bytes a pixel fill a 64-byte multiple — it lands on the first pixel of the slice
+below, already decoded. The plain C routine the vector one stands in for writes exactly the row.
+
 ### ScreenPressor
 
 Converted from FFmpeg's `libavcodec/scpr.c` and `scpr.h`, LGPL-2.1-or-later, for the first two generations.
