@@ -22110,8 +22110,12 @@ Implements `IEquatable<JpegXrFile>`, `IImageFormatMetadata<JpegXrFile>`, `IImage
 | Member | Signature | Summary |
 | --- | --- | --- |
 | `ComponentCount` | `int ComponentCount { get; init; }` |  |
+| `Format` | `PixelFormat? Format { get; init; }` |  |
 | `Height` | `int Height { get; init; }` |  |
 | `PixelData` | `byte[] PixelData { get; init; }` |  |
+| `SourcePixelFormat` | `string SourcePixelFormat { get; init; }` |  |
+| `SourceSamples` | `byte[] SourceSamples { get; init; }` |  |
+| `SourceStride` | `int SourceStride { get; init; }` |  |
 | `Width` | `int Width { get; init; }` |  |
 | `FromRawImage` | `static JpegXrFile FromRawImage(RawImage image)` |  |
 | `ToRawImage` | `static RawImage ToRawImage(JpegXrFile file)` |  |

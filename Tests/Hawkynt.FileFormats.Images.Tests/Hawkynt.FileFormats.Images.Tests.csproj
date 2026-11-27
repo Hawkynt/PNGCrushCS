@@ -35,6 +35,15 @@
     <ProjectReference Include="..\..\Compression.Core\Compression.Core.csproj" />
   </ItemGroup>
 
+  <!-- JPEG XR files jxrlib's encoder wrote, each beside jxrlib's own decode of it in the file's
+       native pixel format, so the managed decoder is measured against the reference byte for byte. -->
+  <ItemGroup>
+    <None Include="Formats\JpegXr\Fixtures\*.jxr;Formats\JpegXr\Fixtures\*.raw">
+      <Link>JxrFixtures\%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
   <!-- Real JPEG XL files from libjxl's test corpus, validating our parsers against bitstreams a
        reference encoder produced rather than only against synthetic round-trips. -->
   <ItemGroup>
