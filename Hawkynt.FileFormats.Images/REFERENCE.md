@@ -39352,7 +39352,7 @@ Implements `IEquatable<X11PuzzleFile>`, `IImageFormatMetadata<X11PuzzleFile>`, `
 
 ### Namespace `FileFormat.X3f`
 
-[`X3fFile`](#x3ffile) · [`X3fReader`](#x3freader) · [`X3fWriter`](#x3fwriter)
+[`X3fFile`](#x3ffile) · [`X3fReader`](#x3freader) · [`X3fSensor`](#x3fsensor) · [`X3fWriter`](#x3fwriter)
 
 #### `X3fFile`
 
@@ -39371,6 +39371,7 @@ Implements `IEquatable<X3fFile>`, `IImageFormatMetadata<X3fFile>`, `IImageFormat
 | `Height` | `int Height { get; init; }` |  |
 | `Magic` | `static ReadOnlySpan<byte> Magic { get; }` |  |
 | `PixelData` | `byte[] PixelData { get; init; }` |  |
+| `Sensor` | `X3fSensor Sensor { get; init; }` |  |
 | `Width` | `int Width { get; init; }` |  |
 | `FromRawImage` | `static X3fFile FromRawImage(RawImage image)` |  |
 | `ToRawImage` | `static RawImage ToRawImage(X3fFile file)` |  |
@@ -39383,6 +39384,17 @@ Implements `IEquatable<X3fFile>`, `IImageFormatMetadata<X3fFile>`, `IImageFormat
 | `FromFile` | `static X3fFile FromFile(FileInfo file)` |  |
 | `FromSpan` | `static X3fFile FromSpan(ReadOnlySpan<byte> data)` |  |
 | `FromStream` | `static X3fFile FromStream(Stream stream)` |  |
+
+#### `X3fSensor`
+
+Implements `IEquatable<X3fSensor>`.
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `X3fSensor` | `X3fSensor(int Width, int Height, ushort[] Layers)` |  |
+| `Height` | `int Height { get; init; }` |  |
+| `Layers` | `ushort[] Layers { get; init; }` |  |
+| `Width` | `int Width { get; init; }` |  |
 
 #### `X3fWriter`
 

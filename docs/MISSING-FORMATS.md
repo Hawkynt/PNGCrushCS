@@ -33,7 +33,7 @@ issue quotes the recorded blocker and the route around it.
 | Category | Tracking issue | Images | Codecs | Containers | Encoders | Total |
 | --- | --- | ---: | ---: | ---: | ---: | ---: |
 | [Modern & standard still-image codecs](#modern--standard-still-image-codecs) | [#513](https://github.com/Hawkynt/PNGCrushCS/issues/513) | 63 | 0 | 0 | 0 | 63 |
-| [Camera RAW & sensor data](#camera-raw--sensor-data) | [#514](https://github.com/Hawkynt/PNGCrushCS/issues/514) | 26 | 0 | 0 | 0 | 26 |
+| [Camera RAW & sensor data](#camera-raw--sensor-data) | [#514](https://github.com/Hawkynt/PNGCrushCS/issues/514) | 25 | 0 | 0 | 0 | 25 |
 | [Geospatial & remote sensing](#geospatial--remote-sensing) | [#515](https://github.com/Hawkynt/PNGCrushCS/issues/515) | 83 | 0 | 0 | 0 | 83 |
 | [Medical & scientific imaging](#medical--scientific-imaging) | [#516](https://github.com/Hawkynt/PNGCrushCS/issues/516) | 42 | 0 | 0 | 0 | 42 |
 | [GPU textures & game assets](#gpu-textures--game-assets) | [#517](https://github.com/Hawkynt/PNGCrushCS/issues/517) | 39 | 0 | 0 | 0 | 39 |
@@ -49,7 +49,7 @@ issue quotes the recorded blocker and the route around it.
 | [Lossless & uncompressed video](#lossless--uncompressed-video) | [#527](https://github.com/Hawkynt/PNGCrushCS/issues/527) | 0 | 11 | 0 | 2 | 13 |
 | [Cinema camera RAW video](#cinema-camera-raw-video) | [#528](https://github.com/Hawkynt/PNGCrushCS/issues/528) | 0 | 6 | 7 | 0 | 13 |
 | [Elementary streams & streaming manifests](#elementary-streams--streaming-manifests) | [#529](https://github.com/Hawkynt/PNGCrushCS/issues/529) | 0 | 0 | 18 | 0 | 18 |
-| **All** | | **576** | **147** | **274** | **19** | **1016** |
+| **All** | | **575** | **147** | **274** | **19** | **1015** |
 
 Each issue carries the labels `cat: <category>`, its kind (`image-format`, `video-codec`, `video-container`, `video-encoder`), `priority: high|medium|low`, and `documented-blocker` where that applies.
 
@@ -140,7 +140,6 @@ Digital still/cinema camera raw, scanner raw, thermal and light-field captures. 
 | Pentax PEF / Pentax DNG Huffman compression (65535) | Image | `.pef`, `.ptx` | read + write | missing | medium | [#601](https://github.com/Hawkynt/PNGCrushCS/issues/601) |
 | Phase One IIQ sensor codec (IIQ L/S, L16) and CAP/EIP | Image | `.iiq`, `.cap`, `.eip` | read + write | missing | medium | [#602](https://github.com/Hawkynt/PNGCrushCS/issues/602) |
 | Samsung SRW sensor compressions (v0/v1/v2) | Image | `.srw` | read + write | missing | medium | [#603](https://github.com/Hawkynt/PNGCrushCS/issues/603) |
-| Sigma X3F Foveon sensor data (TRUE / Huffman storages) | Image | `.x3f` | read + write | blocked | medium | [#604](https://github.com/Hawkynt/PNGCrushCS/issues/604) |
 | Apple QuickTake 100/150 (QTK) | Image | `.qtk` | read + write | missing | low | [#605](https://github.com/Hawkynt/PNGCrushCS/issues/605) |
 | ARRIRAW (ARI) | Image | `.ari` | read + write | missing | low | [#606](https://github.com/Hawkynt/PNGCrushCS/issues/606) |
 | Casio BAY raw | Image | `.bay` | read + write | missing | low | [#607](https://github.com/Hawkynt/PNGCrushCS/issues/607) |

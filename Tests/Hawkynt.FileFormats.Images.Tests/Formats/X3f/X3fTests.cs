@@ -1,3 +1,4 @@
+using System.Linq;
 using System;
 using System.Buffers.Binary;
 using System.IO;
@@ -21,7 +22,7 @@ public sealed class X3fTests {
     return new() { Width = width, Height = height, Format = PixelFormat.Rgb24, PixelData = pixels };
   }
 
-  private sealed record Section(int Format, int Width, int Height, int Stride, byte[] Body);
+  private sealed record Section(int Format, int Width, int Height, int Stride, byte[] Body, int Type = 2);
 
   /// <summary>A container stating a sensor of the given size and holding the given sections.</summary>
   private static byte[] _File(int statedWidth, int statedHeight, params Section[] sections) {
@@ -40,7 +41,7 @@ public sealed class X3fTests {
 
       var head = new byte[X3fFile.ImageSectionHeaderSize];
       System.Text.Encoding.ASCII.GetBytes("SECi").CopyTo(head, 0);
-      BinaryPrimitives.WriteUInt32LittleEndian(head.AsSpan(8), 2);
+      BinaryPrimitives.WriteUInt32LittleEndian(head.AsSpan(8), (uint)section.Type);
       BinaryPrimitives.WriteUInt32LittleEndian(head.AsSpan(12), (uint)section.Format);
       BinaryPrimitives.WriteUInt32LittleEndian(head.AsSpan(16), (uint)section.Width);
       BinaryPrimitives.WriteUInt32LittleEndian(head.AsSpan(20), (uint)section.Height);
@@ -118,6 +119,41 @@ public sealed class X3fTests {
     // A file whose only readable section is a fraction of the size it claims is a Foveon raw with a
     // preview beside it, and the preview is not what was asked for.
     Assert.Throws<InvalidDataException>(() => X3fReader.FromBytes(_File(2268, 1512, _Rgb(189, 126))));
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void APackedHuffmanSensorSumsItsMappedDifferencesAlongEachRow() {
+    // Format 5 packed: a 1,024-entry mapping, then a word a site of three 10-bit indices.
+    const int w = 3, h = 2;
+    var body = new byte[2 * 1024 + 4 * w * h];
+    for (var i = 0; i < 1024; ++i)
+      BinaryPrimitives.WriteUInt16LittleEndian(body.AsSpan(2 * i), (ushort)(i * 2));
+    for (var p = 0; p < w * h; ++p)
+      BinaryPrimitives.WriteUInt32LittleEndian(body.AsSpan(2048 + 4 * p), (uint)(1 | 2 << 10 | 3 << 20));
+    var file = X3fReader.FromBytes(_File(w, h, new Section(5, w, h, 4 * w, body, Type: 3)));
+    Assert.That(file.Sensor!.Layers[..9], Is.EqualTo(new ushort[] { 2, 4, 6, 4, 8, 12, 6, 12, 18 }));
+    var raw = X3fFile.ToRawImage(file);
+    Assert.That((raw.Format, raw.Width, raw.Height), Is.EqualTo((PixelFormat.Rgb48, w, h)), "a file with only sensor data hands out its layers");
+    Assert.That(raw.PixelData[..2], Is.EqualTo(new byte[] { 0, 2 }), "big-endian");
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void ATrueSensorStartsEachPlaneFromItsSeed() {
+    // Format 30: seeds, a code table (a one-bit code for "no difference"), plane sizes, planes.
+    const int w = 4, h = 2;
+    var head = new byte[8 + 4 + 12];
+    BinaryPrimitives.WriteUInt16LittleEndian(head, 100);
+    BinaryPrimitives.WriteUInt16LittleEndian(head.AsSpan(2), 200);
+    BinaryPrimitives.WriteUInt16LittleEndian(head.AsSpan(4), 300);
+    head[8] = 1; // code size 1, code 0 -> index 0 (no bits follow)
+    head[9] = 0;
+    for (var i = 0; i < 3; ++i)
+      BinaryPrimitives.WriteUInt32LittleEndian(head.AsSpan(12 + 4 * i), 16);
+    var body = head.Concat(new byte[48]).ToArray();
+    var file = X3fReader.FromBytes(_File(w, h, new Section(30, w, h, 0, body, Type: 3)));
+    Assert.That(file.Sensor!.Layers.Chunk(3).All(static s => s is [100, 200, 300]), Is.True);
   }
 
   [Test]

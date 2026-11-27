@@ -55,21 +55,38 @@ public static class X3fReader {
 
     RawImage? best = null;
     var refused = 0;
+    var rawPreference = int.MaxValue;
+    var rawSection = -1;
+    var properties = -1;
 
     for (var i = 0; i < count; ++i) {
       var at = directory + 12 + i * X3fFile.DirectoryEntrySize;
       var offset = (int)BinaryPrimitives.ReadUInt32LittleEndian(data[at..]);
       var length = (int)BinaryPrimitives.ReadUInt32LittleEndian(data[(at + 4)..]);
 
+      var kind = data.Slice(at + 8, 4);
+      if (kind.SequenceEqual("PROP"u8))
+        properties = i;
+
       // IMAG is what the older files call a picture section and IMA2 what the newer ones do; the
       // rest of the kinds are camera settings and properties.
-      if (!_IsImageSection(data.Slice(at + 8, 4)))
+      if (!_IsImageSection(kind))
         continue;
 
       if (offset < X3fFile.HeaderSize || length < X3fFile.ImageSectionHeaderSize || (long)offset + length > data.Length)
         throw new InvalidDataException($"An X3F section states {length} bytes at {offset}, which the file cannot hold.");
 
       var section = data.Slice(offset, length);
+      var typeFormat = BinaryPrimitives.ReadUInt32LittleEndian(section[8..]) << 16 | (BinaryPrimitives.ReadUInt32LittleEndian(section[12..]) & 0xFFFF);
+      if (X3fSensorDecoder.IsRaw(typeFormat)) {
+        if (X3fSensorDecoder.Preference(typeFormat) < rawPreference) {
+          rawPreference = X3fSensorDecoder.Preference(typeFormat);
+          rawSection = i;
+        }
+
+        continue;
+      }
+
       var format = (int)BinaryPrimitives.ReadUInt32LittleEndian(section[12..]);
       var width = (int)BinaryPrimitives.ReadUInt32LittleEndian(section[16..]);
       var height = (int)BinaryPrimitives.ReadUInt32LittleEndian(section[20..]);
@@ -91,29 +108,87 @@ public static class X3fReader {
         best = decoded;
     }
 
-    if (best == null)
-      throw new InvalidDataException(
-        refused > 0
-          ? $"An X3F file stores its {refused} picture sections in a Foveon coding this does not undo."
-          : "An X3F file carries no picture section.");
+    X3fSensor? sensor = null;
+    if (rawSection >= 0) {
+      var at = directory + 12 + rawSection * X3fFile.DirectoryEntrySize;
+      var section = data.Slice((int)BinaryPrimitives.ReadUInt32LittleEndian(data[at..]), (int)BinaryPrimitives.ReadUInt32LittleEndian(data[(at + 4)..]));
+      var typeFormat = BinaryPrimitives.ReadUInt32LittleEndian(section[8..]) << 16 | (BinaryPrimitives.ReadUInt32LittleEndian(section[12..]) & 0xFFFF);
+      var (make, model) = properties >= 0 ? _Camera(data, directory + 12 + properties * X3fFile.DirectoryEntrySize) : (null, null);
+      sensor = X3fSensorDecoder.Decode(
+        section[X3fFile.ImageSectionHeaderSize..], typeFormat,
+        (int)BinaryPrimitives.ReadUInt32LittleEndian(section[16..]), (int)BinaryPrimitives.ReadUInt32LittleEndian(section[20..]),
+        (int)BinaryPrimitives.ReadUInt32LittleEndian(section[24..]),
+        string.Equals(make, "Polaroid", StringComparison.OrdinalIgnoreCase) && string.Equals(model, "x530", StringComparison.OrdinalIgnoreCase));
+    }
 
     // The header says how big the camera says the picture is. Anything far short of that is one of
     // the previews these carry alongside the sensor data, and drawing it would answer the wrong
     // question confidently.
-    if (statedWidth > 0 && statedHeight > 0
+    var fullSize = best != null && !(statedWidth > 0 && statedHeight > 0
         && ((long)best.Width * _FullSizeDenominator < (long)statedWidth * _FullSizeNumerator
-            || (long)best.Height * _FullSizeDenominator < (long)statedHeight * _FullSizeNumerator))
+            || (long)best.Height * _FullSizeDenominator < (long)statedHeight * _FullSizeNumerator));
+
+    if (!fullSize) {
+      if (sensor != null)
+        return new() { Width = sensor.Width, Height = sensor.Height, PixelData = null!, Sensor = sensor };
+      if (best == null)
+        throw new InvalidDataException(
+          refused > 0
+            ? $"An X3F file stores its {refused} picture sections in a coding this does not undo."
+            : "An X3F file carries no picture section.");
       throw new InvalidDataException(
         $"An X3F file states {statedWidth} by {statedHeight} and the largest picture this can read "
-        + $"from it is {best.Width} by {best.Height}, which is a preview and not the picture.");
+        + $"from it is {best!.Width} by {best.Height}, which is a preview and not the picture.");
+    }
 
-    var rgb = PixelConverter.Convert(best, PixelFormat.Rgb24);
+    var rgb = PixelConverter.Convert(best!, PixelFormat.Rgb24);
 
     return new() {
       Width = rgb.Width,
       Height = rgb.Height,
       PixelData = rgb.PixelData,
+      Sensor = sensor,
     };
+  }
+
+  /// <summary>The <c>CAMMANUF</c> and <c>CAMMODEL</c> properties of a <c>PROP</c> section, UTF-16 names and values.</summary>
+  private static (string? Make, string? Model) _Camera(ReadOnlySpan<byte> data, int entry) {
+    var offset = (int)BinaryPrimitives.ReadUInt32LittleEndian(data[entry..]);
+    var length = (int)BinaryPrimitives.ReadUInt32LittleEndian(data[(entry + 4)..]);
+    if (offset < X3fFile.HeaderSize || length < 24 || (long)offset + length > data.Length)
+      return (null, null);
+    var section = data.Slice(offset, length);
+    var count = (int)BinaryPrimitives.ReadUInt32LittleEndian(section[8..]);
+    var strings = 24 + 8L * count;
+    if (count < 0 || strings > section.Length)
+      return (null, null);
+    var text = section[(int)strings..].ToArray();
+    string? Read(uint at) {
+      var start = (long)at * 2;
+      if (start >= text.Length)
+        return null;
+      var builder = new System.Text.StringBuilder();
+      for (var p = (int)start; p + 1 < text.Length; p += 2) {
+        var c = (char)BinaryPrimitives.ReadUInt16LittleEndian(text.AsSpan(p));
+        if (c == 0)
+          break;
+        builder.Append(c);
+      }
+
+      return builder.ToString();
+    }
+
+    string? make = null, model = null;
+    for (var i = 0; i < count; ++i) {
+      var name = Read(BinaryPrimitives.ReadUInt32LittleEndian(section[(24 + 8 * i)..]));
+      var value = Read(BinaryPrimitives.ReadUInt32LittleEndian(section[(28 + 8 * i)..]));
+      if (name == "CAMMANUF")
+        make = value;
+      else if (name == "CAMMODEL")
+        model = value;
+    }
+
+    return (make, model);
   }
 
   public static X3fFile FromBytes(byte[] data) {
