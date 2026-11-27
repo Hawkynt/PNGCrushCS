@@ -908,6 +908,41 @@ alpha comes back exactly, and so did DCT alpha on the test picture. FFmpeg decod
 of every form, written into AVI at widths that are and are not multiples of sixteen, to exactly this
 decoder's YUV and alpha planes.
 
+### On2 VP7
+
+Converted from the VP7 paths of FFmpeg's `libavcodec/vp8.c` and `vp8dsp.c`, with its tables parsed out of
+`vp8data.h` mechanically, all LGPL-2.1-or-later. VP7 shares VP8's boolean coder, prediction modes, six-tap
+filter and coefficient tree, and those come from this package's own VP8 decoder, whose edge constants are
+now parameters because VP7 puts 128 where VP8 puts 127 and 129. What is VP7's own is converted: the frame
+header with its four macroblock features (read and, as by FFmpeg, not applied) and fading; the quantiser
+tables; a census over twelve neighbours, scored, with the reference decoder's wrap of a column offset
+across its padding column into the row before; Y2 DC prediction across inter macroblocks in sixteen-bit
+arithmetic; tokens that may end after a zero; a scan order the stream can restate; left coefficient
+contexts that carry from one macroblock row into the next; the transforms with their sixteen-bit
+intermediate rows and DC-only shortcuts; and the loop filter, whose limits, rounding and edge order
+differ from VP8's.
+
+Measured over `samples.ffmpeg.org/V-codecs/VP7/`, the FATE suite's one VP7 film among them: eight films,
+320x176 to 704x272, 17,518 pictures, every one identical to FFmpeg's `yuv420p` planes. They are all
+profile 0 and use neither fades, the simple filter nor the features; 2,784 of their frames restate the
+scan and 1,655 refresh the golden frame.
+
+The encoder is this package's own, FFmpeg having none. It reconstructs with the decoder's code —
+prediction, transforms, census and DC predictor — and takes the decoder's reading of each packet as its
+reference; with the loop filter off, its reconstruction is the decoder's picture byte for byte in both
+profiles. A key frame every twelfth picture; 16x16 and per-subblock intra modes chosen by sum of absolute
+differences; one vector a macroblock, whole-sample around zero and the census's nearest then half and
+quarter, against the previous or the golden frame; the golden frame refreshed every fourth interframe;
+and a change of mean brightness of two levels or more coded as a fade. Quantiser 24, normal filter at
+level 12. A 160x120 gradient key frame comes back at 43.2 dB luma.
+
+FFmpeg decodes what it writes — both profiles, both filters, fine and coarse quantisers, an odd size,
+fades — to exactly this decoder's pictures, with one exception that is FFmpeg's: when a frame fades a
+previous frame the golden frame is not, `vp7_fade_frame` fades that buffer in place, and that buffer is
+the picture it has just returned. Whether its caller sees the faded or the unfaded copy is then a race —
+three runs of the same `ffmpeg` command over the same file gave two different outputs. The pictures it
+predicts from are right either way, so the comparison skips only the pictures that race.
+
 ### On2 VP6
 
 Converted from FFmpeg's `libavcodec/vp6.c` and `vp56.c` with the DSP they lean on — `vp6dsp.c`,

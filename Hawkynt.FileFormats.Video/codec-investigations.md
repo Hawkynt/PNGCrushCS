@@ -1662,6 +1662,11 @@ by inspection alone.
 
 # VP7, where the document names the two files it will not print
 
+*Closed.* VP7 is decoded and encoded now. The decoder is converted from the VP7 paths of FFmpeg's
+LGPL-2.1-or-later `vp8.c`, which carry the dequantisation tables and the census this entry could not
+find printed; `codec-notes.md` has the measurement. `VP72` is not claimed: FFmpeg maps only `VP70` and
+`VP71`, and no `VP72` sample has been seen.
+
 VP7 (`VP70`, `VP71`, `VP72`) is VP8's immediate ancestor, and On2 published its own specification for
 it — "VP7 Data Format and Decoder," document version 1.5 of March 28, 2005, mirrored at
 `multimedia.cx/mirror/VP7_Data_Format_and_Decoder_Overview.pdf` — nine years before ffmpeg's own VP7
