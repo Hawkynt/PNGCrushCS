@@ -2316,6 +2316,36 @@ integer matrix about the block, rounding to quantiser 2, the finest, and decodin
 the sample's 24 pictures gives each back exactly in 884,465 bytes against TechSmith's 880,934. FFmpeg
 decodes what it writes to exactly this decoder's pictures.
 
+### Dxtory
+
+Converted from FFmpeg's `libavcodec/dxtory.c`, LGPL-2.1-or-later. A frame opens with sixteen bytes whose
+first four, big-endian, name the layout — BGR24, 4:2:0, 4:1:0 or 4:4:4 YUV, RGB565 or RGB555 —
+whether it is uncompressed (version 1) or coded (version 2), and in bit 0x20 whether it is stored bottom up.
+Version 1 is the samples in a fixed order, chroma offset by 0x80. Version 2 is a table of slices, each
+sixteen bytes of header and then symbols read least-significant bit first: per channel a list of eight
+recent values, a run of ones naming an entry and moving it to the front, or a zero and a new value pushing
+the list along. The 5- and 6-bit layouts keep shorter lists and widen each value to eight bits.
+
+The odd-size paths are FFmpeg's, and three of them are worth knowing. Version 2's margins read a symbol or
+two for samples past the right edge; they are decoded into padding, so the symbols line up and nothing
+shows. Version 1's 4:1:0 frame odd both ways copies its bottom-right samples to the start of the rows, and
+that is reproduced. Version 1's 4:2:0 frame of odd width stores each pair of rows' last luma sample one place
+past the edge and never fills the last column; FFmpeg's picture holds whatever its buffer held there, and
+this decoder stores the sample in the last column instead. Version 2's 4:2:0 frame of odd height reads only
+every other luma sample of its last row, so no encoder can carry the rest; FFmpeg leaves them unset and so
+does this decoder.
+
+Measured against FFmpeg n9.1 with `-flags +bitexact`: the FATE suite's `dxtory/dxtory_mic.avi`, the only
+sample found, is cut off after its first 4:2:0 picture, which is identical. Frames crafted from noise in every
+version 1 layout, upright and flipped, at even and odd sizes FFmpeg fills completely, and version 2 frames
+of the 5- and 6-bit layouts made of random symbols, all decode as FFmpeg decodes them.
+
+The encoder is this package's own, FFmpeg having none, and lossless: one slice of symbols a frame, each
+sample the list entry that holds it or a new value. A 4:2:0, 4:4:4 or 4:1:0 picture keeps its layout and
+anything else goes as BGR; the first picture decides for the film. A 4:2:0 picture of odd height goes as
+4:4:4, each chroma sample repeated over its block, because of the last row above. FFmpeg decodes what it
+writes, at even and odd sizes in every layout, to exactly this decoder's pictures.
+
 ### Electronic Arts TQI, TGQ, Madcow and TGV
 
 Converted from FFmpeg's `libavcodec/eatqi.c`, `eatgq.c`, `eamad.c`, `eatgv.c` and the inverse DCT the first

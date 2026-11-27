@@ -2573,6 +2573,10 @@ documentation, there is nothing else to derive.
 
 # Dxtory, whose description stops exactly where the compression starts
 
+*Closed.* Dxtory is decoded and encoded now, converted from FFmpeg's LGPL-2.1-or-later `libavcodec/dxtory.c`,
+which supplies the move-to-front coding this section found no description of. `codec-notes.md` has the
+measurement, and the three places FFmpeg's odd-size handling cannot be matched or matched usefully.
+
 Dxtory (`xtor`) is the capture codec of the Windows screen-recording tool of the same name, written for
 recording high frame-rate games. It was investigated with the lossless group, and it stops twice over:
 the description that exists does not describe the compression at all, and what description there is

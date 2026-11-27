@@ -45,11 +45,11 @@ issue quotes the recorded blocker and the route around it.
 | [Standard & broadcast video](#standard--broadcast-video) | [#523](https://github.com/Hawkynt/PNGCrushCS/issues/523) | 0 | 35 | 16 | 0 | 51 |
 | [Game & multimedia-title video](#game--multimedia-title-video) | [#524](https://github.com/Hawkynt/PNGCrushCS/issues/524) | 0 | 41 | 198 | 6 | 245 |
 | [Legacy PC & capture-card video](#legacy-pc--capture-card-video) | [#525](https://github.com/Hawkynt/PNGCrushCS/issues/525) | 0 | 51 | 36 | 2 | 89 |
-| [Screen-capture video](#screen-capture-video) | [#526](https://github.com/Hawkynt/PNGCrushCS/issues/526) | 0 | 15 | 0 | 9 | 24 |
+| [Screen-capture video](#screen-capture-video) | [#526](https://github.com/Hawkynt/PNGCrushCS/issues/526) | 0 | 14 | 0 | 9 | 23 |
 | [Lossless & uncompressed video](#lossless--uncompressed-video) | [#527](https://github.com/Hawkynt/PNGCrushCS/issues/527) | 0 | 12 | 0 | 2 | 14 |
 | [Cinema camera RAW video](#cinema-camera-raw-video) | [#528](https://github.com/Hawkynt/PNGCrushCS/issues/528) | 0 | 6 | 7 | 0 | 13 |
 | [Elementary streams & streaming manifests](#elementary-streams--streaming-manifests) | [#529](https://github.com/Hawkynt/PNGCrushCS/issues/529) | 0 | 0 | 18 | 0 | 18 |
-| **All** | | **578** | **160** | **275** | **19** | **1032** |
+| **All** | | **578** | **159** | **275** | **19** | **1031** |
 
 Each issue carries the labels `cat: <category>`, its kind (`image-format`, `video-codec`, `video-container`, `video-encoder`), `priority: high|medium|low`, and `documented-blocker` where that applies.
 
@@ -1116,7 +1116,6 @@ Screen recording and remote-desktop codecs. Tracked in [#526](https://github.com
 | Fraps (FPS1) | Codec | `.avi` | decode + encode | missing | medium | [#1509](https://github.com/Hawkynt/PNGCrushCS/issues/1509) |
 | TechSmith Screen Capture (TSCC) encoder | Encoder | `TSCC`, `tscc` | encode | decoder only | medium | [#1510](https://github.com/Hawkynt/PNGCrushCS/issues/1510) |
 | Amuse Graphics Movie (AGM0-AGM7) | Codec | `agm`, `AGM0`, `AGM1` | decode + encode | missing | low | [#1511](https://github.com/Hawkynt/PNGCrushCS/issues/1511) |
-| Dxtory | Codec | `.avi` | decode + encode | blocked | low | [#1513](https://github.com/Hawkynt/PNGCrushCS/issues/1513) |
 | FM Screen Capture Codec | Codec | `.avi` | decode + encode | blocked | low | [#1514](https://github.com/Hawkynt/PNGCrushCS/issues/1514) |
 | Giga Link Video Codec (GLCC) | Codec | `GLCC` | decode + encode | missing | low | [#1515](https://github.com/Hawkynt/PNGCrushCS/issues/1515) |
 | Go2Meeting / GoToMeeting (G2M2-G2M5) | Codec | `.asf`, `.avi` | decode + encode | blocked | low | [#1516](https://github.com/Hawkynt/PNGCrushCS/issues/1516) |

@@ -1,0 +1,15 @@
+The Dxtory decoder in this directory is converted from FFmpeg (https://github.com/FFmpeg/FFmpeg):
+
+  libavcodec/dxtory.c   the frame types, the uncompressed layouts, and the slices of move-to-front symbols
+
+  Copyright (c) 2011 Konstantin Shishkov (dxtory.c)
+  and the FFmpeg developers named in the file above.
+
+FFmpeg distributes that source under the GNU Lesser General Public License, version 2.1 or (at your
+option) any later version. This work is distributed under the GNU Lesser General Public License
+version 3 or later, which the "or later" clause permits; the licence text is in LICENSE at the root of
+this repository.
+
+The algorithms are carried across into managed C#, not vendored. The default move-to-front lists are
+reproduced exactly because they are fixed data required for interoperability. The encoder is this
+package's own.
