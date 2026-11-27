@@ -709,6 +709,7 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | Ptif | `.ptif`, `.ptiff` | ✅ | ✅ | — | — | — | ImageMagick, XnView, IrfanView, ffmpeg |
 | PublicPainter | `.cmp` | ✅ | ✅ | — | — | — | recoil2png |
 | Pvr | `.pvr` | ✅ | ✅ | — | — | — | none |
+| Pwc | `.pwc` | ✅ | ✅ | ✅ | — | — | none |
 | Q0 | `.q0` | ✅ | ✅ | — | — | — | none |
 | QdvImage | `.qdv` | ✅ | ✅ | — | — | — | XnView |
 | Qoi | `.qoi` | ✅ | ✅ | — | — | — | ImageMagick, XnView, IrfanView, ffmpeg |

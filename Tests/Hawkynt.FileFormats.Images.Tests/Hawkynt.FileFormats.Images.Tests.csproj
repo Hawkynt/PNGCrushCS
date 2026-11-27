@@ -159,6 +159,15 @@
     </None>
   </ItemGroup>
 
+  <!-- Pictures made here, coded by the author's pwcencode and decoded by his pwcdecode, so the PWC reader
+       and writer are held to the reference programs rather than to each other. See Fixtures\ORIGIN.txt. -->
+  <ItemGroup>
+    <None Include="Formats\Pwc\Fixtures\*">
+      <Link>Fixtures\Pwc\%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
   <ItemGroup>
     <Using Include="NUnit.Framework" />
   </ItemGroup>

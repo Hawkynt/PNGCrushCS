@@ -691,12 +691,13 @@ One cannot be read at all: `pax` is Smaller Animals Software's Pick Ax format, w
 to guess that password. Its codec is a closed Windows DLL — `pax` is the one name of the 178 that
 XnView's own Linux converter does not carry at all, so there is nothing here to interrogate either.
 
-Two are identified down to their first bytes and no further, because the coding was never published:
-`pwc` is the piecewise-constant image model, `4yVa`, distributed as a Windows binary from its
-author's research page; `wic` is the J Wavelet Image Codec, `FA DE BA BE 01 01` in its later form
-and `1B 7A FB 30` in its earlier. Both are marked Windows-only in XnView's catalogue. Its
-author's translator source survived, and from it, Lehtinen's papers and the javawic applet the codec
-is read and written now, both generations. *Closed:* #554.
+Two were identified down to their first bytes and no further, because the coding was never published,
+and both are read and written now. `pwc` is the piecewise-constant image model, `4yVa`, distributed
+as a Windows binary from its author's research page; its bitstream was recovered from the author's
+own encoder and decoder — see `Hawkynt.FileFormats.Images/Formats/Pwc/SPEC.md`. `wic` is the J
+Wavelet Image Codec, `FA DE BA BE 01 01` in its later form and `1B 7A FB 30` in its earlier, marked
+Windows-only in XnView's catalogue; its author's translator source survived, and from it, Lehtinen's
+papers and the javawic applet the codec is read and written, both generations. *Closed:* #554, #577.
 
 Three have a shape worth writing down for whoever comes back to them:
 
@@ -1025,7 +1026,7 @@ Windows only, so nothing here has ever been able to compare against them either.
 | pspf | .pfr .pspframe | read by the Paint Shop Pro reader |
 | pspm | .pspmask |  |
 | pspt | .tex | read by the Paint Shop Pro reader |
-| pwc | .pwc | the piecewise-constant image model; its coding was never published; Windows only |
+| pwc | .pwc | read and written; bitstream recovered from pwcencode/pwcdecode 1.5.1 and held byte-exact to both (Formats/Pwc/SPEC.md) |
 | pxa | .pxa |  |
 | pzl | .pzl |  |
 | pzp | .pzp | read; a compound document, walked from 512 for the first whole PNG in it |
