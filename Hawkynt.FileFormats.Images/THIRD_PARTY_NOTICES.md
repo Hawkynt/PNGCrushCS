@@ -145,3 +145,12 @@ Sources:
 The pinned MIT license is reproduced verbatim in `Formats/DjVu/Codec/DJVU_RS_LICENSE`; implementation and specification provenance is recorded in `Formats/DjVu/Codec/UPSTREAM.md`.
 
 Source: https://github.com/matyushkin/djvu-rs/tree/ae9b8434c077f6ecd65cec93f5ce8e167ddefa96/crates/djvu-zp
+
+## PDF renderer
+
+The PDF page renderer under `Formats/Pdf` is written from ISO 32000 except for these parts, converted from or containing third-party material. The full notices and licence texts sit beside the code:
+
+- `Formats/Pdf/Fonts/` — the CFF, Type 1 and TrueType font program parsers are converted from **pdf.js** (Apache License 2.0, Copyright 2012 Mozilla Foundation): `cff_parser.js`, `type1_parser.js`, `font_renderer.js`, `charsets.js`. See `Formats/Pdf/Fonts/THIRD-PARTY-NOTICE.pdfjs.txt`.
+- `Formats/Pdf/Filters/` — the CCITT fax decoder is converted from pdf.js `ccitt.js`, itself a port of xpdf's CCITTFaxStream that Glyph & Cog, LLC relicensed under Apache 2.0 for pdf.js; the JBIG2 decoder from pdf.js `jbig2.js` and `arithmetic_decoder.js` (Apache License 2.0). See `Formats/Pdf/Filters/THIRD-PARTY-NOTICE.pdfjs.txt`.
+- `Formats/Pdf/Fonts/Data/` — encoding tables and standard-14 widths from pdf.js (Apache License 2.0), the **Adobe Glyph List** (BSD 3-Clause, Adobe), the Adobe Core 14 AFM metrics (redistributable under their own terms), all reproduced in `Formats/Pdf/Fonts/Data/THIRD-PARTY-NOTICE.txt`; and the unmodified **Liberation** Sans, Serif and Mono 2.1.5 fonts (SIL Open Font License 1.1, Red Hat), bundled as substitutes for non-embedded standard fonts, with the licence in `Formats/Pdf/Fonts/Data/Substitutes/OFL-Liberation.txt` and `THIRD-PARTY-NOTICE.Liberation.txt`.
+- The DeviceCMYK conversion uses the sixteen CMYK cube corner colours published with xpdf, as constants; poppler (GPL) was used only as a rendering oracle.
