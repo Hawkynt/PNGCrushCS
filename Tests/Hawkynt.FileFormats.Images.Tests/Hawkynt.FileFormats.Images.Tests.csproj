@@ -141,6 +141,15 @@
     </None>
   </ItemGroup>
 
+  <!-- IWC files this package's writer produced, and the WaveL applet's own decode of each. See
+       Formats\Iwc\Fixtures\README.txt. -->
+  <ItemGroup>
+    <None Include="Formats\Iwc\Fixtures\*">
+      <Link>Fixtures\Iwc\%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
   <ItemGroup>
     <Using Include="NUnit.Framework" />
   </ItemGroup>

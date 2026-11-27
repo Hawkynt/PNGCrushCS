@@ -481,6 +481,7 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | Ipsm | `.pan` | ✅ | ✅ | — | — | — | XnView, IrfanView, ffmpeg |
 | Iss | `.iss` | ✅ | ✅ | — | — | — | XnView |
 | It01 | `.fit` | ✅ | ✅ | — | — | — | none |
+| Iwc | `.iwc` | ✅ | ✅ | ✅ | — | — | none |
 | Jbig | `.jbg`, `.bie`, `.jbig` | ✅ | ✅ | — | — | — | none |
 | Jbig2 | `.jb2`, `.jbig2` | ✅ | ✅ | — | — | — | none |
 | JetGraphicsPlanner | `.jgp` | ✅ | ✅ | — | — | — | recoil2png, IrfanView |
