@@ -269,4 +269,35 @@ public sealed class VideoFormatRegistryTests {
     Assert.That(first.Count(), Is.EqualTo(1));
     Assert.That(first.Count(), Is.EqualTo(1), "a second enumeration walks the same stream again");
   }
+
+  [Test]
+  [Category("Unit")]
+  public void EveryContainerWithAMuxerCanBeWrittenByNameAtRunTime() {
+    // Every container the README ticks Mux for has a writer type, and the generator joins each to
+    // its reader; a container without one would leave this list.
+    var unwritable = VideoFormatRegistry.AllFormats.Where(static e => !e.SupportsWrite).Select(static e => e.Name).ToList();
+    Assert.Multiple(() => {
+      Assert.That(unwritable, Is.Empty);
+      Assert.That(VideoFormatRegistry.WritableFormats.Count(), Is.EqualTo(VideoFormatRegistry.AllFormats.Count()));
+    });
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void ARunTimeMuxProducesWhatTheTypedMuxDoes() {
+    var stream = new MediaStreamInfo {
+      Index = 0,
+      Kind = MediaStreamKind.Video,
+      Codec = CodecTag.FromCharacters("I420"),
+      Width = 4,
+      Height = 2,
+      TimeBase = new Rational(1, 25),
+      FrameRate = new Rational(25, 1),
+    };
+    var packets = new[] { new CodedPacket(0, new byte[12], PresentationTimestamp: 0, IsKeyFrame: true) };
+
+    var byName = VideoFormatRegistry.Mux(VideoFormat.Yuv4Mpeg, [stream], packets);
+    var typed = VideoIO.Mux<FileFormat.Yuv4Mpeg.Yuv4MpegWriter>([stream], packets);
+    Assert.That(byName, Is.EqualTo(typed));
+  }
 }

@@ -57,7 +57,17 @@ public sealed record VideoFormatEntry(
   /// the muxer produces, which for the containers here is the ordinary answer.
   /// </remarks>
   public ConformanceOracle[] VerifiedBy { get; init; } = [];
+
+  /// <summary>The container's muxer, or <c>null</c> where the package can only read it.</summary>
+  public VideoMuxer? Mux { get; init; }
+
+  /// <summary>Whether <see cref="Mux"/> is available.</summary>
+  public bool SupportsWrite => this.Mux != null;
 }
+
+/// <summary>Writes coded packets into one container and returns the finished file.</summary>
+public delegate byte[] VideoMuxer(
+  IReadOnlyList<MediaStreamInfo> streams, IEnumerable<CodedPacket> packets, VideoMetadata? metadata);
 
 /// <summary>
 /// One registered codec: what it is called, which streams it takes, and how to build a decoder for
