@@ -46,6 +46,7 @@ public readonly struct RgbF32 : IRawPixelFormat<RgbF32> { public static RawPixel
 public readonly struct RgbaF32 : IRawPixelFormat<RgbaF32> { public static RawPixelFormatTraits Traits => RawPixelFormats.Get(PixelFormat.RgbaF32); }
 
 public readonly struct Yuv411P8 : IRawPixelFormat<Yuv411P8> { public static RawPixelFormatTraits Traits => RawPixelFormats.Get(PixelFormat.Yuv411P8); }
+public readonly struct Yuv410P8 : IRawPixelFormat<Yuv410P8> { public static RawPixelFormatTraits Traits => RawPixelFormats.Get(PixelFormat.Yuv410P8); }
 public readonly struct Yuv420P8 : IRawPixelFormat<Yuv420P8> { public static RawPixelFormatTraits Traits => RawPixelFormats.Get(PixelFormat.Yuv420P8); }
 public readonly struct Yuv422P8 : IRawPixelFormat<Yuv422P8> { public static RawPixelFormatTraits Traits => RawPixelFormats.Get(PixelFormat.Yuv422P8); }
 public readonly struct Yuv440P8 : IRawPixelFormat<Yuv440P8> { public static RawPixelFormatTraits Traits => RawPixelFormats.Get(PixelFormat.Yuv440P8); }

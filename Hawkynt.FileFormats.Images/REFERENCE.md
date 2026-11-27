@@ -20,165 +20,6 @@ Custom Zopfli-class DEFLATE encoder producing standard zlib-wrapped output
 | `ZopfliDeflater` | `ZopfliDeflater()` |  |
 | `Compress` | `static byte[] Compress(ReadOnlySpan<byte> data, bool hyper, int iterations = 15)` | Compress data to zlib-wrapped DEFLATE format |
 
-### Namespace `Compression.Core.BitIO`
-
-[`BitBuffer`](#bitbuffer) · [`BitBuffer<TOrder>`](#bitbuffertorder) · [`BitOrder`](#bitorder) · [`BitReader`](#bitreader) · [`BitReader<TOrder>`](#bitreadertorder) · [`BitWriter`](#bitwriter) · [`BitWriter<TOrder>`](#bitwritertorder) · [`IBitOrder`](#ibitorder) · [`LsbBitOrder`](#lsbbitorder) · [`MsbBitOrder`](#msbbitorder)
-
-#### `BitBuffer`
-
-| Member | Signature | Summary |
-| --- | --- | --- |
-| `BitBuffer` | `BitBuffer(Stream stream, BitOrder bitOrder = 0)` |  |
-| `BitsAvailable` | `int BitsAvailable { get; }` |  |
-| `AlignToByte` | `void AlignToByte()` |  |
-| `DropBits` | `void DropBits(int count)` |  |
-| `EnsureBits` | `bool EnsureBits(int count)` |  |
-| `PeekBits` | `uint PeekBits(int count)` |  |
-| `ReadBits` | `uint ReadBits(int count)` |  |
-
-#### `BitBuffer<TOrder>`
-
-| Member | Signature | Summary |
-| --- | --- | --- |
-| `BitBuffer` | `BitBuffer(Stream stream)` |  |
-| `BitsAvailable` | `int BitsAvailable { get; }` |  |
-| `AlignToByte` | `void AlignToByte()` |  |
-| `DropBits` | `void DropBits(int count)` |  |
-| `EnsureBits` | `bool EnsureBits(int count)` |  |
-| `PeekBits` | `uint PeekBits(int count)` |  |
-| `ReadBits` | `uint ReadBits(int count)` |  |
-
-#### `BitOrder`
-
-| Value | Numeric | Summary |
-| --- | --- | --- |
-| `LsbFirst` | `0` |  |
-| `MsbFirst` | `1` |  |
-
-#### `BitReader`
-
-| Member | Signature | Summary |
-| --- | --- | --- |
-| `BitReader` | `BitReader(Stream stream, BitOrder bitOrder = 0)` |  |
-| `BitsInBuffer` | `int BitsInBuffer { get; }` |  |
-| `AlignToByte` | `void AlignToByte()` |  |
-| `ReadBit` | `int ReadBit()` |  |
-| `ReadBits` | `uint ReadBits(int count)` |  |
-
-#### `BitReader<TOrder>`
-
-| Member | Signature | Summary |
-| --- | --- | --- |
-| `BitReader` | `BitReader(Stream stream)` |  |
-| `BitsInBuffer` | `int BitsInBuffer { get; }` |  |
-| `AlignToByte` | `void AlignToByte()` |  |
-| `ReadBit` | `int ReadBit()` |  |
-| `ReadBits` | `uint ReadBits(int count)` |  |
-
-#### `BitWriter`
-
-| Member | Signature | Summary |
-| --- | --- | --- |
-| `BitWriter` | `BitWriter(Stream stream, BitOrder bitOrder = 0)` |  |
-| `BitsInBuffer` | `int BitsInBuffer { get; }` |  |
-| `FlushBits` | `void FlushBits()` |  |
-| `WriteBit` | `void WriteBit(int bit)` |  |
-| `WriteBits` | `void WriteBits(uint value, int count)` |  |
-
-#### `BitWriter<TOrder>`
-
-| Member | Signature | Summary |
-| --- | --- | --- |
-| `BitWriter` | `BitWriter(Stream stream)` |  |
-| `BitsInBuffer` | `int BitsInBuffer { get; }` |  |
-| `FlushBits` | `void FlushBits()` |  |
-| `WriteBit` | `void WriteBit(int bit)` |  |
-| `WriteBits` | `void WriteBits(uint value, int count)` |  |
-
-#### `IBitOrder`
-
-| Member | Signature | Summary |
-| --- | --- | --- |
-| `AccumulateBits` | `static uint AccumulateBits(uint result, int bit, int index)` |  |
-| `Drop` | `static ulong Drop(ulong buffer, int bitsInBuffer, int count)` |  |
-| `ExtractBit` | `static ValueTuple<int, int> ExtractBit(int buffer)` |  |
-| `InsertByte` | `static ulong InsertByte(ulong buffer, int bitsInBuffer, int b)` |  |
-| `Peek` | `static uint Peek(ulong buffer, int bitsInBuffer, int count)` |  |
-| `PlaceBit` | `static int PlaceBit(int buffer, int bitsInBuffer, int bit)` |  |
-| `WriteBitIndex` | `static int WriteBitIndex(int count, int index)` |  |
-
-#### `LsbBitOrder`
-
-Implements `IBitOrder`.
-
-| Member | Signature | Summary |
-| --- | --- | --- |
-| `AccumulateBits` | `static uint AccumulateBits(uint result, int bit, int index)` |  |
-| `Drop` | `static ulong Drop(ulong buffer, int bitsInBuffer, int count)` |  |
-| `ExtractBit` | `static ValueTuple<int, int> ExtractBit(int buffer)` |  |
-| `InsertByte` | `static ulong InsertByte(ulong buffer, int bitsInBuffer, int b)` |  |
-| `Peek` | `static uint Peek(ulong buffer, int bitsInBuffer, int count)` |  |
-| `PlaceBit` | `static int PlaceBit(int buffer, int bitsInBuffer, int bit)` |  |
-| `WriteBitIndex` | `static int WriteBitIndex(int count, int index)` |  |
-
-#### `MsbBitOrder`
-
-Implements `IBitOrder`.
-
-| Member | Signature | Summary |
-| --- | --- | --- |
-| `AccumulateBits` | `static uint AccumulateBits(uint result, int bit, int index)` |  |
-| `Drop` | `static ulong Drop(ulong buffer, int bitsInBuffer, int count)` |  |
-| `ExtractBit` | `static ValueTuple<int, int> ExtractBit(int buffer)` |  |
-| `InsertByte` | `static ulong InsertByte(ulong buffer, int bitsInBuffer, int b)` |  |
-| `Peek` | `static uint Peek(ulong buffer, int bitsInBuffer, int count)` |  |
-| `PlaceBit` | `static int PlaceBit(int buffer, int bitsInBuffer, int bit)` |  |
-| `WriteBitIndex` | `static int WriteBitIndex(int count, int index)` |  |
-
-### Namespace `Compression.Core.Entropy.Huffman`
-
-[`CanonicalHuffman`](#canonicalhuffman) · [`HuffmanDecoder<TOrder>`](#huffmandecodertorder) · [`HuffmanEncoder<TOrder>`](#huffmanencodertorder) · [`HuffmanNode`](#huffmannode)
-
-#### `CanonicalHuffman`
-
-| Member | Signature | Summary |
-| --- | --- | --- |
-| `CanonicalHuffman` | `CanonicalHuffman(int[] codeLengths)` |  |
-| `MaxCodeLength` | `int MaxCodeLength { get; }` |  |
-| `MaxSymbol` | `int MaxSymbol { get; }` |  |
-| `DecodeSymbol` | `int DecodeSymbol<TOrder>(BitBuffer<TOrder> bitBuffer)` |  |
-| `DecodeSymbol` | `int DecodeSymbol<TOrder>(BitReader<TOrder> bitReader)` |  |
-| `GetCode` | `ValueTuple<uint, int> GetCode(int symbol)` |  |
-
-#### `HuffmanDecoder<TOrder>`
-
-| Member | Signature | Summary |
-| --- | --- | --- |
-| `HuffmanDecoder` | `HuffmanDecoder(CanonicalHuffman table, BitBuffer<TOrder> bitBuffer)` |  |
-| `DecodeSymbol` | `int DecodeSymbol()` |  |
-| `DecodeSymbols` | `int[] DecodeSymbols(int count)` |  |
-
-#### `HuffmanEncoder<TOrder>`
-
-| Member | Signature | Summary |
-| --- | --- | --- |
-| `HuffmanEncoder` | `HuffmanEncoder(CanonicalHuffman table, BitWriter<TOrder> bitWriter)` |  |
-| `EncodeSymbol` | `void EncodeSymbol(int symbol)` |  |
-| `EncodeSymbols` | `void EncodeSymbols(ReadOnlySpan<int> symbols)` |  |
-| `Flush` | `void Flush()` |  |
-
-#### `HuffmanNode`
-
-| Member | Signature | Summary |
-| --- | --- | --- |
-| `HuffmanNode` | `HuffmanNode(HuffmanNode left, HuffmanNode right)` |  |
-| `HuffmanNode` | `HuffmanNode(int symbol, long frequency)` |  |
-| `Frequency` | `long Frequency { get; }` |  |
-| `IsLeaf` | `bool IsLeaf { get; }` |  |
-| `Left` | `HuffmanNode Left { get; }` |  |
-| `Right` | `HuffmanNode Right { get; }` |  |
-| `Symbol` | `int Symbol { get; }` |  |
-
 ### Namespace `FileFormat.Aai`
 
 [`AaiFile`](#aaifile) · [`AaiReader`](#aaireader) · [`AaiWriter`](#aaiwriter)
@@ -9711,6 +9552,7 @@ Describes the pixel layout and bit depth of raw image data.
 | `Yuv420P14` | `47` | Planar 14-bit YUV 4:2:0 in right-justified little-endian ushort samples. |
 | `Yuv422P14` | `48` | Planar 14-bit YUV 4:2:2 in right-justified little-endian ushort samples. |
 | `Yuv444P14` | `49` | Planar 14-bit YUV 4:4:4 in right-justified little-endian ushort samples. |
+| `Yuv410P8` | `50` | Planar 8-bit YUV 4:1:0: Y, then U and V each one sample per 4x4 luma block (Sorenson Video, Indeo). |
 
 #### `PixelRect`
 
@@ -10650,7 +10492,7 @@ Decodes PVRTC (PowerVR Texture Compression) 2bpp and 4bpp blocks to RGBA32 pixel
 
 ### Namespace `FileFormat.Core.PixelFormats`
 
-[`Argb32`](#argb32) · [`Bgr24`](#bgr24) · [`Bgra32`](#bgra32) · [`Cfa16`](#cfa16) · [`Gray10`](#gray10) · [`Gray16`](#gray16) · [`Gray8`](#gray8) · [`GrayAlpha16`](#grayalpha16) · [`GrayAlpha32`](#grayalpha32) · [`GrayAlphaF16`](#grayalphaf16) · [`GrayAlphaF32`](#grayalphaf32) · [`GrayF16`](#grayf16) · [`GrayF32`](#grayf32) · [`Indexed1`](#indexed1) · [`Indexed10`](#indexed10) · [`Indexed11`](#indexed11) · [`Indexed12`](#indexed12) · [`Indexed13`](#indexed13) · [`Indexed14`](#indexed14) · [`Indexed15`](#indexed15) · [`Indexed16`](#indexed16) · [`Indexed2`](#indexed2) · [`Indexed3`](#indexed3) · [`Indexed4`](#indexed4) · [`Indexed5`](#indexed5) · [`Indexed6`](#indexed6) · [`Indexed7`](#indexed7) · [`Indexed8`](#indexed8) · [`Indexed9`](#indexed9) · [`Rgb24`](#rgb24) · [`Rgb30`](#rgb30) · [`Rgb48`](#rgb48) · [`Rgb565`](#rgb565) · [`RgbF16`](#rgbf16) · [`RgbF32`](#rgbf32) · [`Rgba32`](#rgba32) · [`Rgba64`](#rgba64) · [`RgbaF16`](#rgbaf16) · [`RgbaF32`](#rgbaf32) · [`Yuv411P8`](#yuv411p8) · [`Yuv420P10`](#yuv420p10) · [`Yuv420P12`](#yuv420p12) · [`Yuv420P14`](#yuv420p14) · [`Yuv420P16`](#yuv420p16) · [`Yuv420P8`](#yuv420p8) · [`Yuv420P9`](#yuv420p9) · [`Yuv422P10`](#yuv422p10) · [`Yuv422P12`](#yuv422p12) · [`Yuv422P14`](#yuv422p14) · [`Yuv422P16`](#yuv422p16) · [`Yuv422P8`](#yuv422p8) · [`Yuv422P9`](#yuv422p9) · [`Yuv440P10`](#yuv440p10) · [`Yuv440P12`](#yuv440p12) · [`Yuv440P16`](#yuv440p16) · [`Yuv440P8`](#yuv440p8) · [`Yuv444P10`](#yuv444p10) · [`Yuv444P12`](#yuv444p12) · [`Yuv444P14`](#yuv444p14) · [`Yuv444P16`](#yuv444p16) · [`Yuv444P8`](#yuv444p8) · [`Yuv444P9`](#yuv444p9)
+[`Argb32`](#argb32) · [`Bgr24`](#bgr24) · [`Bgra32`](#bgra32) · [`Cfa16`](#cfa16) · [`Gray10`](#gray10) · [`Gray16`](#gray16) · [`Gray8`](#gray8) · [`GrayAlpha16`](#grayalpha16) · [`GrayAlpha32`](#grayalpha32) · [`GrayAlphaF16`](#grayalphaf16) · [`GrayAlphaF32`](#grayalphaf32) · [`GrayF16`](#grayf16) · [`GrayF32`](#grayf32) · [`Indexed1`](#indexed1) · [`Indexed10`](#indexed10) · [`Indexed11`](#indexed11) · [`Indexed12`](#indexed12) · [`Indexed13`](#indexed13) · [`Indexed14`](#indexed14) · [`Indexed15`](#indexed15) · [`Indexed16`](#indexed16) · [`Indexed2`](#indexed2) · [`Indexed3`](#indexed3) · [`Indexed4`](#indexed4) · [`Indexed5`](#indexed5) · [`Indexed6`](#indexed6) · [`Indexed7`](#indexed7) · [`Indexed8`](#indexed8) · [`Indexed9`](#indexed9) · [`Rgb24`](#rgb24) · [`Rgb30`](#rgb30) · [`Rgb48`](#rgb48) · [`Rgb565`](#rgb565) · [`RgbF16`](#rgbf16) · [`RgbF32`](#rgbf32) · [`Rgba32`](#rgba32) · [`Rgba64`](#rgba64) · [`RgbaF16`](#rgbaf16) · [`RgbaF32`](#rgbaf32) · [`Yuv410P8`](#yuv410p8) · [`Yuv411P8`](#yuv411p8) · [`Yuv420P10`](#yuv420p10) · [`Yuv420P12`](#yuv420p12) · [`Yuv420P14`](#yuv420p14) · [`Yuv420P16`](#yuv420p16) · [`Yuv420P8`](#yuv420p8) · [`Yuv420P9`](#yuv420p9) · [`Yuv422P10`](#yuv422p10) · [`Yuv422P12`](#yuv422p12) · [`Yuv422P14`](#yuv422p14) · [`Yuv422P16`](#yuv422p16) · [`Yuv422P8`](#yuv422p8) · [`Yuv422P9`](#yuv422p9) · [`Yuv440P10`](#yuv440p10) · [`Yuv440P12`](#yuv440p12) · [`Yuv440P16`](#yuv440p16) · [`Yuv440P8`](#yuv440p8) · [`Yuv444P10`](#yuv444p10) · [`Yuv444P12`](#yuv444p12) · [`Yuv444P14`](#yuv444p14) · [`Yuv444P16`](#yuv444p16) · [`Yuv444P8`](#yuv444p8) · [`Yuv444P9`](#yuv444p9)
 
 #### `Argb32`
 
@@ -10959,6 +10801,14 @@ Implements `IRawPixelFormat<RgbaF16>`.
 #### `RgbaF32`
 
 Implements `IRawPixelFormat<RgbaF32>`.
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `Traits` | `static RawPixelFormatTraits Traits { get; }` |  |
+
+#### `Yuv410P8`
+
+Implements `IRawPixelFormat<Yuv410P8>`.
 
 | Member | Signature | Summary |
 | --- | --- | --- |
