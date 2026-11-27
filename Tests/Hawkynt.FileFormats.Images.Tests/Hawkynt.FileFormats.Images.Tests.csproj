@@ -52,6 +52,15 @@
     </None>
   </ItemGroup>
 
+  <!-- Small self-made PDFs and the poppler renders they are held to. Copied under Fixtures\Pdf\
+       keeping their folders, so each stage of the renderer has its own set. -->
+  <ItemGroup>
+    <None Include="Formats\Pdf\Fixtures\**\*.*" Exclude="Formats\Pdf\Fixtures\**\*.py">
+      <Link>Fixtures\Pdf\%(RecursiveDir)%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
   <!-- Real JPEG XL files from libjxl's test corpus, validating our parsers against bitstreams a
        reference encoder produced rather than only against synthetic round-trips. -->
   <ItemGroup>

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using FileFormat.Core;
+using FileFormat.Pdf.Document;
 
 namespace FileFormat.Pdf;
 
@@ -23,8 +24,54 @@ public sealed class PdfFile : IImageFormatReader<PdfFile>, IImageToRawImage<PdfF
 
   static byte[] IImageFormatWriter<PdfFile>.ToBytes(PdfFile file) => PdfWriter.ToBytes(file);
 
-  /// <summary>All extracted raster images from the PDF.</summary>
-  public IReadOnlyList<PdfImage> Images { get; init; } = [];
+  private IReadOnlyList<PdfImage>? _images;
+  private readonly Func<IReadOnlyList<PdfImage>>? _extractImages;
+  private IReadOnlyList<PdfPage>? _pages;
+
+  /// <summary>Builds a document in memory from its images, one page each, as <see cref="PdfWriter"/> lays them out.</summary>
+  public PdfFile() { }
+
+  internal PdfFile(PdfDocument document, Func<IReadOnlyList<PdfImage>> extractImages) {
+    this.Document = document;
+    this._extractImages = extractImages;
+  }
+
+  /// <summary>The document a file was read from, or null for one built in memory.</summary>
+  internal PdfDocument? Document { get; }
+
+  /// <summary>Why the page structure could not be read, when it could not and the images could.</summary>
+  internal Exception? DocumentFailure { get; init; }
+
+  /// <summary>
+  /// The raster images embedded in the document as image XObjects, decoded to pixels: the pictures
+  /// in it rather than its pages. Extracted on first use.
+  /// </summary>
+  public IReadOnlyList<PdfImage> Images {
+    get => this._images ??= this._extractImages?.Invoke() ?? [];
+    init => this._images = value;
+  }
+
+  /// <summary>The document's pages, in order. A document built in memory has one per image.</summary>
+  public IReadOnlyList<PdfPage> Pages => this._pages ??= this._DescribePages();
+
+  private IReadOnlyList<PdfPage> _DescribePages() {
+    var pages = new List<PdfPage>();
+    if (this.Document != null) {
+      for (var i = 0; i < this.Document.Pages.Count; ++i) {
+        var node = this.Document.Pages[i];
+        pages.Add(new() { Index = i, MediaBox = node.MediaBox, CropBox = node.CropBox, Rotation = node.Rotate, UserUnit = node.UserUnit });
+      }
+
+      return pages;
+    }
+
+    for (var i = 0; i < this.Images.Count; ++i) {
+      var box = new PdfBox(0, 0, this.Images[i].Width, this.Images[i].Height);
+      pages.Add(new() { Index = i, MediaBox = box, CropBox = box });
+    }
+
+    return pages;
+  }
 
   /// <summary>Converts the first extracted image to a <see cref="RawImage"/>.</summary>
   public static RawImage ToRawImage(PdfFile file) {

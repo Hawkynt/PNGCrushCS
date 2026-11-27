@@ -1,10 +1,11 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using FileFormat.Pdf.Document;
 
 namespace FileFormat.Pdf;
 
-/// <summary>Reads PDF files and extracts embedded raster images from image XObjects.</summary>
+/// <summary>Reads PDF files: their pages, and the raster images embedded in them as image XObjects.</summary>
 public static class PdfReader {
 
   private const int _MIN_SIZE = 67; // Minimal valid PDF: header + single object + xref + trailer
@@ -33,6 +34,34 @@ public static class PdfReader {
       throw new InvalidDataException("Invalid PDF signature.");
 
     var dataArray = data.ToArray();
+
+    // The page structure is read by the document layer, which copes with object streams, encryption
+    // and a damaged cross-reference; the embedded images are still found the way they always were,
+    // and only when somebody asks for them.
+    PdfDocument? document = null;
+    Exception? failure = null;
+    try {
+      document = PdfDocument.Open(dataArray);
+    } catch (Exception e) when (e is InvalidDataException or NotSupportedException) {
+      failure = e;
+    }
+
+    if (document == null) {
+      // Neither reader can make sense of it: say why in the terms the image extraction always used.
+      var images = _ExtractImages(dataArray);
+      return new PdfFile { Images = images, DocumentFailure = failure };
+    }
+
+    return new PdfFile(document, () => {
+      try {
+        return _ExtractImages(dataArray);
+      } catch (Exception e) when (e is InvalidDataException or IndexOutOfRangeException or ArgumentException or InvalidCastException) {
+        return [];
+      }
+    });
+  }
+
+  private static List<PdfImage> _ExtractImages(byte[] dataArray) {
     var xref = PdfXrefParser.Parse(dataArray);
     var trailer = PdfXrefParser.ParseTrailer(dataArray, xref);
     if (trailer == null)
@@ -51,7 +80,7 @@ public static class PdfReader {
     if (images.Count == 0)
       _BruteForceScanImages(dataArray, xref, images);
 
-    return new PdfFile { Images = images };
+    return images;
   }
 
   private static void _ExtractFromCatalog(Dictionary<string, object?> catalog, byte[] data, Dictionary<int, long> xref, List<PdfImage> images) {
