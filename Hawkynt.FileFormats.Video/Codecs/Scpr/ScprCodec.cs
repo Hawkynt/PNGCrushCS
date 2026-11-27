@@ -287,6 +287,7 @@ internal sealed class ScprRangeEncoder {
 internal sealed class ScprDecoder(int width, int height, int bitsPerPixel) {
 
   private readonly ScprModels _models = new();
+  private Scpr3Models? _models3;
   private uint[] _current = new uint[width * height];
   private uint[] _last = new uint[width * height];
   private readonly int _blocksWide = (width + 15) / 16;
@@ -305,6 +306,7 @@ internal sealed class ScprDecoder(int width, int height, int bitsPerPixel) {
     var data = packet.ToArray();
     var type = data[0];
     ScprRangeDecoder? rc = null;
+    Scpr3RangeDecoder? rc3 = null;
     switch (type) {
       case 2 or 18:
         this._version = type == 2 ? 1 : 2;
@@ -312,7 +314,10 @@ internal sealed class ScprDecoder(int width, int height, int bitsPerPixel) {
         this._Intra(rc);
         break;
       case 34:
-        throw new NotSupportedException("This ScreenPressor frame is of the third generation, which this decoder does not read.");
+        this._version = 3;
+        rc3 = new(data, 1);
+        this._Intra3(rc3);
+        break;
       case 17 or 33: {
         // The colour follows the type byte.
         if (data.Length < 3)
@@ -334,13 +339,18 @@ internal sealed class ScprDecoder(int width, int height, int bitsPerPixel) {
           throw new InvalidDataException("A ScreenPressor inter frame arrived before any key frame.");
         if (data.Length < 1 || data[0] == 0)
           return false; // nothing changed; FFmpeg yields no picture
-        rc = new(data, 2, this._version == 1);
-        this._Inter(rc);
+        if (this._version == 3) {
+          rc3 = new(data, 1);
+          this._Inter3(rc3);
+        } else {
+          rc = new(data, 2, this._version == 1);
+          this._Inter(rc);
+        }
         break;
       default:
         throw new NotSupportedException($"ScreenPressor frame type {type} is not one FFmpeg reads either.");
     }
-    if (rc != null && rc.Left > 5)
+    if (rc != null && rc.Left > 5 || rc3 != null && rc3.Left > 5)
       throw new InvalidDataException("This ScreenPressor frame has bytes left over after its picture.");
     (this._current, this._last) = (this._last, this._current);
     return true;
@@ -462,12 +472,138 @@ internal sealed class ScprDecoder(int width, int height, int bitsPerPixel) {
         }
       }
   }
+
+  // ============================================================================================
+  // The third generation: scpr3.c's decompress_i3 and decompress_p3
+  // ============================================================================================
+
+  private (uint Colour, int Cx, int Cx1) _Units3(Scpr3RangeDecoder rc, int cx, int cx1) {
+    var models = this._models3!;
+    var first = Scpr3Coding.Unit(rc, models.Pixel(0, cx + cx1));
+    cx1 = (cx << 6) & 0xFC0;
+    cx = first >> 2;
+    var second = Scpr3Coding.Unit(rc, models.Pixel(1, cx + cx1));
+    cx1 = (cx << 6) & 0xFC0;
+    cx = second >> 2;
+    var third = Scpr3Coding.Unit(rc, models.Pixel(2, cx + cx1));
+    cx1 = (cx << 6) & 0xFC0;
+    cx = third >> 2;
+    return ((uint)((third << 16) + (second << 8) + first), cx, cx1);
+  }
+
+  private void _Intra3(Scpr3RangeDecoder rc) {
+    var models = this._models3 ??= new();
+    models.Reinitialise();
+    var dst = this._current;
+    int cx = 0, cx1 = 0, k = 0, x = 0, y = 0, lx = 0, ly = 0;
+    uint colour;
+    while (k < width + 1) {
+      (colour, cx, cx1) = this._Units3(rc, cx, cx1);
+      var run = Scpr3Coding.Value(rc, models.Run[0]);
+      if (run <= 0)
+        throw new InvalidDataException("A ScreenPressor run is empty.");
+      k += run;
+      while (run-- > 0) {
+        if (y >= height)
+          throw new InvalidDataException("A ScreenPressor run passes the picture's end.");
+        dst[y * width + x] = colour;
+        lx = x;
+        ly = y;
+        if (++x >= width) {
+          x = 0;
+          ++y;
+        }
+      }
+    }
+
+    var ptype = 0;
+    colour = 0;
+    while (x < width && y < height) {
+      ptype = Scpr3Coding.Value(rc, models.Op[ptype]);
+      if (ptype == 0)
+        (colour, cx, cx1) = this._Units3(rc, cx, cx1);
+      var run = Scpr3Coding.Value(rc, models.Run[ptype]);
+      if (run <= 0)
+        throw new InvalidDataException("A ScreenPressor run is empty.");
+      colour = ScprRuns.Intra(dst, width, height, ptype, run, ref x, ref y, colour, ref lx, ref ly);
+      (cx, cx1) = this._Context(colour);
+    }
+  }
+
+  private void _Inter3(Scpr3RangeDecoder rc) {
+    var models = this._models3!;
+    var min = Scpr3Coding.Value(rc, models.Range);
+    min += Scpr3Coding.Value(rc, models.Range) << 8;
+    var max = Scpr3Coding.Value(rc, models.Range);
+    max += Scpr3Coding.Value(rc, models.Range) << 8;
+    var count = this._blocksWide * this._blocksHigh;
+    if (min > max || min >= count)
+      throw new InvalidDataException("This ScreenPressor frame's block range is out of order.");
+    var blocks = new int[count];
+    while (min <= max) {
+      var fill = Scpr3Coding.Value(rc, models.Fill);
+      var n = Scpr3Coding.Value(rc, models.Count);
+      if (n <= 0)
+        throw new InvalidDataException("A ScreenPressor block run is empty.");
+      while (min < count && n-- > 0)
+        blocks[min++] = fill;
+    }
+
+    Array.Copy(this._last, this._current, this._current.Length);
+    var dst = this._current;
+    var prev = this._last;
+    int cx = 0, cx1 = 0, mvx = 0, mvy = 0;
+    for (var by0 = 0; by0 < this._blocksHigh; ++by0)
+      for (var bx0 = 0; bx0 < this._blocksWide; ++bx0) {
+        var fill = blocks[by0 * this._blocksWide + bx0];
+        if (fill == 0)
+          continue;
+        int sx1 = 0, sy1 = 0, sx2 = 16, sy2 = 16;
+        if (((fill + 1) & 1) != 0) {
+          sx1 = Scpr3Coding.Value(rc, models.Sxy[0]);
+          sy1 = Scpr3Coding.Value(rc, models.Sxy[1]);
+          sx2 = Scpr3Coding.Value(rc, models.Sxy[2]) + 1;
+          sy2 = Scpr3Coding.Value(rc, models.Sxy[3]) + 1;
+        }
+
+        if (((fill + 3) & 2) != 0) {
+          // A moved block either keeps the vector of the last one or states its own.
+          if (!rc.Binary()) {
+            mvx = Scpr3Coding.Value(rc, models.Mv[0]) - 256;
+            mvy = Scpr3Coding.Value(rc, models.Mv[1]) - 256;
+          }
+
+          int top = by0 * 16, left = bx0 * 16;
+          if (top + mvy + sy1 < 0 || left + mvx + sx1 < 0 || top + mvy + sy1 >= height || left + mvx + sx1 >= width)
+            throw new InvalidDataException("A ScreenPressor motion vector points off the picture.");
+          for (var i = 0; i < sy2 - sy1 && top + sy1 + i < height && top + mvy + sy1 + i < height; ++i)
+            for (var j = 0; j < sx2 - sx1 && left + sx1 + j < width && left + mvx + sx1 + j < width; ++j)
+              dst[(top + i + sy1) * width + left + sx1 + j] = prev[(top + mvy + sy1 + i) * width + left + sx1 + mvx + j];
+        } else {
+          int bx = bx0 * 16 + sx1, by = by0 * 16 + sy1;
+          if (bx >= width)
+            throw new InvalidDataException("A ScreenPressor block starts past the picture's edge.");
+          var ptype = 0;
+          uint colour = 0;
+          while (by < by0 * 16 + sy2 && by < height) {
+            ptype = Scpr3Coding.Value(rc, models.Op[ptype]);
+            if (ptype == 0)
+              (colour, cx, cx1) = this._Units3(rc, cx, cx1);
+            var run = Scpr3Coding.Value(rc, models.Run[ptype]);
+            if (run <= 0)
+              throw new InvalidDataException("A ScreenPressor run is empty.");
+            colour = ScprRuns.Inter(dst, prev, width, height, ptype, run, bx0, ref bx, ref by, colour, sx1, sx2);
+            (cx, cx1) = this._Context(colour);
+          }
+        }
+      }
+  }
 }
 
 /// <summary>FFmpeg's <c>decode_run_i</c> and <c>decode_run_p</c> over a picture of rows without padding.</summary>
 internal static class ScprRuns {
 
-  private static uint _Gradient(uint up, uint left, uint upLeft) {
+  internal static uint Gradient(uint up, uint left, uint upLeft) {
     int r = (int)(left & 0xFF) + (int)(up & 0xFF) - (int)(upLeft & 0xFF);
     int g = (int)((left >> 8) & 0xFF) + (int)((up >> 8) & 0xFF) - (int)((upLeft >> 8) & 0xFF);
     int b = (int)((left >> 16) & 0xFF) + (int)((up >> 16) & 0xFF) - (int)((upLeft >> 16) & 0xFF);
@@ -494,7 +630,7 @@ internal static class ScprRuns {
           colour = dst[at - width];
           break;
         case 4:
-          colour = _Gradient(dst[at - width], dst[ly * width + lx], dst[at - width - 1]);
+          colour = Gradient(dst[at - width], dst[ly * width + lx], dst[at - width - 1]);
           break;
         default:
           colour = dst[at - width - 1];
@@ -526,7 +662,7 @@ internal static class ScprRuns {
         1 => dst[at - 1],
         2 => dst[at - width],
         3 => prev[at],
-        4 => _Gradient(dst[at - width], dst[at - 1], dst[at - width - 1]),
+        4 => Gradient(dst[at - width], dst[at - 1], dst[at - width - 1]),
         _ => dst[at - width - 1],
       };
       dst[at] = colour;
@@ -550,7 +686,7 @@ internal sealed class ScprEncoder(int width, int height) {
   private readonly int _blocksWide = (width + 15) / 16;
   private readonly int _blocksHigh = (height + 15) / 16;
 
-  private static (int Cx, int Cx1) _Context(uint colour) => ((int)((colour & 0xFFFFFF) >> 18), (int)((colour & 0xFC00) >> 4));
+  internal static (int Cx, int Cx1) Context(uint colour) => ((int)((colour & 0xFFFFFF) >> 18), (int)((colour & 0xFC00) >> 4));
 
   private void _Units(ScprRangeEncoder rc, uint colour, ref int cx, ref int cx1) {
     int first = (int)(colour & 0xFF), second = (int)((colour >> 8) & 0xFF), third = (int)((colour >> 16) & 0xFF);
@@ -598,19 +734,19 @@ internal sealed class ScprEncoder(int width, int height) {
     }
     var ptype = 0;
     while (at < pixels.Length) {
-      var (next, run) = _BestIntra(pixels, at);
+      var (next, run) = BestIntra(pixels, width, at);
       rc.Value(this._models.Op[ptype], 6, next, 1000);
       ptype = next;
       if (ptype == 0)
         this._Units(rc, pixels[at], ref cx, ref cx1);
       rc.Value(this._models.Run[ptype], 256, run, 400);
       at += run;
-      (cx, cx1) = _Context(pixels[at - 1]);
+      (cx, cx1) = Context(pixels[at - 1]);
     }
   }
 
   /// <summary>The longest run any copying operation reproduces here, or a run of one colour.</summary>
-  private (int Ptype, int Run) _BestIntra(uint[] pixels, int at) {
+  internal static (int Ptype, int Run) BestIntra(uint[] pixels, int width, int at) {
     int bestType = 0, bestRun = 0;
     for (var ptype = 1; ptype <= 5; ++ptype) {
       if (ptype == 3)
@@ -701,7 +837,7 @@ internal sealed class ScprEncoder(int width, int height) {
           this._Units(rc, pixels[by * width + bx], ref cx, ref cx1);
         rc.Value(models.Run[ptype], 256, run, 400);
         var colour = ScprRuns.Inter(dst, prev, width, height, ptype, run, bx0, ref bx, ref by, pixels[by * width + bx], 0, 16);
-        (cx, cx1) = _Context(colour);
+        (cx, cx1) = Context(colour);
       }
     }
   }

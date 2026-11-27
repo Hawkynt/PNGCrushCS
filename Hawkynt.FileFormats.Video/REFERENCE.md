@@ -2777,7 +2777,7 @@ Implements `IVideoCodecDecoder<RsccVideoDecoder>`, `IVideoFrameDecoder`.
 
 #### `ScprVideoDecoder`
 
-Decodes ScreenPressor's first two generations and its solid fills: key frames of runs — a new colour coded through adaptive contexts, or a copy from the left, above, a gradient or above-left — and inter frames that recode or move 16x16 blocks of the last picture.
+Decodes all three generations of ScreenPressor and its solid fills: key frames of runs — a new colour coded through adaptive contexts, or a copy from the left, above, a gradient or above-left — and inter frames that recode or move 16x16 blocks of the last picture.
 
 Implements `IVideoCodecDecoder<ScprVideoDecoder>`, `IVideoFrameDecoder`.
 

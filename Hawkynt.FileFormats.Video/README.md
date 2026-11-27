@@ -243,7 +243,7 @@ measurement notes are in
 | [IFF ANIM Video](https://en.wikipedia.org/wiki/ANIM) | ⚠️ | ✅ | none | `ANIM`; delta methods 2, 3, 5, 6, 7 and 8, palettised or Hold-And-Modify, including DPaint Anim Brush's XOR variant of method 5. Method 4's non-RLC variant and operation 74 publish no wire grammar and are refused. The encoder writes indexed colour only, as uncompressed ILBM key pictures and method 5 byte-vertical deltas | [Amiga ANIM IFF](https://wiki.amigaos.net/wiki/ANIM_IFF_CEL_Animations) |
 | [Brute Force & Ignorance Video](https://wiki.multimedia.cx/index.php/BFI) | ✅ | — | — | `BFIV`; palettised 8-bit with literal runs, back-references, carried runs and fills | [MultimediaWiki BFI](https://wiki.multimedia.cx/index.php/BFI) |
 | [Sierra VMD Video](https://wiki.multimedia.cx/index.php/VMD) | ⚠️ | — | — | `VMDV` codec version 2, 8-bit palettised, painted one rectangle at a time. New-palette frames, empty rectangles, LZ rectangles without the preload marker and unknown rendering methods refused | [MultimediaWiki VMD](https://wiki.multimedia.cx/index.php/VMD) |
-| [ScreenPressor](https://www.infognition.com/ScreenPressor/) | ⚠️ | ✅ | ffmpeg | `SCPR`; the first two generations and solid fills: key frames of runs — a new colour coded through three adaptive 4096-context models, or a copy from the left, above, a gradient or above-left — and inter frames that recode, move or leave 16x16 blocks of the last picture, all through one of two range coders. The third generation is refused by name: no sample of it has been found. An inter frame that changes nothing yields no picture, as in FFmpeg. Decoded to `Bgr24`, or `Rgb24` for a 16-bit stream. All 105 pictures of `samples.ffmpeg.org`'s `SCPR.avi` agree with FFmpeg's. The encoder is this package's own, FFmpeg having none, and lossless: the second generation, a key frame then inter frames that leave unchanged blocks alone, each run the longest a copy reproduces or else one new colour | [Infognition ScreenPressor](https://www.infognition.com/ScreenPressor/) |
+| [ScreenPressor](https://www.infognition.com/ScreenPressor/) | ✅ | ✅ | ffmpeg | `SCPR`; all three generations and solid fills: key frames of runs — a new colour coded through three adaptive 4096-context models, or a copy from the left, above, a gradient or above-left — and inter frames that recode, move or leave 16x16 blocks of the last picture, whole or narrowed to a rectangle. The first two generations code through one of two range coders; the third through a byte-wise rANS coder with colour models that change shape as they learn, from raw bytes to a full 256-symbol table, and moved blocks that may keep the last vector. An inter frame that changes nothing yields no picture, as in FFmpeg. Decoded to `Bgr24`, or `Rgb24` for a 16-bit stream. All 105 pictures of `samples.ffmpeg.org`'s second-generation `SCPR.avi` agree with FFmpeg's; no third-generation film is published, so that generation is measured on streams the package writes, which FFmpeg decodes to exactly this decoder's pictures. The encoder is this package's own, FFmpeg having none, and lossless: the second generation, a key frame then inter frames that leave unchanged blocks alone, each run the longest a copy reproduces or else one new colour | [Infognition ScreenPressor](https://www.infognition.com/ScreenPressor/) |
 | [BitJazz SheerVideo](https://wiki.multimedia.cx/index.php/SheerVideo) | ✅ | ✅ | ffmpeg | `Shr0` to `Shr7`; 29 lossless layouts — RGB, RGBA, and 4:4:4 and 4:2:2 YUV with or without alpha, at eight or ten bits — each row stored raw or as Huffman-coded differences from the left or from a gradient of its neighbours, the layout named in each frame. The row decoders are FFmpeg's, transcribed mechanically. Decoded to `Rgb24`, `Rgba32`, `Rgb48`, `Rgba64` or planar YUV at eight or ten bits; YUV with alpha, which no planar format here carries, to `Rgba32` or `Rgba64`. No real file has been found, but any bits are a valid frame, so frames of random bits in all 29 layouts, at even and odd sizes, are held to FFmpeg's decoding and agree. The encoder is this package's own, FFmpeg having none, and lossless: `BYRY` for 4:2:2, ` YbR` for 4:4:4, ` RGB` for anything else | [MultimediaWiki SheerVideo](https://wiki.multimedia.cx/index.php/SheerVideo) |
 | [Smacker Video](https://wiki.multimedia.cx/index.php/Smacker) | ✅ | — | — | `SMK2` and `SMK4`; 8-bit palettised 4x4 blocks read through four Huffman tables the file states once and every frame shares, with the running palette resolved here rather than in the demuxer. A picture that is not a whole number of 4x4 blocks refuses, as does a stream stating none of its four tables. The composition of those four tables — the piece RAD's own description leaves out, and what this codec sat undecoded on — is adapted from FFmpeg's LGPL-2.1-or-later decoder | [FFmpeg `smacker.c`](https://github.com/FFmpeg/FFmpeg/blob/master/libavcodec/smacker.c) |
 | [Escape 124](https://wiki.multimedia.cx/index.php/Escape_124) | ⚠️ | ✅ | ffmpeg | ARMovie/RPL codec id 124; RGB555 2x2 macroblocks inside 8x8 superblocks, so dimensions not divisible by eight are refused rather than left fringed. The encoder refreshes codebook 1 on coded pictures, reuses unchanged superblocks from the previous reconstruction through the tiered skip code, and emits the eight-byte repeat form when a whole picture is unchanged. It has no forward reference or B-picture mode, so PTS and DTS are never reordered. Each 2x2 block is reduced to its best pair of source RGB555 colours, making the writer lossy by construction. The decoder is adapted from FFmpeg's LGPL-2.1-or-later decoder; encoder decisions are original, and a key/delta/repeat RPL clip is externally checked by FFmpeg | [FFmpeg `escape124.c`](https://github.com/FFmpeg/FFmpeg/blob/master/libavcodec/escape124.c) |
@@ -266,32 +266,17 @@ mistaken for evidence.
 ### Not supported, and why
 
 The package claims the whole domain, so a codec it does not decode is a stated result and not a
-silence. Each of the codecs below was investigated against real files and every description that
-could be found, and each stopped somewhere specific. None of them is refused for want of effort, and
-none is waiting on a decision — they are waiting on a fact that is not published anywhere. Where each
-one stops precisely, and what would change the answer, is in
+silence. Every codec this table used to hold is decoded now. Each had been investigated against real
+files and every description that could be found, and each had stopped on a fact no independent source
+publishes; the sourcing ladder in
+[`AGENTS.md`](https://github.com/Hawkynt/PNGCrushCS/blob/main/AGENTS.md#sourcing-an-implementation)
+counts a licence-compatible implementation as the first rung, and converting FFmpeg's
+LGPL-2.1-or-later decoders is how every one of them was closed — they are listed under
+[Adapted from somebody else's code, and named](https://github.com/Hawkynt/PNGCrushCS/blob/main/Hawkynt.FileFormats.Video/README.md#adapted-from-somebody-elses-code-and-named).
+Where each one stopped, and what closed it, stays on record in
 [`codec-investigations.md`](https://github.com/Hawkynt/PNGCrushCS/blob/main/Hawkynt.FileFormats.Video/codec-investigations.md).
-
-That verdict predates the sourcing ladder in
-[`AGENTS.md`](https://github.com/Hawkynt/PNGCrushCS/blob/main/AGENTS.md#sourcing-an-implementation),
-which counts a licence-compatible implementation as the first rung rather than a barred one. Every
-codec in the table has an FFmpeg decoder under LGPL-2.1-or-later, and converting those decoders is how
-the sixteen in [Adapted from somebody else's code, and named](#adapted-from-somebody-elses-code-and-named)
-were closed. Each row is therefore an open issue, not a settled one. This table, the decoders with no
-encoder, and every container and codec the package does not register at all are tracked one issue
-each in [`docs/MISSING-FORMATS.md`](https://github.com/Hawkynt/PNGCrushCS/blob/main/docs/MISSING-FORMATS.md).
-
-Three walls account for nearly all of them. **The tables are in the binary, not in the files** — the
-smallest frame in a corpus cannot hold a quantisation table, so a table the format needs and never
-transmits can only come from an implementation. **The only description is a paraphrase of a decoder**
-— a wiki page whose function names, typos and constants match the decoder that predates it is not an
-independent source, and building on it makes a provenance problem out of a reverse-engineering one.
-**There is no corpus at all** — no encoder exists to make a file and no archive carries one, so
-nothing could be verified even with a description in hand.
-
-| Codec | Why it is not decoded |
-| --- | --- |
-| ScreenPressor's third generation (`SCPR`) | Its models are FFmpeg's `scpr3.c`, but no file of the generation has been found to check a conversion against |
+The decoders with no encoder, and every container and codec the package does not register at all,
+are tracked one issue each in [`docs/MISSING-FORMATS.md`](https://github.com/Hawkynt/PNGCrushCS/blob/main/docs/MISSING-FORMATS.md).
 
 ### Adapted from somebody else's code, and named
 

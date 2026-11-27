@@ -45,11 +45,11 @@ issue quotes the recorded blocker and the route around it.
 | [Standard & broadcast video](#standard--broadcast-video) | [#523](https://github.com/Hawkynt/PNGCrushCS/issues/523) | 0 | 31 | 16 | 0 | 47 |
 | [Game & multimedia-title video](#game--multimedia-title-video) | [#524](https://github.com/Hawkynt/PNGCrushCS/issues/524) | 0 | 41 | 198 | 6 | 245 |
 | [Legacy PC & capture-card video](#legacy-pc--capture-card-video) | [#525](https://github.com/Hawkynt/PNGCrushCS/issues/525) | 0 | 48 | 36 | 2 | 86 |
-| [Screen-capture video](#screen-capture-video) | [#526](https://github.com/Hawkynt/PNGCrushCS/issues/526) | 0 | 11 | 0 | 9 | 20 |
+| [Screen-capture video](#screen-capture-video) | [#526](https://github.com/Hawkynt/PNGCrushCS/issues/526) | 0 | 10 | 0 | 9 | 19 |
 | [Lossless & uncompressed video](#lossless--uncompressed-video) | [#527](https://github.com/Hawkynt/PNGCrushCS/issues/527) | 0 | 11 | 0 | 2 | 13 |
 | [Cinema camera RAW video](#cinema-camera-raw-video) | [#528](https://github.com/Hawkynt/PNGCrushCS/issues/528) | 0 | 6 | 7 | 0 | 13 |
 | [Elementary streams & streaming manifests](#elementary-streams--streaming-manifests) | [#529](https://github.com/Hawkynt/PNGCrushCS/issues/529) | 0 | 0 | 18 | 0 | 18 |
-| **All** | | **578** | **148** | **275** | **19** | **1020** |
+| **All** | | **578** | **147** | **275** | **19** | **1019** |
 
 Each issue carries the labels `cat: <category>`, its kind (`image-format`, `video-codec`, `video-container`, `video-encoder`), `priority: high|medium|low`, and `documented-blocker` where that applies.
 
@@ -1117,7 +1117,6 @@ Screen recording and remote-desktop codecs. Tracked in [#526](https://github.com
 | MS Expression Encoder Screen (MTS2) | Codec | `.xesc` | decode + encode | missing | low | [#1525](https://github.com/Hawkynt/PNGCrushCS/issues/1525) |
 | MSU Screen Capture Lossless Codec | Codec | `SCLS` | decode + encode | missing | low | [#1526](https://github.com/Hawkynt/PNGCrushCS/issues/1526) |
 | RivaTuner Video (RTV1) | Codec | `.avi` | decode + encode | missing | low | [#1527](https://github.com/Hawkynt/PNGCrushCS/issues/1527) |
-| ScreenPressor third generation (SCPR v3) | Codec | `.avi` | decode + encode | missing | low | [#1529](https://github.com/Hawkynt/PNGCrushCS/issues/1529) |
 | CamStudio (CSCD) encoder | Encoder | `CSCD` | encode | decoder only | low | [#1512](https://github.com/Hawkynt/PNGCrushCS/issues/1512) |
 | innoHeim/Rsupport Screen Capture (RSCC) encoder | Encoder | `RSCC`, `ISCC` | encode | decoder only | low | [#1517](https://github.com/Hawkynt/PNGCrushCS/issues/1517) |
 | Mandsoft Screen Capture (MSCC) encoder | Encoder | `MSCC` | encode | decoder only | low | [#1519](https://github.com/Hawkynt/PNGCrushCS/issues/1519) |

@@ -6,14 +6,15 @@ using FileFormat.Core;
 namespace FileFormat.Codecs;
 
 /// <summary>
-/// Decodes ScreenPressor's first two generations and its solid fills: key frames of runs — a new colour
+/// Decodes all three generations of ScreenPressor and its solid fills: key frames of runs — a new colour
 /// coded through adaptive contexts, or a copy from the left, above, a gradient or above-left — and inter
 /// frames that recode or move 16x16 blocks of the last picture.
 /// </summary>
 /// <remarks>
-/// Converted from FFmpeg's <c>libavcodec/scpr.c</c> and <c>scpr.h</c>, LGPL-2.1-or-later; see
-/// <c>Scpr/THIRD-PARTY-NOTICE.FFmpeg.txt</c>. The third generation, <c>scpr3.c</c>'s, is refused by name: no
-/// sample of it has been found. An inter frame that changes nothing yields no picture, as in FFmpeg.
+/// Converted from FFmpeg's <c>libavcodec/scpr.c</c>, <c>scpr.h</c> and <c>scpr3.c</c>, LGPL-2.1-or-later;
+/// see <c>Scpr/THIRD-PARTY-NOTICE.FFmpeg.txt</c>. The first two generations code through range coders,
+/// the third through a byte-wise rANS coder with colour models that change shape as they learn. An inter
+/// frame that changes nothing yields no picture, as in FFmpeg.
 /// Pictures come out as <see cref="PixelFormat.Bgr24"/>, or for a 16-bit stream <see cref="PixelFormat.Rgb24"/>
 /// with each five-bit sample shifted up three as FFmpeg shifts it, the last row coded shown first.
 /// </remarks>
@@ -85,10 +86,10 @@ public sealed class ScprVideoDecoder : IVideoCodecDecoder<ScprVideoDecoder> {
 public sealed class ScprVideoEncoder : IVideoCodecEncoder<ScprVideoEncoder> {
 
   private readonly MediaStreamInfo _stream;
-  private readonly ScprEncoder _encoder;
+  private readonly Func<uint[], byte[]> _encode;
   private bool _started;
 
-  private ScprVideoEncoder(MediaStreamInfo requested) {
+  private ScprVideoEncoder(MediaStreamInfo requested, bool thirdGeneration) {
     this._stream = new() {
       Index = requested.Index,
       Kind = MediaStreamKind.Video,
@@ -103,7 +104,10 @@ public sealed class ScprVideoEncoder : IVideoCodecEncoder<ScprVideoEncoder> {
       Language = requested.Language,
       Name = requested.Name,
     };
-    this._encoder = new(requested.Width, requested.Height);
+    if (thirdGeneration)
+      this._encode = new Scpr3Encoder(requested.Width, requested.Height).Encode;
+    else
+      this._encode = new ScprEncoder(requested.Width, requested.Height).Encode;
   }
 
   public static string CodecName => ScprVideoDecoder.CodecName;
@@ -117,7 +121,13 @@ public sealed class ScprVideoEncoder : IVideoCodecEncoder<ScprVideoEncoder> {
       throw new NotSupportedException("ScreenPressor can only encode a video stream.");
     if (stream.Width <= 0 || stream.Height <= 0 || (long)((stream.Width + 15) / 16) * ((stream.Height + 15) / 16) > 65535)
       throw new NotSupportedException($"ScreenPressor numbers its blocks in sixteen bits; stream {stream.Index} states {stream.Width}x{stream.Height}.");
-    return new(stream);
+    return new(stream, thirdGeneration: false);
+  }
+
+  /// <summary>An encoder writing the third generation, <c>scpr3.c</c>'s; the conformance tests read it back through FFmpeg.</summary>
+  internal static ScprVideoEncoder CreateThirdGeneration(MediaStreamInfo stream) {
+    _ = Create(stream);
+    return new(stream, thirdGeneration: true);
   }
 
   public MediaStreamInfo DescribeStream() => this._stream;
@@ -137,7 +147,7 @@ public sealed class ScprVideoEncoder : IVideoCodecEncoder<ScprVideoEncoder> {
       }
     var key = !this._started;
     this._started = true;
-    packet = new(this._stream.Index, this._encoder.Encode(pixels), PresentationTimestamp: presentationTimestamp,
+    packet = new(this._stream.Index, this._encode(pixels), PresentationTimestamp: presentationTimestamp,
       DecodeTimestamp: presentationTimestamp, Duration: 1, IsKeyFrame: key);
     return true;
   }

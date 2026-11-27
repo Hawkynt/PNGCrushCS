@@ -5552,10 +5552,10 @@ below, already decoded. The plain C routine the vector one stands in for writes 
 
 ### ScreenPressor
 
-Converted from FFmpeg's `libavcodec/scpr.c` and `scpr.h`, LGPL-2.1-or-later, for the first two generations.
-A frame's first byte names it: 2 and 18 are key frames of the first and second generations, 0 and 1 inter
-frames (0 changing nothing, which yields no picture, as in FFmpeg), 17 and 33 a picture of one colour, and 34
-a key frame of the third generation, which is refused. The two generations share their models and differ in
+Converted from FFmpeg's `libavcodec/scpr.c`, `scpr.h`, `scpr3.c` and `scpr3.h`, LGPL-2.1-or-later.
+A frame's first byte names it: 2, 18 and 34 are key frames of the first, second and third generations, 0
+and 1 inter frames of whichever generation the last key frame was (0 changing nothing, which yields no
+picture, as in FFmpeg), and 17 and 33 a picture of one colour. The two generations share their models and differ in
 their range coder: the second scales the range by each total, the first divides exactly and keeps a second
 code. A new colour is three components, each through one of 4096 adaptive frequency tables chosen by the
 components before it, each table keeping sixteen running sums to find a value quickly; every table halves
@@ -5568,6 +5568,31 @@ here only when first used, since most of the 12,288 never are.
 
 Measured against FFmpeg n9.1 with `-flags +bitexact`: all 105 pictures of `samples.ffmpeg.org`'s
 `V-codecs/SCPR.avi`, a second-generation film, are identical.
+
+The third generation keeps the frame layout — the same runs, the same block kinds and the same run
+operations — and replaces everything that codes it. Its coder is a byte-wise rANS over a 4096-wide code
+space: the state is a 32-bit word kept at or above 2^23 by reading bytes, each symbol takes its slot from
+the state's low twelve bits, and every 131,072 symbols a fresh state is read outright. Raw bytes for the
+colour models that take them come from the same stream between the coder's own. The fixed tables (runs,
+operations, block kinds, counts, rectangles, vectors) keep counts that grow by sixteen and halve past
+4096, with a 32-entry lookup by the slot's top bits. A colour model changes shape as it learns: it takes
+raw bytes while it collects the symbols seen (types 0 to 3), codes up to four and then sixteen symbols
+adaptively with the unseen ones spread evenly between them (4 and 5), keeps up to sixty-four in frequency
+order with scaled shares (6), and ends as a full 256-symbol table (7), each step taken when a symbol is
+seen again or a limit is reached. A moved block opens with an even binary choice between the last
+vector and a new one. The arithmetic is FFmpeg's to the bit, unsigned wrap-arounds and the 16-bit
+storage of every frequency included.
+
+No third-generation film is published — `samples.ffmpeg.org`, the FATE suite and FFmpeg's tracker were
+searched, and the tracker's ScreenPressor files are of a fourth generation FFmpeg does not read — so
+the generation is measured on streams the package writes with an internal third-generation encoder,
+which runs every symbol through the decoder's own models and codes the result backwards. FFmpeg n9.1
+decodes them to exactly this decoder's pictures, which are exactly the pictures given, at 16x16, 37x21,
+160x96 and 560x420. The films are built to reach what a real one would: every colour-model type and
+every transition between them, every intra and inter run operation, all four block kinds with the last
+vector both kept and replaced, and a key frame long enough to cross a fresh coder state. That encoder
+is not the one the package hands out: on `SCPR.avi` its output is a fifth larger and slower to make
+than the second generation's, so the public encoder stays on the second.
 
 The encoder is this package's own, FFmpeg having none, and lossless at 24 bits: the second generation's key
 frame, then inter frames that leave unchanged blocks alone and recode the rest. Each run is the longest any
