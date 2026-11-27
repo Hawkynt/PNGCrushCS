@@ -992,6 +992,53 @@ dB luma; FFmpeg decodes fourteen-picture clips it writes, in AVI and in QuickTim
 decoder's planes. QuickTime needs a sample entry, and the MP4 writer now writes the plain visual one for
 SVQ1, the first of a list of codecs whose decoders read every parameter from the frames.
 
+### Sorenson Video 3
+
+Converted from FFmpeg's `libavcodec/svq3.c` and the H.264 pieces it calls — `h264pred.c`'s intra
+predictors, `h264_parse.c`'s mode checks, `hpeldsp.c` and `tpeldsp.c`'s motion compensation and
+`h264data.c`'s tables — all LGPL-2.1-or-later, with every table transcribed by script. SVQ3 is an early
+H.264 draft and keeps H.264's 4x4 block order, intra predictors, coded-block patterns and chroma DC
+transform, but codes everything in interleaved exp-Golomb codes with its own run/level tables, its own
+transform (13, 17 and 7 rather than H.264's 1 and 2) and dequantisation, its own intra 4x4 mode coding,
+and vectors at a third of a sample with a precision chosen per macroblock. The `SEQH` atom in the
+QuickTime sample description, found by searching it as FFmpeg does, states the picture size, which
+precisions the stream may use, whether it has B pictures and whether it carries a watermark; a
+watermarked stream's zlib logo is inflated and its CRC-16 taken as the key that unlocks four bytes at
+the head of every slice.
+
+FFmpeg's quirks are kept where they change what is decoded. A skipped P macroblock writes no vector, so
+its neighbours' predictions read whatever the reused picture buffer last held there — the three
+buffers rotate exactly as FFmpeg's do. A B macroblock's direct mode scales the co-located vector of the
+next anchor by the picture-number distances, and the 4x4 partitions of the direct and bidirectional
+modes use `hpeldsp`'s two-wide diagonal function for chrominance, which is marked "FIXME non put" in
+FFmpeg and is one: the averaging pass of a 2x2 chroma block at a diagonal half-sample position replaces
+the forward prediction instead of averaging with it. That was the last difference found, and it shows
+only on B pictures, only in chrominance, and only in 2x2 blocks. A packet FFmpeg drops whole — an
+unknown slice header byte, as `broken_sword_Large.mov` has at one point — is dropped here as well and
+the stream goes on.
+
+Measured against FFmpeg's `yuvj420p` output decoded with `-flags +bitexact` and `-fps_mode
+passthrough`: 10,710 pictures, every one identical, from `samples.ffmpeg.org/V-codecs/SVQ3/`'s
+`rotk_trailer_480x280.mov` (4,108, B pictures throughout), `broken_sword_Large.mov` (2,504, B
+pictures, 800x600; the opt-in comparison's memory budget reaches 2,083 of them, and the rest were
+compared from both decoders' raw output), `Vertical400kbit.sorenson3.mov` (1,308), `shrek2_tsr_qt_240.mov` (1,452),
+`lucy_letters_to_satan_2007.mov` (1,191, watermarked), `blade_2_m480.mov` and `gl2.mov` (124 and 23,
+ both truncated files read up to the cut). Two more watermarked films there, `finalfantasy_cc.mov` and
+`starfox2.mov`, open with a compressed `cmov` movie header that the package's QuickTime reader does
+not recognise, so their pictures never reach the decoder; that is the container's.
+
+FFmpeg has no SVQ3 encoder, so the encoder is the package's own. It writes a low-delay stream with
+whole-sample vectors only — the `SEQH` atom goes after the BITMAPINFOHEADER in AVI and Matroska — and
+uses nothing that predicts from inside the picture being coded: an intra macroblock is type 33, whose
+luminance and chrominance both predict from a flat 128, and an inter macroblock is a 16x16 block whose
+vector is nought. With every vector nought the median prediction is nought, so a difference of nought
+states it. Each macroblock is skipped, coded over the co-located reference block or coded intra by
+squared error plus weighted bits, and each 8x8 luminance group and the chroma DC and AC are coded only
+where they pay for themselves. The reference for the next picture is what the package's decoder makes
+of the packet just written, so the two cannot drift apart. At quantiser 18 a 480x264 trailer comes
+back at about 40 dB with slightly fewer bytes than the original stream spent with motion search and B
+pictures.
+
 ### NewTek SpeedHQ
 
 Converted from FFmpeg's `libavcodec/speedhqdec.c`, with the AC run-level table and its codes taken from

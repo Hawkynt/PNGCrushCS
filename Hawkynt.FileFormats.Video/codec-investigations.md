@@ -1863,6 +1863,13 @@ their existence and size. Neither exists today.
 
 # Sorenson Video 3 (SVQ3), an H.264 draft with nobody publishing where it departs
 
+*Closed.* Sorenson Video 3 is decoded and encoded now, converted from FFmpeg's `svq3.c` and the H.264
+code it calls, under LGPL-2.1-or-later — the "Licence-compatible reference sources" route, which makes
+the provenance question below moot rather than answering it: the decoder that reverse-engineered the
+format is itself absorbable. I, P and B pictures, third-sample motion and watermarked streams all
+decode to FFmpeg's pictures on every public film read; `codec-notes.md` has the details, including the
+one FFmpeg quirk that took finding.
+
 SVQ3 — Sorenson Vector Quantizer 3, FourCC `SVQ3` — sits differently from SVQ1: this package already
 carries a verified H.264 decoder (`Codecs/H264/`), and every account of SVQ3 agrees it is a variant of
 that same family — the reason to look at it at all. What stops it is not a shortage of shared machinery;

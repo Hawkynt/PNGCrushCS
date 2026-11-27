@@ -100,6 +100,18 @@ internal static class RealSampleComparison {
         }
       }
 
+      // A decoder that holds pictures back for reordering hands the last of them out on Flush, as
+      // FFmpeg does on the empty packet at the end of the stream.
+      if (refusal == null && truncated == null && ours.Count < budget) {
+        try {
+          foreach (var picture in decoder.Flush())
+            if (ours.Count < budget)
+              ours.Add(picture);
+        } catch (Exception ex) {
+          refusal = $"refused at flush: {ex.Message}";
+        }
+      }
+
       var (decoded, detail, samples) = FFmpegOracle.TryDecodeUnscaled(film, ffmpegPixelFormat, ours.Count, tolerateDiagnostics: true);
       // FFmpeg's complaints are reported, not counted: every picture is still compared, and a film
       // it complains about while producing the same pictures is a film both decoders read alike.
