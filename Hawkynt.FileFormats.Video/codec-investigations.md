@@ -1475,6 +1475,11 @@ to make the check (which this investigation does not do), would settle the quest
 
 # ScreenPressor (SCPR), where the only "documentation" is somebody else's open-source rebuild
 
+*Two generations closed.* The first two generations are decoded, and the second encoded, now, converted from
+FFmpeg's LGPL-2.1-or-later `libavcodec/scpr.c` and `scpr.h`; every picture of the one sample decodes exactly as
+FFmpeg decodes it. The third generation, `scpr3.c`'s, is still refused: no file of it has been found to check
+a conversion against.
+
 ScreenPressor was investigated sixth. `samples.ffmpeg.org/V-codecs/` carries one file, `SCPR.avi`, and
 `ffmpeg -h encoder=scpr` reports none, so the same one-file ceiling MWSC stops at applies here before the
 documentation question is even reached. No MultimediaWiki page exists under `ScreenPressor` or `SCPR`,

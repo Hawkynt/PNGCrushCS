@@ -1,0 +1,15 @@
+The ScreenPressor decoder in this directory is converted from FFmpeg (https://github.com/FFmpeg/FFmpeg):
+
+  libavcodec/scpr.c   the frame types, both range coders, the adaptive models and key and inter frames
+  libavcodec/scpr.h   the run operations
+
+  Copyright (c) 2017 Paul B Mahol (scpr.c, scpr.h)
+  and the FFmpeg developers named in the files above.
+
+FFmpeg distributes those sources under the GNU Lesser General Public License, version 2.1 or (at your
+option) any later version. This work is distributed under the GNU Lesser General Public License
+version 3 or later, which the "or later" clause permits; the licence text is in LICENSE at the root of
+this repository.
+
+The algorithms are carried across into managed C#, not vendored. The range encoder and the encoder are this
+package's own.

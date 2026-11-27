@@ -5303,6 +5303,31 @@ not decode leaves that part of the canvas alone rather than failing the frame, a
 leaves the cursor where it was, and a packet whose leading tag is neither `TDSF` nor `DTSM` hands back
 the canvas unchanged — each of which is what the reference decoder does.
 
+### ScreenPressor
+
+Converted from FFmpeg's `libavcodec/scpr.c` and `scpr.h`, LGPL-2.1-or-later, for the first two generations.
+A frame's first byte names it: 2 and 18 are key frames of the first and second generations, 0 and 1 inter
+frames (0 changing nothing, which yields no picture, as in FFmpeg), 17 and 33 a picture of one colour, and 34
+a key frame of the third generation, which is refused. The two generations share their models and differ in
+their range coder: the second scales the range by each total, the first divides exactly and keeps a second
+code. A new colour is three components, each through one of 4096 adaptive frequency tables chosen by the
+components before it, each table keeping sixteen running sums to find a value quickly; every table halves
+once its total passes 65,536. A key frame codes runs of new colours until a row and a pixel are done, and
+from then on each run first names how it is made — a new colour, the last pixel, the one above, a gradient or
+the one above-left — through a table chosen by the run before. An inter frame names the range of 16x16 blocks
+it touches and fills each with a kind: left alone, recoded as runs (which may also copy the last picture),
+narrowed to a sub-rectangle, or moved from the last picture by a vector. FFmpeg's pixel models are allocated
+here only when first used, since most of the 12,288 never are.
+
+Measured against FFmpeg n9.1 with `-flags +bitexact`: all 105 pictures of `samples.ffmpeg.org`'s
+`V-codecs/SCPR.avi`, a second-generation film, are identical.
+
+The encoder is this package's own, FFmpeg having none, and lossless at 24 bits: the second generation's key
+frame, then inter frames that leave unchanged blocks alone and recode the rest. Each run is the longest any
+copy reproduces from where it starts, or else a run of one new colour. Its range coder propagates carries into
+what it has written, because FFmpeg's decoder renormalises without the carry-less trick. FFmpeg decodes what it
+writes, at odd sizes too, to exactly the pictures given.
+
 ### Smacker Video
 
 RAD Game Tools' own FMV codec, behind more games of the 1990s than anything else in this package's

@@ -1122,7 +1122,7 @@ Screen recording and remote-desktop codecs. Tracked in [#526](https://github.com
 | MS Expression Encoder Screen (MTS2) | Codec | `.xesc` | decode + encode | missing | low | [#1525](https://github.com/Hawkynt/PNGCrushCS/issues/1525) |
 | MSU Screen Capture Lossless Codec | Codec | `SCLS` | decode + encode | missing | low | [#1526](https://github.com/Hawkynt/PNGCrushCS/issues/1526) |
 | RivaTuner Video (RTV1) | Codec | `.avi` | decode + encode | missing | low | [#1527](https://github.com/Hawkynt/PNGCrushCS/issues/1527) |
-| ScreenPressor (SCPR) | Codec | `.avi` | decode + encode | blocked | low | [#1529](https://github.com/Hawkynt/PNGCrushCS/issues/1529) |
+| ScreenPressor third generation (SCPR v3) | Codec | `.avi` | decode + encode | missing | low | [#1529](https://github.com/Hawkynt/PNGCrushCS/issues/1529) |
 | Windows Media Video 9 Screen (MSS2) | Codec | `.wmv` | decode + encode | blocked | low | [#1533](https://github.com/Hawkynt/PNGCrushCS/issues/1533) |
 | CamStudio (CSCD) encoder | Encoder | `CSCD` | encode | decoder only | low | [#1512](https://github.com/Hawkynt/PNGCrushCS/issues/1512) |
 | innoHeim/Rsupport Screen Capture (RSCC) encoder | Encoder | `RSCC`, `ISCC` | encode | decoder only | low | [#1517](https://github.com/Hawkynt/PNGCrushCS/issues/1517) |
