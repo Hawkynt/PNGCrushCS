@@ -56,13 +56,27 @@ internal static class H265Dequantiser {
   /// <param name="scalingList">The weighting matrices, or <c>null</c> for a flat sixteen everywhere.</param>
   /// <param name="matrixId">Which of the six matrices this block uses — Table 7-4.</param>
   internal static void Scale(
-    int[] block, int log2Size, int qp, int bitDepth, H265ScalingList? scalingList, int matrixId) {
+    int[] block, int log2Size, int qp, int bitDepth, H265ScalingList? scalingList, int matrixId)
+    => Scale(block, log2Size, qp, bitDepth, scalingList, matrixId, 15);
+
+  /// <summary>
+  /// Scales one block's coefficients at a stated coefficient range — clause 8.6.3.
+  /// </summary>
+  /// <param name="log2TransformRange">
+  /// <c>Log2TransformRange</c>: fifteen, unless extended precision processing widens it with the
+  /// sample depth. The shift loses what the range gains, and the results are clipped to it.
+  /// </param>
+  internal static void Scale(
+    int[] block, int log2Size, int qp, int bitDepth, H265ScalingList? scalingList, int matrixId,
+    int log2TransformRange) {
     var size = 1 << log2Size;
+    var minimum = -(1L << log2TransformRange);
+    var maximum = (1L << log2TransformRange) - 1;
 
     // The transform's gain grows with the block size and the sample depth's headroom shrinks with
-    // it; both are taken out here so that every coefficient reaching the transform fits in sixteen
-    // bits. At eight bits this is Log2(nTbS) + 3.
-    var shift = bitDepth + log2Size + 10 - 15;
+    // it; both are taken out here so that every coefficient reaching the transform fits in the
+    // coefficient range. At eight bits this is Log2(nTbS) + 3.
+    var shift = bitDepth + log2Size + 10 - log2TransformRange;
     var rounding = 1 << (shift - 1);
 
     var scale = _LevelScale[qp % 6];
@@ -79,8 +93,7 @@ internal static class H265Dequantiser {
           continue;
 
         var scaled = ((long)block[i] * scale << octave) + flatRounding;
-        block[i] = (int)Math.Clamp(
-          scaled >> flatShift, H265Transform.COEFFICIENT_MINIMUM, H265Transform.COEFFICIENT_MAXIMUM);
+        block[i] = (int)Math.Clamp(scaled >> flatShift, minimum, maximum);
       }
 
       return;
@@ -93,8 +106,7 @@ internal static class H265Dequantiser {
           continue;
 
         var scaled = ((long)block[index] * scalingList.Factor(log2Size, matrixId, x, y) * scale << octave) + rounding;
-        block[index] = (int)Math.Clamp(
-          scaled >> shift, H265Transform.COEFFICIENT_MINIMUM, H265Transform.COEFFICIENT_MAXIMUM);
+        block[index] = (int)Math.Clamp(scaled >> shift, minimum, maximum);
       }
   }
 }

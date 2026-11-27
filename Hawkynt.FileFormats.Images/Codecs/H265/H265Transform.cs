@@ -98,16 +98,39 @@ internal static class H265Transform {
   /// <param name="log2Size">The block's size as a base-two logarithm: 2, 3, 4 or 5.</param>
   /// <param name="sine">Whether to use the sine transform — a 4x4 luma block of an intra coding unit.</param>
   /// <param name="bitDepth">The sample depth, which sets the final shift.</param>
-  internal static void Inverse(int[] block, int log2Size, bool sine, int bitDepth) {
+  internal static void Inverse(int[] block, int log2Size, bool sine, int bitDepth)
+    => Inverse(block, log2Size, sine, bitDepth, 15);
+
+  /// <summary>
+  /// Turns a block of dequantised coefficients into residual samples, in place, at a stated
+  /// coefficient range — clause 8.6.4.2.
+  /// </summary>
+  /// <param name="log2TransformRange">
+  /// <c>Log2TransformRange</c>: fifteen, unless extended precision processing widens it with the
+  /// sample depth. It bounds the values between the two stages and sets the second stage's shift,
+  /// <c>bdShift = Max(20 − bitDepth, extended ? 11 : 0)</c>, which is the same number written as
+  /// <c>Log2TransformRange + 5 − bitDepth</c>.
+  /// </param>
+  internal static void Inverse(int[] block, int log2Size, bool sine, int bitDepth, int log2TransformRange) {
     var size = 1 << log2Size;
-    var intermediate = new int[size * size];
+    var bdShift = log2TransformRange + 5 - bitDepth;
+    Span<int> intermediate = stackalloc int[size * size];
 
     // The columns first, then the rows. Between the two the intermediate result is brought back
-    // within sixteen bits, which is what makes the whole transform fit in a machine word — the
-    // standard fixes that shift rather than leaving the intermediate precision to the implementation,
-    // because two decoders that clipped differently would differ on a block with large coefficients.
-    _TransformColumns(block, intermediate, size, log2Size, sine);
-    _TransformRows(intermediate, block, size, log2Size, sine, 20 - bitDepth);
+    // within the coefficient range, which is what makes the whole transform fit in a machine word
+    // — the standard fixes that clip rather than leaving the intermediate precision to the
+    // implementation, because two decoders that clipped differently would differ on a block with
+    // large coefficients. A widened range no longer fits: its sums are taken in 64 bits.
+    if (log2TransformRange <= 15) {
+      _TransformColumns(block, intermediate, size, log2Size, sine);
+      _TransformRows(intermediate, block, size, log2Size, sine, bdShift);
+      return;
+    }
+
+    var minimum = -(1 << log2TransformRange);
+    var maximum = (1 << log2TransformRange) - 1;
+    _TransformColumnsWide(block, intermediate, size, log2Size, sine, minimum, maximum);
+    _TransformRowsWide(intermediate, block, size, log2Size, sine, bdShift);
   }
 
   /// <summary>
@@ -117,16 +140,76 @@ internal static class H265Transform {
   /// The shift is what the two transform stages would have applied, so that a skipped block and a
   /// transformed one arrive at the residual through the same dequantiser scale.
   /// </remarks>
-  internal static void Skip(int[] block, int log2Size, int bitDepth) {
-    var shift = 5 + log2Size;
-    var bdShift = 20 - bitDepth;
-    var rounding = 1 << (bdShift - 1);
+  internal static void Skip(int[] block, int log2Size, int bitDepth) => Skip(block, log2Size, bitDepth, 15, false);
 
-    for (var i = 0; i < 1 << (log2Size << 1); ++i)
-      block[i] = ((block[i] << shift) + rounding) >> bdShift;
+  /// <summary>
+  /// The reconstruction of a block whose residual was sent untransformed, at a stated coefficient
+  /// range — clause 8.6.4.2 with the format range extensions.
+  /// </summary>
+  /// <remarks>
+  /// The standard writes this as a left shift by <c>tsShift</c> followed by the same rounding right
+  /// shift by <c>bdShift</c> the transform ends with. The two collapse into one shift by
+  /// <c>Log2TransformRange − bitDepth − log2Size</c>, rounding when it is to the right, which is how
+  /// the reference decoder computes it. Under extended precision processing <c>tsShift</c> is capped
+  /// at <c>bdShift − 2</c>, so the combined shift never runs to the left; without it a twelve-bit
+  /// 32x32 block shifts left by two.
+  /// </remarks>
+  internal static void Skip(int[] block, int log2Size, int bitDepth, int log2TransformRange, bool extendedPrecision) {
+    var shift = log2TransformRange - bitDepth - log2Size;
+    if (extendedPrecision)
+      shift = Math.Max(0, shift);
+
+    var count = 1 << (log2Size << 1);
+    if (shift > 0) {
+      var rounding = 1 << (shift - 1);
+      for (var i = 0; i < count; ++i)
+        block[i] = (block[i] + rounding) >> shift;
+    } else if (shift < 0)
+      for (var i = 0; i < count; ++i)
+        block[i] <<= -shift;
   }
 
-  private static void _TransformColumns(int[] source, int[] target, int size, int log2Size, bool sine) {
+  /// <summary>
+  /// Turns a block half a turn — <c>transform_skip_rotation_enabled_flag</c>, clause 8.6.2.
+  /// </summary>
+  /// <remarks>
+  /// An intra block's residual grows away from the edge it was predicted from, so an untransformed
+  /// one has its largest values at the far corner, where the scan reaches them last. Rotating it
+  /// puts them where the coefficient coding expects the large values to be.
+  /// </remarks>
+  internal static void Rotate(int[] block, int log2Size) {
+    var last = (1 << (log2Size << 1)) - 1;
+    for (var i = 0; i < (last + 1) >> 1; ++i)
+      (block[i], block[last - i]) = (block[last - i], block[i]);
+  }
+
+  /// <summary>
+  /// Accumulates a differentially coded residual along its direction — clauses 8.6.6 and 8.6.8.
+  /// </summary>
+  internal static void Accumulate(int[] block, int log2Size, H265Rdpcm direction) {
+    var size = 1 << log2Size;
+    switch (direction) {
+      case H265Rdpcm.Horizontal:
+        for (var y = 0; y < size; ++y) {
+          var row = y << log2Size;
+          for (var x = 1; x < size; ++x)
+            block[row + x] += block[row + x - 1];
+        }
+
+        return;
+
+      case H265Rdpcm.Vertical:
+        for (var y = 1; y < size; ++y) {
+          var row = y << log2Size;
+          for (var x = 0; x < size; ++x)
+            block[row + x] += block[row - size + x];
+        }
+
+        return;
+    }
+  }
+
+  private static void _TransformColumns(int[] source, Span<int> target, int size, int log2Size, bool sine) {
     // Row k of the matrix for a block this size is row k * 32/size of the tabulated one, which is
     // what makes one table serve all four sizes.
     var step = sine ? 1 : 32 >> log2Size;
@@ -143,7 +226,8 @@ internal static class H265Transform {
       }
   }
 
-  private static void _TransformRows(int[] source, int[] target, int size, int log2Size, bool sine, int bdShift) {
+  private static void _TransformRows(
+    ReadOnlySpan<int> source, int[] target, int size, int log2Size, bool sine, int bdShift) {
     var step = sine ? 1 : 32 >> log2Size;
     var stride = sine ? 4 : 32;
     var matrix = sine ? _SineMatrix : _Matrix;
@@ -156,6 +240,39 @@ internal static class H265Transform {
           sum += matrix[k * step * stride + x] * source[y * size + k];
 
         target[y * size + x] = (sum + rounding) >> bdShift;
+      }
+  }
+
+  private static void _TransformColumnsWide(
+    int[] source, Span<int> target, int size, int log2Size, bool sine, int minimum, int maximum) {
+    var step = sine ? 1 : 32 >> log2Size;
+    var stride = sine ? 4 : 32;
+    var matrix = sine ? _SineMatrix : _Matrix;
+
+    for (var x = 0; x < size; ++x)
+      for (var y = 0; y < size; ++y) {
+        var sum = 0L;
+        for (var k = 0; k < size; ++k)
+          sum += (long)matrix[k * step * stride + y] * source[k * size + x];
+
+        target[y * size + x] = (int)Math.Clamp((sum + 64) >> 7, minimum, maximum);
+      }
+  }
+
+  private static void _TransformRowsWide(
+    ReadOnlySpan<int> source, int[] target, int size, int log2Size, bool sine, int bdShift) {
+    var step = sine ? 1 : 32 >> log2Size;
+    var stride = sine ? 4 : 32;
+    var matrix = sine ? _SineMatrix : _Matrix;
+    var rounding = 1L << (bdShift - 1);
+
+    for (var y = 0; y < size; ++y)
+      for (var x = 0; x < size; ++x) {
+        var sum = 0L;
+        for (var k = 0; k < size; ++k)
+          sum += (long)matrix[k * step * stride + x] * source[y * size + k];
+
+        target[y * size + x] = (int)((sum + rounding) >> bdShift);
       }
   }
 

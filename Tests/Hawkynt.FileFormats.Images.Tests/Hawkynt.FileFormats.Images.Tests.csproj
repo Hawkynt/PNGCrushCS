@@ -105,6 +105,15 @@
     </None>
   </ItemGroup>
 
+  <!-- H.265 range extension streams: JCT-VC conformance bitstreams and a few the HM reference
+       encoder wrote, each with the MD5 the HM reference decoder's output has. -->
+  <ItemGroup>
+    <None Include="Codecs\H265\Fixtures\*">
+      <Link>Fixtures\H265\%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
   <!-- A CR3 built to the layout ExifTool reads, carrying a preview and a thumbnail. -->
   <ItemGroup>
     <None Include="Formats\Cr3\Fixtures\*">

@@ -127,8 +127,8 @@ internal static class H265MotionCompensation {
     var xFraction = mvX & 3;
     var yFraction = mvY & 3;
 
-    var shift1 = bitDepth - 8;
-    var shift3 = 14 - bitDepth;
+    var shift1 = Math.Min(4, bitDepth - 8);
+    var shift3 = Math.Max(2, 14 - bitDepth);
 
     if (xFraction == 0 && yFraction == 0) {
       for (var row = 0; row < height; ++row)
@@ -209,8 +209,8 @@ internal static class H265MotionCompensation {
     var xFraction = mvX & 7;
     var yFraction = mvY & 7;
 
-    var shift1 = bitDepth - 8;
-    var shift3 = 14 - bitDepth;
+    var shift1 = Math.Min(4, bitDepth - 8);
+    var shift3 = Math.Max(2, 14 - bitDepth);
 
     if (xFraction == 0 && yFraction == 0) {
       for (var row = 0; row < height; ++row)
@@ -294,9 +294,12 @@ internal static class H265MotionCompensation {
       return;
     }
 
+    // Clause 8.5.3.3.4.3: log2WD = denominator + shift1, with shift1 = Max(2, 14 − bitDepth). The
+    // offsets are stated at eight bits and scaled to the sample depth, unless the sequence sends
+    // them at the sample depth itself (high_precision_offsets_enabled_flag).
     var denominator = (component < 0 ? weights.LumaLog2WeightDenom : weights.ChromaLog2WeightDenom)
-                      + 14 - bitDepth;
-    var scale = 1 << (bitDepth - 8);
+                      + Math.Max(2, 14 - bitDepth);
+    var scale = frame.Sps.RangeExtension.HighPrecisionOffsetsEnabled ? 1 : 1 << (bitDepth - 8);
     var refIdxL0 = (int)motion.RefIdxL0;
     var refIdxL1 = (int)motion.RefIdxL1;
 
@@ -347,8 +350,10 @@ internal static class H265MotionCompensation {
   private static void _CombineUnweighted(
     int[][] predictions, ushort[] plane, int stride, int x, int y, int width, int height, int bitDepth,
     int maximum, bool bidirectional) {
+    // Clause 8.5.3.3.4.2: shift2 = Max(3, 15 − bitDepth) and shift1 = Max(2, 14 − bitDepth), so
+    // that the two bits of headroom the interpolation keeps above twelve bits come off again here.
     if (bidirectional) {
-      var shift = 15 - bitDepth;
+      var shift = Math.Max(3, 15 - bitDepth);
       var rounding = 1 << (shift - 1);
 
       for (var row = 0; row < height; ++row)
@@ -362,7 +367,7 @@ internal static class H265MotionCompensation {
     }
 
     var samples = predictions[0] ?? predictions[1];
-    var uniShift = 14 - bitDepth;
+    var uniShift = Math.Max(2, 14 - bitDepth);
     var uniRounding = uniShift > 0 ? 1 << (uniShift - 1) : 0;
 
     for (var row = 0; row < height; ++row)

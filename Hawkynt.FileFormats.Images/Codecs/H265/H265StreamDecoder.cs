@@ -31,6 +31,16 @@ internal sealed class H265StreamDecoder {
   /// <summary>The sequence parameter set of the picture being decoded or last decoded.</summary>
   internal H265SequenceParameterSet? Sequence => this._pictureSequence;
 
+  /// <summary>
+  /// The picture most recently finished, in decoding order, with both in-loop filters applied.
+  /// </summary>
+  /// <remarks>
+  /// A decoded picture hash SEI message describes the picture it follows in decoding order, not the
+  /// one that leaves the buffer next, so whoever checks one needs the picture before bumping has
+  /// reordered it.
+  /// </remarks>
+  internal H265Picture? LastFinishedPicture { get; private set; }
+
   /// <summary>Reads NAL units; a picture completes when the next one begins or at <see cref="EndOfAccessUnit"/>.</summary>
   internal void Decode(IEnumerable<H265NalUnit> nals) {
     foreach (var nal in nals) {
@@ -183,6 +193,7 @@ internal sealed class H265StreamDecoder {
     frame.RefuseIfIncomplete();
     H265Deblocking.Filter(frame);
     H265SampleAdaptiveOffset.Filter(frame);
+    this.LastFinishedPicture = frame.Picture;
 
     this._references.Add(frame.Picture, header, this._pictureLists);
 
@@ -194,23 +205,34 @@ internal sealed class H265StreamDecoder {
   /// A decoded picture as native planar samples, cropped to the conformance window: eight-bit planes
   /// for an eight-bit sequence, RawImage's sixteen-bit planar layout for a deeper one.
   /// </summary>
+  /// <remarks>
+  /// A monochrome sequence comes out as 4:2:0 with neutral chrominance, which is what a reference
+  /// decoder writes when asked for a 4:2:0 file and keeps the luminance exactly as decoded.
+  /// <para/>
+  /// The planar formats name one depth for all three planes, and H.265 lets luma and chroma differ.
+  /// The shallower planes are shifted up to the deeper one's depth, which loses nothing. Depths the
+  /// formats have no name for — eleven, thirteen and fifteen bits — are shifted up one bit into the
+  /// next one that does.
+  /// </remarks>
   internal static RawImage ToPlanarImage(H265Picture picture, H265SequenceParameterSet sps) {
     var width = sps.DisplayWidth;
     var height = sps.DisplayHeight;
-    var shiftX = picture.ChromaShiftX;
-    var shiftY = picture.ChromaShiftY;
+    var monochrome = picture.IsMonochrome;
+    var shiftX = monochrome ? 1 : picture.ChromaShiftX;
+    var shiftY = monochrome ? 1 : picture.ChromaShiftY;
     var chromaWidth = (width + (1 << shiftX) - 1) >> shiftX;
     var chromaHeight = (height + (1 << shiftY) - 1) >> shiftY;
+    var chromaArrayType = monochrome ? 1 : sps.ChromaArrayType;
 
-    if (sps.BitDepthLuma == 8 && sps.BitDepthChroma == 8) {
+    if (sps.BitDepthLuma == 8 && (monochrome || sps.BitDepthChroma == 8)) {
       var luma = _Narrow(picture.Luma);
-      var cb = _Narrow(picture.Cb);
-      var cr = _Narrow(picture.Cr);
-      var stride = picture.ChromaWidth;
+      var stride = monochrome ? (picture.Width + 1) >> 1 : picture.ChromaWidth;
+      var cb = monochrome ? _Neutral(stride * ((picture.Height + 1) >> 1), 128) : _Narrow(picture.Cb);
+      var cr = monochrome ? cb : _Narrow(picture.Cr);
       var left = sps.CropOffsetX;
       var top = sps.CropOffsetY;
 
-      return sps.ChromaArrayType switch {
+      return chromaArrayType switch {
         2 => RawImageFactory.FromYuv422P8(
           width, height, luma, picture.Width, cb, cr, stride, left, top, RawImageColorInfo.Bt601Limited),
         3 => RawImageFactory.FromYuv444P8(
@@ -224,20 +246,34 @@ internal sealed class H265StreamDecoder {
     // sixteen-bit layout rather than being shifted down to a byte, because that shift is a quality
     // decision the caller has not made. The format says which depth they are, so a twelve-bit stream
     // is not handed over labelled as ten.
+    var depth = monochrome ? sps.BitDepthLuma : Math.Max(sps.BitDepthLuma, sps.BitDepthChroma);
+    var named = depth switch { 11 or 13 or 15 => depth + 1, _ => depth };
+    var lumaShift = named - sps.BitDepthLuma;
+    var chromaShift = named - (monochrome ? named : sps.BitDepthChroma);
+
     var data = new byte[checked((width * height + 2 * chromaWidth * chromaHeight) * 2)];
     var at = _CopyWidePlane(
-      picture.Luma, picture.Width, sps.CropOffsetX, sps.CropOffsetY, width, height, data, 0);
-    at = _CopyWidePlane(
-      picture.Cb, picture.ChromaWidth, sps.CropOffsetX >> shiftX, sps.CropOffsetY >> shiftY,
-      chromaWidth, chromaHeight, data, at);
-    _CopyWidePlane(
-      picture.Cr, picture.ChromaWidth, sps.CropOffsetX >> shiftX, sps.CropOffsetY >> shiftY,
-      chromaWidth, chromaHeight, data, at);
+      picture.Luma, picture.Width, sps.CropOffsetX, sps.CropOffsetY, width, height, lumaShift, data, 0);
+
+    if (monochrome) {
+      var neutral = 1 << (named - 1);
+      for (var i = 0; i < 2 * chromaWidth * chromaHeight; ++i) {
+        data[at++] = (byte)neutral;
+        data[at++] = (byte)(neutral >> 8);
+      }
+    } else {
+      at = _CopyWidePlane(
+        picture.Cb, picture.ChromaWidth, sps.CropOffsetX >> shiftX, sps.CropOffsetY >> shiftY,
+        chromaWidth, chromaHeight, chromaShift, data, at);
+      _CopyWidePlane(
+        picture.Cr, picture.ChromaWidth, sps.CropOffsetX >> shiftX, sps.CropOffsetY >> shiftY,
+        chromaWidth, chromaHeight, chromaShift, data, at);
+    }
 
     return new() {
       Width = width,
       Height = height,
-      Format = _PlanarFormat(sps.ChromaArrayType, Math.Max(sps.BitDepthLuma, sps.BitDepthChroma)),
+      Format = _PlanarFormat(chromaArrayType, named),
       PixelData = data,
       ColorInfo = RawImageColorInfo.Bt601Limited,
     };
@@ -245,11 +281,20 @@ internal sealed class H265StreamDecoder {
 
   /// <summary>Which planar layout a sequence's chroma format and sample depth name.</summary>
   private static PixelFormat _PlanarFormat(int chromaArrayType, int bitDepth) => (chromaArrayType, bitDepth) switch {
+    (2, 9) => PixelFormat.Yuv422P9,
     (2, 10) => PixelFormat.Yuv422P10,
     (2, 12) => PixelFormat.Yuv422P12,
+    (2, 14) => PixelFormat.Yuv422P14,
+    (2, 16) => PixelFormat.Yuv422P16,
+    (3, 9) => PixelFormat.Yuv444P9,
     (3, 10) => PixelFormat.Yuv444P10,
     (3, 12) => PixelFormat.Yuv444P12,
+    (3, 14) => PixelFormat.Yuv444P14,
+    (3, 16) => PixelFormat.Yuv444P16,
+    (_, 9) => PixelFormat.Yuv420P9,
     (_, 12) => PixelFormat.Yuv420P12,
+    (_, 14) => PixelFormat.Yuv420P14,
+    (_, 16) => PixelFormat.Yuv420P16,
     _ => PixelFormat.Yuv420P10,
   };
 
@@ -261,13 +306,19 @@ internal sealed class H265StreamDecoder {
     return result;
   }
 
+  private static byte[] _Neutral(int count, byte value) {
+    var result = new byte[count];
+    Array.Fill(result, value);
+    return result;
+  }
+
   /// <summary>Crops one plane into RawImage's wide planar layout: a right-justified sample in a little-endian ushort.</summary>
   private static int _CopyWidePlane(
-    ushort[] source, int sourceStride, int left, int top, int width, int height, byte[] target, int at) {
+    ushort[] source, int sourceStride, int left, int top, int width, int height, int shift, byte[] target, int at) {
     for (var y = 0; y < height; ++y) {
       var row = (top + y) * sourceStride + left;
       for (var x = 0; x < width; ++x) {
-        var sample = source[row + x];
+        var sample = source[row + x] << shift;
         target[at++] = (byte)sample;
         target[at++] = (byte)(sample >> 8);
       }

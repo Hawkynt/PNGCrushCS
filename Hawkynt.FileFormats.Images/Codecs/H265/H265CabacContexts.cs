@@ -60,7 +60,7 @@ internal static class H265CabacContexts {
   internal const int SPLIT_TRANSFORM_FLAG = MVP_FLAG + 1;
   internal const int CBF_LUMA = SPLIT_TRANSFORM_FLAG + 3;
   internal const int CBF_CHROMA = CBF_LUMA + 2;
-  internal const int ABS_MVD_GREATER0_FLAG = CBF_CHROMA + 4;
+  internal const int ABS_MVD_GREATER0_FLAG = CBF_CHROMA + 5;
   internal const int ABS_MVD_GREATER1_FLAG = ABS_MVD_GREATER0_FLAG + 1;
   internal const int CU_QP_DELTA_ABS = ABS_MVD_GREATER1_FLAG + 1;
   internal const int TRANSFORM_SKIP_FLAG_LUMA = CU_QP_DELTA_ABS + 2;
@@ -69,11 +69,20 @@ internal static class H265CabacContexts {
   internal const int LAST_SIG_COEFF_Y_PREFIX = LAST_SIG_COEFF_X_PREFIX + 18;
   internal const int CODED_SUB_BLOCK_FLAG = LAST_SIG_COEFF_Y_PREFIX + 18;
   internal const int SIG_COEFF_FLAG = CODED_SUB_BLOCK_FLAG + 4;
-  internal const int COEFF_ABS_LEVEL_GREATER1_FLAG = SIG_COEFF_FLAG + 42;
+  internal const int COEFF_ABS_LEVEL_GREATER1_FLAG = SIG_COEFF_FLAG + 44;
   internal const int COEFF_ABS_LEVEL_GREATER2_FLAG = COEFF_ABS_LEVEL_GREATER1_FLAG + 24;
 
+  // The format range extensions' own syntax elements, appended after the version 1 ones so that
+  // none of those moves.
+  internal const int EXPLICIT_RDPCM_FLAG = COEFF_ABS_LEVEL_GREATER2_FLAG + 6;
+  internal const int EXPLICIT_RDPCM_DIR_FLAG = EXPLICIT_RDPCM_FLAG + 2;
+  internal const int LOG2_RES_SCALE_ABS_PLUS1 = EXPLICIT_RDPCM_DIR_FLAG + 2;
+  internal const int RES_SCALE_SIGN_FLAG = LOG2_RES_SCALE_ABS_PLUS1 + 8;
+  internal const int CU_CHROMA_QP_OFFSET_FLAG = RES_SCALE_SIGN_FLAG + 2;
+  internal const int CU_CHROMA_QP_OFFSET_IDX = CU_CHROMA_QP_OFFSET_FLAG + 1;
+
   /// <summary>How many context variables one entropy coder holds.</summary>
-  internal const int COUNT = COEFF_ABS_LEVEL_GREATER2_FLAG + 6;
+  internal const int COUNT = CU_CHROMA_QP_OFFSET_IDX + 1;
 
   /// <summary>
   /// The initialisation values, one row per initialisation type: intra, predicted, bidirectional.
@@ -192,8 +201,9 @@ internal static class H265CabacContexts {
     // Table 9-21.
     _Set(tables, CBF_LUMA, [111, 141], [153, 111], [153, 111]);
 
-    // Table 9-22: cbf_cb and cbf_cr share these four.
-    _Set(tables, CBF_CHROMA, [94, 138, 182, 154], [149, 107, 167, 154], [149, 92, 167, 154]);
+    // Table 9-22: cbf_cb and cbf_cr share these five. The fifth is reached only by a 4:4:4 chroma
+    // block at transform depth four, which no subsampled format has.
+    _Set(tables, CBF_CHROMA, [94, 138, 182, 154, 154], [149, 107, 167, 154, 154], [149, 92, 167, 154, 154]);
 
     // Table 9-23.
     _Set(tables, ABS_MVD_GREATER0_FLAG, [_UNUSED], [140], [169]);
@@ -224,22 +234,26 @@ internal static class H265CabacContexts {
     // Table 9-28.
     _Set(tables, CODED_SUB_BLOCK_FLAG, [91, 171, 134, 141], [121, 140, 61, 154], [121, 140, 61, 154]);
 
-    // Table 9-29: twenty-seven luma contexts then fifteen chroma ones.
+    // Table 9-29: twenty-seven luma contexts then fifteen chroma ones, then the two that a block
+    // without a transform uses under transform_skip_context_enabled_flag — luma's, then chroma's.
     _Set(tables, SIG_COEFF_FLAG,
       [
         111, 111, 125, 110, 110, 94, 124, 108, 124, 107, 125, 141, 179, 153, 125, 107, 125, 141, 179, 153, 125,
         107, 125, 141, 179, 153, 125,
         140, 139, 182, 182, 152, 136, 152, 136, 153, 136, 139, 111, 136, 139, 111,
+        141, 111,
       ],
       [
         155, 154, 139, 153, 139, 123, 123, 63, 153, 166, 183, 140, 136, 153, 154, 166, 183, 140, 136, 153, 154,
         166, 183, 140, 136, 153, 154,
         170, 153, 123, 123, 107, 121, 107, 121, 167, 151, 183, 140, 151, 183, 140,
+        140, 140,
       ],
       [
         170, 154, 139, 153, 139, 123, 123, 63, 124, 166, 183, 140, 136, 153, 154, 166, 183, 140, 136, 153, 154,
         166, 183, 140, 136, 153, 154,
         170, 153, 138, 138, 122, 121, 122, 121, 167, 151, 183, 140, 151, 183, 140,
+        140, 140,
       ]);
 
     // Table 9-30: sixteen luma contexts, four sets of four, then eight chroma ones.
@@ -260,6 +274,22 @@ internal static class H265CabacContexts {
     // Table 9-31: four luma contexts and two chroma ones.
     _Set(tables, COEFF_ABS_LEVEL_GREATER2_FLAG,
       [138, 153, 136, 167, 152, 152], [107, 167, 91, 122, 107, 167], [107, 167, 91, 107, 107, 167]);
+
+    // explicit_rdpcm_flag and explicit_rdpcm_dir_flag, one context each for luma and chroma. Only an
+    // inter block may send them, so the intra column is never read.
+    _Set(tables, EXPLICIT_RDPCM_FLAG, [139, 139], [139, 139], [139, 139]);
+    _Set(tables, EXPLICIT_RDPCM_DIR_FLAG, [139, 139], [139, 139], [139, 139]);
+
+    // log2_res_scale_abs_plus1, four bins for each of the two chroma components, and
+    // res_scale_sign_flag, one for each.
+    _Set(tables, LOG2_RES_SCALE_ABS_PLUS1,
+      [154, 154, 154, 154, 154, 154, 154, 154], [154, 154, 154, 154, 154, 154, 154, 154],
+      [154, 154, 154, 154, 154, 154, 154, 154]);
+    _Set(tables, RES_SCALE_SIGN_FLAG, [154, 154], [154, 154], [154, 154]);
+
+    // cu_chroma_qp_offset_flag and cu_chroma_qp_offset_idx.
+    _Set(tables, CU_CHROMA_QP_OFFSET_FLAG, [154], [154], [154]);
+    _Set(tables, CU_CHROMA_QP_OFFSET_IDX, [154], [154], [154]);
 
     return tables;
   }

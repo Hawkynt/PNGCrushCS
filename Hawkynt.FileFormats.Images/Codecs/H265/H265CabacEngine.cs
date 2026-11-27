@@ -136,6 +136,18 @@ internal struct H265CabacEngine {
   }
 
   /// <summary>
+  /// Aligns the decoder before a run of bypass bins — the alignment process the format range
+  /// extensions add to the arithmetic decoding engine.
+  /// </summary>
+  /// <remarks>
+  /// Setting the range to 256 makes every bypass bin that follows a plain bit of the offset: the
+  /// comparison against a range of 256 is a test of one bit, and subtracting it clears that bit.
+  /// That is the whole point of <c>cabac_bypass_alignment_enabled_flag</c> — a hardware decoder can
+  /// then read a sub-block's signs and escapes several bits at a time.
+  /// </remarks>
+  internal void Align() => this._range = 256;
+
+  /// <summary>
   /// The bin that says whether this is the end — clause 9.3.4.3.5.
   /// </summary>
   /// <remarks>

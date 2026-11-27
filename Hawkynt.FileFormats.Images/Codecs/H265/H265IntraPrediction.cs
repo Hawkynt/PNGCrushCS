@@ -223,8 +223,14 @@ internal static class H265IntraPrediction {
   /// </summary>
   /// <param name="prediction">The block, row-major and <paramref name="size"/> across.</param>
   /// <param name="luma">Whether this is a luma block, which is what the three boundary adjustments turn on.</param>
+  /// <param name="disableBoundaryFilter">
+  /// <c>disableIntraBoundaryFilter</c> of clause 8.4.4.2.6: the format range extensions switch off
+  /// the edge adjustment of the straight horizontal and vertical modes in a lossless coding unit
+  /// that uses implicit residual DPCM. The direct-current smoothing is not affected.
+  /// </param>
   internal static void Predict(
-    int[] prediction, int[] reference, int size, int mode, bool luma, int bitDepth) {
+    int[] prediction, int[] reference, int size, int mode, bool luma, int bitDepth,
+    bool disableBoundaryFilter = false) {
     switch (mode) {
       case PLANAR:
         _Planar(prediction, reference, size);
@@ -235,7 +241,7 @@ internal static class H265IntraPrediction {
         return;
 
       default:
-        _Angular(prediction, reference, size, mode, luma, bitDepth);
+        _Angular(prediction, reference, size, mode, luma && !disableBoundaryFilter, bitDepth);
         return;
     }
   }

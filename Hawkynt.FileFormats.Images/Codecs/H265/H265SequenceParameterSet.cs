@@ -168,6 +168,27 @@ internal sealed class H265SequenceParameterSet {
   internal bool StrongIntraSmoothingEnabled { get; private init; }
 
   /// <summary>
+  /// The format range extension flags of <c>sps_range_extension()</c> — clause 7.3.2.2.2. All of
+  /// them are off in a sequence that does not send the extension.
+  /// </summary>
+  internal H265RangeExtension RangeExtension { get; private init; } = H265RangeExtension.None;
+
+  /// <summary>
+  /// <c>CoeffMinY</c> as a power of two: the transform coefficients of one component, and the values
+  /// between the two stages of the inverse transform, are held in a signed range of this many bits.
+  /// </summary>
+  /// <remarks>
+  /// Sixteen bits — fifteen and a sign — in every profile before the range extensions, and still in
+  /// every one of them unless <c>extended_precision_processing_flag</c> is set. Then the range
+  /// grows with the sample depth, six bits above it, so that a sixteen-bit stream keeps the
+  /// precision a sixteen-bit picture needs instead of having its dynamic range clipped away.
+  /// </remarks>
+  internal int Log2TransformRange(int component)
+    => this.RangeExtension.ExtendedPrecisionProcessing
+      ? Math.Max(15, (component == 0 ? this.BitDepthLuma : this.BitDepthChroma) + 6)
+      : 15;
+
+  /// <summary>
   /// What the video usability information says the samples were meant for, or <c>null</c> where the
   /// sequence says nothing.
   /// </summary>
@@ -297,8 +318,9 @@ internal sealed class H265SequenceParameterSet {
     if (reader.ReadFlag())
       colorInfo = _ReadVideoUsabilityInformation(ref reader, maxSubLayersMinus1);
 
+    var rangeExtension = H265RangeExtension.None;
     if (reader.ReadFlag())
-      _RefuseExtensions(ref reader);
+      rangeExtension = _ReadExtensions(ref reader);
 
     var sps = new H265SequenceParameterSet {
       Id = id,
@@ -340,6 +362,7 @@ internal sealed class H265SequenceParameterSet {
       TemporalMvpEnabled = temporalMvpEnabled,
       StrongIntraSmoothingEnabled = strongIntraSmoothing,
       ColorInfo = colorInfo,
+      RangeExtension = rangeExtension,
     };
 
     sps._RefuseWhatIsNotDecodable();
@@ -366,16 +389,27 @@ internal sealed class H265SequenceParameterSet {
         $"An H.265 sequence parameter set states chroma_format_idc {this.ChromaFormatIdc}, which clause 7.4.3.2.1 "
         + "bounds at 3. These bytes are not a parameter set.");
 
-    if (this.BitDepthLuma is < 8 or > 12 || this.BitDepthChroma is < 8 or > 12)
-      throw new NotSupportedException(
-        $"This H.265 stream codes {this.BitDepthLuma}-bit luma and {this.BitDepthChroma}-bit chroma samples "
-        + "(clause 7.4.3.2.1). Eight to twelve bits are implemented, which covers Main, Main 10, the 4:2:2 and "
-        + "4:4:4 twelve-bit profiles and the twelve-bit still profile; deeper samples need the extended precision "
-        + "the range extensions add, and the parameter sets refuse every tool of theirs that changes a sample.");
+    // bit_depth_luma_minus8 and bit_depth_chroma_minus8 run from 0 to 8 (clause 7.4.3.2.1): every
+    // depth from eight to sixteen bits, the upper half of it the format range extensions' own.
+    if (this.BitDepthLuma is < 8 or > 16 || this.BitDepthChroma is < 8 or > 16)
+      throw new InvalidDataException(
+        $"An H.265 sequence parameter set states {this.BitDepthLuma}-bit luma and {this.BitDepthChroma}-bit "
+        + "chroma samples. Clause 7.4.3.2.1 bounds both depths to eight through sixteen bits, so these bytes are "
+        + "not a parameter set.");
+
+    if (this.PcmEnabled
+        && (this.PcmBitDepthLuma > this.BitDepthLuma || this.PcmBitDepthChroma > this.BitDepthChroma))
+      throw new InvalidDataException(
+        $"An H.265 sequence parameter set codes PCM samples at {this.PcmBitDepthLuma} and {this.PcmBitDepthChroma} "
+        + $"bits for pictures of {this.BitDepthLuma} and {this.BitDepthChroma} bits. Clause 7.4.3.2.1 bounds the PCM "
+        + "depth by the picture's, so these bytes are not a parameter set.");
   }
 
-  /// <summary>Reads the extension flags and refuses the ones that change the decoding process.</summary>
-  private static void _RefuseExtensions(ref H265BitReader reader) {
+  /// <summary>
+  /// Reads the extension flags, keeping the format range extension and refusing the extensions
+  /// whose syntax this decoder does not have.
+  /// </summary>
+  private static H265RangeExtension _ReadExtensions(ref H265BitReader reader) {
     var rangeExtension = reader.ReadFlag();
     var multilayerExtension = reader.ReadFlag();
     var threeDimensionalExtension = reader.ReadFlag();
@@ -395,22 +429,20 @@ internal sealed class H265SequenceParameterSet {
         + "not implemented.");
 
     if (!rangeExtension)
-      return;
+      return H265RangeExtension.None;
 
-    // Every one of these nine flags changes the decoding process rather than describing it, so the
-    // one that is set is named: a decoder that read them and pressed on would return a picture.
-    string[] names = [
-      "transform_skip_rotation_enabled_flag", "transform_skip_context_enabled_flag",
-      "implicit_rdpcm_enabled_flag", "explicit_rdpcm_enabled_flag", "extended_precision_processing_flag",
-      "intra_smoothing_disabled_flag", "high_precision_offsets_enabled_flag",
-      "persistent_rice_adaptation_enabled_flag", "cabac_bypass_alignment_enabled_flag",
-    ];
-
-    for (var i = 0; i < names.Length; ++i)
-      if (reader.ReadFlag())
-        throw new NotSupportedException(
-          $"This H.265 sequence parameter set sets {names[i]} (clause 7.3.2.2.2, the format range extensions). It "
-          + "changes how residuals are coded or reconstructed and is not implemented.");
+    // sps_range_extension() — clause 7.3.2.2.2: nine flags and nothing else, in this order.
+    return new() {
+      TransformSkipRotationEnabled = reader.ReadFlag(),
+      TransformSkipContextEnabled = reader.ReadFlag(),
+      ImplicitRdpcmEnabled = reader.ReadFlag(),
+      ExplicitRdpcmEnabled = reader.ReadFlag(),
+      ExtendedPrecisionProcessing = reader.ReadFlag(),
+      IntraSmoothingDisabled = reader.ReadFlag(),
+      HighPrecisionOffsetsEnabled = reader.ReadFlag(),
+      PersistentRiceAdaptationEnabled = reader.ReadFlag(),
+      CabacBypassAlignmentEnabled = reader.ReadFlag(),
+    };
   }
 
   /// <summary>

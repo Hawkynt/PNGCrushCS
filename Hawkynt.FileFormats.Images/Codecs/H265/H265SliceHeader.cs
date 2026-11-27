@@ -68,6 +68,12 @@ internal sealed class H265SliceHeader {
   internal int SliceQpY { get; private init; }
   internal int SliceCbQpOffset { get; private init; }
   internal int SliceCrQpOffset { get; private init; }
+
+  /// <summary>
+  /// <c>cu_chroma_qp_offset_enabled_flag</c>: whether this slice's coding units may choose a
+  /// chrominance quantiser offset from the picture parameter set's lists.
+  /// </summary>
+  internal bool CuChromaQpOffsetEnabled { get; private init; }
   internal bool DeblockingFilterDisabled { get; private init; }
   internal int BetaOffsetDiv2 { get; private init; }
   internal int TcOffsetDiv2 { get; private init; }
@@ -280,6 +286,8 @@ internal sealed class H265SliceHeader {
       sliceCrQpOffset = reader.ReadSignedExpGolomb();
     }
 
+    var cuChromaQpOffsetEnabled = pps.ChromaQpOffsetListEnabled && reader.ReadFlag();
+
     var deblockingDisabled = pps.DeblockingFilterDisabled;
     var betaOffsetDiv2 = pps.BetaOffsetDiv2;
     var tcOffsetDiv2 = pps.TcOffsetDiv2;
@@ -328,6 +336,7 @@ internal sealed class H265SliceHeader {
       SliceQpY = sliceQpY,
       SliceCbQpOffset = sliceCbQpOffset,
       SliceCrQpOffset = sliceCrQpOffset,
+      CuChromaQpOffsetEnabled = cuChromaQpOffsetEnabled,
       DeblockingFilterDisabled = deblockingDisabled,
       BetaOffsetDiv2 = betaOffsetDiv2,
       TcOffsetDiv2 = tcOffsetDiv2,
@@ -388,6 +397,7 @@ internal sealed class H265SliceHeader {
       SliceQpY = inherited.SliceQpY,
       SliceCbQpOffset = inherited.SliceCbQpOffset,
       SliceCrQpOffset = inherited.SliceCrQpOffset,
+      CuChromaQpOffsetEnabled = inherited.CuChromaQpOffsetEnabled,
       DeblockingFilterDisabled = inherited.DeblockingFilterDisabled,
       BetaOffsetDiv2 = inherited.BetaOffsetDiv2,
       TcOffsetDiv2 = inherited.TcOffsetDiv2,
@@ -566,6 +576,11 @@ internal sealed class H265PredictionWeights {
       for (var i = 0; i < count; ++i)
         chromaPresent[i] = reader.ReadFlag();
 
+    // WpOffsetHalfRangeC of clause 7.4.7.3: offsets are stated at eight bits and scaled up unless the
+    // sequence asks for high-precision offsets, which are stated at the chroma depth itself and so
+    // need the wider range for the prediction of the chroma offset from the weight.
+    var halfRange = 1 << (sps.RangeExtension.HighPrecisionOffsetsEnabled ? sps.BitDepthChroma - 1 : 7);
+
     for (var i = 0; i < count; ++i) {
       if (lumaPresent[i]) {
         lumaWeight[i] = (1 << lumaLog2Denom) + reader.ReadSignedExpGolomb();
@@ -580,7 +595,7 @@ internal sealed class H265PredictionWeights {
         var delta = reader.ReadSignedExpGolomb();
         chromaWeight[i, component] = weight;
         chromaOffset[i, component] =
-          Math.Clamp(128 + delta - ((128 * weight) >> chromaLog2Denom), -128, 127);
+          Math.Clamp(halfRange + delta - ((halfRange * weight) >> chromaLog2Denom), -halfRange, halfRange - 1);
       }
     }
   }

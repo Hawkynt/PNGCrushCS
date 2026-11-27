@@ -41,7 +41,7 @@ internal sealed class H265FrameDecoder : IH265MotionContext {
   private readonly sbyte[] _blockQp;
   private readonly int _log2QuantisationGroupSize;
   private readonly byte[] _saoTypeIdx;
-  private readonly sbyte[] _saoOffsets;
+  private readonly short[] _saoOffsets;
   private readonly byte[] _saoBandOrClass;
 
   private readonly List<bool> _sliceLoopFilterAcross = [];
@@ -56,6 +56,14 @@ internal sealed class H265FrameDecoder : IH265MotionContext {
   private readonly byte[] _contexts = new byte[H265CabacContexts.COUNT];
   private readonly byte[] _wavefrontContexts = new byte[H265CabacContexts.COUNT];
   private bool _wavefrontContextsStored;
+
+  /// <summary>
+  /// <c>StatCoeff</c> — the four counters persistent Rice adaptation keeps. They live beside the
+  /// context variables and are initialised, stored for a wavefront row and restored exactly where
+  /// those are.
+  /// </summary>
+  private readonly int[] _statCoeff = new int[4];
+  private readonly int[] _wavefrontStatCoeff = new int[4];
   private int _sliceOrdinal = -1;
   /// <summary>
   /// <c>SliceAddrRs</c>: the raster address of the first coding tree block of the slice — of its
@@ -81,6 +89,32 @@ internal sealed class H265FrameDecoder : IH265MotionContext {
   private bool _cuTransquantBypass;
   private int _cuMaxTransformDepth;
   private bool _cuIntraSplit;
+
+  private readonly H265RangeExtension _range;
+  private readonly int _log2TransformRangeLuma;
+  private readonly int _log2TransformRangeChroma;
+
+  /// <summary>
+  /// Whether each block's chrominance takes the luminance mode — <c>intra_chroma_pred_mode</c> 4,
+  /// which is what a 4:4:4 intra unit must have chosen to predict its chroma residual from luma.
+  /// </summary>
+  private readonly bool[] _chromaModeDerived;
+
+  /// <summary>
+  /// The luminance residual of the transform unit being decoded, kept for cross-component
+  /// prediction: the chrominance residuals of a 4:4:4 unit may add a scaled copy of it.
+  /// </summary>
+  private readonly int[] _lumaResidual = new int[32 * 32];
+  private bool _lumaResidualPresent;
+
+  /// <summary>
+  /// <c>IsCuChromaQpOffsetCoded</c>, and the offsets it chose: <c>CuQpOffsetCb</c> and
+  /// <c>CuQpOffsetCr</c>.
+  /// </summary>
+  private bool _cuChromaQpOffsetCoded;
+  private int _cuQpOffsetCb;
+  private int _cuQpOffsetCr;
+  private readonly int _log2MinCuChromaQpOffsetSize;
 
   private readonly int[] _reference = new int[4 * 32 + 1];
   private readonly bool[] _referenceAvailable = new bool[4 * 32 + 1];
@@ -122,10 +156,15 @@ internal sealed class H265FrameDecoder : IH265MotionContext {
     this._predictionEdgeHorizontal = new bool[blocks];
 
     this._log2QuantisationGroupSize = sps.CtbLog2SizeY - pps.DiffCuQpDeltaDepth;
+    this._log2MinCuChromaQpOffsetSize = sps.CtbLog2SizeY - pps.DiffCuChromaQpOffsetDepth;
+    this._range = sps.RangeExtension;
+    this._log2TransformRangeLuma = sps.Log2TransformRange(0);
+    this._log2TransformRangeChroma = sps.Log2TransformRange(1);
+    this._chromaModeDerived = new bool[blocks];
     this._blockQp = new sbyte[blocks];
 
     this._saoTypeIdx = new byte[sps.PicSizeInCtbsY * 3];
-    this._saoOffsets = new sbyte[sps.PicSizeInCtbsY * 3 * 5];
+    this._saoOffsets = new short[sps.PicSizeInCtbsY * 3 * 5];
     this._saoBandOrClass = new byte[sps.PicSizeInCtbsY * 3];
   }
 
@@ -150,6 +189,8 @@ internal sealed class H265FrameDecoder : IH265MotionContext {
       this._sliceDeblocking.Add((header.DeblockingFilterDisabled, header.BetaOffsetDiv2, header.TcOffsetDiv2));
       this._wavefrontContextsStored = false;
       this._sliceAddressRs = header.SegmentAddress;
+      this._cuQpOffsetCb = 0;
+      this._cuQpOffsetCr = 0;
     } else if (this._sliceOrdinal < 0)
       throw new InvalidDataException(
         "An H.265 dependent slice segment reached the picture decoder without an independent segment first.");
@@ -191,6 +232,7 @@ internal sealed class H265FrameDecoder : IH265MotionContext {
       if (this._pps.EntropyCodingSyncEnabled
           && column == this._tiles.TileColumnStart(ctb) + 1) {
         Array.Copy(this._contexts, this._wavefrontContexts, H265CabacContexts.COUNT);
+        Array.Copy(this._statCoeff, this._wavefrontStatCoeff, 4);
         this._wavefrontContextsStored = true;
       }
 
@@ -208,8 +250,9 @@ internal sealed class H265FrameDecoder : IH265MotionContext {
         var next = this._tiles.ToRasterScan(ts + 1);
         if (this._StartsNewSubset(next) && this._cabac.DecodeTerminate() == 0)
           throw new InvalidDataException(
-            "An H.265 entropy-coded subset ended without end_of_subset_one_bit being set. The CABAC decoder is "
-            + "out of step with the tile/WPP boundary.");
+            $"An H.265 entropy-coded subset ended at coding tree block {ctb} (tile scan {ts}, slice segment from "
+            + $"{header.SegmentAddress}) without end_of_subset_one_bit being set. The CABAC decoder is out of step "
+            + "with the tile/WPP boundary.");
       }
     }
 
@@ -251,15 +294,16 @@ internal sealed class H265FrameDecoder : IH265MotionContext {
     bool wavefrontStart,
     ref int substream) {
     if (tileStart) {
-      H265CabacContexts.Initialize(this._contexts, initType, header.SliceQpY);
+      this._InitializeContexts(initType, header.SliceQpY);
       this._wavefrontContextsStored = false;
     } else if (wavefrontStart) {
-      if (this._wavefrontContextsStored && (!first || header.DependentSliceSegment))
+      if (this._wavefrontContextsStored && (!first || header.DependentSliceSegment)) {
         Array.Copy(this._wavefrontContexts, this._contexts, H265CabacContexts.COUNT);
-      else
-        H265CabacContexts.Initialize(this._contexts, initType, header.SliceQpY);
+        Array.Copy(this._wavefrontStatCoeff, this._statCoeff, 4);
+      } else
+        this._InitializeContexts(initType, header.SliceQpY);
     } else if (!(first && header.DependentSliceSegment))
-      H265CabacContexts.Initialize(this._contexts, initType, header.SliceQpY);
+      this._InitializeContexts(initType, header.SliceQpY);
 
     var offset = first
       ? header.DataOffset
@@ -270,6 +314,11 @@ internal sealed class H265FrameDecoder : IH265MotionContext {
           + "offsets than its entropy-coded subsets require.");
 
     this._cabac.Start(offset);
+  }
+
+  private void _InitializeContexts(int initType, int sliceQpY) {
+    H265CabacContexts.Initialize(this._contexts, initType, sliceQpY);
+    Array.Clear(this._statCoeff);
   }
 
   private void _ResetQuantisationState(int sliceQp) {
@@ -342,7 +391,7 @@ internal sealed class H265FrameDecoder : IH265MotionContext {
       if (this._saoTypeIdx[slot] == 0)
         continue;
 
-      var magnitudes = new int[4];
+      Span<int> magnitudes = stackalloc int[4];
       var depth = component == 0 ? this._sps.BitDepthLuma : this._sps.BitDepthChroma;
       var maximum = (1 << (Math.Min(depth, 10) - 5)) - 1;
       for (var i = 0; i < 4; ++i) {
@@ -365,8 +414,12 @@ internal sealed class H265FrameDecoder : IH265MotionContext {
           : this._saoBandOrClass[ctb * 3 + 1];
       }
 
+      // log2_sao_offset_scale: at depths above ten bits the coded offsets stop at the ten-bit range
+      // and are scaled up into the sample's own, so a sixteen-bit picture can still be corrected by
+      // more than a few least significant bits.
+      var scale = component == 0 ? this._pps.Log2SaoOffsetScaleLuma : this._pps.Log2SaoOffsetScaleChroma;
       for (var i = 0; i < 4; ++i)
-        this._saoOffsets[slot * 5 + i + 1] = (sbyte)magnitudes[i];
+        this._saoOffsets[slot * 5 + i + 1] = (short)(magnitudes[i] * (1 << scale));
     }
   }
 
@@ -380,6 +433,9 @@ internal sealed class H265FrameDecoder : IH265MotionContext {
 
     if (log2CbSize >= this._log2QuantisationGroupSize)
       this._BeginQuantisationGroup(x0, y0);
+
+    if (this._header.CuChromaQpOffsetEnabled && log2CbSize >= this._log2MinCuChromaQpOffsetSize)
+      this._cuChromaQpOffsetCoded = false;
 
     if (!split) {
       this._DecodeCodingUnit(x0, y0, log2CbSize, depth);
@@ -621,10 +677,13 @@ internal sealed class H265FrameDecoder : IH265MotionContext {
       for (var i = 0; i < parts * parts; ++i) {
         var x = x0 + (i % parts) * step;
         var y = y0 + (i / parts) * step;
-        this._FillBlocks(this._intraPredModeC, x, y, step, step, (byte)this._DecodeChromaMode(modes[i]));
+        this._FillBlocks(this._intraPredModeC, x, y, step, step, (byte)this._DecodeChromaMode(modes[i], out var derived));
+        this._FillBlocks(this._chromaModeDerived, x, y, step, step, derived);
       }
-    } else if (this._chromaArrayType != 0)
-      this._FillBlocks(this._intraPredModeC, x0, y0, size, size, (byte)this._DecodeChromaMode(modes[0]));
+    } else if (this._chromaArrayType != 0) {
+      this._FillBlocks(this._intraPredModeC, x0, y0, size, size, (byte)this._DecodeChromaMode(modes[0], out var derived));
+      this._FillBlocks(this._chromaModeDerived, x0, y0, size, size, derived);
+    }
 
     return false;
   }
@@ -661,9 +720,11 @@ internal sealed class H265FrameDecoder : IH265MotionContext {
     return this._intraPredModeY[index];
   }
 
-  private int _DecodeChromaMode(int lumaMode) {
+  private int _DecodeChromaMode(int lumaMode, out bool derived) {
     var mode = lumaMode;
+    derived = true;
     if (this._cabac.DecodeBin(H265CabacContexts.INTRA_CHROMA_PRED_MODE) != 0) {
+      derived = false;
       var index = this._cabac.DecodeBypassBits(2);
       int[] candidates = [
         H265IntraPrediction.PLANAR, H265IntraPrediction.VERTICAL, H265IntraPrediction.HORIZONTAL,
@@ -1052,7 +1113,27 @@ internal sealed class H265FrameDecoder : IH265MotionContext {
       this._SetQuantiser(this._DecodeQuantiserDelta());
     }
 
+    // cu_chroma_qp_offset_flag and cu_chroma_qp_offset_idx — clause 7.3.8.10. Sent once per chroma
+    // quantisation group, at the first unit that codes chrominance it will dequantise.
+    if (anyChroma && this._header.CuChromaQpOffsetEnabled && !this._cuTransquantBypass
+        && !this._cuChromaQpOffsetCoded) {
+      this._cuChromaQpOffsetCoded = true;
+      if (this._cabac.DecodeBin(H265CabacContexts.CU_CHROMA_QP_OFFSET_FLAG) != 0) {
+        var index = 0;
+        var last = this._pps.CbQpOffsetList.Length - 1;
+        while (index < last && this._cabac.DecodeBin(H265CabacContexts.CU_CHROMA_QP_OFFSET_IDX) != 0)
+          ++index;
+
+        this._cuQpOffsetCb = this._pps.CbQpOffsetList[index];
+        this._cuQpOffsetCr = this._pps.CrQpOffsetList[index];
+      } else {
+        this._cuQpOffsetCb = 0;
+        this._cuQpOffsetCr = 0;
+      }
+    }
+
     var qp = this._QuantiserAt(x0, y0);
+    this._lumaResidualPresent = false;
     if (this._cuPredictionMode == H265PredictionMode.Intra)
       this._ReconstructIntraLuma(x0, y0, log2TrafoSize, cbfLuma, qp);
     else if (cbfLuma)
@@ -1060,6 +1141,13 @@ internal sealed class H265FrameDecoder : IH265MotionContext {
 
     if (monochrome)
       return;
+
+    // cross_component_prediction_enabled_flag: a 4:4:4 unit with a luminance residual may predict
+    // each chrominance residual from it, if it is an inter unit or an intra one whose chrominance
+    // follows the luminance mode — any other mode predicts chrominance from something else.
+    var crossComponent = this._pps.CrossComponentPredictionEnabled && cbfLuma
+                         && (this._cuPredictionMode != H265PredictionMode.Intra
+                             || this._chromaModeDerived[this._BlockIndex(x0, y0)]);
 
     // Where the chrominance was coded at the parent, only the last of the four luminance blocks
     // carries it, and it covers the parent's whole area rather than that block's.
@@ -1070,16 +1158,57 @@ internal sealed class H265FrameDecoder : IH265MotionContext {
     var chromaY = (chromaAtParent ? yBase : y0) >> this._chromaShiftY;
     var blocks = stackedChroma ? 2 : 1;
 
-    for (var component = 1; component <= 2; ++component)
+    for (var component = 1; component <= 2; ++component) {
+      var resScale = crossComponent ? this._DecodeResidualScale(component - 1) : 0;
+
       for (var i = 0; i < blocks; ++i) {
         var hasResidual = component == 1 ? flags.Cb(i) : flags.Cr(i);
         var y = chromaY + (i << log2TrafoSizeC);
 
         if (this._cuPredictionMode == H265PredictionMode.Intra)
-          this._ReconstructIntraChroma(chromaX, y, log2TrafoSizeC, component, hasResidual, qp);
-        else if (hasResidual)
-          this._AddChromaResidual(chromaX, y, log2TrafoSizeC, component, qp);
+          this._ReconstructIntraChroma(chromaX, y, log2TrafoSizeC, component, hasResidual, qp, resScale);
+        else if (hasResidual || resScale != 0)
+          this._AddChromaResidual(chromaX, y, log2TrafoSizeC, component, hasResidual, qp, resScale);
       }
+    }
+  }
+
+  /// <summary>
+  /// <c>cross_comp_pred(x0, y0, c)</c>: <c>ResScaleVal</c>, the scale one chrominance residual takes
+  /// the luminance one at, in eighths.
+  /// </summary>
+  private int _DecodeResidualScale(int c) {
+    var log2Plus1 = 0;
+    while (log2Plus1 < 4
+           && this._cabac.DecodeBin(H265CabacContexts.LOG2_RES_SCALE_ABS_PLUS1 + 4 * c + log2Plus1) != 0)
+      ++log2Plus1;
+
+    if (log2Plus1 == 0)
+      return 0;
+
+    var negative = this._cabac.DecodeBin(H265CabacContexts.RES_SCALE_SIGN_FLAG + c) != 0;
+    var magnitude = 1 << (log2Plus1 - 1);
+    return negative ? -magnitude : magnitude;
+  }
+
+  /// <summary>
+  /// Adds the scaled luminance residual to a chrominance one — the residual modification process
+  /// for blocks using cross-component prediction.
+  /// </summary>
+  private void _AddCrossComponent(int log2Size, int resScale) {
+    var count = 1 << (log2Size << 1);
+    var depthLuma = this._sps.BitDepthLuma;
+    var depthChroma = this._sps.BitDepthChroma;
+
+    // (rY << BitDepthC) >> BitDepthY brings the luminance residual to the chrominance depth. A
+    // sixteen-bit residual shifted left by sixteen no longer fits 32 bits, so the shift is taken in
+    // 64 — and skipped where the two depths agree, which is every stream but a few.
+    if (depthLuma == depthChroma)
+      for (var i = 0; i < count; ++i)
+        this._coefficients[i] += (resScale * this._lumaResidual[i]) >> 3;
+    else
+      for (var i = 0; i < count; ++i)
+        this._coefficients[i] += (int)((resScale * (((long)this._lumaResidual[i] << depthChroma) >> depthLuma)) >> 3);
   }
 
   private int _DecodeQuantiserDelta() {
@@ -1102,17 +1231,40 @@ internal sealed class H265FrameDecoder : IH265MotionContext {
     var size = 1 << log2Size;
     var mode = this._intraPredModeY[this._BlockIndex(x0, y0)];
     this._GatherReference(x0, y0, size, mode);
-    H265IntraPrediction.Predict(this._prediction, this._reference, size, mode, true, this._sps.BitDepthLuma);
+    H265IntraPrediction.Predict(
+      this._prediction, this._reference, size, mode, true, this._sps.BitDepthLuma, this._DisableBoundaryFilters);
 
-    var transformSkip = false;
-    if (hasResidual)
-      transformSkip = H265Residual.Decode(
-        ref this._cabac, this._coefficients, log2Size, 0, mode, this._chromaArrayType, this._pps,
-        this._cuTransquantBypass);
+    if (hasResidual) {
+      var form = this._DecodeResidual(log2Size, 0, mode);
+      this._TransformResidual(log2Size, form, this._LumaQuantiser(qp), 0, this._sps.BitDepthLuma);
+      this._KeepLumaResidual(log2Size);
+    }
 
-    this._Reconstruct(
-      this._picture.Luma, this._picture.Width, x0, y0, log2Size, hasResidual, transformSkip,
-      this._LumaQuantiser(qp), 0, this._sps.BitDepthLuma, mode);
+    this._Reconstruct(this._picture.Luma, this._picture.Width, x0, y0, log2Size, hasResidual, this._sps.BitDepthLuma);
+  }
+
+  /// <summary>
+  /// <c>disableIntraBoundaryFilter</c> of clause 8.4.4.2.6: a lossless unit under implicit residual
+  /// DPCM keeps the prediction's edge unfiltered, because the residual accumulated along that edge
+  /// is what reconstructs it exactly.
+  /// </summary>
+  private bool _DisableBoundaryFilters => this._range.ImplicitRdpcmEnabled && this._cuTransquantBypass;
+
+  /// <summary>Reads one residual block with every range extension tool the sequence enables.</summary>
+  private H265ResidualForm _DecodeResidual(int log2Size, int component, int intraMode)
+    => H265Residual.Decode(
+      ref this._cabac, this._coefficients, log2Size, component, intraMode, this._chromaArrayType, this._pps,
+      this._cuTransquantBypass, this._range,
+      component == 0 ? this._log2TransformRangeLuma : this._log2TransformRangeChroma,
+      this._range.PersistentRiceAdaptationEnabled ? this._statCoeff : default);
+
+  /// <summary>Keeps the luminance residual just reconstructed, where cross-component prediction may need it.</summary>
+  private void _KeepLumaResidual(int log2Size) {
+    if (!this._pps.CrossComponentPredictionEnabled)
+      return;
+
+    Array.Copy(this._coefficients, this._lumaResidual, 1 << (log2Size << 1));
+    this._lumaResidualPresent = true;
   }
 
   /// <summary>
@@ -1124,23 +1276,36 @@ internal sealed class H265FrameDecoder : IH265MotionContext {
   private int _LumaQuantiser(int qpY) => qpY + this._sps.QpBdOffsetLuma;
 
   private void _ReconstructIntraChroma(
-    int chromaX, int chromaY, int log2Size, int component, bool hasResidual, int qp) {
+    int chromaX, int chromaY, int log2Size, int component, bool hasResidual, int qp, int resScale) {
     var size = 1 << log2Size;
     var mode = this._ChromaModeAt(chromaX, chromaY);
     var plane = this._picture.Chroma(component - 1);
 
     this._GatherReferenceChroma(chromaX, chromaY, size, component, mode);
-    H265IntraPrediction.Predict(this._prediction, this._reference, size, mode, false, this._sps.BitDepthChroma);
+    H265IntraPrediction.Predict(
+      this._prediction, this._reference, size, mode, false, this._sps.BitDepthChroma, this._DisableBoundaryFilters);
 
-    var transformSkip = false;
-    if (hasResidual)
-      transformSkip = H265Residual.Decode(
-        ref this._cabac, this._coefficients, log2Size, component, mode, this._chromaArrayType, this._pps,
-        this._cuTransquantBypass);
-
+    this._ChromaResidual(log2Size, component, mode, hasResidual, qp, resScale);
     this._Reconstruct(
-      plane, this._picture.ChromaWidth, chromaX, chromaY, log2Size, hasResidual, transformSkip,
-      this._ChromaQuantiser(qp, component), component, this._sps.BitDepthChroma, -1);
+      plane, this._picture.ChromaWidth, chromaX, chromaY, log2Size, hasResidual || resScale != 0,
+      this._sps.BitDepthChroma);
+  }
+
+  /// <summary>
+  /// Puts one chrominance residual into <see cref="_coefficients"/>: decoded where it was coded,
+  /// zero where it was not, and with the luminance residual's share added where cross-component
+  /// prediction asks for it.
+  /// </summary>
+  private void _ChromaResidual(int log2Size, int component, int intraMode, bool hasResidual, int qp, int resScale) {
+    if (hasResidual) {
+      var form = this._DecodeResidual(log2Size, component, intraMode);
+      this._TransformResidual(
+        log2Size, form, this._ChromaQuantiser(qp, component), component, this._sps.BitDepthChroma);
+    } else if (resScale != 0)
+      Array.Clear(this._coefficients, 0, 1 << (log2Size << 1));
+
+    if (resScale != 0 && this._lumaResidualPresent)
+      this._AddCrossComponent(log2Size, resScale);
   }
 
   /// <summary>The chrominance intra prediction mode covering one chrominance sample position.</summary>
@@ -1148,21 +1313,18 @@ internal sealed class H265FrameDecoder : IH265MotionContext {
     => this._intraPredModeC[this._BlockIndex(chromaX << this._chromaShiftX, chromaY << this._chromaShiftY)];
 
   private void _AddLumaResidual(int x0, int y0, int log2Size, int qp) {
-    var transformSkip = H265Residual.Decode(
-      ref this._cabac, this._coefficients, log2Size, 0, -1, this._chromaArrayType, this._pps,
-      this._cuTransquantBypass);
-    this._AddResidual(
-      this._picture.Luma, this._picture.Width, x0, y0, log2Size, transformSkip,
-      this._LumaQuantiser(qp), 0, this._sps.BitDepthLuma, false);
+    var form = this._DecodeResidual(log2Size, 0, -1);
+    this._TransformResidual(log2Size, form, this._LumaQuantiser(qp), 0, this._sps.BitDepthLuma);
+    this._KeepLumaResidual(log2Size);
+    this._AddResidual(this._picture.Luma, this._picture.Width, x0, y0, log2Size, this._sps.BitDepthLuma);
   }
 
-  private void _AddChromaResidual(int chromaX, int chromaY, int log2Size, int component, int qp) {
-    var transformSkip = H265Residual.Decode(
-      ref this._cabac, this._coefficients, log2Size, component, -1, this._chromaArrayType, this._pps,
-      this._cuTransquantBypass);
+  private void _AddChromaResidual(
+    int chromaX, int chromaY, int log2Size, int component, bool hasResidual, int qp, int resScale) {
+    this._ChromaResidual(log2Size, component, -1, hasResidual, qp, resScale);
     this._AddResidual(
       this._picture.Chroma(component - 1), this._picture.ChromaWidth, chromaX, chromaY, log2Size,
-      transformSkip, this._ChromaQuantiser(qp, component), component, this._sps.BitDepthChroma, false);
+      this._sps.BitDepthChroma);
   }
 
   /// <summary>
@@ -1178,20 +1340,18 @@ internal sealed class H265FrameDecoder : IH265MotionContext {
   /// </remarks>
   private int _ChromaQuantiser(int lumaQp, int component) {
     var offset = component == 1
-      ? this._pps.CbQpOffset + this._header.SliceCbQpOffset
-      : this._pps.CrQpOffset + this._header.SliceCrQpOffset;
+      ? this._pps.CbQpOffset + this._header.SliceCbQpOffset + this._cuQpOffsetCb
+      : this._pps.CrQpOffset + this._header.SliceCrQpOffset + this._cuQpOffsetCr;
     var index = Math.Clamp(lumaQp + offset, -this._sps.QpBdOffsetChroma, 57);
     var mapped = this._chromaArrayType == 1 ? H265Dequantiser.ChromaQp(index) : Math.Min(index, 51);
     return mapped + this._sps.QpBdOffsetChroma;
   }
 
+  /// <summary>Writes the prediction, plus the residual in <see cref="_coefficients"/> where there is one.</summary>
   private void _Reconstruct(
-    ushort[] plane, int stride, int x0, int y0, int log2Size, bool hasResidual, bool transformSkip,
-    int qp, int component, int bitDepth, int intraMode) {
+    ushort[] plane, int stride, int x0, int y0, int log2Size, bool hasResidual, int bitDepth) {
     var size = 1 << log2Size;
     var maximum = (1 << bitDepth) - 1;
-    if (hasResidual)
-      this._TransformResidual(log2Size, transformSkip, qp, component, bitDepth, intraMode);
 
     for (var y = 0; y < size; ++y) {
       var row = (y0 + y) * stride + x0;
@@ -1204,12 +1364,10 @@ internal sealed class H265FrameDecoder : IH265MotionContext {
     }
   }
 
-  private void _AddResidual(
-    ushort[] plane, int stride, int x0, int y0, int log2Size, bool transformSkip, int qp, int component,
-    int bitDepth, bool intra) {
+  /// <summary>Adds the residual in <see cref="_coefficients"/> to the inter prediction already in the plane.</summary>
+  private void _AddResidual(ushort[] plane, int stride, int x0, int y0, int log2Size, int bitDepth) {
     var size = 1 << log2Size;
     var maximum = (1 << bitDepth) - 1;
-    this._TransformResidual(log2Size, transformSkip, qp, component, bitDepth, intra ? 0 : -1);
 
     for (var y = 0; y < size; ++y) {
       var row = (y0 + y) * stride + x0;
@@ -1218,27 +1376,48 @@ internal sealed class H265FrameDecoder : IH265MotionContext {
     }
   }
 
-  private void _TransformResidual(
-    int log2Size, bool transformSkip, int qp, int component, int bitDepth, int intraMode) {
-    if (this._cuTransquantBypass)
+  /// <summary>
+  /// Turns the levels in <see cref="_coefficients"/> into a residual, in place — clause 8.6.2.
+  /// </summary>
+  /// <remarks>
+  /// Three routes, and the format range extensions add a step to two of them. A lossless unit takes
+  /// its levels as the residual. A block sent without its transform is scaled and shifted. Every
+  /// other block is scaled and inverse transformed. The two that skip the transform may then be
+  /// turned half round (<c>transform_skip_rotation_enabled_flag</c>, an intra 4x4 block) and
+  /// accumulated along a direction (residual DPCM, implicit for intra and explicit for inter).
+  /// </remarks>
+  private void _TransformResidual(int log2Size, H265ResidualForm form, int qp, int component, int bitDepth) {
+    var rotate = this._range.TransformSkipRotationEnabled && log2Size == 2
+                 && this._cuPredictionMode == H265PredictionMode.Intra;
+
+    if (this._cuTransquantBypass) {
+      if (rotate)
+        H265Transform.Rotate(this._coefficients, log2Size);
+      H265Transform.Accumulate(this._coefficients, log2Size, form.Rdpcm);
       return;
+    }
 
     var scalingList = this._sps.ScalingListEnabled
       ? this._pps.ScalingList ?? this._sps.ScalingList
       : null;
-    if (transformSkip && log2Size > 2)
+    if (form.TransformSkip && log2Size > 2)
       scalingList = null;
 
+    var log2Range = component == 0 ? this._log2TransformRangeLuma : this._log2TransformRangeChroma;
     var matrixId = component + (this._cuPredictionMode == H265PredictionMode.Intra ? 0 : 3);
-    H265Dequantiser.Scale(this._coefficients, log2Size, qp, bitDepth, scalingList, matrixId);
-    if (transformSkip) {
-      H265Transform.Skip(this._coefficients, log2Size, bitDepth);
+    H265Dequantiser.Scale(this._coefficients, log2Size, qp, bitDepth, scalingList, matrixId, log2Range);
+
+    if (form.TransformSkip) {
+      if (rotate)
+        H265Transform.Rotate(this._coefficients, log2Size);
+      H265Transform.Skip(
+        this._coefficients, log2Size, bitDepth, log2Range, this._range.ExtendedPrecisionProcessing);
+      H265Transform.Accumulate(this._coefficients, log2Size, form.Rdpcm);
       return;
     }
 
     var sine = log2Size == 2 && component == 0 && this._cuPredictionMode == H265PredictionMode.Intra;
-    _ = intraMode;
-    H265Transform.Inverse(this._coefficients, log2Size, sine, bitDepth);
+    H265Transform.Inverse(this._coefficients, log2Size, sine, bitDepth, log2Range);
   }
 
   private void _GatherReference(int x0, int y0, int size, int mode) {
@@ -1263,7 +1442,7 @@ internal sealed class H265FrameDecoder : IH265MotionContext {
     }
 
     H265IntraPrediction.Substitute(this._reference, this._referenceAvailable, size, this._sps.BitDepthLuma);
-    if (H265IntraPrediction.FilterReference(mode, size))
+    if (!this._range.IntraSmoothingDisabled && H265IntraPrediction.FilterReference(mode, size))
       H265IntraPrediction.Filter(
         this._reference, size, this._sps.StrongIntraSmoothingEnabled, this._sps.BitDepthLuma);
   }
@@ -1300,7 +1479,8 @@ internal sealed class H265FrameDecoder : IH265MotionContext {
 
     H265IntraPrediction.Substitute(this._reference, this._referenceAvailable, size, this._sps.BitDepthChroma);
 
-    if (this._chromaArrayType == 3 && H265IntraPrediction.FilterReference(mode, size))
+    if (this._chromaArrayType == 3 && !this._range.IntraSmoothingDisabled
+        && H265IntraPrediction.FilterReference(mode, size))
       H265IntraPrediction.Filter(this._reference, size, false, this._sps.BitDepthChroma);
   }
 

@@ -56,6 +56,33 @@ internal sealed class H265PictureParameterSet {
   internal int Log2ParallelMergeLevel { get; private init; }
   internal bool SliceSegmentHeaderExtensionPresent { get; private init; }
 
+  /// <summary>
+  /// <c>cross_component_prediction_enabled_flag</c>: a 4:4:4 transform unit may predict each
+  /// chrominance residual from the luminance one, scaled by a power of two it states.
+  /// </summary>
+  internal bool CrossComponentPredictionEnabled { get; private init; }
+
+  /// <summary>
+  /// <c>chroma_qp_offset_list_enabled_flag</c>: a coding unit may pick its chrominance quantiser
+  /// offsets from <see cref="CbQpOffsetList"/> and <see cref="CrQpOffsetList"/>.
+  /// </summary>
+  internal bool ChromaQpOffsetListEnabled { get; private init; }
+
+  /// <summary><c>diff_cu_chroma_qp_offset_depth</c>: how far below the coding tree block one choice holds.</summary>
+  internal int DiffCuChromaQpOffsetDepth { get; private init; }
+
+  /// <summary>The Cb offsets a coding unit may choose from, <c>cb_qp_offset_list</c>.</summary>
+  internal int[] CbQpOffsetList { get; private init; } = [];
+
+  /// <summary>The Cr offsets a coding unit may choose from, <c>cr_qp_offset_list</c>.</summary>
+  internal int[] CrQpOffsetList { get; private init; } = [];
+
+  /// <summary><c>log2_sao_offset_scale_luma</c>: how far left every luma sample adaptive offset is shifted.</summary>
+  internal int Log2SaoOffsetScaleLuma { get; private init; }
+
+  /// <summary><c>log2_sao_offset_scale_chroma</c>.</summary>
+  internal int Log2SaoOffsetScaleChroma { get; private init; }
+
   internal static H265PictureParameterSet Parse(ReadOnlySpan<byte> payload) {
     var reader = new H265BitReader(payload);
 
@@ -129,9 +156,9 @@ internal sealed class H265PictureParameterSet {
     var log2ParallelMergeLevel = reader.ReadUnsignedExpGolomb() + 2;
     var sliceHeaderExtension = reader.ReadFlag();
 
-    var log2MaxTransformSkipBlockSize = 2;
+    var range = RangeExtensionValues.None;
     if (reader.ReadFlag())
-      log2MaxTransformSkipBlockSize = _RefuseExtensions(ref reader, transformSkip);
+      range = _ReadExtensions(ref reader, transformSkip);
 
     return new() {
       Id = id,
@@ -146,7 +173,7 @@ internal sealed class H265PictureParameterSet {
       InitQp = initQp,
       ConstrainedIntraPred = constrainedIntraPred,
       TransformSkipEnabled = transformSkip,
-      Log2MaxTransformSkipBlockSize = log2MaxTransformSkipBlockSize,
+      Log2MaxTransformSkipBlockSize = range.Log2MaxTransformSkipBlockSize,
       CuQpDeltaEnabled = cuQpDeltaEnabled,
       DiffCuQpDeltaDepth = diffCuQpDeltaDepth,
       CbQpOffset = cbQpOffset,
@@ -172,11 +199,35 @@ internal sealed class H265PictureParameterSet {
       ListsModificationPresent = listsModification,
       Log2ParallelMergeLevel = log2ParallelMergeLevel,
       SliceSegmentHeaderExtensionPresent = sliceHeaderExtension,
+      CrossComponentPredictionEnabled = range.CrossComponentPrediction,
+      ChromaQpOffsetListEnabled = range.ChromaQpOffsetList,
+      DiffCuChromaQpOffsetDepth = range.DiffCuChromaQpOffsetDepth,
+      CbQpOffsetList = range.CbQpOffsets,
+      CrQpOffsetList = range.CrQpOffsets,
+      Log2SaoOffsetScaleLuma = range.Log2SaoOffsetScaleLuma,
+      Log2SaoOffsetScaleChroma = range.Log2SaoOffsetScaleChroma,
     };
   }
 
-  /// <summary>Reads the extension flags and refuses the ones that change how a block is reconstructed.</summary>
-  private static int _RefuseExtensions(ref H265BitReader reader, bool transformSkipEnabled) {
+  /// <summary>What <c>pps_range_extension()</c> states, with the defaults of a set that sends none.</summary>
+  private readonly record struct RangeExtensionValues(
+    int Log2MaxTransformSkipBlockSize,
+    bool CrossComponentPrediction,
+    bool ChromaQpOffsetList,
+    int DiffCuChromaQpOffsetDepth,
+    int[] CbQpOffsets,
+    int[] CrQpOffsets,
+    int Log2SaoOffsetScaleLuma,
+    int Log2SaoOffsetScaleChroma) {
+
+    internal static RangeExtensionValues None => new(2, false, false, 0, [], [], 0, 0);
+  }
+
+  /// <summary>
+  /// Reads the extension flags, keeping the format range extension and refusing the extensions
+  /// whose syntax this decoder does not have.
+  /// </summary>
+  private static RangeExtensionValues _ReadExtensions(ref H265BitReader reader, bool transformSkipEnabled) {
     var rangeExtension = reader.ReadFlag();
     var multilayerExtension = reader.ReadFlag();
     var threeDimensionalExtension = reader.ReadFlag();
@@ -194,30 +245,49 @@ internal sealed class H265PictureParameterSet {
         + "mode and the adaptive colour transform are not implemented.");
 
     if (!rangeExtension)
-      return 2;
+      return RangeExtensionValues.None;
 
+    // pps_range_extension() — clause 7.3.2.3.2.
     var log2MaxTransformSkipBlockSize = transformSkipEnabled ? reader.ReadUnsignedExpGolomb() + 2 : 2;
+    if (log2MaxTransformSkipBlockSize > 5)
+      throw new InvalidDataException(
+        $"An H.265 picture parameter set allows transform skipping up to blocks of 2^{log2MaxTransformSkipBlockSize}. "
+        + "No transform block is larger than 32x32, and clause 7.4.3.3.2 bounds the size there.");
 
-    if (reader.ReadFlag())
-      throw new NotSupportedException(
-        "This H.265 picture parameter set sets cross_component_prediction_enabled_flag (clause 7.3.2.3.2). The "
-        + "chroma residual is then predicted from the luma residual, which is a format range extension tool and is "
-        + "not implemented.");
+    var crossComponentPrediction = reader.ReadFlag();
+    var chromaQpOffsetList = reader.ReadFlag();
 
-    if (reader.ReadFlag())
-      throw new NotSupportedException(
-        "This H.265 picture parameter set sets chroma_qp_offset_list_enabled_flag (clause 7.3.2.3.2). A coding unit "
-        + "may then choose its chroma quantiser offset from a list, which is a format range extension tool and is "
-        + "not implemented.");
+    var depth = 0;
+    int[] cbOffsets = [];
+    int[] crOffsets = [];
+    if (chromaQpOffsetList) {
+      depth = reader.ReadUnsignedExpGolomb();
+      var length = reader.ReadUnsignedExpGolomb() + 1;
+      if (length > 6)
+        throw new InvalidDataException(
+          $"An H.265 picture parameter set lists {length} chroma quantiser offsets; clause 7.4.3.3.2 allows six.");
+
+      cbOffsets = new int[length];
+      crOffsets = new int[length];
+      for (var i = 0; i < length; ++i) {
+        cbOffsets[i] = reader.ReadSignedExpGolomb();
+        crOffsets[i] = reader.ReadSignedExpGolomb();
+        if (cbOffsets[i] is < -12 or > 12 || crOffsets[i] is < -12 or > 12)
+          throw new InvalidDataException(
+            $"An H.265 picture parameter set lists the chroma quantiser offsets {cbOffsets[i]} and {crOffsets[i]}; "
+            + "clause 7.4.3.3.2 bounds both at twelve either way.");
+      }
+    }
 
     var lumaSaoScale = reader.ReadUnsignedExpGolomb();
     var chromaSaoScale = reader.ReadUnsignedExpGolomb();
-    if (lumaSaoScale != 0 || chromaSaoScale != 0)
-      throw new NotSupportedException(
-        $"This H.265 picture parameter set scales the sample adaptive offset by 2^{lumaSaoScale} for luma and "
-        + $"2^{chromaSaoScale} for chroma (log2_sao_offset_scale, clause 7.3.2.3.2). That is a format range "
-        + "extension tool for sample depths above ten and is not implemented.");
+    if (lumaSaoScale > 6 || chromaSaoScale > 6)
+      throw new InvalidDataException(
+        $"An H.265 picture parameter set scales its sample adaptive offsets by 2^{lumaSaoScale} and "
+        + $"2^{chromaSaoScale}. Clause 7.4.3.3.2 bounds the scale by the sample depth above ten bits, which is at "
+        + "most six.");
 
-    return log2MaxTransformSkipBlockSize;
+    return new(log2MaxTransformSkipBlockSize, crossComponentPrediction, chromaQpOffsetList, depth,
+      cbOffsets, crOffsets, lumaSaoScale, chromaSaoScale);
   }
 }

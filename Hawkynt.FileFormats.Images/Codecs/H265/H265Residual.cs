@@ -25,6 +25,15 @@ namespace FileFormat.Codecs.H265;
 /// <b>The scan is chosen from the intra prediction mode</b> for the two smallest block sizes, so this
 /// has to be told what that mode was — a residual whose energy runs vertically is read down its
 /// columns. Every other block is read along the diagonal.
+/// <para/>
+/// <b>The format range extensions change it in five places</b>, all of them for residuals that are
+/// not transform coefficients. A block coded without its transform — skipped, or bypassed
+/// losslessly — may take its significance contexts from a single pair kept for it, may say that it
+/// is a residual differentially coded along one direction, and gives up sign hiding where that
+/// differential coding makes the parity trick unsound. A Rice parameter may persist from one
+/// sub-block to the next through the four <c>StatCoeff</c> counters; the escape codes of a stream
+/// with extended precision are bounded to the coefficient range it declares; and the bypass bins
+/// may be aligned so that they become plain bits.
 /// </remarks>
 internal static class H265Residual {
 
@@ -37,19 +46,9 @@ internal static class H265Residual {
   ];
 
   /// <summary>
-  /// Reads one transform block's coefficients into <paramref name="coefficients"/>.
+  /// Reads one transform block's coefficients into <paramref name="coefficients"/>, for a sequence
+  /// that uses none of the format range extension tools.
   /// </summary>
-  /// <param name="log2Size">The block's size as a base-two logarithm: 2, 3, 4 or 5.</param>
-  /// <param name="cIdx">0 for luma, 1 for Cb, 2 for Cr.</param>
-  /// <param name="intraPredMode">
-  /// The prediction mode of the block, which chooses the scan for the two smallest sizes. Pass a
-  /// negative value for an inter block, which always scans diagonally.
-  /// </param>
-  /// <param name="chromaArrayType">
-  /// The sequence's chroma format, which decides whether an 8x8 chrominance block chooses its scan
-  /// from the prediction mode: only at 4:4:4, where such a block is the same size as the luminance
-  /// one beside it rather than the chrominance of a 16x16.
-  /// </param>
   /// <returns>Whether the residual was sent untransformed.</returns>
   internal static bool Decode(
     ref H265CabacEngine cabac,
@@ -59,14 +58,87 @@ internal static class H265Residual {
     int intraPredMode,
     int chromaArrayType,
     H265PictureParameterSet pps,
-    bool transquantBypass) {
+    bool transquantBypass)
+    => Decode(
+      ref cabac, coefficients, log2Size, cIdx, intraPredMode, chromaArrayType, pps, transquantBypass,
+      H265RangeExtension.None, 15, default).TransformSkip;
+
+  /// <summary>
+  /// Reads one transform block's coefficients into <paramref name="coefficients"/> — clause 7.3.8.11.
+  /// </summary>
+  /// <param name="log2Size">The block's size as a base-two logarithm: 2, 3, 4 or 5.</param>
+  /// <param name="cIdx">0 for luma, 1 for Cb, 2 for Cr.</param>
+  /// <param name="intraPredMode">
+  /// The prediction mode of the block, which chooses the scan for the two smallest sizes and, with
+  /// implicit residual DPCM, whether the residual is accumulated. Pass a negative value for an inter
+  /// block, which always scans diagonally.
+  /// </param>
+  /// <param name="chromaArrayType">
+  /// The sequence's chroma format, which decides whether an 8x8 chrominance block chooses its scan
+  /// from the prediction mode: only at 4:4:4, where such a block is the same size as the luminance
+  /// one beside it rather than the chrominance of a 16x16.
+  /// </param>
+  /// <param name="range">The sequence's range extension tools.</param>
+  /// <param name="log2TransformRange">
+  /// <c>Log2TransformRange</c> of this component, which bounds the escape codes when extended
+  /// precision processing is on.
+  /// </param>
+  /// <param name="statCoeff">
+  /// The four <c>StatCoeff</c> counters of the slice, updated in place. Empty when persistent Rice
+  /// adaptation is off.
+  /// </param>
+  internal static H265ResidualForm Decode(
+    ref H265CabacEngine cabac,
+    int[] coefficients,
+    int log2Size,
+    int cIdx,
+    int intraPredMode,
+    int chromaArrayType,
+    H265PictureParameterSet pps,
+    bool transquantBypass,
+    H265RangeExtension range,
+    int log2TransformRange,
+    Span<int> statCoeff) {
     var size = 1 << log2Size;
     Array.Clear(coefficients, 0, size * size);
+
+    var intra = intraPredMode >= 0;
+    var chroma = cIdx > 0;
 
     var transformSkip = false;
     if (pps.TransformSkipEnabled && !transquantBypass && log2Size <= pps.Log2MaxTransformSkipBlockSize)
       transformSkip = cabac.DecodeBin(
         cIdx == 0 ? H265CabacContexts.TRANSFORM_SKIP_FLAG_LUMA : H265CabacContexts.TRANSFORM_SKIP_FLAG_CHROMA) != 0;
+
+    // explicit_rdpcm_flag and explicit_rdpcm_dir_flag: an inter block that is not transformed may say
+    // its residual runs along one direction. An intra block says nothing — its direction is implied
+    // by the prediction mode, and only for the two modes that predict straight along one axis.
+    var rdpcm = H265Rdpcm.None;
+    if (!intra && range.ExplicitRdpcmEnabled && (transformSkip || transquantBypass)) {
+      if (cabac.DecodeBin(H265CabacContexts.EXPLICIT_RDPCM_FLAG + (chroma ? 1 : 0)) != 0)
+        rdpcm = cabac.DecodeBin(H265CabacContexts.EXPLICIT_RDPCM_DIR_FLAG + (chroma ? 1 : 0)) != 0
+          ? H265Rdpcm.Vertical
+          : H265Rdpcm.Horizontal;
+    } else if (intra && range.ImplicitRdpcmEnabled && (transformSkip || transquantBypass)
+               && intraPredMode is H265IntraPrediction.HORIZONTAL or H265IntraPrediction.VERTICAL)
+      rdpcm = intraPredMode == H265IntraPrediction.VERTICAL ? H265Rdpcm.Vertical : H265Rdpcm.Horizontal;
+
+    // Sign hiding infers a sign from the parity of the levels, which is only sound where the levels
+    // are what is reconstructed. A lossless block and a differentially coded one reconstruct
+    // something else, so they always send every sign.
+    var signHidingAllowed = pps.SignDataHidingEnabled && !transquantBypass && rdpcm == H265Rdpcm.None;
+
+    // transform_skip_context_enabled_flag: a block without a transform codes all of its
+    // significance flags in one context per channel, 42 for luma and 43 (27 + 16) for chroma.
+    var singleSignificanceContext =
+      range.TransformSkipContextEnabled && (transformSkip || transquantBypass);
+
+    // StatCoeff is indexed by channel and by whether the block was transformed (clause 9.3.3.11).
+    var persistentRice = range.PersistentRiceAdaptationEnabled && statCoeff.Length >= 4;
+    var statIndex = (chroma ? 0 : 2) + (transformSkip || transquantBypass ? 1 : 0);
+    var riceCap = range.PersistentRiceAdaptationEnabled ? int.MaxValue : 4;
+    var limitedEscape = range.ExtendedPrecisionProcessing;
+    var align = range.CabacBypassAlignmentEnabled;
 
     var scanIdx = _ScanIndex(log2Size, cIdx, intraPredMode, chromaArrayType);
 
@@ -91,6 +163,11 @@ internal static class H265Residual {
 
       --lastScanPos;
 
+      if (lastSubBlock < 0)
+        throw new System.IO.InvalidDataException(
+          $"An H.265 transform block states its last significant coefficient at ({lastX}, {lastY}), which is not on "
+          + "the scan this block uses. The entropy decoder is out of step with the bitstream.");
+
       var subX = H265ScanOrder.X(subBlockScan, lastSubBlock);
       var subY = H265ScanOrder.Y(subBlockScan, lastSubBlock);
       var x = (subX << 2) + H265ScanOrder.X(positionScan, lastScanPos);
@@ -98,16 +175,12 @@ internal static class H265Residual {
 
       if (x == lastX && y == lastY)
         break;
-
-      if (lastSubBlock < 0)
-        throw new System.IO.InvalidDataException(
-          $"An H.265 transform block states its last significant coefficient at ({lastX}, {lastY}), which is not on "
-          + "the scan this block uses. The entropy decoder is out of step with the bitstream.");
     }
 
-    var codedSubBlock = new bool[subBlocksAcross * subBlocksAcross];
-    var significant = new bool[16];
-    var greaterThanOne = new bool[16];
+    Span<bool> codedSubBlock = stackalloc bool[64];
+    codedSubBlock = codedSubBlock[..(subBlocksAcross * subBlocksAcross)];
+    Span<bool> significant = stackalloc bool[16];
+    Span<bool> greaterThanOne = stackalloc bool[16];
 
     var greater1CtxSet = 0;
     var greater1Ctx = 1;
@@ -131,8 +204,8 @@ internal static class H265Residual {
       } else
         codedSubBlock[subIndex] = true;
 
-      Array.Clear(significant);
-      Array.Clear(greaterThanOne);
+      significant.Clear();
+      greaterThanOne.Clear();
 
       var start = i == lastSubBlock ? lastScanPos - 1 : 15;
       if (i == lastSubBlock)
@@ -140,9 +213,6 @@ internal static class H265Residual {
 
       if (codedSubBlock[subIndex])
         for (var n = start; n >= 0; --n) {
-          var x = (subX << 2) + H265ScanOrder.X(positionScan, n);
-          var y = (subY << 2) + H265ScanOrder.Y(positionScan, n);
-
           if (n == 0 && inferDirectCurrent) {
             // Nothing else in this sub-block was significant, so its direct current coefficient must
             // be — otherwise the sub-block would have been flagged as not coded at all.
@@ -156,15 +226,23 @@ internal static class H265Residual {
             }
           }
 
-          significant[n] = cabac.DecodeBin(
-            H265CabacContexts.SIG_COEFF_FLAG
-            + _SignificanceContext(codedSubBlock, subBlocksAcross, log2Size, scanIdx, cIdx, x, y)) != 0;
+          int context;
+          if (singleSignificanceContext)
+            context = chroma ? 43 : 42;
+          else {
+            var x = (subX << 2) + H265ScanOrder.X(positionScan, n);
+            var y = (subY << 2) + H265ScanOrder.Y(positionScan, n);
+            context = _SignificanceContext(codedSubBlock, subBlocksAcross, log2Size, scanIdx, cIdx, x, y);
+          }
+
+          significant[n] = cabac.DecodeBin(H265CabacContexts.SIG_COEFF_FLAG + context) != 0;
         }
 
       var firstSignificant = 16;
       var lastSignificant = -1;
       var greater1Count = 0;
       var lastGreater1Position = -1;
+      var escapeDataPresent = false;
 
       // The first pass over the sub-block that reads levels: up to eight coefficients are asked
       // whether they exceed one, and the context walks along a chain whose state says how many of
@@ -178,8 +256,10 @@ internal static class H265Residual {
 
         firstSignificant = n;
 
-        if (greater1Count >= 8)
+        if (greater1Count >= 8) {
+          escapeDataPresent = true;
           continue;
+        }
 
         if (greater1Count == 0) {
           greater1CtxSet = i == 0 || cIdx > 0 ? 0 : 2;
@@ -201,8 +281,12 @@ internal static class H265Residual {
         previousGreater1Flag = greaterThanOne[n];
         ++greater1Count;
 
-        if (greaterThanOne[n] && lastGreater1Position < 0)
-          lastGreater1Position = n;
+        if (greaterThanOne[n]) {
+          if (lastGreater1Position < 0)
+            lastGreater1Position = n;
+          else
+            escapeDataPresent = true;
+        }
       }
 
       if (lastSignificant < 0)
@@ -211,12 +295,18 @@ internal static class H265Residual {
       // Only one coefficient per sub-block is ever asked whether it exceeds two: the first that
       // exceeded one. Everything else that exceeded one goes straight to the escape coding.
       var greaterThanTwo = false;
-      if (lastGreater1Position >= 0)
+      if (lastGreater1Position >= 0) {
         greaterThanTwo = cabac.DecodeBin(
           H265CabacContexts.COEFF_ABS_LEVEL_GREATER2_FLAG + greater1CtxSet + (cIdx > 0 ? 4 : 0)) != 0;
+        escapeDataPresent |= greaterThanTwo;
+      }
 
-      var signHidden = lastSignificant - firstSignificant > 3 && !transquantBypass;
-      var hideSign = pps.SignDataHidingEnabled && signHidden;
+      // cabac_bypass_alignment_enabled_flag: everything from here to the end of the sub-block is
+      // bypass coded, and once the range is 256 each of those bins is simply the next bit.
+      if (align && escapeDataPresent)
+        cabac.Align();
+
+      var hideSign = signHidingAllowed && lastSignificant - firstSignificant > 3;
 
       var signs = 0;
       var signCount = 0;
@@ -230,8 +320,8 @@ internal static class H265Residual {
 
       var levelCount = 0;
       var levelSum = 0;
-      var riceParam = 0;
-      var lastAbsoluteLevel = 0;
+      var riceParam = persistentRice ? statCoeff[statIndex] >> 2 : 0;
+      var statisticsUpdated = !persistentRice;
       var signBit = signCount - 1;
 
       for (var n = 15; n >= 0; --n) {
@@ -247,14 +337,28 @@ internal static class H265Residual {
 
         var level = baseLevel;
         if (baseLevel == threshold) {
+          var remaining = _DecodeRemaining(ref cabac, riceParam, limitedEscape, log2TransformRange);
+          level += remaining;
+
           // The Rice parameter adapts to what this sub-block has held so far, so a block of large
           // coefficients stops paying a unary prefix for each of them. It adapts from the levels the
           // escape coding itself has carried and not from every level in the sub-block: a run of
           // coefficients that the flags alone could state says nothing about how wide the ones that
           // could not will be.
-          riceParam = Math.Min(riceParam + (lastAbsoluteLevel > 3 * (1 << riceParam) ? 1 : 0), 4);
-          level += _DecodeRemaining(ref cabac, riceParam);
-          lastAbsoluteLevel = level;
+          if (level > 3 << riceParam)
+            riceParam = Math.Min(riceParam + 1, riceCap);
+
+          // persistent_rice_adaptation_enabled_flag: the first escape of each sub-block nudges the
+          // counter its channel and transform kind start the next sub-block from.
+          if (!statisticsUpdated) {
+            var initial = statCoeff[statIndex] >> 2;
+            if (remaining >= 3 << initial)
+              ++statCoeff[statIndex];
+            else if (2 * remaining < 1 << initial && statCoeff[statIndex] > 0)
+              --statCoeff[statIndex];
+
+            statisticsUpdated = true;
+          }
         }
 
         var negative = false;
@@ -275,7 +379,7 @@ internal static class H265Residual {
       }
     }
 
-    return transformSkip;
+    return new(transformSkip, rdpcm);
   }
 
   /// <summary>
@@ -345,35 +449,61 @@ internal static class H265Residual {
   }
 
   /// <summary>
-  /// The escape coding for a level the flags could not state — clause 9.3.3.11.
+  /// The escape coding for a level the flags could not state — clause 9.3.3.11 and, under extended
+  /// precision processing, the limited k-th order exponential-Golomb binarization.
   /// </summary>
   /// <remarks>
   /// A Rice code with an exponential-Golomb tail: up to four ones for the quotient, then the
   /// remainder at the Rice parameter's width, and if all four ones arrived the value carries on into
   /// a code whose own prefix each add a doubling. Every bin of it is bypassed, so the whole thing
   /// costs exactly its own length.
+  /// <para/>
+  /// Under extended precision processing the tail is the limited exponential-Golomb code instead:
+  /// its prefix may not grow past <c>32 − Log2TransformRange</c> ones beyond the first three, and a
+  /// code that reaches that limit carries a suffix as wide as the rest of the coefficient range
+  /// rather than one more doubling. A sixteen-bit coefficient range is otherwise reached only by
+  /// prefixes long enough to make a hardware decoder's worst case unbounded. The conversion follows
+  /// the JCT-VC reference decoder's <c>xReadCoefRemainExGolomb</c> (see THIRD-PARTY-NOTICE.HM.txt).
   /// </remarks>
-  private static int _DecodeRemaining(ref H265CabacEngine cabac, int riceParam) {
+  private static int _DecodeRemaining(
+    ref H265CabacEngine cabac, int riceParam, bool limited, int log2TransformRange) {
+    const int binReduction = 3;
+
     var prefix = 0;
-    while (prefix < 32 && cabac.DecodeBypass() != 0)
-      ++prefix;
+    if (limited) {
+      var longest = 32 - log2TransformRange;
+      while (prefix < longest && cabac.DecodeBypass() != 0)
+        ++prefix;
+    } else {
+      while (prefix < 32 && cabac.DecodeBypass() != 0)
+        ++prefix;
 
-    if (prefix >= 32)
-      throw new System.IO.InvalidDataException(
-        "An H.265 coefficient level escape code began with 32 one bits, which no conforming stream contains. The "
-        + "entropy decoder is out of step with the bitstream.");
+      if (prefix >= 32)
+        throw new System.IO.InvalidDataException(
+          "An H.265 coefficient level escape code began with 32 one bits, which no conforming stream contains. The "
+          + "entropy decoder is out of step with the bitstream.");
+    }
 
-    if (prefix < 4)
+    if (prefix <= binReduction)
       return (prefix << riceParam) + cabac.DecodeBypassBits(riceParam);
 
-    var escapeLength = prefix - 3;
+    if (limited) {
+      var prefixLength = prefix - binReduction;
+      var suffixLength = prefixLength == 32 - binReduction - log2TransformRange
+        ? log2TransformRange - riceParam
+        : prefixLength;
+      return cabac.DecodeBypassBits(suffixLength + riceParam)
+             + ((((1 << prefixLength) - 1) + binReduction) << riceParam);
+    }
+
+    var escapeLength = prefix - binReduction;
     return (((1 << escapeLength) + 2) << riceParam) + cabac.DecodeBypassBits(escapeLength + riceParam);
   }
 
   /// <summary>
   /// The context for <c>coded_sub_block_flag</c> — clause 9.3.4.2.4: whether the neighbours were coded.
   /// </summary>
-  private static int _CodedSubBlockContext(bool[] coded, int across, int subX, int subY, int cIdx) {
+  private static int _CodedSubBlockContext(ReadOnlySpan<bool> coded, int across, int subX, int subY, int cIdx) {
     var neighbours = 0;
 
     if (subX < across - 1 && coded[subY * across + subX + 1])
@@ -396,7 +526,7 @@ internal static class H265Residual {
   /// crossed with the block size and the scan.
   /// </remarks>
   private static int _SignificanceContext(
-    bool[] coded, int across, int log2Size, int scanIdx, int cIdx, int x, int y) {
+    ReadOnlySpan<bool> coded, int across, int log2Size, int scanIdx, int cIdx, int x, int y) {
     if (log2Size == 2)
       return _SmallBlockContext[(y << 2) + x] + (cIdx > 0 ? 27 : 0);
 
@@ -434,3 +564,24 @@ internal static class H265Residual {
     return 27 + context + (log2Size == 3 ? 9 : 12);
   }
 }
+
+/// <summary>
+/// Which way a residual block is accumulated, if at all — the residual modification processes for
+/// transform-skipped and transform-bypassed blocks.
+/// </summary>
+internal enum H265Rdpcm : byte {
+
+  /// <summary>The residual is used as it was decoded.</summary>
+  None,
+
+  /// <summary>Each sample is the sum of the ones to its left in its row.</summary>
+  Horizontal,
+
+  /// <summary>Each sample is the sum of the ones above it in its column.</summary>
+  Vertical,
+}
+
+/// <summary>How one residual block was coded, which decides how it is reconstructed.</summary>
+/// <param name="TransformSkip"><c>transform_skip_flag</c>: the residual was sent without its transform.</param>
+/// <param name="Rdpcm">Whether, and along which direction, the residual is accumulated.</param>
+internal readonly record struct H265ResidualForm(bool TransformSkip, H265Rdpcm Rdpcm);

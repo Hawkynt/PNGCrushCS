@@ -24,3 +24,7 @@ Hawkynt.FileFormats.Images/README.md text eol=crlf
 # JWIC and IWC fixtures: coded streams the tests compare byte for byte with what the writers produce.
 *.wic binary
 *.iwc binary
+
+# H.265 elementary streams the range extension tests decode. They begin with a start code and so
+# with a NUL, but a conformance bitstream is evidence and nothing may rewrite it in a checkout.
+*.bit binary
