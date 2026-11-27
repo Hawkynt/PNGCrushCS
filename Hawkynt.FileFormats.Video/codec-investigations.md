@@ -1015,6 +1015,10 @@ skip-count rule to confirm against.
 
 # NewTek SpeedHQ, an MPEG-2-shaped codec that agrees with the real standard almost everywhere and not quite everywhere
 
+*Closed.* SpeedHQ is decoded and encoded now, converted from FFmpeg's LGPL-2.1-or-later `speedhqdec.c`,
+whose reassigned AC table is the one this entry could not find printed anywhere else; `codec-notes.md` has the
+measurement.
+
 SpeedHQ (`SHQ0` through `SHQ5`, `SHQ7`, `SHQ9`) was investigated as the next professional/intermediate
 codec after Hap, on the strength of MultimediaWiki's own note for it — unlike Canopus's pages above,
 this one states plainly that "NewTek has provided samples and support in understanding the format,"

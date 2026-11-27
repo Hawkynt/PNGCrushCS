@@ -885,6 +885,29 @@ dB luma; FFmpeg decodes fourteen-picture clips it writes, in AVI and in QuickTim
 decoder's planes. QuickTime needs a sample entry, and the MP4 writer now writes the plain visual one for
 SVQ1, the first of a list of codecs whose decoders read every parameter from the frames.
 
+### NewTek SpeedHQ
+
+Converted from FFmpeg's `libavcodec/speedhqdec.c`, with the AC run-level table and its codes taken from
+`speedhq.c` and MPEG-2's DC size codes from `mpeg12data.c`, all LGPL-2.1-or-later. The AC codes are
+MPEG-2's Table B.15 with some codewords moved, written least-significant bit first. Fields, the four
+slices per field with their 24-bit lengths, run-length and DCT alpha and the half-macroblock border
+column of a width that is a multiple of eight follow the decoder one for one. The inverse transform is
+FFmpeg's `simple_idct`, which this package already had for DV.
+
+Measured against FFmpeg's planes over pictures FFmpeg's own `speedhq` encoder writes at 4:2:0, 4:2:2
+and 4:4:4 — 210 pictures, every one identical — and against the Adler-32 checksums FATE records for its
+progressive (`0x9bb6dc6d`, 112x64) and single-field (`0x75de4109`, 112x32) samples, which this decoder's
+planes reproduce exactly.
+
+The encoder is this package's own around FFmpeg's `encode_dc` and `encode_block` from `speedhqenc.c`:
+progressive pictures, one quantiser scale for every slice (4 of the format's 1-100), each 8x8 block
+through MPEG's forward transform. FFmpeg's encoder writes only the three alpha-less forms at widths that
+are multiples of sixteen; this one writes all eight, the border column and both alpha codings included.
+A 64x48 gradient comes back at 38.5 dB in 4:2:0, 40.5 in 4:2:2 and 41.3 in 4:4:4 (RGB PSNR); run-length
+alpha comes back exactly, and so did DCT alpha on the test picture. FFmpeg decodes three-picture clips
+of every form, written into AVI at widths that are and are not multiples of sixteen, to exactly this
+decoder's YUV and alpha planes.
+
 ### On2 VP6
 
 Converted from FFmpeg's `libavcodec/vp6.c` and `vp56.c` with the DSP they lean on — `vp6dsp.c`,
