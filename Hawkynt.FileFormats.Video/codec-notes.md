@@ -890,6 +890,45 @@ block stops short. It decodes each frame it writes with the decoder above to get
 next. FFmpeg decodes what it writes, in AVI and Matroska and at sizes that are and are not whole
 macroblocks, to exactly this decoder's pictures.
 
+### MS Screen 2
+
+Converted from FFmpeg's `libavcodec/mss2.c`, `mss12.c` and `mss2dsp.c`, LGPL-2.1-or-later. The region
+coder is `mss12.c` in its second version — adaptive frequency models that swap a symbol upwards when it
+draws level with the one above it, a move-to-front colour cache seeded 1, 2, 4 for the inter-picture
+masks, second-order contexts chosen by how many distinct colours the four neighbours hold — driven by
+MS Screen 2's own arithmetic coder, which works in 24 bits a byte at a time and maps non-power-of-two
+ranges piecewise, after Stuiver and Moffat. A frame may move the whole last picture by one vector, in
+which case it is drawn into a fresh picture and copies and moves come from the last one; otherwise it
+is drawn over the last one in place, and FFmpeg's in-place moves, row by row, are kept. The picture can
+be cut into two slices with their own models, at a row the frame or the extradata states. The
+run-length mode builds a Huffman code each frame from the codes it lists and the rest of the alphabet in
+order; the 15-bit mode is byte-oriented runs.
+
+The WMV9 rectangles — up to twenty a frame, or one implicit rectangle over the whole picture — are each
+a Windows Media Video 9 Main profile intra picture preceded by its size in 24 bits. They are decoded by
+the package's VC-1 intra decoder, taught for this the I-picture deblocking filter (8.6: every horizontal
+block edge, then every vertical one, which is the order FFmpeg's trailing filter amounts to), per-frame
+range reduction, and MS Screen 2's variant of the picture header, in which the frame-count bits become
+the one flag that switches range reduction and resolution scaling on. A rectangle coded at half size in
+both directions is doubled with `mss2dsp.c`'s interpolation, converted to RGB with its fixed-point
+BT.601 matrix, and laid over the palette picture, only where the palette picture holds the mask colour
+when there is one; a rectangle with nothing coded is mid-grey.
+
+Measured against FFmpeg's `rgb24` output decoded with `-flags +bitexact`: the 1,438 pictures of
+`samples.ffmpeg.org/V-codecs/MSS2` — `intro_windows.wmv`, `msn08_VBRq70_800x600.wmv`, `mss2_speech.wmv`
+and `msscreencodec.wmv`, 320x240 to 800x608 — every one identical. Between them they hold 307 frames
+with WMV9 rectangles, 154 of them implicit, 307 masked, up to nine rectangles a frame, 163 range-reduced
+and half-resolution rectangles at quantisers 2 to 29, 375 moved frames and 220 two-slice frames. They
+hold no run-length or 15-bit frames, so those are checked instead against what this encoder writes and
+against hand-built 15-bit frames, which FFmpeg decodes to the same pictures. A rectangle scaled in one
+direction only, which FFmpeg asks for a sample of, is refused.
+
+FFmpeg has no MSS2 encoder, so the encoder is the package's own. It writes run-length frames: a key
+frame restates the palette, and an inter frame codes only the rectangle that changed, as runs of
+unchanged pixels, of the row above and of one colour, with the frame's own Huffman code. A picture of
+255 colours or fewer comes back exactly; one needing a colour the palette lacks starts a new key frame,
+and one of more colours is mapped to a 6x7x6 cube.
+
 ### Sorenson Video 1
 
 Converted from FFmpeg's `libavcodec/svq1dec.c` with its codebooks, codes and frame-size table parsed

@@ -775,6 +775,12 @@ was produced and from what.
 
 # Microsoft Screen Codec 2 (MSS2), which adds an embedded codec to MSS1's wall
 
+*Closed.* MSS2 is decoded and encoded now. The source this entry found absent is FFmpeg's `mss2.c`,
+`mss12.c` and `mss2dsp.c`, under LGPL-2.1-or-later, and the boundaries of the WMV9 rectangles within a
+packet are stated there: each coded rectangle is preceded by its size in 24 bits, little-endian. The
+rectangles themselves go through the package's VC-1 intra decoder. All 1,438 pictures of the four
+public films decode to FFmpeg's; `codec-notes.md` has the details.
+
 MSS2 — Windows Media Screen Codec version 9, FourCC `MSS2` — was investigated alongside MSS1. It stops
 for the same reason MSS1 does, with one further complication that makes it strictly harder rather than
 easier: part of its picture is coded by embedding Windows Media Video 9 image blocks, so even a decoder

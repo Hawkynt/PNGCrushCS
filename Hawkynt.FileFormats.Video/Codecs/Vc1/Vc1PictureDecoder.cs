@@ -69,7 +69,17 @@ internal sealed class Vc1PictureDecoder {
     _ => "intra",
   };
 
-  internal void DecodeIntra(ref Vc1BitReader reader, Vc1PictureHeader header, Vc1Frame frame) {
+  /// <param name="reader">The bitstream, after the picture header.</param>
+  /// <param name="header">The picture header.</param>
+  /// <param name="frame">The frame to fill.</param>
+  /// <param name="rangeReducedFrame">
+  /// Whether this picture was coded at half range (RANGEREDFRM): every sample is expanded as
+  /// <c>(v - 64) * 2</c> before it is clamped, as FFmpeg's <c>vc1_decode_i_blocks</c> does without
+  /// overlap smoothing.
+  /// </param>
+  /// <param name="loopFilter">Whether to run the I-picture deblocking filter over the result (8.6).</param>
+  internal void DecodeIntra(
+    ref Vc1BitReader reader, Vc1PictureHeader header, Vc1Frame frame, bool rangeReducedFrame = false, bool loopFilter = false) {
     Array.Clear(this._lumaCoded);
     this._escape.Reset();
 
@@ -146,9 +156,15 @@ internal sealed class Vc1PictureDecoder {
       Vc1OverlapSmoothing.Apply(frame.Cr, frame.ChromaWidth, frame.ChromaHeight);
     }
 
-    _Finish(frame.Luma, smoothing);
-    _Finish(frame.Cb, smoothing);
-    _Finish(frame.Cr, smoothing);
+    if (rangeReducedFrame && smoothing)
+      throw new NotSupportedException("A range-reduced picture with overlap smoothing is not implemented.");
+
+    _Finish(frame.Luma, smoothing, rangeReducedFrame);
+    _Finish(frame.Cb, smoothing, rangeReducedFrame);
+    _Finish(frame.Cr, smoothing, rangeReducedFrame);
+
+    if (loopFilter)
+      Vc1LoopFilter.ApplyIntra(frame, quantiser);
   }
 
   /// <summary>
@@ -216,10 +232,12 @@ internal sealed class Vc1PictureDecoder {
   /// Where overlap smoothing did not run, 128 is not added — the DC seed carried the offset instead,
   /// and adding it here as well would wash out every picture the sequence chose not to smooth.
   /// </remarks>
-  private static void _Finish(int[] plane, bool smoothing) {
+  private static void _Finish(int[] plane, bool smoothing, bool rangeReduced) {
     var offset = smoothing ? 128 : 0;
     for (var i = 0; i < plane.Length; ++i) {
       var value = plane[i] + offset;
+      if (rangeReduced)
+        value = (value - 64) * 2;
       plane[i] = value < 0 ? 0 : value > 255 ? 255 : value;
     }
   }
