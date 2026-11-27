@@ -187,6 +187,16 @@
     </None>
   </ItemGroup>
 
+  <!-- ERI pictures and animations written by the Entis libraries built from their published
+       source, with their decodes, and this package's writer's files with the libraries' decodes of
+       them. Fixtures\Eri\manifest.txt says which is which. -->
+  <ItemGroup>
+    <None Include="Formats\Eri\Fixtures\*">
+      <Link>Fixtures\Eri\%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
   <ItemGroup>
     <Using Include="NUnit.Framework" />
   </ItemGroup>

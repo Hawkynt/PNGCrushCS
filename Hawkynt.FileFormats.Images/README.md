@@ -310,6 +310,7 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | Envi | `.hdr` | ✅ | ✅ | — | — | — | none |
 | EpaBios | `.epa` | ✅ | ✅ | — | — | — | recoil2png, IrfanView |
 | Eps | `.eps`, `.epsf`, `.epsi`, `.epi`, `.ept` | ✅ | ✅ | — | — | — | Ghostscript |
+| Eri | `.eri`, `.mei` | ✅ | ✅ | ✅ | ✅ | — | none |
 | Eroiica | `.eif` | ✅ | ✅ | — | ✅ | — | none |
 | EscapePaint | `.esp` | ✅ | ✅ | — | — | — | none |
 | EsmSoftwarePix | `.pix` | ✅ | ✅ | — | — | — | IrfanView |

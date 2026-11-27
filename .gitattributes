@@ -32,3 +32,8 @@ Hawkynt.FileFormats.Images/README.md text eol=crlf
 # WhyPic is one arithmetic code after two letters, so a short file can hold no zero byte at all
 # and would be taken for text; two of its fixtures are exactly that.
 *.ypc binary
+
+# ERI fixtures: the Entis libraries' files and their palettes, which are evidence only byte for byte.
+*.eri binary
+*.mei binary
+*.pal binary
