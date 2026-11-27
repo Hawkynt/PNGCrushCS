@@ -206,6 +206,15 @@
     </None>
   </ItemGroup>
 
+  <!-- Pick Ax pictures written by Smaller Animals' own PAXIO.dll and ImgSource 5, from the two
+       pictures given beside them. See Formats\Pax\Fixtures\PROVENANCE.txt. -->
+  <ItemGroup>
+    <None Include="Formats\Pax\Fixtures\*">
+      <Link>Fixtures\Pax\%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
   <ItemGroup>
     <Using Include="NUnit.Framework" />
   </ItemGroup>

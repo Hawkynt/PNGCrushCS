@@ -634,6 +634,7 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | PalmPdb | `.pdb` | ✅ | ✅ | — | — | — | none |
 | Paradox | `.mcpp` | ✅ | ✅ | — | — | — | recoil2png, IrfanView |
 | Pat | `.pat` | ✅ | ✅ | — | — | — | XnView |
+| Pax | `.pax` | ✅ | ✅ | — | — | — | none |
 | Pc88 | `.pc8` | ✅ | ✅ | — | — | — | none |
 | Pc98Ebd | `.ebd` | ✅ | ✅ | — | — | — | recoil2png, IrfanView |
 | Pcd | `.pcd` | ✅ | ✅ | — | — | — | ffmpeg |
