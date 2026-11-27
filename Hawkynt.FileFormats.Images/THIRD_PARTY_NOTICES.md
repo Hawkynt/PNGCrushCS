@@ -54,6 +54,8 @@ Reproduced verbatim in `Formats/Avif/Codec/RAV1E_PATENTS`.
 
 `Formats/JpegXl/Codec/JxlFastLosslessEncoder.cs` is a managed adaptation of the JPEG XL project's fast-lossless modular encoder (`lib/jxl/enc_fast_lossless.cc`), cross-checked against the Rust `zune-jpegxl` adaptation.
 
+The reader's modular stream structure (`Formats/JpegXl/Codec/JxlModularSpecDecoder.cs`: which channels a stream codes, when it ends at its header, how its arithmetic decoder is set up) follows libjxl's `lib/jxl/modular/encoding/encoding.cc`, and its edge-preserving filter (`Formats/JpegXl/Codec/JxlEdgePreservingFilter.cs`) follows `lib/jxl/render_pipeline/stage_epf.cc` and `lib/jxl/epf.cc`.
+
 ### libjxl license (BSD 3-Clause)
 
 Copyright (c) the JPEG XL Project Authors.

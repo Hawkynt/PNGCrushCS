@@ -690,6 +690,42 @@ public static class JpegXlReader {
     return true;
   }
 
+  /// <summary>
+  /// A lossy frame's colour with its alpha plane beside it. The plane is an
+  /// extra channel of the frame's modular side-stream, stated in its own bit
+  /// depth; a plane coded at reduced resolution would need the format's
+  /// upsampler and is refused rather than stretched.
+  /// </summary>
+  private static byte[] _InterleaveAlpha(
+    byte[] rgb, JxlVarDctImage vardct, JxlExtraChannelInfo info, int alphaIndex, int pixelCount, bool deep
+  ) {
+    if (alphaIndex >= vardct.ExtraChannels.Length)
+      throw new InvalidDataException("A lossy frame states an alpha plane its side-stream does not carry.");
+    var plane = vardct.ExtraChannels[alphaIndex];
+    if (plane.Width != vardct.Width || plane.Height != vardct.Height || plane.Pixels.Length < pixelCount)
+      throw new NotSupportedException("This JPEG XL frame codes its alpha plane at reduced resolution, which needs the format's upsampler.");
+    if (info.BitDepth.FloatingPoint)
+      throw new NotSupportedException("This JPEG XL frame codes its alpha plane in floating point.");
+
+    var maximumStated = (1L << (int)Math.Clamp(info.BitDepth.BitsPerSample, 1, 31)) - 1;
+    var bytesPerSample = deep ? 2 : 1;
+    var maximum = deep ? 65535L : 255L;
+    var packed = new byte[checked(pixelCount * 4 * bytesPerSample)];
+    for (var i = 0; i < pixelCount; ++i) {
+      Array.Copy(rgb, i * 3 * bytesPerSample, packed, i * 4 * bytesPerSample, 3 * bytesPerSample);
+      var stated = Math.Clamp(plane.Pixels[i], 0L, maximumStated);
+      var value = (stated * maximum + maximumStated / 2) / maximumStated;
+      var at = (i * 4 + 3) * bytesPerSample;
+      if (deep) {
+        packed[at] = (byte)(value >> 8);
+        packed[at + 1] = (byte)value;
+      } else
+        packed[at] = (byte)value;
+    }
+
+    return packed;
+  }
+
   private static bool _TryPackDecoded(
     JpegXlSpecMetadata metadata,
     JxlImageMetadata imageMetadata,
@@ -715,12 +751,16 @@ public static class JpegXlReader {
           vardct.Channels[0], vardct.Channels[1], vardct.Channels[2], vardct.Width, vardct.Height);
       if (rgb.Length != checked(pixelCount * 3 * bytesPerSample))
         return false;
+      var lossyAlpha = _AlphaPlane(imageMetadata) - 3;
+      var lossyPixels = lossyAlpha >= 0
+        ? _InterleaveAlpha(rgb, vardct, imageMetadata.ExtraChannelInfo[lossyAlpha], lossyAlpha, pixelCount, deep)
+        : rgb;
       file = new JpegXlFile {
         Width = metadata.Width,
         Height = metadata.Height,
-        ComponentCount = 3,
+        ComponentCount = lossyAlpha >= 0 ? 4 : 3,
         BitsPerSample = deep ? 16 : 8,
-        PixelData = rgb,
+        PixelData = lossyPixels,
         Brand = brand,
       };
       return true;
