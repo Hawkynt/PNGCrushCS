@@ -1,0 +1,8 @@
+Filter=CCITTFaxDecode
+Width=203
+Height=61
+K=4
+Columns=203
+Rows=61
+EndOfLine=true
+BlackIs1=true
