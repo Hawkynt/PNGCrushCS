@@ -18,8 +18,9 @@
     <!-- The frame comparisons decode the same JPEG on its own to check the container against, and the
          test JPEGs are written with the image package's own encoder. -->
     <!--
-      Aliased on purpose. HEIF still pictures are H.265, so the H.265 core is compiled into the
-      image assembly as well as the video one from a single source location. This project sees
+      Aliased on purpose. The H.264 core is compiled into the image assembly as well as the video
+      one from a single source location. The H.265 core lives in the image assembly alone, and the
+      files that test it name it with extern alias. This project sees
       both sets of internals, so without an alias every one of those types is ambiguous here.
       Files that genuinely want something from the image assembly say so with extern alias.
     -->

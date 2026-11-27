@@ -1,8 +1,12 @@
+extern alias Images;
+
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using Hawkynt.FileFormats.Video.Tests;
+
+using Images::FileFormat.Codecs.H265;
 
 namespace FileFormat.Codecs.H265.Tests;
 

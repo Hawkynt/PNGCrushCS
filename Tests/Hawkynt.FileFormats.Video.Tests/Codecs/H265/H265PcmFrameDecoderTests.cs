@@ -1,4 +1,8 @@
+extern alias Images;
+
 using System.Collections.Generic;
+
+using Images::FileFormat.Codecs.H265;
 
 namespace FileFormat.Codecs.H265.Tests;
 
