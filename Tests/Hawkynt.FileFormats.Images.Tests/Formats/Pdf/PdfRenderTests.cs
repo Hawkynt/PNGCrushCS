@@ -30,6 +30,7 @@ public sealed class PdfRenderTests {
   // pixel grid comes back unchanged. That edge is most of the difference here.
   [TestCase("Render/images", 72, 2.5, 0.6)]
   [TestCase("Render/bilevel", 72, 2.5, 1.8)]
+  [TestCase("Render/shading", 72, 1.5, 0.8)]
   [Category("Unit")]
   public void Fixture_AgreesWithPoppler(string name, double resolution, double maxMeanError, double maxBadPercent) {
     var file = _Read(name + ".pdf");

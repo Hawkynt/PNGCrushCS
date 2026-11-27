@@ -7,10 +7,6 @@ namespace FileFormat.Pdf.Rendering;
 
 internal sealed partial class PdfRenderer {
 
-  private PdfPaint? _PatternPaint(bool stroke) => throw new NotSupportedException("PDF patterns are not supported yet.");
-
-  private void _ShadingOperator(string name) => throw new NotSupportedException("The PDF 'sh' operator is not supported yet.");
-
   private void _RunGroup(byte[] content, PdfDict? resources, PdfDict group) {
     if (this._state.FillAlpha < 1 || this._state.StrokeAlpha < 1 || this._state.BlendMode != PdfBlendMode.Normal || this._state.SoftMask != null)
       throw new NotSupportedException("PDF transparency groups are not supported yet.");

@@ -22,6 +22,9 @@ internal abstract class PdfFunction {
   /// <summary>How many values the function returns.</summary>
   public abstract int Outputs { get; }
 
+  /// <summary>How many values the function takes.</summary>
+  public virtual int Inputs => Math.Max(1, this.Domain.Length / 2);
+
   /// <summary>Evaluates the function.</summary>
   public abstract void Evaluate(ReadOnlySpan<double> input, Span<double> output);
 
@@ -81,6 +84,7 @@ internal abstract class PdfFunction {
 
   private sealed class ArrayFunction(List<PdfFunction> parts) : PdfFunction {
     public override int Outputs => parts.Count;
+    public override int Inputs => parts.Count > 0 ? parts[0].Inputs : 1;
 
     public override void Evaluate(ReadOnlySpan<double> input, Span<double> output) {
       Span<double> one = stackalloc double[Math.Max(1, parts.Count == 0 ? 1 : parts[0].Outputs)];
@@ -165,19 +169,34 @@ internal abstract class PdfFunction {
         frac[i] = this._size[i] == 1 ? 0 : e - l;
       }
 
+      // Only inputs that fall between two samples need both neighbours; the rest contribute one
+      // sample each, so the corner count is 2 to the number of in-between inputs, not of all inputs.
+      Span<int> active = stackalloc int[this._inputs];
+      var activeCount = 0;
+      long baseIndex = 0;
+      long stride = this._outputs;
+      Span<long> strides = stackalloc long[this._inputs];
+      for (var i = 0; i < this._inputs; ++i) {
+        strides[i] = stride;
+        baseIndex += lower[i] * stride;
+        if (frac[i] > 1e-12 && this._size[i] > 1 && activeCount < 16)
+          active[activeCount++] = i;
+        stride *= this._size[i];
+      }
+
       for (var o = 0; o < this._outputs && o < output.Length; ++o) {
         var sum = 0.0;
-        var corners = 1 << this._inputs;
+        var corners = 1 << activeCount;
         for (var c = 0; c < corners; ++c) {
           var weight = 1.0;
-          long index = 0;
-          long stride = this._outputs;
-          for (var i = 0; i < this._inputs; ++i) {
-            var up = (c >> i) & 1;
-            weight *= up == 1 ? frac[i] : 1 - frac[i];
-            var coord = Math.Min(lower[i] + up, this._size[i] - 1);
-            index += coord * stride;
-            stride *= this._size[i];
+          var index = baseIndex;
+          for (var k = 0; k < activeCount; ++k) {
+            var i = active[k];
+            if (((c >> k) & 1) == 1) {
+              weight *= frac[i];
+              index += strides[i];
+            } else
+              weight *= 1 - frac[i];
           }
 
           if (weight != 0)

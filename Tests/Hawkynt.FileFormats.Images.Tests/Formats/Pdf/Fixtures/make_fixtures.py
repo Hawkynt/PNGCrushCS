@@ -199,9 +199,59 @@ def bilevel():
     return page(content, b"<< /XObject << /G4 5 0 R /G3 6 0 R /J2 7 0 R >> >>", b"[0 0 203 200]", extra)
 
 
+def shading():
+    """Every shading type through sh and as patterns, and coloured and uncoloured tiling patterns."""
+    import struct
+    extra = []
+
+    def add(body):
+        extra.append(body)
+        return 4 + len(extra)
+
+    def coord(v):
+        return struct.pack(">H", int(round(v / 200.0 * 65535)))
+
+    rainbow = add(b"<< /FunctionType 3 /Domain [0 1] /Bounds [0.5] /Encode [0 1 0 1] /Functions ["
+                  b"<< /FunctionType 2 /Domain [0 1] /C0 [1 0 0] /C1 [0 1 0] /N 1 >> << /FunctionType 2 /Domain [0 1] /C0 [0 1 0] /C1 [0 0 1] /N 1 >>] >>")
+    function = add(stream(b"/FunctionType 4 /Domain [0 1 0 1] /Range [0 1 0 1 0 1]", b"{ 2 copy mul 3 1 roll }", flate=False))
+    type1 = add(b"<< /ShadingType 1 /ColorSpace /DeviceRGB /Domain [0 1 0 1] /Matrix [40 0 0 40 5 150] /Function %d 0 R >>" % function)
+    type2 = add(b"<< /ShadingType 2 /ColorSpace /DeviceRGB /Coords [55 160 95 180] /Function %d 0 R /Extend [true false] >>" % rainbow)
+    type3 = add(b"<< /ShadingType 3 /ColorSpace /DeviceRGB /Coords [125 165 2 140 175 22] /Function %d 0 R /Extend [false true] >>" % rainbow)
+    tri = b""
+    for flag, x, y, rgb in [(0, 155, 150, (255, 0, 0)), (0, 195, 150, (0, 255, 0)), (0, 175, 190, (0, 0, 255)), (1, 195, 190, (255, 255, 0))]:
+        tri += bytes([flag]) + coord(x) + coord(y) + bytes(rgb)
+    type4 = add(stream(b"/ShadingType 4 /ColorSpace /DeviceRGB /BitsPerCoordinate 16 /BitsPerComponent 8 /BitsPerFlag 8 /Decode [0 200 0 200 0 1 0 1 0 1]", tri))
+    lattice = b""
+    for x, y, t in [(5, 100), (25, 100), (45, 100), (5, 130), (25, 135), (45, 130)] and [(5, 100, 0), (25, 100, 128), (45, 100, 255), (5, 130, 255), (25, 135, 128), (45, 130, 0)]:
+        lattice += coord(x) + coord(y) + bytes([t])
+    type5 = add(stream(b"/ShadingType 5 /ColorSpace /DeviceRGB /BitsPerCoordinate 16 /BitsPerComponent 8 /VerticesPerRow 3 /Decode [0 200 0 200 0 1] /Function %d 0 R" % rainbow, lattice))
+    coons = bytes([0])
+    for x, y in [(55, 100), (60, 115), (50, 125), (58, 140), (75, 145), (85, 135), (95, 140), (92, 120), (100, 110), (95, 100), (80, 92), (70, 105)]:
+        coons += coord(x) + coord(y)
+    coons += bytes([255, 0, 0, 0, 255, 0, 0, 0, 255, 255, 255, 0])
+    type6 = add(stream(b"/ShadingType 6 /ColorSpace /DeviceRGB /BitsPerCoordinate 16 /BitsPerComponent 8 /BitsPerFlag 8 /Decode [0 200 0 200 0 1 0 1 0 1]", coons))
+    tensor = bytes([0])
+    for x, y in [(105, 100), (105, 113), (105, 127), (105, 140), (118, 140), (132, 140), (145, 140), (145, 127), (145, 113), (145, 100), (132, 100), (118, 100), (110, 125), (125, 135), (140, 115), (120, 105)]:
+        tensor += coord(x) + coord(y)
+    tensor += bytes([0, 128, 255, 255, 0, 128, 128, 255, 0, 255, 255, 255])
+    type7 = add(stream(b"/ShadingType 7 /ColorSpace /DeviceRGB /BitsPerCoordinate 16 /BitsPerComponent 8 /BitsPerFlag 8 /Decode [0 200 0 200 0 1 0 1 0 1]", tensor))
+    axialPattern = add(b"<< /PatternType 2 /Matrix [1 0 0 1 0 0] /Shading << /ShadingType 2 /ColorSpace /DeviceRGB /Coords [150 100 195 140] /Function %d 0 R /Background [0.2 0.2 0.2] >> >>" % rainbow)
+    tile = add(stream(b"/PatternType 1 /PaintType 1 /TilingType 1 /BBox [0 0 10 10] /XStep 12 /YStep 12 /Resources << >> /Matrix [1 0.3 -0.3 1 0 0]",
+                      b"1 0 0 rg 0 0 6 6 re f 0 0 1 rg 5 5 m 10 5 l 7.5 10 l f"))
+    stencil = add(stream(b"/PatternType 1 /PaintType 2 /TilingType 2 /BBox [0 0 8 8] /XStep 8 /YStep 8 /Resources << >>",
+                         b"0 0 4 4 re f 4 4 4 4 re f"))
+    resources = (b"<< /Shading << /S1 %d 0 R /S2 %d 0 R /S3 %d 0 R /S4 %d 0 R /S5 %d 0 R /S6 %d 0 R /S7 %d 0 R >>"
+                 b" /Pattern << /Ax %d 0 R /Tile %d 0 R /Stencil %d 0 R >> /ColorSpace << /UP [/Pattern /DeviceRGB] >> >>") % (type1, type2, type3, type4, type5, type6, type7, axialPattern, tile, stencil)
+    c = bytearray(b"q 5 150 40 40 re W n /S1 sh Q q 55 150 40 40 re W n /S2 sh Q q 100 145 50 50 re W n /S3 sh Q /S4 sh /S5 sh /S6 sh /S7 sh\n")
+    c += b"/Pattern cs /Ax scn 150 95 45 45 re f\n"
+    c += b"/Pattern cs /Tile scn 5 5 90 80 re f\n"
+    c += b"/UP cs 0.1 0.6 0.3 /Stencil scn 105 5 90 80 re f\n"
+    return page(bytes(c), resources, extra=extra)
+
+
 if __name__ == "__main__":
     target = sys.argv[1]
     os.makedirs(os.path.join(target, "Render"), exist_ok=True)
-    for name, maker in [("images", images), ("vector", vector), ("bilevel", bilevel)]:
+    for name, maker in [("images", images), ("vector", vector), ("bilevel", bilevel), ("shading", shading)]:
         with open(os.path.join(target, "Render", name + ".pdf"), "wb") as handle:
             handle.write(maker())
