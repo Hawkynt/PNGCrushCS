@@ -2370,6 +2370,27 @@ picture back exactly, in 1,421,428 bytes against `6-methyl-5-hepten-2-one-CC-db.
 1,646,987 against `skrzyzowanie4.avi`'s 2,227,139, but 154,474 against the LZO-packed
 `fmvcVirtualDub_small.avi`'s 131,694. FFmpeg decodes what it writes to exactly this decoder's pictures.
 
+### Brooktree ProSumer
+
+Converted from FFmpeg's `libavcodec/prosumer.c`, LGPL-2.1-or-later, its code table copied exactly. A frame is
+a 32-byte header — `BTIC`, a version of 2, and at byte 28 the payload's length — and a stream of nibbles,
+read from the top of each little-endian 32-bit word. The nibbles form a prefix code of one to three nibbles
+for pairs of residual bytes and for runs of zero words; two zero nibbles escape to a literal pair. FFmpeg
+decodes through a table of twelve-bit look-aheads that may hold up to three codes at once, and this decoder
+builds the same table the same way. The residuals predict each 32-bit word from the one above as
+`(((above >> 3) + (residual & 0x3F3F3F3F)) << 3) & 0xFCFCFCFC`, the shift carrying bits between bytes, the
+first row from a row of 0x80. The result is 4:1:1 YUV — each eight pixels U Y V Y U Y V Y Y Y Y Y — of six
+bits a sample, stored bottom up.
+
+Measured against FFmpeg n9.1 with `-flags +bitexact`: all 472 pictures of `samples.ffmpeg.org`'s `cnn1.avi`
+and `test7.avi` are identical.
+
+The encoder is this package's own, FFmpeg having none. ProSumer keeps six bits a sample, and because the
+predictor carries bits across a word's bytes not every combination of samples is reachable, so each residual
+byte is chosen in turn, from the lowest, to land its own sample and the next one's lowest bit as near as
+possible. Pairs the table holds take their code, runs of zero words take theirs, and the rest are escaped.
+FFmpeg decodes what it writes to exactly this decoder's pictures. Lossy, because ProSumer is.
+
 ### Canopus HQ and HQA
 
 Converted from FFmpeg's `libavcodec/hq_hqa.c` and `hq_hqadsp.c`, LGPL-2.1-or-later, with the quantiser

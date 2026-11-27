@@ -2818,6 +2818,10 @@ sketch above is reproduced here so that whoever finds either does not have to lo
 
 # Brooktree ProSumer Video (BT20), one sentence written four years late
 
+*Closed.* BT20 is decoded and encoded now, converted from FFmpeg's LGPL-2.1-or-later `libavcodec/prosumer.c`,
+whose code table is the codebook this section found named and never printed. Every picture of the two real
+films found decodes exactly as FFmpeg decodes it; `codec-notes.md` has the measurement.
+
 ProSumer (`BT20`) is the capture codec of the Brooktree — later Conexant — Bt848 capture cards, whose
 binary decoder answers to the filename `btvvc32.drv`. It is intra-only, 4:1:1, in an AVI, and its frame
 payloads open with the four ASCII characters `BTIC`. It was investigated with the lossless group and

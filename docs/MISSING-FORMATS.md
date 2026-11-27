@@ -44,12 +44,12 @@ issue quotes the recorded blocker and the route around it.
 | [Embroidery & industrial](#embroidery--industrial) | [#522](https://github.com/Hawkynt/PNGCrushCS/issues/522) | 20 | 0 | 0 | 0 | 20 |
 | [Standard & broadcast video](#standard--broadcast-video) | [#523](https://github.com/Hawkynt/PNGCrushCS/issues/523) | 0 | 33 | 16 | 0 | 49 |
 | [Game & multimedia-title video](#game--multimedia-title-video) | [#524](https://github.com/Hawkynt/PNGCrushCS/issues/524) | 0 | 41 | 198 | 6 | 245 |
-| [Legacy PC & capture-card video](#legacy-pc--capture-card-video) | [#525](https://github.com/Hawkynt/PNGCrushCS/issues/525) | 0 | 51 | 36 | 2 | 89 |
+| [Legacy PC & capture-card video](#legacy-pc--capture-card-video) | [#525](https://github.com/Hawkynt/PNGCrushCS/issues/525) | 0 | 50 | 36 | 2 | 88 |
 | [Screen-capture video](#screen-capture-video) | [#526](https://github.com/Hawkynt/PNGCrushCS/issues/526) | 0 | 13 | 0 | 9 | 22 |
 | [Lossless & uncompressed video](#lossless--uncompressed-video) | [#527](https://github.com/Hawkynt/PNGCrushCS/issues/527) | 0 | 12 | 0 | 2 | 14 |
 | [Cinema camera RAW video](#cinema-camera-raw-video) | [#528](https://github.com/Hawkynt/PNGCrushCS/issues/528) | 0 | 6 | 7 | 0 | 13 |
 | [Elementary streams & streaming manifests](#elementary-streams--streaming-manifests) | [#529](https://github.com/Hawkynt/PNGCrushCS/issues/529) | 0 | 0 | 18 | 0 | 18 |
-| **All** | | **578** | **156** | **275** | **19** | **1028** |
+| **All** | | **578** | **155** | **275** | **19** | **1027** |
 
 Each issue carries the labels `cat: <category>`, its kind (`image-format`, `video-codec`, `video-container`, `video-encoder`), `priority: high|medium|low`, and `documented-blocker` where that applies.
 
@@ -1024,7 +1024,6 @@ Codecs/containers from games, consoles, CD-ROM titles and animation tools. Track
 | Auravision AURA | Codec | `aura`, `AURA` | decode + encode | missing | low | [#1425](https://github.com/Hawkynt/PNGCrushCS/issues/1425) |
 | Auravision Aura 2 | Codec | `aura2`, `AUR2` | decode + encode | missing | low | [#1426](https://github.com/Hawkynt/PNGCrushCS/issues/1426) |
 | Aware Motion Wavelets (MWV1) | Codec | `MWV1` | decode + encode | missing | low | [#1427](https://github.com/Hawkynt/PNGCrushCS/issues/1427) |
-| Brooktree ProSumer Video (BT20) | Codec | `.avi` | decode + encode | blocked | low | [#1428](https://github.com/Hawkynt/PNGCrushCS/issues/1428) |
 | Caimans Video Codec for GBA | Codec | `Caimans` | decode + encode | missing | low | [#1429](https://github.com/Hawkynt/PNGCrushCS/issues/1429) |
 | CPiA webcam video | Codec | `cpia` | decode + encode | missing | low | [#1430](https://github.com/Hawkynt/PNGCrushCS/issues/1430) |
 | DPS Perception (CFCC) | Codec | `CFCC` | decode + encode | missing | low | [#1433](https://github.com/Hawkynt/PNGCrushCS/issues/1433) |
