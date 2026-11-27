@@ -132,6 +132,15 @@
     </None>
   </ItemGroup>
 
+  <!-- JWIC files the translator's own coder wrote from the pictures beside them, and its decode of
+       each. See Formats\Wic\Fixtures\README.txt. -->
+  <ItemGroup>
+    <None Include="Formats\Wic\Fixtures\*">
+      <Link>Fixtures\Wic\%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
   <ItemGroup>
     <Using Include="NUnit.Framework" />
   </ItemGroup>

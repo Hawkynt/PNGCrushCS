@@ -20,3 +20,6 @@ Hawkynt.FileFormats.Images/README.md text eol=crlf
 *.exe binary
 *.cur binary
 *.ico binary
+
+# JWIC and IWC fixtures: coded streams the tests compare byte for byte with what the writers produce.
+*.wic binary
