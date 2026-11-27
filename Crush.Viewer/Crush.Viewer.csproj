@@ -34,6 +34,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Optimizers\Optimizer.Image\Optimizer.Image.csproj" />
     <ProjectReference Include="..\Hawkynt.FileFormats.Images\Hawkynt.FileFormats.Images.csproj" />
+    <ProjectReference Include="..\Hawkynt.FileFormats.Video\Hawkynt.FileFormats.Video.csproj" />
     <ProjectReference Include="..\FileFormat.Core\FileFormat.Core.csproj" />
     <ProjectReference Include="..\Hawkynt.ImageProcessing\Hawkynt.ImageProcessing.csproj" />
     <ProjectReference Include="..\Hawkynt.ColorProcessing.Adapter\Hawkynt.ColorProcessing.Adapter.csproj" />

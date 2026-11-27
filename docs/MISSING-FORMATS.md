@@ -26,7 +26,7 @@ syntaxes, lossless and arithmetic JPEG, VC-1 Advanced Profile, …). **Encoder**
 that decode but cannot be written. **Blocked** entries were investigated earlier and stopped; their
 issue quotes the recorded blocker and the route around it.
 
-Video issues depend on [#512](https://github.com/Hawkynt/PNGCrushCS/issues/512), which gives the viewer a video path at all.
+`Crush.Viewer` opens, plays, saves and converts every registered video container and codec ([#512](https://github.com/Hawkynt/PNGCrushCS/issues/512)), so a video issue's viewer criterion is met by registering the format.
 
 ## 📊 Summary
 

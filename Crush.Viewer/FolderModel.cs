@@ -20,7 +20,9 @@ internal enum WalkMode {
 internal sealed class FolderModel {
 
   private static readonly Lazy<HashSet<string>> _readableExtensions = new(() =>
-    FormatRegistry.SupportedReadFormats.SelectMany(e => e.AllExtensions).ToHashSet(StringComparer.OrdinalIgnoreCase));
+    FormatRegistry.SupportedReadFormats.SelectMany(e => e.AllExtensions)
+      .Concat(VideoService.Extensions)
+      .ToHashSet(StringComparer.OrdinalIgnoreCase));
 
   private FileInfo[] _files = [];
 
@@ -39,7 +41,7 @@ internal sealed class FolderModel {
   /// <summary>The picture being shown, or <c>null</c>.</summary>
   internal FileInfo? Current => (uint)this.Index < (uint)this._files.Length ? this._files[this.Index] : null;
 
-  /// <summary>Every extension any registered reader claims.</summary>
+  /// <summary>Every extension any registered picture reader or video container claims.</summary>
   internal static IReadOnlySet<string> ReadableExtensions => _readableExtensions.Value;
 
   /// <summary>Whether a registered reader could open this file.</summary>
@@ -110,7 +112,8 @@ internal sealed class FolderModel {
       var header = new byte[(int)Math.Min(_HEADER_BYTES, file.Length)];
       var read = stream.ReadAtLeast(header, header.Length, throwOnEndOfStream: false);
       var format = FormatRegistry.DetectFromBytes(header.AsSpan(0, read));
-      return format != ImageFormat.Unknown && FormatRegistry.GetEntry(format)?.SupportsRead == true;
+      return (format != ImageFormat.Unknown && FormatRegistry.GetEntry(format)?.SupportsRead == true)
+        || VideoService.HasVideoHeader(header.AsSpan(0, read));
     } catch (IOException) {
       return false;
     } catch (UnauthorizedAccessException) {
