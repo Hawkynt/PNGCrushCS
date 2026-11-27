@@ -2018,6 +2018,12 @@ one.
 
 # Electronic Arts TGQ, TQI and MAD, whose only documentation is their own decoder's author
 
+*Closed.* All three are decoded and encoded now, converted from FFmpeg's LGPL-2.1-or-later `eatgq.c`,
+`eatqi.c`, `eamad.c` and the `eaidct.c` they share, which settles the transform and zigzag this section
+could find no description of. Every picture of the real films found decodes exactly as FFmpeg decodes it;
+`codec-notes.md` has the measurement and the two details no description states — MAD's matrix is read
+through a signed pointer, and TGQ's bitstream runs least-significant bit first.
+
 TGQ (`pQTG`/`TGQs`), TQI (`pIQT`) and MAD (`MADk`/`MADm`/`MADe`) are three of the DCT-based codecs in
 Electronic Arts' own game-cinematic family — see `EaReader`'s container above, which the CMV and TGV
 sections of `README.md` already read two siblings of. All three were investigated together because they
@@ -2092,6 +2098,10 @@ share with MAD's own MPEG-1-derived run-length coding were not themselves mapped
 provenance question was settled first, as it is meant to be, before any of that work was spent.
 
 # Electronic Arts TGV, recovered as far as its own published errors allow
+
+*Closed.* TGV is decoded and encoded now, converted from FFmpeg's LGPL-2.1-or-later `eatgv.c` rather than
+from the page this section measures; all 2,309 pictures of five real films match FFmpeg's. The record of the
+page's own errors below stands as it was.
 
 TGV (`kVGT`/`fVGT`) is Electronic Arts' lossless-intra, block-VQ-inter codec, and it clears the bar TGQ,
 TQI and MAD do not: `Electronic_Arts_TGV`'s MultimediaWiki page was created on 14 March 2006 and

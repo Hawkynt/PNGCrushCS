@@ -23,8 +23,14 @@ public sealed class EaContainer : IVideoContainerReader<EaContainer> {
   /// <summary>Whether at least one documented EA sound-family chunk occurs in the file.</summary>
   public required bool HasAudio { get; init; }
 
+  /// <summary>MAD: the milliseconds a picture lasts, from the first picture's header; 0 where unstated.</summary>
+  public int FrameDurationMilliseconds { get; init; }
+
+  /// <summary>Whether the chunk sizes are big-endian.</summary>
+  public bool BigEndian { get; init; }
+
   public static string PrimaryExtension => ".wve";
-  public static string[] FileExtensions => [".wve", ".cmv", ".tgv", ".uv", ".uv2"];
+  public static string[] FileExtensions => [".wve", ".cmv", ".tgv", ".uv", ".uv2", ".mad", ".tgq", ".tqi"];
 
   public static bool? MatchesSignature(ReadOnlySpan<byte> header) => EaReader.LooksPlausible(header) ? true : null;
 
@@ -47,9 +53,18 @@ public sealed class EaContainer : IVideoContainerReader<EaContainer> {
 
     var streams = new List<MediaStreamInfo>(2);
     if (container.VideoCodec != EaVideoCodecKind.None) {
-      var (tag, timeBase, frameRate) = container.VideoCodec == EaVideoCodecKind.Cmv
-        ? (CodecTag.FromCharacters("cmv "), container.FrameRate > 0 ? new Rational(1, container.FrameRate) : Rational.Unknown, container.FrameRate > 0 ? new Rational(container.FrameRate, 1) : Rational.Unknown)
-        : (CodecTag.FromCharacters("tgv "), Rational.Unknown, Rational.Unknown);
+      var (tag, timeBase, frameRate) = container.VideoCodec switch {
+        EaVideoCodecKind.Cmv => (CodecTag.FromCharacters("cmv "),
+          container.FrameRate > 0 ? new Rational(1, container.FrameRate) : Rational.Unknown,
+          container.FrameRate > 0 ? new Rational(container.FrameRate, 1) : Rational.Unknown),
+        EaVideoCodecKind.Mad => (CodecTag.FromCharacters("mad "),
+          container.FrameDurationMilliseconds > 0 ? new Rational(container.FrameDurationMilliseconds, 1000) : Rational.Unknown,
+          container.FrameDurationMilliseconds > 0 ? new Rational(1000, container.FrameDurationMilliseconds) : Rational.Unknown),
+        // FFmpeg's demuxer gives TGQ and TQI fifteen pictures a second where nothing else says.
+        EaVideoCodecKind.Tgq => (CodecTag.FromCharacters("tgq "), new Rational(1, 15), new Rational(15, 1)),
+        EaVideoCodecKind.Tqi => (CodecTag.FromCharacters("tqi "), new Rational(1, 15), new Rational(15, 1)),
+        _ => (CodecTag.FromCharacters("tgv "), Rational.Unknown, Rational.Unknown),
+      };
 
       streams.Add(new() {
         Index = streams.Count,
@@ -96,4 +111,7 @@ public enum EaVideoCodecKind {
   None,
   Cmv,
   Tgv,
+  Mad,
+  Tgq,
+  Tqi,
 }

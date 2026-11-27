@@ -2212,6 +2212,48 @@ approximated. The writer pads a film with silence, four hundred samples a frame 
 it is given no sound, because a TMV film is paced by its sound. FFmpeg reads both the container and the
 codec this writes, to exactly the pictures this decoder produces.
 
+### Electronic Arts TQI, TGQ, Madcow and TGV
+
+Converted from FFmpeg's `libavcodec/eatqi.c`, `eatgq.c`, `eamad.c`, `eatgv.c` and the inverse DCT the first
+three share in `eaidct.c`, all LGPL-2.1-or-later, with `ff_inv_aanscales`, the MPEG-1 default intra matrix
+and the zigzag copied exactly. The container learned the chunks each arrives in from
+`libavformat/electronicarts.c`: `pIQT` for TQI, `TGQs`/`pQGT` for TGQ, `MADk`/`MADm`/`MADe` for MAD and
+`kVGT`/`fVGT` for TGV. A chunk's size may be big-endian, which is detected as FFmpeg does, by the size
+being larger than its own byte swap. After `1SNe`, `SCEl`, `SEND` or `SEEN` the reader skips to the next
+header chunk, as FFmpeg does, which is what makes the films that carry several sound headers read through to
+the end. TQI pictures are handed out without their chunk header, as FFmpeg's demuxer hands them to its
+decoder; the others keep theirs.
+
+TQI is MPEG-1 intra coding under a matrix derived from the chunk's quality byte, its bitstream byte-swapped
+in thirty-two-bit words. The DC sizes are read with the MPEG-2 tables, a superset of MPEG-1's. TGQ has a
+coefficient code of its own, read least-significant bit first, and a macroblock is a full block set, a
+DC-only one, or a copy from the last picture. MAD's bitstream is byte-swapped in sixteen-bit words, and its
+quantiser matrix, stored as sixteen-bit unsigned values, is read through a signed sixteen-bit pointer: an
+entry the header's scale takes past 32767 acts negative, and the real films depend on that. TGV's key
+pictures are packed by an LZ77 variant and its predicted pictures are four-by-four cells from a
+per-picture codebook or copied with motion from the last picture, the bitstream again
+least-significant bit first.
+
+Measured against FFmpeg n9.1 with `-flags +bitexact`: TQI, all 1,142 pictures of the real films found; TGQ,
+all 278; MAD, all 4,832 pictures of seven films; TGV, all 2,309 pictures of five films as RGB.
+
+The four encoders are this package's own, FFmpeg having none. The forward transform is a projection onto
+the basis of EA's own inverse DCT, so what the encoder rounds toward is what the decoder reconstructs. TQI
+writes every picture intra at quality 90. TGQ writes quality 90, a key picture every twelfth, copies
+macroblocks that have not changed, and writes a macroblock too busy for its one-byte length as its DC values
+alone. MAD writes quantiser scale 4, below which its matrix stays inside the sixteen bits FFmpeg reads it
+through, and codes a predicted macroblock as a copy with a DC offset where that is close and as intra
+where it is not. TGV keeps an `Indexed8` picture's own palette, a new palette starting a key picture, and
+takes anything else to a fixed six-seven-six colour cube; it copies unchanged cells and writes the rest raw,
+so a picture already in its palette comes back exactly. Each encoder's reference is its decoder's reading
+of the packet just written.
+
+The writer opens a silent TGQ or TQI film with an `SCHl` header that declares no sound and states the frame
+rate, without which FFmpeg's probe does not recognise the film. FFmpeg's header search reads up to five
+chunks for both a sound and a picture header, so a silent film shorter than five chunks is padded with
+`SCEl` end chunks, which it steps over. FFmpeg decodes what all four write to exactly the pictures this
+package's decoders produce.
+
 ### Ut Video
 
 Lossless and intra only, and the capture codec of the three here that is still in active use. A

@@ -24,11 +24,24 @@ internal static class EaReader {
     var fourCc = BinaryPrimitives.ReadUInt32LittleEndian(header);
     if (!_IsKnownChunk(fourCc))
       return false;
-    return BinaryPrimitives.ReadUInt32LittleEndian(header[4..]) >= _CHUNK_HEADER_LENGTH;
+    var size = BinaryPrimitives.ReadUInt32LittleEndian(header[4..]);
+    return Math.Min(size, BinaryPrimitives.ReverseEndianness(size)) >= _CHUNK_HEADER_LENGTH;
   }
 
   private static bool _IsKnownChunk(uint fourCc)
-    => EaChunkType.IsCmv(fourCc) || EaChunkType.IsTgv(fourCc) || EaChunkType.IsAudio(fourCc);
+    => EaChunkType.IsCmv(fourCc) || EaChunkType.IsTgv(fourCc) || EaChunkType.IsMad(fourCc)
+       || EaChunkType.IsTgq(fourCc) || fourCc == EaChunkType.pIQT || EaChunkType.IsAudio(fourCc);
+
+  /// <summary>
+  /// Whether the chunk sizes are big-endian, as the console releases write them: FFmpeg's test, the
+  /// first chunk's size larger read one way than the other.
+  /// </summary>
+  internal static bool IsBigEndian(ReadOnlySpan<byte> data) {
+    if (data.Length < _CHUNK_HEADER_LENGTH)
+      return false;
+    var size = BinaryPrimitives.ReadUInt32LittleEndian(data[4..]);
+    return size > BinaryPrimitives.ReverseEndianness(size);
+  }
 
   internal static EaContainer Open(ReadOnlyMemory<byte> data) {
     if (!LooksPlausible(data.Span))
@@ -44,11 +57,14 @@ internal static class EaReader {
       FrameRate = summary.FrameRate,
       VideoFrameCount = summary.VideoFrameCount,
       HasAudio = summary.HasAudio,
+      FrameDurationMilliseconds = summary.FrameDurationMilliseconds,
+      BigEndian = IsBigEndian(data.Span),
     };
   }
 
   private readonly record struct Summary(
-    EaVideoCodecKind VideoCodec, int Width, int Height, int FrameRate, int VideoFrameCount, bool HasAudio);
+    EaVideoCodecKind VideoCodec, int Width, int Height, int FrameRate, int VideoFrameCount, bool HasAudio,
+    int FrameDurationMilliseconds = 0);
 
   private static Summary _Summarise(ReadOnlyMemory<byte> data) {
     var codec = EaVideoCodecKind.None;
@@ -57,6 +73,7 @@ internal static class EaReader {
     var frameRate = 0;
     var frames = 0;
     var hasAudio = false;
+    var duration = 0;
 
     foreach (var chunk in _WalkChunks(data)) {
       var payload = data.Span.Slice(chunk.PayloadOffset, chunk.PayloadLength);
@@ -82,11 +99,38 @@ internal static class EaReader {
           height = h;
         }
         ++frames;
+      } else if (EaChunkType.IsMad(chunk.FourCc)) {
+        if (codec == EaVideoCodecKind.None)
+          codec = EaVideoCodecKind.Mad;
+        if (width == 0 && payload.Length >= 12) {
+          duration = BinaryPrimitives.ReadUInt16LittleEndian(payload[6..]);
+          width = BinaryPrimitives.ReadUInt16LittleEndian(payload[8..]);
+          height = BinaryPrimitives.ReadUInt16LittleEndian(payload[10..]);
+        }
+        ++frames;
+      } else if (EaChunkType.IsTgq(chunk.FourCc)) {
+        if (codec == EaVideoCodecKind.None)
+          codec = EaVideoCodecKind.Tgq;
+        if (width == 0 && payload.Length >= 4) {
+          // TGQ states its own size in the byte order of the chunk sizes.
+          var big = BinaryPrimitives.ReadUInt32LittleEndian(data.Span[(chunk.ChunkStart + 4)..]) > 0x000FFFFF;
+          width = big ? BinaryPrimitives.ReadUInt16BigEndian(payload) : BinaryPrimitives.ReadUInt16LittleEndian(payload);
+          height = big ? BinaryPrimitives.ReadUInt16BigEndian(payload[2..]) : BinaryPrimitives.ReadUInt16LittleEndian(payload[2..]);
+        }
+        ++frames;
+      } else if (chunk.FourCc == EaChunkType.pIQT) {
+        if (codec == EaVideoCodecKind.None)
+          codec = EaVideoCodecKind.Tqi;
+        if (width == 0 && payload.Length >= 4) {
+          width = BinaryPrimitives.ReadUInt16LittleEndian(payload);
+          height = BinaryPrimitives.ReadUInt16LittleEndian(payload[2..]);
+        }
+        ++frames;
       } else if (EaChunkType.IsAudio(chunk.FourCc))
         hasAudio = true;
     }
 
-    return new(codec, width, height, frameRate, frames, hasAudio);
+    return new(codec, width, height, frameRate, frames, hasAudio, duration);
   }
 
   private static (int Width, int Height, int FrameRate) _ReadCmvHeader(ReadOnlySpan<byte> payload)
@@ -100,9 +144,13 @@ internal static class EaReader {
 
   private static IEnumerable<ChunkHeader> _WalkChunks(ReadOnlyMemory<byte> data) {
     var at = 0;
+    var bigEndian = IsBigEndian(data.Span);
+    var skipping = false;
     while (at + _CHUNK_HEADER_LENGTH <= data.Length) {
       var fourCc = BinaryPrimitives.ReadUInt32LittleEndian(data.Span[at..]);
-      var size = BinaryPrimitives.ReadUInt32LittleEndian(data.Span[(at + 4)..]);
+      var size = bigEndian
+        ? BinaryPrimitives.ReadUInt32BigEndian(data.Span[(at + 4)..])
+        : BinaryPrimitives.ReadUInt32LittleEndian(data.Span[(at + 4)..]);
       if (size < _CHUNK_HEADER_LENGTH)
         throw new InvalidDataException($"A chunk at byte {at} states a size of {size}, shorter than its header.");
 
@@ -110,7 +158,20 @@ internal static class EaReader {
       var payloadLength = checked((int)size - _CHUNK_HEADER_LENGTH);
       if (payloadOffset + (long)payloadLength > data.Length)
         yield break;
+
+      // After a sound stream's end chunk FFmpeg's demuxer skips everything up to the next header chunk;
+      // what lies between is not part of the film it plays, and is not part of the one read here.
+      if (skipping) {
+        if (fourCc is not (EaChunkType._1SNh or EaChunkType.SCHl or EaChunkType.SEAD or EaChunkType.SHEN)) {
+          at = payloadOffset + payloadLength;
+          continue;
+        }
+        skipping = false;
+      }
+
       yield return new(fourCc, payloadLength, payloadOffset);
+      if (fourCc is EaChunkType._1SNe or EaChunkType.SCEl or EaChunkType.SEND or EaChunkType.SEEN)
+        skipping = true;
       at = payloadOffset + payloadLength;
     }
   }
@@ -154,6 +215,19 @@ internal static class EaReader {
           DecodeTimestamp: frameIndex,
           Duration: 1,
           IsKeyFrame: chunk.FourCc == EaChunkType.kVGT);
+        ++frameIndex;
+      } else if (EaChunkType.IsMad(chunk.FourCc) || EaChunkType.IsTgq(chunk.FourCc) || chunk.FourCc == EaChunkType.pIQT) {
+        if (!hasVideo)
+          continue;
+        // FFmpeg hands MAD and TGQ pictures over with their chunk header and TQI's without, and each
+        // decoder reads its packet accordingly.
+        yield return new(
+          StreamIndex: 0,
+          Data: chunk.FourCc == EaChunkType.pIQT ? data.Slice(chunk.PayloadOffset, chunk.PayloadLength) : _WithHeader(data, chunk),
+          PresentationTimestamp: frameIndex,
+          DecodeTimestamp: frameIndex,
+          Duration: 1,
+          IsKeyFrame: chunk.FourCc is not (EaChunkType.MADm or EaChunkType.MADe));
         ++frameIndex;
       } else if (EaChunkType.IsAudio(chunk.FourCc) && container.HasAudio)
         yield return new(StreamIndex: audioStream, Data: _WithHeader(data, chunk), IsKeyFrame: true);

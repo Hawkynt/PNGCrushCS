@@ -1,0 +1,27 @@
+The Electronic Arts TQI, TGQ, Madcow (MAD) and TGV decoders in this directory, and the parts of the EA
+container reader in Formats/Ea that find their chunks, are converted from FFmpeg
+(https://github.com/FFmpeg/FFmpeg):
+
+  libavcodec/eatqi.c          TQI: the quality-derived matrix and the MPEG-1 intra macroblocks
+  libavcodec/eatgq.c          TGQ: its matrix, its own coefficient code, and its macroblock modes
+  libavcodec/eamad.c          MAD: key and predicted pictures, motion compensation, the matrix
+  libavcodec/eatgv.c          TGV: the LZ77 key frames and the vector-quantised predicted frames
+  libavcodec/eaidct.c         the inverse DCT all three DCT codecs share
+  libavformat/electronicarts.c the chunks each codec arrives in, and their byte order
+  libavcodec/aandcttab.c      ff_inv_aanscales
+  libavcodec/mpeg12data.c     ff_mpeg1_default_intra_matrix
+  libavcodec/mathtables.c     ff_zigzag_direct
+
+  Copyright (c) 2007-2009 Peter Ross (eatqi.c, eatgq.c, eamad.c, eatgv.c, eaidct.c)
+  Copyright (c) 2004 The FFmpeg project, Copyright (c) 2006-2008 Peter Ross (electronicarts.c)
+  and the FFmpeg developers named in the files above.
+
+FFmpeg distributes those sources under the GNU Lesser General Public License, version 2.1 or (at your
+option) any later version. This work is distributed under the GNU Lesser General Public License
+version 3 or later, which the "or later" clause permits; the licence text is in LICENSE at the root of
+this repository.
+
+The algorithms are carried across into managed C#, not vendored. The tables in EaVideo.cs are
+reproduced exactly because they are fixed data required for interoperability. The four encoders in
+EaEncoders.cs and the additions to the container writer are this package's own; FFmpeg has no encoder
+for any of these codecs.
