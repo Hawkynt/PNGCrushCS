@@ -1,0 +1,17 @@
+The Canopus HQ and HQA decoder in this directory is converted from FFmpeg (https://github.com/FFmpeg/FFmpeg):
+
+  libavcodec/hq_hqa.c      the HQ and HQA frame and slice layouts, the macroblocks and blocks
+  libavcodec/hq_hqadsp.c   the inverse transform
+  libavcodec/hq_hqadata.h  the quantiser matrices and map, the AC code, the profiles and their macroblock orders
+  libavcodec/hq_common.c   the coded-block-pattern code, shared with HQX
+
+  The FFmpeg developers; these files carry no copyright line of their own.
+
+FFmpeg distributes those sources under the GNU Lesser General Public License, version 2.1 or (at your
+option) any later version. This work is distributed under the GNU Lesser General Public License
+version 3 or later, which the "or later" clause permits; the licence text is in LICENSE at the root of
+this repository.
+
+The algorithms are carried across into managed C#, not vendored. The tables in HqHqaTables.cs were
+transcribed mechanically, by a script that parsed the C initialisers, and are reproduced exactly because
+they are fixed data required for interoperability. The encoder is this package's own.

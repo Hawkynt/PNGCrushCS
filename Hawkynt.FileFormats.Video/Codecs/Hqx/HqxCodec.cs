@@ -93,9 +93,11 @@ internal sealed class HqxVlc {
     return vlc;
   }
 
+  /// <summary>Where a symbol has several codes, the writer uses the shortest.</summary>
   private void _Add(int symbol, int code, int length) {
     this._symbols[(long)length << 32 | (uint)code] = symbol;
-    this._codes.TryAdd(symbol, (code, length));
+    if (!this._codes.TryGetValue(symbol, out var known) || length < known.Length)
+      this._codes[symbol] = (code, length);
   }
 
   internal int Read(ref HqxBitReader reader) {

@@ -1140,9 +1140,9 @@ the single-bit-flip guessing that this investigation's evidence explicitly canno
 
 # Canopus HQ, HQA and HQX, where the vendor's own papers say nothing about the bitstream
 
-*HQX closed.* HQX is decoded and encoded now, converted from FFmpeg's LGPL-2.1-or-later `libavcodec/hqx.c`,
-`hqxdsp.c` and the code tables of `hqxvlc.h` and `hq_common.c`; both FATE samples decode exactly as FFmpeg
-decodes them. HQ and HQA remain below.
+*Closed.* All three are decoded and encoded now, converted from FFmpeg's LGPL-2.1-or-later `libavcodec/hqx.c`,
+`hqxdsp.c`, `hq_hqa.c` and `hq_hqadsp.c`, with the tables of `hqxvlc.h`, `hq_hqadata.h` and `hq_common.c`.
+Every FATE sample of all three decodes exactly as FFmpeg decodes it; `codec-notes.md` has the measurement.
 
 Canopus HQ (`CUVC`) and its alpha-carrying sibling HQA share one ffmpeg decoder, `hq_hqa`; their
 successor HQX (`CHQX`) is a second. Both were investigated on the strength of what the coverage notes

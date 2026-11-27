@@ -2370,6 +2370,30 @@ picture back exactly, in 1,421,428 bytes against `6-methyl-5-hepten-2-one-CC-db.
 1,646,987 against `skrzyzowanie4.avi`'s 2,227,139, but 154,474 against the LZO-packed
 `fmvcVirtualDub_small.avi`'s 131,694. FFmpeg decodes what it writes to exactly this decoder's pictures.
 
+### Canopus HQ and HQA
+
+Converted from FFmpeg's `libavcodec/hq_hqa.c` and `hq_hqadsp.c`, LGPL-2.1-or-later, with the quantiser
+matrices, the quantiser map, the AC code, the 22 profiles and their macroblock orders of `hq_hqadata.h`
+transcribed mechanically by a script that parsed the C initialisers; the coded-block-pattern code is HQX's.
+An HQ frame is `UVC` and a profile number — a fixed size, a slice count and a table of macroblock positions —
+and the slices' offsets; each slice decodes its share of the table in order, a 16x16 macroblock at a time:
+a quantiser group, an interlace flag, and eight blocks, each a nine-bit DC, one of the group's four matrices
+for its plane, and run-and-level codes scaled by the matrix entry at their zigzag position. An HQA frame is
+`HQA1`, any size, one quantiser group, and eight slices, each taking every eighth macroblock along a
+diagonal; a macroblock opens with a coded-block pattern over alpha, luma and chroma, and reads its matrix
+choice before its DC. The inverse transform is FFmpeg's: rows then columns, products wrapping as unsigned
+32-bit values, sixteen-bit intermediates. A profile number past the table falls back to profile 0, and a
+slice that cannot be placed ends the frame there, as in FFmpeg.
+
+Measured against FFmpeg n9.1 with `-flags +bitexact`: the FATE suite's `canopus/hq.avi` (8 pictures, 720x576),
+the interlaced `hq25i.avi` (1920x1080) and `hqa.avi` (1920x1080, alpha) are identical in every plane.
+
+The encoder is this package's own, FFmpeg having none. HQ for a picture of a profile's size, HQA for any
+other or for a picture with alpha; progressive, quantiser group 0, the forward transform a projection onto
+the decoder's own basis, and each block at the finest of its four matrices that keeps every level within the
+code's 255. An HQA slice with no macroblock still gets a byte, because FFmpeg stops at an empty slice.
+FFmpeg decodes what it writes, HQ at two profiles and HQA at odd sizes, to exactly this decoder's planes.
+
 ### Canopus HQX
 
 Converted from FFmpeg's `libavcodec/hqx.c` and `hqxdsp.c`, LGPL-2.1-or-later, with the DC, AC and
