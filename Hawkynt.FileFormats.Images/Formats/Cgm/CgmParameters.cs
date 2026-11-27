@@ -33,8 +33,28 @@ public sealed class CgmParameters(byte[] data, CgmState state) {
   /// <summary>An enumeration, which is always sixteen bits whatever else the file has set.</summary>
   public int Enumeration() => this._Signed(16);
 
-  /// <summary>An unsigned value of the given width in bits.</summary>
+  private int _bit;
+
+  /// <summary>An unsigned value of the given width in bits; below eight, packed most significant first within the byte.</summary>
   public int Unsigned(int bits) {
+    if (bits is 1 or 2 or 4 || this._bit != 0) {
+      if (bits % 8 == 0 && this._bit == 0)
+        goto bytewise;
+      var result = 0;
+      for (var i = 0; i < bits; ++i) {
+        if (this._at >= data.Length)
+          throw new InvalidDataException("A packed metafile parameter runs past the end of its command.");
+        result = (result << 1) | ((data[this._at] >> (7 - this._bit)) & 1);
+        if (++this._bit == 8) {
+          this._bit = 0;
+          ++this._at;
+        }
+      }
+
+      return result;
+    }
+
+    bytewise:
     var bytes = bits / 8;
     if (this._at + bytes > data.Length)
       throw new InvalidDataException($"A metafile parameter of {bytes} bytes runs past the end of its command.");
@@ -133,14 +153,19 @@ public sealed class CgmParameters(byte[] data, CgmState state) {
   /// <summary>How many bytes one colour takes at that precision.</summary>
   public int ColourSize(int precision)
     => state.DirectColour
-      ? 3 * ((precision > 0 ? precision : state.ColourPrecision) / 8)
-      : (precision > 0 ? precision : state.ColourIndexPrecision) / 8;
+      ? Math.Max(1, 3 * (precision > 0 ? precision : state.ColourPrecision) / 8)
+      : Math.Max(1, (precision > 0 ? precision : state.ColourIndexPrecision) / 8);
 
   /// <summary>
   /// Moves on to the next word boundary of the parameter list, which is where a cell array's next
   /// row of cells begins.
   /// </summary>
   public void AlignToWord() {
+    if (this._bit != 0) {
+      this._bit = 0;
+      ++this._at;
+    }
+
     if ((this._at & 1) != 0)
       ++this._at;
   }

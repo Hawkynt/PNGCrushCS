@@ -173,22 +173,36 @@ public static class CgmRenderer {
     if (nx < 1 || ny < 1 || (long)nx * ny > VectorCanvas.MaximumPixels)
       throw new InvalidDataException($"A metafile states a cell array of {nx} by {ny} cells.");
 
+    // The cell representation mode follows the precision: 0 runs of a colour, 1 every cell packed.
+    var packed = parameters.Enumeration() != 0;
     var perCell = parameters.ColourSize(precision);
     if (perCell < 1)
       throw new InvalidDataException("A metafile states a cell array whose colours take no bytes at all.");
 
     var pixels = new byte[nx * ny * 4];
     for (var row = 0; row < ny; ++row) {
-      for (var column = 0; column < nx; ++column) {
+      var column = 0;
+      while (column < nx) {
+        var run = 1;
+        if (!packed) {
+          if (parameters.Remaining < 2)
+            throw new InvalidDataException($"A cell array of {nx} by {ny} runs out of runs at row {row}.");
+          run = parameters.Integer();
+          if (run < 1 || column + run > nx)
+            throw new InvalidDataException($"A cell array run of {run} cells passes the end of row {row}.");
+        }
+
         if (parameters.Remaining < perCell)
           throw new InvalidDataException($"A cell array of {nx} by {ny} runs out of colours at row {row}.");
 
         var colour = parameters.Colour(precision);
-        var at = (row * nx + column) * 4;
-        pixels[at] = colour.R;
-        pixels[at + 1] = colour.G;
-        pixels[at + 2] = colour.B;
-        pixels[at + 3] = 255;
+        for (var i = 0; i < run; ++i, ++column) {
+          var at = (row * nx + column) * 4;
+          pixels[at] = colour.R;
+          pixels[at + 1] = colour.G;
+          pixels[at + 2] = colour.B;
+          pixels[at + 3] = 255;
+        }
       }
 
       parameters.AlignToWord();

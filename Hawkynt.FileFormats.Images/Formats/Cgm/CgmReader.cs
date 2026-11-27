@@ -6,7 +6,7 @@ using System.Text;
 
 namespace FileFormat.Cgm;
 
-/// <summary>Splits a binary metafile into its commands.</summary>
+/// <summary>Splits a metafile into its binary commands, translating the character and clear-text encodings into them.</summary>
 public static class CgmReader {
 
   /// <summary>Class 0 element 1: the command every metafile opens with.</summary>
@@ -38,8 +38,17 @@ public static class CgmReader {
       throw new InvalidDataException("A Computer Graphics Metafile is too short to hold one command.");
 
     var first = BinaryPrimitives.ReadUInt16BigEndian(data);
-    if ((first >> 12) != ClassDelimiter || ((first >> 5) & 0x7F) != BeginMetafile)
-      throw new InvalidDataException("Not a binary Computer Graphics Metafile: it does not open with BEGIN METAFILE.");
+    if ((first >> 12) != ClassDelimiter || ((first >> 5) & 0x7F) != BeginMetafile) {
+      List<CgmCommand>? translated = null;
+      if (CgmCharacter.Matches(data))
+        translated = CgmCharacter.Translate(data);
+      else if (CgmClearText.Matches(data))
+        translated = CgmClearText.Translate(data);
+      if (translated != null)
+        return new() { Commands = translated, Name = _NameOf(translated) };
+
+      throw new InvalidDataException("Not a Computer Graphics Metafile: it opens with neither a binary nor a character-encoded BEGIN METAFILE, nor the clear-text BEGMF.");
+    }
 
     var commands = new List<CgmCommand>();
     var at = 0;

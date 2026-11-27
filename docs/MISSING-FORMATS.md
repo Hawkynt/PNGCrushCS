@@ -38,7 +38,7 @@ issue quotes the recorded blocker and the route around it.
 | [Medical & scientific imaging](#medical--scientific-imaging) | [#516](https://github.com/Hawkynt/PNGCrushCS/issues/516) | 42 | 0 | 0 | 0 | 42 |
 | [GPU textures & game assets](#gpu-textures--game-assets) | [#517](https://github.com/Hawkynt/PNGCrushCS/issues/517) | 39 | 0 | 0 | 0 | 39 |
 | [Retro computer & legacy platforms](#retro-computer--legacy-platforms) | [#518](https://github.com/Hawkynt/PNGCrushCS/issues/518) | 101 | 0 | 0 | 0 | 101 |
-| [Vector, document & print](#vector-document--print) | [#519](https://github.com/Hawkynt/PNGCrushCS/issues/519) | 92 | 0 | 0 | 0 | 92 |
+| [Vector, document & print](#vector-document--print) | [#519](https://github.com/Hawkynt/PNGCrushCS/issues/519) | 91 | 0 | 0 | 0 | 91 |
 | [Fonts, text-mode & teletext](#fonts-text-mode--teletext) | [#520](https://github.com/Hawkynt/PNGCrushCS/issues/520) | 61 | 0 | 0 | 0 | 61 |
 | [Editor & application native](#editor--application-native) | [#521](https://github.com/Hawkynt/PNGCrushCS/issues/521) | 49 | 0 | 0 | 0 | 49 |
 | [Embroidery & industrial](#embroidery--industrial) | [#522](https://github.com/Hawkynt/PNGCrushCS/issues/522) | 20 | 0 | 0 | 0 | 20 |
@@ -49,7 +49,7 @@ issue quotes the recorded blocker and the route around it.
 | [Lossless & uncompressed video](#lossless--uncompressed-video) | [#527](https://github.com/Hawkynt/PNGCrushCS/issues/527) | 0 | 11 | 0 | 2 | 13 |
 | [Cinema camera RAW video](#cinema-camera-raw-video) | [#528](https://github.com/Hawkynt/PNGCrushCS/issues/528) | 0 | 6 | 7 | 0 | 13 |
 | [Elementary streams & streaming manifests](#elementary-streams--streaming-manifests) | [#529](https://github.com/Hawkynt/PNGCrushCS/issues/529) | 0 | 0 | 18 | 0 | 18 |
-| **All** | | **574** | **147** | **274** | **19** | **1014** |
+| **All** | | **573** | **147** | **274** | **19** | **1013** |
 
 Each issue carries the labels `cat: <category>`, its kind (`image-format`, `video-codec`, `video-container`, `video-encoder`), `priority: high|medium|low`, and `documented-blocker` where that applies.
 
@@ -474,7 +474,6 @@ Vector drawings, metafiles, page description, printer rasters, fax. Tracked in [
 | AutoCAD Slide (SLD) and Slide Library (SLB) | Image | `.sld`, `.slb` | read + write | missing | low | [#904](https://github.com/Hawkynt/PNGCrushCS/issues/904) |
 | Autodesk Design Web Format (DWF / DWFx) | Image | `.dwf`, `.dwfx` | read + write | missing | low | [#905](https://github.com/Hawkynt/PNGCrushCS/issues/905) |
 | Calamus Vector Graphic (CVG) | Image | `.cvg` | read + write | missing | low | [#906](https://github.com/Hawkynt/PNGCrushCS/issues/906) |
-| CGM character and clear-text encodings | Image | `.cgm` | read + write | blocked | low | [#907](https://github.com/Hawkynt/PNGCrushCS/issues/907) |
 | Complete PC / Complete Fax (CPF, CFP) | Image | `.cpf`, `.cfp` | read + write | missing | low | [#908](https://github.com/Hawkynt/PNGCrushCS/issues/908) |
 | Compressed Windows metafiles (WMZ / EMZ) | Image | `.wmz`, `.emz` | read + write | missing | low | [#909](https://github.com/Hawkynt/PNGCrushCS/issues/909) |
 | Corel Compressed Exchange (CCX) | Image | `.ccx` | read + write | missing | low | [#910](https://github.com/Hawkynt/PNGCrushCS/issues/910) |

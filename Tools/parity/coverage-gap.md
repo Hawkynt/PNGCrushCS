@@ -249,8 +249,11 @@ of them — the file's own stated page, and nothing invented where it states one
     geometry does too. Three are refused as malformed XML — an undeclared `xlink` prefix, a
     redefined `xmlns`, and a file that is not XML at all — and librsvg refuses all three for the
     same reasons. One more states a height of zero, which librsvg also calls sizeless.
-  - `cgm` reads the six binary samples and refuses the character and clear-text encodings, which
-    are different grammars rather than variants. `abydos` is in the corpus as a metafile, an SVG
+  - `cgm` reads the six binary samples, and the character (ISO 8632-2) and clear-text (ISO 8632-4)
+    encodings by translating them into binary commands. RAL-CGM 3.50's translations of every
+    sample into both draw pixel-identical to the binaries, except where RAL-CGM's own writers cut
+    long point lists short; the one native character-encoded sample draws identical to RAL-CGM's
+    binary translation of it. *Closed:* #907. `abydos` is in the corpus as a metafile, an SVG
     and a plot; ours of the metafile against librsvg's of the SVG is 1.3% RMSE at 512x384.
   - `hpgl` reads all five. Nothing here renders HP-GL, so the evidence is the parse: a second
     reading written separately agrees on the extent of all five.
@@ -918,7 +921,7 @@ Windows only, so nothing here has ever been able to compare against them either.
 | cbmf | .bmf |  |
 | cdr | .cdr |  |
 | cft | .ctf | read; XnView's reader for the name is its TIFF reader, function for function |
-| cgm | .cgm | binary encoding read; character and clear-text refused |
+| cgm | .cgm | binary, character and clear-text encodings read; binary written |
 | cloe | .cloe | read |
 | cmt | .cmt | read; the demosaic in double, which is where XnView and cmttoppm.c part company |
 | cmx | .cmx |  |

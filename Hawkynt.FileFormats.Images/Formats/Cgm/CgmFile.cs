@@ -4,7 +4,7 @@ using FileFormat.Core;
 
 namespace FileFormat.Cgm;
 
-/// <summary>A Computer Graphics Metafile (.cgm) in the binary encoding of ISO/IEC 8632-3.</summary>
+/// <summary>A Computer Graphics Metafile (.cgm): binary encoding (ISO/IEC 8632-3), with the character and clear-text encodings read as well.</summary>
 /// <remarks>
 /// A flat stream of commands, each opening with one sixteen-bit word: four bits of element class,
 /// seven of element identifier and five of parameter length, with the length escaping to a second
@@ -22,9 +22,10 @@ namespace FileFormat.Cgm;
 /// pixel, capped; where the file states a metric scale factor, that is a physical size and it is
 /// taken at ninety-six pixels to the inch.
 /// <para/>
-/// The other two encodings the standard defines — the character encoding and the clear-text one —
-/// are refused rather than half read. They are different grammars, not variations, and a file in
-/// either of them opens with something this would misread.
+/// The other two encodings the standard defines are read too, by translating them into these
+/// commands: the character encoding of ISO/IEC 8632-2, built for 7-bit channels, and the clear-text
+/// encoding of ISO/IEC 8632-4. Writing is always binary, so reading either and writing it back
+/// converts it.
 /// <para/>
 /// A raster is drawn where the file carries one: the cell array element, which is the standard's own
 /// way of putting a grid of colours into a metafile.
@@ -57,7 +58,12 @@ public readonly record struct CgmFile
     // Every binary metafile opens with BEGIN METAFILE: class 0, identifier 1, which is the top
     // eleven bits of the first word and leaves only the length free.
     var word = (header[0] << 8) | header[1];
-    return (word & 0xFFE0) == 0x0020;
+    if ((word & 0xFFE0) == 0x0020)
+      return true;
+
+    // The character encoding opens with its own BEGIN METAFILE opcode, the clear-text one with
+    // the word BEGMF.
+    return CgmCharacter.Matches(header) || CgmClearText.Matches(header);
   }
 
   /// <summary>Everything the file draws, in the order it draws it.</summary>
