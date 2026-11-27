@@ -43,13 +43,13 @@ issue quotes the recorded blocker and the route around it.
 | [Editor & application native](#editor--application-native) | [#521](https://github.com/Hawkynt/PNGCrushCS/issues/521) | 49 | 0 | 0 | 0 | 49 |
 | [Embroidery & industrial](#embroidery--industrial) | [#522](https://github.com/Hawkynt/PNGCrushCS/issues/522) | 20 | 0 | 0 | 0 | 20 |
 | [Standard & broadcast video](#standard--broadcast-video) | [#523](https://github.com/Hawkynt/PNGCrushCS/issues/523) | 0 | 35 | 16 | 0 | 51 |
-| [Game & multimedia-title video](#game--multimedia-title-video) | [#524](https://github.com/Hawkynt/PNGCrushCS/issues/524) | 0 | 48 | 201 | 6 | 255 |
+| [Game & multimedia-title video](#game--multimedia-title-video) | [#524](https://github.com/Hawkynt/PNGCrushCS/issues/524) | 0 | 47 | 200 | 6 | 253 |
 | [Legacy PC & capture-card video](#legacy-pc--capture-card-video) | [#525](https://github.com/Hawkynt/PNGCrushCS/issues/525) | 0 | 51 | 36 | 2 | 89 |
 | [Screen-capture video](#screen-capture-video) | [#526](https://github.com/Hawkynt/PNGCrushCS/issues/526) | 0 | 16 | 0 | 9 | 25 |
 | [Lossless & uncompressed video](#lossless--uncompressed-video) | [#527](https://github.com/Hawkynt/PNGCrushCS/issues/527) | 0 | 12 | 0 | 2 | 14 |
 | [Cinema camera RAW video](#cinema-camera-raw-video) | [#528](https://github.com/Hawkynt/PNGCrushCS/issues/528) | 0 | 6 | 7 | 0 | 13 |
 | [Elementary streams & streaming manifests](#elementary-streams--streaming-manifests) | [#529](https://github.com/Hawkynt/PNGCrushCS/issues/529) | 0 | 0 | 18 | 0 | 18 |
-| **All** | | **578** | **168** | **278** | **19** | **1043** |
+| **All** | | **578** | **167** | **277** | **19** | **1041** |
 
 Each issue carries the labels `cat: <category>`, its kind (`image-format`, `video-codec`, `video-container`, `video-encoder`), `priority: high|medium|low`, and `documented-blocker` where that applies.
 
@@ -772,7 +772,6 @@ Codecs/containers from games, consoles, CD-ROM titles and animation tools. Track
 | RAD Bink / Bink 2 container | Container | `.bik`, `.bk2` | demux + mux | missing | medium | [#1164](https://github.com/Hawkynt/PNGCrushCS/issues/1164) |
 | Smacker Video encoder | Encoder | `SMK2`, `SMK4` | encode | decoder only | medium | [#1165](https://github.com/Hawkynt/PNGCrushCS/issues/1165) |
 | 4X Movie video | Codec | `.4xm` | decode + encode | missing | low | [#1168](https://github.com/Hawkynt/PNGCrushCS/issues/1168) |
-| 8088flex TMV | Codec | `.tmv` | decode + encode | blocked | low | [#1171](https://github.com/Hawkynt/PNGCrushCS/issues/1171) |
 | Amazing Studio Packed Animation File Video | Codec | `.paf` | decode + encode | missing | low | [#1181](https://github.com/Hawkynt/PNGCrushCS/issues/1181) |
 | American Laser Games MM Video | Codec | `.mm` | decode + encode | missing | low | [#1184](https://github.com/Hawkynt/PNGCrushCS/issues/1184) |
 | Argonaut Games BRP video (BVID) | Codec | `.brp` | decode + encode | missing | low | [#1191](https://github.com/Hawkynt/PNGCrushCS/issues/1191) |
@@ -818,7 +817,6 @@ Codecs/containers from games, consoles, CD-ROM titles and animation tools. Track
 | 3DO STR stream | Container | `.str` | demux + mux | missing | low | [#1167](https://github.com/Hawkynt/PNGCrushCS/issues/1167) |
 | 4X Technologies 4XM movie | Container | `.4xm` | demux + mux | missing | low | [#1169](https://github.com/Hawkynt/PNGCrushCS/issues/1169) |
 | 7th Level movie (Monty Python and the Holy Grail) | Container | `.mov_toc`, `.mov_data` | demux + mux | missing | low | [#1170](https://github.com/Hawkynt/PNGCrushCS/issues/1170) |
-| 8088flex TMV | Container | `.tmv` | demux + mux | blocked | low | [#1172](https://github.com/Hawkynt/PNGCrushCS/issues/1172) |
 | A/X-101 BIN (Sega CD) | Container | `.bin` | demux + mux | missing | low | [#1173](https://github.com/Hawkynt/PNGCrushCS/issues/1173) |
 | Access Software VID | Container | `.vid` | demux + mux | missing | low | [#1174](https://github.com/Hawkynt/PNGCrushCS/issues/1174) |
 | ACG Movie (overlay animation) | Container | `.wdf`, `.m24` | demux + mux | missing | low | [#1175](https://github.com/Hawkynt/PNGCrushCS/issues/1175) |

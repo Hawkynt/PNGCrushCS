@@ -2191,6 +2191,27 @@ flattened until no code passes the thirty bits FFmpeg can read. A 320x240 gradie
 153,600. Noise grows by a twenty-fifth, since YLC has no stored form and a flag bit goes with every group.
 FFmpeg decodes what it writes to exactly the pictures given.
 
+### 8088flex TMV
+
+Container and codec converted from FFmpeg's `libavformat/tmv.c` and `libavcodec/tmv.c`, with the IBM CGA font
+from `libavutil/xga_font_data.c` and the CGA palette from `libavcodec/cga_data.c` parsed out mechanically, all
+LGPL-2.1-or-later. The file is a twelve-byte header — `TMAV`, sample rate, sound bytes a frame, compression
+method 0, the screen's columns and rows, and feature bits for 512-byte padding and stereo — and then, frame
+after frame, a screen of character and attribute bytes and a block of unsigned 8-bit sound. The frame rate
+is the sound's. A cell is drawn with the CGA font, the attribute's low nibble the foreground and its high
+nibble the background, all sixteen colours of it as FFmpeg draws it rather than blinking. The sound is
+handed out as WAVE format 1 with an 8-bit WAVEFORMATEX, so a remux into AVI carries it unchanged.
+
+Measured: all 110 pictures of the FATE suite's `tmv/pop-partial.tmv` — the only sample anywhere, truncated
+inside its last frame — are identical to FFmpeg's RGB, and its 40,480 sound bytes are FFmpeg's.
+
+The encoder is this package's own, FFmpeg having none. Each cell's pixels go to their nearest CGA colours.
+The two most frequent become background and foreground, and the glyph nearest the resulting mask is
+chosen, tried both ways round. A screen drawn from the font comes back exactly; any other picture is
+approximated. The writer pads a film with silence, four hundred samples a frame at the video's rate, when
+it is given no sound, because a TMV film is paced by its sound. FFmpeg reads both the container and the
+codec this writes, to exactly the pictures this decoder produces.
+
 ### Ut Video
 
 Lossless and intra only, and the capture codec of the three here that is still in active use. A

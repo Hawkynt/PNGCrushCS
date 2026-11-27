@@ -2343,6 +2343,10 @@ question before either was needed.
 
 # 8088flex TMV, which has neither a description nor a whole sample
 
+*Closed.* TMV is demuxed, muxed, decoded and encoded now, converted from FFmpeg's LGPL-2.1-or-later
+`libavformat/tmv.c` and `libavcodec/tmv.c`; the truncated sample decodes, as far as it goes, exactly as FFmpeg
+decodes it. `codec-notes.md` has the measurement.
+
 TMV (magic `TMAV`) was investigated next and stops earliest of anything in this file: it clears none of
 the three things every other entry here had at least one of — a published document, a paraphrase-shaped
 wiki page to rule out, or a real, complete sample corpus.
