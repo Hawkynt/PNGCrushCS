@@ -3025,6 +3025,10 @@ against the oracle. The header, the prediction rule and the sample above are rec
 has either does not start from the container.
 # FM Screen Capture Codec (FMVC), whose real page arrived five years after its decoder
 
+*Closed.* FMVC is decoded and encoded now, converted from FFmpeg's LGPL-2.1-or-later `libavcodec/fmvc.c`,
+which settles the two LZ77 variants this section found named but not stated. Every picture of the four real
+films found decodes exactly as FFmpeg decodes it; `codec-notes.md` has the measurement.
+
 FM Screen Capture Codec (`FMVC`) was investigated as one of the screen-capture and lossless names this
 project's coverage still lacked, and looked promising on first sight: a real sample corpus and a
 MultimediaWiki page describing tile sizes, header fields and byte counts in some detail. It stops on

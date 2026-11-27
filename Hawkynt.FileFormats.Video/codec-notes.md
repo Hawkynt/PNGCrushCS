@@ -2346,6 +2346,30 @@ anything else goes as BGR; the first picture decides for the film. A 4:2:0 pictu
 4:4:4, each chroma sample repeated over its block, because of the last row above. FFmpeg decodes what it
 writes, at even and odd sizes in every layout, to exactly this decoder's pictures.
 
+### FM Screen Capture
+
+Converted from FFmpeg's `libavcodec/fmvc.c`, LGPL-2.1-or-later. The picture is a bottom-up buffer of rows
+padded to 32-bit words, divided into blocks of 84 words by 112 rows, a remainder under 37 words or 49 rows
+joining the block before it and a larger one standing alone. A key frame unpacks a whole new buffer; any
+other frame lists the blocks it changes and unpacks each one's XOR. Two packers: type 2 is LZO1X, and type 1
+is FM Screen Capture's own LZ77, whose literal runs must each be followed by a back reference, whose raw
+blocks of 280 bytes or a power of two are reached only between back references, and whose long back
+reference of distance zero ends the stream. Both decompressors keep FFmpeg's control flow exactly, because
+they depend on exactly where a read past the end yields zero and where a back reference is clamped to the
+buffer's start. As in FFmpeg, block deltas are unpacked in the order a frame lists them and applied in
+block order.
+
+Measured against FFmpeg n9.1 with `-flags +bitexact`: all 718 pictures of the FATE suite's two films and
+`samples.ffmpeg.org`'s two, between them both packers, are identical.
+
+The encoder is this package's own, FFmpeg having none, and lossless at 24 bits a pixel: a key frame first,
+then only the blocks that changed, as XOR, all packed by type 1 with a hash-chain match finder. An unchanged
+frame is eight bytes. FFmpeg's block layout leaves a picture under 49 rows, or under 37 words a row, with no
+block at all, and it refuses such a stream; so does this encoder. Re-encoding the real films gives every
+picture back exactly, in 1,421,428 bytes against `6-methyl-5-hepten-2-one-CC-db.avi`'s 1,786,965 and
+1,646,987 against `skrzyzowanie4.avi`'s 2,227,139, but 154,474 against the LZO-packed
+`fmvcVirtualDub_small.avi`'s 131,694. FFmpeg decodes what it writes to exactly this decoder's pictures.
+
 ### Electronic Arts TQI, TGQ, Madcow and TGV
 
 Converted from FFmpeg's `libavcodec/eatqi.c`, `eatgq.c`, `eamad.c`, `eatgv.c` and the inverse DCT the first

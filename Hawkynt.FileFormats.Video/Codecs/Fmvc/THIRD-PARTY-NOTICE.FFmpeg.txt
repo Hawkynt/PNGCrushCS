@@ -1,0 +1,15 @@
+The FM Screen Capture decoder in this directory is converted from FFmpeg (https://github.com/FFmpeg/FFmpeg):
+
+  libavcodec/fmvc.c     the block layout, the key and delta frames, and the type 1 and type 2 decompressors
+
+  Copyright (c) 2017 Paul B Mahol (fmvc.c)
+  and the FFmpeg developers named in the file above.
+
+FFmpeg distributes that source under the GNU Lesser General Public License, version 2.1 or (at your
+option) any later version. This work is distributed under the GNU Lesser General Public License
+version 3 or later, which the "or later" clause permits; the licence text is in LICENSE at the root of
+this repository.
+
+The algorithms are carried across into managed C#, not vendored; the decompressors keep FFmpeg's control
+flow, on which their handling of damaged input depends. The type 1 compressor and the encoder are this
+package's own.
