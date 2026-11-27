@@ -23023,6 +23023,106 @@ Implements `IEquatable<LudekMakerFile>`, `IImageFormatMetadata<LudekMakerFile>`,
 | --- | --- | --- |
 | `ToBytes` | `static byte[] ToBytes(LudekMakerFile file)` |  |
 
+### Namespace `FileFormat.LuraWave`
+
+[`LuraWaveColourMode`](#lurawavecolourmode) · [`LuraWaveFile`](#lurawavefile) · [`LuraWaveHeader`](#lurawaveheader) · [`LuraWaveReader`](#lurawavereader) · [`LuraWaveRegion`](#lurawaveregion) · [`LuraWaveWriter`](#lurawavewriter)
+
+#### `LuraWaveColourMode`
+
+| Value | Numeric | Summary |
+| --- | --- | --- |
+| `Grey` | `1` |  |
+| `ColourDifference` | `2` |  |
+| `Rgb` | `4` |  |
+| `ReversibleColour` | `6` |  |
+| `FourChannel` | `7` |  |
+| `Polynomial` | `8` |  |
+| `WideGrey` | `17` |  |
+| `WideReversibleColour` | `19` |  |
+| `WideSignedGrey` | `22` |  |
+
+#### `LuraWaveFile`
+
+Implements `IEquatable<LuraWaveFile>`, `IImageFormatMetadata<LuraWaveFile>`, `IImageFormatReader<LuraWaveFile>`, `IImageFormatWriter<LuraWaveFile>`, `IImageFromRawImage<LuraWaveFile>`, `IImageInfoReader<LuraWaveFile>`, `IImageToRawImage<LuraWaveFile>`.
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `Header` | `LuraWaveHeader Header { get; init; }` |  |
+| `Height` | `int Height { get; init; }` |  |
+| `Mode` | `LuraWaveColourMode Mode { get; init; }` |  |
+| `PixelData` | `byte[] PixelData { get; init; }` |  |
+| `PixelFormat` | `PixelFormat PixelFormat { get; }` |  |
+| `Width` | `int Width { get; init; }` |  |
+| `FromRawImage` | `static LuraWaveFile FromRawImage(RawImage image)` |  |
+| `PixelFormatOf` | `static PixelFormat PixelFormatOf(LuraWaveColourMode mode)` |  |
+| `ReadImageInfo` | `static ImageInfo? ReadImageInfo(ReadOnlySpan<byte> header)` |  |
+| `ToRawImage` | `static RawImage ToRawImage(LuraWaveFile file)` |  |
+
+#### `LuraWaveHeader`
+
+Implements `IEquatable<LuraWaveHeader>`.
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `LuraWaveHeader` | `LuraWaveHeader()` |  |
+| `DefaultDpiFixed` | `const int DefaultDpiFixed` |  |
+| `FullQuality` | `const int FullQuality` |  |
+| `MaxRegions` | `const int MaxRegions` |  |
+| `Signature` | `const ushort Signature` |  |
+| `SupportedVersion` | `const byte SupportedVersion` |  |
+| `Channels` | `int Channels { get; }` |  |
+| `CodedWidth` | `int CodedWidth { get; init; }` |  |
+| `CodingFlags` | `byte CodingFlags { get; init; }` |  |
+| `DataOffset` | `int DataOffset { get; init; }` |  |
+| `Height` | `int Height { get; init; }` |  |
+| `HorizontalDpiFixed` | `int HorizontalDpiFixed { get; init; }` |  |
+| `IsEmbedded` | `bool IsEmbedded { get; }` |  |
+| `Levels` | `int Levels { get; init; }` |  |
+| `LowestBitPlane` | `int LowestBitPlane { get; init; }` |  |
+| `MaxValue` | `int MaxValue { get; init; }` |  |
+| `ModeFlags` | `byte ModeFlags { get; init; }` |  |
+| `Mode` | `LuraWaveColourMode Mode { get; init; }` |  |
+| `PasswordCheck` | `int PasswordCheck { get; init; }` |  |
+| `PublicQuality` | `int PublicQuality { get; init; }` |  |
+| `Quality` | `int Quality { get; init; }` |  |
+| `RegionShift` | `int RegionShift { get; init; }` |  |
+| `Regions` | `LuraWaveRegion[] Regions { get; init; }` |  |
+| `StripeCount` | `int StripeCount { get; init; }` |  |
+| `StripeHeight` | `int StripeHeight { get; init; }` |  |
+| `StripeSizes` | `int[] StripeSizes { get; init; }` |  |
+| `VerticalDpiFixed` | `int VerticalDpiFixed { get; init; }` |  |
+| `Width` | `int Width { get; init; }` |  |
+| `ChannelsOf` | `static int ChannelsOf(LuraWaveColourMode mode)` |  |
+| `HasSignature` | `static bool HasSignature(ReadOnlySpan<byte> data)` |  |
+| `Parse` | `static LuraWaveHeader Parse(ReadOnlySpan<byte> data)` |  |
+
+#### `LuraWaveReader`
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `FromBytes` | `static LuraWaveFile FromBytes(byte[] data)` |  |
+| `FromFile` | `static LuraWaveFile FromFile(FileInfo file)` |  |
+| `FromSpan` | `static LuraWaveFile FromSpan(ReadOnlySpan<byte> data)` |  |
+| `FromStream` | `static LuraWaveFile FromStream(Stream stream)` |  |
+
+#### `LuraWaveRegion`
+
+Implements `IEquatable<LuraWaveRegion>`.
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `LuraWaveRegion` | `LuraWaveRegion(int X, int Y, int Width, int Height)` |  |
+| `Height` | `int Height { get; init; }` |  |
+| `Width` | `int Width { get; init; }` |  |
+| `X` | `int X { get; init; }` |  |
+| `Y` | `int Y { get; init; }` |  |
+
+#### `LuraWaveWriter`
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `ToBytes` | `static byte[] ToBytes(LuraWaveFile file)` |  |
+
 ### Namespace `FileFormat.MacPaint`
 
 [`MacPaintFile`](#macpaintfile) · [`MacPaintReader`](#macpaintreader) · [`MacPaintWriter`](#macpaintwriter)
@@ -31145,6 +31245,56 @@ Implements `IBinarySerializable<PvrHeader>`, `IEquatable<PvrHeader>`.
 | Member | Signature | Summary |
 | --- | --- | --- |
 | `ToBytes` | `static byte[] ToBytes(PvrFile file)` |  |
+
+### Namespace `FileFormat.Pwc`
+
+[`PwcCodingFlags`](#pwccodingflags) · [`PwcFile`](#pwcfile) · [`PwcReader`](#pwcreader) · [`PwcWriter`](#pwcwriter)
+
+#### `PwcCodingFlags`
+
+| Value | Numeric | Summary |
+| --- | --- | --- |
+| `None` | `0` |  |
+| `Gray` | `1` |  |
+| `NoCornerGuesses` | `2` |  |
+| `NoListDecision` | `4` |  |
+
+#### `PwcFile`
+
+Implements `IEquatable<PwcFile>`, `IImageFormatMetadata<PwcFile>`, `IImageFormatReader<PwcFile>`, `IImageFormatWriter<PwcFile>`, `IImageFromRawImage<PwcFile>`, `IImageInfoReader<PwcFile>`, `IImageToRawImage<PwcFile>`.
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `DefaultMaxLps` | `const int DefaultMaxLps` |  |
+| `BitsPerPixel` | `int BitsPerPixel { get; init; }` |  |
+| `BottomUp` | `bool BottomUp { get; init; }` |  |
+| `CodingFlags` | `PwcCodingFlags CodingFlags { get; init; }` |  |
+| `Height` | `int Height { get; init; }` |  |
+| `MaxLps` | `int MaxLps { get; init; }` |  |
+| `Palette` | `byte[] Palette { get; init; }` |  |
+| `PixelData` | `byte[] PixelData { get; init; }` |  |
+| `StoresPalette` | `bool StoresPalette { get; init; }` |  |
+| `Width` | `int Width { get; init; }` |  |
+| `FromRawImage` | `static PwcFile FromRawImage(RawImage image)` |  |
+| `ReadImageInfo` | `static ImageInfo? ReadImageInfo(ReadOnlySpan<byte> header)` |  |
+| `ToRawImage` | `static RawImage ToRawImage(PwcFile file)` |  |
+
+#### `PwcReader`
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `MaxPixels` | `const long MaxPixels` |  |
+| `FromBytes` | `static PwcFile FromBytes(byte[] data)` |  |
+| `FromFile` | `static PwcFile FromFile(FileInfo file)` |  |
+| `FromSpan` | `static PwcFile FromSpan(ReadOnlySpan<byte> data)` |  |
+| `FromStream` | `static PwcFile FromStream(Stream stream)` |  |
+| `LinearPalette` | `static byte[] LinearPalette(int depth)` |  |
+
+#### `PwcWriter`
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `ToBytes` | `static byte[] ToBytes(PwcFile file)` |  |
 
 ### Namespace `FileFormat.Q0`
 
@@ -41973,432 +42123,434 @@ Implements `IEquatable<FormatEntry>`.
 | `Lss16` | `469` |  |
 | `LucasFilm` | `470` |  |
 | `LudekMaker` | `471` |  |
-| `MacPaint` | `472` |  |
-| `MadDesigner` | `473` |  |
-| `MadStudio` | `474` |  |
-| `MadStudioMissile` | `475` |  |
-| `MadStudioTile` | `476` |  |
-| `Mag` | `477` |  |
-| `MagicPainter` | `478` |  |
-| `Mamut` | `479` |  |
-| `MapletownMl1` | `480` |  |
-| `MapletownMx1` | `481` |  |
-| `MapletownNl3` | `482` |  |
-| `MasterSystemTile` | `483` |  |
-| `MatLab` | `484` |  |
-| `MawWareTexture` | `485` |  |
-| `MayaIff` | `486` |  |
-| `McPainter` | `487` |  |
-| `Mcs` | `488` |  |
-| `Mda` | `489` |  |
-| `Mdp` | `490` |  |
-| `MegaPaint` | `491` |  |
-| `MegaluxFrame` | `492` |  |
-| `MetaImage` | `493` |  |
-| `MgrBitmap` | `494` |  |
-| `MicroDesignCut` | `495` |  |
-| `MicroDesignGrf` | `496` |  |
-| `MicroDynamicsMars` | `497` |  |
-| `MicroIllustrator` | `498` |  |
-| `MicroIllustratorA8` | `499` |  |
-| `MicroPainter8` | `500` |  |
-| `Miff` | `501` |  |
-| `MiniPaint` | `502` |  |
-| `Mlt` | `503` |  |
-| `Mng` | `504` |  |
-| `MobileFax` | `505` |  |
-| `MobyDick` | `506` |  |
-| `MonoMagic` | `507` |  |
-| `MonoStar` | `508` |  |
-| `MovieMakerBackground` | `509` |  |
-| `Mpo` | `510` |  |
-| `Mrc` | `511` |  |
-| `Mrf` | `512` |  |
-| `Mrw` | `513` |  |
-| `Msp` | `514` |  |
-| `Msx` | `515` |  |
-| `MsxFont` | `516` |  |
-| `MsxGl16` | `517` |  |
-| `MsxGl6` | `518` |  |
-| `MsxGl8` | `519` |  |
-| `MsxGlYjk` | `520` |  |
-| `MsxMig` | `521` |  |
-| `MsxScc` | `522` |  |
-| `MsxScreen10` | `523` |  |
-| `MsxScreen2` | `524` |  |
-| `MsxScreen3` | `525` |  |
-| `MsxScreen4` | `526` |  |
-| `MsxScreen5` | `527` |  |
-| `MsxScreen6` | `528` |  |
-| `MsxScreen8` | `529` |  |
-| `MsxSprite` | `530` |  |
-| `MsxVideo` | `531` |  |
-| `MsxView` | `532` |  |
-| `Mtv` | `533` |  |
-| `MuifliEditor` | `534` |  |
-| `MultiLaceEditor` | `535` |  |
-| `MultiPainter` | `536` |  |
-| `MultiPalettePicture` | `537` |  |
-| `NcrImage` | `538` |  |
-| `NdsTexture` | `539` |  |
-| `NeoBookCartoon` | `540` |  |
-| `NeoGeoPocket` | `541` |  |
-| `NeoGeoSprite` | `542` |  |
-| `Neochrome` | `543` |  |
-| `NeroCoverDesigner` | `544` |  |
-| `NesChr` | `545` |  |
-| `Netpbm` | `546` |  |
-| `NewsRoom` | `547` |  |
-| `Nfo` | `548` |  |
-| `Nhdr` | `549` |  |
-| `Nie` | `550` |  |
-| `Nifti` | `551` |  |
-| `Nifti2` | `552` |  |
-| `Nifti2Gzip` | `553` |  |
-| `NiftiGzip` | `554` |  |
-| `NiftiPair` | `555` |  |
-| `NistIHead` | `556` |  |
-| `Nitf` | `557` |  |
-| `NokiaGroupGraphics` | `558` |  |
-| `NokiaLogo` | `559` |  |
-| `NokiaNlm` | `560` |  |
-| `NokiaOperatorLogo` | `561` |  |
-| `NokiaPictureMessage` | `562` |  |
-| `Nrrd` | `563` |  |
-| `NufliEditor` | `564` |  |
-| `OazFax` | `565` |  |
-| `OcpArtStudioWindow` | `566` |  |
-| `OcsPics` | `567` |  |
-| `OdFontEditor` | `568` |  |
-| `Oil` | `569` |  |
-| `OlicomFax` | `570` |  |
-| `Olpc565` | `571` |  |
-| `OpenRaster` | `572` |  |
-| `Optocat` | `573` |  |
-| `Oric` | `574` |  |
-| `Otb` | `575` |  |
-| `PabloPaint` | `576` |  |
-| `Pagefox` | `577` |  |
-| `PaintMagic` | `578` |  |
-| `PaintPro` | `579` |  |
-| `PaintShop` | `580` |  |
-| `PaintShopBrowser` | `581` |  |
-| `PaintShopCompressed` | `582` |  |
-| `Palm` | `583` |  |
-| `PalmImageViewer` | `584` |  |
-| `PalmPdb` | `585` |  |
-| `Paradox` | `586` |  |
-| `Pat` | `587` |  |
-| `Pc88` | `588` |  |
-| `Pc98Ebd` | `589` |  |
-| `PcEngineTile` | `590` |  |
-| `PcPaint` | `591` |  |
-| `Pcd` | `592` |  |
-| `Pcds` | `593` |  |
-| `Pcl` | `594` |  |
-| `Pco16Bit` | `595` |  |
-| `PcpBitmap` | `596` |  |
-| `Pcx` | `597` |  |
-| `Pdf` | `598` |  |
-| `Pdn` | `599` |  |
-| `Pds` | `600` |  |
-| `PeResource` | `601` |  |
-| `PerfectPix` | `602` |  |
-| `Pes` | `603` |  |
-| `PetDraw` | `604` |  |
-| `PetsciiBot` | `605` |  |
-| `Pfm` | `606` |  |
-| `Pgx` | `607` |  |
-| `Phm` | `608` |  |
-| `PhotoChrome` | `609` |  |
-| `PhotoChromePcs` | `610` |  |
-| `PhotoLine` | `611` |  |
-| `PhotoPaint` | `612` |  |
-| `PhotoParade` | `613` |  |
-| `PhotoStudio` | `614` |  |
-| `PhotoSuiteProject` | `615` |  |
-| `Pi` | `616` |  |
-| `Pic2` | `617` |  |
-| `PicWorks` | `618` |  |
-| `Picasso` | `619` |  |
-| `Picasso64` | `620` |  |
-| `Pict` | `621` |  |
-| `PictureEditor` | `622` |  |
-| `PicturePublisher` | `623` |  |
-| `PicturePublisher4` | `624` |  |
-| `PixarRib` | `625` |  |
-| `Pixel64` | `626` |  |
-| `PixelPerfect` | `627` |  |
-| `PixelPowerCollage` | `628` |  |
-| `Pixia` | `629` |  |
-| `Pixibox` | `630` |  |
-| `Pkm` | `631` |  |
-| `Pl4Picture` | `632` |  |
-| `PlaybackBitmapSequence` | `633` |  |
-| `PlotMaker` | `634` |  |
-| `PmBitmap` | `635` |  |
-| `PmView` | `636` |  |
-| `PmgDesigner` | `637` |  |
-| `Png` | `638` |  |
-| `PntrFalcon` | `639` |  |
-| `PocketPc2bp` | `640` |  |
-| `PocketPcTheme` | `641` |  |
-| `PortfolioGraphics` | `642` |  |
-| `Portrait` | `643` |  |
-| `PostScript` | `644` |  |
-| `PowerGraphics` | `645` |  |
-| `PowerPoint` | `646` |  |
-| `PrintMaster` | `647` |  |
-| `PrintShop` | `648` |  |
-| `PrintShopIcon` | `649` |  |
-| `PrintTechnik` | `650` |  |
-| `PrinterPageSegment` | `651` |  |
-| `Printfox` | `652` |  |
-| `PrintfoxPagefox` | `653` |  |
-| `PrismPaint` | `654` |  |
-| `Prisms` | `655` |  |
-| `ProfiGrf` | `656` |  |
-| `Ps2Txc` | `657` |  |
-| `Psb` | `658` |  |
-| `Psd` | `659` |  |
-| `PsionPic` | `660` |  |
-| `Psp` | `661` |  |
-| `Ptif` | `662` |  |
-| `PublicPainter` | `663` |  |
-| `Pvr` | `664` |  |
-| `Q0` | `665` |  |
-| `QdvImage` | `666` |  |
-| `Qoi` | `667` |  |
-| `Qrt` | `668` |  |
-| `Qtif` | `669` |  |
-| `QuakeLmp` | `670` |  |
-| `QuakeSpr` | `671` |  |
-| `QuantelVpb` | `672` |  |
-| `QuantumPaint` | `673` |  |
-| `RagD` | `674` |  |
-| `RagePaint` | `675` |  |
-| `RainbowPainter` | `676` |  |
-| `RamBrandt` | `677` |  |
-| `RawGreyscale` | `678` |  |
-| `RawWorkshop` | `679` |  |
-| `RedStormRsb` | `680` |  |
-| `Rembrandt` | `681` |  |
-| `Rgf` | `682` |  |
-| `RicohFax` | `683` |  |
-| `RicohIs30` | `684` |  |
-| `RicohJ6i` | `685` |  |
-| `RiscOsSprite` | `686` |  |
-| `Rla` | `687` |  |
-| `Rlc2` | `688` |  |
-| `RockyInterlace` | `689` |  |
-| `RunPaint` | `690` |  |
-| `SamCoupe` | `691` |  |
-| `SamCoupeLce` | `692` |  |
-| `SamCoupeMode4` | `693` |  |
-| `SamCoupeScreen` | `694` |  |
-| `SamCoupeSsx` | `695` |  |
-| `SamarHiresMap` | `696` |  |
-| `SaracenPaint` | `697` |  |
-| `SbigCcd` | `698` |  |
-| `SciFax` | `699` |  |
-| `ScitexCt` | `700` |  |
-| `ScreenBlaster` | `701` |  |
-| `ScreenMaker` | `702` |  |
-| `Sdg` | `703` |  |
-| `Sdt` | `704` |  |
-| `SeattleFilmWorks` | `705` |  |
-| `SecondNatureSlideShow` | `706` |  |
-| `SecretPhotos` | `707` |  |
-| `SegaGenTile` | `708` |  |
-| `SegaSj1` | `709` |  |
-| `SemiGraphicLogo` | `710` |  |
-| `SeqImage` | `711` |  |
-| `SeriousTexture` | `712` |  |
-| `SeuckSprites` | `713` |  |
-| `SevenuP` | `714` |  |
-| `Sf3` | `715` |  |
-| `Sff` | `716` |  |
-| `Sgi` | `717` |  |
-| `ShapeTableFileType` | `718` |  |
-| `SharpX68k` | `719` |  |
-| `ShfXlEdit` | `720` |  |
-| `SiemensBmx` | `721` |  |
-| `SifImage` | `722` |  |
-| `SinbadSlideshow` | `723` |  |
-| `SinclairBasic` | `724` |  |
-| `Sixel` | `725` |  |
-| `Skantek` | `726` |  |
-| `SketchPaddles` | `727` |  |
-| `SmartFax` | `728` |  |
-| `SmartST` | `729` |  |
-| `SnesTile` | `730` |  |
-| `SoftImage` | `731` |  |
-| `SoftwareAutomation` | `732` |  |
-| `SonyMavica` | `733` |  |
-| `SonyPmp` | `734` |  |
-| `SpcPainter` | `735` |  |
-| `SpecScii` | `736` |  |
-| `SpeccyExtended` | `737` |  |
-| `Spectrum512` | `738` |  |
-| `Spectrum512Comp` | `739` |  |
-| `Spectrum512Ext` | `740` |  |
-| `Spectrum512Smoosh` | `741` |  |
-| `SpeederFalcon` | `742` |  |
-| `Spiff` | `743` |  |
-| `SpookySpritesFalcon` | `744` |  |
-| `SpotImage` | `745` |  |
-| `Sprite64` | `746` |  |
-| `SpritePad` | `747` |  |
-| `SriSun` | `748` |  |
-| `StTrueColor` | `749` |  |
-| `Stad` | `750` |  |
-| `StarPainter` | `751` |  |
-| `StarPainterFont` | `752` |  |
-| `StelaRaw` | `753` |  |
-| `Stellar` | `754` |  |
-| `SunIcon` | `755` |  |
-| `SunRaster` | `756` |  |
-| `SuperHires` | `757` |  |
-| `SuperHiresEditor` | `758` |  |
-| `SuperHiresEditor1` | `759` |  |
-| `SuperHiresEditor2` | `760` |  |
-| `SuperHiresFli` | `761` |  |
-| `SuperHiresStudio` | `762` |  |
-| `Svg` | `763` |  |
-| `Svgz` | `764` |  |
-| `SyberiaTexture` | `765` |  |
-| `SymbOsGraphic` | `766` |  |
-| `SymbianMbm` | `767` |  |
-| `SyntheticArts` | `768` |  |
-| `Synu` | `769` |  |
-| `Taac` | `770` |  |
-| `TaquartInterlace` | `771` |  |
-| `TechnicolorDream` | `772` |  |
-| `TeliFax` | `773` |  |
-| `TextureEditorMikey` | `774` |  |
-| `TextureMaker0` | `775` |  |
-| `Tg4` | `776` |  |
-| `Tga` | `777` |  |
-| `Thomson` | `778` |  |
-| `Ti92Picture` | `779` |  |
-| `TiBitmap` | `780` |  |
-| `TiPicture` | `781` |  |
-| `Tiff` | `782` |  |
-| `TilePic` | `783` |  |
-| `TilezTexture` | `784` |  |
-| `Tim` | `785` |  |
-| `Tim2` | `786` |  |
-| `TimexGigascreen` | `787` |  |
-| `Tiny` | `788` |  |
-| `TmSat` | `789` |  |
-| `TobiasRichterSlideshow` | `790` |  |
-| `TriPaint` | `791` |  |
-| `Trs80` | `792` |  |
-| `TrsPix` | `793` |  |
-| `TrueColorImg` | `794` |  |
-| `TruePaint` | `795` |  |
-| `TrueType` | `796` |  |
-| `TrzmielCompressed` | `797` |  |
-| `TurboRascal` | `798` |  |
-| `TurboView` | `799` |  |
-| `UfliEditor` | `800` |  |
-| `Uhdr` | `801` |  |
-| `UifliEditor` | `802` |  |
-| `Uimg` | `803` |  |
-| `UleadAlbumTemplate` | `804` |  |
-| `UleadImageLibrary` | `805` |  |
-| `UtahRle` | `806` |  |
-| `UyvyRaw` | `807` |  |
-| `VbxeSlideShow` | `808` |  |
-| `VdcBitmap` | `809` |  |
-| `Vector06c` | `810` |  |
-| `VentaFax` | `811` |  |
-| `VertiZontalInterlacing` | `812` |  |
-| `VerticalHiresInterlace` | `813` |  |
-| `Vic20` | `814` |  |
-| `Vicar` | `815` |  |
-| `Vidcom64` | `816` |  |
-| `VidiChrome` | `817` |  |
-| `VidigPaint` | `818` |  |
-| `Viff` | `819` |  |
-| `Vips` | `820` |  |
-| `VirtualBoyTile` | `821` |  |
-| `Vitec` | `822` |  |
-| `Vivid` | `823` |  |
-| `Vp8` | `824` |  |
-| `Vp8L` | `825` |  |
-| `Vrml` | `826` |  |
-| `Vtf` | `827` |  |
-| `Vue` | `828` |  |
-| `Wad2` | `829` |  |
-| `Wad3` | `830` |  |
-| `Wal` | `831` |  |
-| `Wbmp` | `832` |  |
-| `WebP` | `833` |  |
-| `WebShots` | `834` |  |
-| `Wic` | `835` |  |
-| `WigmoreArtist` | `836` |  |
-| `WinFax` | `837` |  |
-| `WizSolitaireDeck` | `838` |  |
-| `Wmf` | `839` |  |
-| `WonderSwanTile` | `840` |  |
-| `Word` | `841` |  |
-| `WorldportFax` | `842` |  |
-| `Wpg` | `843` |  |
-| `Wsq` | `844` |  |
-| `Wzl` | `845` |  |
-| `X11Puzzle` | `846` |  |
-| `X3f` | `847` |  |
-| `XBin` | `848` |  |
-| `XFliEditor` | `849` |  |
-| `Xar` | `850` |  |
-| `Xbm` | `851` |  |
-| `XbmColor` | `852` |  |
-| `Xcf` | `853` |  |
-| `Xcursor` | `854` |  |
-| `Ximage` | `855` |  |
-| `XionicsSmp` | `856` |  |
-| `XlPaint` | `857` |  |
-| `Xld4` | `858` |  |
-| `Xpm` | `859` |  |
-| `XvThumbnail` | `860` |  |
-| `Xwd` | `861` |  |
-| `Xyz` | `862` |  |
-| `Ybm` | `863` |  |
-| `YuvRaw` | `864` |  |
-| `ZeissBivas` | `865` |  |
-| `ZeissLsm` | `866` |  |
-| `Zinc` | `867` |  |
-| `ZonerBrush` | `868` |  |
-| `Zoom4` | `869` |  |
-| `Zoomatic` | `870` |  |
-| `ZsStaffKid98` | `871` |  |
-| `Zx81` | `872` |  |
-| `ZxArtStudio` | `873` |  |
-| `ZxAttributes` | `874` |  |
-| `ZxAttributesGigascreen` | `875` |  |
-| `ZxBigFont` | `876` |  |
-| `ZxBorderMulticolor` | `877` |  |
-| `ZxBorderScreen` | `878` |  |
-| `ZxChrd` | `879` |  |
-| `ZxFlash` | `880` |  |
-| `ZxFont` | `881` |  |
-| `ZxGigascreen` | `882` |  |
-| `ZxMlg` | `883` |  |
-| `ZxMultiArtist` | `884` |  |
-| `ZxMulticolor` | `885` |  |
-| `ZxNext` | `886` |  |
-| `ZxNextImage` | `887` |  |
-| `ZxPaintbrush` | `888` |  |
-| `ZxPaintyOne` | `889` |  |
-| `ZxRgb3` | `890` |  |
-| `ZxSnapshot` | `891` |  |
-| `ZxSpectrum` | `892` |  |
-| `ZxTimex` | `893` |  |
-| `ZxTrefiBorderScreen` | `894` |  |
-| `ZxTricolor` | `895` |  |
-| `ZxUlaPlus` | `896` |  |
-| `ZzRough` | `897` |  |
+| `LuraWave` | `472` |  |
+| `MacPaint` | `473` |  |
+| `MadDesigner` | `474` |  |
+| `MadStudio` | `475` |  |
+| `MadStudioMissile` | `476` |  |
+| `MadStudioTile` | `477` |  |
+| `Mag` | `478` |  |
+| `MagicPainter` | `479` |  |
+| `Mamut` | `480` |  |
+| `MapletownMl1` | `481` |  |
+| `MapletownMx1` | `482` |  |
+| `MapletownNl3` | `483` |  |
+| `MasterSystemTile` | `484` |  |
+| `MatLab` | `485` |  |
+| `MawWareTexture` | `486` |  |
+| `MayaIff` | `487` |  |
+| `McPainter` | `488` |  |
+| `Mcs` | `489` |  |
+| `Mda` | `490` |  |
+| `Mdp` | `491` |  |
+| `MegaPaint` | `492` |  |
+| `MegaluxFrame` | `493` |  |
+| `MetaImage` | `494` |  |
+| `MgrBitmap` | `495` |  |
+| `MicroDesignCut` | `496` |  |
+| `MicroDesignGrf` | `497` |  |
+| `MicroDynamicsMars` | `498` |  |
+| `MicroIllustrator` | `499` |  |
+| `MicroIllustratorA8` | `500` |  |
+| `MicroPainter8` | `501` |  |
+| `Miff` | `502` |  |
+| `MiniPaint` | `503` |  |
+| `Mlt` | `504` |  |
+| `Mng` | `505` |  |
+| `MobileFax` | `506` |  |
+| `MobyDick` | `507` |  |
+| `MonoMagic` | `508` |  |
+| `MonoStar` | `509` |  |
+| `MovieMakerBackground` | `510` |  |
+| `Mpo` | `511` |  |
+| `Mrc` | `512` |  |
+| `Mrf` | `513` |  |
+| `Mrw` | `514` |  |
+| `Msp` | `515` |  |
+| `Msx` | `516` |  |
+| `MsxFont` | `517` |  |
+| `MsxGl16` | `518` |  |
+| `MsxGl6` | `519` |  |
+| `MsxGl8` | `520` |  |
+| `MsxGlYjk` | `521` |  |
+| `MsxMig` | `522` |  |
+| `MsxScc` | `523` |  |
+| `MsxScreen10` | `524` |  |
+| `MsxScreen2` | `525` |  |
+| `MsxScreen3` | `526` |  |
+| `MsxScreen4` | `527` |  |
+| `MsxScreen5` | `528` |  |
+| `MsxScreen6` | `529` |  |
+| `MsxScreen8` | `530` |  |
+| `MsxSprite` | `531` |  |
+| `MsxVideo` | `532` |  |
+| `MsxView` | `533` |  |
+| `Mtv` | `534` |  |
+| `MuifliEditor` | `535` |  |
+| `MultiLaceEditor` | `536` |  |
+| `MultiPainter` | `537` |  |
+| `MultiPalettePicture` | `538` |  |
+| `NcrImage` | `539` |  |
+| `NdsTexture` | `540` |  |
+| `NeoBookCartoon` | `541` |  |
+| `NeoGeoPocket` | `542` |  |
+| `NeoGeoSprite` | `543` |  |
+| `Neochrome` | `544` |  |
+| `NeroCoverDesigner` | `545` |  |
+| `NesChr` | `546` |  |
+| `Netpbm` | `547` |  |
+| `NewsRoom` | `548` |  |
+| `Nfo` | `549` |  |
+| `Nhdr` | `550` |  |
+| `Nie` | `551` |  |
+| `Nifti` | `552` |  |
+| `Nifti2` | `553` |  |
+| `Nifti2Gzip` | `554` |  |
+| `NiftiGzip` | `555` |  |
+| `NiftiPair` | `556` |  |
+| `NistIHead` | `557` |  |
+| `Nitf` | `558` |  |
+| `NokiaGroupGraphics` | `559` |  |
+| `NokiaLogo` | `560` |  |
+| `NokiaNlm` | `561` |  |
+| `NokiaOperatorLogo` | `562` |  |
+| `NokiaPictureMessage` | `563` |  |
+| `Nrrd` | `564` |  |
+| `NufliEditor` | `565` |  |
+| `OazFax` | `566` |  |
+| `OcpArtStudioWindow` | `567` |  |
+| `OcsPics` | `568` |  |
+| `OdFontEditor` | `569` |  |
+| `Oil` | `570` |  |
+| `OlicomFax` | `571` |  |
+| `Olpc565` | `572` |  |
+| `OpenRaster` | `573` |  |
+| `Optocat` | `574` |  |
+| `Oric` | `575` |  |
+| `Otb` | `576` |  |
+| `PabloPaint` | `577` |  |
+| `Pagefox` | `578` |  |
+| `PaintMagic` | `579` |  |
+| `PaintPro` | `580` |  |
+| `PaintShop` | `581` |  |
+| `PaintShopBrowser` | `582` |  |
+| `PaintShopCompressed` | `583` |  |
+| `Palm` | `584` |  |
+| `PalmImageViewer` | `585` |  |
+| `PalmPdb` | `586` |  |
+| `Paradox` | `587` |  |
+| `Pat` | `588` |  |
+| `Pc88` | `589` |  |
+| `Pc98Ebd` | `590` |  |
+| `PcEngineTile` | `591` |  |
+| `PcPaint` | `592` |  |
+| `Pcd` | `593` |  |
+| `Pcds` | `594` |  |
+| `Pcl` | `595` |  |
+| `Pco16Bit` | `596` |  |
+| `PcpBitmap` | `597` |  |
+| `Pcx` | `598` |  |
+| `Pdf` | `599` |  |
+| `Pdn` | `600` |  |
+| `Pds` | `601` |  |
+| `PeResource` | `602` |  |
+| `PerfectPix` | `603` |  |
+| `Pes` | `604` |  |
+| `PetDraw` | `605` |  |
+| `PetsciiBot` | `606` |  |
+| `Pfm` | `607` |  |
+| `Pgx` | `608` |  |
+| `Phm` | `609` |  |
+| `PhotoChrome` | `610` |  |
+| `PhotoChromePcs` | `611` |  |
+| `PhotoLine` | `612` |  |
+| `PhotoPaint` | `613` |  |
+| `PhotoParade` | `614` |  |
+| `PhotoStudio` | `615` |  |
+| `PhotoSuiteProject` | `616` |  |
+| `Pi` | `617` |  |
+| `Pic2` | `618` |  |
+| `PicWorks` | `619` |  |
+| `Picasso` | `620` |  |
+| `Picasso64` | `621` |  |
+| `Pict` | `622` |  |
+| `PictureEditor` | `623` |  |
+| `PicturePublisher` | `624` |  |
+| `PicturePublisher4` | `625` |  |
+| `PixarRib` | `626` |  |
+| `Pixel64` | `627` |  |
+| `PixelPerfect` | `628` |  |
+| `PixelPowerCollage` | `629` |  |
+| `Pixia` | `630` |  |
+| `Pixibox` | `631` |  |
+| `Pkm` | `632` |  |
+| `Pl4Picture` | `633` |  |
+| `PlaybackBitmapSequence` | `634` |  |
+| `PlotMaker` | `635` |  |
+| `PmBitmap` | `636` |  |
+| `PmView` | `637` |  |
+| `PmgDesigner` | `638` |  |
+| `Png` | `639` |  |
+| `PntrFalcon` | `640` |  |
+| `PocketPc2bp` | `641` |  |
+| `PocketPcTheme` | `642` |  |
+| `PortfolioGraphics` | `643` |  |
+| `Portrait` | `644` |  |
+| `PostScript` | `645` |  |
+| `PowerGraphics` | `646` |  |
+| `PowerPoint` | `647` |  |
+| `PrintMaster` | `648` |  |
+| `PrintShop` | `649` |  |
+| `PrintShopIcon` | `650` |  |
+| `PrintTechnik` | `651` |  |
+| `PrinterPageSegment` | `652` |  |
+| `Printfox` | `653` |  |
+| `PrintfoxPagefox` | `654` |  |
+| `PrismPaint` | `655` |  |
+| `Prisms` | `656` |  |
+| `ProfiGrf` | `657` |  |
+| `Ps2Txc` | `658` |  |
+| `Psb` | `659` |  |
+| `Psd` | `660` |  |
+| `PsionPic` | `661` |  |
+| `Psp` | `662` |  |
+| `Ptif` | `663` |  |
+| `PublicPainter` | `664` |  |
+| `Pvr` | `665` |  |
+| `Pwc` | `666` |  |
+| `Q0` | `667` |  |
+| `QdvImage` | `668` |  |
+| `Qoi` | `669` |  |
+| `Qrt` | `670` |  |
+| `Qtif` | `671` |  |
+| `QuakeLmp` | `672` |  |
+| `QuakeSpr` | `673` |  |
+| `QuantelVpb` | `674` |  |
+| `QuantumPaint` | `675` |  |
+| `RagD` | `676` |  |
+| `RagePaint` | `677` |  |
+| `RainbowPainter` | `678` |  |
+| `RamBrandt` | `679` |  |
+| `RawGreyscale` | `680` |  |
+| `RawWorkshop` | `681` |  |
+| `RedStormRsb` | `682` |  |
+| `Rembrandt` | `683` |  |
+| `Rgf` | `684` |  |
+| `RicohFax` | `685` |  |
+| `RicohIs30` | `686` |  |
+| `RicohJ6i` | `687` |  |
+| `RiscOsSprite` | `688` |  |
+| `Rla` | `689` |  |
+| `Rlc2` | `690` |  |
+| `RockyInterlace` | `691` |  |
+| `RunPaint` | `692` |  |
+| `SamCoupe` | `693` |  |
+| `SamCoupeLce` | `694` |  |
+| `SamCoupeMode4` | `695` |  |
+| `SamCoupeScreen` | `696` |  |
+| `SamCoupeSsx` | `697` |  |
+| `SamarHiresMap` | `698` |  |
+| `SaracenPaint` | `699` |  |
+| `SbigCcd` | `700` |  |
+| `SciFax` | `701` |  |
+| `ScitexCt` | `702` |  |
+| `ScreenBlaster` | `703` |  |
+| `ScreenMaker` | `704` |  |
+| `Sdg` | `705` |  |
+| `Sdt` | `706` |  |
+| `SeattleFilmWorks` | `707` |  |
+| `SecondNatureSlideShow` | `708` |  |
+| `SecretPhotos` | `709` |  |
+| `SegaGenTile` | `710` |  |
+| `SegaSj1` | `711` |  |
+| `SemiGraphicLogo` | `712` |  |
+| `SeqImage` | `713` |  |
+| `SeriousTexture` | `714` |  |
+| `SeuckSprites` | `715` |  |
+| `SevenuP` | `716` |  |
+| `Sf3` | `717` |  |
+| `Sff` | `718` |  |
+| `Sgi` | `719` |  |
+| `ShapeTableFileType` | `720` |  |
+| `SharpX68k` | `721` |  |
+| `ShfXlEdit` | `722` |  |
+| `SiemensBmx` | `723` |  |
+| `SifImage` | `724` |  |
+| `SinbadSlideshow` | `725` |  |
+| `SinclairBasic` | `726` |  |
+| `Sixel` | `727` |  |
+| `Skantek` | `728` |  |
+| `SketchPaddles` | `729` |  |
+| `SmartFax` | `730` |  |
+| `SmartST` | `731` |  |
+| `SnesTile` | `732` |  |
+| `SoftImage` | `733` |  |
+| `SoftwareAutomation` | `734` |  |
+| `SonyMavica` | `735` |  |
+| `SonyPmp` | `736` |  |
+| `SpcPainter` | `737` |  |
+| `SpecScii` | `738` |  |
+| `SpeccyExtended` | `739` |  |
+| `Spectrum512` | `740` |  |
+| `Spectrum512Comp` | `741` |  |
+| `Spectrum512Ext` | `742` |  |
+| `Spectrum512Smoosh` | `743` |  |
+| `SpeederFalcon` | `744` |  |
+| `Spiff` | `745` |  |
+| `SpookySpritesFalcon` | `746` |  |
+| `SpotImage` | `747` |  |
+| `Sprite64` | `748` |  |
+| `SpritePad` | `749` |  |
+| `SriSun` | `750` |  |
+| `StTrueColor` | `751` |  |
+| `Stad` | `752` |  |
+| `StarPainter` | `753` |  |
+| `StarPainterFont` | `754` |  |
+| `StelaRaw` | `755` |  |
+| `Stellar` | `756` |  |
+| `SunIcon` | `757` |  |
+| `SunRaster` | `758` |  |
+| `SuperHires` | `759` |  |
+| `SuperHiresEditor` | `760` |  |
+| `SuperHiresEditor1` | `761` |  |
+| `SuperHiresEditor2` | `762` |  |
+| `SuperHiresFli` | `763` |  |
+| `SuperHiresStudio` | `764` |  |
+| `Svg` | `765` |  |
+| `Svgz` | `766` |  |
+| `SyberiaTexture` | `767` |  |
+| `SymbOsGraphic` | `768` |  |
+| `SymbianMbm` | `769` |  |
+| `SyntheticArts` | `770` |  |
+| `Synu` | `771` |  |
+| `Taac` | `772` |  |
+| `TaquartInterlace` | `773` |  |
+| `TechnicolorDream` | `774` |  |
+| `TeliFax` | `775` |  |
+| `TextureEditorMikey` | `776` |  |
+| `TextureMaker0` | `777` |  |
+| `Tg4` | `778` |  |
+| `Tga` | `779` |  |
+| `Thomson` | `780` |  |
+| `Ti92Picture` | `781` |  |
+| `TiBitmap` | `782` |  |
+| `TiPicture` | `783` |  |
+| `Tiff` | `784` |  |
+| `TilePic` | `785` |  |
+| `TilezTexture` | `786` |  |
+| `Tim` | `787` |  |
+| `Tim2` | `788` |  |
+| `TimexGigascreen` | `789` |  |
+| `Tiny` | `790` |  |
+| `TmSat` | `791` |  |
+| `TobiasRichterSlideshow` | `792` |  |
+| `TriPaint` | `793` |  |
+| `Trs80` | `794` |  |
+| `TrsPix` | `795` |  |
+| `TrueColorImg` | `796` |  |
+| `TruePaint` | `797` |  |
+| `TrueType` | `798` |  |
+| `TrzmielCompressed` | `799` |  |
+| `TurboRascal` | `800` |  |
+| `TurboView` | `801` |  |
+| `UfliEditor` | `802` |  |
+| `Uhdr` | `803` |  |
+| `UifliEditor` | `804` |  |
+| `Uimg` | `805` |  |
+| `UleadAlbumTemplate` | `806` |  |
+| `UleadImageLibrary` | `807` |  |
+| `UtahRle` | `808` |  |
+| `UyvyRaw` | `809` |  |
+| `VbxeSlideShow` | `810` |  |
+| `VdcBitmap` | `811` |  |
+| `Vector06c` | `812` |  |
+| `VentaFax` | `813` |  |
+| `VertiZontalInterlacing` | `814` |  |
+| `VerticalHiresInterlace` | `815` |  |
+| `Vic20` | `816` |  |
+| `Vicar` | `817` |  |
+| `Vidcom64` | `818` |  |
+| `VidiChrome` | `819` |  |
+| `VidigPaint` | `820` |  |
+| `Viff` | `821` |  |
+| `Vips` | `822` |  |
+| `VirtualBoyTile` | `823` |  |
+| `Vitec` | `824` |  |
+| `Vivid` | `825` |  |
+| `Vp8` | `826` |  |
+| `Vp8L` | `827` |  |
+| `Vrml` | `828` |  |
+| `Vtf` | `829` |  |
+| `Vue` | `830` |  |
+| `Wad2` | `831` |  |
+| `Wad3` | `832` |  |
+| `Wal` | `833` |  |
+| `Wbmp` | `834` |  |
+| `WebP` | `835` |  |
+| `WebShots` | `836` |  |
+| `Wic` | `837` |  |
+| `WigmoreArtist` | `838` |  |
+| `WinFax` | `839` |  |
+| `WizSolitaireDeck` | `840` |  |
+| `Wmf` | `841` |  |
+| `WonderSwanTile` | `842` |  |
+| `Word` | `843` |  |
+| `WorldportFax` | `844` |  |
+| `Wpg` | `845` |  |
+| `Wsq` | `846` |  |
+| `Wzl` | `847` |  |
+| `X11Puzzle` | `848` |  |
+| `X3f` | `849` |  |
+| `XBin` | `850` |  |
+| `XFliEditor` | `851` |  |
+| `Xar` | `852` |  |
+| `Xbm` | `853` |  |
+| `XbmColor` | `854` |  |
+| `Xcf` | `855` |  |
+| `Xcursor` | `856` |  |
+| `Ximage` | `857` |  |
+| `XionicsSmp` | `858` |  |
+| `XlPaint` | `859` |  |
+| `Xld4` | `860` |  |
+| `Xpm` | `861` |  |
+| `XvThumbnail` | `862` |  |
+| `Xwd` | `863` |  |
+| `Xyz` | `864` |  |
+| `Ybm` | `865` |  |
+| `YuvRaw` | `866` |  |
+| `ZeissBivas` | `867` |  |
+| `ZeissLsm` | `868` |  |
+| `Zinc` | `869` |  |
+| `ZonerBrush` | `870` |  |
+| `Zoom4` | `871` |  |
+| `Zoomatic` | `872` |  |
+| `ZsStaffKid98` | `873` |  |
+| `Zx81` | `874` |  |
+| `ZxArtStudio` | `875` |  |
+| `ZxAttributes` | `876` |  |
+| `ZxAttributesGigascreen` | `877` |  |
+| `ZxBigFont` | `878` |  |
+| `ZxBorderMulticolor` | `879` |  |
+| `ZxBorderScreen` | `880` |  |
+| `ZxChrd` | `881` |  |
+| `ZxFlash` | `882` |  |
+| `ZxFont` | `883` |  |
+| `ZxGigascreen` | `884` |  |
+| `ZxMlg` | `885` |  |
+| `ZxMultiArtist` | `886` |  |
+| `ZxMulticolor` | `887` |  |
+| `ZxNext` | `888` |  |
+| `ZxNextImage` | `889` |  |
+| `ZxPaintbrush` | `890` |  |
+| `ZxPaintyOne` | `891` |  |
+| `ZxRgb3` | `892` |  |
+| `ZxSnapshot` | `893` |  |
+| `ZxSpectrum` | `894` |  |
+| `ZxTimex` | `895` |  |
+| `ZxTrefiBorderScreen` | `896` |  |
+| `ZxTricolor` | `897` |  |
+| `ZxUlaPlus` | `898` |  |
+| `ZzRough` | `899` |  |
 
 #### `MagicSignature`
 
