@@ -456,8 +456,9 @@ reader for that name to take a JPEG, which every one of them refused:
   - `iwc` is WaveL's wavelet codec, and its header is fully recovered — from WaveL's own Java decoder
     applet, whose class fields survived: `IWC`, a version byte, the two sizes, a level count and a
     quality, then float scale factors and minima, nine floats per level, and a byte count that
-    matches the payload of the sample exactly. What is not recovered is the coding, which is an
-    entropy-coded subband scheme that would have to be written out of decompiled Java. XnView cannot
+    matches the payload of the sample exactly. The coding is recovered now too — a splay-tree
+    entropy coder over the subbands, read out of the same classes and checked against them run on a
+    desktop JVM. *Closed:* #589. XnView cannot
     read it on this platform either.
   - `mbig` is the Michelin road atlas, and it has no magic bytes at all: four 32-bit words giving a
     tile size and a grid, then a directory of two words per tile where a second word of zero means
@@ -693,8 +694,9 @@ XnView's own Linux converter does not carry at all, so there is nothing here to 
 Two are identified down to their first bytes and no further, because the coding was never published:
 `pwc` is the piecewise-constant image model, `4yVa`, distributed as a Windows binary from its
 author's research page; `wic` is the J Wavelet Image Codec, `FA DE BA BE 01 01` in its later form
-and `1B 7A FB 30` in its earlier. Both are marked Windows-only in XnView's catalogue, so nothing
-here has ever seen one decoded either.
+and `1B 7A FB 30` in its earlier. Both are marked Windows-only in XnView's catalogue. Its
+author's translator source survived, and from it, Lehtinen's papers and the javawic applet the codec
+is read and written now, both generations. *Closed:* #554.
 
 Three have a shape worth writing down for whoever comes back to them:
 
@@ -965,7 +967,7 @@ Windows only, so nothing here has ever been able to compare against them either.
 | ioca | .mod |  |
 | ipg | .ipg |  |
 | iss | .iss | read; 3KCBIMSP, one or eight bits a pixel, counting upward from white |
-| iwc | .iwc | header recovered from WaveL's own applet; the subband coding is not. Windows only |
+| iwc | .iwc | read and write, pixel-exact against WaveL's own Java applet run on a desktop JVM |
 | jbf | .jbf | version 2 read; version 1's bitmap coding refused |
 | jig | .jig |  |
 | jig2 | .jig |  |
@@ -1062,7 +1064,7 @@ Windows only, so nothing here has ever been able to compare against them either.
 | uyvyi | .qtl | raw YUV; nothing states the size, and five names share this extension |
 | vit | .vit |  |
 | vob | .vob |  |
-| wic | .wic | the J Wavelet Image Codec; its coding was never published; Windows only |
+| wic | .wic | read and write, both header generations, pixel-exact against the 1.01 translator's own coder and the javawic applet |
 | wrl | .wrl | read; the `PixelTexture` node the converter writes and cannot read back, bottom row first |
 | wzl | .wzl |  |
 | x3f | .x3f |  |

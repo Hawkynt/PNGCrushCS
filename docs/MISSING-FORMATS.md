@@ -32,7 +32,7 @@ issue quotes the recorded blocker and the route around it.
 
 | Category | Tracking issue | Images | Codecs | Containers | Encoders | Total |
 | --- | --- | ---: | ---: | ---: | ---: | ---: |
-| [Modern & standard still-image codecs](#modern--standard-still-image-codecs) | [#513](https://github.com/Hawkynt/PNGCrushCS/issues/513) | 61 | 0 | 0 | 0 | 61 |
+| [Modern & standard still-image codecs](#modern--standard-still-image-codecs) | [#513](https://github.com/Hawkynt/PNGCrushCS/issues/513) | 59 | 0 | 0 | 0 | 59 |
 | [Camera RAW & sensor data](#camera-raw--sensor-data) | [#514](https://github.com/Hawkynt/PNGCrushCS/issues/514) | 24 | 0 | 0 | 0 | 24 |
 | [Geospatial & remote sensing](#geospatial--remote-sensing) | [#515](https://github.com/Hawkynt/PNGCrushCS/issues/515) | 83 | 0 | 0 | 0 | 83 |
 | [Medical & scientific imaging](#medical--scientific-imaging) | [#516](https://github.com/Hawkynt/PNGCrushCS/issues/516) | 42 | 0 | 0 | 0 | 42 |
@@ -49,7 +49,7 @@ issue quotes the recorded blocker and the route around it.
 | [Lossless & uncompressed video](#lossless--uncompressed-video) | [#527](https://github.com/Hawkynt/PNGCrushCS/issues/527) | 0 | 11 | 0 | 2 | 13 |
 | [Cinema camera RAW video](#cinema-camera-raw-video) | [#528](https://github.com/Hawkynt/PNGCrushCS/issues/528) | 0 | 6 | 7 | 0 | 13 |
 | [Elementary streams & streaming manifests](#elementary-streams--streaming-manifests) | [#529](https://github.com/Hawkynt/PNGCrushCS/issues/529) | 0 | 0 | 18 | 0 | 18 |
-| **All** | | **571** | **147** | **274** | **19** | **1011** |
+| **All** | | **569** | **147** | **274** | **19** | **1009** |
 
 Each issue carries the labels `cat: <category>`, its kind (`image-format`, `video-codec`, `video-container`, `video-encoder`), `priority: high|medium|low`, and `documented-blocker` where that applies.
 
@@ -82,7 +82,6 @@ JPEG/JPEG 2000/HEIF variants, wavelet, HDR and research still-image codecs. Trac
 | Gifpress compressed GIF (.gps) | Image | `.gps` | read + write | missing | low | [#551](https://github.com/Hawkynt/PNGCrushCS/issues/551) |
 | HEIF image sequence (HEVC/AVC track, .heics/.avcs) | Image | `.heics`, `.hevcs`, `.avcs` | read + write | missing | low | [#552](https://github.com/Hawkynt/PNGCrushCS/issues/552) |
 | hipix (HPX) | Image | `.hpx` | read + write | missing | low | [#553](https://github.com/Hawkynt/PNGCrushCS/issues/553) |
-| J Wavelet Image Codec (WIC) | Image | `.wic` | read + write | blocked | low | [#554](https://github.com/Hawkynt/PNGCrushCS/issues/554) |
 | JPEG 2000 in HEIF (HEJ2, ISO/IEC 15444-16) | Image | `.hej2`, `.heif` | read + write | missing | low | [#555](https://github.com/Hawkynt/PNGCrushCS/issues/555) |
 | JPEG AI (ISO/IEC 6048) | Image | `.jai` | read + write | missing | low | [#556](https://github.com/Hawkynt/PNGCrushCS/issues/556) |
 | JPEG arithmetic coding (SOF9/SOF10/SOF11) | Image | `.jpg`, `.jpeg` | read + write | missing | low | [#557](https://github.com/Hawkynt/PNGCrushCS/issues/557) |
@@ -116,7 +115,6 @@ JPEG/JPEG 2000/HEIF variants, wavelet, HDR and research still-image codecs. Trac
 | Uncompressed HEIF (ISO/IEC 23001-17 'unci') | Image | `.heif` | read + write | missing | low | [#586](https://github.com/Hawkynt/PNGCrushCS/issues/586) |
 | V-Ray image (.vrimg) | Image | `.vrimg` | read + write | missing | low | [#587](https://github.com/Hawkynt/PNGCrushCS/issues/587) |
 | VVC (H.266) in HEIF | Image | `.heif`, `.vvic` | read + write | missing | low | [#588](https://github.com/Hawkynt/PNGCrushCS/issues/588) |
-| WaveL Image Wavelet Codec (IWC) | Image | `.iwc` | read + write | blocked | low | [#589](https://github.com/Hawkynt/PNGCrushCS/issues/589) |
 | WebP 2 (experimental) | Image | `.wp2` | read + write | missing | low | [#590](https://github.com/Hawkynt/PNGCrushCS/issues/590) |
 | WhyPic (YPC) | Image | `.ypc` | read + write | blocked | low | [#591](https://github.com/Hawkynt/PNGCrushCS/issues/591) |
 | Zpng | Image | `.zpng` | read + write | missing | low | [#592](https://github.com/Hawkynt/PNGCrushCS/issues/592) |
