@@ -857,6 +857,39 @@ frame, so a miscounted coded-block run, a mode written for a macro block that ca
 in the wrong units would pass it and fail in a real player on frame two. A still scene is also required
 to converge, which is what demonstrates the coded-block flags firing at all.
 
+### On2 VP4
+
+Converted from the `version >= 2` paths of FFmpeg's `libavcodec/vp3.c` and from `vp3dsp.c`, with every
+table of `vp4data.h` and the token tables of `vp3data.h` transcribed by script, all LGPL-2.1-or-later.
+It is a decoder of its own rather than a branch of the VP3.1 one above, because VP4 changes almost every
+layer while keeping VP3's shape. Which blocks are coded comes as runs over every macroblock of the three
+planes — fully, partly, not — with a block pattern for the partly coded ones from one of two tables the
+previous pattern chooses. The eight coding modes are VP3's, but a vector is coded relative to the last
+one of its kind with one of seven tables picked by that vector's size, and golden-frame vectors keep a
+history of their own. The coefficients are read a block at a time in Hilbert order, with an end-of-block
+run counted per coefficient position — a run ends that many later blocks at the same position, and a run
+of nought ends every later one there — and the DC is predicted as it is read, from the mean of two
+same-kind neighbours or the last DC of that kind. The quantiser and filter tables are VP4's own, and
+there is no loop filter over the picture: a motion-compensated prediction that straddles a block edge of
+its reference has that edge filtered in a copy first. The picture is held as FFmpeg holds it, bottom row
+first and padded to whole macroblocks, and cropped from the top left.
+
+The left neighbours of the DC predictor carry from the last superblock of one row into the first of the
+next, which is FFmpeg's behaviour and is kept. Measured against FFmpeg's `yuv420p` planes decoded with
+`-flags +bitexact`: the 364 pictures of `samples.ffmpeg.org/V-codecs/VP4/ot171_vp40.avi`, 160x112, four
+key frames and every one of the eight coding modes — golden frames and four-vector macroblocks
+among them — with 29,519 predictions passing through the motion-compensation filter; every one
+identical. It is
+the only public VP4 film.
+
+FFmpeg has no VP4 encoder, so the encoder is the package's own. It writes a key frame every thirtieth
+picture and inter frames whose macroblocks are copied, partly coded or wholly coded with VP4's "inter,
+no motion vector" mode, using mode scheme 5 where that mode is one bit, the first coefficient table of
+every group, each DC as its difference from VP4's prediction, and an end-of-block run of one wherever a
+block stops short. It decodes each frame it writes with the decoder above to get the reference for the
+next. FFmpeg decodes what it writes, in AVI and Matroska and at sizes that are and are not whole
+macroblocks, to exactly this decoder's pictures.
+
 ### Sorenson Video 1
 
 Converted from FFmpeg's `libavcodec/svq1dec.c` with its codebooks, codes and frame-size table parsed

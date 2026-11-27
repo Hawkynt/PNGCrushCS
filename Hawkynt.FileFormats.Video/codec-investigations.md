@@ -1558,6 +1558,11 @@ it was produced and from what.
 
 # On2 VP4, where the wiring is published and one wire is not
 
+*Closed.* VP4 is decoded and encoded now. The motion-vector codes this entry found printed nowhere are
+in FFmpeg's `vp4data.h`, under LGPL-2.1-or-later, with every other VP4 table; they and the VP4 paths of
+`vp3.c` and `vp3dsp.c` are converted, and the one public film, `ot171_vp40.avi`, decodes to FFmpeg's
+pictures exactly. `codec-notes.md` has the details.
+
 VP4 — FourCC `VP40` — was investigated first among the two On2 codecs this task targeted, on the
 strength of a real advantage the note above already gives it: it shares almost all of its structure
 with VP3, which this package decodes exact over 3,182 frames. That advantage turns out to be real for

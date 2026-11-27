@@ -44,12 +44,12 @@ issue quotes the recorded blocker and the route around it.
 | [Embroidery & industrial](#embroidery--industrial) | [#522](https://github.com/Hawkynt/PNGCrushCS/issues/522) | 20 | 0 | 0 | 0 | 20 |
 | [Standard & broadcast video](#standard--broadcast-video) | [#523](https://github.com/Hawkynt/PNGCrushCS/issues/523) | 0 | 31 | 16 | 0 | 47 |
 | [Game & multimedia-title video](#game--multimedia-title-video) | [#524](https://github.com/Hawkynt/PNGCrushCS/issues/524) | 0 | 41 | 198 | 6 | 245 |
-| [Legacy PC & capture-card video](#legacy-pc--capture-card-video) | [#525](https://github.com/Hawkynt/PNGCrushCS/issues/525) | 0 | 50 | 36 | 2 | 88 |
+| [Legacy PC & capture-card video](#legacy-pc--capture-card-video) | [#525](https://github.com/Hawkynt/PNGCrushCS/issues/525) | 0 | 49 | 36 | 2 | 87 |
 | [Screen-capture video](#screen-capture-video) | [#526](https://github.com/Hawkynt/PNGCrushCS/issues/526) | 0 | 13 | 0 | 9 | 22 |
 | [Lossless & uncompressed video](#lossless--uncompressed-video) | [#527](https://github.com/Hawkynt/PNGCrushCS/issues/527) | 0 | 11 | 0 | 2 | 13 |
 | [Cinema camera RAW video](#cinema-camera-raw-video) | [#528](https://github.com/Hawkynt/PNGCrushCS/issues/528) | 0 | 6 | 7 | 0 | 13 |
 | [Elementary streams & streaming manifests](#elementary-streams--streaming-manifests) | [#529](https://github.com/Hawkynt/PNGCrushCS/issues/529) | 0 | 0 | 18 | 0 | 18 |
-| **All** | | **578** | **152** | **275** | **19** | **1024** |
+| **All** | | **578** | **151** | **275** | **19** | **1023** |
 
 Each issue carries the labels `cat: <category>`, its kind (`image-format`, `video-codec`, `video-container`, `video-encoder`), `priority: high|medium|low`, and `documented-blocker` where that applies.
 
@@ -1045,7 +1045,6 @@ Codecs/containers from games, consoles, CD-ROM titles and animation tools. Track
 | Motion Pixels Video | Codec | `.mvi`, `.avi` | decode + encode | missing | low | [#1467](https://github.com/Hawkynt/PNGCrushCS/issues/1467) |
 | MSU Lossless Video Codec | Codec | `MSUD` | decode + encode | missing | low | [#1469](https://github.com/Hawkynt/PNGCrushCS/issues/1469) |
 | NuppelVideo RTJPEG | Codec | `.nuv` | decode + encode | missing | low | [#1474](https://github.com/Hawkynt/PNGCrushCS/issues/1474) |
-| On2 VP4 | Codec | `.avi` | decode + encode | blocked | low | [#1476](https://github.com/Hawkynt/PNGCrushCS/issues/1476) |
 | Pegasus Motion Wavelet 2000 (PVW2) | Codec | `PVW2` | decode + encode | missing | low | [#1479](https://github.com/Hawkynt/PNGCrushCS/issues/1479) |
 | Radius Studio Video (PGVV) | Codec | `PGVV` | decode + encode | missing | low | [#1482](https://github.com/Hawkynt/PNGCrushCS/issues/1482) |
 | SGI RLE 8-bit (rle1) | Codec | `.mv`, `.mov`, `.qt` | decode + encode | missing | low | [#1485](https://github.com/Hawkynt/PNGCrushCS/issues/1485) |
