@@ -46,10 +46,10 @@ issue quotes the recorded blocker and the route around it.
 | [Game & multimedia-title video](#game--multimedia-title-video) | [#524](https://github.com/Hawkynt/PNGCrushCS/issues/524) | 0 | 48 | 201 | 6 | 255 |
 | [Legacy PC & capture-card video](#legacy-pc--capture-card-video) | [#525](https://github.com/Hawkynt/PNGCrushCS/issues/525) | 0 | 51 | 36 | 2 | 89 |
 | [Screen-capture video](#screen-capture-video) | [#526](https://github.com/Hawkynt/PNGCrushCS/issues/526) | 0 | 16 | 0 | 9 | 25 |
-| [Lossless & uncompressed video](#lossless--uncompressed-video) | [#527](https://github.com/Hawkynt/PNGCrushCS/issues/527) | 0 | 14 | 0 | 2 | 16 |
+| [Lossless & uncompressed video](#lossless--uncompressed-video) | [#527](https://github.com/Hawkynt/PNGCrushCS/issues/527) | 0 | 13 | 0 | 2 | 15 |
 | [Cinema camera RAW video](#cinema-camera-raw-video) | [#528](https://github.com/Hawkynt/PNGCrushCS/issues/528) | 0 | 6 | 7 | 0 | 13 |
 | [Elementary streams & streaming manifests](#elementary-streams--streaming-manifests) | [#529](https://github.com/Hawkynt/PNGCrushCS/issues/529) | 0 | 0 | 18 | 0 | 18 |
-| **All** | | **578** | **170** | **278** | **19** | **1045** |
+| **All** | | **578** | **169** | **278** | **19** | **1044** |
 
 Each issue carries the labels `cat: <category>`, its kind (`image-format`, `video-codec`, `video-container`, `video-encoder`), `priority: high|medium|low`, and `documented-blocker` where that applies.
 
@@ -1156,7 +1156,6 @@ Lossless intermediate and uncompressed video codecs. Tracked in [#527](https://g
 | Format | Kind | Extensions / ids | Needs | Status | Priority | Issue |
 | --- | --- | --- | --- | --- | --- | --- |
 | DNxUncompressed (SMPTE RDD 50) | Codec | `.mxf`, `.mov` | decode + encode | missing | medium | [#1534](https://github.com/Hawkynt/PNGCrushCS/issues/1534) |
-| Lagarith lossless | Codec | `.avi` | decode + encode | blocked | medium | [#1535](https://github.com/Hawkynt/PNGCrushCS/issues/1535) |
 | Alparysoft Lossless (ASLC) | Codec | `ASLC` | decode + encode | missing | low | [#1536](https://github.com/Hawkynt/PNGCrushCS/issues/1536) |
 | AMV3 lossless | Codec | `AMV3` | decode + encode | missing | low | [#1537](https://github.com/Hawkynt/PNGCrushCS/issues/1537) |
 | Bitpacked (RFC 4175 packed YUV 4:2:2) | Codec | `bitpacked`, `UYVY` | decode + encode | missing | low | [#1538](https://github.com/Hawkynt/PNGCrushCS/issues/1538) |

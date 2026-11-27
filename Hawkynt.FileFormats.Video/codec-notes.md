@@ -2142,6 +2142,33 @@ reconstructing with `simple_idct`. It states 255 kbit/s in the extension header,
 prediction off and per-macroblock tables unused. FFmpeg decodes what it writes, in AVI and Matroska and
 with noise pictures that force the escapes, to exactly this decoder's pictures.
 
+### Lagarith
+
+Converted from FFmpeg's `libavcodec/lagarith.c`, `lagarithrac.c` and `lagarithrac.h`, LGPL-2.1-or-later,
+with the probability header's variable-length code copied exactly. The probability table is rescaled to
+a power of two by FFmpeg's soft-float reciprocal and multiply, which reproduce in integers the x86 floating
+point the reference encoder rescaled with, the remainder handed out round the first 128 non-zero entries.
+The range decoder reads every byte one bit late, as the reference does. FFmpeg's hash table for finding a
+symbol is only a start for a linear search, so a binary search for the first cumulative probability above
+the code value gives the same symbol. Zero runs carry across lines and, as in FFmpeg, across planes. RGB
+planes run bottom-up, with red and blue coded as differences from green; YUY2 has its own first two rows.
+
+Measured against FFmpeg's planes, decoded with `-flags +bitexact`, over `samples.ffmpeg.org/V-codecs/lagarith/`
+and the FATE suite's `lagarith/`: ten films, every picture identical, in RGB24 (306 pictures compared),
+RGBA (136), YUY2 (67, up to 1920x1080) and YV12 (113, the comparison's byte budget reached). FATE's
+`lagarith-1.3.27-black-frames-and-off-by-ones.avi` is among them. Its empty packets are dropped frames and
+give no picture in either decoder. The measure is FFmpeg's decode, which FFmpeg's own tracker once
+recorded as not bit-exact with the reference. FATE now carries the sample from that report, but
+`lagarith.dll`, the reference decoder beside the samples, was not run.
+
+The encoder is this package's own: each plane is predicted with the decoder's predictors run forwards.
+The probability table is its residue counts, halved until the total fits 23 bits. The range encoder
+mirrors the decoder at twice its scale, so the decoder's one-bit offset becomes a byte boundary, and it
+carries into bytes already written. A plane of one value is coded as solid, and so is a picture of one
+colour. A plane the coder would enlarge has its residues stored. A 64x48 gradient codes to 985 bytes of
+4,608, and noise to eight bytes over the raw size. FFmpeg decodes what it writes, in all four layouts, in
+AVI and Matroska, to exactly the pictures given.
+
 ### Ut Video
 
 Lossless and intra only, and the capture codec of the three here that is still in active use. A

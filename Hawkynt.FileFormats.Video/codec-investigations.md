@@ -322,6 +322,12 @@ the format being unreachable.
 
 # Lagarith, where the entropy coder's state is a floating-point number
 
+*Closed.* Lagarith is decoded and encoded now, converted from FFmpeg's LGPL-2.1-or-later `lagarith.c` and
+`lagarithrac.c`, whose soft-float rescaling reproduces the reference encoder's x86 rounding in integers;
+`codec-notes.md` has the measurement. The second wall below stands in part: the measure is FFmpeg's decode,
+which now includes the FATE sample named for the off-by-one report, and the reference decoder itself — the
+`lagarith.dll` beside the samples — was not run.
+
 Lagarith (`LAGS`) is a lossless codec of the HuffYUV family: median prediction, a run-length pass over
 the zeroes, and then a range coder rather than a Huffman table. It was investigated because lossless
 is the sharpest bar this package has — max delta 0 or the decoder is wrong — and because two of its
