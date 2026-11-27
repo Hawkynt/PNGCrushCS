@@ -56,7 +56,7 @@ three times it was wrong, and each was overturned by checking rather than by rea
     extracted payload and matches it on every pixel.
 
 The names still open are not waiting on effort. Recomputed against the catalogue rather than taken
-from this file's own history, they are ten: `sid`, `ldf`, `eri`, `fif`, `pwc`, `iwc`,
+from this file's own history, they are nine: `sid`, `ldf`, `eri`, `fif`, `iwc`,
 `wic` and `ypc` are Windows-only third-party plugins whose coding was never published, and the
 converter on this platform does not carry their readers either, so there is nothing here to ask;
 `prc`'s only reference implementation cannot read its own output, and writes a file it then refuses;
@@ -64,7 +64,7 @@ and `pax` is Blowfish under a password the file does not carry. What would move 
 specification or a working decoder, not more searching — the per-name detail is in "Nothing credible
 describes these" and the table below.
 
-Beside those ten, one row is read under some of its names and not all: `ti` wants `.92i` as well
+Beside those nine, one row is read under some of its names and not all: `ti` wants `.92i` as well
 as the five now read, and the TI-92 really is a different container with its picture data compressed,
 so that half stays open on its merits. Two more are not extensions at all and never were — Amica
 Paint's is the literal `[b]` and ColoRIX's the wildcard `sc?` — which is recorded under "The two rows
