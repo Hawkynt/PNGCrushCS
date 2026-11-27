@@ -53,6 +53,8 @@ internal static class H265MotionPrediction {
     var yCb = frame.CodingBlockY;
     var nCbS = frame.CodingBlockSize;
     var partitionMode = frame.CodingBlockPartitionMode;
+    var originalWidth = nPbW;
+    var originalHeight = nPbH;
 
     // An 8x8 coding block whose merge candidates are shared across a parallel merge region derives
     // one candidate list for the whole block rather than one per prediction block. That is what makes
@@ -90,8 +92,9 @@ internal static class H265MotionPrediction {
 
     // A prediction block of eight samples' area may not use two references. A merge candidate that
     // does is cut down to the first list rather than refused, because the encoder chose the index
-    // knowing this rule would apply.
-    if (chosen.PredictL0 && chosen.PredictL1 && nPbW + nPbH == 12) {
+    // knowing this rule would apply. The area is the prediction block's own (nOrigPbW and nOrigPbH),
+    // not that of the coding block whose candidate list a parallel merge region shares.
+    if (chosen.PredictL0 && chosen.PredictL1 && originalWidth + originalHeight == 12) {
       chosen.PredictL1 = false;
       chosen.RefIdxL1 = -1;
       chosen.MvL1X = 0;
