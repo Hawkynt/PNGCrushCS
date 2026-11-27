@@ -168,6 +168,15 @@
     </None>
   </ItemGroup>
 
+  <!-- LuraWave streams in every colour mode and layout, each beside what LuraTech's own Java
+       decoder (lwf_jsdk2.6) decoded it to. See Formats\LuraWave\LuraWaveOracleTests.cs. -->
+  <ItemGroup>
+    <None Include="Formats\LuraWave\Fixtures\*">
+      <Link>Fixtures\LuraWave\%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
   <ItemGroup>
     <Using Include="NUnit.Framework" />
   </ItemGroup>

@@ -515,6 +515,7 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | Lss16 | `.lss`, `.16` | ✅ | ✅ | — | — | — | XnView |
 | LucasFilm | `.lff` | ✅ | ✅ | — | — | — | none |
 | LudekMaker | `.ldm` | ✅ | ✅ | — | — | — | recoil2png, IrfanView |
+| LuraWave | `.lwf` | ✅ | ✅ | ✅ | — | — | none |
 | LViewPro | `.lvp` | ✅ | ✅ | — | — | — | XnView, IrfanView, ffmpeg |
 | MacPaint | `.mac`, `.macp`, `.pntg`, `.pnt`, `.paint`, `.mpnt` | ✅ | ✅ | — | — | — | recoil2png, ImageMagick, IrfanView |
 | MadDesigner | `.mbg` | ✅ | ✅ | — | — | — | recoil2png |
