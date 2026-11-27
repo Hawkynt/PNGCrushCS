@@ -21,8 +21,9 @@ namespace FileFormat.TiPicture;
 /// that was settled instead by building the same picture under both signatures and handing the pair
 /// to XnView's converter, which read them identically. Only the signature differs.
 /// <para/>
-/// The <c>**TI92**</c> files are a different container — a folder of named entries rather than a run
-/// of them — and their picture data is compressed, so they are not read here.
+/// The <c>**TI92**</c> files are a different container — a directory of named entries at absolute
+/// offsets rather than a run of them — and are read by <c>Ti92PictureFile</c>; their pictures are
+/// plain bitmaps, not compressed, as an earlier note here had it.
 /// </remarks>
 [VerifiedBy(ConformanceOracle.XnView)]
 public readonly record struct TiPictureFile

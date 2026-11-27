@@ -35937,6 +35937,57 @@ Implements `IImageFormatMetadata<ThomsonFile>`, `IImageFormatReader<ThomsonFile>
 | --- | --- | --- |
 | `ToBytes` | `static byte[] ToBytes(ThomsonFile file)` |  |
 
+### Namespace `FileFormat.Ti92Picture`
+
+[`Ti92Picture`](#ti92picture) · [`Ti92PictureFile`](#ti92picturefile) · [`Ti92PictureReader`](#ti92picturereader) · [`Ti92PictureWriter`](#ti92picturewriter)
+
+#### `Ti92Picture`
+
+Implements `IEquatable<Ti92Picture>`.
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `Ti92Picture` | `Ti92Picture(string Name, int Width, int Height, byte[] PixelData)` |  |
+| `Height` | `int Height { get; init; }` |  |
+| `Name` | `string Name { get; init; }` |  |
+| `PixelData` | `byte[] PixelData { get; init; }` |  |
+| `Width` | `int Width { get; init; }` |  |
+
+#### `Ti92PictureFile`
+
+Implements `IEquatable<Ti92PictureFile>`, `IImageFormatMetadata<Ti92PictureFile>`, `IImageFormatReader<Ti92PictureFile>`, `IImageFormatWriter<Ti92PictureFile>`, `IImageFromRawImage<Ti92PictureFile>`, `IImageToRawImage<Ti92PictureFile>`, `IMultiImageFileFormat<Ti92PictureFile>`.
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `EntrySize` | `const int EntrySize` |  |
+| `HeaderSize` | `const int HeaderSize` |  |
+| `PictureTag` | `const byte PictureTag` |  |
+| `PictureType` | `const byte PictureType` |  |
+| `Folder` | `string Folder { get; init; }` |  |
+| `Model` | `string Model { get; init; }` |  |
+| `Pictures` | `IReadOnlyList<Ti92Picture> Pictures { get; init; }` |  |
+| `FromRawImage` | `static Ti92PictureFile FromRawImage(RawImage image)` |  |
+| `FromRawImage` | `static Ti92PictureFile FromRawImage(RawImage image, string extension)` |  |
+| `ImageCount` | `static int ImageCount(Ti92PictureFile file)` |  |
+| `ToRawImage` | `static RawImage ToRawImage(Ti92PictureFile file)` |  |
+| `ToRawImage` | `static RawImage ToRawImage(Ti92PictureFile file, int index)` |  |
+
+#### `Ti92PictureReader`
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `FromBytes` | `static Ti92PictureFile FromBytes(byte[] data)` |  |
+| `FromFile` | `static Ti92PictureFile FromFile(FileInfo file)` |  |
+| `FromSpan` | `static Ti92PictureFile FromSpan(ReadOnlySpan<byte> data)` |  |
+| `FromStream` | `static Ti92PictureFile FromStream(Stream stream)` |  |
+| `ModelOf` | `static string ModelOf(ReadOnlySpan<byte> header)` |  |
+
+#### `Ti92PictureWriter`
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `ToBytes` | `static byte[] ToBytes(Ti92PictureFile file)` |  |
+
 ### Namespace `FileFormat.TiBitmap`
 
 [`TiBitmapFile`](#tibitmapfile) · [`TiBitmapReader`](#tibitmapreader) · [`TiBitmapWriter`](#tibitmapwriter)
@@ -42076,123 +42127,124 @@ Implements `IEquatable<FormatEntry>`.
 | `Tg4` | `774` |  |
 | `Tga` | `775` |  |
 | `Thomson` | `776` |  |
-| `TiBitmap` | `777` |  |
-| `TiPicture` | `778` |  |
-| `Tiff` | `779` |  |
-| `TilePic` | `780` |  |
-| `TilezTexture` | `781` |  |
-| `Tim` | `782` |  |
-| `Tim2` | `783` |  |
-| `TimexGigascreen` | `784` |  |
-| `Tiny` | `785` |  |
-| `TmSat` | `786` |  |
-| `TobiasRichterSlideshow` | `787` |  |
-| `TriPaint` | `788` |  |
-| `Trs80` | `789` |  |
-| `TrsPix` | `790` |  |
-| `TrueColorImg` | `791` |  |
-| `TruePaint` | `792` |  |
-| `TrueType` | `793` |  |
-| `TrzmielCompressed` | `794` |  |
-| `TurboRascal` | `795` |  |
-| `TurboView` | `796` |  |
-| `UfliEditor` | `797` |  |
-| `Uhdr` | `798` |  |
-| `UifliEditor` | `799` |  |
-| `Uimg` | `800` |  |
-| `UleadAlbumTemplate` | `801` |  |
-| `UleadImageLibrary` | `802` |  |
-| `UtahRle` | `803` |  |
-| `UyvyRaw` | `804` |  |
-| `VbxeSlideShow` | `805` |  |
-| `VdcBitmap` | `806` |  |
-| `Vector06c` | `807` |  |
-| `VentaFax` | `808` |  |
-| `VertiZontalInterlacing` | `809` |  |
-| `VerticalHiresInterlace` | `810` |  |
-| `Vic20` | `811` |  |
-| `Vicar` | `812` |  |
-| `Vidcom64` | `813` |  |
-| `VidiChrome` | `814` |  |
-| `VidigPaint` | `815` |  |
-| `Viff` | `816` |  |
-| `Vips` | `817` |  |
-| `VirtualBoyTile` | `818` |  |
-| `Vitec` | `819` |  |
-| `Vivid` | `820` |  |
-| `Vp8` | `821` |  |
-| `Vp8L` | `822` |  |
-| `Vrml` | `823` |  |
-| `Vtf` | `824` |  |
-| `Vue` | `825` |  |
-| `Wad2` | `826` |  |
-| `Wad3` | `827` |  |
-| `Wal` | `828` |  |
-| `Wbmp` | `829` |  |
-| `WebP` | `830` |  |
-| `WebShots` | `831` |  |
-| `WigmoreArtist` | `832` |  |
-| `WinFax` | `833` |  |
-| `WizSolitaireDeck` | `834` |  |
-| `Wmf` | `835` |  |
-| `WonderSwanTile` | `836` |  |
-| `Word` | `837` |  |
-| `WorldportFax` | `838` |  |
-| `Wpg` | `839` |  |
-| `Wsq` | `840` |  |
-| `Wzl` | `841` |  |
-| `X11Puzzle` | `842` |  |
-| `X3f` | `843` |  |
-| `XBin` | `844` |  |
-| `XFliEditor` | `845` |  |
-| `Xar` | `846` |  |
-| `Xbm` | `847` |  |
-| `XbmColor` | `848` |  |
-| `Xcf` | `849` |  |
-| `Xcursor` | `850` |  |
-| `Ximage` | `851` |  |
-| `XionicsSmp` | `852` |  |
-| `XlPaint` | `853` |  |
-| `Xld4` | `854` |  |
-| `Xpm` | `855` |  |
-| `XvThumbnail` | `856` |  |
-| `Xwd` | `857` |  |
-| `Xyz` | `858` |  |
-| `Ybm` | `859` |  |
-| `YuvRaw` | `860` |  |
-| `ZeissBivas` | `861` |  |
-| `ZeissLsm` | `862` |  |
-| `Zinc` | `863` |  |
-| `ZonerBrush` | `864` |  |
-| `Zoom4` | `865` |  |
-| `Zoomatic` | `866` |  |
-| `ZsStaffKid98` | `867` |  |
-| `Zx81` | `868` |  |
-| `ZxArtStudio` | `869` |  |
-| `ZxAttributes` | `870` |  |
-| `ZxAttributesGigascreen` | `871` |  |
-| `ZxBigFont` | `872` |  |
-| `ZxBorderMulticolor` | `873` |  |
-| `ZxBorderScreen` | `874` |  |
-| `ZxChrd` | `875` |  |
-| `ZxFlash` | `876` |  |
-| `ZxFont` | `877` |  |
-| `ZxGigascreen` | `878` |  |
-| `ZxMlg` | `879` |  |
-| `ZxMultiArtist` | `880` |  |
-| `ZxMulticolor` | `881` |  |
-| `ZxNext` | `882` |  |
-| `ZxNextImage` | `883` |  |
-| `ZxPaintbrush` | `884` |  |
-| `ZxPaintyOne` | `885` |  |
-| `ZxRgb3` | `886` |  |
-| `ZxSnapshot` | `887` |  |
-| `ZxSpectrum` | `888` |  |
-| `ZxTimex` | `889` |  |
-| `ZxTrefiBorderScreen` | `890` |  |
-| `ZxTricolor` | `891` |  |
-| `ZxUlaPlus` | `892` |  |
-| `ZzRough` | `893` |  |
+| `Ti92Picture` | `777` |  |
+| `TiBitmap` | `778` |  |
+| `TiPicture` | `779` |  |
+| `Tiff` | `780` |  |
+| `TilePic` | `781` |  |
+| `TilezTexture` | `782` |  |
+| `Tim` | `783` |  |
+| `Tim2` | `784` |  |
+| `TimexGigascreen` | `785` |  |
+| `Tiny` | `786` |  |
+| `TmSat` | `787` |  |
+| `TobiasRichterSlideshow` | `788` |  |
+| `TriPaint` | `789` |  |
+| `Trs80` | `790` |  |
+| `TrsPix` | `791` |  |
+| `TrueColorImg` | `792` |  |
+| `TruePaint` | `793` |  |
+| `TrueType` | `794` |  |
+| `TrzmielCompressed` | `795` |  |
+| `TurboRascal` | `796` |  |
+| `TurboView` | `797` |  |
+| `UfliEditor` | `798` |  |
+| `Uhdr` | `799` |  |
+| `UifliEditor` | `800` |  |
+| `Uimg` | `801` |  |
+| `UleadAlbumTemplate` | `802` |  |
+| `UleadImageLibrary` | `803` |  |
+| `UtahRle` | `804` |  |
+| `UyvyRaw` | `805` |  |
+| `VbxeSlideShow` | `806` |  |
+| `VdcBitmap` | `807` |  |
+| `Vector06c` | `808` |  |
+| `VentaFax` | `809` |  |
+| `VertiZontalInterlacing` | `810` |  |
+| `VerticalHiresInterlace` | `811` |  |
+| `Vic20` | `812` |  |
+| `Vicar` | `813` |  |
+| `Vidcom64` | `814` |  |
+| `VidiChrome` | `815` |  |
+| `VidigPaint` | `816` |  |
+| `Viff` | `817` |  |
+| `Vips` | `818` |  |
+| `VirtualBoyTile` | `819` |  |
+| `Vitec` | `820` |  |
+| `Vivid` | `821` |  |
+| `Vp8` | `822` |  |
+| `Vp8L` | `823` |  |
+| `Vrml` | `824` |  |
+| `Vtf` | `825` |  |
+| `Vue` | `826` |  |
+| `Wad2` | `827` |  |
+| `Wad3` | `828` |  |
+| `Wal` | `829` |  |
+| `Wbmp` | `830` |  |
+| `WebP` | `831` |  |
+| `WebShots` | `832` |  |
+| `WigmoreArtist` | `833` |  |
+| `WinFax` | `834` |  |
+| `WizSolitaireDeck` | `835` |  |
+| `Wmf` | `836` |  |
+| `WonderSwanTile` | `837` |  |
+| `Word` | `838` |  |
+| `WorldportFax` | `839` |  |
+| `Wpg` | `840` |  |
+| `Wsq` | `841` |  |
+| `Wzl` | `842` |  |
+| `X11Puzzle` | `843` |  |
+| `X3f` | `844` |  |
+| `XBin` | `845` |  |
+| `XFliEditor` | `846` |  |
+| `Xar` | `847` |  |
+| `Xbm` | `848` |  |
+| `XbmColor` | `849` |  |
+| `Xcf` | `850` |  |
+| `Xcursor` | `851` |  |
+| `Ximage` | `852` |  |
+| `XionicsSmp` | `853` |  |
+| `XlPaint` | `854` |  |
+| `Xld4` | `855` |  |
+| `Xpm` | `856` |  |
+| `XvThumbnail` | `857` |  |
+| `Xwd` | `858` |  |
+| `Xyz` | `859` |  |
+| `Ybm` | `860` |  |
+| `YuvRaw` | `861` |  |
+| `ZeissBivas` | `862` |  |
+| `ZeissLsm` | `863` |  |
+| `Zinc` | `864` |  |
+| `ZonerBrush` | `865` |  |
+| `Zoom4` | `866` |  |
+| `Zoomatic` | `867` |  |
+| `ZsStaffKid98` | `868` |  |
+| `Zx81` | `869` |  |
+| `ZxArtStudio` | `870` |  |
+| `ZxAttributes` | `871` |  |
+| `ZxAttributesGigascreen` | `872` |  |
+| `ZxBigFont` | `873` |  |
+| `ZxBorderMulticolor` | `874` |  |
+| `ZxBorderScreen` | `875` |  |
+| `ZxChrd` | `876` |  |
+| `ZxFlash` | `877` |  |
+| `ZxFont` | `878` |  |
+| `ZxGigascreen` | `879` |  |
+| `ZxMlg` | `880` |  |
+| `ZxMultiArtist` | `881` |  |
+| `ZxMulticolor` | `882` |  |
+| `ZxNext` | `883` |  |
+| `ZxNextImage` | `884` |  |
+| `ZxPaintbrush` | `885` |  |
+| `ZxPaintyOne` | `886` |  |
+| `ZxRgb3` | `887` |  |
+| `ZxSnapshot` | `888` |  |
+| `ZxSpectrum` | `889` |  |
+| `ZxTimex` | `890` |  |
+| `ZxTrefiBorderScreen` | `891` |  |
+| `ZxTricolor` | `892` |  |
+| `ZxUlaPlus` | `893` |  |
+| `ZzRough` | `894` |  |
 
 #### `MagicSignature`
 
