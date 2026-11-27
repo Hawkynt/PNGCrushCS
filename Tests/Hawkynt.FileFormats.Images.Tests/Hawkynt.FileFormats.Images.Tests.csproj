@@ -97,6 +97,14 @@
     </None>
   </ItemGroup>
 
+  <!-- Self-made PDF fixtures (font programs, documents), kept under their own folder tree. -->
+  <ItemGroup>
+    <None Include="Formats\Pdf\Fixtures\**\*">
+      <Link>Fixtures\Pdf\%(RecursiveDir)%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
   <!-- An Aseprite sprite written by ImageMagick, and the picture ImageMagick was given to write it
        from. The second is the reference because ImageMagick cannot read the sprite back. -->
   <ItemGroup>
