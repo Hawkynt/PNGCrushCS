@@ -17,6 +17,8 @@ namespace FileFormat.Bpg.Tests;
 /// 4:2:2 in both chroma positions' default, grey, the BT.601, BT.709, BT.2020 and YCgCo matrices,
 /// limited range, ten and twelve bits, alpha straight and premultiplied, and two animations whose
 /// later frames are P pictures, one with an alpha stream and a frame duration of its own per frame.
+/// The 4:4:4, RGB and lossless files exercise the H.265 range extension tools <c>bpgenc</c> turns on
+/// for them: cross-component prediction and implicit RDPCM.
 /// </remarks>
 [TestFixture]
 public sealed class LibbpgParityTests {
@@ -37,6 +39,12 @@ public sealed class LibbpgParityTests {
   [TestCase("libbpg_rgba61_422_b10", "d43204ec29bd8855270012c35d8c1327ce72db530bba21592fd983f48a392eab")]
   [TestCase("libbpg_anim_rgba_delays", "130cf630e1bed74fa6188440e6579cb3bddfbbe196fa978c6c968dc21158a0f9")]
   [TestCase("libbpg_anim_rgb", "584eed06507fdc080528a513e1d2119ac2a0a2ac40ef8708cf6f38d0b457d62b")]
+  [TestCase("libbpg_rgb61_444_ycbcr", "377ecdad3ade1f62f86b58f50df157a61ad388988426e131e704875bb4d54f53")]
+  [TestCase("libbpg_rgb61_444_rgb", "8cdb7b40001678cc469e2b3f844d09b655822de79e0fb607ebb766c6cf795455")]
+  [TestCase("libbpg_rgb61_444_b12", "ce05851cd1032f820fdb1f0a5ac0483eec3f7b876afe53ba6d906ba0808043c6")]
+  [TestCase("libbpg_rgb61_lossless", "8bcbe17c0f3eeb0bde5f6d6394935f40ac2b6ceb8787abc00bea26e75f71cf2c")]
+  [TestCase("libbpg_rgba61_444_premul", "62cf7bdb8c2a2a8dec09954dbd500568ed9bdf17336106984a2db53d79c7c4a9")]
+  [TestCase("libbpg_rgba61_lossless", "932cf9c130b6efa4040edc6990ea7b32151eba00c5536089ffaea9a4fbe6ac4c")]
   [Category("Unit")]
   public void DecodesEveryFrameAsLibbpgDoes(string name, string sha256) {
     var file = BpgReader.FromBytes(_Fixture(name));

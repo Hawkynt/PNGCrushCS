@@ -32,7 +32,7 @@ issue quotes the recorded blocker and the route around it.
 
 | Category | Tracking issue | Images | Codecs | Containers | Encoders | Total |
 | --- | --- | ---: | ---: | ---: | ---: | ---: |
-| [Modern & standard still-image codecs](#modern--standard-still-image-codecs) | [#513](https://github.com/Hawkynt/PNGCrushCS/issues/513) | 59 | 0 | 0 | 0 | 59 |
+| [Modern & standard still-image codecs](#modern--standard-still-image-codecs) | [#513](https://github.com/Hawkynt/PNGCrushCS/issues/513) | 58 | 0 | 0 | 0 | 58 |
 | [Camera RAW & sensor data](#camera-raw--sensor-data) | [#514](https://github.com/Hawkynt/PNGCrushCS/issues/514) | 24 | 0 | 0 | 0 | 24 |
 | [Geospatial & remote sensing](#geospatial--remote-sensing) | [#515](https://github.com/Hawkynt/PNGCrushCS/issues/515) | 83 | 0 | 0 | 0 | 83 |
 | [Medical & scientific imaging](#medical--scientific-imaging) | [#516](https://github.com/Hawkynt/PNGCrushCS/issues/516) | 42 | 0 | 0 | 0 | 42 |
@@ -49,7 +49,7 @@ issue quotes the recorded blocker and the route around it.
 | [Lossless & uncompressed video](#lossless--uncompressed-video) | [#527](https://github.com/Hawkynt/PNGCrushCS/issues/527) | 0 | 11 | 0 | 2 | 13 |
 | [Cinema camera RAW video](#cinema-camera-raw-video) | [#528](https://github.com/Hawkynt/PNGCrushCS/issues/528) | 0 | 6 | 7 | 0 | 13 |
 | [Elementary streams & streaming manifests](#elementary-streams--streaming-manifests) | [#529](https://github.com/Hawkynt/PNGCrushCS/issues/529) | 0 | 0 | 18 | 0 | 18 |
-| **All** | | **569** | **147** | **274** | **19** | **1009** |
+| **All** | | **568** | **147** | **274** | **19** | **1008** |
 
 Each issue carries the labels `cat: <category>`, its kind (`image-format`, `video-codec`, `video-container`, `video-encoder`), `priority: high|medium|low`, and `documented-blocker` where that applies.
 
@@ -61,7 +61,6 @@ JPEG/JPEG 2000/HEIF variants, wavelet, HDR and research still-image codecs. Trac
 | --- | --- | --- | --- | --- | --- | --- |
 | Apple CgBI ('iPhone-optimised') PNG | Image | `.png` | read + write | missing | medium | [#530](https://github.com/Hawkynt/PNGCrushCS/issues/530) |
 | AVIF image sequence (animated AVIF, 'avis') | Image | `.avifs`, `.avif` | read + write | missing | medium | [#531](https://github.com/Hawkynt/PNGCrushCS/issues/531) |
-| BPG transform-coded (HEVC) pictures | Image | `.bpg` | read + write | blocked | medium | [#532](https://github.com/Hawkynt/PNGCrushCS/issues/532) |
 | HEIF/HEIC with HEVC range-extension / SCC tools and >12-bit samples | Image | `.heic`, `.heif`, `.hif` | read + write | blocked | medium | [#533](https://github.com/Hawkynt/PNGCrushCS/issues/533) |
 | High-Throughput JPEG 2000 (HTJ2K, Part 15) | Image | `.jph`, `.jhc` | read + write | missing | medium | [#534](https://github.com/Hawkynt/PNGCrushCS/issues/534) |
 | JPEG XS | Image | `.jxs` | read + write | missing | medium | [#536](https://github.com/Hawkynt/PNGCrushCS/issues/536) |
