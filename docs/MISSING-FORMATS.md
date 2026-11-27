@@ -43,13 +43,13 @@ issue quotes the recorded blocker and the route around it.
 | [Editor & application native](#editor--application-native) | [#521](https://github.com/Hawkynt/PNGCrushCS/issues/521) | 49 | 0 | 0 | 0 | 49 |
 | [Embroidery & industrial](#embroidery--industrial) | [#522](https://github.com/Hawkynt/PNGCrushCS/issues/522) | 20 | 0 | 0 | 0 | 20 |
 | [Standard & broadcast video](#standard--broadcast-video) | [#523](https://github.com/Hawkynt/PNGCrushCS/issues/523) | 0 | 35 | 16 | 0 | 51 |
-| [Game & multimedia-title video](#game--multimedia-title-video) | [#524](https://github.com/Hawkynt/PNGCrushCS/issues/524) | 0 | 43 | 200 | 6 | 249 |
+| [Game & multimedia-title video](#game--multimedia-title-video) | [#524](https://github.com/Hawkynt/PNGCrushCS/issues/524) | 0 | 42 | 199 | 6 | 247 |
 | [Legacy PC & capture-card video](#legacy-pc--capture-card-video) | [#525](https://github.com/Hawkynt/PNGCrushCS/issues/525) | 0 | 51 | 36 | 2 | 89 |
 | [Screen-capture video](#screen-capture-video) | [#526](https://github.com/Hawkynt/PNGCrushCS/issues/526) | 0 | 16 | 0 | 9 | 25 |
 | [Lossless & uncompressed video](#lossless--uncompressed-video) | [#527](https://github.com/Hawkynt/PNGCrushCS/issues/527) | 0 | 12 | 0 | 2 | 14 |
 | [Cinema camera RAW video](#cinema-camera-raw-video) | [#528](https://github.com/Hawkynt/PNGCrushCS/issues/528) | 0 | 6 | 7 | 0 | 13 |
 | [Elementary streams & streaming manifests](#elementary-streams--streaming-manifests) | [#529](https://github.com/Hawkynt/PNGCrushCS/issues/529) | 0 | 0 | 18 | 0 | 18 |
-| **All** | | **578** | **163** | **277** | **19** | **1037** |
+| **All** | | **578** | **162** | **276** | **19** | **1035** |
 
 Each issue carries the labels `cat: <category>`, its kind (`image-format`, `video-codec`, `video-container`, `video-encoder`), `priority: high|medium|low`, and `documented-blocker` where that applies.
 
@@ -779,7 +779,6 @@ Codecs/containers from games, consoles, CD-ROM titles and animation tools. Track
 | Bethesda VID video | Codec | `.vid` | decode + encode | missing | low | [#1201](https://github.com/Hawkynt/PNGCrushCS/issues/1201) |
 | Bitmap Brothers JV video | Codec | `.jv` | decode + encode | missing | low | [#1203](https://github.com/Hawkynt/PNGCrushCS/issues/1203) |
 | CDToons (Broderbund Living Books) | Codec | `.mov` | decode + encode | missing | low | [#1210](https://github.com/Hawkynt/PNGCrushCS/issues/1210) |
-| Chronomaster DFA | Codec | `.dfa` | decode + encode | blocked | low | [#1213](https://github.com/Hawkynt/PNGCrushCS/issues/1213) |
 | Cinepak for Sega | Codec | `sega`, `SEGA` | decode + encode | missing | low | [#1215](https://github.com/Hawkynt/PNGCrushCS/issues/1215) |
 | Creature Shock AVS | Codec | `.avs` | decode + encode | missing | low | [#1219](https://github.com/Hawkynt/PNGCrushCS/issues/1219) |
 | CRI P256 | Codec | `P256`, `B256` | decode + encode | missing | low | [#1220](https://github.com/Hawkynt/PNGCrushCS/issues/1220) |
@@ -845,7 +844,6 @@ Codecs/containers from games, consoles, CD-ROM titles and animation tools. Track
 | CD+Graphics (CD+G) | Container | `.cdg` | demux + mux | missing | low | [#1209](https://github.com/Hawkynt/PNGCrushCS/issues/1209) |
 | Celestial Impact DXV | Container | `.dxv` | demux + mux | missing | low | [#1211](https://github.com/Hawkynt/PNGCrushCS/issues/1211) |
 | Chewy: Esc from F5 CFO | Container | `.cfo` | demux + mux | missing | low | [#1212](https://github.com/Hawkynt/PNGCrushCS/issues/1212) |
-| Chronomaster DFA | Container | `.dfa` | demux + mux | blocked | low | [#1214](https://github.com/Hawkynt/PNGCrushCS/issues/1214) |
 | Coktel Vision IMD | Container | `.imd` | demux + mux | missing | low | [#1216](https://github.com/Hawkynt/PNGCrushCS/issues/1216) |
 | Companions of Xanth cutscenes (XANTH_9x.PIC) | Container | `xanth` | demux + mux | missing | low | [#1218](https://github.com/Hawkynt/PNGCrushCS/issues/1218) |
 | CRI USM (Sofdec 2) | Container | `.usm` | demux + mux | missing | low | [#1221](https://github.com/Hawkynt/PNGCrushCS/issues/1221) |

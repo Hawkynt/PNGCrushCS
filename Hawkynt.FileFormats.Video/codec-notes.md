@@ -2212,6 +2212,45 @@ approximated. The writer pads a film with silence, four hundred samples a frame 
 it is given no sound, because a TMV film is paced by its sound. FFmpeg reads both the container and the
 codec this writes, to exactly the pictures this decoder produces.
 
+### Chronomaster DFA
+
+Container and codec converted from FFmpeg's `libavformat/dfa.c` and `libavcodec/dfa.c`, LGPL-2.1-or-later.
+The film is a 128-byte `DFIA` header — version, frame count, width, height, milliseconds a frame, and 0x80
+at byte 16 in every known film — and then frame after frame a run of chunks, each a name, a size and a
+type, ended by `EOFR`. A frame is handed to the decoder as FFmpeg's demuxer hands it over: every chunk up
+to and including the `EOFR` header. The version travels to the decoder as two bytes of codec private data,
+as FFmpeg's extradata.
+
+The decoder keeps one eight-bit picture that each frame's chunks rewrite: `COPY` raw, `TSW1` and `DSW1`
+LZ77 over byte pairs (`DSW1` with skips), `BDLT` and `WDLT` line deltas of bytes and of words, `TDLT`
+copy-and-skip pairs, `BLCK` a clear, and `DDS1` the LZ77 again with every pixel doubled both ways. The
+palette is 6-bit, taken to eight bits by FFmpeg's shift of the whole 24-bit value, carries and all.
+Chunks are read through a cursor that yields zero past the end, as FFmpeg's `GetByteContext` does; a back
+reference of distance zero copies nothing, as `av_memcpy_backptr` does; and a damaged chunk leaves the
+picture as far as it got, so the next frame draws over that, as FFmpeg's does. Version 0x100 films store
+four quarter-width columns of lines and are drawn in display order.
+
+One departure. FFmpeg's `DDS1` skip tests `frame - frame_end < v`, which no skip inside the picture can
+pass, and a `DDS1` picture cannot be drawn without skips, so FFmpeg refuses all of them: the last 56
+frames of `0000.dfa` never appear. This decoder tests `frame_end - frame < v`. Its oracle for those frames is
+FFmpeg n9.1's own chunk decoders, compiled on their own behind a stand-in for `GetByteContext`: left as
+they are, they reproduce FFmpeg's output for all four films byte for byte, and with the one comparison
+turned round they draw every `DDS1` frame.
+
+Measured against FFmpeg n9.1 with `-flags +bitexact`: all 553 pictures it draws of `0000.dfa`, `0001.dfa`,
+`0002.dfa` and `LOGOS.DFA` are identical to this decoder's, and all 609 pictures of the four films are
+identical to the corrected chunk decoders'. The test keeps that build's SHA-256 for each film.
+
+The encoder is this package's own, FFmpeg having none. Each frame is a `PAL1` chunk when the palette
+changes, then the smallest of `COPY`, `BLCK`, `TSW1` from the first changed byte, and `DSW1`, which skips
+unchanged runs and otherwise copies back or writes pairs, both matching at even distances within
+`TSW1`'s reach of 16,382 bytes. Only the first picture is written whole, since DFA has no index to seek by.
+An `Indexed8` picture keeps its indices, its palette taken to six bits a component; anything else goes to
+a fixed six-seven-six colour cube. Re-encoding the decoded real films gives every picture back exactly, in
+803,442 bytes against `0001.dfa`'s 815,704, 973,210 against `0002.dfa`'s 958,832, and 3,905,854 against
+`LOGOS.DFA`'s 5,082,797. FFmpeg reads the container and the codec this writes, to exactly this decoder's
+pictures.
+
 ### Electronic Arts TQI, TGQ, Madcow and TGV
 
 Converted from FFmpeg's `libavcodec/eatqi.c`, `eatgq.c`, `eamad.c`, `eatgv.c` and the inverse DCT the first

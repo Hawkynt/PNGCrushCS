@@ -288,6 +288,8 @@ public sealed class EncoderOracleTests {
     ("Ogg", ".ogv", static (streams, packets) => VideoIO.Mux<OggWriter>(streams, packets)),
     // TMV's text-mode video has no code any other container carries.
     ("Tmv", ".tmv", static (streams, packets) => VideoIO.Mux<FileFormat.Tmv.TmvWriter>(streams, packets)),
+    // Nor has DFA's.
+    ("Dfa", ".dfa", static (streams, packets) => VideoIO.Mux<FileFormat.Dfa.DfaWriter>(streams, packets)),
   ];
 
   /// <summary>

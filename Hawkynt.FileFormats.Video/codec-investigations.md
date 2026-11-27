@@ -2289,6 +2289,13 @@ file format around them.
 # Chronomaster DFA, whose page is the cleanest case of a paraphrase this project has found without a
 citation to prove it
 
+*Closed.* DFA is demuxed, muxed, decoded and encoded now, converted from FFmpeg's LGPL-2.1-or-later
+`libavformat/dfa.c` and `libavcodec/dfa.c`. One correction to what follows: FFmpeg does not decode all four
+films. Its `DDS1` skip compares `frame - frame_end < v`, which no skip inside the picture can pass, so it
+refuses every `DDS1` frame, the last 56 pictures of `0000.dfa`. This decoder makes the comparison FFmpeg
+meant, and is held to FFmpeg's own chunk decoders built with that one comparison corrected. `codec-notes.md`
+has the measurement.
+
 DFA (`dfa`, magic `DFIA`) was investigated as the next Amiga-and-legacy-adjacent item on the list —
 DreamForge's FMV format for *Chronomaster* and *Anvil of Dawn* — and it stops before a byte of it was
 written, on provenance alone.
