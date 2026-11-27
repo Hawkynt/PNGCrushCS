@@ -73,13 +73,13 @@ public sealed class PdfFile : IImageFormatReader<PdfFile>, IImageToRawImage<PdfF
     return pages;
   }
 
-  /// <summary>Converts the first extracted image to a <see cref="RawImage"/>.</summary>
+  /// <summary>Renders the first page.</summary>
   public static RawImage ToRawImage(PdfFile file) {
     ArgumentNullException.ThrowIfNull(file);
-    if (file.Images.Count == 0)
-      throw new InvalidOperationException("PDF contains no extractable images.");
+    if (ImageCount(file) == 0)
+      throw new InvalidOperationException(file.Document == null ? "PDF contains no extractable images." : "PDF has no pages.");
 
-    return file.Images[0].ToRawImage();
+    return ToRawImage(file, 0);
   }
 
   /// <summary>Creates a single-image PDF from a <see cref="RawImage"/>.</summary>
@@ -100,18 +100,53 @@ public sealed class PdfFile : IImageFormatReader<PdfFile>, IImageToRawImage<PdfF
     return new PdfFile { Images = [pdfImage] };
   }
 
-  /// <summary>Returns the number of images extracted from this PDF file.</summary>
+  /// <summary>The number of pages.</summary>
   public static int ImageCount(PdfFile file) {
     ArgumentNullException.ThrowIfNull(file);
-    return file.Images.Count;
+    if (file.DocumentFailure is NotSupportedException refused)
+      throw refused;
+
+    return file.Pages.Count;
   }
 
-  /// <summary>Converts the image at the given index to a <see cref="RawImage"/>.</summary>
+  /// <summary>Renders a page at the default options: 72 dots per inch, annotations shown, at most 16 megapixels.</summary>
+  /// <remarks>
+  /// A document built in memory rather than read from bytes has no content streams; its pages are its
+  /// images, each one page the size of the image, which is exactly how <see cref="PdfWriter"/> lays
+  /// them out, so those come back as they went in.
+  /// </remarks>
   public static RawImage ToRawImage(PdfFile file, int index) {
     ArgumentNullException.ThrowIfNull(file);
-    if ((uint)index >= (uint)file.Images.Count)
+    if (file.Document == null) {
+      if (file.DocumentFailure is NotSupportedException refused)
+        throw refused;
+      if ((uint)index >= (uint)file.Images.Count)
+        throw new ArgumentOutOfRangeException(nameof(index));
+
+      return file.Images[index].ToRawImage();
+    }
+
+    return RenderPage(file, index).Image;
+  }
+
+  /// <summary>Renders a page.</summary>
+  /// <param name="file">The document, which must have been read from bytes.</param>
+  /// <param name="index">The page, from zero.</param>
+  /// <param name="options">Resolution, pixel cap and whether to draw annotations; the defaults when null.</param>
+  /// <exception cref="NotSupportedException">The page uses something this renderer does not implement; the message names it.</exception>
+  public static PdfPageRendering RenderPage(PdfFile file, int index, PdfRenderOptions? options = null) {
+    ArgumentNullException.ThrowIfNull(file);
+    options ??= PdfRenderOptions.Default;
+    options.Validate();
+    if (file.Document == null) {
+      if (file.DocumentFailure is NotSupportedException refused)
+        throw refused;
+      throw new InvalidOperationException("Only a PDF read from bytes has pages to render.");
+    }
+
+    if ((uint)index >= (uint)file.Document.Pages.Count)
       throw new ArgumentOutOfRangeException(nameof(index));
 
-    return file.Images[index].ToRawImage();
+    return Rendering.PdfPageRenderer.Render(file.Document, file.Document.Pages[index], options);
   }
 }

@@ -22,7 +22,7 @@ public sealed class PdfImage {
   public byte[] PixelData { get; init; } = [];
 
   /// <summary>Converts this PDF image to a platform-independent <see cref="RawImage"/>.</summary>
-  internal RawImage ToRawImage() {
+  public RawImage ToRawImage() {
     var format = ColorSpace switch {
       PdfColorSpace.DeviceGray => PixelFormat.Gray8,
       PdfColorSpace.DeviceCMYK => PixelFormat.Rgb24, // CMYK is converted during extraction
