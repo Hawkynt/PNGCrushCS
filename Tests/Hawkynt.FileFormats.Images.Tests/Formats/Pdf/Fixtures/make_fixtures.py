@@ -13,6 +13,11 @@ import zlib
 from PIL import Image
 
 
+def read(path):
+    with open(path, "rb") as handle:
+        return handle.read()
+
+
 def build(objects, trailer_extra=b""):
     """Classic cross-reference PDF from object bodies numbered from 1; object 1 is the catalog."""
     out = bytearray(b"%PDF-1.7\n%\xe2\xe3\xcf\xd3\n")
@@ -183,9 +188,9 @@ def vector():
 def bilevel():
     """CCITT and JBIG2 images, as a picture and as a stencil, from the filter fixtures beside this."""
     here = os.path.dirname(os.path.abspath(__file__))
-    g4 = open(os.path.join(here, "Filters", "ccitt-g4.bin"), "rb").read()
-    g3 = open(os.path.join(here, "Filters", "ccitt-g3-2d.bin"), "rb").read()
-    jbig2 = open(os.path.join(here, "Filters", "jbig2-generic-t0.bin"), "rb").read()
+    g4 = read(os.path.join(here, "Filters", "ccitt-g4.bin"))
+    g3 = read(os.path.join(here, "Filters", "ccitt-g3-2d.bin"))
+    jbig2 = read(os.path.join(here, "Filters", "jbig2-generic-t0.bin"))
 
     def raw(dictionary, data):
         return b"<< " + dictionary + b" /Length %d >>\nstream\n" % len(data) + data + b"\nendstream"
@@ -249,9 +254,60 @@ def shading():
     return page(bytes(c), resources, extra=extra)
 
 
+def text():
+    """Every font kind the renderer reads, the text state operators and the render modes.
+
+    The embedded programs are the tiny self-made fonts in Fonts/; the standard fonts are not
+    embedded and come out in the renderer's substitutes (and in whatever poppler substitutes).
+    """
+    here = os.path.dirname(os.path.abspath(__file__))
+    font = lambda name: read(os.path.join(here, "Fonts", name))
+    extra = []
+
+    def add(body):
+        extra.append(body)
+        return 4 + len(extra)
+
+    widths = b"[" + b" ".join(b"600" for _ in range(224)) + b"]"
+    type1 = add(stream(b"/Length1 481 /Length2 973 /Length3 0", font("type1.pfa"), flate=False))
+    d1 = add(b"<< /Type /FontDescriptor /FontName /T1Test /Flags 34 /FontBBox [0 0 1000 1000] /ItalicAngle 0 /Ascent 800 /Descent -200 /CapHeight 700 /StemV 80 /FontFile %d 0 R >>" % type1)
+    f1 = add(b"<< /Type /Font /Subtype /Type1 /BaseFont /T1Test /FirstChar 32 /LastChar 255 /Widths %s /FontDescriptor %d 0 R /Encoding << /Differences [66 /Aacute] >> >>" % (widths, d1))
+    cff = add(stream(b"/Subtype /Type1C", font("name-keyed.cff"), flate=False))
+    d2 = add(b"<< /Type /FontDescriptor /FontName /CffTest /Flags 32 /FontBBox [0 0 1000 1000] /ItalicAngle 0 /Ascent 800 /Descent -200 /CapHeight 700 /StemV 80 /FontFile3 %d 0 R >>" % cff)
+    f2 = add(b"<< /Type /Font /Subtype /Type1 /BaseFont /CffTest /FirstChar 32 /LastChar 255 /Widths %s /FontDescriptor %d 0 R /Encoding /WinAnsiEncoding >>" % (widths, d2))
+    ttf = add(stream(b"/Length1 %d" % len(font("truetype.ttf")), font("truetype.ttf")))
+    d3 = add(b"<< /Type /FontDescriptor /FontName /TtTest /Flags 32 /FontBBox [0 0 1000 1000] /ItalicAngle 0 /Ascent 800 /Descent -200 /CapHeight 700 /StemV 80 /FontFile2 %d 0 R >>" % ttf)
+    f3 = add(b"<< /Type /Font /Subtype /TrueType /BaseFont /TtTest /FirstChar 32 /LastChar 255 /Widths %s /FontDescriptor %d 0 R /Encoding /WinAnsiEncoding >>" % (widths, d3))
+    cidcff = add(stream(b"/Subtype /CIDFontType0C", font("cid-keyed.cff"), flate=False))
+    d4 = add(b"<< /Type /FontDescriptor /FontName /CidTest /Flags 4 /FontBBox [0 0 1000 1000] /ItalicAngle 0 /Ascent 800 /Descent -200 /CapHeight 700 /StemV 80 /FontFile3 %d 0 R >>" % cidcff)
+    cid0 = add(b"<< /Type /Font /Subtype /CIDFontType0 /BaseFont /CidTest /CIDSystemInfo << /Registry (Adobe) /Ordering (Identity) /Supplement 0 >> /FontDescriptor %d 0 R /DW 700 /W [34 [600 500] 40 52 650] >>" % d4)
+    f4 = add(b"<< /Type /Font /Subtype /Type0 /BaseFont /CidTest /Encoding /Identity-H /DescendantFonts [%d 0 R] >>" % cid0)
+    cid2 = add(b"<< /Type /Font /Subtype /CIDFontType2 /BaseFont /TtTest /CIDSystemInfo << /Registry (Adobe) /Ordering (Identity) /Supplement 0 >> /FontDescriptor %d 0 R /DW 800 /CIDToGIDMap /Identity >>" % d3)
+    f5 = add(b"<< /Type /Font /Subtype /Type0 /BaseFont /TtTest /Encoding /Identity-H /DescendantFonts [%d 0 R] >>" % cid2)
+    f5v = add(b"<< /Type /Font /Subtype /Type0 /BaseFont /TtTest /Encoding /Identity-V /DescendantFonts [%d 0 R] >>" % cid2)
+    square = add(stream(b"", b"1000 0 d0 0.9 0.4 0 rg 100 100 800 800 re f", flate=False))
+    triangle = add(stream(b"", b"900 0 0 0 800 800 d1 50 50 m 750 50 l 400 750 l f", flate=False))
+    f6 = add(b"<< /Type /Font /Subtype /Type3 /FontBBox [0 0 1000 1000] /FontMatrix [0.001 0 0 0.001 0 0] /CharProcs << /sq %d 0 R /tri %d 0 R >> "
+             b"/Encoding << /Type /Encoding /Differences [97 /sq /tri] >> /FirstChar 97 /LastChar 98 /Widths [1000 900] /Resources << >> >>" % (square, triangle))
+    resources = (b"<< /Font << /F1 %d 0 R /F2 %d 0 R /F3 %d 0 R /F4 %d 0 R /F5 %d 0 R /F5V %d 0 R /F6 %d 0 R"
+                 b" /H << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> /TB << /Type /Font /Subtype /Type1 /BaseFont /Times-Bold >>"
+                 b" /C << /Type /Font /Subtype /Type1 /BaseFont /Courier >> /AB << /Type /Font /Subtype /TrueType /BaseFont /Arial,BoldItalic /Encoding /WinAnsiEncoding >> >> >>") % (f1, f2, f3, f4, f5, f5v, f6)
+    c = bytearray()
+    c += b"BT /F1 24 Tf 10 170 Td (AFOS B) Tj /F2 24 Tf 0 -26 Td (AOIFGS) Tj /F3 24 Tf 0 -26 Td (AO\305 OA) Tj ET\n"
+    c += b"BT /F4 22 Tf 120 170 Td <0022003000290027> Tj /F5 22 Tf 0 -26 Td [<0002> 300 <0003> -200 <0004>] TJ ET\n"
+    c += b"BT /F5V 16 Tf 185 160 Td <000200030002> Tj ET\n"
+    c += b"BT /F6 20 Tf 0.1 0.2 0.8 rg 120 110 Td (abab) Tj 3 Tr 0 -20 Td (ab) Tj 0 Tr ET\n"
+    c += b"BT /H 12 Tf 10 82 Td 14 TL (Helvetica: Sphinx of black quartz) Tj T* 2 Tc 4 Tw (spaced out words) Tj 0 Tc 0 Tw ET\n"
+    c += b"BT /TB 12 Tf 10 54 Td 75 Tz (Times bold, narrow) Tj 100 Tz 0 -14 Td 3 Ts (raised) Tj 0 Ts ( and \\(level\\)) Tj ET\n"
+    c += b"BT /C 11 Tf 13 TL 10 26 Td (Courier ') Tj 1 2 (with \\\") \" /AB 11 Tf ( Arial,BoldItalic) Tj ET\n"
+    c += b"q BT /H 40 Tf 0.8 0 0 RG 1.2 w 1 Tr 120 40 Td (Out) Tj 2 Tr 0 0 1 rg 70 0 Td (F) Tj ET Q\n"
+    c += b"q BT /F2 40 Tf 7 Tr 130 2 Td (OS) Tj ET 0 0.6 0 rg 0 0 200 40 re f Q\n"
+    return page(bytes(c), resources, extra=extra)
+
+
 if __name__ == "__main__":
     target = sys.argv[1]
     os.makedirs(os.path.join(target, "Render"), exist_ok=True)
-    for name, maker in [("images", images), ("vector", vector), ("bilevel", bilevel), ("shading", shading)]:
+    for name, maker in [("images", images), ("vector", vector), ("bilevel", bilevel), ("shading", shading), ("text", text)]:
         with open(os.path.join(target, "Render", name + ".pdf"), "wb") as handle:
             handle.write(maker())

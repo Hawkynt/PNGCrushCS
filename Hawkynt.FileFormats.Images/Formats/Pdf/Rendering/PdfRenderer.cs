@@ -196,6 +196,12 @@ internal sealed partial class PdfRenderer {
 
   private void _Execute(string op, List<object?> o) {
     var hidden = this._hiddenDepth > 0;
+
+    // A Type 3 glyph begun with d1 is a shape painted in the text's colour; its own colour
+    // operators are ignored (§9.6.5).
+    if (this._uncolouredGlyph && op is "CS" or "cs" or "SC" or "SCN" or "sc" or "scn" or "G" or "g" or "RG" or "rg" or "K" or "k")
+      return;
+
     switch (op) {
       // Graphics state.
       case "q":

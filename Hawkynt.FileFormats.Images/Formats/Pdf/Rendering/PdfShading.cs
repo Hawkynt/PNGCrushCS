@@ -395,7 +395,7 @@ internal abstract class PdfShading {
             this._triangles.Add((a, b, c));
             break;
           case 2 when a >= 0:
-            (a, b, c) = (a, c, index);
+            (b, c) = (c, index);
             this._triangles.Add((a, b, c));
             break;
         }

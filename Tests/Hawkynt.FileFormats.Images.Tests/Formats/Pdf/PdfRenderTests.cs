@@ -31,6 +31,9 @@ public sealed class PdfRenderTests {
   [TestCase("Render/images", 72, 2.5, 0.6)]
   [TestCase("Render/bilevel", 72, 2.5, 1.8)]
   [TestCase("Render/shading", 72, 1.5, 0.8)]
+  // The standard fonts are not embedded: poppler draws them in URW's Nimbus faces, this renderer in
+  // Liberation, so their lines differ in glyph shape though not in placement.
+  [TestCase("Render/text", 144, 2.0, 1.2)]
   [Category("Unit")]
   public void Fixture_AgreesWithPoppler(string name, double resolution, double maxMeanError, double maxBadPercent) {
     var file = _Read(name + ".pdf");
@@ -103,6 +106,35 @@ public sealed class PdfRenderTests {
       "<< /Type /OCG /Name (Hidden) >>");
     var page = PdfFile.ToRawImage(PdfReader.FromBytes(pdf), 0);
     Assert.That(page.PixelData, Is.All.EqualTo(255));
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void TextInAFontWithNoSubstitute_IsLeftOut_AndSaidSo() {
+    var pdf = _Build(
+      "<< /Type /Catalog /Pages 2 0 R >>",
+      "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+      "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 100 30] /Resources << /Font << /S << /Type /Font /Subtype /Type1 /BaseFont /Symbol >> /H << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> >> >> /Contents 4 0 R >>",
+      _Stream("BT /S 20 Tf 5 5 Td (abg) Tj /H 20 Tf (Hi) Tj ET"));
+    var rendering = PdfFile.RenderPage(PdfReader.FromBytes(pdf), 0);
+    Assert.Multiple(() => {
+      Assert.That(rendering.Omissions, Has.Count.EqualTo(1));
+      Assert.That(rendering.Omissions[0], Does.Contain("Symbol"));
+      Assert.That(rendering.Image.PixelData, Has.Some.LessThan(128), "the Helvetica text after it is still drawn");
+    });
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void PredefinedCjkCMap_IsRefusedByName() {
+    var pdf = _Build(
+      "<< /Type /Catalog /Pages 2 0 R >>",
+      "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+      "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 100 30] /Resources << /Font << /J 5 0 R >> >> /Contents 4 0 R >>",
+      _Stream("BT /J 20 Tf 5 5 Td <3042> Tj ET"),
+      "<< /Type /Font /Subtype /Type0 /BaseFont /MS-Mincho /Encoding /UniJIS-UCS2-H /DescendantFonts [<< /Type /Font /Subtype /CIDFontType2 /BaseFont /MS-Mincho /CIDSystemInfo << /Registry (Adobe) /Ordering (Japan1) /Supplement 2 >> >>] >>");
+    var failure = Assert.Throws<NotSupportedException>(() => PdfFile.RenderPage(PdfReader.FromBytes(pdf), 0));
+    Assert.That(failure!.Message, Does.Contain("UniJIS-UCS2-H"));
   }
 
   [Test]
