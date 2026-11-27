@@ -305,9 +305,42 @@ def text():
     return page(bytes(c), resources, extra=extra)
 
 
+def transparency():
+    """Constant alpha, all sixteen blend modes, isolated and non-isolated groups, soft masks."""
+    extra = []
+
+    def add(body):
+        extra.append(body)
+        return 4 + len(extra)
+
+    modes = [b"Normal", b"Multiply", b"Screen", b"Overlay", b"Darken", b"Lighten", b"ColorDodge", b"ColorBurn",
+             b"HardLight", b"SoftLight", b"Difference", b"Exclusion", b"Hue", b"Saturation", b"Color", b"Luminosity"]
+    gs = b" ".join(b"/B%d << /BM /%s >>" % (i, m) for i, m in enumerate(modes))
+    gs += b" /Half << /ca 0.5 /CA 0.5 >> /Mul << /BM /Multiply >>"
+    group_content = b"/Mul gs 1 0.8 0 rg 0 0 30 30 re f 0 0.7 1 rg 15 15 30 30 re f"
+    nonisolated = add(stream(b"/Type /XObject /Subtype /Form /BBox [0 0 45 45] /Group << /S /Transparency /I false >> /Resources << /ExtGState << /Mul << /BM /Multiply >> >> >>", group_content))
+    isolated = add(stream(b"/Type /XObject /Subtype /Form /BBox [0 0 45 45] /Group << /S /Transparency /I true >> /Resources << /ExtGState << /Mul << /BM /Multiply >> >> >>", group_content))
+    lum = add(stream(b"/Type /XObject /Subtype /Form /BBox [0 0 200 200] /Group << /S /Transparency /CS /DeviceGray >> /Resources << >>",
+                     b"q 1 g 0 0 200 200 re f 0 g 70 20 m 130 20 l 100 70 l f 0.5 g 140 20 40 40 re f Q"))
+    alphaMask = add(stream(b"/Type /XObject /Subtype /Form /BBox [0 0 200 200] /Group << /S /Transparency >> /Resources << /ExtGState << /H << /ca 0.4 >> >> >>",
+                           b"0 g 10 10 40 25 re f /H gs 20 20 40 25 re f"))
+    transfer = add(b"<< /FunctionType 2 /Domain [0 1] /C0 [1] /C1 [0] /N 1 >>")
+    gs += b" /LumMask << /SMask << /S /Luminosity /G %d 0 R /TR %d 0 R >> >> /AlphaMask << /SMask << /S /Alpha /G %d 0 R >> >>" % (lum, transfer, alphaMask)
+    resources = b"<< /ExtGState << " + gs + b" >> /XObject << /NI %d 0 R /IS %d 0 R >> >>" % (nonisolated, isolated)
+    c = bytearray(b"0.2 0.5 0.8 rg 0 100 200 100 re f 1 0.9 0.4 rg 0 100 100 50 re f\n")
+    for i in range(16):
+        x = 5 + (i % 8) * 24
+        y = 160 - (i // 8) * 40
+        c += b"q /B%d gs 0.9 0.3 0.6 rg %d %d 20 25 re f Q\n" % (i, x, y)
+    c += b"q /Half gs 0 0.6 0.2 rg 10 70 50 25 re f 0 0 0 RG 6 w 20 75 m 80 90 l S Q\n"
+    c += b"q 1 0.5 0 rg 70 40 120 60 re f Q q 1 0 0 1 80 45 cm /NI Do Q q 1 0 0 1 140 45 cm /IS Do Q\n"
+    c += b"q /LumMask gs 0.6 0 0.6 rg 0 0 200 40 re f Q q /AlphaMask gs 0 0 0.6 rg 0 0 70 50 re f Q\n"
+    return page(bytes(c), resources, extra=extra)
+
+
 if __name__ == "__main__":
     target = sys.argv[1]
     os.makedirs(os.path.join(target, "Render"), exist_ok=True)
-    for name, maker in [("images", images), ("vector", vector), ("bilevel", bilevel), ("shading", shading), ("text", text)]:
+    for name, maker in [("images", images), ("vector", vector), ("bilevel", bilevel), ("shading", shading), ("text", text), ("transparency", transparency)]:
         with open(os.path.join(target, "Render", name + ".pdf"), "wb") as handle:
             handle.write(maker())

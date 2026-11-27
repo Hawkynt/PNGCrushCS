@@ -5,7 +5,7 @@ using FileFormat.Pdf.Document;
 
 namespace FileFormat.Pdf;
 
-/// <summary>In-memory representation of a PDF file's extracted raster images.</summary>
+/// <summary>A PDF document: its pages, rendered as images, and the raster images embedded in it.</summary>
 [FormatMagicBytes([0x25, 0x50, 0x44, 0x46])] // %PDF
 [VerifiedBy(ConformanceOracle.ImageMagick, ConformanceOracle.Ghostscript)]
 public sealed class PdfFile : IImageFormatReader<PdfFile>, IImageToRawImage<PdfFile>, IImageFromRawImage<PdfFile>, IImageFormatWriter<PdfFile>, IMultiImageFileFormat<PdfFile> {

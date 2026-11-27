@@ -34,6 +34,7 @@ public sealed class PdfRenderTests {
   // The standard fonts are not embedded: poppler draws them in URW's Nimbus faces, this renderer in
   // Liberation, so their lines differ in glyph shape though not in placement.
   [TestCase("Render/text", 144, 2.0, 1.2)]
+  [TestCase("Render/transparency", 72, 0.5, 0.2)]
   [Category("Unit")]
   public void Fixture_AgreesWithPoppler(string name, double resolution, double maxMeanError, double maxBadPercent) {
     var file = _Read(name + ".pdf");
@@ -135,6 +136,30 @@ public sealed class PdfRenderTests {
       "<< /Type /Font /Subtype /Type0 /BaseFont /MS-Mincho /Encoding /UniJIS-UCS2-H /DescendantFonts [<< /Type /Font /Subtype /CIDFontType2 /BaseFont /MS-Mincho /CIDSystemInfo << /Registry (Adobe) /Ordering (Japan1) /Supplement 2 >> >>] >>");
     var failure = Assert.Throws<NotSupportedException>(() => PdfFile.RenderPage(PdfReader.FromBytes(pdf), 0));
     Assert.That(failure!.Message, Does.Contain("UniJIS-UCS2-H"));
+  }
+
+  /// <remarks>
+  /// poppler does not implement knockout groups — it composites their elements over one another —
+  /// so this is held to the specification's arithmetic (§11.4.6.4) instead: inside an isolated
+  /// knockout group, the second of two half-transparent squares replaces the first where they
+  /// overlap rather than lying over it.
+  /// </remarks>
+  [Test]
+  [Category("Unit")]
+  public void KnockoutGroup_LetsTheLaterElementReplaceTheEarlier() {
+    var pdf = _Build(
+      "<< /Type /Catalog /Pages 2 0 R >>",
+      "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+      "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 30 10] /Resources << /XObject << /G 5 0 R >> >> /Contents 4 0 R >>",
+      _Stream("/G Do"),
+      "<< /Type /XObject /Subtype /Form /BBox [0 0 30 10] /Group << /S /Transparency /I true /K true >> /Resources << /ExtGState << /H << /ca 0.5 >> >> >> /Length 44 >>\nstream\n/H gs 1 0 0 rg 0 0 20 10 re f 0 0 1 rg 10 0 20 10 re f\nendstream");
+    var page = PdfFile.ToRawImage(PdfReader.FromBytes(pdf), 0);
+    byte[] At(int x) => page.PixelData.AsSpan((5 * page.Width + x) * 3, 3).ToArray();
+    Assert.Multiple(() => {
+      Assert.That(At(5), Is.EqualTo(new byte[] { 255, 128, 128 }), "red alone");
+      Assert.That(At(15), Is.EqualTo(new byte[] { 128, 128, 255 }), "blue knocks the red out");
+      Assert.That(At(25), Is.EqualTo(new byte[] { 128, 128, 255 }), "blue alone");
+    });
   }
 
   [Test]

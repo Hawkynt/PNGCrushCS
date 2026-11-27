@@ -35,6 +35,12 @@ internal sealed class PdfSurface {
   /// <summary>Four floats a pixel: premultiplied red, green, blue, and alpha.</summary>
   public float[] Pixels { get; }
 
+  /// <summary>
+  /// For a non-isolated group, the alpha of the group's own elements alone, without the backdrop it
+  /// started from (§11.4.8), or null.
+  /// </summary>
+  public float[]? GroupAlpha { get; set; }
+
   /// <summary>For a knockout group, what each element is composited against instead of what is there.</summary>
   public float[]? KnockoutBackdrop { get; set; }
 
@@ -162,6 +168,14 @@ internal sealed class PdfSurface {
       p[at + 1] = rg;
       p[at + 2] = rb;
       p[at + 3] = ra;
+
+      if (this.GroupAlpha is { } groupAlpha) {
+        var gi = at >> 2;
+        var effective = knockout != null ? a * cover : a;
+        groupAlpha[gi] = knockout != null
+          ? groupAlpha[gi] * (1 - cover) + a * cover
+          : groupAlpha[gi] + effective * (1 - groupAlpha[gi]);
+      }
     }
   }
 
