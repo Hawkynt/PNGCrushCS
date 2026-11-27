@@ -42,14 +42,14 @@ issue quotes the recorded blocker and the route around it.
 | [Fonts, text-mode & teletext](#fonts-text-mode--teletext) | [#520](https://github.com/Hawkynt/PNGCrushCS/issues/520) | 61 | 0 | 0 | 0 | 61 |
 | [Editor & application native](#editor--application-native) | [#521](https://github.com/Hawkynt/PNGCrushCS/issues/521) | 49 | 0 | 0 | 0 | 49 |
 | [Embroidery & industrial](#embroidery--industrial) | [#522](https://github.com/Hawkynt/PNGCrushCS/issues/522) | 20 | 0 | 0 | 0 | 20 |
-| [Standard & broadcast video](#standard--broadcast-video) | [#523](https://github.com/Hawkynt/PNGCrushCS/issues/523) | 0 | 36 | 16 | 0 | 52 |
+| [Standard & broadcast video](#standard--broadcast-video) | [#523](https://github.com/Hawkynt/PNGCrushCS/issues/523) | 0 | 35 | 16 | 0 | 51 |
 | [Game & multimedia-title video](#game--multimedia-title-video) | [#524](https://github.com/Hawkynt/PNGCrushCS/issues/524) | 0 | 48 | 201 | 6 | 255 |
 | [Legacy PC & capture-card video](#legacy-pc--capture-card-video) | [#525](https://github.com/Hawkynt/PNGCrushCS/issues/525) | 0 | 51 | 36 | 2 | 89 |
 | [Screen-capture video](#screen-capture-video) | [#526](https://github.com/Hawkynt/PNGCrushCS/issues/526) | 0 | 16 | 0 | 9 | 25 |
 | [Lossless & uncompressed video](#lossless--uncompressed-video) | [#527](https://github.com/Hawkynt/PNGCrushCS/issues/527) | 0 | 14 | 0 | 2 | 16 |
 | [Cinema camera RAW video](#cinema-camera-raw-video) | [#528](https://github.com/Hawkynt/PNGCrushCS/issues/528) | 0 | 6 | 7 | 0 | 13 |
 | [Elementary streams & streaming manifests](#elementary-streams--streaming-manifests) | [#529](https://github.com/Hawkynt/PNGCrushCS/issues/529) | 0 | 0 | 18 | 0 | 18 |
-| **All** | | **578** | **171** | **278** | **19** | **1046** |
+| **All** | | **578** | **170** | **278** | **19** | **1045** |
 
 Each issue carries the labels `cat: <category>`, its kind (`image-format`, `video-codec`, `video-container`, `video-encoder`), `priority: high|medium|low`, and `documented-blocker` where that applies.
 
@@ -723,7 +723,6 @@ ITU/ISO/SMPTE/AOM codecs, broadcast and professional intermediates, streaming. T
 | RealVideo 3.0 (RV30) | Codec | `.rm`, `.rmvb` | decode + encode | missing | medium | [#1126](https://github.com/Hawkynt/PNGCrushCS/issues/1126) |
 | Resolume DXV | Codec | `.mov` | decode + encode | missing | medium | [#1127](https://github.com/Hawkynt/PNGCrushCS/issues/1127) |
 | Scalable HEVC (SHVC) and MV-HEVC multilayer decoding | Codec | `SHVC`, `MV-HEVC`, `nuh_layer_id>0` | decode + encode | missing | medium | [#1128](https://github.com/Hawkynt/PNGCrushCS/issues/1128) |
-| Windows Media Video 7 (WMV1) | Codec | `.wmv`, `.asf` | decode + encode | blocked | medium | [#1129](https://github.com/Hawkynt/PNGCrushCS/issues/1129) |
 | Windows Media Video 8 (WMV2) | Codec | `.wmv`, `.asf` | decode + encode | blocked | medium | [#1130](https://github.com/Hawkynt/PNGCrushCS/issues/1130) |
 | General eXchange Format (GXF) | Container | `.gxf` | demux + mux | missing | medium | [#1118](https://github.com/Hawkynt/PNGCrushCS/issues/1118) |
 | Interoperable Master Format (IMF) composition | Container | `.xml` | demux + mux | missing | medium | [#1119](https://github.com/Hawkynt/PNGCrushCS/issues/1119) |

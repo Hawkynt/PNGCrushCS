@@ -56,7 +56,11 @@ internal sealed class MsMpeg4IntraPrediction {
   /// <summary>Whether each block belongs to an intra macroblock that has been decoded.</summary>
   private readonly bool[] _available;
 
-  internal MsMpeg4IntraPrediction(int macroblockWidth, int macroblockHeight, int sliceHeight) {
+  // WMV1 predicts across slice boundaries, and breaks a gradient tie the standard's way.
+  private readonly bool _wmv1;
+
+  internal MsMpeg4IntraPrediction(int macroblockWidth, int macroblockHeight, int sliceHeight, bool wmv1 = false) {
+    this._wmv1 = wmv1;
     this._macroblockWidth = macroblockWidth;
     this._sliceHeight = sliceHeight < 1 ? macroblockHeight : sliceHeight;
     var count = macroblockWidth * macroblockHeight * 6;
@@ -91,7 +95,7 @@ internal sealed class MsMpeg4IntraPrediction {
     var c = this._DcOf(above, absentDc);
 
     // Less-than-or-equal, and this is the whole of the difference from ISO/IEC 14496-2 7.4.3.1.
-    return Math.Abs(b - a) <= Math.Abs(b - c);
+    return this._wmv1 ? Math.Abs(a - b) < Math.Abs(b - c) : Math.Abs(b - a) <= Math.Abs(b - c);
   }
 
   /// <summary>
@@ -103,11 +107,11 @@ internal sealed class MsMpeg4IntraPrediction {
   /// the block's whole value and not the difference that was transmitted.
   /// </remarks>
   internal void Apply(
-    int address, int block, Span<int> coefficients, bool predictAc, bool fromAbove, int absentDc) {
+    int address, int block, Span<int> coefficients, bool predictAc, bool fromAbove, int absentDc, int? dc = null) {
     var (left, _, above) = this._Neighbours(address, block);
     var source = fromAbove ? above : left;
 
-    coefficients[0] += this._DcOf(source, absentDc);
+    coefficients[0] += dc ?? this._DcOf(source, absentDc);
 
     if (predictAc && source >= 0 && this._available[source])
       if (fromAbove) {
@@ -124,6 +128,12 @@ internal sealed class MsMpeg4IntraPrediction {
   /// <summary>
   /// What a block's DC is predicted to be, which an encoder subtracts where a decoder adds.
   /// </summary>
+  /// <summary>The DCs of the left, above-left and above neighbours, the absent value standing in for any missing.</summary>
+  internal (int Left, int AboveLeft, int Above) NeighbourDcs(int address, int block, int absentDc) {
+    var (left, aboveLeft, above) = this._Neighbours(address, block);
+    return (this._DcOf(left, absentDc), this._DcOf(aboveLeft, absentDc), this._DcOf(above, absentDc));
+  }
+
   internal int PredictedDc(int address, int block, bool fromAbove, int absentDc) {
     var (left, _, above) = this._Neighbours(address, block);
     return this._DcOf(fromAbove ? above : left, absentDc);
@@ -171,7 +181,7 @@ internal sealed class MsMpeg4IntraPrediction {
     var toAboveLeft = toAbove - 1;
 
     var hasLeft = column > 0;
-    var hasAbove = row > 0 && this._SameSlice(address, toAbove);
+    var hasAbove = row > 0 && (this._wmv1 || this._SameSlice(address, toAbove));
     var hasAboveLeft = hasLeft && hasAbove;
 
     var here = address * 6;

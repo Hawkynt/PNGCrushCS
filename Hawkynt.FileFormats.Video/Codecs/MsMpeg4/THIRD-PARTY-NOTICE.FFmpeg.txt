@@ -11,16 +11,20 @@ Files used, all from libavcodec:
                        intra chrominance pattern tables of version 2; both
                        motion vector tables of version 3
   msmpeg4_vc1_data.c   the intra-picture coded block pattern table and both
-                       DC tables of version 3
+                       DC tables of version 3; WMV1's four scan tables
   h263data.c           run-level table 5; CBPY; the motion vector magnitudes;
                        the intra and inter MCBPC tables version 1 borrows
   mpeg4data.h          run-level table 2; the DC size tables versions 1 and 2
                        invert to make their own
   msmpeg4.c            the DC predictor, the coded block pattern predictor and
-                       the construction of the version 1 and 2 DC tables
+                       the construction of the version 1 and 2 DC tables;
+                       WMV1's inter-intra DC prediction and get_dc
   msmpeg4dec.c         the picture header, the macroblock layer of all three
                        versions, the block layer and its three escape forms,
-                       and the motion vector decoding
+                       and the motion vector decoding; WMV1's picture header,
+                       per-macroblock run-level tables, inter-intra direction,
+                       variable-length third escape and overflow handling
+  msmpeg4data.c (WMV1) WMV1's luminance DC step table and the inter-intra code
   msmpeg4enc.c         the encoder's table choices, its coded block pattern
                        prediction and its escape selection
   rl.c                 the derivation of the largest level per run and the

@@ -128,7 +128,6 @@ public sealed class MsMpeg4VideoDecoder : IVideoCodecDecoder<MsMpeg4VideoDecoder
 
   /// <summary>The codes that name Windows Media Video 7 and 8, refused as what they are.</summary>
   private static readonly CodecTag[] _WindowsMediaTags = [
-    CodecTag.FromCharacters("WMV1"),
     CodecTag.FromCharacters("WMV2"),
   ];
 
@@ -201,12 +200,11 @@ public sealed class MsMpeg4VideoDecoder : IVideoCodecDecoder<MsMpeg4VideoDecoder
 
     if (_Matches(stream, _WindowsMediaTags))
       throw new NotSupportedException(
-        $"Stream {stream.Index} is coded as '{stream.Codec}', which is Windows Media Video 7 or 8. Those are the next "
-        + "two members of this family and share its picture header and much of its block layer, but each brings "
-        + "machinery of its own — its own four scan orders and a trailing header the picture header depends on for "
-        + "the first, a different inverse transform and a different half-sample interpolation for the second. A "
-        + "stream of either decoded as version 3 would produce a picture rather than an error, so they are refused "
-        + "rather than approximated.");
+        $"Stream {stream.Index} is coded as '{stream.Codec}', which is Windows Media Video 8. It is the next member of "
+        + "this family and shares its picture header and much of its block layer, but brings machinery of its own — "
+        + "a different inverse transform, a different half-sample interpolation and a block transform of its own. A "
+        + "stream of it decoded as version 3 would produce a picture rather than an error, so it is refused rather "
+        + "than approximated.");
 
     if (stream.Width <= 0 || stream.Height <= 0)
       throw new NotSupportedException(

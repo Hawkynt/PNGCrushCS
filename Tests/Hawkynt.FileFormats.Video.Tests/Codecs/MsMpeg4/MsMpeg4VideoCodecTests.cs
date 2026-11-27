@@ -82,10 +82,9 @@ public sealed class MsMpeg4VideoCodecTests {
     Assert.That((int)MsMpeg4VideoDecoder.Create(stream).Version, Is.EqualTo(3));
   }
 
-  [TestCase("WMV1")]
   [TestCase("WMV2")]
   [Category("Unit")]
-  public void WindowsMediaVideoIsRefusedByNameRatherThanDecodedAsVersionThree(string tag) {
+  public void WindowsMediaVideo8IsRefusedByNameRatherThanDecodedAsVersionThree(string tag) {
     Assert.That(MsMpeg4VideoDecoder.Accepts(_Stream(tag)), Is.True, "the registry has to reach the refusal");
     var refusal = Assert.Throws<NotSupportedException>(() => MsMpeg4VideoDecoder.Create(_Stream(tag)));
     Assert.That(refusal!.Message, Does.Contain("Windows Media Video"));

@@ -521,6 +521,10 @@ whoever picks this up again starts from the block layer and not from the contain
 
 # Windows Media Video 7 (WMV1), where the tables are MS-MPEG4v3's own
 
+*Closed.* WMV1 is decoded and encoded now: the tables this entry found missing are the ones the Microsoft
+MPEG-4 decoder already took from FFmpeg's LGPL-2.1-or-later sources, and WMV1's own differences are
+converted from the WMV1 paths of `msmpeg4dec.c`; `codec-notes.md` has the measurement.
+
 WMV1 — Microsoft's name is Windows Media Video 7 — was investigated because it looked like it might
 have an advantage MS-MPEG4v3 did not: ffmpeg carries a real `wmv1` encoder, so a corpus can be built and
 driven toward whatever codeword needs to be seen, which is exactly how Microsoft MPEG-4 version 2's

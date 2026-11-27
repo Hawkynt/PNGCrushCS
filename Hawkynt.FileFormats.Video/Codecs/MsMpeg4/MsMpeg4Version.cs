@@ -38,4 +38,7 @@ internal enum MsMpeg4Version {
   /// step the other two fix at eight.
   /// </remarks>
   Version3 = 3,
+
+  /// <summary>Windows Media Video 7 (<c>WMV1</c>): version 3's tables with its own scans, DC steps and headers.</summary>
+  Wmv1 = 4,
 }

@@ -172,6 +172,16 @@ public sealed class MsMpeg4VideoEncoder : IVideoCodecEncoder<MsMpeg4VideoEncoder
   }
 
   /// <summary>Codes one picture, either whole or against the one before it.</summary>
+  /// <summary>The same encoder writing Windows Media Video 7, which <see cref="Wmv1VideoEncoder"/> hands out.</summary>
+  internal static MsMpeg4VideoEncoder CreateWmv1(MediaStreamInfo stream) {
+    ArgumentNullException.ThrowIfNull(stream);
+    if (stream.Width <= 0 || stream.Height <= 0)
+      throw new NotSupportedException(
+        $"A WMV1 encoder needs the picture size up front; {stream.Width}x{stream.Height} was supplied. "
+        + "The bitstream states it nowhere, so the container's is the only one there is.");
+    return new(stream, MsMpeg4Version.Wmv1, CodecTag.FromCharacters("WMV1"));
+  }
+
   public bool TryEncode(RawImage frame, long? presentationTimestamp, out CodedPacket packet) {
     ArgumentNullException.ThrowIfNull(frame);
 

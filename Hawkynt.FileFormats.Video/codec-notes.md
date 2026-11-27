@@ -2111,6 +2111,37 @@ one of which consumed exactly the bits it should, exercising all three escape fo
 What refuses, by name: version 1 and version 3, which are different bitstreams sharing this one's
 name.
 
+### Windows Media Video 7
+
+WMV1 is Microsoft MPEG-4 version 3 with differences, and the decoder is the version 3 one taught them
+from the WMV1 paths of FFmpeg's `libavcodec/msmpeg4dec.c`, `msmpeg4.c` and `h263dec.c`, with WMV1's DC
+steps, scans and inter-intra code from `msmpeg4data.c` and `msmpeg4_vc1_data.c`, all LGPL-2.1-or-later.
+The differences: the extension header — frame rate, bit rate, flip-flop rounding — sits inside the intra
+picture header rather than after the picture; above 50 kbit/s a picture may say that each coded macroblock
+restates its run-level table; below 320x240 at 128 kbit/s or less, an intra macroblock of a predicted
+picture states a prediction direction and takes the DC of its first luminance block and of its
+chrominance from the mean of the reconstructed samples beside or above it; DC and AC prediction cross
+slice boundaries; the gradient test is strict; the second escape's run is one short in intra blocks too;
+and the third escape states its level and run lengths at its first use in a picture. A block that runs
+past its sixty-fourth coefficient is ended at the sixty-third with the stray coefficient dropped, which
+is what FFmpeg does and what real files need. WMV1 is held to FFmpeg's integer `simple_idct`, which is
+what FFmpeg decodes it with — the version 1 to 3 decoder keeps the floating-point transform it was
+measured with.
+
+Measured against FFmpeg's `yuv420p` planes, decoded with `-flags +bitexact`: 4,216 pictures, every one
+identical. 3,886 are `samples.ffmpeg.org/V-codecs/WMV1/Damien.wmv`, an ASF film, about which FFmpeg logs
+a block overflow and a damaged macroblock while producing exactly the pictures decoded here. The rest are
+seven streams FFmpeg's own `wmv1` encoder wrote, at 64 kbit/s to 1 Mbit/s and quantisers 2 to 20, 160x120
+to 352x288 and the odd 200x150, between them covering inter-intra prediction and per-macroblock tables.
+The bit-exact flag matters: without it FFmpeg's x86 half-sample averaging without rounding is an
+approximation, which put two chrominance samples of one picture a level out and was traced to that
+rather than to the decode. The raw-picture comparisons against FFmpeg ask for it now.
+
+The encoder is the Microsoft MPEG-4 one writing WMV1's header, scans, DC steps and third escape, and
+reconstructing with `simple_idct`. It states 255 kbit/s in the extension header, which keeps inter-intra
+prediction off and per-macroblock tables unused. FFmpeg decodes what it writes, in AVI and Matroska and
+with noise pictures that force the escapes, to exactly this decoder's pictures.
+
 ### Ut Video
 
 Lossless and intra only, and the capture codec of the three here that is still in active use. A

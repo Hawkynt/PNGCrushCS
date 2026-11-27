@@ -49,6 +49,58 @@ internal static class DvInverseDct {
   /// <summary>
   /// Transforms a block and writes it as eight-bit samples.
   /// </summary>
+  /// <summary>
+  /// The same transform in place, unclamped: FFmpeg's <c>ff_simple_idct_int16_8bit</c>, for a caller
+  /// that adds the result to a prediction or clamps it itself. The coefficients are held in sixteen
+  /// bits on the way in, as FFmpeg's blocks hold them.
+  /// </summary>
+  internal static void Transform(Span<int> block) {
+    Span<short> coefficients = stackalloc short[64];
+    for (var i = 0; i < 64; ++i)
+      coefficients[i] = unchecked((short)block[i]);
+
+    for (var i = 0; i < 8; ++i)
+      _Row(coefficients.Slice(i * 8, 8));
+
+    unchecked {
+      for (var column = 0; column < 8; ++column) {
+        var a0 = _W4 * (coefficients[column] + _COLUMN_BIAS);
+        var a1 = a0;
+        var a2 = a0;
+        var a3 = a0;
+
+        a0 += _W2 * coefficients[column + 8 * 2];
+        a1 += _W6 * coefficients[column + 8 * 2];
+        a2 -= _W6 * coefficients[column + 8 * 2];
+        a3 -= _W2 * coefficients[column + 8 * 2];
+
+        var b0 = _W1 * coefficients[column + 8] + _W3 * coefficients[column + 8 * 3];
+        var b1 = _W3 * coefficients[column + 8] - _W7 * coefficients[column + 8 * 3];
+        var b2 = _W5 * coefficients[column + 8] - _W1 * coefficients[column + 8 * 3];
+        var b3 = _W7 * coefficients[column + 8] - _W5 * coefficients[column + 8 * 3];
+
+        a0 += _W4 * coefficients[column + 8 * 4] + _W6 * coefficients[column + 8 * 6];
+        a1 += -_W4 * coefficients[column + 8 * 4] - _W2 * coefficients[column + 8 * 6];
+        a2 += -_W4 * coefficients[column + 8 * 4] + _W2 * coefficients[column + 8 * 6];
+        a3 += _W4 * coefficients[column + 8 * 4] - _W6 * coefficients[column + 8 * 6];
+
+        b0 += _W5 * coefficients[column + 8 * 5] + _W7 * coefficients[column + 8 * 7];
+        b1 += -_W1 * coefficients[column + 8 * 5] - _W5 * coefficients[column + 8 * 7];
+        b2 += _W7 * coefficients[column + 8 * 5] + _W3 * coefficients[column + 8 * 7];
+        b3 += _W3 * coefficients[column + 8 * 5] - _W1 * coefficients[column + 8 * 7];
+
+        block[column] = (a0 + b0) >> _COLUMN_SHIFT;
+        block[column + 8] = (a1 + b1) >> _COLUMN_SHIFT;
+        block[column + 8 * 2] = (a2 + b2) >> _COLUMN_SHIFT;
+        block[column + 8 * 3] = (a3 + b3) >> _COLUMN_SHIFT;
+        block[column + 8 * 4] = (a3 - b3) >> _COLUMN_SHIFT;
+        block[column + 8 * 5] = (a2 - b2) >> _COLUMN_SHIFT;
+        block[column + 8 * 6] = (a1 - b1) >> _COLUMN_SHIFT;
+        block[column + 8 * 7] = (a0 - b0) >> _COLUMN_SHIFT;
+      }
+    }
+  }
+
   internal static void Put(Span<short> block, byte[] plane, int offset, int stride) {
     for (var i = 0; i < 8; ++i)
       _Row(block.Slice(i * 8, 8));

@@ -80,6 +80,12 @@ internal sealed class MsMpeg4PictureEncoder {
   /// <summary>Which of three run-level tables version 3 is told to use: the pair versions 1 and 2 fix.</summary>
   private const int _RUN_LEVEL_TABLE_INDEX = 2;
 
+  /// <summary>The bit rate a WMV1 intra picture states, in kbit/s: high enough to keep inter-intra prediction off.</summary>
+  private const int _WMV1_STATED_BIT_RATE = 255;
+
+  // WMV1's third escape states its level and run lengths at its first use in a picture.
+  private bool _escapeLengthsWritten;
+
   private readonly MsMpeg4Version _version;
   private readonly int _quantiser;
   private readonly bool _intraPicture;
@@ -117,8 +123,8 @@ internal sealed class MsMpeg4PictureEncoder {
     this._vectorX = new short[count];
     this._vectorY = new short[count];
     this._isDecoded = new bool[count];
-    this._intraPrediction = new(macroblockWidth, macroblockHeight, sliceHeight);
-    this._codedBlock = version == MsMpeg4Version.Version3 && intraPicture
+    this._intraPrediction = new(macroblockWidth, macroblockHeight, sliceHeight, wmv1: version == MsMpeg4Version.Wmv1);
+    this._codedBlock = version is MsMpeg4Version.Version3 or MsMpeg4Version.Wmv1 && intraPicture
       ? new(macroblockWidth, macroblockHeight)
       : null;
   }
@@ -139,7 +145,7 @@ internal sealed class MsMpeg4PictureEncoder {
       }
     }
 
-    if (this._intraPicture)
+    if (this._intraPicture && this._version != MsMpeg4Version.Wmv1)
       this._WriteExtensionHeader();
 
     this._target.PadBorders();
@@ -170,7 +176,16 @@ internal sealed class MsMpeg4PictureEncoder {
         this._version == MsMpeg4Version.Version1 ? this._sliceHeight : 0x16 + this._macroblockHeight / this._sliceHeight,
         5);
 
-      if (this._version != MsMpeg4Version.Version3)
+      if (this._version == MsMpeg4Version.Wmv1) {
+        // WMV1 carries version 3's trailing extension header here instead. The bit rate it states
+        // decides two coding modes rather than describing the stream: above 128 kbit/s small pictures
+        // do without inter-intra prediction, and above 50 kbit/s a flag follows saying whether
+        // macroblocks restate their run-level tables, which this encoder writes clear.
+        this._writer.Write(Math.Min(this._frameRate, 31), 5);
+        this._writer.Write(_WMV1_STATED_BIT_RATE, 11);
+        this._writer.Write(0, 1);
+        this._writer.Write(0, 1);
+      } else if (this._version != MsMpeg4Version.Version3)
         return;
 
       _WriteZeroOneOrTwo(this._writer, _RUN_LEVEL_TABLE_INDEX);
@@ -185,7 +200,9 @@ internal sealed class MsMpeg4PictureEncoder {
     if (this._version != MsMpeg4Version.Version1)
       this._writer.Write(1, 1);
 
-    if (this._version != MsMpeg4Version.Version3)
+    if (this._version == MsMpeg4Version.Wmv1)
+      this._writer.Write(0, 1); // no per-macroblock run-level tables
+    else if (this._version != MsMpeg4Version.Version3)
       return;
 
     _WriteZeroOneOrTwo(this._writer, _RUN_LEVEL_TABLE_INDEX);
@@ -272,7 +289,8 @@ internal sealed class MsMpeg4PictureEncoder {
     var luminance = pattern >> 2;
 
     switch (this._version) {
-      case MsMpeg4Version.Version3: {
+      case MsMpeg4Version.Version3:
+      case MsMpeg4Version.Wmv1: {
         var coded = chroma;
         for (var index = 0; index < 4; ++index) {
           var bit = (pattern >> (5 - index)) & 1;
@@ -311,6 +329,7 @@ internal sealed class MsMpeg4PictureEncoder {
 
     switch (this._version) {
       case MsMpeg4Version.Version3:
+      case MsMpeg4Version.Wmv1:
         // Bit six clear means intra in the P-picture table; the lower six bits are the direct CBP.
         this._writer.Write(
           MsMpeg4Data.MacroblockNonIntraCodes[pattern], MsMpeg4Data.MacroblockNonIntraLengths[pattern]);
@@ -367,7 +386,7 @@ internal sealed class MsMpeg4PictureEncoder {
       }
 
       if ((pattern & (1 << (5 - index))) != 0)
-        this._WriteCoefficients(block, Mpeg4Quantisation.ZigZag, codes, first: 1, intra: true);
+        this._WriteCoefficients(block, this._IntraScan, codes, first: 1, intra: true);
 
       samples[0] = block[0] * step;
       var multiplier = 2 * this._quantiser;
@@ -377,7 +396,7 @@ internal sealed class MsMpeg4PictureEncoder {
         samples[i] = level == 0 ? 0 : level < 0 ? level * multiplier - offset : level * multiplier + offset;
       }
 
-      Mpeg4InverseDct.Transform(samples);
+      this._InverseTransform(samples);
       this._Store(address, index, samples);
     }
   }
@@ -403,11 +422,27 @@ internal sealed class MsMpeg4PictureEncoder {
       levels[i] = _QuantiseCoefficient(coefficients[i], this._quantiser);
   }
 
-  private int _StepOf(bool isLuminance) => this._version != MsMpeg4Version.Version3
-    ? MsMpeg4BlockDecoder.FixedDcStep
-    : isLuminance
+  private int _StepOf(bool isLuminance) => this._version switch {
+    MsMpeg4Version.Version3 => isLuminance
       ? MsMpeg4Data.Version3LuminanceDcStep[this._quantiser]
-      : MsMpeg4Data.Version3ChrominanceDcStep[this._quantiser];
+      : MsMpeg4Data.Version3ChrominanceDcStep[this._quantiser],
+    MsMpeg4Version.Wmv1 => isLuminance
+      ? MsMpeg4Data.Wmv1LuminanceDcStep[this._quantiser]
+      : MsMpeg4Data.Version3ChrominanceDcStep[this._quantiser],
+    _ => MsMpeg4BlockDecoder.FixedDcStep,
+  };
+
+  private int[] _IntraScan => this._version == MsMpeg4Version.Wmv1 ? MsMpeg4Data.Wmv1IntraScan : Mpeg4Quantisation.ZigZag;
+
+  private int[] _InterScan => this._version == MsMpeg4Version.Wmv1 ? MsMpeg4Data.Wmv1InterScan : Mpeg4Quantisation.ZigZag;
+
+  /// <summary>WMV1 reconstructs with FFmpeg's integer <c>simple_idct</c>, which its decoders use.</summary>
+  private void _InverseTransform(Span<int> samples) {
+    if (this._version == MsMpeg4Version.Wmv1)
+      Dv.DvInverseDct.Transform(samples);
+    else
+      Mpeg4InverseDct.Transform(samples);
+  }
 
   // ============================================================================================
   // Predicted macroblocks
@@ -468,7 +503,7 @@ internal sealed class MsMpeg4PictureEncoder {
     var codes = MsMpeg4Tables.RunLevel[3 + _RUN_LEVEL_TABLE_INDEX];
     for (var index = 0; index < 6; ++index)
       if ((pattern & (1 << (5 - index))) != 0)
-        this._WriteCoefficients(levels.Slice(index * 64, 64), Mpeg4Quantisation.ZigZag, codes, first: 0, intra: false);
+        this._WriteCoefficients(levels.Slice(index * 64, 64), this._InterScan, codes, first: 0, intra: false);
 
     this._Reconstruct(address, prediction, levels, pattern);
     this._Remember(address, vectorX, vectorY);
@@ -477,6 +512,7 @@ internal sealed class MsMpeg4PictureEncoder {
   private void _WritePredictedMacroblockHeader(int pattern) {
     switch (this._version) {
       case MsMpeg4Version.Version3:
+      case MsMpeg4Version.Wmv1:
         this._writer.Write(
           MsMpeg4Data.MacroblockNonIntraCodes[pattern + 64], MsMpeg4Data.MacroblockNonIntraLengths[pattern + 64]);
         return;
@@ -505,7 +541,7 @@ internal sealed class MsMpeg4PictureEncoder {
   }
 
   private void _WriteVector(int differenceX, int differenceY) {
-    if (this._version == MsMpeg4Version.Version3) {
+    if (this._version is MsMpeg4Version.Version3 or MsMpeg4Version.Wmv1) {
       MsMpeg4Tables.MotionVectorCodes[0].Write(this._writer, differenceX + 32, differenceY + 32);
       return;
     }
@@ -564,7 +600,7 @@ internal sealed class MsMpeg4PictureEncoder {
         samples[i] = level == 0 ? 0 : level < 0 ? level * multiplier - offset : level * multiplier + offset;
       }
 
-      Mpeg4InverseDct.Transform(samples);
+      this._InverseTransform(samples);
       for (var i = 0; i < 64; ++i)
         samples[i] += predicted[i];
 
@@ -683,7 +719,7 @@ internal sealed class MsMpeg4PictureEncoder {
       if (levels[scan[i]] != 0)
         lastIndex = i;
 
-    var runOffset = intra || this._version == MsMpeg4Version.Version2 ? 0 : 1;
+    var runOffset = intra ? (this._version == MsMpeg4Version.Wmv1 ? 1 : 0) : this._version == MsMpeg4Version.Version2 ? 0 : 1;
     var previous = first - 1;
 
     for (var i = first; i <= lastIndex; ++i) {
@@ -732,8 +768,34 @@ internal sealed class MsMpeg4PictureEncoder {
         continue;
       }
 
-      _WriteThirdEscape(this._writer, last, run, level, prefix: true);
+      if (this._version == MsMpeg4Version.Wmv1)
+        this._WriteWmv1ThirdEscape(last, run, level);
+      else
+        _WriteThirdEscape(this._writer, last, run, level, prefix: true);
     }
+  }
+
+  /// <summary>
+  /// WMV1's third escape: at its first use in a picture it states a seven-bit level and a six-bit
+  /// run, which is enough for every level this encoder writes; then the run, a sign and the magnitude.
+  /// </summary>
+  private void _WriteWmv1ThirdEscape(bool last, int run, int level) {
+    this._writer.Write(0, 2);
+    this._writer.Write(last ? 1 : 0, 1);
+    if (!this._escapeLengthsWritten) {
+      if (this._quantiser < 8)
+        this._writer.Write(7, 3);
+      else {
+        this._writer.Write(0, 5); // lengths two to six passed over, seven taken
+        this._writer.Write(1, 1);
+      }
+      this._writer.Write(6 - 3, 2);
+      this._escapeLengthsWritten = true;
+    }
+
+    this._writer.Write(run, 6);
+    this._writer.Write(level < 0 ? 1 : 0, 1);
+    this._writer.Write(Math.Abs(level), 7);
   }
 
   private static void _WriteThirdEscape(MsMpeg4BitWriter writer, bool last, int run, int level, bool prefix) {
