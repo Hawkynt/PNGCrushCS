@@ -2908,6 +2908,9 @@ documented well enough to build from, which is what makes it the most frustratin
 rather than the most obscure.
 # YLC, which reads as a complete description until one clause of it is taken seriously
 
+*Closed.* YLC is decoded and encoded now, converted from FFmpeg's LGPL-2.1-or-later `ylc.c`, which prints the
+225-entry quad table this entry could not find; `codec-notes.md` has the measurement.
+
 YLC — "YUY2 Lossless Codec", `YLC0` in an AVI — comes from a Japanese AviUtl plugin author's own tool.
 It was investigated with the lossless group, and it is the closest call in this file: everything about
 it says implementable right up to a single clause in the middle of its own pseudocode.

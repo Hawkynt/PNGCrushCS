@@ -2169,6 +2169,28 @@ colour. A plane the coder would enlarge has its residues stored. A 64x48 gradien
 4,608, and noise to eight bytes over the raw size. FFmpeg decodes what it writes, in all four layouts, in
 AVI and Matroska, to exactly the pictures given.
 
+### YUY2 Lossless Codec (YLC)
+
+Converted from FFmpeg's `libavcodec/ylc.c`, LGPL-2.1-or-later, with its four 225-entry residue tables parsed
+out mechanically. The Huffman tables are built from 256 counts a table in each packet by `build_vlc`'s own
+pairing — the two smallest non-zero counts, the second smallest on the left — and the codes are the
+complement of the path to each leaf. That pairing is followed exactly, its edge case included: with fewer than
+two non-zero counts the root is leaf 255. Both regions are read from byte-swapped 32-bit words, the picture's
+only where a word is whole. A group of four YUYV bytes is a flag and one first-table symbol — one of the
+residue quads, or a skip of two to thirty-two unchanged groups that may cross rows — or four literal codes,
+the second luminance coded as its sum with the first. Prediction is the gradient, left plus top minus top-left,
+with left and top-left carried from one row into the next.
+
+Measured: every one of the 100 pictures of `samples.ffmpeg.org/V-codecs/ylc0.avi` is identical to FFmpeg's
+`yuv422p` planes.
+
+The encoder is this package's own, FFmpeg having none. It takes residues from the predictor run forwards,
+skips a run of two or more all-zero groups, writes a group the residue tables hold as that symbol and any
+other as literals, and builds tables from its own counts through the decoder's construction. Counts are
+flattened until no code passes the thirty bits FFmpeg can read. A 320x240 gradient codes to 568 bytes of
+153,600. Noise grows by a twenty-fifth, since YLC has no stored form and a flag bit goes with every group.
+FFmpeg decodes what it writes to exactly the pictures given.
+
 ### Ut Video
 
 Lossless and intra only, and the capture codec of the three here that is still in active use. A
