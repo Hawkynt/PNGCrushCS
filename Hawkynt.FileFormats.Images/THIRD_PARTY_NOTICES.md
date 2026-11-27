@@ -85,6 +85,22 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 
 Source: https://github.com/etemesi254/zune-image/tree/dev/crates/zune-jpegxl
 
+## BPG decoding (libbpg)
+
+`Formats/Bpg/Codec/BpgStreamDecoder.cs` (the sequence parameter set a BPG header stands for, the alpha stream split, frame durations) and `Formats/Bpg/Codec/BpgColourOutput.cs` (chroma interpolation filters, colour conversion, alpha division) are converted from Fabrice Bellard's libbpg 0.9.8, `libbpg.c`.
+
+### libbpg license (MIT)
+
+Copyright (c) 2014 Fabrice Bellard
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+Source: https://bellard.org/bpg/
+
 ## JPEG XR decoder (jxrlib)
 
 `Formats/JpegXr/JxrLib` is a managed conversion of the decoder in Microsoft's jxrlib (`image/sys`, `image/decode`, and the container and copy logic of `jxrgluelib/JXRGlueJxr.c`); the files it was converted from are listed in `Formats/JpegXr/JxrLib/THIRD-PARTY-NOTICE.JxrLib.txt` together with the licence.

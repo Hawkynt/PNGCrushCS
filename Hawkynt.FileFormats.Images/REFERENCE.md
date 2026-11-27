@@ -5361,7 +5361,7 @@ Implements `IEquatable<BotticelliFile>`, `IImageFormatMetadata<BotticelliFile>`,
 
 #### `BpgFile`
 
-Implements `IImageFormatMetadata<BpgFile>`, `IImageFormatReader<BpgFile>`, `IImageFormatWriter<BpgFile>`, `IImageFromRawImage<BpgFile>`, `IImageToRawImage<BpgFile>`.
+Implements `IImageFormatMetadata<BpgFile>`, `IImageFormatReader<BpgFile>`, `IImageFormatWriter<BpgFile>`, `IImageFromRawImage<BpgFile>`, `IImageToRawImage<BpgFile>`, `IMultiImageFileFormat<BpgFile>`.
 
 | Member | Signature | Summary |
 | --- | --- | --- |
@@ -5375,11 +5375,15 @@ Implements `IImageFormatMetadata<BpgFile>`, `IImageFormatReader<BpgFile>`, `IIma
 | `Height` | `int Height { get; init; }` |  |
 | `IsAnimation` | `bool IsAnimation { get; init; }` |  |
 | `LimitedRange` | `bool LimitedRange { get; init; }` |  |
+| `LoopCount` | `int LoopCount { get; }` |  |
 | `PixelData` | `byte[] PixelData { get; init; }` |  |
 | `PixelFormat` | `BpgPixelFormat PixelFormat { get; init; }` |  |
 | `Width` | `int Width { get; init; }` |  |
+| `FrameDurations` | `static IReadOnlyList<TimeSpan> FrameDurations(BpgFile file)` |  |
 | `FromRawImage` | `static BpgFile FromRawImage(RawImage image)` |  |
+| `ImageCount` | `static int ImageCount(BpgFile file)` |  |
 | `ToRawImage` | `static RawImage ToRawImage(BpgFile file)` |  |
+| `ToRawImage` | `static RawImage ToRawImage(BpgFile file, int index)` |  |
 
 #### `BpgPixelFormat`
 

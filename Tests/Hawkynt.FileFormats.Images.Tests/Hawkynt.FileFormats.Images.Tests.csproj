@@ -35,6 +35,14 @@
     <ProjectReference Include="..\..\Compression.Core\Compression.Core.csproj" />
   </ItemGroup>
 
+  <!-- BPG files libbpg's bpgenc wrote; the tests hold the hash of what libbpg decodes each to. -->
+  <ItemGroup>
+    <None Include="Formats\Bpg\Fixtures\*.bpg">
+      <Link>BpgFixtures\%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
   <!-- JPEG XR files jxrlib's encoder wrote, each beside jxrlib's own decode of it in the file's
        native pixel format, so the managed decoder is measured against the reference byte for byte. -->
   <ItemGroup>
