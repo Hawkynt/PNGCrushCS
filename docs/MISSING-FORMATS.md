@@ -33,7 +33,7 @@ issue quotes the recorded blocker and the route around it.
 | Category | Tracking issue | Images | Codecs | Containers | Encoders | Total |
 | --- | --- | ---: | ---: | ---: | ---: | ---: |
 | [Modern & standard still-image codecs](#modern--standard-still-image-codecs) | [#513](https://github.com/Hawkynt/PNGCrushCS/issues/513) | 63 | 0 | 0 | 0 | 63 |
-| [Camera RAW & sensor data](#camera-raw--sensor-data) | [#514](https://github.com/Hawkynt/PNGCrushCS/issues/514) | 25 | 0 | 0 | 0 | 25 |
+| [Camera RAW & sensor data](#camera-raw--sensor-data) | [#514](https://github.com/Hawkynt/PNGCrushCS/issues/514) | 24 | 0 | 0 | 0 | 24 |
 | [Geospatial & remote sensing](#geospatial--remote-sensing) | [#515](https://github.com/Hawkynt/PNGCrushCS/issues/515) | 83 | 0 | 0 | 0 | 83 |
 | [Medical & scientific imaging](#medical--scientific-imaging) | [#516](https://github.com/Hawkynt/PNGCrushCS/issues/516) | 42 | 0 | 0 | 0 | 42 |
 | [GPU textures & game assets](#gpu-textures--game-assets) | [#517](https://github.com/Hawkynt/PNGCrushCS/issues/517) | 39 | 0 | 0 | 0 | 39 |
@@ -49,7 +49,7 @@ issue quotes the recorded blocker and the route around it.
 | [Lossless & uncompressed video](#lossless--uncompressed-video) | [#527](https://github.com/Hawkynt/PNGCrushCS/issues/527) | 0 | 11 | 0 | 2 | 13 |
 | [Cinema camera RAW video](#cinema-camera-raw-video) | [#528](https://github.com/Hawkynt/PNGCrushCS/issues/528) | 0 | 6 | 7 | 0 | 13 |
 | [Elementary streams & streaming manifests](#elementary-streams--streaming-manifests) | [#529](https://github.com/Hawkynt/PNGCrushCS/issues/529) | 0 | 0 | 18 | 0 | 18 |
-| **All** | | **575** | **147** | **274** | **19** | **1015** |
+| **All** | | **574** | **147** | **274** | **19** | **1014** |
 
 Each issue carries the labels `cat: <category>`, its kind (`image-format`, `video-codec`, `video-container`, `video-encoder`), `priority: high|medium|low`, and `documented-blocker` where that applies.
 
@@ -129,7 +129,6 @@ Digital still/cinema camera raw, scanner raw, thermal and light-field captures. 
 
 | Format | Kind | Extensions / ids | Needs | Status | Priority | Issue |
 | --- | --- | --- | --- | --- | --- | --- |
-| Canon CR3 CRX sensor codec | Image | `.cr3`, `.crm` | read + write | blocked | high | [#593](https://github.com/Hawkynt/PNGCrushCS/issues/593) |
 | DNG compressed / tiled / linear raw (lossless JPEG, lossy JPEG, Deflate, JPEG XL) | Image | `.dng` | read + write | missing | high | [#594](https://github.com/Hawkynt/PNGCrushCS/issues/594) |
 | Fujifilm RAF compressed raw (lossless/lossy compressed, X-Trans) | Image | `.raf` | read + write | missing | high | [#595](https://github.com/Hawkynt/PNGCrushCS/issues/595) |
 | Olympus/OM System ORF compressed sensor data | Image | `.orf`, `.ori` | read + write | missing | high | [#596](https://github.com/Hawkynt/PNGCrushCS/issues/596) |

@@ -1,6 +1,8 @@
 using System;
 using System.Buffers.Binary;
 using System.IO;
+using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 
 namespace FileFormat.Cr3;
@@ -71,12 +73,14 @@ public static class Cr3Reader {
     _Walk(data, 0, data.Length);
     if (!sawBrand)
       throw new InvalidDataException("Not a CR3: no ftyp box states the crx brand.");
-    if (preview == null && thumbnail == null)
-      throw new NotSupportedException(
-        "This CR3 carries no preview or thumbnail, so the only picture in it is the sensor data, "
-        + "which is coded with Canon's CRX and is not decoded here.");
+    var tracks = FindTracks(data);
+    if (preview == null && thumbnail == null && tracks.Count == 0)
+      throw new InvalidDataException("This CR3 carries no preview, thumbnail or CRX track.");
 
+    byte[]? source = tracks.Count > 0 ? data.ToArray() : null;
     return new Cr3File {
+      CrxSource = source,
+      CrxTracks = tracks,
       CodecVersion = codecVersion,
       PreviewJpeg = preview,
       PreviewWidth = previewWidth,
@@ -168,5 +172,88 @@ public static class Cr3Reader {
       previewWidth = width;
       previewHeight = height;
     }
+  }
+  /// <summary>
+  /// The CRX tracks: each one whose sample description holds a <c>CMP1</c> box, with where its
+  /// <c>co64</c> and <c>stsz</c> place its data; largest image first, file order among equals.
+  /// </summary>
+  internal static List<(CrxHeader Header, long Offset, long Size)> FindTracks(ReadOnlySpan<byte> data) {
+    var tracks = new List<(CrxHeader Header, long Offset, long Size)>();
+
+    void Walk(ReadOnlySpan<byte> span, int at, int end, ref CrxHeader? header, ref long offset, ref long size) {
+      while (at + 8 <= end) {
+        long boxSize = BinaryPrimitives.ReadUInt32BigEndian(span[at..]);
+        var type = Encoding.ASCII.GetString(span.Slice(at + 4, 4));
+        var head = 8;
+        if (boxSize == 1) {
+          if (at + 16 > end)
+            return;
+          boxSize = (long)BinaryPrimitives.ReadUInt64BigEndian(span[(at + 8)..]);
+          head = 16;
+        } else if (boxSize == 0) {
+          boxSize = end - at;
+        }
+
+        if (boxSize < head || at + boxSize > end)
+          return;
+        var body = span.Slice(at + head, (int)boxSize - head);
+        switch (type) {
+          case "moov" or "mdia" or "minf" or "stbl":
+            Walk(span, at + head, at + (int)boxSize, ref header, ref offset, ref size);
+            break;
+          case "trak": {
+            CrxHeader? trackHeader = null;
+            long trackOffset = 0, trackSize = 0;
+            Walk(span, at + head, at + (int)boxSize, ref trackHeader, ref trackOffset, ref trackSize);
+            if (trackHeader is { } h && trackSize > 0)
+              tracks.Add((h, trackOffset, trackSize));
+            break;
+          }
+          case "stsd":
+            // The sample entry holds the CMP1 box among others; it is found by its type.
+            for (var i = 4; i + 4 <= body.Length; ++i)
+              if (body[i] == 'C' && body[i + 1] == 'M' && body[i + 2] == 'P' && body[i + 3] == '1') {
+                var cmpSize = (int)BinaryPrimitives.ReadUInt32BigEndian(body[(i - 4)..]);
+                if (cmpSize >= 8 && i - 4 + cmpSize <= body.Length) {
+                  header = CrxHeader.Parse(body.Slice(i + 4, cmpSize - 8));
+                  break;
+                }
+              }
+
+            break;
+          case "co64":
+            if (body.Length >= 16)
+              offset = (long)BinaryPrimitives.ReadUInt64BigEndian(body[8..]);
+            break;
+          case "stsz":
+            if (body.Length >= 12) {
+              size = BinaryPrimitives.ReadUInt32BigEndian(body[4..]);
+              if (size == 0 && body.Length >= 16)
+                size = BinaryPrimitives.ReadUInt32BigEndian(body[12..]);
+            }
+
+            break;
+        }
+
+        at += (int)boxSize;
+      }
+    }
+
+    CrxHeader? none = null;
+    long o = 0, z = 0;
+    Walk(data, 0, data.Length, ref none, ref o, ref z);
+    foreach (var (_, offset, size) in tracks)
+      if (offset < 0 || offset + size > data.Length)
+        throw new InvalidDataException("A CR3 CRX track lies outside the file.");
+    return [.. tracks.OrderByDescending(static t => (long)t.Header.Width * t.Header.Height)];
+  }
+
+  /// <summary>The main sensor image: the largest CRX track, decoded; <c>null</c> where the file has none.</summary>
+  internal static Cr3Sensor? ReadSensor(ReadOnlySpan<byte> data) {
+    var tracks = FindTracks(data);
+    if (tracks.Count == 0)
+      return null;
+    var (header, offset, size) = tracks[0];
+    return CrxDecoder.Decode(header, data.Slice((int)offset, (int)size));
   }
 }

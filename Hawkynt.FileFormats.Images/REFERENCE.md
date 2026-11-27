@@ -11618,7 +11618,7 @@ Implements `IEquatable<CpcSpriteFile>`, `IImageFormatMetadata<CpcSpriteFile>`, `
 
 ### Namespace `FileFormat.Cr3`
 
-[`Cr3File`](#cr3file) · [`Cr3Reader`](#cr3reader) · [`Cr3Writer`](#cr3writer)
+[`Cr3File`](#cr3file) · [`Cr3Reader`](#cr3reader) · [`Cr3Sensor`](#cr3sensor) · [`Cr3Writer`](#cr3writer)
 
 #### `Cr3File`
 
@@ -11628,9 +11628,11 @@ Implements `IImageFormatMetadata<Cr3File>`, `IImageFormatReader<Cr3File>`, `IIma
 | --- | --- | --- |
 | `Cr3File` | `Cr3File()` |  |
 | `CodecVersion` | `string CodecVersion { get; init; }` |  |
+| `DualPixelSensor` | `Cr3Sensor DualPixelSensor { get; }` |  |
 | `PreviewHeight` | `int PreviewHeight { get; init; }` |  |
 | `PreviewJpeg` | `byte[] PreviewJpeg { get; init; }` |  |
 | `PreviewWidth` | `int PreviewWidth { get; init; }` |  |
+| `Sensor` | `Cr3Sensor Sensor { get; }` |  |
 | `ThumbnailHeight` | `int ThumbnailHeight { get; init; }` |  |
 | `ThumbnailJpeg` | `byte[] ThumbnailJpeg { get; init; }` |  |
 | `ThumbnailWidth` | `int ThumbnailWidth { get; init; }` |  |
@@ -11645,6 +11647,19 @@ Implements `IImageFormatMetadata<Cr3File>`, `IImageFormatReader<Cr3File>`, `IIma
 | `FromFile` | `static Cr3File FromFile(FileInfo file)` |  |
 | `FromSpan` | `static Cr3File FromSpan(ReadOnlySpan<byte> data)` |  |
 | `FromStream` | `static Cr3File FromStream(Stream stream)` |  |
+
+#### `Cr3Sensor`
+
+Implements `IEquatable<Cr3Sensor>`.
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `Cr3Sensor` | `Cr3Sensor(int Width, int Height, int BitsPerSample, int CfaLayout, ushort[] Samples)` |  |
+| `BitsPerSample` | `int BitsPerSample { get; init; }` |  |
+| `CfaLayout` | `int CfaLayout { get; init; }` |  |
+| `Height` | `int Height { get; init; }` |  |
+| `Samples` | `ushort[] Samples { get; init; }` |  |
+| `Width` | `int Width { get; init; }` |  |
 
 #### `Cr3Writer`
 

@@ -146,10 +146,10 @@ public sealed class Cr3Tests {
   }
 
   /// <summary>
-  /// A CR3 whose only picture is its sensor data says so, because CRX is not decoded here.
+  /// A CR3 with no preview, no thumbnail and no CRX track has nothing to read, and says so.
   /// </summary>
   [Test]
-  public void ACr3CarryingOnlySensorDataIsRefusedByName() {
+  public void ACr3CarryingNothingReadableIsRefused() {
     var file = _Read();
     var stripped = new Cr3File { CodecVersion = file.CodecVersion, ThumbnailJpeg = file.ThumbnailJpeg, ThumbnailWidth = 160, ThumbnailHeight = 120 };
     var bytes = Cr3Writer.ToBytes(stripped);
@@ -159,7 +159,7 @@ public sealed class Cr3Tests {
     Assert.That(at, Is.GreaterThan(0));
     bytes[at] = (byte)'X';
 
-    var failure = Assert.Throws<NotSupportedException>(() => Cr3Reader.FromBytes(bytes));
+    var failure = Assert.Throws<InvalidDataException>(() => Cr3Reader.FromBytes(bytes));
     Assert.That(failure!.Message, Does.Contain("CRX"));
   }
 }

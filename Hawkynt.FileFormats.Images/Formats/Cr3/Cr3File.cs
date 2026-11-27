@@ -6,10 +6,14 @@ namespace FileFormat.Cr3;
 
 /// <summary>In-memory representation of a Canon CR3 raw file.</summary>
 /// <remarks>
-/// Camera-authored CR3 files keep their sensor samples in Canon's CRX codec, which is not implemented
-/// here. Reading therefore exposes the JPEG preview and thumbnail stored beside that sensor data.
-/// Writing deliberately stops at the same boundary: an arbitrary <see cref="RawImage"/> is encoded as
-/// a JPEG preview inside a CR3 container, without inventing a CRX track, camera model, lens or exposure.
+/// Camera-authored CR3 files keep their sensor samples in Canon's CRX codec, lossless or wavelet
+/// coded (C-RAW), and both are decoded: <see cref="Sensor"/> is the main image's Bayer mosaic and
+/// <see cref="DualPixelSensor"/> the second track a dual-pixel raw carries, each decoded when first
+/// asked for. The picture handed out is still the full-size JPEG preview the camera stored, or its
+/// thumbnail, and the mosaic itself only where neither is there, since a mosaic is not yet a
+/// picture. Writing deliberately stops at the preview: an arbitrary <see cref="RawImage"/> is
+/// encoded as a JPEG preview inside a CR3 container, without inventing a CRX track, camera model,
+/// lens or exposure.
 /// </remarks>
 [FormatDetectionPriority(210)]
 [FormatMimeType("image/x-canon-cr3")]
@@ -55,6 +59,33 @@ public sealed class Cr3File :
   public int ThumbnailWidth { get; init; }
   public int ThumbnailHeight { get; init; }
 
+  internal byte[]? CrxSource { get; init; }
+  internal IReadOnlyList<(CrxHeader Header, long Offset, long Size)> CrxTracks { get; init; } = [];
+  private Cr3Sensor? _sensor;
+  private Cr3Sensor? _dualPixel;
+
+  /// <summary>The main image's sensor data: the Bayer mosaic of the largest CRX track, or <c>null</c> where there is none.</summary>
+  public Cr3Sensor? Sensor => this._sensor ??= this._Decode(0);
+
+  /// <summary>A dual-pixel raw's second sensor image — the second track of the main image's size — or <c>null</c>.</summary>
+  public Cr3Sensor? DualPixelSensor {
+    get {
+      if (this._dualPixel != null)
+        return this._dualPixel;
+      if (this.CrxTracks.Count < 2)
+        return null;
+      var (main, second) = (this.CrxTracks[0].Header, this.CrxTracks[1].Header);
+      return second.Width == main.Width && second.Height == main.Height ? this._dualPixel = this._Decode(1) : null;
+    }
+  }
+
+  private Cr3Sensor? _Decode(int index) {
+    if (this.CrxSource == null || index >= this.CrxTracks.Count)
+      return null;
+    var (header, offset, size) = this.CrxTracks[index];
+    return CrxDecoder.Decode(header, this.CrxSource.AsSpan((int)offset, (int)size));
+  }
+
   /// <summary>Builds a preview-only CR3 container representation from an arbitrary picture.</summary>
   /// <remarks>
   /// CR3 states preview dimensions as unsigned sixteen-bit values. The picture is JPEG-encoded through
@@ -72,14 +103,19 @@ public sealed class Cr3File :
     };
   }
 
-  /// <summary>The largest picture the file carries outside its sensor data.</summary>
+  /// <summary>The largest picture the file carries outside its sensor data, or the sensor's mosaic as <see cref="PixelFormat.Gray16"/> where it carries none.</summary>
   public static RawImage ToRawImage(Cr3File file) {
     ArgumentNullException.ThrowIfNull(file);
 
-    var jpeg = file.PreviewJpeg ?? file.ThumbnailJpeg
-               ?? throw new ArgumentException("CR3 carries no preview or thumbnail.", nameof(file));
+    var jpeg = file.PreviewJpeg ?? file.ThumbnailJpeg;
+    if (jpeg != null)
+      return JpegFile.ToRawImage(JpegReader.FromBytes(jpeg));
 
-    return JpegFile.ToRawImage(JpegReader.FromBytes(jpeg));
+    var sensor = file.Sensor ?? throw new ArgumentException("CR3 carries no preview, thumbnail or sensor data.", nameof(file));
+    var pixels = new byte[sensor.Samples.Length * 2];
+    for (var i = 0; i < sensor.Samples.Length; ++i)
+      System.Buffers.Binary.BinaryPrimitives.WriteUInt16BigEndian(pixels.AsSpan(2 * i), sensor.Samples[i]);
+    return new() { Width = sensor.Width, Height = sensor.Height, Format = PixelFormat.Gray16, PixelData = pixels };
   }
 
   private static void _ValidateDimension(int value, string name) {
