@@ -2370,6 +2370,36 @@ picture back exactly, in 1,421,428 bytes against `6-methyl-5-hepten-2-one-CC-db.
 1,646,987 against `skrzyzowanie4.avi`'s 2,227,139, but 154,474 against the LZO-packed
 `fmvcVirtualDub_small.avi`'s 131,694. FFmpeg decodes what it writes to exactly this decoder's pictures.
 
+### Canopus HQX
+
+Converted from FFmpeg's `libavcodec/hqx.c` and `hqxdsp.c`, LGPL-2.1-or-later, with the DC, AC and
+coded-block-pattern code tables of `hqxvlc.h` and `hq_common.c` and the quantiser tables of `hqx.c`
+transcribed mechanically by a script that parsed the C initialisers. The DC codes are given outright; the
+AC codes are canonical from their lengths, assigned in listed order as `ff_vlc_init_from_lengths` assigns
+them, each symbol a level and a run.
+
+A frame is `HQ`, a byte naming the layout — 4:2:2 or 4:4:4, with or without alpha — and whether it is
+interlaced, the DC precision of 9, 10 or 11 bits, the size, and seventeen offsets bounding sixteen slices.
+Each slice holds a share of the 16x16 macroblocks dealt out tile by tile in a shuffled order, which this
+decoder follows exactly; every macroblock is visited once. A macroblock chooses one of sixteen sets of four
+quantisers, and each eight-by-eight block one of those four and so one of six AC tables. Alpha layouts open
+each macroblock with a coded-block pattern, and an uncoded block is transparent. The inverse transform is
+FFmpeg's: its column-pass products wrap as unsigned 32-bit values, both passes store sixteen-bit
+intermediates, and the twelve-bit result is widened to sixteen as `(v << 4) | (v >> 8)`. A slice whose
+offsets are out of order is skipped, as FFmpeg skips it.
+
+Measured against FFmpeg n9.1 with `-flags +bitexact`: the FATE suite's `canopus/hqx422.avi` (4:2:2, 720x576)
+and `hqx422a.avi` (4:2:2 with alpha, 1920x1080) are identical to FFmpeg's in every plane, alpha included.
+
+The encoder is this package's own, FFmpeg having none. The first picture chooses the layout: 4:2:2 YUV stays
+4:2:2, anything else goes as 4:4:4, with alpha where the picture has it; the 4:2:2-with-alpha layout is
+written too, though no input format chooses it. Progressive, 11-bit DC precision, quantiser set 2. The forward
+transform is a projection onto the basis of the decoder's own inverse transform, measured by running it on
+one coefficient at a time, and each block takes the finest of its four quantisers that keeps every level
+within the tables' 255. A run or level a table lacks is reached through its level-zero codes. A small picture
+leaves some slices no macroblock; FFmpeg complains of a slice with no bytes, so each gets one. FFmpeg decodes
+what it writes in all four layouts to exactly this decoder's planes.
+
 ### Electronic Arts TQI, TGQ, Madcow and TGV
 
 Converted from FFmpeg's `libavcodec/eatqi.c`, `eatgq.c`, `eamad.c`, `eatgv.c` and the inverse DCT the first
