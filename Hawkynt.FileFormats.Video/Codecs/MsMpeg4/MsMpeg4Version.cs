@@ -41,4 +41,10 @@ internal enum MsMpeg4Version {
 
   /// <summary>Windows Media Video 7 (<c>WMV1</c>): version 3's tables with its own scans, DC steps and headers.</summary>
   Wmv1 = 4,
+
+  /// <summary>
+  /// Windows Media Video 8 (<c>WMV2</c>): WMV1's block layer under a macroblock layer of its own —
+  /// its own transform, adaptive 8x4 and 4x8 transforms, quarter-sample motion and IntraX8 pictures.
+  /// </summary>
+  Wmv2 = 5,
 }

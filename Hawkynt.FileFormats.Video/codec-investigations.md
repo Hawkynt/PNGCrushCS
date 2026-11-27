@@ -634,6 +634,14 @@ the shared escape constants above argue against, but do not by themselves rule o
 
 # Windows Media Video 8 (WMV2), which adds a private table on top of WMV1's wall
 
+*Closed.* WMV2 is decoded and encoded now, IntraX8 pictures included. The tables this entry found
+missing are FFmpeg's, under LGPL-2.1-or-later — the run-level, DC and motion-vector tables the WMV1
+decoder already took, and the three predicted-macroblock tables, WMV2's scans and IntraX8's Huffman
+tables transcribed by script from `msmpeg4data.c`, `wmv2data.c` and `intrax8huf.h`; the macroblock
+layer, transforms, quarter-sample motion and IntraX8 are converted from `wmv2dec.c`, `wmv2dsp.c`,
+`intrax8.c` and `intrax8dsp.c`. `codec-notes.md` has the measurement: 30,209 pictures of eight real
+films, every one identical to FFmpeg's.
+
 WMV2 — Windows Media Video 8 — was investigated alongside WMV1 for the same reason: ffmpeg carries a
 real `wmv2` encoder, which is more than MS-MPEG4v3's own investigation had to work with. It stops at the
 same wall WMV1 does, for the same evidence, and it adds one wall of its own on top.
@@ -3137,7 +3145,8 @@ on top of that. MSS1 and MSS2 stop somewhere else: no independent description of
 coder exists, the one detailed write-up tracks libavcodec's own function names down to a shared
 spelling mistake, and MSS2 additionally embeds Windows Media Video 9 rectangles located by the very
 structure that coder would decode. What is left of this family is `msmpeg4v1`, `msmpeg4` (version 3),
-`msp2`, `msa1` and `mts2`.
+`msp2`, `msa1` and `mts2`. *(Superseded: versions 1 and 3, WMV1, MSS1 and WMV2 have since been converted from FFmpeg's
+LGPL-2.1-or-later sources under the sourcing ladder; each section above says so.)*
 
 **On2 and RealVideo** — `vp4`, `vp5`, `vp6`, `vp7`, `rv30`, `rv40`, `rv60`. VP3 shares almost all of
 its structure with Theora, which is done and exact, so it is the cheapest of these by a wide margin.

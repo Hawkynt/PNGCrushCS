@@ -80,14 +80,14 @@ internal sealed class MsMpeg4BlockDecoder {
   /// <summary>The step the luminance DC of an intra block is quantised with.</summary>
   internal int LuminanceDcStep => this._version switch {
     MsMpeg4Version.Version3 => MsMpeg4Data.Version3LuminanceDcStep[this._quantiser],
-    MsMpeg4Version.Wmv1 => MsMpeg4Data.Wmv1LuminanceDcStep[this._quantiser],
+    MsMpeg4Version.Wmv1 or MsMpeg4Version.Wmv2 => MsMpeg4Data.Wmv1LuminanceDcStep[this._quantiser],
     _ => FixedDcStep,
   };
 
   /// <summary>The same for a chrominance block.</summary>
   internal int ChrominanceDcStep => this._version switch {
     MsMpeg4Version.Version3 => MsMpeg4Data.Version3ChrominanceDcStep[this._quantiser],
-    MsMpeg4Version.Wmv1 => MsMpeg4Data.Version3ChrominanceDcStep[this._quantiser],
+    MsMpeg4Version.Wmv1 or MsMpeg4Version.Wmv2 => MsMpeg4Data.Version3ChrominanceDcStep[this._quantiser],
     _ => FixedDcStep,
   };
 
@@ -141,7 +141,7 @@ internal sealed class MsMpeg4BlockDecoder {
       // written in as well as where the prediction comes from.
       var absentDc = MsMpeg4IntraPrediction.AbsentDc(step);
       var fromAbove = forced?.FromAbove ?? prediction.PredictsFromAbove(address, index, absentDc);
-      var scan = this._version == MsMpeg4Version.Wmv1
+      var scan = this._version >= MsMpeg4Version.Wmv1
         ? !predictAc ? MsMpeg4Data.Wmv1IntraScan : fromAbove ? MsMpeg4Data.Wmv1HorizontalScan : MsMpeg4Data.Wmv1VerticalScan
         : !predictAc ? Mpeg4Quantisation.ZigZag
         : fromAbove ? Mpeg4Quantisation.AlternateHorizontal : Mpeg4Quantisation.AlternateVertical;
@@ -169,7 +169,9 @@ internal sealed class MsMpeg4BlockDecoder {
   /// three MPEG-4 versions keep the floating-point transform they were measured with.
   /// </summary>
   private void _InverseTransform(Span<int> samples) {
-    if (this._version == MsMpeg4Version.Wmv1)
+    if (this._version == MsMpeg4Version.Wmv2)
+      Wmv2.Wmv2Transform.Transform(samples);
+    else if (this._version == MsMpeg4Version.Wmv1)
       Dv.DvInverseDct.Transform(samples);
     else
       Mpeg4InverseDct.Transform(samples);
@@ -182,7 +184,7 @@ internal sealed class MsMpeg4BlockDecoder {
 
     // Reconstructed as they are read rather than afterwards: the codes of a predicted block state a
     // level already multiplied by the step, because the table a picture reads is chosen per quantiser.
-    var scan = this._version == MsMpeg4Version.Wmv1 ? MsMpeg4Data.Wmv1InterScan : Mpeg4Quantisation.ZigZag;
+    var scan = this._version >= MsMpeg4Version.Wmv1 ? MsMpeg4Data.Wmv1InterScan : Mpeg4Quantisation.ZigZag;
     this._ReadCoefficients(ref reader, levels, scan, this._predictedCodes, intra: false);
 
     levels.CopyTo(samples);
@@ -192,6 +194,14 @@ internal sealed class MsMpeg4BlockDecoder {
     // which is what stops two conforming transforms drifting apart without it.
     this._InverseTransform(samples);
   }
+
+  /// <summary>
+  /// Reads the residual levels of a predicted block in the scan given, already reconstructed and not
+  /// transformed: WMV2's entry, whose adaptive 8x4 and 4x8 halves bring scans and transforms of their
+  /// own and so cannot share <see cref="ReadInter"/>'s.
+  /// </summary>
+  internal void ReadInterLevels(ref Mpeg4BitReader reader, scoped Span<int> levels, int[] scan)
+    => this._ReadCoefficients(ref reader, levels, scan, this._predictedCodes, intra: false);
 
   // ============================================================================================
   // Version 1's intra blocks
@@ -270,7 +280,7 @@ internal sealed class MsMpeg4BlockDecoder {
     // The second escape form's run is one short in versions 1 and 3 and exact in version 2. One added
     // integer, and every coefficient after it lands one position out when it is wrong.
     // WMV1 makes it one short in intra blocks too.
-    var runOffset = intra ? (this._version == MsMpeg4Version.Wmv1 ? 1 : 0) : this._version == MsMpeg4Version.Version2 ? 0 : 1;
+    var runOffset = intra ? (this._version >= MsMpeg4Version.Wmv1 ? 1 : 0) : this._version == MsMpeg4Version.Version2 ? 0 : 1;
 
     var position = intra ? 0 : -1;
 
@@ -284,7 +294,7 @@ internal sealed class MsMpeg4BlockDecoder {
         level = _Sign(ref reader, codes.LevelOf(index) * multiplier + offset);
       } else if (this._version == MsMpeg4Version.Version1 || reader.NextBits(1) == 0) {
         if (this._version == MsMpeg4Version.Version1 || reader.NextBits(2) == 0) {
-          (advance, level) = this._version == MsMpeg4Version.Wmv1
+          (advance, level) = this._version >= MsMpeg4Version.Wmv1
             ? this._ReadWmv1ThirdEscape(ref reader, multiplier, offset)
             : _ReadThirdEscape(ref reader, this._version, multiplier, offset);
         } else {
@@ -311,7 +321,7 @@ internal sealed class MsMpeg4BlockDecoder {
       // FFmpeg reads a WMV1 block that runs past its sixty-fourth coefficient as ending at the
       // sixty-third, the stray coefficient dropped — Microsoft's encoders write a last level of -1 one
       // position out — and every WMV1 decoder in use agrees with it.
-      if ((uint)position > 63 && this._version == MsMpeg4Version.Wmv1)
+      if ((uint)position > 63 && this._version >= MsMpeg4Version.Wmv1)
         return;
 
       if ((uint)position > 63)

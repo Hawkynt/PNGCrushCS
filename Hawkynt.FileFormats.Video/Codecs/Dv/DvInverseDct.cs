@@ -140,6 +140,12 @@ internal static class DvInverseDct {
     }
   }
 
+  /// <summary>
+  /// One row of the eight-point transform, in place: FFmpeg's <c>idctRowCondDC_int16_8bit</c>, which
+  /// WMV2's 8x4 transform also opens with.
+  /// </summary>
+  internal static void Row(Span<short> row) => _Row(row);
+
   /// <summary>One row of the eight-point transform, in place.</summary>
   private static void _Row(Span<short> row) {
     unchecked {

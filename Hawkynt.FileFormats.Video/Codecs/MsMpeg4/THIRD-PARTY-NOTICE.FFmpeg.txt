@@ -32,10 +32,30 @@ Files used, all from libavcodec:
   h263.c               the motion vector predictor
   h263dec.c            the slice loop and the trailing extension header
 
+WMV2, in ../Wmv2 (and its decoder and encoder beside this directory):
+
+  wmv2dec.c            the extension header, the picture headers, the skip map,
+                       the macroblock layer, the vector predictor, the adaptive
+                       8x4 and 4x8 transform choice and the quarter-sample
+                       motion compensation and its filters
+  wmv2dsp.c            WMV2's 8x8 inverse transform
+  wmv2data.c           the two half-block scans
+  wmv2enc.c            the picture header the encoder writes
+  msmpeg4data.c        the three WMV2 predicted-macroblock tables
+                       (table_mb_non_intra2 to 4) and the cbp table map
+  simple_idct.c        the 8x4 and 4x8 inverse transforms
+  intrax8.c            the IntraX8 picture decoder
+  intrax8dsp.c         its spatial predictors and its loop filter
+  intrax8huf.h         its orientation, DC and AC Huffman tables
+  h263.c, h263dsp.c    the H.263 Annex J loop filter and its strength table
+
 Copyright (c) 2001 Fabrice Bellard
 Copyright (c) 2002-2013 Michael Niedermayer <michaelni@gmx.at>
 Copyright (c) 2000-2002 Fabrice Bellard, Michael Niedermayer (rl.c)
 Copyright (c) 2007 Aurelien Jacobs <aurel@gnuage.org>
+Copyright (c) 2002 The FFmpeg Project (wmv2dec.c)
+Copyright (c) 2001 Michael Niedermayer (simple_idct.c)
+Copyright (c) 2000, 2001 Fabrice Bellard, 2001 Juan J. Sierralta P (h263.c)
 
 FFmpeg is free software; you can redistribute it and/or modify it under the
 terms of the GNU Lesser General Public License as published by the Free

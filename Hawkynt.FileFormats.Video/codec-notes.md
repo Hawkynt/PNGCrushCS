@@ -2142,6 +2142,58 @@ reconstructing with `simple_idct`. It states 255 kbit/s in the extension header,
 prediction off and per-macroblock tables unused. FFmpeg decodes what it writes, in AVI and Matroska and
 with noise pictures that force the escapes, to exactly this decoder's pictures.
 
+### Windows Media Video 8
+
+WMV2 keeps WMV1's block layer — the run-level tables, the three escapes, the DC prediction and steps,
+the scans — and the decoder takes it from the WMV1 one unchanged but for the transform. Everything
+around it is converted from FFmpeg's `libavcodec/wmv2dec.c`, `wmv2dsp.c`, `intrax8.c`, `intrax8dsp.c`
+and the H.263 loop filter in `h263.c` and `h263dsp.c`, with `wmv2data.c`'s scans, `msmpeg4data.c`'s
+three predicted-macroblock tables and `intrax8huf.h`'s Huffman tables transcribed by script, all
+LGPL-2.1-or-later. The four bytes after the `BITMAPINFOHEADER` say which tools the stream uses:
+quarter-sample motion, the loop filter, adaptive transforms, IntraX8 pictures, the chosen vector
+predictor, per-macroblock run-level tables, and how many slices a picture has.
+
+What differs from WMV1, and where it bites. Every 8x8 block goes through WMV2's own transform — rows
+shifted by eight, columns by fourteen, with a 181/256 rotation for the odd terms — intra and predicted
+alike; an adaptively split block goes through FFmpeg's `simple_idct` 8x4 or 4x8 halves instead, and a
+half that runs past its thirty-second coefficient lands on the DC, because FFmpeg's 64-entry scans are
+zero past the 32 they hold. The predicted macroblock's joint type and pattern comes from one of three
+tables picked by the quantiser band and a stated index. The skip map comes ahead of every macroblock in
+one of three layouts — a bit each, a bit a row or column then a bit each — and a row or column map that
+skips everything makes the picture no picture: FFmpeg returns nothing for it and does not flip the
+rounding, so neither does this decoder. The vector predictor is the left neighbour on a slice's first
+row and otherwise the median with nought standing in for a neighbour outside the picture, unless the
+left and upper neighbours disagree by eight half-samples and the stream lets the macroblock choose.
+Quarter-sample motion filters the luminance with (-1, 9, 9, -1)/16 and averages in an extra horizontal
+quarter step where the vector is odd; the source position is clipped to sixteen samples outside the
+picture's stated, not macroblock-aligned, size and its fraction dropped there, as FFmpeg does. The
+deblocking filter is H.263's Annex J one run in FFmpeg's order, a skipped macroblock filtered with a
+quantiser of nought. Rounding flips at every predicted picture and is set by every intra one.
+
+IntraX8 is a separate picture coder: 8x8 blocks predicted from the filtered samples above and beside
+them in one of twelve directions, chosen by the neighbours' history and a stated correction, with an
+AC compensation of the DC's own leakage, an optional quantisation matrix, its own DC, AC and orientation
+tables chosen once a picture, a flat-block shortcut, and its own loop filter applied as each block is
+placed. Its quirks are FFmpeg's and kept: the run estimate takes the upper-left neighbour into account
+wherever x and y share a bit, not only away from the edges.
+
+Measured against FFmpeg's `yuv420p` planes, decoded with `-flags +bitexact`: 30,209 pictures, every one
+identical. They are the eight films of `samples.ffmpeg.org/V-codecs/WMV8` and its `j-frames` directory —
+320x240, 640x360 and the 294x166 of `703.wmv`, which is not a whole number of macroblocks. Between them
+they hold 443 J-frames, 45,000 deblocked pictures, 19,000 with quarter-sample motion, every adaptive
+transform at every level it can be chosen at, all four skip-map layouts and both outcomes of the chosen
+predictor; FFmpeg's "ignoring overflow" over one of them is the WMV1 block overrun, read the same way here.
+What FFmpeg's own `wmv2` encoder writes — which states the quarter-sample, adaptive-transform, J-frame and
+per-macroblock-table flags and uses none of them — decodes to FFmpeg's pictures as well, with and without
+`+loop`, at sizes that are and are not whole macroblocks.
+
+The encoder is the Microsoft MPEG-4 one writing WMV2's picture header, skip map, macroblock tables and
+vector predictor, with every optional tool off in the extension header and one slice. It reconstructs
+with WMV2's transform and the alternating rounding the format makes compulsory, and avoids the row and
+column skip maps so that a picture of nothing but skipped macroblocks is still a picture. FFmpeg decodes
+what it writes, in AVI and Matroska and with noise pictures that force the escapes, to exactly this
+decoder's pictures.
+
 ### Lagarith
 
 Converted from FFmpeg's `libavcodec/lagarith.c`, `lagarithrac.c` and `lagarithrac.h`, LGPL-2.1-or-later,

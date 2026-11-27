@@ -95,7 +95,7 @@ internal sealed class MsMpeg4PictureEncoder {
   private readonly Mpeg4Frame _source;
   private readonly Mpeg4Frame _target;
   private readonly Mpeg4Frame? _reference;
-  private readonly MsMpeg4BitWriter _writer = new();
+  private MsMpeg4BitWriter _writer = new();
   private readonly MsMpeg4IntraPrediction _intraPrediction;
   private readonly MsMpeg4CodedBlockPrediction? _codedBlock;
   private readonly short[] _vectorX;
@@ -103,11 +103,17 @@ internal sealed class MsMpeg4PictureEncoder {
   private readonly bool[] _isDecoded;
   private readonly int[] _lastDc = new int[3];
   private readonly int _frameRate;
+  private readonly int _rounding;
 
+  /// <summary>Which WMV2 predicted macroblocks were skipped, stated in the picture header ahead of them all.</summary>
+  private readonly bool[]? _skipped;
+
+  /// <param name="rounding">One where the half-sample averages round down, which only WMV2 alternates.</param>
   internal MsMpeg4PictureEncoder(
     MsMpeg4Version version, int quantiser, bool intraPicture, int frameRate,
     Mpeg4Frame source, Mpeg4Frame target, Mpeg4Frame? reference,
-    int macroblockWidth, int macroblockHeight, int sliceHeight) {
+    int macroblockWidth, int macroblockHeight, int sliceHeight, int rounding = 0) {
+    this._rounding = rounding;
     this._version = version;
     this._quantiser = quantiser;
     this._intraPicture = intraPicture;
@@ -123,15 +129,22 @@ internal sealed class MsMpeg4PictureEncoder {
     this._vectorX = new short[count];
     this._vectorY = new short[count];
     this._isDecoded = new bool[count];
-    this._intraPrediction = new(macroblockWidth, macroblockHeight, sliceHeight, wmv1: version == MsMpeg4Version.Wmv1);
-    this._codedBlock = version is MsMpeg4Version.Version3 or MsMpeg4Version.Wmv1 && intraPicture
+    this._intraPrediction = new(macroblockWidth, macroblockHeight, sliceHeight, wmv1: version >= MsMpeg4Version.Wmv1);
+    this._skipped = version == MsMpeg4Version.Wmv2 && !intraPicture ? new bool[count] : null;
+    this._codedBlock = version >= MsMpeg4Version.Version3 && intraPicture
       ? new(macroblockWidth, macroblockHeight)
       : null;
   }
 
   /// <summary>Codes the whole picture and hands back its bytes, the last one padded.</summary>
   internal byte[] Encode() {
-    this._WriteHeader();
+    // WMV2 states its predicted picture's skip map ahead of every macroblock, so the macroblocks are
+    // written first into a writer of their own and the header put in front of them afterwards.
+    var header = this._writer;
+    if (this._version == MsMpeg4Version.Wmv2)
+      this._writer = new();
+    else
+      this._WriteHeader();
 
     for (var row = 0; row < this._macroblockHeight; ++row) {
       this._ResetLastDc();
@@ -145,7 +158,12 @@ internal sealed class MsMpeg4PictureEncoder {
       }
     }
 
-    if (this._intraPicture && this._version != MsMpeg4Version.Wmv1)
+    if (this._version == MsMpeg4Version.Wmv2) {
+      var body = this._writer;
+      this._writer = header;
+      this._WriteWmv2Header();
+      this._writer.Append(body);
+    } else if (this._intraPicture && this._version != MsMpeg4Version.Wmv1)
       this._WriteExtensionHeader();
 
     this._target.PadBorders();
@@ -232,6 +250,55 @@ internal sealed class MsMpeg4PictureEncoder {
       this._writer.Write(0, 1);
   }
 
+  /// <summary>
+  /// WMV2's picture header, as FFmpeg's <c>wmv2_decode_picture_header</c> and
+  /// <c>ff_wmv2_decode_secondary_picture_header</c> read it under the extension header
+  /// <see cref="Wmv2ExtensionHeader"/> writes: no J-frames, quarter-sample motion, adaptive transforms
+  /// or per-macroblock tables, so only the tables, the skip map and the macroblock table's band.
+  /// </summary>
+  private void _WriteWmv2Header() {
+    this._writer.Write(this._intraPicture ? 0 : 1, 1);
+    if (this._intraPicture)
+      this._writer.Write(0, 7);
+    this._writer.Write(this._quantiser, 5);
+
+    if (this._intraPicture) {
+      _WriteZeroOneOrTwo(this._writer, _RUN_LEVEL_TABLE_INDEX);
+      _WriteZeroOneOrTwo(this._writer, _RUN_LEVEL_TABLE_INDEX);
+      this._writer.Write(0, 1);
+      return;
+    }
+
+    // A skip map of one bit a macroblock where anything is skipped and none at all otherwise. The row
+    // and column layouts are avoided on purpose: a map of those that skips everything is read by
+    // FFmpeg as no picture, and the picture would go missing from its output.
+    var anySkipped = Array.IndexOf(this._skipped!, true) >= 0;
+    this._writer.Write(anySkipped ? 1 : 0, 2);
+    if (anySkipped)
+      foreach (var skipped in this._skipped!)
+        this._writer.Write(skipped ? 1 : 0, 1);
+
+    _WriteZeroOneOrTwo(this._writer, 0); // the macroblock table's band index
+    _WriteZeroOneOrTwo(this._writer, _RUN_LEVEL_TABLE_INDEX);
+    this._writer.Write(0, 1); // DC table
+    this._writer.Write(0, 1); // motion vector table
+  }
+
+  /// <summary>
+  /// The four bytes a WMV2 stream carries after its <c>BITMAPINFOHEADER</c>, as this encoder writes
+  /// its pictures: a frame rate, a nominal bit rate, every optional tool off and one slice.
+  /// </summary>
+  internal static byte[] Wmv2ExtensionHeader(int frameRate) {
+    var writer = new MsMpeg4BitWriter();
+    writer.Write(Math.Min(frameRate, 31), 5);
+    writer.Write(_WMV1_STATED_BIT_RATE, 11);
+    writer.Write(0, 6); // mspel, loop filter, adaptive transform, J-frames, top-left vectors, per-macroblock tables
+    writer.Write(1, 3); // one slice
+    var bytes = writer.ToArray();
+    Array.Resize(ref bytes, 4);
+    return bytes;
+  }
+
   private static void _WriteZeroOneOrTwo(MsMpeg4BitWriter writer, int value) {
     if (value == 0) {
       writer.Write(0, 1);
@@ -290,7 +357,8 @@ internal sealed class MsMpeg4PictureEncoder {
 
     switch (this._version) {
       case MsMpeg4Version.Version3:
-      case MsMpeg4Version.Wmv1: {
+      case MsMpeg4Version.Wmv1:
+      case MsMpeg4Version.Wmv2: {
         var coded = chroma;
         for (var index = 0; index < 4; ++index) {
           var bit = (pattern >> (5 - index)) & 1;
@@ -328,6 +396,11 @@ internal sealed class MsMpeg4PictureEncoder {
     var luminance = pattern >> 2;
 
     switch (this._version) {
+      case MsMpeg4Version.Wmv2:
+        this._WriteWmv2MacroblockCode(pattern);
+        this._writer.Write(0, 1); // AC prediction off.
+        return;
+
       case MsMpeg4Version.Version3:
       case MsMpeg4Version.Wmv1:
         // Bit six clear means intra in the P-picture table; the lower six bits are the direct CBP.
@@ -426,19 +499,21 @@ internal sealed class MsMpeg4PictureEncoder {
     MsMpeg4Version.Version3 => isLuminance
       ? MsMpeg4Data.Version3LuminanceDcStep[this._quantiser]
       : MsMpeg4Data.Version3ChrominanceDcStep[this._quantiser],
-    MsMpeg4Version.Wmv1 => isLuminance
+    MsMpeg4Version.Wmv1 or MsMpeg4Version.Wmv2 => isLuminance
       ? MsMpeg4Data.Wmv1LuminanceDcStep[this._quantiser]
       : MsMpeg4Data.Version3ChrominanceDcStep[this._quantiser],
     _ => MsMpeg4BlockDecoder.FixedDcStep,
   };
 
-  private int[] _IntraScan => this._version == MsMpeg4Version.Wmv1 ? MsMpeg4Data.Wmv1IntraScan : Mpeg4Quantisation.ZigZag;
+  private int[] _IntraScan => this._version >= MsMpeg4Version.Wmv1 ? MsMpeg4Data.Wmv1IntraScan : Mpeg4Quantisation.ZigZag;
 
-  private int[] _InterScan => this._version == MsMpeg4Version.Wmv1 ? MsMpeg4Data.Wmv1InterScan : Mpeg4Quantisation.ZigZag;
+  private int[] _InterScan => this._version >= MsMpeg4Version.Wmv1 ? MsMpeg4Data.Wmv1InterScan : Mpeg4Quantisation.ZigZag;
 
   /// <summary>WMV1 reconstructs with FFmpeg's integer <c>simple_idct</c>, which its decoders use.</summary>
   private void _InverseTransform(Span<int> samples) {
-    if (this._version == MsMpeg4Version.Wmv1)
+    if (this._version == MsMpeg4Version.Wmv2)
+      Wmv2.Wmv2Transform.Transform(samples);
+    else if (this._version == MsMpeg4Version.Wmv1)
       Dv.DvInverseDct.Transform(samples);
     else
       Mpeg4InverseDct.Transform(samples);
@@ -449,8 +524,9 @@ internal sealed class MsMpeg4PictureEncoder {
   // ============================================================================================
 
   private void _EncodePredictedMacroblock(int address) {
-    var predictedX = this._PredictVector(address, horizontal: true);
-    var predictedY = this._PredictVector(address, horizontal: false);
+    var (predictedX, predictedY) = this._version == MsMpeg4Version.Wmv2
+      ? this._PredictWmv2Vector(address)
+      : (this._PredictVector(address, horizontal: true), this._PredictVector(address, horizontal: false));
     var (vectorX, vectorY, interDistortion) = this._Search(address, predictedX, predictedY);
 
     // A vector whose difference cannot be written is given up rather than clipped, because clipping
@@ -463,7 +539,8 @@ internal sealed class MsMpeg4PictureEncoder {
     }
 
     if (this._ShouldEncodeIntra(address, interDistortion)) {
-      this._writer.Write(0, 1);
+      if (this._version != MsMpeg4Version.Wmv2)
+        this._writer.Write(0, 1);
       this._EncodeIntraMacroblock(address, inPredictedPicture: true);
       return;
     }
@@ -490,13 +567,17 @@ internal sealed class MsMpeg4PictureEncoder {
     }
 
     if (pattern == 0 && vectorX == 0 && vectorY == 0) {
-      this._writer.Write(1, 1);
+      if (this._skipped != null)
+        this._skipped[address] = true;
+      else
+        this._writer.Write(1, 1);
       this._Reconstruct(address, prediction, levels, pattern: 0);
       this._Remember(address, 0, 0);
       return;
     }
 
-    this._writer.Write(0, 1);
+    if (this._skipped == null)
+      this._writer.Write(0, 1);
     this._WritePredictedMacroblockHeader(pattern);
     this._WriteVector(vectorX - predictedX, vectorY - predictedY);
 
@@ -511,6 +592,10 @@ internal sealed class MsMpeg4PictureEncoder {
 
   private void _WritePredictedMacroblockHeader(int pattern) {
     switch (this._version) {
+      case MsMpeg4Version.Wmv2:
+        this._WriteWmv2MacroblockCode(pattern + 64);
+        return;
+
       case MsMpeg4Version.Version3:
       case MsMpeg4Version.Wmv1:
         this._writer.Write(
@@ -540,8 +625,22 @@ internal sealed class MsMpeg4PictureEncoder {
     }
   }
 
+  /// <summary>
+  /// A WMV2 predicted picture's macroblock code, out of whichever of its three tables the header's
+  /// band index of nought chooses at this quantiser.
+  /// </summary>
+  private void _WriteWmv2MacroblockCode(int value) {
+    var band = (this._quantiser > 10 ? 1 : 0) + (this._quantiser > 20 ? 1 : 0);
+    var (codes, lengths) = Wmv2.Wmv2Data.CbpTableMap[3 * band] switch {
+      0 => (Wmv2.Wmv2Data.NonIntra2Codes, Wmv2.Wmv2Data.NonIntra2Lengths),
+      1 => (Wmv2.Wmv2Data.NonIntra3Codes, Wmv2.Wmv2Data.NonIntra3Lengths),
+      _ => (Wmv2.Wmv2Data.NonIntra4Codes, Wmv2.Wmv2Data.NonIntra4Lengths),
+    };
+    this._writer.Write(codes[value], lengths[value]);
+  }
+
   private void _WriteVector(int differenceX, int differenceY) {
-    if (this._version is MsMpeg4Version.Version3 or MsMpeg4Version.Wmv1) {
+    if (this._version >= MsMpeg4Version.Version3) {
       MsMpeg4Tables.MotionVectorCodes[0].Write(this._writer, differenceX + 32, differenceY + 32);
       return;
     }
@@ -719,7 +818,7 @@ internal sealed class MsMpeg4PictureEncoder {
       if (levels[scan[i]] != 0)
         lastIndex = i;
 
-    var runOffset = intra ? (this._version == MsMpeg4Version.Wmv1 ? 1 : 0) : this._version == MsMpeg4Version.Version2 ? 0 : 1;
+    var runOffset = intra ? (this._version >= MsMpeg4Version.Wmv1 ? 1 : 0) : this._version == MsMpeg4Version.Version2 ? 0 : 1;
     var previous = first - 1;
 
     for (var i = first; i <= lastIndex; ++i) {
@@ -768,7 +867,7 @@ internal sealed class MsMpeg4PictureEncoder {
         continue;
       }
 
-      if (this._version == MsMpeg4Version.Wmv1)
+      if (this._version >= MsMpeg4Version.Wmv1)
         this._WriteWmv1ThirdEscape(last, run, level);
       else
         _WriteThirdEscape(this._writer, last, run, level, prefix: true);
@@ -868,6 +967,27 @@ internal sealed class MsMpeg4PictureEncoder {
     return _Median(left, top, topRight);
   }
 
+  /// <summary>
+  /// WMV2's predictor, FFmpeg's <c>wmv2_pred_motion</c> with the top-left choice off: the left
+  /// neighbour on a slice's first row, the median of left, above and above-right below it, and a
+  /// vector of nought standing in for a neighbour outside the picture rather than being left out.
+  /// </summary>
+  private (int X, int Y) _PredictWmv2Vector(int address) {
+    var column = address % this._macroblockWidth;
+    var row = address / this._macroblockWidth;
+    int ax = 0, ay = 0, bx = 0, by = 0, cx = 0, cy = 0;
+    if (column > 0)
+      (ax, ay) = (this._vectorX[address - 1], this._vectorY[address - 1]);
+    if (row % this._sliceHeight == 0)
+      return (ax, ay);
+
+    var above = address - this._macroblockWidth;
+    (bx, by) = (this._vectorX[above], this._vectorY[above]);
+    if (column + 1 < this._macroblockWidth)
+      (cx, cy) = (this._vectorX[above + 1], this._vectorY[above + 1]);
+    return (Math.Max(Math.Min(ax, bx), Math.Min(Math.Max(ax, bx), cx)), Math.Max(Math.Min(ay, by), Math.Min(Math.Max(ay, by), cy)));
+  }
+
   private (int Value, bool Valid) _CandidateOf(int neighbour, short[] vectors)
     => neighbour < 0 || !this._isDecoded[neighbour] ? (0, false) : (vectors[neighbour], true);
 
@@ -910,7 +1030,7 @@ internal sealed class MsMpeg4PictureEncoder {
     var border = index < 4 ? Mpeg4Frame.Border : Mpeg4Frame.Border / 2;
 
     Mpeg4MotionCompensation.PredictHalfSample(
-      prediction, plane, stride, origin, border, width, height, left, top, vectorX, vectorY, rounding: 0);
+      prediction, plane, stride, origin, border, width, height, left, top, vectorX, vectorY, this._rounding);
   }
 
   private void _Read(Mpeg4Frame frame, int address, int index, scoped Span<int> samples) {

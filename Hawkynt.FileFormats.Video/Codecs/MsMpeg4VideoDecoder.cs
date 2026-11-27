@@ -64,11 +64,10 @@ namespace FileFormat.Codecs;
 /// decoded by ffmpeg's version 1 decoder and compared against this one's. Three hundred and
 /// eighty-one samples of sixty-four million differ, none by more than one level.
 /// <para/>
-/// <b>What it does not do.</b> Windows Media Video 7 and 8 are refused by name. They are the same
-/// family and the next two members of it, but each adds machinery of its own — its own scan orders and
-/// a trailing header for the first, a different inverse transform and a different interpolation for
-/// the second — and a stream of either decoded as version 3 would produce a picture rather than an
-/// error. There is no <c>catch</c> anywhere that hands back a blank, a copied or a repeated picture,
+/// <b>What it does not do.</b> Windows Media Video 7 and 8 are left to <see cref="Wmv1VideoDecoder"/>
+/// and <see cref="Wmv2VideoDecoder"/>. They are the same family and the next two members of it, but
+/// each adds machinery of its own, and a stream of either decoded as version 3 would produce a picture
+/// rather than an error. There is no <c>catch</c> anywhere that hands back a blank, a copied or a repeated picture,
 /// because a plausible wrong picture is worse than a refusal: nobody checks a picture that looks like
 /// a picture.
 /// </remarks>
@@ -126,11 +125,6 @@ public sealed class MsMpeg4VideoDecoder : IVideoCodecDecoder<MsMpeg4VideoDecoder
   /// </remarks>
   private static readonly string[] _Version3CodecIds = ["V_MPEG4/MS/V3"];
 
-  /// <summary>The codes that name Windows Media Video 7 and 8, refused as what they are.</summary>
-  private static readonly CodecTag[] _WindowsMediaTags = [
-    CodecTag.FromCharacters("WMV2"),
-  ];
-
   /// <summary>
   /// How many bits an intra picture's trailing extension header occupies, by version.
   /// </summary>
@@ -182,8 +176,7 @@ public sealed class MsMpeg4VideoDecoder : IVideoCodecDecoder<MsMpeg4VideoDecoder
     if (stream.Kind != MediaStreamKind.Video)
       return false;
 
-    return _Matches(stream, _Version1Tags) || _Matches(stream, _Version2Tags) || _IsVersion3(stream)
-           || _Matches(stream, _WindowsMediaTags);
+    return _Matches(stream, _Version1Tags) || _Matches(stream, _Version2Tags) || _IsVersion3(stream);
   }
 
   /// <summary>
@@ -197,14 +190,6 @@ public sealed class MsMpeg4VideoDecoder : IVideoCodecDecoder<MsMpeg4VideoDecoder
   /// </remarks>
   public static MsMpeg4VideoDecoder Create(MediaStreamInfo stream) {
     ArgumentNullException.ThrowIfNull(stream);
-
-    if (_Matches(stream, _WindowsMediaTags))
-      throw new NotSupportedException(
-        $"Stream {stream.Index} is coded as '{stream.Codec}', which is Windows Media Video 8. It is the next member of "
-        + "this family and shares its picture header and much of its block layer, but brings machinery of its own — "
-        + "a different inverse transform, a different half-sample interpolation and a block transform of its own. A "
-        + "stream of it decoded as version 3 would produce a picture rather than an error, so it is refused rather "
-        + "than approximated.");
 
     if (stream.Width <= 0 || stream.Height <= 0)
       throw new NotSupportedException(

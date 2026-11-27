@@ -43,6 +43,14 @@ internal sealed class MsMpeg4BitWriter {
   }
 
   /// <summary>The picture as bytes, its last byte padded with zeroes.</summary>
+  /// <summary>Appends every bit another writer holds, in order.</summary>
+  internal void Append(MsMpeg4BitWriter other) {
+    ArgumentNullException.ThrowIfNull(other);
+    for (var i = 0; i < other._count; ++i)
+      this.Write(other._bytes[i], 8);
+    this.Write(other._partial, other._partialBits);
+  }
+
   internal byte[] ToArray() {
     var bytes = this._count;
     if (this._partialBits > 0)
