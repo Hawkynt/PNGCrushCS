@@ -20,6 +20,165 @@ Custom Zopfli-class DEFLATE encoder producing standard zlib-wrapped output
 | `ZopfliDeflater` | `ZopfliDeflater()` |  |
 | `Compress` | `static byte[] Compress(ReadOnlySpan<byte> data, bool hyper, int iterations = 15)` | Compress data to zlib-wrapped DEFLATE format |
 
+### Namespace `Compression.Core.BitIO`
+
+[`BitBuffer`](#bitbuffer) · [`BitBuffer<TOrder>`](#bitbuffertorder) · [`BitOrder`](#bitorder) · [`BitReader`](#bitreader) · [`BitReader<TOrder>`](#bitreadertorder) · [`BitWriter`](#bitwriter) · [`BitWriter<TOrder>`](#bitwritertorder) · [`IBitOrder`](#ibitorder) · [`LsbBitOrder`](#lsbbitorder) · [`MsbBitOrder`](#msbbitorder)
+
+#### `BitBuffer`
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `BitBuffer` | `BitBuffer(Stream stream, BitOrder bitOrder = 0)` |  |
+| `BitsAvailable` | `int BitsAvailable { get; }` |  |
+| `AlignToByte` | `void AlignToByte()` |  |
+| `DropBits` | `void DropBits(int count)` |  |
+| `EnsureBits` | `bool EnsureBits(int count)` |  |
+| `PeekBits` | `uint PeekBits(int count)` |  |
+| `ReadBits` | `uint ReadBits(int count)` |  |
+
+#### `BitBuffer<TOrder>`
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `BitBuffer` | `BitBuffer(Stream stream)` |  |
+| `BitsAvailable` | `int BitsAvailable { get; }` |  |
+| `AlignToByte` | `void AlignToByte()` |  |
+| `DropBits` | `void DropBits(int count)` |  |
+| `EnsureBits` | `bool EnsureBits(int count)` |  |
+| `PeekBits` | `uint PeekBits(int count)` |  |
+| `ReadBits` | `uint ReadBits(int count)` |  |
+
+#### `BitOrder`
+
+| Value | Numeric | Summary |
+| --- | --- | --- |
+| `LsbFirst` | `0` |  |
+| `MsbFirst` | `1` |  |
+
+#### `BitReader`
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `BitReader` | `BitReader(Stream stream, BitOrder bitOrder = 0)` |  |
+| `BitsInBuffer` | `int BitsInBuffer { get; }` |  |
+| `AlignToByte` | `void AlignToByte()` |  |
+| `ReadBit` | `int ReadBit()` |  |
+| `ReadBits` | `uint ReadBits(int count)` |  |
+
+#### `BitReader<TOrder>`
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `BitReader` | `BitReader(Stream stream)` |  |
+| `BitsInBuffer` | `int BitsInBuffer { get; }` |  |
+| `AlignToByte` | `void AlignToByte()` |  |
+| `ReadBit` | `int ReadBit()` |  |
+| `ReadBits` | `uint ReadBits(int count)` |  |
+
+#### `BitWriter`
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `BitWriter` | `BitWriter(Stream stream, BitOrder bitOrder = 0)` |  |
+| `BitsInBuffer` | `int BitsInBuffer { get; }` |  |
+| `FlushBits` | `void FlushBits()` |  |
+| `WriteBit` | `void WriteBit(int bit)` |  |
+| `WriteBits` | `void WriteBits(uint value, int count)` |  |
+
+#### `BitWriter<TOrder>`
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `BitWriter` | `BitWriter(Stream stream)` |  |
+| `BitsInBuffer` | `int BitsInBuffer { get; }` |  |
+| `FlushBits` | `void FlushBits()` |  |
+| `WriteBit` | `void WriteBit(int bit)` |  |
+| `WriteBits` | `void WriteBits(uint value, int count)` |  |
+
+#### `IBitOrder`
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `AccumulateBits` | `static uint AccumulateBits(uint result, int bit, int index)` |  |
+| `Drop` | `static ulong Drop(ulong buffer, int bitsInBuffer, int count)` |  |
+| `ExtractBit` | `static ValueTuple<int, int> ExtractBit(int buffer)` |  |
+| `InsertByte` | `static ulong InsertByte(ulong buffer, int bitsInBuffer, int b)` |  |
+| `Peek` | `static uint Peek(ulong buffer, int bitsInBuffer, int count)` |  |
+| `PlaceBit` | `static int PlaceBit(int buffer, int bitsInBuffer, int bit)` |  |
+| `WriteBitIndex` | `static int WriteBitIndex(int count, int index)` |  |
+
+#### `LsbBitOrder`
+
+Implements `IBitOrder`.
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `AccumulateBits` | `static uint AccumulateBits(uint result, int bit, int index)` |  |
+| `Drop` | `static ulong Drop(ulong buffer, int bitsInBuffer, int count)` |  |
+| `ExtractBit` | `static ValueTuple<int, int> ExtractBit(int buffer)` |  |
+| `InsertByte` | `static ulong InsertByte(ulong buffer, int bitsInBuffer, int b)` |  |
+| `Peek` | `static uint Peek(ulong buffer, int bitsInBuffer, int count)` |  |
+| `PlaceBit` | `static int PlaceBit(int buffer, int bitsInBuffer, int bit)` |  |
+| `WriteBitIndex` | `static int WriteBitIndex(int count, int index)` |  |
+
+#### `MsbBitOrder`
+
+Implements `IBitOrder`.
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `AccumulateBits` | `static uint AccumulateBits(uint result, int bit, int index)` |  |
+| `Drop` | `static ulong Drop(ulong buffer, int bitsInBuffer, int count)` |  |
+| `ExtractBit` | `static ValueTuple<int, int> ExtractBit(int buffer)` |  |
+| `InsertByte` | `static ulong InsertByte(ulong buffer, int bitsInBuffer, int b)` |  |
+| `Peek` | `static uint Peek(ulong buffer, int bitsInBuffer, int count)` |  |
+| `PlaceBit` | `static int PlaceBit(int buffer, int bitsInBuffer, int bit)` |  |
+| `WriteBitIndex` | `static int WriteBitIndex(int count, int index)` |  |
+
+### Namespace `Compression.Core.Entropy.Huffman`
+
+[`CanonicalHuffman`](#canonicalhuffman) · [`HuffmanDecoder<TOrder>`](#huffmandecodertorder) · [`HuffmanEncoder<TOrder>`](#huffmanencodertorder) · [`HuffmanNode`](#huffmannode)
+
+#### `CanonicalHuffman`
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `CanonicalHuffman` | `CanonicalHuffman(int[] codeLengths)` |  |
+| `MaxCodeLength` | `int MaxCodeLength { get; }` |  |
+| `MaxSymbol` | `int MaxSymbol { get; }` |  |
+| `DecodeSymbol` | `int DecodeSymbol<TOrder>(BitBuffer<TOrder> bitBuffer)` |  |
+| `DecodeSymbol` | `int DecodeSymbol<TOrder>(BitReader<TOrder> bitReader)` |  |
+| `GetCode` | `ValueTuple<uint, int> GetCode(int symbol)` |  |
+
+#### `HuffmanDecoder<TOrder>`
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `HuffmanDecoder` | `HuffmanDecoder(CanonicalHuffman table, BitBuffer<TOrder> bitBuffer)` |  |
+| `DecodeSymbol` | `int DecodeSymbol()` |  |
+| `DecodeSymbols` | `int[] DecodeSymbols(int count)` |  |
+
+#### `HuffmanEncoder<TOrder>`
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `HuffmanEncoder` | `HuffmanEncoder(CanonicalHuffman table, BitWriter<TOrder> bitWriter)` |  |
+| `EncodeSymbol` | `void EncodeSymbol(int symbol)` |  |
+| `EncodeSymbols` | `void EncodeSymbols(ReadOnlySpan<int> symbols)` |  |
+| `Flush` | `void Flush()` |  |
+
+#### `HuffmanNode`
+
+| Member | Signature | Summary |
+| --- | --- | --- |
+| `HuffmanNode` | `HuffmanNode(HuffmanNode left, HuffmanNode right)` |  |
+| `HuffmanNode` | `HuffmanNode(int symbol, long frequency)` |  |
+| `Frequency` | `long Frequency { get; }` |  |
+| `IsLeaf` | `bool IsLeaf { get; }` |  |
+| `Left` | `HuffmanNode Left { get; }` |  |
+| `Right` | `HuffmanNode Right { get; }` |  |
+| `Symbol` | `int Symbol { get; }` |  |
+
 ### Namespace `FileFormat.Aai`
 
 [`AaiFile`](#aaifile) · [`AaiReader`](#aaireader) · [`AaiWriter`](#aaiwriter)
