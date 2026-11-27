@@ -180,9 +180,28 @@ def vector():
     return page(bytes(c), resources.replace(b" >> >>", b" >> /ExtGState << /GS1 << /ca 0.5 /BM /Multiply >> >> >>", 1) if False else resources[:-3] + b" /ExtGState << /GS1 << /ca 0.5 /BM /Multiply >> >> >>", extra=extra)
 
 
+def bilevel():
+    """CCITT and JBIG2 images, as a picture and as a stencil, from the filter fixtures beside this."""
+    here = os.path.dirname(os.path.abspath(__file__))
+    g4 = open(os.path.join(here, "Filters", "ccitt-g4.bin"), "rb").read()
+    g3 = open(os.path.join(here, "Filters", "ccitt-g3-2d.bin"), "rb").read()
+    jbig2 = open(os.path.join(here, "Filters", "jbig2-generic-t0.bin"), "rb").read()
+
+    def raw(dictionary, data):
+        return b"<< " + dictionary + b" /Length %d >>\nstream\n" % len(data) + data + b"\nendstream"
+
+    extra = [
+        raw(b"/Type /XObject /Subtype /Image /Width 203 /Height 61 /ColorSpace /DeviceGray /BitsPerComponent 1 /Filter /CCITTFaxDecode /DecodeParms << /K -1 /Columns 203 /Rows 61 >>", g4),
+        raw(b"/Type /XObject /Subtype /Image /Width 203 /Height 61 /ImageMask true /Filter /CCITTFaxDecode /DecodeParms << /K 1 /Columns 203 /Rows 61 >>", g3),
+        raw(b"/Type /XObject /Subtype /Image /Width 96 /Height 64 /ColorSpace /DeviceGray /BitsPerComponent 1 /Filter /JBIG2Decode", jbig2),
+    ]
+    content = b"q 203 0 0 61 0 139 cm /G4 Do Q 0 0 0.7 rg q 203 0 0 61 0 70 cm /G3 Do Q q 96 0 0 64 50 2 cm /J2 Do Q"
+    return page(content, b"<< /XObject << /G4 5 0 R /G3 6 0 R /J2 7 0 R >> >>", b"[0 0 203 200]", extra)
+
+
 if __name__ == "__main__":
     target = sys.argv[1]
     os.makedirs(os.path.join(target, "Render"), exist_ok=True)
-    for name, maker in [("images", images), ("vector", vector)]:
+    for name, maker in [("images", images), ("vector", vector), ("bilevel", bilevel)]:
         with open(os.path.join(target, "Render", name + ".pdf"), "wb") as handle:
             handle.write(maker())

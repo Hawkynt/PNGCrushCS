@@ -28,7 +28,8 @@ public sealed class PdfRenderTests {
   // poppler sizes an axis-aligned image as floor(x0) to floor(x1) + 1, one column and row more than
   // the image reaches; this renderer rounds both edges instead, so a page whose images sit 1:1 on the
   // pixel grid comes back unchanged. That edge is most of the difference here.
-  [TestCase("Render/images", 72, 8.0, 6.5)]
+  [TestCase("Render/images", 72, 2.5, 0.6)]
+  [TestCase("Render/bilevel", 72, 2.5, 1.8)]
   [Category("Unit")]
   public void Fixture_AgreesWithPoppler(string name, double resolution, double maxMeanError, double maxBadPercent) {
     var file = _Read(name + ".pdf");
