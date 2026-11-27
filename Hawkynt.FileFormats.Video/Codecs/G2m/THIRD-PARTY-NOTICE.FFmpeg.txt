@@ -1,0 +1,32 @@
+The Go2Meeting decoder in this directory (with G2mVideoDecoder.cs beside it)
+is converted from FFmpeg (https://ffmpeg.org), whose decoder is where the
+format was reverse-engineered. Its maker published no specification for it.
+
+Files used, all from libavcodec:
+
+  g2meet.c     the chunk layer, the display information, the ePIC tile coder
+               and its pixel cache, the JPEG part and its quantisation
+               matrices, the Kempf tiles, and the cursor's shape and blending
+  elsdec.c     the ELS binary arithmetic decoder, its ladder of rungs, its
+               allowable-value table and its exp-Golomb unsigned numbers
+
+Copyright (c) 2012 Konstantin Shishkov (g2meet.c)
+Copyright (c) 2013 Maxim Poliakovski (g2meet.c, elsdec.c)
+
+FFmpeg is free software; you can redistribute it and/or modify it under the
+terms of the GNU Lesser General Public License as published by the Free
+Software Foundation; either version 2.1 of the License, or (at your option)
+any later version.
+
+FFmpeg is distributed in the hope that it will be useful, but WITHOUT ANY
+WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
+A PARTICULAR PURPOSE.  See the GNU Lesser General Public License for more
+details.
+
+You should have received a copy of the GNU Lesser General Public License along
+with FFmpeg; if not, write to the Free Software Foundation, Inc., 51 Franklin
+Street, Fifth Floor, Boston, MA 02110-1301 USA.
+
+This library is licensed LGPL-3.0-or-later, which is a permitted "any later
+version" of the LGPL-2.1 FFmpeg offers, so the two are compatible in this
+direction and in no other.

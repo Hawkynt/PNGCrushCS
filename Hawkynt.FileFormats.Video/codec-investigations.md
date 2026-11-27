@@ -1448,6 +1448,10 @@ implementation.
 
 # Go2Meeting (G2M), where the one detailed page is the decoder's own author's account of it
 
+*Closed.* Go2Meeting is decoded and encoded now, converted from FFmpeg's `g2meet.c` and `elsdec.c` under
+LGPL-2.1-or-later rather than from the page this entry would not build on. All three coding paths are in
+it, and 1,287 pictures of five public films decode to FFmpeg's; `codec-notes.md` has the details.
+
 Go2Meeting's screen codec (`G2M2`, `G2M3`, `G2M4`) was investigated fifth, flagged going in as large and
 partly JPEG-based, and it stops on documentation grounds before its size becomes the deciding factor.
 

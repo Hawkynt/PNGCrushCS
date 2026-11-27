@@ -929,6 +929,41 @@ unchanged pixels, of the row above and of one colour, with the frame's own Huffm
 255 colours or fewer comes back exactly; one needing a colour the palette lacks starts a new key frame,
 and one of more colours is mapped to a 6x7x6 cube.
 
+### Go2Meeting
+
+Converted from FFmpeg's `libavcodec/g2meet.c` and `elsdec.c`, LGPL-2.1-or-later, with the ELS ladder,
+its allowable-value table and G2M's two quantisation matrices transcribed by script. A packet is a list
+of chunks — display information, tiles, cursor position and shape — painted into a frame buffer that
+every packet hands out, the cursor alpha-blended over the copy and never into the buffer. ePIC tiles are
+a lossless context model over the ELS binary coder: each pixel is the left or the upper neighbour, a
+run along the row or along the row above, the upper-left or upper-right neighbour, a colour that has
+followed the left one before in this tile, or a median-predicted colour coded in its green and two
+colour differences, with every candidate turned down pushed onto a stack so later ones skip it. A
+transparent colour marks where a JPEG part shows through, coded in 4:2:0 at G2M's fixed matrices for
+only the 8x8 blocks that hold it. Kempf tiles are a flat colour, a palette of up to 256 entries with
+deflated indices and per-row "unchanged" flags, the same with JPEG behind one palette entry, or JPEG
+alone.
+
+FFmpeg's quirks are kept where they change what is decoded. The ePIC tile is decoded into a buffer it
+keeps across tiles and pictures and never clears, and the block mask for the JPEG part reads whole 8x8
+blocks of it past the tile's edge, so the buffer here is kept the same way; ELS errors come back as
+negative bits that some contexts take as ones; a tile that fails is left as it was, and a packet FFmpeg
+refuses whole — shorter than twelve bytes, or with the wrong magic — gives no frame.
+
+Measured against FFmpeg's `rgb24` output decoded with `-flags +bitexact`: 1,287 pictures, every one
+identical, from `SarbanesOxelyReporting.wmv` (G2M2, 1280x1024, its first 381 pictures, as far as the
+comparison's memory budget reaches), `101807.wmv` and `smp3.wmv` (G2M3) and `labor.wmv` (G2M4). The films,
+decoded whole, hold 2,620 pure ePIC tiles and 5,177 with JPEG behind them, Kempf flat, palette and
+palette-plus-JPEG tiles, and both cursor formats; the pictures of `SarbanesOxelyReporting.wmv` past
+its 381st decode without a fault but are not compared. A tile of JPEG alone, in either coding, appears in none
+of them. The fifth film, `g2m4.wmv`, is cut short at ten megabytes, and the package's ASF reader finds
+no packet of it where FFmpeg reads up to the cut.
+
+FFmpeg has no G2M encoder, so the encoder is the package's own. It writes `G2M4` with Kempf tiles of
+64x64: the first picture states the display information and every tile, later ones only the tiles that
+changed, with each unchanged row flagged so the decoder keeps it. A tile of 256 colours or fewer comes
+back exactly; one of more is mapped to a 6x7x6 cube.
+
 ### Sorenson Video 1
 
 Converted from FFmpeg's `libavcodec/svq1dec.c` with its codebooks, codes and frame-size table parsed
