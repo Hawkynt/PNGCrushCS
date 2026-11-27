@@ -964,6 +964,41 @@ FFmpeg has no G2M encoder, so the encoder is the package's own. It writes `G2M4`
 changed, with each unchanged row flagged so the decoder keeps it. A tile of 256 colours or fewer comes
 back exactly; one of more is mapped to a 6x7x6 cube.
 
+### Star Control II 3DO TrueMotion
+
+The 3DO release of Star Control II plays its intro, ending and ship spins from Duck TrueMotion films
+split across four files of one name, which The Ur-Quan Masters reads as an add-on: `.hdr` (a version,
+1 or 3, the picture size in eight-pixel blocks and two eight-entry delta tables for luminance and
+chrominance), `.tbl` (256 codebook vectors of up to seven pairs of delta indices), `.frm` (the offset
+of every chunk) and `.duk` (the chunks: a sound length, a picture length, Duck's 4-bit stereo ADPCM at
+22,050 Hz and the picture). The only implementations are NihAV's `na_game_tool` (GPL-3.0) and The
+Ur-Quan Masters' own player (GPL-2.0), so this is rung two: the format was written up from
+`na_game_tool`'s reading of it, implemented from that description, and `na_game_tool` is the oracle.
+
+A picture is words of two RGB555 pixels. Each of its bytes names a codebook vector, read a pair of
+indices at a time. In the eight-row layout (method 1) every band is two rows of words, each predicted
+from the one above, the first starting from the band before's second; every four words open with a
+chrominance pair, which only the first row's running sum receives, then four luminance pairs a row.
+In the four-row layout (method 3) a band is one row of words with a chrominance pair every fourth.
+Each band row is shown four times. Chrominance adds its deltas to red and blue of both pixels;
+luminance adds half its delta to all three components of its own pixel, and in the eight-row layout
+the delta's odd bit toggles the pixel's spare top bit in a running XOR, which the next addition carries
+through — the arithmetic is wrapping 32-bit throughout, and the decoder keeps the spare bits so the
+carries come out the same. Every picture starts from black, so every picture stands alone.
+
+No film may be redistributed: the cutscenes exist only on the commercial 3DO disc, The Ur-Quan Masters
+leaves them out of its official packs, and the one prebuilt pack is described on its own forum as of
+questionable legality. The tests therefore build a seeded film of both layouts with codebook vectors
+of every length up to fourteen, odd and even deltas and junk in the codebook bytes no vector uses, and
+its six pictures are bit for bit — every 16-bit word, spare bits included — those `na_game_tool` 0.6.0
+writes to AVI for it; their hashes are committed, and an opt-in test reruns the tool. The sound is
+handed out as it is stored, under its own tag, since the package decodes no audio. The container's
+writer puts that film back byte for byte — `Finish` returns the `.duk`, and the header, codebook and
+chunk offsets are written beside it — so what `na_game_tool` read is also what the writer writes; it
+claims no oracle in the registry only because `na_game_tool` is not one the conformance fixture can
+run on CI. There is no picture encoder: nothing plays a new film of the format, and copying a film's
+pictures from one set of files to another needs none.
+
 ### Sorenson Video 1
 
 Converted from FFmpeg's `libavcodec/svq1dec.c` with its codebooks, codes and frame-size table parsed

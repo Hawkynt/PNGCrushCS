@@ -43,13 +43,13 @@ issue quotes the recorded blocker and the route around it.
 | [Editor & application native](#editor--application-native) | [#521](https://github.com/Hawkynt/PNGCrushCS/issues/521) | 49 | 0 | 0 | 0 | 49 |
 | [Embroidery & industrial](#embroidery--industrial) | [#522](https://github.com/Hawkynt/PNGCrushCS/issues/522) | 20 | 0 | 0 | 0 | 20 |
 | [Standard & broadcast video](#standard--broadcast-video) | [#523](https://github.com/Hawkynt/PNGCrushCS/issues/523) | 0 | 31 | 16 | 0 | 47 |
-| [Game & multimedia-title video](#game--multimedia-title-video) | [#524](https://github.com/Hawkynt/PNGCrushCS/issues/524) | 0 | 41 | 198 | 6 | 245 |
+| [Game & multimedia-title video](#game--multimedia-title-video) | [#524](https://github.com/Hawkynt/PNGCrushCS/issues/524) | 0 | 41 | 197 | 6 | 244 |
 | [Legacy PC & capture-card video](#legacy-pc--capture-card-video) | [#525](https://github.com/Hawkynt/PNGCrushCS/issues/525) | 0 | 48 | 36 | 2 | 86 |
 | [Screen-capture video](#screen-capture-video) | [#526](https://github.com/Hawkynt/PNGCrushCS/issues/526) | 0 | 10 | 0 | 9 | 19 |
 | [Lossless & uncompressed video](#lossless--uncompressed-video) | [#527](https://github.com/Hawkynt/PNGCrushCS/issues/527) | 0 | 11 | 0 | 2 | 13 |
 | [Cinema camera RAW video](#cinema-camera-raw-video) | [#528](https://github.com/Hawkynt/PNGCrushCS/issues/528) | 0 | 6 | 7 | 0 | 13 |
 | [Elementary streams & streaming manifests](#elementary-streams--streaming-manifests) | [#529](https://github.com/Hawkynt/PNGCrushCS/issues/529) | 0 | 0 | 18 | 0 | 18 |
-| **All** | | **578** | **147** | **275** | **19** | **1019** |
+| **All** | | **578** | **147** | **274** | **19** | **1018** |
 
 Each issue carries the labels `cat: <category>`, its kind (`image-format`, `video-codec`, `video-container`, `video-encoder`), `priority: high|medium|low`, and `documented-blocker` where that applies.
 
@@ -969,7 +969,6 @@ Codecs/containers from games, consoles, CD-ROM titles and animation tools. Track
 | Soul Hunt VID | Container | `.vid` | demux + mux | missing | low | [#1378](https://github.com/Hawkynt/PNGCrushCS/issues/1378) |
 | Spectrum Holobyte FVF | Container | `.fvf` | demux + mux | missing | low | [#1379](https://github.com/Hawkynt/PNGCrushCS/issues/1379) |
 | Spidy animation v2 (Imperium Galactica) | Container | `.ani` | demux + mux | missing | low | [#1380](https://github.com/Hawkynt/PNGCrushCS/issues/1380) |
-| Star Control II 3DO TrueMotion video (.duk/.hdr/.frm/.tbl) | Container | `.duk` | demux + mux | blocked | low | [#1381](https://github.com/Hawkynt/PNGCrushCS/issues/1381) |
 | Stardock VDO (Entrepreneur) | Container | `.vdo` | demux + mux | missing | low | [#1382](https://github.com/Hawkynt/PNGCrushCS/issues/1382) |
 | System Shock movie/audio log format | Container | `.movie` | demux + mux | missing | low | [#1383](https://github.com/Hawkynt/PNGCrushCS/issues/1383) |
 | Talisman ANI | Container | `.ani` | demux + mux | missing | low | [#1384](https://github.com/Hawkynt/PNGCrushCS/issues/1384) |
