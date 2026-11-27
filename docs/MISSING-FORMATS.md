@@ -36,7 +36,7 @@ issue quotes the recorded blocker and the route around it.
 | [Camera RAW & sensor data](#camera-raw--sensor-data) | [#514](https://github.com/Hawkynt/PNGCrushCS/issues/514) | 26 | 0 | 0 | 0 | 26 |
 | [Geospatial & remote sensing](#geospatial--remote-sensing) | [#515](https://github.com/Hawkynt/PNGCrushCS/issues/515) | 83 | 0 | 0 | 0 | 83 |
 | [Medical & scientific imaging](#medical--scientific-imaging) | [#516](https://github.com/Hawkynt/PNGCrushCS/issues/516) | 42 | 0 | 0 | 0 | 42 |
-| [GPU textures & game assets](#gpu-textures--game-assets) | [#517](https://github.com/Hawkynt/PNGCrushCS/issues/517) | 40 | 0 | 0 | 0 | 40 |
+| [GPU textures & game assets](#gpu-textures--game-assets) | [#517](https://github.com/Hawkynt/PNGCrushCS/issues/517) | 39 | 0 | 0 | 0 | 39 |
 | [Retro computer & legacy platforms](#retro-computer--legacy-platforms) | [#518](https://github.com/Hawkynt/PNGCrushCS/issues/518) | 101 | 0 | 0 | 0 | 101 |
 | [Vector, document & print](#vector-document--print) | [#519](https://github.com/Hawkynt/PNGCrushCS/issues/519) | 92 | 0 | 0 | 0 | 92 |
 | [Fonts, text-mode & teletext](#fonts-text-mode--teletext) | [#520](https://github.com/Hawkynt/PNGCrushCS/issues/520) | 61 | 0 | 0 | 0 | 61 |
@@ -49,7 +49,7 @@ issue quotes the recorded blocker and the route around it.
 | [Lossless & uncompressed video](#lossless--uncompressed-video) | [#527](https://github.com/Hawkynt/PNGCrushCS/issues/527) | 0 | 11 | 0 | 2 | 13 |
 | [Cinema camera RAW video](#cinema-camera-raw-video) | [#528](https://github.com/Hawkynt/PNGCrushCS/issues/528) | 0 | 6 | 7 | 0 | 13 |
 | [Elementary streams & streaming manifests](#elementary-streams--streaming-manifests) | [#529](https://github.com/Hawkynt/PNGCrushCS/issues/529) | 0 | 0 | 18 | 0 | 18 |
-| **All** | | **577** | **147** | **274** | **19** | **1017** |
+| **All** | | **576** | **147** | **274** | **19** | **1016** |
 
 Each issue carries the labels `cat: <category>`, its kind (`image-format`, `video-codec`, `video-container`, `video-encoder`), `priority: high|medium|low`, and `documented-blocker` where that applies.
 
@@ -333,7 +333,6 @@ GPU/console texture containers, game sprites and engine assets. Tracked in [#517
 | Quake/Half-Life miptex lump (MIP) | Image | `.mip` | read + write | missing | low | [#773](https://github.com/Hawkynt/PNGCrushCS/issues/773) |
 | Sega Dreamcast PVR (PVRT/GBIX) | Image | `.pvr` | read + write | missing | low | [#774](https://github.com/Hawkynt/PNGCrushCS/issues/774) |
 | Sega GVR (GameCube PVR variant) | Image | `.gvr` | read + write | missing | low | [#775](https://github.com/Hawkynt/PNGCrushCS/issues/775) |
-| Serious Engine texture (Croteam .tex) | Image | `.tex` | read + write | blocked | low | [#776](https://github.com/Hawkynt/PNGCrushCS/issues/776) |
 | Source 2 compiled texture (vtex_c) | Image | `.vtex_c` | read + write | missing | low | [#777](https://github.com/Hawkynt/PNGCrushCS/issues/777) |
 | StarCraft / Warcraft II GRP | Image | `.grp` | read + write | missing | low | [#778](https://github.com/Hawkynt/PNGCrushCS/issues/778) |
 | Unreal Engine 1/2 texture package (UTX) | Image | `.utx` | read + write | missing | low | [#779](https://github.com/Hawkynt/PNGCrushCS/issues/779) |
