@@ -177,6 +177,16 @@
     </None>
   </ItemGroup>
 
+  <!-- WhyPic pictures written by the reference encoder built from the distribution's source, the
+       reference decoder's bitmaps of them, and the few this package's writer had to make because
+       the reference encoder cannot. Fixtures\WhyPic\manifest.txt says which is which. -->
+  <ItemGroup>
+    <None Include="Formats\WhyPic\Fixtures\*">
+      <Link>Fixtures\WhyPic\%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
   <ItemGroup>
     <Using Include="NUnit.Framework" />
   </ItemGroup>

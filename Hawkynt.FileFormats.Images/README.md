@@ -881,6 +881,7 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | Wbmp | `.wbmp`, `.wbm`, `.wap` | ✅ | ✅ | — | — | — | ImageMagick, XnView, IrfanView, ffmpeg |
 | WebP | `.webp`, `.wep` | ✅ | ✅ | — | ✅ | ✅ | ImageMagick, XnView, IrfanView, dwebp, ffmpeg |
 | WebShots | `.wb1`, `.wbc`, `.wbp`, `.wbz` | ✅ | ✅ | — | — | — | none |
+| WhyPic | `.ypc` | ✅ | ✅ | ✅ | — | — | none |
 | Wic | `.wic` | ✅ | ✅ | ✅ | — | — | none |
 | WigmoreArtist | `.wig` | ✅ | ✅ | — | — | — | recoil2png, IrfanView |
 | WinFax | `.fxs`, `.fxo`, `.fxr`, `.fxd`, `.fxm` | ✅ | ✅ | — | — | — | none |
