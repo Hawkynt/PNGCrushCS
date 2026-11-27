@@ -312,6 +312,11 @@ internal static class FFmpegOracle {
   /// narrower than the key frames around them — reaches a fixed-size comparison through a scaler.
   /// <c>-noautoscale</c> turns that off and the raw output becomes a run of pictures of varying size,
   /// which only a caller that knows each picture's size can cut apart.
+  /// <para/>
+  /// The decoder is asked to be bit-exact. Without the flag FFmpeg's x86 half-sample averaging without
+  /// rounding — <c>put_no_rnd_pixels*_x2</c> and friends — is an approximation that differs from the
+  /// arithmetic it stands for on a scattering of samples, and a film it touched would look like a
+  /// decoder fault one level at a time.
   /// </remarks>
   /// <param name="tolerateDiagnostics">Hand the pictures back even when FFmpeg complained, for a damaged film
   /// whose undamaged part is what is being compared; the complaint is returned as the output.</param>
@@ -327,7 +332,7 @@ internal static class FFmpegOracle {
       };
 
       foreach (var argument in new[] {
-        "-hide_banner", "-loglevel", "error", "-y", "-i", path,
+        "-hide_banner", "-loglevel", "error", "-y", "-flags", "+bitexact", "-i", path,
         "-map", "0:v:0", "-an", "-sn", "-dn", "-fps_mode", "passthrough", "-noautoscale",
         "-frames:v", (maxFrames ?? int.MaxValue).ToString(System.Globalization.CultureInfo.InvariantCulture),
         // image2pipe writes the same raw pictures as rawvideo; unlike it, it also writes a picture whose

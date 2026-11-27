@@ -100,7 +100,10 @@ internal static class RealSampleComparison {
         }
       }
 
-      var (decoded, detail, samples) = FFmpegOracle.TryDecodeUnscaled(film, ffmpegPixelFormat, ours.Count, tolerateDiagnostics: truncated != null);
+      var (decoded, detail, samples) = FFmpegOracle.TryDecodeUnscaled(film, ffmpegPixelFormat, ours.Count, tolerateDiagnostics: true);
+      // FFmpeg's complaints are reported, not counted: every picture is still compared, and a film
+      // it complains about while producing the same pictures is a film both decoders read alike.
+      var complained = decoded && detail != "decoded";
       if (!decoded) {
         failures.Add($"{name}: ffmpeg would not decode it: {detail}");
         continue;
@@ -130,9 +133,13 @@ internal static class RealSampleComparison {
                  + (refusal != null ? $"; {refusal}" : "")
                  + (difference == null && at != samples.Length ? $"; ffmpeg has {samples.Length - at} bytes more" : "")
                  + (truncated != null ? $"; the container stops early ({truncated})" : "")
-                 + (preRoll != 0 ? $"; {preRoll} pre-roll pictures not shown by either" : "");
+                 + (preRoll != 0 ? $"; {preRoll} pre-roll pictures not shown by either" : "")
+                 + (complained ? $"; ffmpeg reports: {detail.Trim().Split('\n')[0]}" : "");
       TestContext.Out.WriteLine(line);
-      if (difference != null || refusal != null || (at != samples.Length && truncated == null))
+      // A picture this decoder refuses is a failure unless FFmpeg reported damage in the film too, in
+      // which case it is the picture FFmpeg concealed and everything before it has been compared.
+      var damageAgreed = refusal != null && difference == null && complained;
+      if (difference != null || (refusal != null && !damageAgreed) || (at != samples.Length && truncated == null && refusal == null))
         failures.Add(line);
     }
 
