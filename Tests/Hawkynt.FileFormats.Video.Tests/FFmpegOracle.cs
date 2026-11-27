@@ -313,7 +313,10 @@ internal static class FFmpegOracle {
   /// <c>-noautoscale</c> turns that off and the raw output becomes a run of pictures of varying size,
   /// which only a caller that knows each picture's size can cut apart.
   /// </remarks>
-  public static (bool Decoded, string Output, byte[] Pictures) TryDecodeUnscaled(string path, string pixelFormat, int? maxFrames = null) {
+  /// <param name="tolerateDiagnostics">Hand the pictures back even when FFmpeg complained, for a damaged film
+  /// whose undamaged part is what is being compared; the complaint is returned as the output.</param>
+  public static (bool Decoded, string Output, byte[] Pictures) TryDecodeUnscaled(
+    string path, string pixelFormat, int? maxFrames = null, bool tolerateDiagnostics = false) {
     var raw = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName() + ".raw");
 
     try {
@@ -327,7 +330,9 @@ internal static class FFmpegOracle {
         "-hide_banner", "-loglevel", "error", "-y", "-i", path,
         "-map", "0:v:0", "-an", "-sn", "-dn", "-fps_mode", "passthrough", "-noautoscale",
         "-frames:v", (maxFrames ?? int.MaxValue).ToString(System.Globalization.CultureInfo.InvariantCulture),
-        "-f", "rawvideo", "-pix_fmt", pixelFormat, raw,
+        // image2pipe writes the same raw pictures as rawvideo; unlike it, it also writes a picture whose
+        // timestamp repeats the one before, which some old QuickTime films carry.
+        "-c:v", "rawvideo", "-pix_fmt", pixelFormat, "-f", "image2pipe", raw,
       })
         startInfo.ArgumentList.Add(argument);
 
@@ -343,12 +348,16 @@ internal static class FFmpegOracle {
         return (false, "ffmpeg timed out", []);
       }
 
-      var diagnostics = SignificantDiagnostics(string.Concat(stdout.Result, stderr.Result));
-      if (diagnostics.Length != 0)
+      // The muxer's complaint about a repeated timestamp is about the output file, not the decode.
+      var diagnostics = string.Join('\n', SignificantDiagnostics(string.Concat(stdout.Result, stderr.Result))
+        .Split('\n')
+        .Where(static line => !line.Contains("non monotonically increasing dts to muxer", StringComparison.Ordinal)))
+        .Trim();
+      if (diagnostics.Length != 0 && !(tolerateDiagnostics && File.Exists(raw)))
         return (false, diagnostics, []);
 
       return File.Exists(raw)
-        ? (true, "decoded", File.ReadAllBytes(raw))
+        ? (true, diagnostics.Length == 0 ? "decoded" : diagnostics, File.ReadAllBytes(raw))
         : (false, "it produced no decoded video bytes", []);
     } catch (Win32Exception) {
       return (false, "no ffmpeg on this machine", []);

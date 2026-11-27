@@ -857,6 +857,34 @@ frame, so a miscounted coded-block run, a mode written for a macro block that ca
 in the wrong units would pass it and fail in a real player on frame two. A still scene is also required
 to converge, which is what demonstrates the coded-block flags firing at all.
 
+### Sorenson Video 1
+
+Converted from FFmpeg's `libavcodec/svq1dec.c` with its codebooks, codes and frame-size table parsed
+out of `svq1_cb.h`, `svq1_vlc.h`, `svq1.c` and H.263's `h263data.c`, all LGPL-2.1-or-later. The vector
+reconstruction is kept in FFmpeg's packed form — four samples in a word, odd and even bytes summed in two
+16-bit lanes and clipped by a bit trick — because a lane that goes negative borrows from its neighbour,
+and the result is then not always the clamped per-sample sum; every SVQ1 decoder in use computes the word
+form. Output is `Yuv410P8`, a planar 4:1:0 format added to `FileFormat.Core` for it.
+
+Measured over `samples.ffmpeg.org/V-codecs/SVQ1/` and the FATE suite's `svq1/`: eleven of twelve films,
+128x72 to 800x200, 16,043 pictures, every one identical to FFmpeg's `yuv410p` planes. Three needed the
+comparison to be fair rather than the decoder changed: `audi_a4.mov` is truncated, and is compared up to
+the last sample its index can reach; `menace_640qt4.mov` has an edit list whose first six pictures are
+decoded and not shown, by either; and `101.mov` is 600x450, whose last chrominance row no decoder writes,
+because SVQ1 codes chrominance at a quarter of the picture rounded down to whole 16x16 blocks. The
+twelfth, `alice_lo_m.mov`, codes its pictures under a second sample description and this package's MP4
+reader reports the first; that is a demuxer gap, not a codec one.
+
+The encoder takes FFmpeg's `encode_block` from `svq1enc.c` — one to six codebook stages and the mean
+alone tried for every vector, then whether splitting it codes it more cheaply, each level's bits in a
+buffer of its own because the decoder reads the tree breadth first — and puts this package's own motion
+search and mode decision around it: whole-sample over ±8 then half-sample, and skip, inter or intra by
+squared error plus λ times bits at λ = 8. The temporal reference counts up, so the ±128 mean swap never
+applies. The reference is what the decoder makes of each packet. A 160x120 gradient comes back at 43.8
+dB luma; FFmpeg decodes fourteen-picture clips it writes, in AVI and in QuickTime, to exactly this
+decoder's planes. QuickTime needs a sample entry, and the MP4 writer now writes the plain visual one for
+SVQ1, the first of a list of codecs whose decoders read every parameter from the frames.
+
 ### On2 VP6
 
 Converted from FFmpeg's `libavcodec/vp6.c` and `vp56.c` with the DSP they lean on — `vp6dsp.c`,

@@ -1,0 +1,26 @@
+The Sorenson Video 1 decoder in this directory, and the vector-quantisation search in its encoder, are
+converted from FFmpeg (https://github.com/FFmpeg/FFmpeg):
+
+  libavcodec/svq1dec.c   the frame header and its scrambling, the quadtree walk, multi-stage vector
+                         reconstruction in packed four-sample words, half-sample motion with its median
+                         prediction, and the four-vector mode
+  libavcodec/svq1enc.c   encode_block: the codebook-stage and split search the encoder uses (its
+                         motion estimation, which rests on FFmpeg's MPEG encoder, is not taken)
+  libavcodec/svq1_cb.h   the intra and inter codebooks
+  libavcodec/svq1_vlc.h  the block-type, stage-count and mean codes
+  libavcodec/svq1.c      the frame-size table
+  libavcodec/h263data.c  the motion-vector codes SVQ1 shares with H.263
+
+  Copyright (C) 2002 the xine project, (C) 2002 the ffmpeg project (svq1dec.c, svq1_cb.h, svq1_vlc.h)
+  Copyright (C) 2004 Mike Melanson <melanson@pcisys.net> (svq1enc.c)
+  and the FFmpeg developers named in the files above.
+
+FFmpeg distributes those sources under the GNU Lesser General Public License, version 2.1 or (at your
+option) any later version. This work is distributed under the GNU Lesser General Public License
+version 3 or later, which the "or later" clause permits; the licence text is in LICENSE at the root of
+this repository.
+
+The algorithms are carried across into managed C#, not vendored. The tables in Svq1Tables.cs were
+transcribed mechanically, by a script that parsed the C initialisers, and are reproduced exactly because
+they are fixed codec data required for interoperability. The encoder's motion search, mode decision,
+bit assembly and packetisation are this package's own.

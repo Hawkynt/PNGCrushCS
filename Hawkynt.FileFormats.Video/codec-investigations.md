@@ -1757,6 +1757,9 @@ not derive from ffmpeg's reverse-engineered decoder.
 
 # Sorenson Video 1 (SVQ1), where the codebook is the whole codec and nobody has printed it
 
+*Closed.* SVQ1 is decoded and encoded now, converted from FFmpeg's LGPL-2.1-or-later `svq1dec.c`, whose
+codebooks are the ones this entry could not find printed; `codec-notes.md` has the measurement.
+
 SVQ1 — Sorenson Vector Quantizer 1, FourCC `SVQ1` — is a hierarchical multistage vector quantizer over
 16x16 blocks down to 4x2, with mean removal and motion compensation between frames. The brief for this
 investigation named the question to ask before writing anything: is that codebook published anywhere

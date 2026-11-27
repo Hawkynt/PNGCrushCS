@@ -44,12 +44,12 @@ issue quotes the recorded blocker and the route around it.
 | [Embroidery & industrial](#embroidery--industrial) | [#522](https://github.com/Hawkynt/PNGCrushCS/issues/522) | 20 | 0 | 0 | 0 | 20 |
 | [Standard & broadcast video](#standard--broadcast-video) | [#523](https://github.com/Hawkynt/PNGCrushCS/issues/523) | 0 | 37 | 16 | 0 | 53 |
 | [Game & multimedia-title video](#game--multimedia-title-video) | [#524](https://github.com/Hawkynt/PNGCrushCS/issues/524) | 0 | 48 | 201 | 6 | 255 |
-| [Legacy PC & capture-card video](#legacy-pc--capture-card-video) | [#525](https://github.com/Hawkynt/PNGCrushCS/issues/525) | 0 | 53 | 36 | 2 | 91 |
+| [Legacy PC & capture-card video](#legacy-pc--capture-card-video) | [#525](https://github.com/Hawkynt/PNGCrushCS/issues/525) | 0 | 52 | 36 | 2 | 90 |
 | [Screen-capture video](#screen-capture-video) | [#526](https://github.com/Hawkynt/PNGCrushCS/issues/526) | 0 | 16 | 0 | 9 | 25 |
 | [Lossless & uncompressed video](#lossless--uncompressed-video) | [#527](https://github.com/Hawkynt/PNGCrushCS/issues/527) | 0 | 14 | 0 | 2 | 16 |
 | [Cinema camera RAW video](#cinema-camera-raw-video) | [#528](https://github.com/Hawkynt/PNGCrushCS/issues/528) | 0 | 6 | 7 | 0 | 13 |
 | [Elementary streams & streaming manifests](#elementary-streams--streaming-manifests) | [#529](https://github.com/Hawkynt/PNGCrushCS/issues/529) | 0 | 0 | 18 | 0 | 18 |
-| **All** | | **578** | **174** | **278** | **19** | **1049** |
+| **All** | | **578** | **173** | **278** | **19** | **1048** |
 
 Each issue carries the labels `cat: <category>`, its kind (`image-format`, `video-codec`, `video-container`, `video-encoder`), `priority: high|medium|low`, and `documented-blocker` where that applies.
 
@@ -1031,7 +1031,6 @@ Codecs/containers from games, consoles, CD-ROM titles and animation tools. Track
 | --- | --- | --- | --- | --- | --- | --- |
 | AMV video (MTV/AMV player) | Codec | `.amv`, `.mtv` | decode + encode | missing | medium | [#1418](https://github.com/Hawkynt/PNGCrushCS/issues/1418) |
 | On2 VP7 | Codec | `.vp7`, `.avi` | decode + encode | blocked | medium | [#1419](https://github.com/Hawkynt/PNGCrushCS/issues/1419) |
-| Sorenson Video 1 (SVQ1) | Codec | `.mov` | decode + encode | blocked | medium | [#1421](https://github.com/Hawkynt/PNGCrushCS/issues/1421) |
 | Sorenson Video 3 (SVQ3) | Codec | `.mov` | decode + encode | blocked | medium | [#1422](https://github.com/Hawkynt/PNGCrushCS/issues/1422) |
 | AMV (Chinese MP4/MTV player video) | Container | `.amv` | demux + mux | missing | medium | [#1417](https://github.com/Hawkynt/PNGCrushCS/issues/1417) |
 | Shockwave Flash video streams (SWF) | Container | `.swf` | demux + mux | missing | medium | [#1420](https://github.com/Hawkynt/PNGCrushCS/issues/1420) |
