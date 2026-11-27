@@ -42,14 +42,14 @@ issue quotes the recorded blocker and the route around it.
 | [Fonts, text-mode & teletext](#fonts-text-mode--teletext) | [#520](https://github.com/Hawkynt/PNGCrushCS/issues/520) | 61 | 0 | 0 | 0 | 61 |
 | [Editor & application native](#editor--application-native) | [#521](https://github.com/Hawkynt/PNGCrushCS/issues/521) | 49 | 0 | 0 | 0 | 49 |
 | [Embroidery & industrial](#embroidery--industrial) | [#522](https://github.com/Hawkynt/PNGCrushCS/issues/522) | 20 | 0 | 0 | 0 | 20 |
-| [Standard & broadcast video](#standard--broadcast-video) | [#523](https://github.com/Hawkynt/PNGCrushCS/issues/523) | 0 | 33 | 16 | 0 | 49 |
+| [Standard & broadcast video](#standard--broadcast-video) | [#523](https://github.com/Hawkynt/PNGCrushCS/issues/523) | 0 | 32 | 16 | 0 | 48 |
 | [Game & multimedia-title video](#game--multimedia-title-video) | [#524](https://github.com/Hawkynt/PNGCrushCS/issues/524) | 0 | 41 | 198 | 6 | 245 |
 | [Legacy PC & capture-card video](#legacy-pc--capture-card-video) | [#525](https://github.com/Hawkynt/PNGCrushCS/issues/525) | 0 | 50 | 36 | 2 | 88 |
 | [Screen-capture video](#screen-capture-video) | [#526](https://github.com/Hawkynt/PNGCrushCS/issues/526) | 0 | 13 | 0 | 9 | 22 |
 | [Lossless & uncompressed video](#lossless--uncompressed-video) | [#527](https://github.com/Hawkynt/PNGCrushCS/issues/527) | 0 | 12 | 0 | 2 | 14 |
 | [Cinema camera RAW video](#cinema-camera-raw-video) | [#528](https://github.com/Hawkynt/PNGCrushCS/issues/528) | 0 | 6 | 7 | 0 | 13 |
 | [Elementary streams & streaming manifests](#elementary-streams--streaming-manifests) | [#529](https://github.com/Hawkynt/PNGCrushCS/issues/529) | 0 | 0 | 18 | 0 | 18 |
-| **All** | | **578** | **155** | **275** | **19** | **1027** |
+| **All** | | **578** | **154** | **275** | **19** | **1026** |
 
 Each issue carries the labels `cat: <category>`, its kind (`image-format`, `video-codec`, `video-container`, `video-encoder`), `priority: high|medium|low`, and `documented-blocker` where that applies.
 
@@ -731,7 +731,6 @@ ITU/ISO/SMPTE/AOM codecs, broadcast and professional intermediates, streaming. T
 | Apple Pixlet | Codec | `.mov` | decode + encode | missing | low | [#1132](https://github.com/Hawkynt/PNGCrushCS/issues/1132) |
 | AVS2 video (IEEE 1857.4 / GB/T 33475.2) | Codec | `.avs2` | decode + encode | missing | low | [#1133](https://github.com/Hawkynt/PNGCrushCS/issues/1133) |
 | AVS3 video (IEEE 1857.10) | Codec | `.avs3` | decode + encode | missing | low | [#1134](https://github.com/Hawkynt/PNGCrushCS/issues/1134) |
-| BitJazz SheerVideo | Codec | `.mov` | decode + encode | blocked | low | [#1135](https://github.com/Hawkynt/PNGCrushCS/issues/1135) |
 | CD-i Delta YUV (DYUV) video | Codec | `DYUV` | decode + encode | missing | low | [#1139](https://github.com/Hawkynt/PNGCrushCS/issues/1139) |
 | Chinese AVS1-P2 (JiZhun) / AVS+ | Codec | `.cavs`, `.avs` | decode + encode | missing | low | [#1140](https://github.com/Hawkynt/PNGCrushCS/issues/1140) |
 | Cisco Thor | Codec | `thor`, `NETVC` | decode + encode | missing | low | [#1141](https://github.com/Hawkynt/PNGCrushCS/issues/1141) |

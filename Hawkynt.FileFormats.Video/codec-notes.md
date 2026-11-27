@@ -5303,6 +5303,26 @@ not decode leaves that part of the canvas alone rather than failing the frame, a
 leaves the cursor where it was, and a packet whose leading tag is neither `TDSF` nor `DTSM` hands back
 the canvas unchanged — each of which is what the reference decoder does.
 
+### BitJazz SheerVideo
+
+Converted from FFmpeg's `libavcodec/sheervideo.c` and `sheervideodata.h`, LGPL-2.1-or-later. A frame is twenty
+bytes — `Shir` or `Zwak`, and at byte 16 the layout's four-character code — then rows, each a bit choosing
+raw samples or Huffman-coded differences. The 29 layouts' 25 row decoders differ in small ways — which
+component reads which of two code tables, the start values, how 4:2:2 chroma and the second luma sample of a
+pair are predicted — so rather than restate them they were transcribed mechanically by a script: every
+pointer becomes an offset into a plane held as integers, and every store is masked to the plane's sample
+width as FFmpeg's stores narrow. The code tables are built as FFmpeg's `build_vlc` builds them, from counts of
+each length going up to sixteen and back down.
+
+No real SheerVideo file has been found. Any bits are a valid frame, though, so each of the 29 layouts is
+decoded from frames of random bits, here and by FFmpeg n9.1, at 40x12 and at the odd 37x9, and every plane
+agrees — RGB0's never-written fourth byte excepted.
+
+The encoder is this package's own, FFmpeg having none, and lossless at eight bits: 4:2:2 as `BYRY`, 4:4:4 as
+` YbR` and anything else as ` RGB`, every row predicted and each residual the one that lands on the sample
+given, in the order the decoder reads them. FFmpeg decodes what it writes, odd widths included, to exactly
+the pictures given.
+
 ### ScreenPressor
 
 Converted from FFmpeg's `libavcodec/scpr.c` and `scpr.h`, LGPL-2.1-or-later, for the first two generations.

@@ -1,0 +1,16 @@
+The SheerVideo decoder in this directory is converted from FFmpeg (https://github.com/FFmpeg/FFmpeg):
+
+  libavcodec/sheervideo.c       the layouts, the code tables' construction and the 25 row decoders
+  libavcodec/sheervideodata.h   the code-length tables
+
+  Copyright (c) 2016 Paul B Mahol (sheervideo.c)
+  and the FFmpeg developers named in the files above.
+
+FFmpeg distributes those sources under the GNU Lesser General Public License, version 2.1 or (at your
+option) any later version. This work is distributed under the GNU Lesser General Public License
+version 3 or later, which the "or later" clause permits; the licence text is in LICENSE at the root of
+this repository.
+
+SheerVideoDecode.cs was produced mechanically from those sources by a script that turns each pointer into
+an offset into a plane and masks each store to its sample width; its tables are reproduced exactly because
+they are fixed data required for interoperability. The encoder is this package's own.

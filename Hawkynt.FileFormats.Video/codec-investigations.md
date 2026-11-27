@@ -2879,6 +2879,11 @@ packed layouts in this group.
 
 # SheerVideo, whose provenance is clean and whose tables are still in the binary
 
+*Closed.* SheerVideo is decoded and encoded now, converted from FFmpeg's LGPL-2.1-or-later
+`libavcodec/sheervideo.c` and `sheervideodata.h`, whose tables are the ones this section found only in the
+binary. No real file has been found; frames of random bits in every layout decode exactly as FFmpeg decodes
+them. `codec-notes.md` has the method.
+
 SheerVideo is BitJazz's commercial lossless codec, `Shr0` through `Shr7` in a QuickTime file, covering
 RGB and Y'CbCr with and without alpha, 8-bit and 10-bit, full and video range, 4:4:4 and 4:2:2,
 progressive and interlaced. It is worth separating from everything else in this file for one reason:
