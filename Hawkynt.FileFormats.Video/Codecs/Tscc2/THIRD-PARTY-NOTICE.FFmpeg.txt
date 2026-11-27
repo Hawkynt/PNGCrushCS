@@ -1,0 +1,18 @@
+The TechSmith Screen Codec 2 decoder in this directory is converted from FFmpeg
+(https://github.com/FFmpeg/FFmpeg):
+
+  libavcodec/tscc2.c      the frame layout, the macroblock modes and the inverse transform
+  libavcodec/tscc2data.h  the quantisers and the DC, count and AC code tables
+  libavcodec/mathtables.c ff_zigzag_scan
+
+  Copyright (c) 2012 Konstantin Shishkov (tscc2.c, tscc2data.h)
+  and the FFmpeg developers named in the files above.
+
+FFmpeg distributes those sources under the GNU Lesser General Public License, version 2.1 or (at your
+option) any later version. This work is distributed under the GNU Lesser General Public License
+version 3 or later, which the "or later" clause permits; the licence text is in LICENSE at the root of
+this repository.
+
+The algorithms are carried across into managed C#, not vendored. The tables in Tscc2Tables.cs were
+transcribed mechanically, by a script that parsed the C initialisers, and are reproduced exactly because
+they are fixed data required for interoperability. The encoder is this package's own.

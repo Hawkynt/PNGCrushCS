@@ -1507,6 +1507,10 @@ not an implementation.
 
 # TechSmith Screen Codec 2 (TSCC2), the DCT-based codec that shares only a vendor with TSCC
 
+*Closed.* TSCC2 is decoded and encoded now, converted from FFmpeg's LGPL-2.1-or-later `libavcodec/tscc2.c`
+with its tables transcribed mechanically from `tscc2data.h`. Every whole picture of the FATE sample decodes
+exactly as FFmpeg decodes it; `codec-notes.md` has the measurement.
+
 TSCC2 was investigated last, as the brief for this batch of work expected: despite the name, it is not a
 variant of this package's own TSCC decoder — DEFLATE over a run-length coding — but a block-transform
 codec, and it stops on the same evidence Canopus HQ, HQA and HQX do above.

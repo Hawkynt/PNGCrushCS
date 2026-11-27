@@ -2289,6 +2289,33 @@ films, picture for picture, gives every picture back exactly and comes out small
 `SW.ANM`'s 418,832 and 27,233 against `Vrs.anm`'s 32,498. FFmpeg reads the container and the codec this
 writes, to exactly this decoder's pictures, a film of several pages included.
 
+### TechSmith Screen Codec 2
+
+Converted from FFmpeg's `libavcodec/tscc2.c`, LGPL-2.1-or-later, with the quantisers and the DC, count
+and AC code tables transcribed mechanically from `tscc2data.h` by a script that parsed the C initialisers.
+Codes are canonical, assigned from their lengths in listed order as `ff_vlc_init_from_lengths` assigns them,
+and read least-significant bit first, so the first bit read is a code's first bit.
+
+A frame is a type byte — 0 repeats the last frame and yields no picture, as in FFmpeg — two quantisers
+from 2 to 14, a byte nobody reads, a run-length map giving each sixteen-by-eight macroblock one of four
+properties (0 and 3 skip it; 1 and 2 choose a quantiser), and a row of macroblocks at a time, each row's
+length in one odd byte or a doubled 32-bit word. A coded macroblock carries each of its three full-size
+planes as a fill, 128 raw samples, or eight four-by-four blocks: a DC, the first raw and the rest
+differences, a count of AC coefficients, and run-and-level codes in zigzag order, each with an escape to
+raw bits. The inverse transform is FFmpeg's integer one, and it stores each sample's low eight bits
+without clamping, as FFmpeg's does.
+
+Measured against FFmpeg n9.1 with `-flags +bitexact`: all 24 whole pictures of the FATE suite's
+`tscc/tsc2_16bpp.avi`, the only sample found anywhere, are identical in `yuv444p`. The file is cut off at a
+million bytes inside the 25th, which both decoders refuse.
+
+The encoder is this package's own, FFmpeg having none, and lossless. A macroblock that has not changed is
+skipped. Each plane of the rest is the smallest of a fill, the transform, and raw samples, the transform
+taken only where it reproduces every sample: the coefficients are found by inverting the transform's
+integer matrix about the block, rounding to quantiser 2, the finest, and decoding to check. Re-encoding
+the sample's 24 pictures gives each back exactly in 884,465 bytes against TechSmith's 880,934. FFmpeg
+decodes what it writes to exactly this decoder's pictures.
+
 ### Electronic Arts TQI, TGQ, Madcow and TGV
 
 Converted from FFmpeg's `libavcodec/eatqi.c`, `eatgq.c`, `eamad.c`, `eatgv.c` and the inverse DCT the first
