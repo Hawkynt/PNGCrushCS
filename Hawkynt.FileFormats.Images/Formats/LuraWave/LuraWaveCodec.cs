@@ -163,20 +163,21 @@ internal static class LuraWaveCodec {
   internal const int EncoderLevels = 6;
 
   /// <summary>
-  /// Writes a complete single-stripe ("embedded") lossless stream: grey, 16-bit grey, reversible-colour RGB or four
-  /// raw 8-bit channels.
+  /// Writes a complete single-stripe ("embedded") lossless stream: grey, 16-bit grey, reversible-colour RGB, three
+  /// plain channels (the layout LuraDocument stores its layers in) or four raw 8-bit channels.
   /// </summary>
-  /// <param name="pixels">Grey8, big-endian Gray16, Rgb24 or Rgba32 rows without padding.</param>
+  /// <param name="pixels">Grey8, big-endian Gray16, three-byte or Rgba32 rows without padding.</param>
   /// <param name="width">Image width.</param>
   /// <param name="height">Image height.</param>
   /// <param name="mode">
   /// <see cref="LuraWaveColourMode.Grey"/>, <see cref="LuraWaveColourMode.WideGrey"/>,
-  /// <see cref="LuraWaveColourMode.ReversibleColour"/> or <see cref="LuraWaveColourMode.RawFourChannel"/>.
+  /// <see cref="LuraWaveColourMode.ReversibleColour"/>, <see cref="LuraWaveColourMode.Rgb"/> or
+  /// <see cref="LuraWaveColourMode.RawFourChannel"/>.
   /// </param>
   /// <param name="metadataSource">A header whose resolution is carried over, or <see langword="null"/>.</param>
   public static byte[] Encode(ReadOnlySpan<byte> pixels, int width, int height, LuraWaveColourMode mode, LuraWaveHeader? metadataSource = null) {
-    if (mode is not (LuraWaveColourMode.Grey or LuraWaveColourMode.WideGrey or LuraWaveColourMode.ReversibleColour or LuraWaveColourMode.RawFourChannel))
-      throw new ArgumentException($"The writer codes grey, wide grey, reversible colour or four raw channels from pixels, not {mode}.", nameof(mode));
+    if (mode is not (LuraWaveColourMode.Grey or LuraWaveColourMode.WideGrey or LuraWaveColourMode.ReversibleColour or LuraWaveColourMode.Rgb or LuraWaveColourMode.RawFourChannel))
+      throw new ArgumentException($"The writer codes grey, wide grey, reversible colour, three plain channels or four raw channels from pixels, not {mode}.", nameof(mode));
 
     var header = EmbeddedHeader(width, height, mode, mode == LuraWaveColourMode.WideGrey ? 65535 : 0, metadataSource);
     var channels = header.Channels;
@@ -194,6 +195,11 @@ internal static class LuraWaveCodec {
           break;
         case LuraWaveColourMode.WideGrey:
           plane[target] = pixels[source * 2] << 8 | pixels[source * 2 + 1];
+          break;
+        case LuraWaveColourMode.Rgb:
+          // Mode 4, "3x8 bit raw": each byte biased by -128 and no colour transform.
+          for (var c = 0; c < 3; ++c)
+            plane[target + c] = pixels[source * 3 + c] - 128;
           break;
         case LuraWaveColourMode.RawFourChannel:
           for (var c = 0; c < 4; ++c)
