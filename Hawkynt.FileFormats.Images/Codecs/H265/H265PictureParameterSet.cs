@@ -83,6 +83,44 @@ internal sealed class H265PictureParameterSet {
   /// <summary><c>log2_sao_offset_scale_chroma</c>.</summary>
   internal int Log2SaoOffsetScaleChroma { get; private init; }
 
+  /// <summary>
+  /// <c>pps_curr_pic_ref_enabled_flag</c>: a picture using this set is appended to its own reference
+  /// lists, so that a prediction unit naming it copies a block of what is already decoded.
+  /// </summary>
+  internal bool CurrentPictureReferenceEnabled { get; private init; }
+
+  /// <summary>
+  /// <c>residual_adaptive_colour_transform_enabled_flag</c>: a 4:4:4 transform unit may code its
+  /// three residuals in YCgCo and have them turned back into the picture's own components.
+  /// </summary>
+  internal bool AdaptiveColourTransformEnabled { get; private init; }
+
+  /// <summary><c>pps_slice_act_qp_offsets_present_flag</c>: each slice may adjust the three offsets below.</summary>
+  internal bool SliceActQpOffsetsPresent { get; private init; }
+
+  /// <summary><c>PpsActQpOffsetY</c>, <c>PpsActQpOffsetCb</c> and <c>PpsActQpOffsetCr</c>.</summary>
+  internal int ActQpOffsetY { get; private init; }
+
+  internal int ActQpOffsetCb { get; private init; }
+
+  internal int ActQpOffsetCr { get; private init; }
+
+  /// <summary>
+  /// <c>pps_palette_predictor_initializer</c>, one array per colour component, or <c>null</c> where
+  /// the picture takes the sequence's initialisers. An empty set of arrays is not the same as none:
+  /// it starts every predictor empty whatever the sequence says.
+  /// </summary>
+  internal int[][]? PalettePredictorInitializers { get; private init; }
+
+  /// <summary>
+  /// <c>TwoVersionsOfCurrDecPicFlag</c> of clause 7.4.3.3.3: a picture that predicts from itself
+  /// and has a loop filter to run is kept twice while it is decoded — unfiltered, for its own
+  /// prediction, and filtered, for everything after it.
+  /// </summary>
+  internal bool TwoVersionsOfCurrentPicture(H265SequenceParameterSet sps)
+    => this.CurrentPictureReferenceEnabled
+       && (sps.SampleAdaptiveOffsetEnabled || !this.DeblockingFilterDisabled || this.DeblockingFilterOverrideEnabled);
+
   internal static H265PictureParameterSet Parse(ReadOnlySpan<byte> payload) {
     var reader = new H265BitReader(payload);
 
@@ -157,8 +195,9 @@ internal sealed class H265PictureParameterSet {
     var sliceHeaderExtension = reader.ReadFlag();
 
     var range = RangeExtensionValues.None;
+    var screen = ScreenContentValues.None;
     if (reader.ReadFlag())
-      range = _ReadExtensions(ref reader, transformSkip);
+      (range, screen) = _ReadExtensions(ref reader, transformSkip);
 
     return new() {
       Id = id,
@@ -206,6 +245,13 @@ internal sealed class H265PictureParameterSet {
       CrQpOffsetList = range.CrQpOffsets,
       Log2SaoOffsetScaleLuma = range.Log2SaoOffsetScaleLuma,
       Log2SaoOffsetScaleChroma = range.Log2SaoOffsetScaleChroma,
+      CurrentPictureReferenceEnabled = screen.CurrentPictureReference,
+      AdaptiveColourTransformEnabled = screen.AdaptiveColourTransform,
+      SliceActQpOffsetsPresent = screen.SliceActQpOffsetsPresent,
+      ActQpOffsetY = screen.ActQpOffsetY,
+      ActQpOffsetCb = screen.ActQpOffsetCb,
+      ActQpOffsetCr = screen.ActQpOffsetCr,
+      PalettePredictorInitializers = screen.PalettePredictorInitializers,
     };
   }
 
@@ -223,11 +269,27 @@ internal sealed class H265PictureParameterSet {
     internal static RangeExtensionValues None => new(2, false, false, 0, [], [], 0, 0);
   }
 
+  /// <summary>What <c>pps_scc_extension()</c> states, with the defaults of a set that sends none.</summary>
+  private readonly record struct ScreenContentValues(
+    bool CurrentPictureReference,
+    bool AdaptiveColourTransform,
+    bool SliceActQpOffsetsPresent,
+    int ActQpOffsetY,
+    int ActQpOffsetCb,
+    int ActQpOffsetCr,
+    int[][]? PalettePredictorInitializers) {
+
+    // The offsets a set that sends no colour transform states are its _plus5 and _plus3 syntax
+    // inferred as zero; nothing reads them then, but they are what clause 7.4.3.3.3 derives.
+    internal static ScreenContentValues None => new(false, false, false, -5, -5, -3, null);
+  }
+
   /// <summary>
-  /// Reads the extension flags, keeping the format range extension and refusing the extensions
-  /// whose syntax this decoder does not have.
+  /// Reads the extension flags, keeping the format range and screen content coding extensions and
+  /// refusing the extensions whose syntax this decoder does not have.
   /// </summary>
-  private static RangeExtensionValues _ReadExtensions(ref H265BitReader reader, bool transformSkipEnabled) {
+  private static (RangeExtensionValues Range, ScreenContentValues ScreenContent) _ReadExtensions(
+    ref H265BitReader reader, bool transformSkipEnabled) {
     var rangeExtension = reader.ReadFlag();
     var multilayerExtension = reader.ReadFlag();
     var threeDimensionalExtension = reader.ReadFlag();
@@ -239,14 +301,64 @@ internal sealed class H265PictureParameterSet {
         "This H.265 picture parameter set carries a multilayer or 3D extension (clause 7.3.2.3.1, Annexes F, G and "
         + "I). Only the base layer syntax is implemented.");
 
-    if (screenContentExtension)
+    var range = rangeExtension ? _ReadRangeExtension(ref reader, transformSkipEnabled) : RangeExtensionValues.None;
+    var screen = screenContentExtension ? _ReadScreenContentExtension(ref reader) : ScreenContentValues.None;
+    return (range, screen);
+  }
+
+  /// <summary>Reads <c>pps_screen_content_coding_extension()</c> — clause 7.3.2.3.3.</summary>
+  private static ScreenContentValues _ReadScreenContentExtension(ref H265BitReader reader) {
+    var currentPictureReference = reader.ReadFlag();
+    var colourTransform = reader.ReadFlag();
+
+    var sliceOffsets = false;
+    var offsetY = -5;
+    var offsetCb = -5;
+    var offsetCr = -3;
+    if (colourTransform) {
+      sliceOffsets = reader.ReadFlag();
+      offsetY = reader.ReadSignedExpGolomb() - 5;
+      offsetCb = reader.ReadSignedExpGolomb() - 5;
+      offsetCr = reader.ReadSignedExpGolomb() - 3;
+      if (offsetY is < -12 or > 12 || offsetCb is < -12 or > 12 || offsetCr is < -12 or > 12)
+        throw new InvalidDataException(
+          $"An H.265 picture parameter set offsets the colour-transformed quantisers by {offsetY}, {offsetCb} and "
+          + $"{offsetCr}; clause 7.4.3.3.3 bounds each at twelve either way.");
+    }
+
+    int[][]? initializers = null;
+    if (reader.ReadFlag()) {
+      var count = reader.ReadUnsignedExpGolomb();
+      if (count > 128)
+        throw new InvalidDataException(
+          $"An H.265 picture parameter set initialises its palette predictor with {count} colours; no predictor holds "
+          + "more than 128.");
+
+      initializers = [];
+      if (count > 0) {
+        var monochrome = reader.ReadFlag();
+        var lumaDepth = reader.ReadUnsignedExpGolomb() + 8;
+        var chromaDepth = monochrome ? 8 : reader.ReadUnsignedExpGolomb() + 8;
+        if (lumaDepth > 16 || chromaDepth > 16)
+          throw new InvalidDataException(
+            $"An H.265 picture parameter set codes its palette initialisers at {lumaDepth} and {chromaDepth} bits; "
+            + "clause 7.4.3.3.3 ties them to the sequence's depths, which stop at sixteen.");
+
+        initializers = H265ScreenContentExtension.ReadEntries(
+          ref reader, monochrome ? 1 : 3, count, lumaDepth, chromaDepth);
+      }
+    }
+
+    if (colourTransform)
       throw new NotSupportedException(
-        "This H.265 picture parameter set carries a screen content coding extension (clause 7.3.2.3.3). Palette "
-        + "mode and the adaptive colour transform are not implemented.");
+        "This H.265 picture parameter set sets residual_adaptive_colour_transform_enabled_flag (clause 7.3.2.3.3). "
+        + "The adaptive colour transform is not implemented.");
 
-    if (!rangeExtension)
-      return RangeExtensionValues.None;
+    return new(currentPictureReference, colourTransform, sliceOffsets, offsetY, offsetCb, offsetCr, initializers);
+  }
 
+  /// <summary>Reads <c>pps_range_extension()</c> — clause 7.3.2.3.2.</summary>
+  private static RangeExtensionValues _ReadRangeExtension(ref H265BitReader reader, bool transformSkipEnabled) {
     // pps_range_extension() — clause 7.3.2.3.2.
     var log2MaxTransformSkipBlockSize = transformSkipEnabled ? reader.ReadUnsignedExpGolomb() + 2 : 2;
     if (log2MaxTransformSkipBlockSize > 5)

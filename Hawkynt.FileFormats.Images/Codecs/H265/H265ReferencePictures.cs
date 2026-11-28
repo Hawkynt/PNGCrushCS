@@ -194,58 +194,92 @@ internal sealed class H265ReferencePictures {
   /// that index zero of each names the nearest picture in the direction that list is for. A list
   /// shorter than the slice activates is filled by repeating itself, which is not a mistake: it lets
   /// a slice name the same picture twice with different weights.
+  /// <para/>
+  /// A picture that may predict from itself — <c>pps_curr_pic_ref_enabled_flag</c>, which is how
+  /// intra block copy is coded — closes every round of that repetition with itself, and a list that
+  /// would otherwise leave it out ends with it.
   /// </remarks>
-  internal IReadOnlyList<H265Picture>[] BuildLists(H265SliceHeader header) {
+  internal IReadOnlyList<H265Picture>[] BuildLists(H265SliceHeader header, H265Picture current) {
     ArgumentNullException.ThrowIfNull(header);
+    ArgumentNullException.ThrowIfNull(current);
 
     if (header.SliceType == H265SliceType.I)
       return [[], []];
 
-    var list0 = _Build(this.ShortTermBefore, this.ShortTermAfter, this.LongTermCurrent,
-      header.NumRefIdxL0Active, header.ListEntryL0);
+    var self = header.Pps.CurrentPictureReferenceEnabled ? current : null;
+    var list0 = _Build(this.ShortTermBefore, this.ShortTermAfter, this.LongTermCurrent, self,
+      header.NumRefIdxL0Active, header.ListEntryL0, true);
 
     var list1 = header.SliceType == H265SliceType.B
-      ? _Build(this.ShortTermAfter, this.ShortTermBefore, this.LongTermCurrent,
-        header.NumRefIdxL1Active, header.ListEntryL1)
+      ? _Build(this.ShortTermAfter, this.ShortTermBefore, this.LongTermCurrent, self,
+        header.NumRefIdxL1Active, header.ListEntryL1, false)
       : [];
 
     return [list0, list1];
   }
 
+  /// <summary>
+  /// Which slots of <c>RefPicListTemp0</c> and <c>RefPicListTemp1</c> hold the current picture,
+  /// given how many other pictures the reference picture set names — equations 8-8 and 8-10.
+  /// </summary>
+  internal static bool[] CurrentPictureSlots(int others, int active) {
+    var length = Math.Max(active, others + 1);
+    var slots = new bool[length + 1];
+    var at = 0;
+    while (at < length) {
+      at += Math.Min(others, length - at);
+      slots[at++] = true;
+    }
+
+    return slots;
+  }
+
   private static H265Picture[] _Build(
-    H265Picture[] first, H265Picture[] second, H265Picture[] longTerm, int active, int[]? entries) {
-    var available = first.Length + second.Length + longTerm.Length;
+    H265Picture[] first, H265Picture[] second, H265Picture[] longTerm, H265Picture? current, int active,
+    int[]? entries, bool firstList) {
+    var others = first.Length + second.Length + longTerm.Length;
+    var available = others + (current != null ? 1 : 0);
     if (available == 0)
       throw new InvalidDataException(
         "An H.265 predicted slice names no reference pictures at all. A slice that predicts from nothing has no "
         + "defined reconstruction.");
 
-    var temporary = new H265Picture[Math.Max(active, available)];
+    // The round that the current picture closes is not cut short at the list's length: equation 8-8
+    // appends it unconditionally, so the temporary list can be one longer than it was sized for.
+    var length = Math.Max(active, available);
+    var temporary = new H265Picture[length + 1];
     var at = 0;
-    while (at < temporary.Length) {
+    while (at < length) {
       foreach (var picture in first)
-        if (at < temporary.Length)
+        if (at < length)
           temporary[at++] = picture;
 
       foreach (var picture in second)
-        if (at < temporary.Length)
+        if (at < length)
           temporary[at++] = picture;
 
       foreach (var picture in longTerm)
-        if (at < temporary.Length)
+        if (at < length)
           temporary[at++] = picture;
+
+      if (current != null)
+        temporary[at++] = current;
     }
 
     var list = new H265Picture[active];
     for (var i = 0; i < active; ++i) {
       var index = entries != null ? entries[i] : i;
-      if (index >= temporary.Length)
+      if (index >= at)
         throw new InvalidDataException(
-          $"An H.265 slice reorders its reference list to entry {index}, past the {temporary.Length} pictures the "
+          $"An H.265 slice reorders its reference list to entry {index}, past the {at} pictures the "
           + "reference picture set names.");
 
       list[i] = temporary[index];
     }
+
+    // Equation 8-9: an unmodified first list too short to reach the current picture ends with it.
+    if (current != null && firstList && entries == null && available > active)
+      list[active - 1] = current;
 
     return list;
   }

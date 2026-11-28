@@ -11,6 +11,15 @@ HEVC reference software (HM), release HM-16.20, https://vcgit.hhi.fraunhofer.de/
 
 The constants of the new CABAC contexts are those of ITU-T H.265 Tables 9-5 to 9-37.
 
+Parts of the H.265 screen content coding support in this folder follow the HM screen content
+model, release HM-16.21+SCM-8.8, from the same repository, where its behaviour settles what the
+normative text leaves to be read:
+
+  - the size condition of the 8x8 bi-prediction restriction beside a current picture reference,
+    taken as the prediction block's own width and height of at most eight
+    (H265MotionPrediction.RestrictSmallBiprediction, from TComDataCU::isBipredRestriction and
+    TComDataCU::is8x8BipredRestriction).
+
 HM is distributed under the following licence:
 
 The copyright in this software is being made available under the BSD

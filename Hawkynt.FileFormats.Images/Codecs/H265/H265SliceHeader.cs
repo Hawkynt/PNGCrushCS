@@ -82,6 +82,19 @@ internal sealed class H265SliceHeader {
   internal int DataOffset { get; private init; }
   internal int NumPicTotalCurr { get; private init; }
 
+  /// <summary>
+  /// <c>use_integer_mv_flag</c>: every motion vector of the slice is a whole number of luma samples,
+  /// its difference coded in samples rather than quarters.
+  /// </summary>
+  internal bool UseIntegerMv { get; private init; }
+
+  /// <summary><c>slice_act_y_qp_offset</c>, <c>slice_act_cb_qp_offset</c> and <c>slice_act_cr_qp_offset</c>.</summary>
+  internal int SliceActQpOffsetY { get; private init; }
+
+  internal int SliceActQpOffsetCb { get; private init; }
+
+  internal int SliceActQpOffsetCr { get; private init; }
+
   internal bool IsIntra => this.SliceType == H265SliceType.I;
 
   /// <summary>Reads one header, leaving the reader at the byte the slice segment data starts on.</summary>
@@ -133,7 +146,9 @@ internal sealed class H265SliceHeader {
         $"An H.265 slice states slice_type {sliceTypeValue}. Table 7-7 defines only 0 (B), 1 (P) and 2 (I).");
 
     var sliceType = (H265SliceType)sliceTypeValue;
-    if (nal.IsRandomAccessPoint && sliceType != H265SliceType.I)
+    // A picture that may predict from itself is allowed to be a random access point and still have
+    // predicted slices: they can only name the picture itself, which a decoder entering here has.
+    if (nal.IsRandomAccessPoint && sliceType != H265SliceType.I && !pps.CurrentPictureReferenceEnabled)
       throw new InvalidDataException(
         $"An H.265 intra random access point picture (NAL unit type {(int)nal.Type}) carries a "
         + $"{sliceType} slice. Clause 7.4.7.1 requires every slice of such a picture to be intra.");
@@ -219,7 +234,9 @@ internal sealed class H265SliceHeader {
     H265PredictionWeights? weights = null;
     var maxNumMergeCand = 5;
 
-    var picTotalCurr = _CountPicturesUsedByCurrentPicture(shortTermSet, longTermUsed);
+    var picTotalCurr = _CountPicturesUsedByCurrentPicture(shortTermSet, longTermUsed)
+                       + (pps.CurrentPictureReferenceEnabled ? 1 : 0);
+    var useIntegerMv = sps.ScreenContent.MotionVectorResolutionControlIdc == 1;
 
     if (sliceType != H265SliceType.I) {
       numRefIdxL0 = pps.NumRefIdxL0DefaultActive;
@@ -265,12 +282,18 @@ internal sealed class H265SliceHeader {
 
       if ((pps.WeightedPred && sliceType == H265SliceType.P)
           || (pps.WeightedBipred && sliceType == H265SliceType.B))
-        weights = H265PredictionWeights.Parse(ref reader, sps, sliceType, numRefIdxL0, numRefIdxL1);
+        weights = H265PredictionWeights.Parse(
+          ref reader, sps, sliceType, numRefIdxL0, numRefIdxL1,
+          _CurrentPictureEntries(0, shortTermSet, longTermUsed, pps, numRefIdxL0, listEntryL0),
+          _CurrentPictureEntries(1, shortTermSet, longTermUsed, pps, numRefIdxL1, listEntryL1));
 
       maxNumMergeCand = 5 - reader.ReadUnsignedExpGolomb();
       if (maxNumMergeCand is < 1 or > 5)
         throw new InvalidDataException(
           $"An H.265 slice states MaxNumMergeCand of {maxNumMergeCand}, which clause 7.4.7.1 bounds to 1 through 5.");
+
+      if (sps.ScreenContent.MotionVectorResolutionControlIdc == 2)
+        useIntegerMv = reader.ReadFlag();
     }
 
     var sliceQpY = pps.InitQp + reader.ReadSignedExpGolomb();
@@ -284,6 +307,19 @@ internal sealed class H265SliceHeader {
     if (pps.SliceChromaQpOffsetsPresent) {
       sliceCbQpOffset = reader.ReadSignedExpGolomb();
       sliceCrQpOffset = reader.ReadSignedExpGolomb();
+    }
+
+    var sliceActY = 0;
+    var sliceActCb = 0;
+    var sliceActCr = 0;
+    if (pps.SliceActQpOffsetsPresent) {
+      sliceActY = reader.ReadSignedExpGolomb();
+      sliceActCb = reader.ReadSignedExpGolomb();
+      sliceActCr = reader.ReadSignedExpGolomb();
+      if (sliceActY is < -12 or > 12 || sliceActCb is < -12 or > 12 || sliceActCr is < -12 or > 12)
+        throw new InvalidDataException(
+          $"An H.265 slice offsets its colour-transformed quantisers by {sliceActY}, {sliceActCb} and {sliceActCr}; "
+          + "clause 7.4.7.1 bounds each at twelve either way.");
     }
 
     var cuChromaQpOffsetEnabled = pps.ChromaQpOffsetListEnabled && reader.ReadFlag();
@@ -337,6 +373,10 @@ internal sealed class H265SliceHeader {
       SliceCbQpOffset = sliceCbQpOffset,
       SliceCrQpOffset = sliceCrQpOffset,
       CuChromaQpOffsetEnabled = cuChromaQpOffsetEnabled,
+      UseIntegerMv = useIntegerMv,
+      SliceActQpOffsetY = sliceActY,
+      SliceActQpOffsetCb = sliceActCb,
+      SliceActQpOffsetCr = sliceActCr,
       DeblockingFilterDisabled = deblockingDisabled,
       BetaOffsetDiv2 = betaOffsetDiv2,
       TcOffsetDiv2 = tcOffsetDiv2,
@@ -398,6 +438,10 @@ internal sealed class H265SliceHeader {
       SliceCbQpOffset = inherited.SliceCbQpOffset,
       SliceCrQpOffset = inherited.SliceCrQpOffset,
       CuChromaQpOffsetEnabled = inherited.CuChromaQpOffsetEnabled,
+      UseIntegerMv = inherited.UseIntegerMv,
+      SliceActQpOffsetY = inherited.SliceActQpOffsetY,
+      SliceActQpOffsetCb = inherited.SliceActQpOffsetCb,
+      SliceActQpOffsetCr = inherited.SliceActQpOffsetCr,
       DeblockingFilterDisabled = inherited.DeblockingFilterDisabled,
       BetaOffsetDiv2 = inherited.BetaOffsetDiv2,
       TcOffsetDiv2 = inherited.TcOffsetDiv2,
@@ -456,6 +500,49 @@ internal sealed class H265SliceHeader {
     }
 
     return offsets;
+  }
+
+  /// <summary>
+  /// Which entries of reference list <paramref name="list"/> will be the current picture itself —
+  /// the list construction of clause 8.3.4, followed through with positions instead of pictures.
+  /// </summary>
+  /// <remarks>
+  /// The prediction weight table needs this before any picture is at hand: it sends no weights for
+  /// an entry that is the current picture, and which entries those are follows from the reference
+  /// picture set's counts and the list modification alone. <see cref="H265ReferencePictures"/>
+  /// builds the lists themselves by the same rule.
+  /// </remarks>
+  private static bool[] _CurrentPictureEntries(
+    int list, H265ShortTermReferencePictureSet shortTerm, bool[] longTermUsed, H265PictureParameterSet pps,
+    int active, int[]? entries) {
+    var flags = new bool[Math.Max(active, 1)];
+    if (!pps.CurrentPictureReferenceEnabled || active == 0)
+      return flags;
+
+    var before = 0;
+    foreach (var used in shortTerm.UsedByCurrPicS0)
+      if (used)
+        ++before;
+    var after = 0;
+    foreach (var used in shortTerm.UsedByCurrPicS1)
+      if (used)
+        ++after;
+    var longTerm = 0;
+    foreach (var used in longTermUsed)
+      if (used)
+        ++longTerm;
+
+    var others = before + after + longTerm;
+    var temporary = H265ReferencePictures.CurrentPictureSlots(others, active);
+    for (var i = 0; i < active; ++i) {
+      var index = entries != null ? entries[i] : i;
+      flags[i] = index < temporary.Length && temporary[index];
+    }
+
+    if (list == 0 && entries == null && others + 1 > active)
+      flags[active - 1] = true;
+
+    return flags;
   }
 
   private static int _CountPicturesUsedByCurrentPicture(
@@ -521,7 +608,8 @@ internal sealed class H265PredictionWeights {
     => list == 0 ? this.ChromaOffsetL0[index, component] : this.ChromaOffsetL1[index, component];
 
   internal static H265PredictionWeights Parse(
-    ref H265BitReader reader, H265SequenceParameterSet sps, H265SliceType sliceType, int countL0, int countL1) {
+    ref H265BitReader reader, H265SequenceParameterSet sps, H265SliceType sliceType, int countL0, int countL1,
+    bool[] currentL0, bool[] currentL1) {
     var lumaLog2Denom = reader.ReadUnsignedExpGolomb();
     if (lumaLog2Denom > 7)
       throw new InvalidDataException(
@@ -536,7 +624,7 @@ internal sealed class H265PredictionWeights {
           + "7.4.7.3 permits.");
     }
 
-    _ParseList(ref reader, sps, countL0, lumaLog2Denom, chromaLog2Denom,
+    _ParseList(ref reader, sps, countL0, lumaLog2Denom, chromaLog2Denom, currentL0,
       out var lumaWeightL0, out var lumaOffsetL0, out var chromaWeightL0, out var chromaOffsetL0);
 
     var lumaWeightL1 = new int[Math.Max(countL1, 1)];
@@ -545,7 +633,7 @@ internal sealed class H265PredictionWeights {
     var chromaOffsetL1 = new int[Math.Max(countL1, 1), 2];
 
     if (sliceType == H265SliceType.B)
-      _ParseList(ref reader, sps, countL1, lumaLog2Denom, chromaLog2Denom,
+      _ParseList(ref reader, sps, countL1, lumaLog2Denom, chromaLog2Denom, currentL1,
         out lumaWeightL1, out lumaOffsetL1, out chromaWeightL1, out chromaOffsetL1);
 
     return new(lumaLog2Denom, chromaLog2Denom,
@@ -555,7 +643,7 @@ internal sealed class H265PredictionWeights {
 
   private static void _ParseList(
     ref H265BitReader reader, H265SequenceParameterSet sps, int count, int lumaLog2Denom, int chromaLog2Denom,
-    out int[] lumaWeight, out int[] lumaOffset, out int[,] chromaWeight, out int[,] chromaOffset) {
+    bool[] current, out int[] lumaWeight, out int[] lumaOffset, out int[,] chromaWeight, out int[,] chromaOffset) {
     lumaWeight = new int[Math.Max(count, 1)];
     lumaOffset = new int[Math.Max(count, 1)];
     chromaWeight = new int[Math.Max(count, 1), 2];
@@ -567,14 +655,16 @@ internal sealed class H265PredictionWeights {
       chromaWeight[i, 1] = 1 << chromaLog2Denom;
     }
 
+    // An entry that is the current picture itself — intra block copy — sends neither flag, and is
+    // predicted from with the default weights: there is no fade between a picture and itself.
     var lumaPresent = new bool[Math.Max(count, 1)];
     for (var i = 0; i < count; ++i)
-      lumaPresent[i] = reader.ReadFlag();
+      lumaPresent[i] = !current[i] && reader.ReadFlag();
 
     var chromaPresent = new bool[Math.Max(count, 1)];
     if (sps.ChromaArrayType != 0)
       for (var i = 0; i < count; ++i)
-        chromaPresent[i] = reader.ReadFlag();
+        chromaPresent[i] = !current[i] && reader.ReadFlag();
 
     // WpOffsetHalfRangeC of clause 7.4.7.3: offsets are stated at eight bits and scaled up unless the
     // sequence asks for high-precision offsets, which are stated at the chroma depth itself and so

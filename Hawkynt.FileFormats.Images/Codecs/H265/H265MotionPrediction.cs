@@ -90,18 +90,64 @@ internal static class H265MotionPrediction {
 
     var chosen = candidates[mergeIndex];
 
+    // Step 9 of clause 8.5.3.2.2: a vector into the current picture, or any vector of a slice that
+    // codes whole samples only, is taken to the whole sample at or before it.
+    for (var list = 0; list < 2; ++list)
+      if (chosen.Predicts(list) && (frame.Header.UseIntegerMv || IsCurrentPicture(frame, list, chosen.RefIdx(list))))
+        chosen.Set(list, true, chosen.RefIdx(list), (chosen.MvX(list) >> 2) << 2, (chosen.MvY(list) >> 2) << 2);
+
     // A prediction block of eight samples' area may not use two references. A merge candidate that
     // does is cut down to the first list rather than refused, because the encoder chose the index
     // knowing this rule would apply. The area is the prediction block's own (nOrigPbW and nOrigPbH),
     // not that of the coding block whose candidate list a parallel merge region shares.
-    if (chosen.PredictL0 && chosen.PredictL1 && originalWidth + originalHeight == 12) {
-      chosen.PredictL1 = false;
-      chosen.RefIdxL1 = -1;
-      chosen.MvL1X = 0;
-      chosen.MvL1Y = 0;
-    }
+    if (chosen.PredictL0 && chosen.PredictL1 && originalWidth + originalHeight == 12)
+      _DropSecondList(ref chosen);
 
+    RestrictSmallBiprediction(frame, ref chosen, originalWidth, originalHeight);
     return chosen;
+  }
+
+  /// <summary>Whether entry <paramref name="refIdx"/> of a reference list is the picture being decoded.</summary>
+  internal static bool IsCurrentPicture(IH265MotionContext frame, int list, int refIdx) {
+    var pictures = frame.ReferenceList(list);
+    return refIdx >= 0 && refIdx < pictures.Count && ReferenceEquals(pictures[refIdx], frame.Picture);
+  }
+
+  /// <summary>
+  /// The 8x8 bi-prediction restriction of clause 8.5.3.2.1: where a picture is kept in two versions
+  /// while it predicts from itself, a prediction block of at most 8x8 that would interpolate two
+  /// different fractional-sample predictions uses only the first.
+  /// </summary>
+  /// <remarks>
+  /// The rule bounds the memory bandwidth a decoder needs when the current picture, unfiltered,
+  /// is a reference beside the filtered pictures. Its block-size condition is the one the reference
+  /// decoder applies — the prediction block itself at most eight samples each way — which for every
+  /// partition a bi-predicted block can have agrees with the <c>nPbSw</c> and <c>nPbSh</c> of
+  /// equations 8-86 and 8-87.
+  /// </remarks>
+  internal static void RestrictSmallBiprediction(IH265MotionContext frame, ref H265MotionInfo motion, int width, int height) {
+    if (!motion.PredictL0 || !motion.PredictL1 || width > 8 || height > 8)
+      return;
+    if (!frame.Pps.TwoVersionsOfCurrentPicture(frame.Sps))
+      return;
+
+    var integerL0 = ((motion.MvL0X | motion.MvL0Y) & 3) == 0;
+    var integerL1 = ((motion.MvL1X | motion.MvL1Y) & 3) == 0;
+    if (integerL0 || integerL1)
+      return;
+
+    var identical = motion.MvL0X == motion.MvL1X && motion.MvL0Y == motion.MvL1Y
+                    && frame.ReferenceList(0)[motion.RefIdxL0].PictureOrderCount
+                    == frame.ReferenceList(1)[motion.RefIdxL1].PictureOrderCount;
+    if (!identical)
+      _DropSecondList(ref motion);
+  }
+
+  private static void _DropSecondList(ref H265MotionInfo motion) {
+    motion.PredictL1 = false;
+    motion.RefIdxL1 = -1;
+    motion.MvL1X = 0;
+    motion.MvL1Y = 0;
   }
 
   /// <summary>

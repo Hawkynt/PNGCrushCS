@@ -174,6 +174,12 @@ internal sealed class H265SequenceParameterSet {
   internal H265RangeExtension RangeExtension { get; private init; } = H265RangeExtension.None;
 
   /// <summary>
+  /// The screen content coding tools of <c>sps_scc_extension()</c> — clause 7.3.2.2.3. All of them
+  /// are off in a sequence that does not send the extension.
+  /// </summary>
+  internal H265ScreenContentExtension ScreenContent { get; private init; } = H265ScreenContentExtension.None;
+
+  /// <summary>
   /// <c>CoeffMinY</c> as a power of two: the transform coefficients of one component, and the values
   /// between the two stages of the inverse transform, are held in a signed range of this many bits.
   /// </summary>
@@ -319,8 +325,9 @@ internal sealed class H265SequenceParameterSet {
       colorInfo = _ReadVideoUsabilityInformation(ref reader, maxSubLayersMinus1);
 
     var rangeExtension = H265RangeExtension.None;
+    var screenContent = H265ScreenContentExtension.None;
     if (reader.ReadFlag())
-      rangeExtension = _ReadExtensions(ref reader);
+      (rangeExtension, screenContent) = _ReadExtensions(ref reader, chromaFormatIdc, bitDepthLuma, bitDepthChroma);
 
     var sps = new H265SequenceParameterSet {
       Id = id,
@@ -363,6 +370,7 @@ internal sealed class H265SequenceParameterSet {
       StrongIntraSmoothingEnabled = strongIntraSmoothing,
       ColorInfo = colorInfo,
       RangeExtension = rangeExtension,
+      ScreenContent = screenContent,
     };
 
     sps._RefuseWhatIsNotDecodable();
@@ -378,6 +386,11 @@ internal sealed class H265SequenceParameterSet {
   /// stream this decoder cannot read produces no picture at all.
   /// </remarks>
   private void _RefuseWhatIsNotDecodable() {
+    if (this.ScreenContent.PaletteModeEnabled)
+      throw new NotSupportedException(
+        "This H.265 sequence parameter set sets palette_mode_enabled_flag of the screen content coding extension "
+        + "(clause 7.3.2.2.3). Palette coded coding units are not implemented.");
+
     if (this.SeparateColourPlaneFlag)
       throw new NotSupportedException(
         "This H.265 stream sets separate_colour_plane_flag (clause 7.4.3.2.1): its three colour planes are coded as "
@@ -406,10 +419,16 @@ internal sealed class H265SequenceParameterSet {
   }
 
   /// <summary>
-  /// Reads the extension flags, keeping the format range extension and refusing the extensions
-  /// whose syntax this decoder does not have.
+  /// Reads the extension flags, keeping the format range and screen content coding extensions and
+  /// refusing the extensions whose syntax this decoder does not have.
   /// </summary>
-  private static H265RangeExtension _ReadExtensions(ref H265BitReader reader) {
+  /// <remarks>
+  /// The extensions follow each other in the order of their flags, so the screen content one is
+  /// read after the range one and would be read after the multilayer and 3D ones, were those not
+  /// refused first.
+  /// </remarks>
+  private static (H265RangeExtension Range, H265ScreenContentExtension ScreenContent) _ReadExtensions(
+    ref H265BitReader reader, int chromaFormatIdc, int bitDepthLuma, int bitDepthChroma) {
     var rangeExtension = reader.ReadFlag();
     var multilayerExtension = reader.ReadFlag();
     var threeDimensionalExtension = reader.ReadFlag();
@@ -422,27 +441,26 @@ internal sealed class H265SequenceParameterSet {
         + "I). Only the base layer syntax is implemented, and a stream whose extension layers were dropped is not "
         + "the stream that was encoded.");
 
-    if (screenContentExtension)
-      throw new NotSupportedException(
-        "This H.265 sequence parameter set carries a screen content coding extension (clause 7.3.2.2.3). Palette "
-        + "mode, adaptive colour transform and intra block copy change how a coding unit is reconstructed and are "
-        + "not implemented.");
+    var range = H265RangeExtension.None;
+    if (rangeExtension)
+      // sps_range_extension() — clause 7.3.2.2.2: nine flags and nothing else, in this order.
+      range = new() {
+        TransformSkipRotationEnabled = reader.ReadFlag(),
+        TransformSkipContextEnabled = reader.ReadFlag(),
+        ImplicitRdpcmEnabled = reader.ReadFlag(),
+        ExplicitRdpcmEnabled = reader.ReadFlag(),
+        ExtendedPrecisionProcessing = reader.ReadFlag(),
+        IntraSmoothingDisabled = reader.ReadFlag(),
+        HighPrecisionOffsetsEnabled = reader.ReadFlag(),
+        PersistentRiceAdaptationEnabled = reader.ReadFlag(),
+        CabacBypassAlignmentEnabled = reader.ReadFlag(),
+      };
 
-    if (!rangeExtension)
-      return H265RangeExtension.None;
+    var screenContent = screenContentExtension
+      ? H265ScreenContentExtension.Parse(ref reader, chromaFormatIdc, bitDepthLuma, bitDepthChroma)
+      : H265ScreenContentExtension.None;
 
-    // sps_range_extension() — clause 7.3.2.2.2: nine flags and nothing else, in this order.
-    return new() {
-      TransformSkipRotationEnabled = reader.ReadFlag(),
-      TransformSkipContextEnabled = reader.ReadFlag(),
-      ImplicitRdpcmEnabled = reader.ReadFlag(),
-      ExplicitRdpcmEnabled = reader.ReadFlag(),
-      ExtendedPrecisionProcessing = reader.ReadFlag(),
-      IntraSmoothingDisabled = reader.ReadFlag(),
-      HighPrecisionOffsetsEnabled = reader.ReadFlag(),
-      PersistentRiceAdaptationEnabled = reader.ReadFlag(),
-      CabacBypassAlignmentEnabled = reader.ReadFlag(),
-    };
+    return (range, screenContent);
   }
 
   /// <summary>

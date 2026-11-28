@@ -158,6 +158,7 @@ internal sealed class H265FrameDecoder : IH265MotionContext {
     this._log2QuantisationGroupSize = sps.CtbLog2SizeY - pps.DiffCuQpDeltaDepth;
     this._log2MinCuChromaQpOffsetSize = sps.CtbLog2SizeY - pps.DiffCuChromaQpOffsetDepth;
     this._range = sps.RangeExtension;
+    this._lumaBoundaryFilters = !sps.ScreenContent.IntraBoundaryFilteringDisabled;
     this._log2TransformRangeLuma = sps.Log2TransformRange(0);
     this._log2TransformRangeChroma = sps.Log2TransformRange(1);
     this._chromaModeDerived = new bool[blocks];
@@ -918,10 +919,18 @@ internal sealed class H265FrameDecoder : IH265MotionContext {
       var predictor = H265MotionPrediction.DerivePredictor(
         this, x, y, width, height, partIdx, list, refIdx, predictorFlag);
 
-      motion.Set(list, true, refIdx,
-        _WrapMotionVector(predictor.X + mvdX), _WrapMotionVector(predictor.Y + mvdY));
+      // A vector into the current picture, or any vector of a slice coding whole samples only, has
+      // its difference stated in whole samples and its predictor taken to the sample at or before
+      // it — equations 8-98 to 8-101.
+      if (this._header.UseIntegerMv || H265MotionPrediction.IsCurrentPicture(this, list, refIdx))
+        motion.Set(list, true, refIdx,
+          _WrapMotionVector(((predictor.X >> 2) + mvdX) << 2), _WrapMotionVector(((predictor.Y >> 2) + mvdY) << 2));
+      else
+        motion.Set(list, true, refIdx,
+          _WrapMotionVector(predictor.X + mvdX), _WrapMotionVector(predictor.Y + mvdY));
     }
 
+    H265MotionPrediction.RestrictSmallBiprediction(this, ref motion, width, height);
     return motion;
   }
 
@@ -1134,6 +1143,7 @@ internal sealed class H265FrameDecoder : IH265MotionContext {
 
     var qp = this._QuantiserAt(x0, y0);
     this._lumaResidualPresent = false;
+
     if (this._cuPredictionMode == H265PredictionMode.Intra)
       this._ReconstructIntraLuma(x0, y0, log2TrafoSize, cbfLuma, qp);
     else if (cbfLuma)
@@ -1232,7 +1242,8 @@ internal sealed class H265FrameDecoder : IH265MotionContext {
     var mode = this._intraPredModeY[this._BlockIndex(x0, y0)];
     this._GatherReference(x0, y0, size, mode);
     H265IntraPrediction.Predict(
-      this._prediction, this._reference, size, mode, true, this._sps.BitDepthLuma, this._DisableBoundaryFilters);
+      this._prediction, this._reference, size, mode, this._lumaBoundaryFilters, this._sps.BitDepthLuma,
+      this._DisableBoundaryFilters);
 
     if (hasResidual) {
       var form = this._DecodeResidual(log2Size, 0, mode);
@@ -1249,6 +1260,13 @@ internal sealed class H265FrameDecoder : IH265MotionContext {
   /// is what reconstructs it exactly.
   /// </summary>
   private bool _DisableBoundaryFilters => this._range.ImplicitRdpcmEnabled && this._cuTransquantBypass;
+
+  /// <summary>
+  /// Whether a luma block gets the boundary adjustments of the DC, horizontal and vertical modes at
+  /// all. <c>intra_boundary_filtering_disabled_flag</c> of the screen content extensions switches
+  /// off every one of them, which the prediction treats exactly as it treats a chroma block.
+  /// </summary>
+  private readonly bool _lumaBoundaryFilters;
 
   /// <summary>Reads one residual block with every range extension tool the sequence enables.</summary>
   private H265ResidualForm _DecodeResidual(int log2Size, int component, int intraMode)

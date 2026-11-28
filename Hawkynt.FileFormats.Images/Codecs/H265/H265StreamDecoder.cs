@@ -153,7 +153,7 @@ internal sealed class H265StreamDecoder {
     if (this._skippingPicture)
       return;
 
-    var lists = this._references.BuildLists(header);
+    var lists = this._references.BuildLists(header, this._frame!.Picture);
     this._frame!.DecodeSliceSegment(header, lists);
     this._pictureLists = lists;
   }
@@ -165,7 +165,11 @@ internal sealed class H265StreamDecoder {
 
     var poc = this._references.ComputePictureOrderCount(header);
     this._references.ApplyReferencePictureSet(header, poc);
-    this._references.BumpBeforeDecoding(header.Sps.MaxNumReorderPictures, header.Sps.MaxDecodedPictureBuffering);
+    // A picture kept in two versions while it is decoded holds a second buffer of its own, which
+    // clause C.5.2.2 counts against the buffering the sequence declares.
+    var twoVersions = header.Pps.TwoVersionsOfCurrentPicture(header.Sps) ? 1 : 0;
+    this._references.BumpBeforeDecoding(
+      header.Sps.MaxNumReorderPictures, header.Sps.MaxDecodedPictureBuffering - twoVersions);
 
     while (this._references.TryTakeOutput(out var released))
       this._ready.Enqueue((released, this._pictureSequence));
@@ -173,6 +177,12 @@ internal sealed class H265StreamDecoder {
     this._frame = new(header.Sps, header.Pps);
     this._frame.Picture.PictureOrderCount = poc;
     this._frame.Picture.IsOutput = header.PicOutputFlag;
+
+    // A picture that may predict from itself is marked as a long-term reference while it is decoded
+    // (clause 8.1.3), which is what keeps motion vector prediction from scaling a block vector by a
+    // distance in time it does not have. Storing it remarks it as a short-term one.
+    if (header.Pps.CurrentPictureReferenceEnabled)
+      this._frame.Picture.Marking = H265ReferenceMarking.LongTerm;
   }
 
   private void _FinishPicture() {
