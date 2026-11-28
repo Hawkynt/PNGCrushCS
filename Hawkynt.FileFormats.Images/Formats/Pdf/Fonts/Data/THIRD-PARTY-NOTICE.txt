@@ -89,3 +89,15 @@ ReadMe that accompanies them reads:
 4. Liberation fonts 2.1.5 (SIL Open Font License 1.1)
 ----------------------------------------------------
 See THIRD-PARTY-NOTICE.Liberation.txt and Substitutes/OFL-Liberation.txt.
+
+
+5. Adobe cmap-resources (BSD 3-Clause)
+--------------------------------------
+CMaps/cmaps.bin.br carries the CMap files of
+https://github.com/adobe-type-tools/cmap-resources (every current character
+collection and Adobe-Manga1; not the deprecated Adobe-Japan2 set, the UTF-8
+encodings or the CID-to-CID Adobe-<ordering>-<supplement> maps), repacked by
+CMaps/pack_cmaps.py into a compact binary form with every codespace range,
+CID range, CID mapping, notdef range, usecmap and WMode kept, and compressed
+with Brotli. Copyright 1990-2023 Adobe. The licence text travels beside it as
+CMaps/LICENSE-cmap-resources.txt and inside the assembly.

@@ -75,6 +75,15 @@
                       LogicalName="FileFormat.Pdf.Fonts.Data.Substitutes.OFL-Liberation.txt" />
   </ItemGroup>
 
+  <!-- Adobe's predefined CMaps (cmap-resources, BSD-3-Clause), repacked by pack_cmaps.py and
+       Brotli-compressed; the licence travels inside the assembly beside them. -->
+  <ItemGroup>
+    <EmbeddedResource Include="Formats\Pdf\Fonts\Data\CMaps\cmaps.bin.br"
+                      LogicalName="FileFormat.Pdf.Fonts.Data.CMaps.cmaps.bin.br" />
+    <EmbeddedResource Include="Formats\Pdf\Fonts\Data\CMaps\LICENSE-cmap-resources.txt"
+                      LogicalName="FileFormat.Pdf.Fonts.Data.CMaps.LICENSE-cmap-resources.txt" />
+  </ItemGroup>
+
   <ItemGroup>
     <None Include="README.md" Pack="true" PackagePath="\" />
     <!-- Expose <FileFormatRegistryNamespace> to the source generator's AnalyzerConfigOptions. -->

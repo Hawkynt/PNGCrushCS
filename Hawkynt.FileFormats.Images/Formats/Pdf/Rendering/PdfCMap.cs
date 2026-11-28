@@ -1,31 +1,41 @@
 using System;
 using System.Collections.Generic;
 using FileFormat.Pdf.Document;
+using FileFormat.Pdf.Fonts.Data;
 
 namespace FileFormat.Pdf.Rendering;
 
 /// <summary>
 /// A CMap mapping character codes to CIDs (PDF 32000-1 §9.7.5): codespace ranges to split a string
-/// into codes, and CID ranges and single mappings.
+/// into codes, CID ranges and single mappings, and notdef ranges for codes nothing else maps.
 /// </summary>
 /// <remarks>
 /// Embedded CMaps are parsed from their PostScript text (begincodespacerange, begincidrange,
-/// begincidchar, beginnotdefrange, usecmap, /WMode). Identity-H and Identity-V are built in. The
-/// other predefined CMaps — the CJK encodings of Adobe's cmap-resources — are data this package does
-/// not carry, and are refused by name.
+/// begincidchar, beginnotdefrange, usecmap, /WMode). Identity-H and Identity-V are built in; every
+/// other predefined CMap — the CJK encodings of table 118 and the rest of Adobe's cmap-resources —
+/// comes from the bundled set in <see cref="PdfPredefinedCMaps"/>.
+/// <para/>
+/// Mappings are kept in the order they are defined, a CMap's own after those of the one it uses, and
+/// a later mapping of a code wins over an earlier one. Lookups go through tables built on first use.
 /// </remarks>
 internal sealed class PdfCMap {
 
   private readonly List<(int Bytes, uint Low, uint High)> _codespaces = [];
-  private readonly List<(int Bytes, uint Low, uint High, int Cid)> _ranges = [];
-  private readonly Dictionary<(int, uint), int> _singles = [];
+  private readonly List<(int Bytes, uint Low, uint High, int Cid)> _mappings = [];
+  private readonly List<(int Bytes, uint Low, uint High, int Cid)> _notdefs = [];
   private bool _identity;
+  private int[]?[]? _small;
+  private Dictionary<(int, uint), int>? _large;
+  private int _shortest = 4;
 
   /// <summary>Whether text in this CMap is written vertically.</summary>
   public bool Vertical { get; private set; }
 
+  /// <summary>The CMap's name when it is a predefined one, for choosing a substitute font's character collection.</summary>
+  public string? PredefinedName { get; private set; }
+
   public static PdfCMap Identity(bool vertical) {
-    var map = new PdfCMap { _identity = true, Vertical = vertical };
+    var map = new PdfCMap { _identity = true, Vertical = vertical, PredefinedName = vertical ? "Identity-V" : "Identity-H" };
     map._codespaces.Add((2, 0, 0xFFFF));
     return map;
   }
@@ -34,11 +44,7 @@ internal sealed class PdfCMap {
   public static PdfCMap Parse(PdfDocument document, object? value, int depth = 0) {
     value = document.Resolve(value);
     if (value is string name)
-      return name switch {
-        "Identity-H" => Identity(false),
-        "Identity-V" => Identity(true),
-        _ => throw new NotSupportedException($"The predefined CMap /{name} is not available; only Identity-H and Identity-V are built in."),
-      };
+      return Predefined(name, depth) ?? throw new NotSupportedException($"The CMap /{name} is neither embedded nor one of the predefined CMaps.");
 
     if (value is not PdfStreamObject stream)
       throw new NotSupportedException("A font's /Encoding CMap is neither a name nor a stream.");
@@ -50,18 +56,54 @@ internal sealed class PdfCMap {
       map.Vertical = PdfValues.Integer(wmode) == 1;
 
     map._Read(document, document.Decode(stream), depth);
-    if (map._codespaces.Count == 0)
-      map._codespaces.Add((2, 0, 0xFFFF));
+    map._Finish();
     return map;
   }
 
+  private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, PdfCMap?> _PredefinedCache = new(StringComparer.Ordinal);
+
+  /// <summary>A predefined CMap by name, or null when there is no such CMap; each is built once and shared.</summary>
+  public static PdfCMap? Predefined(string name, int depth = 0)
+    => depth == 0 ? _PredefinedCache.GetOrAdd(name, static n => _Predefined(n, 0)) : _Predefined(name, depth);
+
+  private static PdfCMap? _Predefined(string name, int depth) {
+    switch (name) {
+      case "Identity-H":
+        return Identity(false);
+      case "Identity-V":
+        return Identity(true);
+    }
+
+    if (depth > 8 || PdfPredefinedCMaps.Find(name) is not { } record)
+      return null;
+
+    var map = new PdfCMap { PredefinedName = name, Vertical = record.Vertical };
+    if (record.UseCMap is { Length: > 0 } use && _Predefined(use, depth + 1) is { } parent) {
+      map._Inherit(parent);
+      map.Vertical = record.Vertical;
+    }
+
+    map._codespaces.AddRange(record.Codespaces);
+    map._mappings.AddRange(record.Mappings);
+    map._notdefs.AddRange(record.Notdefs);
+    map._Finish();
+    return map;
+  }
+
+  private void _Finish() {
+    if (this._codespaces.Count == 0)
+      this._codespaces.Add((2, 0, 0xFFFF));
+    this._shortest = 4;
+    foreach (var (bytes, _, _) in this._codespaces)
+      this._shortest = Math.Min(this._shortest, bytes);
+  }
+
   private void _Inherit(PdfCMap parent) {
-    this._identity |= parent._identity && this._ranges.Count == 0 && this._singles.Count == 0;
+    this._identity |= parent._identity && this._mappings.Count == 0;
     this.Vertical = parent.Vertical;
     this._codespaces.AddRange(parent._codespaces);
-    this._ranges.AddRange(parent._ranges);
-    foreach (var (key, value) in parent._singles)
-      this._singles[key] = value;
+    this._mappings.AddRange(parent._mappings);
+    this._notdefs.AddRange(parent._notdefs);
   }
 
   private void _Read(PdfDocument document, byte[] data, int depth) {
@@ -86,17 +128,20 @@ internal sealed class PdfCMap {
         case "begincidrange":
           this._Pairs(lexer, "endcidrange", 3, values => {
             if (values[0] is byte[] low && values[1] is byte[] high && PdfValues.IsNumber(values[2]))
-              this._ranges.Add((low.Length, _Value(low), _Value(high), PdfValues.Integer(values[2])));
+              this._mappings.Add((low.Length, _Value(low), _Value(high), PdfValues.Integer(values[2])));
           });
           break;
         case "begincidchar":
           this._Pairs(lexer, "endcidchar", 2, values => {
             if (values[0] is byte[] code && PdfValues.IsNumber(values[1]))
-              this._singles[(code.Length, _Value(code))] = PdfValues.Integer(values[1]);
+              this._mappings.Add((code.Length, _Value(code), _Value(code), PdfValues.Integer(values[1])));
           });
           break;
         case "beginnotdefrange":
-          this._Pairs(lexer, "endnotdefrange", 3, _ => { });
+          this._Pairs(lexer, "endnotdefrange", 3, values => {
+            if (values[0] is byte[] low && values[1] is byte[] high && PdfValues.IsNumber(values[2]))
+              this._notdefs.Add((low.Length, _Value(low), _Value(high), PdfValues.Integer(values[2])));
+          });
           break;
         case "usecmap":
           if (operands.Count > 0 && operands[^1] is string parent && depth < 8)
@@ -152,10 +197,7 @@ internal sealed class PdfCMap {
 
       if (length == 0) {
         // No codespace matches: take as many bytes as the shortest range, as the spec suggests.
-        var shortest = 4;
-        foreach (var (bytes, _, _) in this._codespaces)
-          shortest = Math.Min(shortest, bytes);
-        length = Math.Max(1, Math.Min(shortest, text.Length - pos));
+        length = Math.Max(1, Math.Min(this._shortest, text.Length - pos));
         code = 0;
         for (var i = 0; i < length; ++i)
           code = (code << 8) | text[pos + i];
@@ -166,17 +208,61 @@ internal sealed class PdfCMap {
     }
   }
 
-  /// <summary>The CID for a code of a given length, 0 when the CMap does not map it.</summary>
+  /// <summary>The CID for a code of a given length: its mapping, else its notdef mapping, else 0.</summary>
   public int Cid(uint code, int length) {
-    if (this._singles.TryGetValue((length, code), out var single))
-      return single;
-
-    for (var i = this._ranges.Count - 1; i >= 0; --i) {
-      var (bytes, low, high, cid) = this._ranges[i];
-      if (bytes == length && code >= low && code <= high)
-        return cid + (int)(code - low);
-    }
+    this._Build();
+    if (length <= 2) {
+      var table = this._small![length];
+      if (table != null && code < (uint)table.Length && table[code] >= 0)
+        return table[code];
+    } else if (this._large!.TryGetValue((length, code), out var cid))
+      return cid;
 
     return this._identity ? (int)code : 0;
+  }
+
+  /// <summary>Every code of a length this CMap maps, with its CID (notdef ranges left out).</summary>
+  public IEnumerable<(uint Code, int Length, int Cid)> Mappings() {
+    foreach (var (bytes, low, high, cid) in this._mappings)
+      for (var c = low; c <= high && c >= low; ++c)
+        yield return (c, bytes, cid + (int)(c - low));
+  }
+
+  private void _Build() {
+    if (this._small != null)
+      return;
+
+    var small = new int[]?[3];
+    var large = new Dictionary<(int, uint), int>();
+
+    // A notdef range maps every code in it to the one CID; a CID range counts up from its CID.
+    void Apply(List<(int Bytes, uint Low, uint High, int Cid)> list, int step) {
+      foreach (var (bytes, low, high, cid) in list) {
+        if (bytes is < 1 or > 4 || high < low)
+          continue;
+        if (bytes <= 2) {
+          var table = small[bytes] ??= _NewTable(bytes == 1 ? 256 : 65536);
+          for (uint c = low; c <= high && c < table.Length; ++c)
+            table[c] = cid + step * (int)(c - low);
+        } else {
+          // Large ranges in 3- and 4-byte CMaps are rare and short; guard against absurd ones.
+          var end = Math.Min(high, low + 0x10000);
+          for (var c = low; c <= end && c >= low; ++c)
+            large[(bytes, c)] = cid + step * (int)(c - low);
+        }
+      }
+    }
+
+    // Notdef mappings first, so a real mapping of the same code replaces them.
+    Apply(this._notdefs, 0);
+    Apply(this._mappings, 1);
+    this._large = large;
+    this._small = small;
+  }
+
+  private static int[] _NewTable(int size) {
+    var table = new int[size];
+    Array.Fill(table, -1);
+    return table;
   }
 }

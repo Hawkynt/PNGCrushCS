@@ -38,6 +38,7 @@ public sealed class PdfRenderTests {
   // ICCBased fills under each rendering intent agree with poppler to the unit; the rest is the
   // resampling of the two upscaled images.
   [TestCase("Render/color", 72, 0.3, 0.1)]
+  [TestCase("Render/cmaps", 144, 0.4, 0.2)]
   [Category("Unit")]
   public void Fixture_AgreesWithPoppler(string name, double resolution, double maxMeanError, double maxBadPercent) {
     var file = _Read(name + ".pdf");
@@ -175,15 +176,15 @@ public sealed class PdfRenderTests {
 
   [Test]
   [Category("Unit")]
-  public void PredefinedCjkCMap_IsRefusedByName() {
+  public void UnknownCMapName_IsRefusedByName() {
     var pdf = _Build(
       "<< /Type /Catalog /Pages 2 0 R >>",
       "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
       "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 100 30] /Resources << /Font << /J 5 0 R >> >> /Contents 4 0 R >>",
       _Stream("BT /J 20 Tf 5 5 Td <3042> Tj ET"),
-      "<< /Type /Font /Subtype /Type0 /BaseFont /MS-Mincho /Encoding /UniJIS-UCS2-H /DescendantFonts [<< /Type /Font /Subtype /CIDFontType2 /BaseFont /MS-Mincho /CIDSystemInfo << /Registry (Adobe) /Ordering (Japan1) /Supplement 2 >> >>] >>");
+      "<< /Type /Font /Subtype /Type0 /BaseFont /MS-Mincho /Encoding /NoSuch-UCS2-H /DescendantFonts [<< /Type /Font /Subtype /CIDFontType2 /BaseFont /MS-Mincho /CIDSystemInfo << /Registry (Adobe) /Ordering (Japan1) /Supplement 2 >> >>] >>");
     var failure = Assert.Throws<NotSupportedException>(() => PdfFile.RenderPage(PdfReader.FromBytes(pdf), 0));
-    Assert.That(failure!.Message, Does.Contain("UniJIS-UCS2-H"));
+    Assert.That(failure!.Message, Does.Contain("NoSuch-UCS2-H"));
   }
 
   /// <remarks>

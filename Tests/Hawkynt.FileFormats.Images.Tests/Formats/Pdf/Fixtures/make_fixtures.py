@@ -543,6 +543,58 @@ def color():
     return page(bytes(c), resources, extra=extra)
 
 
+def cmaps():
+    """Composite fonts under predefined CMaps of every collection, one- and two-byte and vertical, plus CIDToGIDMap streams.
+
+    The self-made CID-keyed CFF has glyphs at CIDs 1, 34, 39, 40, 41, 48, 52, 96 and 150; in every
+    collection the printable ASCII range of the pc/Uni CMaps lands on CIDs 1-95 (code - 31), so
+    "AFGHOS" reaches 34 39 40 41 48 52, and a two-byte code is added where a CMap reaches 96.
+    """
+    here = os.path.dirname(os.path.abspath(__file__))
+    font = lambda name: read(os.path.join(here, "Fonts", name))
+    extra = []
+
+    def add(body):
+        extra.append(body)
+        return 4 + len(extra)
+
+    cidcff = add(stream(b"/Subtype /CIDFontType0C", font("cid-keyed.cff"), flate=False))
+    d4 = add(b"<< /Type /FontDescriptor /FontName /CidTest /Flags 4 /FontBBox [0 0 1000 1000] /ItalicAngle 0 /Ascent 800 /Descent -200 /CapHeight 700 /StemV 80 /FontFile3 %d 0 R >>" % cidcff)
+    # poppler looks a predefined CMap up in the descendant's own character collection, so each
+    # collection gets a descendant of its own over the same program.
+    collections = {}
+    for ordering, supplement in [(b"Japan1", 7), (b"GB1", 6), (b"Korea1", 2), (b"CNS1", 7)]:
+        collections[ordering] = add(b"<< /Type /Font /Subtype /CIDFontType0 /BaseFont /CidTest /CIDSystemInfo << /Registry (Adobe) /Ordering (%s) /Supplement %d >> /FontDescriptor %d 0 R /DW 700 /W [34 [600 500] 40 52 650] >>" % (ordering, supplement, d4))
+    ttf = add(stream(b"/Length1 %d" % len(font("truetype.ttf")), font("truetype.ttf")))
+    d3 = add(b"<< /Type /FontDescriptor /FontName /TtTest /Flags 4 /FontBBox [0 0 1000 1000] /ItalicAngle 0 /Ascent 800 /Descent -200 /CapHeight 700 /StemV 80 /FontFile2 %d 0 R >>" % ttf)
+    gid_map = bytearray(2 * 60)
+    for cid, gid in [(34, 2), (39, 3), (41, 4), (48, 2), (52, 3)]:
+        gid_map[2 * cid:2 * cid + 2] = gid.to_bytes(2, "big")
+    cidmap = add(stream(b"", bytes(gid_map)))
+    cid2 = add(b"<< /Type /Font /Subtype /CIDFontType2 /BaseFont /TtTest /CIDSystemInfo << /Registry (Adobe) /Ordering (Korea1) /Supplement 2 >> /FontDescriptor %d 0 R /DW 800 /CIDToGIDMap %d 0 R >>" % (d3, cidmap))
+    encodings = [(b"UniJIS-UCS2-H", b"<00410046004700480020004F0053>"), (b"90msp-RKSJ-H", b"<41464748204F53>"),
+                 (b"GBpc-EUC-H", b"<4146A1A1474820>"), (b"UniGB-UCS2-H", b"<0041004600470048>"),
+                 (b"KSCpc-EUC-H", b"<41814647484F>"), (b"UniKS-UCS2-H", b"<004100460047>"),
+                 (b"B5pc-H", b"<414647484F53>"), (b"UniCNS-UCS2-H", b"<0041004600470048>"),
+                 (b"GBK-EUC-H", b"<A1A1>"), (b"UniJIS-UTF16-H", b"<004100460047>")]
+    def collection(name):
+        return collections[b"Japan1" if b"JIS" in name or b"RKSJ" in name else b"GB1" if b"GB" in name else b"Korea1" if b"KS" in name else b"CNS1"]
+
+    fonts = []
+    for name, _ in encodings:
+        fonts.append(add(b"<< /Type /Font /Subtype /Type0 /BaseFont /CidTest /Encoding /%s /DescendantFonts [%d 0 R] >>" % (name, collection(name))))
+    vertical = add(b"<< /Type /Font /Subtype /Type0 /BaseFont /CidTest /Encoding /UniJIS-UCS2-V /DescendantFonts [%d 0 R] >>" % collections[b"Japan1"])
+    tt = add(b"<< /Type /Font /Subtype /Type0 /BaseFont /TtTest /Encoding /UniKS-UCS2-H /DescendantFonts [%d 0 R] >>" % cid2)
+    names = b" ".join(b"/E%d %d 0 R" % (i, f) for i, f in enumerate(fonts))
+    resources = b"<< /Font << %s /V %d 0 R /T %d 0 R >> >>" % (names, vertical, tt)
+    c = bytearray(b"BT 16 TL\n")
+    for i, (_, text) in enumerate(encodings):
+        c += b"/E%d 14 Tf 1 0 0 1 %d %d Tm %s Tj\n" % (i, 8 + (i % 2) * 95, 180 - (i // 2) * 22, text)
+    c += b"/V 16 Tf 1 0 0 1 185 190 Tm <0041004600470048> Tj\n"
+    c += b"/T 18 Tf 1 0 0 1 8 40 Tm <00410046004800200030> Tj ET\n"
+    return page(bytes(c), resources, extra=extra)
+
+
 def jpx_alpha():
     """JPX images carrying their own opacity: /SMaskInData 1 and 2 (with and without /Matte), 0, and CMYK."""
     extra = []
@@ -587,7 +639,7 @@ def jpx_alpha():
 if __name__ == "__main__":
     target = sys.argv[1]
     os.makedirs(os.path.join(target, "Render"), exist_ok=True)
-    for name, maker in [("images", images), ("vector", vector), ("bilevel", bilevel), ("shading", shading), ("text", text), ("transparency", transparency), ("color", color), ("jpx-alpha", jpx_alpha)]:
+    for name, maker in [("images", images), ("vector", vector), ("bilevel", bilevel), ("shading", shading), ("text", text), ("transparency", transparency), ("color", color), ("jpx-alpha", jpx_alpha), ("cmaps", cmaps)]:
         with open(os.path.join(target, "Render", name + ".pdf"), "wb") as handle:
             handle.write(maker())
     os.makedirs(os.path.join(target, "Color"), exist_ok=True)
