@@ -56,11 +56,11 @@ three times it was wrong, and each was overturned by checking rather than by rea
     extracted payload and matches it on every pixel.
 
 The names still open are not waiting on effort. Recomputed against the catalogue rather than taken
-from this file's own history, they are nine: `sid`, `ldf`, `eri`, `fif`, `iwc`,
+from this file's own history, they are eight: `sid`, `ldf`, `eri`, `fif`, `iwc`,
 `wic` and `ypc` are Windows-only third-party plugins whose coding was never published, and the
 converter on this platform does not carry their readers either, so there is nothing here to ask;
-`prc`'s only reference implementation cannot read its own output, and writes a file it then refuses;
-and `pax` is Blowfish under a password the file does not carry. What would move any of them is a
+and `pax` is Blowfish under a password the file does not carry. (`prc` was the ninth: XnView's is
+no reference for it, but Sony's own library is, and it is read and written now.) What would move any of them is a
 specification or a working decoder, not more searching — the per-name detail is in "Nothing credible
 describes these" and the table below.
 
@@ -708,8 +708,8 @@ Three have a shape worth writing down for whoever comes back to them:
   - `prc` is Sony's Picture Gear Pocket, and it is a Palm resource database — the 78-byte Palm
     header, type and creator both `IMVS`, then resources named `iINF`, `iFRI`, `iPLT` and `iTIL`.
     The picture is in the `iTIL` tiles against the `iPLT` palette. `nconvert` writes one given
-    `-colours 16`, so unlike everything else in this list it can be worked on with a sample in hand
-    — but not a trustworthy one. See the measurements further down.
+    `-colours 16`, but not a trustworthy one; Sony's own `libprcim.dll` was the reference instead,
+    and the format is read and written — see further down.
   - `pseg` is an IBM printer page segment: MO:DCA structured fields, each introduced by `5A`. The
     architecture allows an IOCA image inside one and there is an IOCA reader here already, but that
     is not what XnView reads: its page-segment loader handles the IM1 image and nothing else. See
@@ -885,14 +885,14 @@ than the vendor's name:
     walk of length-prefixed records rather than a signature search, and it was not finished. The
     entry above still calls PowerPoint "not a picture format", which is true of the container and no
     longer the whole story — the row is closable the way `pzp` was closed.
-  - `prc`, Picture Gear Pocket: the Palm resource database named above, now measured. `iINF` is
-    eighteen bytes — width, height, a zero, the depth, a zero, a stride in pixels, `00 FF`, the
-    record id — `iPLT` is a count and four bytes an entry, `iFRI` names the tile records, and each
-    `iTIL` is a two-byte length and a 32x32 tile. It is still not implemented, and the reason is that
-    there is nothing to check it against: the converter cannot read `prc` at all, not even the file
-    it has just written, and the file it writes is wrong — a 16x12 picture comes back with rows 0, 2,
-    4 and so on in the first half of the tile and the rest of it blank. A reader built on that would
-    be agreeing with a bug.
+  - `prc`, Picture Gear Pocket: the Palm resource database named above, read and written now. The
+    converter was no help — it cannot read `prc` at all, not even the file it has just written, and
+    the file it writes is four bits a pixel, which no Sony software reads, and is cut off before its
+    last tile. The reference is Sony's own picture library, `libprcim.dll`, from PictureGear Lite
+    and Image Converter on the CLIÉ discs at ftp.sonyclie.org, driven under Wine, together with the
+    sample pictures on those discs: eight bits against a palette of up to 224 colours, or sixteen
+    bits of RGB 5:6:5, in 32- or 64-pixel tiles with a byte-pair run-length coding. See
+    `Hawkynt.FileFormats.Images/Formats/PictureGearPocket/SPEC.md`. *Closed:* #865.
 
 The last column marks the ones XnView itself cannot load on this platform: its catalogue says
 Windows only, so nothing here has ever been able to compare against them either.
@@ -1022,7 +1022,7 @@ Windows only, so nothing here has ever been able to compare against them either.
 | pp5 | .pp5 |  |
 | pps | .pps | read; one reader with `ppt`, walking the OfficeArt records from offset 512 for the first JPEG or PNG BLIP |
 | ppt | .ppt | read; one reader with `pps` |
-| prc | .prc | Picture Gear Pocket, measured but not built: the converter cannot read one, and the one it writes is wrong |
+| prc | .prc | read and written; held to Sony's own libprcim.dll and the CLIÉ disc samples (Formats/PictureGearPocket/SPEC.md) |
 | prf | .prf |  |
 | prisms | .pri .lff | read; EB E8 00 00 and R8G8B8A8, a two-byte command stream, rows from the bottom up |
 | pseg | .pse .psg | read; the IM1 image cells are uncompressed bits, a cell width's worth to a row, placed where the cell positions say |

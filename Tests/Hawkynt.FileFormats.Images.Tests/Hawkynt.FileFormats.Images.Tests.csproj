@@ -215,6 +215,16 @@
     </None>
   </ItemGroup>
 
+  <!-- PictureGear Pocket pictures written by Sony's own libprcim.dll from pictures made for this
+       suite, the harness that drove it, and one file XnView's converter wrote. See
+       Formats\PictureGearPocket\Fixtures\PROVENANCE.txt. -->
+  <ItemGroup>
+    <None Include="Formats\PictureGearPocket\Fixtures\*">
+      <Link>Fixtures\PictureGearPocket\%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
   <!-- Fractal images made for this suite, and Iterated's DECO_32.DLL decode of each. See
        Formats\Fif\Fixtures\PROVENANCE.txt. -->
   <ItemGroup>

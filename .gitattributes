@@ -37,3 +37,6 @@ Hawkynt.FileFormats.Images/README.md text eol=crlf
 *.eri binary
 *.mei binary
 *.pal binary
+
+# PictureGear Pocket fixtures: Sony's libprcim wrote them, and the tests compare our writer's bytes with them.
+*.prc binary
