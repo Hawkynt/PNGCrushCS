@@ -219,10 +219,12 @@ render with its name in the message, so a file that would have come out wrong co
   - `.frm` is not one format and mostly not pictures: sixteen of the samples are EZ-Forms form
     definitions, six are character-cell templates, one is an unidentified object format and one is a
     JPEG under the wrong name. There is no raster `.frm` here to implement.
-  - `.lwf` is LuraWave, and it is read and written now. Its coding was never published, but the
-    licensed Java decoder that the MBF ImageJ bundle redistributes runs on any JVM; a specification
-    was derived from it (`Formats/LuraWave/SPEC.md`) and every colour mode decodes to exactly what
-    that decoder returns.
+  - `.lwf` is LuraWave, and it is read and written now. Its coding was never published. A
+    specification was derived (`Formats/LuraWave/SPEC.md`) from the licensed Java decoder the MBF
+    ImageJ bundle redistributes and from the C codec inside LuraTech's own SmartCompress 3.0, which
+    runs under Wine and is the reference where the two disagree. LuraTech-encoded streams in every
+    colour mode decode to exactly what that codec returns: rendered modes as pictures, and modes 5,
+    20 and 21 as their raw channels. *Closed:* #567.
 
 ### The corpus was the limit, and it need not have been
 

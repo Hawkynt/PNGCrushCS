@@ -32,7 +32,7 @@ issue quotes the recorded blocker and the route around it.
 
 | Category | Tracking issue | Images | Codecs | Containers | Encoders | Total |
 | --- | --- | ---: | ---: | ---: | ---: | ---: |
-| [Modern & standard still-image codecs](#modern--standard-still-image-codecs) | [#513](https://github.com/Hawkynt/PNGCrushCS/issues/513) | 53 | 0 | 0 | 0 | 53 |
+| [Modern & standard still-image codecs](#modern--standard-still-image-codecs) | [#513](https://github.com/Hawkynt/PNGCrushCS/issues/513) | 52 | 0 | 0 | 0 | 52 |
 | [Camera RAW & sensor data](#camera-raw--sensor-data) | [#514](https://github.com/Hawkynt/PNGCrushCS/issues/514) | 24 | 0 | 0 | 0 | 24 |
 | [Geospatial & remote sensing](#geospatial--remote-sensing) | [#515](https://github.com/Hawkynt/PNGCrushCS/issues/515) | 83 | 0 | 0 | 0 | 83 |
 | [Medical & scientific imaging](#medical--scientific-imaging) | [#516](https://github.com/Hawkynt/PNGCrushCS/issues/516) | 42 | 0 | 0 | 0 | 42 |
@@ -49,7 +49,7 @@ issue quotes the recorded blocker and the route around it.
 | [Lossless & uncompressed video](#lossless--uncompressed-video) | [#527](https://github.com/Hawkynt/PNGCrushCS/issues/527) | 0 | 11 | 0 | 2 | 13 |
 | [Cinema camera RAW video](#cinema-camera-raw-video) | [#528](https://github.com/Hawkynt/PNGCrushCS/issues/528) | 0 | 6 | 7 | 0 | 13 |
 | [Elementary streams & streaming manifests](#elementary-streams--streaming-manifests) | [#529](https://github.com/Hawkynt/PNGCrushCS/issues/529) | 0 | 0 | 18 | 0 | 18 |
-| **All** | | **562** | **147** | **274** | **19** | **1002** |
+| **All** | | **561** | **147** | **274** | **19** | **1001** |
 
 Each issue carries the labels `cat: <category>`, its kind (`image-format`, `video-codec`, `video-container`, `video-encoder`), `priority: high|medium|low`, and `documented-blocker` where that applies.
 
@@ -90,7 +90,6 @@ JPEG/JPEG 2000/HEIF variants, wavelet, HDR and research still-image codecs. Trac
 | Lepton (Dropbox lossless JPEG recompression) | Image | `.lep` | read + write | missing | low | [#564](https://github.com/Hawkynt/PNGCrushCS/issues/564) |
 | libgd GD image (.gd) | Image | `.gd` | read + write | missing | low | [#565](https://github.com/Hawkynt/PNGCrushCS/issues/565) |
 | Lightning Strike (.cod), Corel Wavelet (.wi), Elecard Wavelet (.wlt), J Wavelet (.wic), WaveL IWC | Image | `.cod`, `.wi`, `.wvl`, `.wlt`, `.wic`, `.iwc` | read + write | missing | low | [#566](https://github.com/Hawkynt/PNGCrushCS/issues/566) |
-| LuraWave (LWF) | Image | `.lwf` | read + write | blocked | low | [#567](https://github.com/Hawkynt/PNGCrushCS/issues/567) |
 | Magick Persistent Cache (MPC) | Image | `.mpc`, `.cache` | read + write | missing | low | [#568](https://github.com/Hawkynt/PNGCrushCS/issues/568) |
 | Naive Image Animation (NIA) | Image | `.nia` | read + write | missing | low | [#569](https://github.com/Hawkynt/PNGCrushCS/issues/569) |
 | packJPG / packPNM / packARI image recompression | Image | `.pjg`, `.ppn` | read + write | missing | low | [#570](https://github.com/Hawkynt/PNGCrushCS/issues/570) |
