@@ -84,6 +84,9 @@ public sealed class LuraWaveReaderTests {
   [TestCase("mode01-tail.lwf", 8, TestName = "Grey")]
   [TestCase("mode17-widegrey-12bit.lwf", 16, TestName = "Wide grey")]
   [TestCase("mode06-stripes.lwf", 24, TestName = "Colour in stripes")]
+  [TestCase("luratech-m05-s-l3-base.lwf", 32, TestName = "Four raw channels")]
+  [TestCase("luratech-m20-s-l4.lwf", 24, TestName = "Wide Lab")]
+  [TestCase("luratech-m21-s-l3-base.lwf", 24, TestName = "Wide YUVK")]
   [Category("Unit")]
   public void ReadImageInfo_AgreesWithAFullDecode(string fixture, int bits) {
     var data = LuraWaveFixtures.Bytes(fixture);
@@ -208,16 +211,6 @@ public sealed class LuraWaveReaderTests {
   public void TwoInterestRegions_AreRead() {
     var regions = LuraWaveHeader.Parse(LuraWaveFixtures.Bytes("luratech-m01-roi2.lwf")).Regions;
     Assert.That(regions, Is.EqualTo(new LuraWaveRegion[] { new(10, 12, 30, 20), new(60, 30, 25, 25) }));
-  }
-
-  [TestCase(5, TestName = "Four 8-bit channels")]
-  [TestCase(20, TestName = "3x16 bit LAB")]
-  [TestCase(21, TestName = "4x16 bit YUVK")]
-  [Category("Unit")]
-  public void ColourModesWithoutARendering_AreRefusedByName(int mode) {
-    var data = LuraWaveFixtures.Bytes("luratech-s02-l4.lwf");
-    data[16] = (byte)mode;
-    Assert.That(() => LuraWaveHeader.Parse(data), Throws.InstanceOf<InvalidDataException>().With.Message.Contains("not supported"));
   }
 
   [TestCase("mode06-stripes.lwf", TestName = "Striped")]

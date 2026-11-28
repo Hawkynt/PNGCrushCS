@@ -110,8 +110,11 @@ internal static class LuraWaveColour {
 
   private static (int R, int G, int B) FromFourChannel(int y, int u, int v, int k) {
     var g = y - ((u + v) >> 2);
-    var r = u + g;
-    var b = v + g;
+    return FromFourChannelInput(u + g, g, v + g, k);
+  }
+
+  // The quadratic takes the encoder's four input samples: all at 255 come out as paper white, all at 0 as black.
+  private static (int R, int G, int B) FromFourChannelInput(int r, int g, int b, int k) {
     var rr = r * r >> 4;
     var gg = g * g >> 4;
     var bb = b * b >> 4;
@@ -127,6 +130,63 @@ internal static class LuraWaveColour {
       + (14458 * r << 4) + (22478 * g << 4) + (-10849 * b << 4) >> 20;
     var blue = -24695 * bb + -16732 * rb + 13983 * kg + 55580 * kb + 9221 * gb + (23589 * b << 4) >> 20;
     return (red, green, blue);
+  }
+
+  /// <summary>
+  /// Writes one 8-bit RGB pixel for <see cref="LuraWaveColourMode.WideFourChannel"/> from its four channels as
+  /// LuraTech's decoder returns them: each is reduced to 8 bits by <paramref name="shift"/> and mapped by the quadratic of
+  /// <see cref="LuraWaveColourMode.FourChannel"/>, which is LuraTech's own rendering of the 8-bit counterpart.
+  /// </summary>
+  public static void RgbFromWideFourChannel(ushort[] c, int i, int shift, byte[] output, int o) {
+    var (r, g, b) = FromFourChannelInput(c[i] >> shift, c[i + 1] >> shift, c[i + 2] >> shift, c[i + 3] >> shift);
+    output[o] = Clamp8(r);
+    output[o + 1] = Clamp8(g);
+    output[o + 2] = Clamp8(b);
+  }
+
+  /// <summary>
+  /// Writes one 8-bit sRGB pixel for <see cref="LuraWaveColourMode.WideLab"/> from its three channels as LuraTech's
+  /// decoder returns them.
+  /// </summary>
+  /// <remarks>
+  /// The channels are read as the 8-bit Lab encoding of <see cref="LuraWaveColourMode.Polynomial"/> (L* = 100·L/255,
+  /// a* = a − 128) widened by <paramref name="shift"/> bits, so that dropping those bits gives the 8-bit view. At 16
+  /// bits this is the ICC version 2 encoding: L* = 100·L/65280, a* = a/256 − 128. The colour is taken relative to a D65
+  /// white, the white point LuraTech's own Lab-to-RGB quadratic fits best, and converted to sRGB (IEC 61966-2-1).
+  /// </remarks>
+  public static void SrgbFromWideLab(ushort[] c, int i, int shift, byte[] output, int o) {
+    var unit = (double)(1 << shift);
+    var lightness = Math.Min(100.0, c[i] * 100.0 / (255 * unit));
+    var a = c[i + 1] / unit - 128;
+    var b = c[i + 2] / unit - 128;
+
+    var fy = (lightness + 16) / 116;
+    var x = WhiteX * LabInverse(fy + a / 500);
+    var y = LabInverse(fy);
+    var z = WhiteZ * LabInverse(fy - b / 200);
+
+    // IEC 61966-2-1: XYZ (D65) to linear sRGB.
+    output[o] = SrgbByte(3.2406 * x - 1.5372 * y - 0.4986 * z);
+    output[o + 1] = SrgbByte(-0.9689 * x + 1.8758 * y + 0.0415 * z);
+    output[o + 2] = SrgbByte(0.0557 * x - 0.2040 * y + 1.0570 * z);
+  }
+
+  // D65 (x = 0.3127, y = 0.3290), the white point of sRGB, scaled to Y = 1.
+  private const double WhiteX = 0.3127 / 0.3290;
+  private const double WhiteZ = (1 - 0.3127 - 0.3290) / 0.3290;
+
+  // CIE 15: the inverse of the cube-root compression, linear below (6/29)^3.
+  private static double LabInverse(double t) => t > 6.0 / 29 ? t * t * t : 3 * (6.0 / 29) * (6.0 / 29) * (t - 4.0 / 29);
+
+  // IEC 61966-2-1 transfer function, rounded to 8 bits.
+  private static byte SrgbByte(double linear) {
+    if (!(linear > 0))
+      return 0;
+    if (linear >= 1)
+      return 255;
+
+    var encoded = linear <= 0.0031308 ? 12.92 * linear : 1.055 * Math.Pow(linear, 1 / 2.4) - 0.055;
+    return (byte)Math.Round(encoded * 255);
   }
 
   private static (int R, int G, int B) FromPolynomial(int l, int a, int b) {

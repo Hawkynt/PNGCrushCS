@@ -19,6 +19,12 @@ public enum LuraWaveColourMode : byte {
   /// <summary>Three channels ("3x8 bit raw"), plain red/green/blue each biased by -128.</summary>
   Rgb = 4,
 
+  /// <summary>
+  /// Four plain 8-bit channels, each biased by -128 and coded without a colour transform: the four-channel counterpart
+  /// of <see cref="Rgb"/>, read as red, green, blue and alpha.
+  /// </summary>
+  RawFourChannel = 5,
+
   /// <summary>Three channels ("3x8 bit YUV") in the reversible integer colour transform (the one JPEG 2000 later called RCT).</summary>
   ReversibleColour = 6,
 
@@ -36,6 +42,18 @@ public enum LuraWaveColourMode : byte {
 
   /// <summary>Three channels ("3x16 bit YUV") wider than 8 bits in the reversible colour transform.</summary>
   WideReversibleColour = 19,
+
+  /// <summary>
+  /// Three channels ("3x16 bit LAB"): unsigned wide CIE L*, a* and b* passed through unchanged, a* and b* centred on
+  /// half the range; the wide counterpart of <see cref="Polynomial"/>.
+  /// </summary>
+  WideLab = 20,
+
+  /// <summary>
+  /// Four channels ("4x16 bit YUVK"): cyan, magenta and yellow wider than 8 bits in the reversible colour transform,
+  /// plus black; the wide counterpart of <see cref="FourChannel"/>.
+  /// </summary>
+  WideFourChannel = 21,
 
   /// <summary>One channel ("16 bit grey scale"), grey wider than 8 bits stored with a bias of half its range.</summary>
   WideSignedGrey = 22,

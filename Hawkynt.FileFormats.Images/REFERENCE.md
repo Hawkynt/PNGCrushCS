@@ -23202,12 +23202,15 @@ Implements `IEquatable<LudekMakerFile>`, `IImageFormatMetadata<LudekMakerFile>`,
 | `Grey` | `1` |  |
 | `ColourDifference` | `2` |  |
 | `Rgb` | `4` |  |
+| `RawFourChannel` | `5` |  |
 | `ReversibleColour` | `6` |  |
 | `FourChannel` | `7` |  |
 | `Polynomial` | `8` |  |
 | `WideGrey` | `17` |  |
 | `WideColourDifference` | `18` |  |
 | `WideReversibleColour` | `19` |  |
+| `WideLab` | `20` |  |
+| `WideFourChannel` | `21` |  |
 | `WideSignedGrey` | `22` |  |
 
 #### `LuraWaveFile`
@@ -23216,6 +23219,8 @@ Implements `IEquatable<LuraWaveFile>`, `IImageFormatMetadata<LuraWaveFile>`, `II
 
 | Member | Signature | Summary |
 | --- | --- | --- |
+| `ChannelCount` | `int ChannelCount { get; }` |  |
+| `Channels` | `ushort[] Channels { get; init; }` |  |
 | `Header` | `LuraWaveHeader Header { get; init; }` |  |
 | `Height` | `int Height { get; init; }` |  |
 | `Mode` | `LuraWaveColourMode Mode { get; init; }` |  |

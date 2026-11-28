@@ -20,6 +20,7 @@ public sealed class LuraWaveWriterTests {
   [TestCase(PixelFormat.Gray8)]
   [TestCase(PixelFormat.Gray16)]
   [TestCase(PixelFormat.Rgb24)]
+  [TestCase(PixelFormat.Rgba32)]
   [Category("Unit")]
   public void RoundTrip_IsLossless(PixelFormat format) {
     var image = _Noise(70, 53, format, 1);
@@ -67,13 +68,26 @@ public sealed class LuraWaveWriterTests {
 
   [Test]
   [Category("Unit")]
-  public void Alpha_IsDropped_ColourKept() {
+  public void Alpha_IsKept_AsFourRawChannels() {
     var image = _Noise(12, 10, PixelFormat.Rgba32, 3);
+    var file = LuraWaveFile.FromRawImage(image);
     var back = _RoundTrip(image);
-    var expected = image.EnsureFormat(PixelFormat.Rgb24).PixelData;
     Assert.Multiple(() => {
-      Assert.That(back.Format, Is.EqualTo(PixelFormat.Rgb24));
-      Assert.That(back.PixelData, Is.EqualTo(expected));
+      Assert.That(file.Mode, Is.EqualTo(LuraWaveColourMode.RawFourChannel));
+      Assert.That(back.Format, Is.EqualTo(PixelFormat.Rgba32));
+      Assert.That(back.PixelData, Is.EqualTo(image.PixelData));
+    });
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void OtherAlphaLayouts_AreKeptAsRgba() {
+    var image = _Noise(9, 7, PixelFormat.Rgba32, 4);
+    var bgra = image.EnsureFormat(PixelFormat.Bgra32);
+    var back = _RoundTrip(bgra);
+    Assert.Multiple(() => {
+      Assert.That(back.Format, Is.EqualTo(PixelFormat.Rgba32));
+      Assert.That(back.PixelData, Is.EqualTo(image.PixelData));
     });
   }
 

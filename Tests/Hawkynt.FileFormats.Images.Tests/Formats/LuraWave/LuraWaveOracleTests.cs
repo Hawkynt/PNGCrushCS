@@ -17,7 +17,8 @@ namespace FileFormat.LuraWave.Tests;
 /// <para>
 /// The <c>luratech-*</c> streams come from the same program's encoder (entry points <c>0x455730</c> and
 /// <c>0x4557C0</c>), fed synthetic gradients with noise: every colour mode it writes that a LuraTech decoder renders,
-/// both stripe layouts, two interest regions, byte budgets and a password. The other streams were written with this
+/// both stripe layouts, two interest regions, byte budgets and a password. The three modes it returns only as raw
+/// channels are held to those channels in <see cref="LuraWaveRawModeTests"/>. The other streams were written with this
 /// package's encoder from <c>source.ppm</c> (a seeded ImageMagick plasma with a drawn rectangle and line, 45x37 so
 /// every dimension needs padding).
 /// </para>

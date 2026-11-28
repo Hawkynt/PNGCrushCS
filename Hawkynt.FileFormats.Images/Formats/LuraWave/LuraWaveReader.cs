@@ -56,12 +56,14 @@ public static class LuraWaveReader {
       check = LuraWavePassword.StreamCheck(password);
     }
 
+    var (pixels, channels) = LuraWaveCodec.Decode(data, header, check);
     return new() {
       Width = header.Width,
       Height = header.Height,
       Mode = header.Mode,
       Header = header,
-      PixelData = LuraWaveCodec.Decode(data, header, check),
+      PixelData = pixels,
+      Channels = channels,
     };
   }
 }

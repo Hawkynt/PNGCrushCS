@@ -26,8 +26,9 @@ decoder's output; where its Java decoder differs, the section "LuraTech's Java d
   SmartCompress 3 Lite package and `https://sembiance.com/fileFormatSamples/image/luraWave/`. All three use colour
   mode 2 and decode exactly as the C codec decodes them.
 * **LuraTech-encoded files.** The C encoder wrote streams from synthetic gradients with noise. They cover every
-  colour mode it writes, 3 to 6 levels, both stripe layouts, one and two interest regions, byte budgets, a reduced
-  quality, passwords, 12-bit and 16-bit maxima, and 37x23, 100x70 and 300x200 pictures. Every one decodes exactly as
+  colour mode it writes (modes 5, 20 and 21 against the raw channels the C decoder returns), 3 to 6 levels, both
+  stripe layouts, one and two interest regions, byte budgets, reduced qualities, passwords, 12-bit, 16-bit and odd
+  maxima, and 37x23, 100x70 and 300x200 pictures. Every one decodes exactly as
   the C decoder decodes it, with and without the password. A selection is committed with the decoder's output.
 ## Container
 
@@ -216,20 +217,24 @@ Both hashes look at the first 32 characters. A character "counts" if it is a let
 | 1 | 1 ("8 bit grey scale") | `grey = c0+128` |
 | 2 | 3 ("3x8 bit YUV") | `y = c0>>2`, `r = y−c2`, `b = y−c1`, `g = (c0−r−b)>>1`, each `+128` |
 | 4 | 3 ("3x8 bit raw") | `R,G,B = c0,c1,c2 + 128` |
+| 5 | 4 (no name) | Raw: `c0…c3 + 128`, each clamped to 0..255. Read here as R, G, B, A (see "Modes returned raw") |
 | 6 | 3 ("3x8 bit YUV") | `G = c0+128 − ((c1+c2)>>2)`, `R = c1+G`, `B = c2+G` |
 | 7 | 4 ("4x8 bit CMYK") | Mode 6 for `r,g,b` (cyan, magenta, yellow), `k = c3+128`, then the quadratic below |
 | 8 | 3 ("3x8 bit LAB") | `l = clamp(c0+128, 0, 255)`, `a,b = clamp(c1,c2, −128, 127)`, then the quadratic below |
 | 17 | 1 ("16 bit grey scale") | 16-bit `clamp(c0, 0, M)` |
 | 18 | 3 ("3x16 bit YUV") | Mode 2 without the `+128`, each then `>> s` |
 | 19 | 3 ("3x16 bit YUV") | Mode 6 without the `+128`, each then `>> s` |
+| 20 | 3 ("3x16 bit LAB") | Raw: `clamp(c0…c2, 0, M)`. Read here as L*a*b* (see "Modes returned raw") |
+| 21 | 4 ("4x16 bit YUVK") | Raw: mode 6 without the `+128` on `c0…c2`, then `c3`, each clamped to 0..M. Read here as mode 7's input (see "Modes returned raw") |
 | 22 | 1 ("16 bit grey scale") | 16-bit `clamp(c0 + M/2, 0, M)` |
 
 Every 8-bit output is clamped to 0..255. `M` is the `MV` chunk's maximum, or 65535 without one. For the 8-bit
 views of the wide modes, a maximum of exactly 32768 counts as 32767. `s` is the bit length of that maximum (at
 least 8, at most 16) minus 8.
 
-The encoder takes these inputs: grey, R/G/B in three byte orders (modes 2, 4, 6), CMYK with the transform on C, M
-and Y (mode 7), L*a*b* passed through (mode 8), and 16-bit equivalents (modes 17 to 22).
+The encoder takes these inputs: grey, R/G/B in three byte orders (modes 2, 4, 6), four plain channels (mode 5),
+CMYK with the transform on C, M and Y (mode 7), L*a*b* passed through (mode 8), and 16-bit equivalents (modes 17 to
+22). Every 8-bit input sample is biased by −128 before coding, the 16-bit ones are not.
 
 Mode 7, with every product `>> 4` (`rr = r·r>>4`, and so on), and every sum `>> 20`:
 
@@ -243,14 +248,37 @@ Mode 8, with plain products:
 * `G = (−13522·a² + 6650·b² + (−21507·al>>1) + (62429·l<<6)) >> 22`
 * `B = ((−48443·b<<1) + 62757·l) >> 16`
 
-Channel 0 is coded one plane finer in modes 6 and 8, and two planes finer in modes 7 and 19. Mode 20 ("3x16 bit
-LAB") is coded one plane finer, and mode 21 ("4x16 bit YUVK") two.
+Channel 0 is coded one plane finer in modes 6, 8 and 20, and two planes finer in modes 7, 19 and 21.
+
+### Modes returned raw
+
+For modes 5, 20 and 21 the C decoder accepts only one output type each (2, `0x23` and `0x24`) and returns the
+channels in the table above; every other output type, RGB included, fails with error −4. SmartCompress
+itself cannot show them: its viewer has no case for modes 5 and 21 and asks for 8-bit RGB for mode 20, which the
+decoder refuses. The Java decoder rejects all three. So the channels are what a decoder must reproduce exactly, and
+this implementation returns them as LuraTech's decoder does. The pictures it draws from them are its own, chosen from
+what the encoder does on the way in:
+
+* **Mode 5.** The forward step (`0x45D7A0`) is mode 4's with a fourth channel: each byte minus 128, no transform and no
+  channel weighting. It is fed by pixel type 2, a plain four-channel type distinct from the CMYK type 3 that mode 7
+  takes. The channels are therefore taken as mode 4's red, green and blue plus a fourth, alpha.
+* **Mode 20.** The forward step (`0x464A90`) copies the three 16-bit inputs unchanged, without the bias mode 8 gets.
+  The decoder clamps all three, a and b included, to 0..M, so a and b are stored unsigned around a midpoint, like
+  mode 8's bytes. The channels are read as mode 8's encoding widened by `s` bits, so that `>> s` gives the mode-8
+  view: `L* = 100·L/(255·2^s)`, `a* = a/2^s − 128`, `b* = b/2^s − 128`. At 16 bits this is the ICC version 2
+  encoding. The colour is relative to D65 and converted to sRGB (IEC 61966-2-1). D65 is the white point LuraTech's
+  own Lab-to-RGB conversion implies: fitting a CIE L*a*b* to sRGB conversion to the mode 8 quadratic over its
+  in-gamut range puts the best white at `x = 0.31, y = 0.33` (D65 is `0.3127, 0.3290`; D50, `0.3457, 0.3585`, fits
+  worse). The encoder has no RGB-to-Lab step of its own to compare with.
+* **Mode 21.** The forward step (`0x464FD0`) is mode 7's without the bias: the reversible colour transform on the
+  first three inputs and the fourth passed through. Channel 0 is weighted by two planes, as in mode 7. "YUVK" is that
+  transform of CMY, plus K. The channels are therefore mode 7's CMYK input widened, and are drawn the way LuraTech's
+  decoder draws mode 7: each reduced to 8 bits by `>> s` (a maximum of 32768 counting as 32767) and mapped by the
+  mode 7 quadratic. That quadratic treats 255 in every channel as paper white and 0 as black, so the samples run the
+  other way from ink coverage.
 
 ## What this implementation refuses, and why
 
-* **Modes 5, 20 and 21.** These are four plain 8-bit channels, "3x16 bit LAB" and "4x16 bit YUVK". LuraTech's
-  encoder writes them, but its C decoder only hands back their raw channels, and the Java decoder rejects them.
-  No LuraTech program shows what these pixels look like in RGB.
 * **Stripe heights other than `2^levels`.** The stripe buffers would overlap, as described above. LuraTech's encoder
   never writes any other height.
 * **A single wavelet level.** The root sits at level 0, so the shifts go negative. LuraTech's encoder crashes at two
@@ -263,7 +291,10 @@ LAB") is coded one plane finer, and mode 21 ("4x16 bit YUVK") two.
 
 The writer produces lossless, embedded streams:
 
-* mode 1 for 8-bit grey, mode 17 (`MV = 65535`) for 16-bit grey, and mode 6 for colour;
+* mode 1 for 8-bit grey, mode 17 (`MV = 65535`) for 16-bit grey, mode 6 for colour, and mode 5 for colour with
+  alpha;
+* modes 5, 20 and 21 from the raw channels of a file read in that mode, with that file's `MV` maximum, through the
+  encoder's own forward step for the mode;
 * up to six levels, `lowestPlane = 2` as in LuraTech's files (0 below three levels);
 * no regions and no password.
 
@@ -278,7 +309,11 @@ Coefficients that become significant late are thereby impossible. Every coeffici
 at its own most significant bit and refined down to plane 2, and the verbatim stage delivers the rest, so the
 decode is exact. Sorting down to plane 0 would be about two percent smaller. But then nodes whose thresholds have
 run out appear, and the two LuraTech decoders read those differently. At plane 2, with channel weights of at most
-one, they cannot appear. Both decoders return the source pixels unchanged for every committed writer fixture.
+one, they cannot appear. Both decoders return the source pixels unchanged for every committed writer fixture in modes
+1, 6 and 17. Modes 5, 20 and 21 only the C decoder reads. Mode 21 weights channel 0 by two planes, so its streams do
+reach the spent-children case, which the encoder answers the C decoder's way. The C decoder returned the source
+channels unchanged from all 26 streams the writer made from the channels of LuraTech's lossless mode 5, 20 and 21
+streams: 37x23, 100x70 and 300x200, without a maximum and with maxima of 4095, 32768 and 65535.
 
 ## LuraTech's Java decoder
 

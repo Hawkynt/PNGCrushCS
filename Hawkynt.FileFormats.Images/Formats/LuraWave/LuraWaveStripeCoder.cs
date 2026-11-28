@@ -138,8 +138,8 @@ internal sealed class LuraWaveStripeCoder {
     // The luminance-like first channel of some modes is coded one or two bit planes finer than the rest.
     this._channelWeight = new int[this._channels];
     this._channelWeight[0] = header.Mode switch {
-      LuraWaveColourMode.ReversibleColour or LuraWaveColourMode.Polynomial => 1,
-      LuraWaveColourMode.FourChannel or LuraWaveColourMode.WideReversibleColour => 2,
+      LuraWaveColourMode.ReversibleColour or LuraWaveColourMode.Polynomial or LuraWaveColourMode.WideLab => 1,
+      LuraWaveColourMode.FourChannel or LuraWaveColourMode.WideReversibleColour or LuraWaveColourMode.WideFourChannel => 2,
       _ => 0,
     };
 

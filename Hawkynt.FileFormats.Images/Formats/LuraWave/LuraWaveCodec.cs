@@ -7,11 +7,14 @@ namespace FileFormat.LuraWave;
 internal static class LuraWaveCodec {
 
   /// <summary>Decodes all stripes, undoes the wavelet and converts to pixels.</summary>
-  /// <returns>Grey8, Gray16 (big-endian) or Rgb24 pixels, depending on <see cref="LuraWaveFile.PixelFormatOf"/>.</returns>
+  /// <returns>
+  /// Pixels in <see cref="LuraWaveFile.PixelFormatOf"/> (Gray8, big-endian Gray16, Rgb24 or Rgba32), and for the modes
+  /// LuraTech's decoder returns only raw, the channel samples it returns (see <see cref="LuraWaveFile.Channels"/>).
+  /// </returns>
   /// <param name="data">The whole file.</param>
   /// <param name="header">Its parsed header.</param>
   /// <param name="passwordCheck">The 32-bit check of an accepted password, or <see langword="null"/> for the public quality.</param>
-  public static byte[] Decode(byte[] data, LuraWaveHeader header, uint? passwordCheck = null) {
+  public static (byte[] Pixels, ushort[]? Channels) Decode(byte[] data, LuraWaveHeader header, uint? passwordCheck = null) {
     var declared = 0L;
     foreach (var size in header.StripeSizes)
       declared += size;
@@ -42,7 +45,76 @@ internal static class LuraWaveCodec {
     for (var channel = 0; channel < channels; ++channel)
       LuraWaveWavelet.Inverse(plane, width, codedHeight, channels, channel, header.Levels);
 
-    return ToPixels(plane, header);
+    var samples = ToChannels(plane, header);
+    return (samples is null ? ToPixels(plane, header) : ChannelsToPixels(samples, header), samples);
+  }
+
+  /// <summary>
+  /// The channel samples LuraTech's decoder hands back for the modes it returns only raw (its output types 2, 0x23 and
+  /// 0x24): the colour transform undone, clamped to 0..255 or to the stream's maximum, interleaved, cropped to the
+  /// visible size. <see langword="null"/> for every other mode.
+  /// </summary>
+  private static ushort[]? ToChannels(int[] plane, LuraWaveHeader header) {
+    var mode = header.Mode;
+    if (mode is not (LuraWaveColourMode.RawFourChannel or LuraWaveColourMode.WideLab or LuraWaveColourMode.WideFourChannel))
+      return null;
+
+    var channels = header.Channels;
+    var rowSamples = header.CodedWidth * channels;
+    var maximum = mode == LuraWaveColourMode.RawFourChannel ? 255 : LuraWaveColour.WideMaximum(header);
+    var output = new ushort[header.Width * header.Height * channels];
+    for (var y = 0; y < header.Height; ++y)
+    for (var x = 0; x < header.Width; ++x) {
+      var i = y * rowSamples + x * channels;
+      var o = (y * header.Width + x) * channels;
+      switch (mode) {
+        case LuraWaveColourMode.RawFourChannel:
+          for (var c = 0; c < 4; ++c)
+            output[o + c] = (ushort)Math.Clamp(plane[i + c] + 128, 0, maximum);
+          break;
+        case LuraWaveColourMode.WideLab:
+          for (var c = 0; c < 3; ++c)
+            output[o + c] = (ushort)Math.Clamp(plane[i + c], 0, maximum);
+          break;
+        default: {
+          // The reversible colour transform on the first three channels, the fourth passed through.
+          var g = plane[i] - ((plane[i + 1] + plane[i + 2]) >> 2);
+          output[o] = (ushort)Math.Clamp(plane[i + 1] + g, 0, maximum);
+          output[o + 1] = (ushort)Math.Clamp(g, 0, maximum);
+          output[o + 2] = (ushort)Math.Clamp(plane[i + 2] + g, 0, maximum);
+          output[o + 3] = (ushort)Math.Clamp(plane[i + 3], 0, maximum);
+          break;
+        }
+      }
+    }
+
+    return output;
+  }
+
+  private static byte[] ChannelsToPixels(ushort[] samples, LuraWaveHeader header) {
+    var count = header.Width * header.Height;
+    switch (header.Mode) {
+      case LuraWaveColourMode.RawFourChannel: {
+        var output = new byte[count * 4];
+        for (var i = 0; i < output.Length; ++i)
+          output[i] = (byte)samples[i];
+        return output;
+      }
+      case LuraWaveColourMode.WideLab: {
+        var shift = LuraWaveColour.WideRange(header).Shift;
+        var output = new byte[count * 3];
+        for (var p = 0; p < count; ++p)
+          LuraWaveColour.SrgbFromWideLab(samples, p * 3, shift, output, p * 3);
+        return output;
+      }
+      default: {
+        var shift = LuraWaveColour.WideRange(header).Shift;
+        var output = new byte[count * 3];
+        for (var p = 0; p < count; ++p)
+          LuraWaveColour.RgbFromWideFourChannel(samples, p * 4, shift, output, p * 3);
+        return output;
+      }
+    }
   }
 
   private static byte[] ToPixels(int[] plane, LuraWaveHeader header) {
@@ -91,40 +163,25 @@ internal static class LuraWaveCodec {
   internal const int EncoderLevels = 6;
 
   /// <summary>
-  /// Writes a complete single-stripe ("embedded") lossless stream: grey, 16-bit grey or reversible-colour RGB.
+  /// Writes a complete single-stripe ("embedded") lossless stream: grey, 16-bit grey, reversible-colour RGB or four
+  /// raw 8-bit channels.
   /// </summary>
-  /// <param name="pixels">Grey8, big-endian Gray16 or Rgb24 rows without padding.</param>
+  /// <param name="pixels">Grey8, big-endian Gray16, Rgb24 or Rgba32 rows without padding.</param>
   /// <param name="width">Image width.</param>
   /// <param name="height">Image height.</param>
-  /// <param name="mode"><see cref="LuraWaveColourMode.Grey"/>, <see cref="LuraWaveColourMode.WideGrey"/> or <see cref="LuraWaveColourMode.ReversibleColour"/>.</param>
+  /// <param name="mode">
+  /// <see cref="LuraWaveColourMode.Grey"/>, <see cref="LuraWaveColourMode.WideGrey"/>,
+  /// <see cref="LuraWaveColourMode.ReversibleColour"/> or <see cref="LuraWaveColourMode.RawFourChannel"/>.
+  /// </param>
   /// <param name="metadataSource">A header whose resolution is carried over, or <see langword="null"/>.</param>
   public static byte[] Encode(ReadOnlySpan<byte> pixels, int width, int height, LuraWaveColourMode mode, LuraWaveHeader? metadataSource = null) {
-    if (mode is not (LuraWaveColourMode.Grey or LuraWaveColourMode.WideGrey or LuraWaveColourMode.ReversibleColour))
-      throw new ArgumentException($"The writer codes grey, wide grey or reversible colour, not {mode}.", nameof(mode));
+    if (mode is not (LuraWaveColourMode.Grey or LuraWaveColourMode.WideGrey or LuraWaveColourMode.ReversibleColour or LuraWaveColourMode.RawFourChannel))
+      throw new ArgumentException($"The writer codes grey, wide grey, reversible colour or four raw channels from pixels, not {mode}.", nameof(mode));
 
-    var levels = EncoderLevels;
-    while (levels > 2 && (1 << levels) > Math.Min(width, height))
-      --levels;
-
-    var block = 1 << levels;
-    var codedWidth = (width + block - 1) / block * block;
-    var codedHeight = (height + block - 1) / block * block;
-    var header = new LuraWaveHeader {
-      Width = width,
-      Height = height,
-      Mode = mode,
-      CodedWidth = codedWidth,
-      StripeHeight = codedHeight,
-      Levels = levels,
-      CodingFlags = 0x20,
-      LowestBitPlane = LuraWaveStripeCoder.IsLosslessLowestPlane(DefaultLowestBitPlane, levels) ? DefaultLowestBitPlane : 0,
-      StripeCount = 1,
-      MaxValue = mode == LuraWaveColourMode.WideGrey ? 65535 : 0,
-      HorizontalDpiFixed = metadataSource?.HorizontalDpiFixed ?? LuraWaveHeader.DefaultDpiFixed,
-      VerticalDpiFixed = metadataSource?.VerticalDpiFixed ?? LuraWaveHeader.DefaultDpiFixed,
-    };
-
+    var header = EmbeddedHeader(width, height, mode, mode == LuraWaveColourMode.WideGrey ? 65535 : 0, metadataSource);
     var channels = header.Channels;
+    var codedWidth = header.CodedWidth;
+    var codedHeight = header.StripeHeight;
     var plane = new int[codedWidth * codedHeight * channels];
     for (var y = 0; y < codedHeight; ++y)
     for (var x = 0; x < codedWidth; ++x) {
@@ -137,6 +194,10 @@ internal static class LuraWaveCodec {
           break;
         case LuraWaveColourMode.WideGrey:
           plane[target] = pixels[source * 2] << 8 | pixels[source * 2 + 1];
+          break;
+        case LuraWaveColourMode.RawFourChannel:
+          for (var c = 0; c < 4; ++c)
+            plane[target + c] = pixels[source * 4 + c] - 128;
           break;
         default: {
           int r = pixels[source * 3], g = pixels[source * 3 + 1], b = pixels[source * 3 + 2];
@@ -151,6 +212,78 @@ internal static class LuraWaveCodec {
     }
 
     return EncodeSamples(header, plane);
+  }
+
+  /// <summary>
+  /// Writes a complete single-stripe lossless stream from channel samples laid out as <see cref="LuraWaveFile.Channels"/>,
+  /// in one of the modes LuraTech's decoder returns only raw. The forward step is LuraTech's encoder's: the 8-bit bias
+  /// for <see cref="LuraWaveColourMode.RawFourChannel"/>, none for <see cref="LuraWaveColourMode.WideLab"/>, and the
+  /// reversible colour transform on the first three channels of <see cref="LuraWaveColourMode.WideFourChannel"/>.
+  /// </summary>
+  /// <param name="samples">Interleaved samples, <c>width·height·channels</c> of them.</param>
+  /// <param name="width">Image width.</param>
+  /// <param name="height">Image height.</param>
+  /// <param name="mode">The colour mode.</param>
+  /// <param name="maxValue">The <c>MV</c> maximum of a wide mode, or 0 for none (65535).</param>
+  /// <param name="metadataSource">A header whose resolution is carried over, or <see langword="null"/>.</param>
+  public static byte[] EncodeChannels(ReadOnlySpan<ushort> samples, int width, int height, LuraWaveColourMode mode, int maxValue, LuraWaveHeader? metadataSource = null) {
+    if (mode is not (LuraWaveColourMode.RawFourChannel or LuraWaveColourMode.WideLab or LuraWaveColourMode.WideFourChannel))
+      throw new ArgumentException($"Channel samples are written in modes 5, 20 or 21, not {mode}.", nameof(mode));
+
+    var header = EmbeddedHeader(width, height, mode, mode == LuraWaveColourMode.RawFourChannel ? 0 : maxValue, metadataSource);
+    var channels = header.Channels;
+    var codedWidth = header.CodedWidth;
+    var codedHeight = header.StripeHeight;
+    var plane = new int[codedWidth * codedHeight * channels];
+    for (var y = 0; y < codedHeight; ++y)
+    for (var x = 0; x < codedWidth; ++x) {
+      var source = (Math.Min(y, height - 1) * width + Math.Min(x, width - 1)) * channels;
+      var target = (y * codedWidth + x) * channels;
+      switch (mode) {
+        case LuraWaveColourMode.RawFourChannel:
+          for (var c = 0; c < 4; ++c)
+            plane[target + c] = samples[source + c] - 128;
+          break;
+        case LuraWaveColourMode.WideLab:
+          for (var c = 0; c < 3; ++c)
+            plane[target + c] = samples[source + c];
+          break;
+        default: {
+          int r = samples[source], g = samples[source + 1], b = samples[source + 2];
+          plane[target] = (r + 2 * g + b) >> 2;
+          plane[target + 1] = r - g;
+          plane[target + 2] = b - g;
+          plane[target + 3] = samples[source + 3];
+          break;
+        }
+      }
+    }
+
+    return EncodeSamples(header, plane);
+  }
+
+  private static LuraWaveHeader EmbeddedHeader(int width, int height, LuraWaveColourMode mode, int maxValue, LuraWaveHeader? metadataSource) {
+    var levels = EncoderLevels;
+    while (levels > 2 && (1 << levels) > Math.Min(width, height))
+      --levels;
+
+    var block = 1 << levels;
+    var codedWidth = (width + block - 1) / block * block;
+    var codedHeight = (height + block - 1) / block * block;
+    return new() {
+      Width = width,
+      Height = height,
+      Mode = mode,
+      CodedWidth = codedWidth,
+      StripeHeight = codedHeight,
+      Levels = levels,
+      CodingFlags = 0x20,
+      LowestBitPlane = LuraWaveStripeCoder.IsLosslessLowestPlane(DefaultLowestBitPlane, levels) ? DefaultLowestBitPlane : 0,
+      StripeCount = 1,
+      MaxValue = maxValue,
+      HorizontalDpiFixed = metadataSource?.HorizontalDpiFixed ?? LuraWaveHeader.DefaultDpiFixed,
+      VerticalDpiFixed = metadataSource?.VerticalDpiFixed ?? LuraWaveHeader.DefaultDpiFixed,
+    };
   }
 
   /// <summary>
