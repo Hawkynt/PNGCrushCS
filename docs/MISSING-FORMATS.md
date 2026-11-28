@@ -32,7 +32,7 @@ issue quotes the recorded blocker and the route around it.
 
 | Category | Tracking issue | Images | Codecs | Containers | Encoders | Total |
 | --- | --- | ---: | ---: | ---: | ---: | ---: |
-| [Modern & standard still-image codecs](#modern--standard-still-image-codecs) | [#513](https://github.com/Hawkynt/PNGCrushCS/issues/513) | 56 | 0 | 0 | 0 | 56 |
+| [Modern & standard still-image codecs](#modern--standard-still-image-codecs) | [#513](https://github.com/Hawkynt/PNGCrushCS/issues/513) | 55 | 0 | 0 | 0 | 55 |
 | [Camera RAW & sensor data](#camera-raw--sensor-data) | [#514](https://github.com/Hawkynt/PNGCrushCS/issues/514) | 24 | 0 | 0 | 0 | 24 |
 | [Geospatial & remote sensing](#geospatial--remote-sensing) | [#515](https://github.com/Hawkynt/PNGCrushCS/issues/515) | 83 | 0 | 0 | 0 | 83 |
 | [Medical & scientific imaging](#medical--scientific-imaging) | [#516](https://github.com/Hawkynt/PNGCrushCS/issues/516) | 42 | 0 | 0 | 0 | 42 |
@@ -49,7 +49,7 @@ issue quotes the recorded blocker and the route around it.
 | [Lossless & uncompressed video](#lossless--uncompressed-video) | [#527](https://github.com/Hawkynt/PNGCrushCS/issues/527) | 0 | 11 | 0 | 2 | 13 |
 | [Cinema camera RAW video](#cinema-camera-raw-video) | [#528](https://github.com/Hawkynt/PNGCrushCS/issues/528) | 0 | 6 | 7 | 0 | 13 |
 | [Elementary streams & streaming manifests](#elementary-streams--streaming-manifests) | [#529](https://github.com/Hawkynt/PNGCrushCS/issues/529) | 0 | 0 | 18 | 0 | 18 |
-| **All** | | **566** | **147** | **274** | **19** | **1006** |
+| **All** | | **565** | **147** | **274** | **19** | **1005** |
 
 Each issue carries the labels `cat: <category>`, its kind (`image-format`, `video-codec`, `video-container`, `video-encoder`), `priority: high|medium|low`, and `documented-blocker` where that applies.
 
@@ -101,7 +101,6 @@ JPEG/JPEG 2000/HEIF variants, wavelet, HDR and research still-image codecs. Trac
 | PFS - Portable Floatmap Stream (pfstools) | Image | `.pfs` | read + write | missing | low | [#573](https://github.com/Hawkynt/PNGCrushCS/issues/573) |
 | PGF - Progressive Graphics File (libpgf) | Image | `.pgf` | read + write | missing | low | [#574](https://github.com/Hawkynt/PNGCrushCS/issues/574) |
 | PGMYUV | Image | `.pgmyuv` | read + write | missing | low | [#575](https://github.com/Hawkynt/PNGCrushCS/issues/575) |
-| Pick Ax (PAX) | Image | `.pax` | read + write | blocked | low | [#576](https://github.com/Hawkynt/PNGCrushCS/issues/576) |
 | PIK (Google) | Image | `.pik` | read + write | missing | low | [#578](https://github.com/Hawkynt/PNGCrushCS/issues/578) |
 | QOIR (Quite OK Image Format, Revised) | Image | `.qoir` | read + write | missing | low | [#579](https://github.com/Hawkynt/PNGCrushCS/issues/579) |
 | RK Image (RKI) | Image | `.rki` | read + write | missing | low | [#580](https://github.com/Hawkynt/PNGCrushCS/issues/580) |

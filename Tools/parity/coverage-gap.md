@@ -945,7 +945,7 @@ Windows only, so nothing here has ever been able to compare against them either.
 | fbm | .cbm |  |
 | fff | .fff | read; its signature stands at 452 and its JPEG at 3272 |
 | fi | .fi | read; a zlib stream holding the palette and then the rows, or a JPEG at 598 |
-| fif | .fif | Windows only |
+| fif | .fif | FTC 1.1, FTC 3.1-3.3 and FIF1 read, FTC 3.1 written; 33 of 34 real samples exact against Iterated's DECO_32.DLL |
 | fre | .fre | read; a GE Genesis image, met as the Visible Human CT slices, and the Male MRI slices too |
 | frm | .frm |  |
 | frm2 | .frm |  |
@@ -1002,7 +1002,7 @@ Windows only, so nothing here has ever been able to compare against them either.
 | nsr | .bn .ph | read; a ten-byte header, and the panel it states cannot be the 320x192 the old reader assumed |
 | oil | .oil | read, from the Open Image Library's own specification; no sample was available |
 | pan | .pan |  |
-| pax | .pax | Pick Ax, Blowfish under a password the file does not carry; XnView's Linux converter does not carry it either |
+| pax | .pax | read and write, every cipher, against Smaller Animals' own PAXIO and ImgSource; the password is the caller's to give |
 | pbt | .pbt | read; 02 00 and PBIT, the size at 0x0C and 0x10 big-endian, Group 4 from 512 |
 | pcl | .pcl | the raster subset read; text and HP-GL/2 passed over |
 | pd | .pd .t1 .t2 | read by the GE Genesis reader, which is the loader XnView reads it with |
