@@ -38,7 +38,7 @@ issue quotes the recorded blocker and the route around it.
 | [Medical & scientific imaging](#medical--scientific-imaging) | [#516](https://github.com/Hawkynt/PNGCrushCS/issues/516) | 42 | 0 | 0 | 0 | 42 |
 | [GPU textures & game assets](#gpu-textures--game-assets) | [#517](https://github.com/Hawkynt/PNGCrushCS/issues/517) | 39 | 0 | 0 | 0 | 39 |
 | [Retro computer & legacy platforms](#retro-computer--legacy-platforms) | [#518](https://github.com/Hawkynt/PNGCrushCS/issues/518) | 101 | 0 | 0 | 0 | 101 |
-| [Vector, document & print](#vector-document--print) | [#519](https://github.com/Hawkynt/PNGCrushCS/issues/519) | 91 | 0 | 0 | 0 | 91 |
+| [Vector, document & print](#vector-document--print) | [#519](https://github.com/Hawkynt/PNGCrushCS/issues/519) | 90 | 0 | 0 | 0 | 90 |
 | [Fonts, text-mode & teletext](#fonts-text-mode--teletext) | [#520](https://github.com/Hawkynt/PNGCrushCS/issues/520) | 61 | 0 | 0 | 0 | 61 |
 | [Editor & application native](#editor--application-native) | [#521](https://github.com/Hawkynt/PNGCrushCS/issues/521) | 49 | 0 | 0 | 0 | 49 |
 | [Embroidery & industrial](#embroidery--industrial) | [#522](https://github.com/Hawkynt/PNGCrushCS/issues/522) | 20 | 0 | 0 | 0 | 20 |
@@ -49,7 +49,7 @@ issue quotes the recorded blocker and the route around it.
 | [Lossless & uncompressed video](#lossless--uncompressed-video) | [#527](https://github.com/Hawkynt/PNGCrushCS/issues/527) | 0 | 11 | 0 | 2 | 13 |
 | [Cinema camera RAW video](#cinema-camera-raw-video) | [#528](https://github.com/Hawkynt/PNGCrushCS/issues/528) | 0 | 6 | 7 | 0 | 13 |
 | [Elementary streams & streaming manifests](#elementary-streams--streaming-manifests) | [#529](https://github.com/Hawkynt/PNGCrushCS/issues/529) | 0 | 0 | 18 | 0 | 18 |
-| **All** | | **563** | **147** | **274** | **19** | **1003** |
+| **All** | | **562** | **147** | **274** | **19** | **1002** |
 
 Each issue carries the labels `cat: <category>`, its kind (`image-format`, `video-codec`, `video-container`, `video-encoder`), `priority: high|medium|low`, and `documented-blocker` where that applies.
 
@@ -448,7 +448,6 @@ Vector drawings, metafiles, page description, printer rasters, fax. Tracked in [
 | Lottie animation (Bodymovin JSON, dotLottie) | Image | `.json`, `.lottie` | read + write | missing | medium | [#888](https://github.com/Hawkynt/PNGCrushCS/issues/888) |
 | Microsoft Visio drawing (VSD, VSDX, VSS, VSSX, VSDM, VDX) | Image | `.vsd`, `.vsdx`, `.vsdm`, `.vss`, `.vssx`, `.vdx` | read + write | missing | medium | [#889](https://github.com/Hawkynt/PNGCrushCS/issues/889) |
 | OpenDocument Drawing / StarOffice XML Draw (ODG, OTG, FODG, SXD) | Image | `.odg`, `.otg`, `.fodg`, `.sxd`, `.std` | read + write | missing | medium | [#890](https://github.com/Hawkynt/PNGCrushCS/issues/890) |
-| PDF page rendering (content streams) | Image | `.pdf`, `.ai` | read + write | blocked | medium | [#891](https://github.com/Hawkynt/PNGCrushCS/issues/891) |
 | PWG Raster (PWG 5102.4) | Image | `.pwg` | read + write | missing | medium | [#892](https://github.com/Hawkynt/PNGCrushCS/issues/892) |
 | 101 Clips image | Image | `.img` | read + write | missing | low | [#893](https://github.com/Hawkynt/PNGCrushCS/issues/893) |
 | Acorn ArtWorks | Image | `.aw` | read + write | missing | low | [#894](https://github.com/Hawkynt/PNGCrushCS/issues/894) |
