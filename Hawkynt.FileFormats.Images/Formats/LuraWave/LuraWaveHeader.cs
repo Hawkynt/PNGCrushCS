@@ -109,7 +109,7 @@ public sealed record LuraWaveHeader {
   public static int ChannelsOf(LuraWaveColourMode mode) => mode switch {
     LuraWaveColourMode.Grey or LuraWaveColourMode.WideGrey or LuraWaveColourMode.WideSignedGrey => 1,
     LuraWaveColourMode.ColourDifference or LuraWaveColourMode.Rgb or LuraWaveColourMode.ReversibleColour
-      or LuraWaveColourMode.Polynomial or LuraWaveColourMode.WideReversibleColour => 3,
+      or LuraWaveColourMode.Polynomial or LuraWaveColourMode.WideColourDifference or LuraWaveColourMode.WideReversibleColour => 3,
     LuraWaveColourMode.FourChannel => 4,
     _ => 0,
   };
@@ -184,8 +184,6 @@ public sealed record LuraWaveHeader {
           var count = body[0];
           if (count > MaxRegions)
             throw new InvalidDataException($"LuraWave 'ER' chunk lists {count} regions; at most {MaxRegions} are possible.");
-          if (count > 1)
-            throw new InvalidDataException($"LuraWave 'ER' chunk lists {count} interest regions; the vendor decoder seeds every region after the first into the neighbouring tree (and fails outright at the last one), so only a single region has a defined decode.");
           Require(body, 2 + count * 12, tag);
           var regions = new LuraWaveRegion[count];
           for (var i = 0; i < count; ++i) {
@@ -232,6 +230,8 @@ public sealed record LuraWaveHeader {
   private void Validate() {
     if (this.Width <= 0 || this.Height <= 0)
       throw new InvalidDataException("LuraWave stream has no 'GE' chunk or zero dimensions.");
+    if ((byte)this.Mode is 5 or 20 or 21)
+      throw new InvalidDataException($"LuraWave colour mode {(byte)this.Mode} ({((byte)this.Mode == 5 ? "four 8-bit channels without a colour model" : (byte)this.Mode == 20 ? "3x16 bit LAB" : "4x16 bit YUVK")}) is not supported: LuraTech's encoder writes it, but neither of its decoders renders it as RGB, so there is no reference for what its pixels look like.");
     if (this.Channels == 0)
       throw new InvalidDataException($"Unknown LuraWave colour mode {(byte)this.Mode}.");
     if (this.CodedWidth <= 0 || this.StripeHeight <= 0 || this.StripeCount <= 0)
@@ -255,7 +255,7 @@ public sealed record LuraWaveHeader {
       throw new InvalidDataException($"LuraWave image of {this.Width}x{this.Height} pixels is larger than this decoder accepts.");
     if (this.DataOffset % 4 != 0)
       throw new InvalidDataException("LuraWave coded data does not start on a 4-byte boundary.");
-    if (this.Mode is LuraWaveColourMode.WideGrey or LuraWaveColourMode.WideReversibleColour or LuraWaveColourMode.WideSignedGrey && this.MaxValue < 0)
+    if (this.Mode is LuraWaveColourMode.WideGrey or LuraWaveColourMode.WideColourDifference or LuraWaveColourMode.WideReversibleColour or LuraWaveColourMode.WideSignedGrey && this.MaxValue < 0)
       throw new InvalidDataException("LuraWave 'MV' chunk holds a negative maximum.");
   }
 

@@ -11,45 +11,57 @@ internal static class LuraWaveColour {
 
   private static ushort Clamp16(int value) => value < 0 ? (ushort)0 : value > 65535 ? (ushort)65535 : (ushort)value;
 
-  /// <summary>Bits to drop from a wide sample to reach eight; the decoder halves the announced maximum until it fits in 256.</summary>
+  /// <summary>
+  /// Bits to drop from a wide sample to reach eight: the bit length of the maximum (at least 8, at most 16) minus 8.
+  /// </summary>
   public static int WideShift(int maxValue) {
-    var shift = 0;
-    for (var range = maxValue; range > 256; range >>= 1)
-      ++shift;
-    return shift;
+    var bits = 16;
+    for (var mask = 0x8000; bits > 8 && (maxValue & mask) == 0; mask >>= 1)
+      --bits;
+    return bits - 8;
   }
 
+  /// <summary>The largest wide sample: the <c>MV</c> chunk's value, or 65535 without one.</summary>
+  public static int WideMaximum(LuraWaveHeader header) => header.MaxValue == 0 ? 65535 : header.MaxValue;
+
   /// <summary>
-  /// Wide grey modes fall back to a 16-bit maximum when no <c>MV</c> chunk says otherwise; the wide colour mode does not,
-  /// and so keeps its samples unshifted.
+  /// The maximum and shift behind the 8-bit view of a wide mode. A maximum of exactly 32768 is taken as 32767 there,
+  /// as LuraTech's decoder does.
   /// </summary>
-  public static (int MaxValue, int Shift) WideRange(LuraWaveHeader header)
-    => header.MaxValue == 0 && header.Mode != LuraWaveColourMode.WideReversibleColour
-      ? (65535, 8)
-      : (header.MaxValue, WideShift(header.MaxValue));
+  public static (int MaxValue, int Shift) WideRange(LuraWaveHeader header) {
+    var maximum = WideMaximum(header);
+    if (maximum == 0x8000)
+      maximum = 0x7FFF;
+    return (maximum, WideShift(maximum));
+  }
 
   /// <summary>One 8-bit grey sample from the first channel at <paramref name="i"/>.</summary>
   public static byte Grey8(LuraWaveColourMode mode, int[] s, int i, int maxValue, int shift) => mode switch {
-    LuraWaveColourMode.WideGrey => Clamp8(s[i] >> shift),
-    LuraWaveColourMode.WideSignedGrey => Clamp8((s[i] + (maxValue >> 1)) >> shift),
+    LuraWaveColourMode.WideGrey => Clamp8(Math.Clamp(s[i], 0, maxValue) >> shift),
+    LuraWaveColourMode.WideSignedGrey => Clamp8(Math.Clamp(s[i] + (maxValue >> 1), 0, maxValue) >> shift),
     _ => Clamp8(s[i] + 128),
   };
 
-  /// <summary>One 16-bit grey sample for the wide grey modes.</summary>
+  /// <summary>One 16-bit grey sample for the wide grey modes, clamped to the stream's maximum.</summary>
   public static ushort Grey16(LuraWaveColourMode mode, int[] s, int i, int maxValue)
-    => mode == LuraWaveColourMode.WideSignedGrey ? Clamp16(s[i] + (maxValue >> 1)) : Clamp16(s[i]);
+    => (ushort)Math.Clamp(mode == LuraWaveColourMode.WideSignedGrey ? s[i] + (maxValue >> 1) : s[i], 0, maxValue);
 
   /// <summary>Writes one RGB pixel for the colour modes from the interleaved samples at <paramref name="i"/>.</summary>
   public static void Rgb(LuraWaveColourMode mode, int[] s, int i, int shift, byte[] output, int o) {
     int r, g, b;
     switch (mode) {
-      case LuraWaveColourMode.ColourDifference: {
-        var luma = (s[i] >> 2) + 128;
-        r = luma - s[i + 2];
-        g = luma + ((s[i + 1] + s[i + 2]) >> 1);
-        b = luma - s[i + 1];
+      case LuraWaveColourMode.ColourDifference:
+        (r, g, b) = FromColourDifference(s[i], s[i + 1], s[i + 2]);
+        r += 128;
+        g += 128;
+        b += 128;
         break;
-      }
+      case LuraWaveColourMode.WideColourDifference:
+        (r, g, b) = FromColourDifference(s[i], s[i + 1], s[i + 2]);
+        r >>= shift;
+        g >>= shift;
+        b >>= shift;
+        break;
       case LuraWaveColourMode.Rgb:
         r = s[i] + 128;
         g = s[i + 1] + 128;
@@ -58,11 +70,12 @@ internal static class LuraWaveColour {
       case LuraWaveColourMode.ReversibleColour:
         (r, g, b) = FromReversible(s[i] + 128, s[i + 1], s[i + 2]);
         break;
-      case LuraWaveColourMode.WideReversibleColour: {
-        var y = s[i] >> shift;
-        (r, g, b) = FromReversible(y, s[i + 1] >> shift, s[i + 2] >> shift);
+      case LuraWaveColourMode.WideReversibleColour:
+        (r, g, b) = FromReversible(s[i], s[i + 1], s[i + 2]);
+        r >>= shift;
+        g >>= shift;
+        b >>= shift;
         break;
-      }
       case LuraWaveColourMode.FourChannel:
         (r, g, b) = FromFourChannel(s[i] + 128, s[i + 1], s[i + 2], s[i + 3] + 128);
         break;
@@ -77,6 +90,17 @@ internal static class LuraWaveColour {
     output[o] = Clamp8(r);
     output[o + 1] = Clamp8(g);
     output[o + 2] = Clamp8(b);
+  }
+
+  /// <summary>
+  /// The colour-difference model: the first channel is four times a luma that weighs green twice, the others are luma
+  /// minus blue and luma minus red. Green is recovered exactly from the full first channel, not from the rounded luma.
+  /// </summary>
+  private static (int R, int G, int B) FromColourDifference(int y4, int u, int v) {
+    var luma = y4 >> 2;
+    var red = luma - v;
+    var blue = luma - u;
+    return (red, (y4 - red - blue) >> 1, blue);
   }
 
   private static (int R, int G, int B) FromReversible(int y, int u, int v) {

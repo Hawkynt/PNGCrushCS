@@ -23206,6 +23206,7 @@ Implements `IEquatable<LudekMakerFile>`, `IImageFormatMetadata<LudekMakerFile>`,
 | `FourChannel` | `7` |  |
 | `Polynomial` | `8` |  |
 | `WideGrey` | `17` |  |
+| `WideColourDifference` | `18` |  |
 | `WideReversibleColour` | `19` |  |
 | `WideSignedGrey` | `22` |  |
 
@@ -23269,9 +23270,13 @@ Implements `IEquatable<LuraWaveHeader>`.
 | Member | Signature | Summary |
 | --- | --- | --- |
 | `FromBytes` | `static LuraWaveFile FromBytes(byte[] data)` |  |
+| `FromBytes` | `static LuraWaveFile FromBytes(byte[] data, string password)` |  |
 | `FromFile` | `static LuraWaveFile FromFile(FileInfo file)` |  |
+| `FromFile` | `static LuraWaveFile FromFile(FileInfo file, string password)` |  |
 | `FromSpan` | `static LuraWaveFile FromSpan(ReadOnlySpan<byte> data)` |  |
+| `FromSpan` | `static LuraWaveFile FromSpan(ReadOnlySpan<byte> data, string password)` |  |
 | `FromStream` | `static LuraWaveFile FromStream(Stream stream)` |  |
+| `FromStream` | `static LuraWaveFile FromStream(Stream stream, string password)` |  |
 
 #### `LuraWaveRegion`
 

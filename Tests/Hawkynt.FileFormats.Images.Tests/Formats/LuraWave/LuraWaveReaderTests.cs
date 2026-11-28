@@ -205,12 +205,19 @@ public sealed class LuraWaveReaderTests {
 
   [Test]
   [Category("Unit")]
-  public void MoreThanOneInterestRegion_IsRefused() {
-    var header = LuraWaveHeader.Parse(LuraWaveFixtures.Bytes("mode06-region.lwf")) with {
-      Regions = [new(0, 0, 4, 4), new(8, 8, 4, 4)],
-    };
-    var data = header.Serialize([0xFF, 0xFF, 0xFF, 0xFF]);
-    Assert.That(() => LuraWaveHeader.Parse(data), Throws.InstanceOf<InvalidDataException>().With.Message.Contains("region"));
+  public void TwoInterestRegions_AreRead() {
+    var regions = LuraWaveHeader.Parse(LuraWaveFixtures.Bytes("luratech-m01-roi2.lwf")).Regions;
+    Assert.That(regions, Is.EqualTo(new LuraWaveRegion[] { new(10, 12, 30, 20), new(60, 30, 25, 25) }));
+  }
+
+  [TestCase(5, TestName = "Four 8-bit channels")]
+  [TestCase(20, TestName = "3x16 bit LAB")]
+  [TestCase(21, TestName = "4x16 bit YUVK")]
+  [Category("Unit")]
+  public void ColourModesWithoutARendering_AreRefusedByName(int mode) {
+    var data = LuraWaveFixtures.Bytes("luratech-s02-l4.lwf");
+    data[16] = (byte)mode;
+    Assert.That(() => LuraWaveHeader.Parse(data), Throws.InstanceOf<InvalidDataException>().With.Message.Contains("not supported"));
   }
 
   [TestCase("mode06-stripes.lwf", TestName = "Striped")]

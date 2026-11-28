@@ -2,34 +2,41 @@ namespace FileFormat.LuraWave;
 
 /// <summary>The colour model a LuraWave stream was coded in — the first byte after the dimensions in its <c>GE</c> chunk.</summary>
 /// <remarks>
-/// The names describe what the decoder does with the channels; LuraTech never published names for these values.
+/// LuraTech never published names for these values. The descriptions follow what LuraTech's encoder and decoders do
+/// with the channels; the colour model each stands for is the one LuraWave SmartCompress 3.0 lists for it (for example
+/// "3x8 bit YUV", "3x8 bit LAB", "4x8 bit CMYK"). Three further values its encoder writes are refused by name: 5 (four
+/// 8-bit channels without a colour model), 20 ("3x16 bit LAB") and 21 ("4x16 bit YUVK"); LuraTech's decoders turn
+/// none of them into RGB.
 /// </remarks>
 public enum LuraWaveColourMode : byte {
 
   /// <summary>One channel, 8-bit grey stored with a bias of -128.</summary>
   Grey = 1,
 
-  /// <summary>Three channels: a luminance stored at four times its scale plus two colour differences.</summary>
+  /// <summary>Three channels ("3x8 bit YUV"): four times a luminance that weighs green twice, plus two colour differences.</summary>
   ColourDifference = 2,
 
-  /// <summary>Three channels, plain red/green/blue each biased by -128.</summary>
+  /// <summary>Three channels ("3x8 bit raw"), plain red/green/blue each biased by -128.</summary>
   Rgb = 4,
 
-  /// <summary>Three channels in the reversible integer colour transform (the one JPEG 2000 later called RCT).</summary>
+  /// <summary>Three channels ("3x8 bit YUV") in the reversible integer colour transform (the one JPEG 2000 later called RCT).</summary>
   ReversibleColour = 6,
 
-  /// <summary>Four channels: the reversible colour transform plus a fourth channel, mapped to RGB by a quadratic polynomial (presumably CMYK).</summary>
+  /// <summary>Four channels ("4x8 bit CMYK"): cyan, magenta and yellow in the reversible colour transform plus black, mapped to RGB by a quadratic polynomial.</summary>
   FourChannel = 7,
 
-  /// <summary>Three channels mapped to RGB by a quadratic polynomial (presumably a Lab-like opponent space).</summary>
+  /// <summary>Three channels ("3x8 bit LAB"): CIE L*a*b* with a and b signed, mapped to RGB by a quadratic polynomial.</summary>
   Polynomial = 8,
 
-  /// <summary>One channel, unsigned grey wider than 8 bits; its range is announced by an <c>MV</c> chunk.</summary>
+  /// <summary>One channel ("16 bit grey scale"), unsigned grey wider than 8 bits; its range is announced by an <c>MV</c> chunk.</summary>
   WideGrey = 17,
 
-  /// <summary>Three channels wider than 8 bits in the reversible colour transform.</summary>
+  /// <summary>Three channels ("3x16 bit YUV") wider than 8 bits in the colour-difference model of <see cref="ColourDifference"/>.</summary>
+  WideColourDifference = 18,
+
+  /// <summary>Three channels ("3x16 bit YUV") wider than 8 bits in the reversible colour transform.</summary>
   WideReversibleColour = 19,
 
-  /// <summary>One channel, grey wider than 8 bits stored with a bias of half its range.</summary>
+  /// <summary>One channel ("16 bit grey scale"), grey wider than 8 bits stored with a bias of half its range.</summary>
   WideSignedGrey = 22,
 }

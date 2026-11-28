@@ -5,8 +5,9 @@ namespace FileFormat.LuraWave;
 
 /// <summary>In-memory representation of a LuraWave (<c>.lwf</c>) image: LuraTech's wavelet still-image codec.</summary>
 /// <remarks>
-/// Every colour mode, both stripe layouts, interest regions and the password-limited public quality decode exactly as
-/// LuraTech's own Java decoder decodes them. The writer produces lossless single-stripe streams: 8-bit grey,
+/// Every colour mode LuraTech's decoders render, both stripe layouts, interest regions, byte budgets and passwords
+/// decode exactly as the C codec in LuraWave SmartCompress 3.0 decodes them, on streams from LuraTech's own encoder.
+/// The writer produces lossless single-stripe streams that both LuraTech decoders return unchanged: 8-bit grey,
 /// 16-bit grey, or RGB in the reversible colour transform. See <c>SPEC.md</c> beside this file.
 /// </remarks>
 [FormatMagicBytes([0x57, 0x56, 0x02])]

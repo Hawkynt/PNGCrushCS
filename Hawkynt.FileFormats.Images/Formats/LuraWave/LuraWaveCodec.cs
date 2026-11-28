@@ -8,7 +8,10 @@ internal static class LuraWaveCodec {
 
   /// <summary>Decodes all stripes, undoes the wavelet and converts to pixels.</summary>
   /// <returns>Grey8, Gray16 (big-endian) or Rgb24 pixels, depending on <see cref="LuraWaveFile.PixelFormatOf"/>.</returns>
-  public static byte[] Decode(byte[] data, LuraWaveHeader header) {
+  /// <param name="data">The whole file.</param>
+  /// <param name="header">Its parsed header.</param>
+  /// <param name="passwordCheck">The 32-bit check of an accepted password, or <see langword="null"/> for the public quality.</param>
+  public static byte[] Decode(byte[] data, LuraWaveHeader header, uint? passwordCheck = null) {
     var declared = 0L;
     foreach (var size in header.StripeSizes)
       declared += size;
@@ -23,7 +26,7 @@ internal static class LuraWaveCodec {
     var plane = new int[(long)width * codedHeight * channels];
     var stripe = new int[stripeSamples];
     var reader = new LuraWaveBitReader(data, header.DataOffset);
-    var decoder = new LuraWaveStripeCoder(header, reader);
+    var decoder = new LuraWaveStripeCoder(header, reader, passwordCheck);
     for (var index = 0; index < header.StripeCount; ++index) {
       if (index > 0) {
         if (reader.State == LuraWaveReadState.Exhausted)
@@ -59,7 +62,7 @@ internal static class LuraWaveCodec {
         var output = new byte[header.Width * header.Height * 2];
         for (var y = 0; y < header.Height; ++y)
         for (var x = 0; x < header.Width; ++x) {
-          var value = LuraWaveColour.Grey16(mode, plane, y * rowSamples + x, header.MaxValue);
+          var value = LuraWaveColour.Grey16(mode, plane, y * rowSamples + x, LuraWaveColour.WideMaximum(header));
           var o = (y * header.Width + x) * 2;
           output[o] = (byte)(value >> 8);
           output[o + 1] = (byte)value;
@@ -77,10 +80,12 @@ internal static class LuraWaveCodec {
   }
 
   /// <summary>
-  /// Where bit-plane coding hands over to verbatim bits. LuraTech's own files stop at plane 2; for lossless coding,
-  /// sorting all the way down came out about two percent smaller on photographs, so the writer does that.
+  /// Where bit-plane coding hands over to verbatim bits: plane 2, as in LuraTech's own files. Sorting all the way down
+  /// is about two percent smaller, but at the last planes LuraTech's two decoders disagree about nodes whose
+  /// thresholds have all run out (the C decoder gives them up without a bit, the Java one still reads one); stopping
+  /// at plane 2 keeps every such case out of a stream whose channel weights are at most one, so both decode it exactly.
   /// </summary>
-  internal const int DefaultLowestBitPlane = 0;
+  internal const int DefaultLowestBitPlane = 2;
 
   /// <summary>Most wavelet levels the encoder uses — the depth LuraTech's own encoder chose.</summary>
   internal const int EncoderLevels = 6;
@@ -112,7 +117,7 @@ internal static class LuraWaveCodec {
       StripeHeight = codedHeight,
       Levels = levels,
       CodingFlags = 0x20,
-      LowestBitPlane = DefaultLowestBitPlane,
+      LowestBitPlane = LuraWaveStripeCoder.IsLosslessLowestPlane(DefaultLowestBitPlane, levels) ? DefaultLowestBitPlane : 0,
       StripeCount = 1,
       MaxValue = mode == LuraWaveColourMode.WideGrey ? 65535 : 0,
       HorizontalDpiFixed = metadataSource?.HorizontalDpiFixed ?? LuraWaveHeader.DefaultDpiFixed,
@@ -162,6 +167,8 @@ internal static class LuraWaveCodec {
     var stripeSamples = width * header.StripeHeight * channels;
     var stripe = new int[stripeSamples];
     var sizes = new int[header.StripeCount];
+    // Bit 0 of the byte after the colour mode marks the striped ("baseline") layout, as LuraTech's encoder sets it.
+    header = header with { ModeFlags = (byte)(header.StripeCount > 1 ? header.ModeFlags | 1 : header.ModeFlags & ~1) };
     using var coded = new System.IO.MemoryStream();
     for (var index = 0; index < header.StripeCount; ++index) {
       Array.Copy(plane, (long)index * stripeSamples, stripe, 0, stripeSamples);

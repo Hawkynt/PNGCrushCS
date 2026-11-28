@@ -65,7 +65,9 @@ internal sealed class LuraWaveStripeCoder {
   private readonly int[] _subtreeSize;   // nodes in a quadtree whose top sits at a given level
   private readonly int _rootBlock;
   private readonly int[] _channelWeight;
-  private readonly int _passwordCheck;
+  private readonly uint _passwordCheck;
+  private readonly bool _unlocked;
+  private readonly int[] _minShift;
 
   private readonly int[] _position;
   private readonly int[] _next;
@@ -75,7 +77,7 @@ internal sealed class LuraWaveStripeCoder {
   private int _tail;
   private int _passes;
   private int _publicPassLimit;
-  private int _requestedPassLimit;
+  private int _totalPassLimit;
 
   // Encoder only: the true coefficients (sign and magnitude), the current plane's top bit, and per node the highest
   // plane at which anything it is responsible for becomes significant.
@@ -96,10 +98,16 @@ internal sealed class LuraWaveStripeCoder {
   }
 
   /// <summary>Prepares a decoder pulling bits from <paramref name="reader"/>.</summary>
-  public LuraWaveStripeCoder(LuraWaveHeader header, LuraWaveBitReader reader) : this(header) => this._reader = reader;
+  /// <param name="header">The stream's header.</param>
+  /// <param name="reader">Source of the coded bits.</param>
+  /// <param name="passwordCheck">
+  /// The 32-bit check value of an accepted password, which lets decoding run past the public quality of a protected
+  /// stream; <see langword="null"/> to stop at the public quality.
+  /// </param>
+  public LuraWaveStripeCoder(LuraWaveHeader header, LuraWaveBitReader reader, uint? passwordCheck = null) : this(header, passwordCheck) => this._reader = reader;
 
   /// <summary>Prepares an encoder pushing bits into <paramref name="writer"/>.</summary>
-  public LuraWaveStripeCoder(LuraWaveHeader header, LuraWaveBitWriter writer) : this(header) {
+  public LuraWaveStripeCoder(LuraWaveHeader header, LuraWaveBitWriter writer) : this(header, (uint?)null) {
     if (header.PublicQuality != LuraWaveHeader.FullQuality)
       throw new ArgumentException("The encoder writes no password-limited streams.", nameof(header));
     if (!IsLosslessLowestPlane(header.LowestBitPlane, header.Levels))
@@ -107,7 +115,7 @@ internal sealed class LuraWaveStripeCoder {
     this._writer = writer;
   }
 
-  private LuraWaveStripeCoder(LuraWaveHeader header) {
+  private LuraWaveStripeCoder(LuraWaveHeader header, uint? passwordCheck) {
     this._header = header;
     this._channels = header.Channels;
     this._width = header.CodedWidth;
@@ -135,7 +143,11 @@ internal sealed class LuraWaveStripeCoder {
       _ => 0,
     };
 
-    this._passwordCheck = 0; // no password given: the check word must be all zero bits
+    // A protected stream decodes to its public quality unless the password is known; with it, the 32-bit check
+    // embedded at the public budget must match before decoding continues.
+    this._unlocked = passwordCheck.HasValue && header.PublicQuality < LuraWaveHeader.FullQuality;
+    this._passwordCheck = passwordCheck ?? 0;
+    this._minShift = header.Regions.Length > 0 ? new int[nodes] : [];
   }
 
   /// <summary>Decodes one stripe into <paramref name="target"/> (two's complement, interleaved channels).</summary>
@@ -244,9 +256,12 @@ internal sealed class LuraWaveStripeCoder {
 
   /// <summary>The traversal shared by both directions, after the top plane is known.</summary>
   private void Run(int topPlane, int stripeTop) {
-    this._publicPassLimit = PassBudget(this._header.PublicQuality, topPlane);
-    this._requestedPassLimit = PassBudget(LuraWaveHeader.FullQuality, topPlane);
+    var locked = this._header.PublicQuality < LuraWaveHeader.FullQuality && !this._unlocked;
+    this._totalPassLimit = PassBudget(locked ? this._header.PublicQuality : LuraWaveHeader.FullQuality, topPlane);
+    this._publicPassLimit = this._unlocked ? PassBudget(this._header.PublicQuality, topPlane) : int.MaxValue;
     this._passes = 0;
+    if (topPlane == 0)
+      return; // an all-zero stripe carries nothing beyond its top-plane field
 
     var mask = 1 << topPlane;
     mask |= (mask >> 2) | (mask >> 3);
@@ -263,22 +278,56 @@ internal sealed class LuraWaveStripeCoder {
       this.CountPass();
     }
 
-    mask >>= 1;
-    for (var round = 1; round < this._levels; ++round) {
-      foreach (var orientation in (ReadOnlySpan<int>)[Horizontal, Vertical, Diagonal])
-        for (int node = 0, visited = 0; visited < this._rootCount && this.Reading; node = this._next[node], ++visited)
-          this.SendTailOfRoot(node, orientation, mask);
+    // A spent pass budget, or coded data that ran out, ends the stripe: the verbatim stage only follows complete planes.
+    if (!this.Reading)
+      return;
 
-      if (this.State == LuraWaveReadState.Exhausted)
-        this.State = LuraWaveReadState.Reading;
-      this.CountPass();
-    }
+    mask >>= 1;
+    this.SendTails(Math.Min(topPlane, this._header.LowestBitPlane), mask);
   }
 
   /// <summary>
+  /// Below the lowest coded plane every node gets its remaining bits verbatim, one tree level per round and one
+  /// orientation after the other. Only the deeper steps count against the pass budget: round <c>r</c> and orientation
+  /// <c>o</c> count when <c>3L - 3r - o</c> does not exceed <c>3 * plane - 2</c>, the count starting at one.
+  /// </summary>
+  private void SendTails(int plane, int mask) {
+    var totalLeft = this._totalPassLimit - this._passes;
+    if (totalLeft == 1)
+      return;
+
+    var publicLeft = this._publicPassLimit == int.MaxValue ? int.MaxValue : this._publicPassLimit - this._passes;
+    var count = 1;
+    if (publicLeft < 2) {
+      this.CheckPassword();
+      publicLeft = totalLeft;
+    }
+
+    var line = 3 * plane - 2;
+    ReadOnlySpan<int> orientations = [Horizontal, Vertical, Diagonal];
+    for (var round = 1; round < this._levels; ++round)
+    for (var o = 0; o < 3; ++o) {
+      for (int node = 0, visited = 0; visited < this._rootCount && this.Reading; node = this._next[node], ++visited)
+        this.SendTailOfRoot(node, orientations[o], mask);
+      if (!this.Reading)
+        return;
+
+      if (3 * this._levels - 3 * round - o > line)
+        continue;
+      if (++count == totalLeft)
+        return;
+      if (publicLeft <= count) {
+        this.CheckPassword();
+        publicLeft = totalLeft;
+      }
+    }
+  }
+
+
+  /// <summary>
   /// Whether stopping bit-plane coding at <paramref name="lowest"/> still delivers every bit: the roots, which the
-  /// verbatim rounds never reach, keep all their bits only while the plane stays below the level count, and the
-  /// verbatim rounds themselves only run in full while they fit in the pass budget (fewer than three per skipped plane).
+  /// verbatim rounds never reach, keep all their bits only while the plane stays below the level count. The second
+  /// clause is a conservative bound kept from before the verbatim budget was known to always suffice.
   /// </summary>
   internal static bool IsLosslessLowestPlane(int lowest, int levels)
     => lowest == 0 || (lowest < levels && levels - 1 < 3 * lowest);
@@ -337,22 +386,27 @@ internal sealed class LuraWaveStripeCoder {
       visit(node);
   }
 
-  /// <summary>Counts a finished pass; past the public budget the stream carries a 32-bit password check.</summary>
+  /// <summary>Counts a finished bit-plane pass: the total budget ends coding, the public budget asks for the password check.</summary>
   private void CountPass() {
     ++this._passes;
-    if (this._passes >= this._requestedPassLimit)
+    if (this._passes >= this._totalPassLimit) {
       this.State = LuraWaveReadState.Exhausted;
+      return;
+    }
+
     if (this._passes < this._publicPassLimit)
       return;
 
+    this.CheckPassword();
+    this._publicPassLimit = int.MaxValue;
+  }
+
+  /// <summary>Reads the 32-bit password check (least significant bit first) and refuses to go on when it differs.</summary>
+  private void CheckPassword() {
     var check = this._passwordCheck;
     for (var i = 0; i < 32; ++i, check >>= 1)
-      if (this.Bit(Question.PasswordCheck) != ((check & 1) != 0)) {
-        this.State = LuraWaveReadState.Exhausted;
-        return;
-      }
-
-    this._publicPassLimit = this._requestedPassLimit;
+      if (this.Bit(Question.PasswordCheck) != ((check & 1) != 0))
+        throw new System.IO.InvalidDataException("The LuraWave stream's embedded password check does not match, although the header's check value did.");
   }
 
   #region tree construction
@@ -386,44 +440,53 @@ internal sealed class LuraWaveStripeCoder {
 
   /// <summary>
   /// With interest regions, every node's shift is fixed up front from the regions its pixels fall into; returns the
-  /// largest extra shift found below the root, which the root itself takes on.
+  /// largest extra shift found below the root, which the root itself takes on. The smallest shift below each node is
+  /// kept as well, for <see cref="ChildrenSpent"/>.
   /// </summary>
   private int SeedRegionShifts(int root, int x, int y, int baseShift) {
     var top = this._levels - 1;
     var size = this._subtreeSize[top];
-    var largest = 0;
-    foreach (var region in this._header.Regions) {
-      largest = Math.Max(largest, this.SeedRegion(root + 1, x, y, top, Horizontal, region, baseShift));
-      largest = Math.Max(largest, this.SeedRegion(root + 1 + size, x, y, top, Vertical, region, baseShift));
-      largest = Math.Max(largest, this.SeedRegion(root + 1 + 2 * size, x, y, top, Diagonal, region, baseShift - 1));
-    }
-
-    return largest;
+    var (largest, smallest) = this.SeedRegion(root + 1, x, y, top, Horizontal, baseShift);
+    var (vertical, verticalMin) = this.SeedRegion(root + 1 + size, x, y, top, Vertical, baseShift);
+    var (diagonal, diagonalMin) = this.SeedRegion(root + 1 + 2 * size, x, y, top, Diagonal, baseShift - 1);
+    this._minShift[root] = Math.Min(Math.Min(smallest, verticalMin) + baseShift, diagonalMin + baseShift - 1);
+    return Math.Max(largest, Math.Max(vertical, diagonal));
   }
 
-  private int SeedRegion(int node, int x, int y, int level, int orientation, LuraWaveRegion region, int baseShift) {
+  /// <summary>Seeds one subtree; returns the largest and smallest extra shift of its finest-level nodes.</summary>
+  private (int Largest, int Smallest) SeedRegion(int node, int x, int y, int level, int orientation, int baseShift) {
     var span = 1 << level;
-    var found = 0;
+    int largest, smallest;
     if (level > 1) {
       var size = this._subtreeSize[level - 1];
-      found = Math.Max(found, this.SeedRegion(node + 1, x, y, level - 1, orientation, region, baseShift));
-      found = Math.Max(found, this.SeedRegion(node + 1 + size, x + span, y, level - 1, orientation, region, baseShift));
-      found = Math.Max(found, this.SeedRegion(node + 1 + 2 * size, x, y + span, level - 1, orientation, region, baseShift));
-      found = Math.Max(found, this.SeedRegion(node + 1 + 3 * size, x + span, y + span, level - 1, orientation, region, baseShift));
+      (largest, smallest) = this.SeedRegion(node + 1, x, y, level - 1, orientation, baseShift);
+      foreach (var (dx, dy, k) in (ReadOnlySpan<(int, int, int)>)[(span, 0, 1), (0, span, 2), (span, span, 3)]) {
+        var (high, low) = this.SeedRegion(node + 1 + k * size, x + dx, y + dy, level - 1, orientation, baseShift);
+        largest = Math.Max(largest, high);
+        smallest = Math.Min(smallest, low);
+      }
     } else {
-      // A finest-level node is judged by one representative pixel of its 4x4 footprint.
+      // A finest-level node is judged by one representative pixel of its 4x4 footprint; any region containing it
+      // gives the (shared) region shift.
       var half = span >> 1;
       var (px, py) = orientation switch {
         Horizontal => (x + span + half, y + span),
         Vertical => (x + span, y + span + half),
         _ => (x + span + half, y + span + half),
       };
-      if (px >= region.X && px <= region.X + region.Width && py >= region.Y && py <= region.Y + region.Height)
-        found = this._header.RegionShift;
+      largest = 0;
+      foreach (var region in this._header.Regions)
+        if (px >= region.X && px <= region.X + region.Width && py >= region.Y && py <= region.Y + region.Height) {
+          largest = this._header.RegionShift;
+          break;
+        }
+
+      smallest = largest;
     }
 
-    this._flags[node] = (found + baseShift) << ShiftOffset;
-    return found;
+    this._flags[node] = (largest + baseShift) << ShiftOffset;
+    this._minShift[node] = smallest + baseShift;
+    return (largest, smallest);
   }
 
   /// <summary>Gives a node a fresh flags word, either from scratch or on top of a region-seeded shift.</summary>
@@ -503,15 +566,24 @@ internal sealed class LuraWaveStripeCoder {
       this._coefficients[index] |= this.Bit(Question.Negative, index) ? threshold | Sign : threshold;
   }
 
-  /// <summary>Refinement of a coefficient already above <paramref name="threshold"/>: replace the guessed half bit by the real one.</summary>
+  /// <summary>
+  /// Refinement of a coefficient already above <paramref name="threshold"/>: the bit at the threshold's top <c>t</c> and
+  /// the guess below it are cleared, <c>t/8</c> becomes the new reconstruction offset, and the coded bit sets <c>t</c>.
+  /// </summary>
   private void RefineCoefficient(int index, int threshold) {
     ref var value = ref this._coefficients[index];
     if ((value & int.MaxValue) <= threshold)
       return;
 
-    value &= ~(threshold >> 1);
-    if (this.Bit(Question.Refinement, index, threshold))
-      value |= threshold;
+    // A bit read past the end of the coded data leaves the coefficient as it was.
+    var bit = this.Bit(Question.Refinement, index, threshold);
+    if (!this.Reading)
+      return;
+
+    var top = TopBit(threshold);
+    value = (value & ~(top | top >> 1)) | top >> 3;
+    if (bit)
+      value |= top;
   }
 
   /// <summary>The four coefficients a leaf or inner node stands for.</summary>
@@ -632,9 +704,15 @@ internal sealed class LuraWaveStripeCoder {
         if (!this.Bit(Question.AnyChildOpens, node))
           return;
         flags ^= StateMask;
+        if (this.ChildrenSpent(node, mask)) {
+          this._flags[node] = flags;
+          return;
+        }
         break;
       case Exhausting:
         if (count == 3 && (flags & ChildMarks) == allOpen)
+          return;
+        if (this.ChildrenSpent(node, mask))
           return;
         break;
       default:
@@ -655,6 +733,17 @@ internal sealed class LuraWaveStripeCoder {
       flags |= Complete;
     this._flags[node] = flags;
   }
+
+  /// <summary>
+  /// Whether every threshold below <paramref name="node"/> has run out at this plane: its unopened children are then
+  /// given up without spending a bit, now and in every later pass.
+  /// </summary>
+  private bool ChildrenSpent(int node, int mask) => ((uint)mask >> this.MinShift(node)) == 0;
+
+  /// <summary>The smallest shift of any finest-level node below <paramref name="node"/>.</summary>
+  private int MinShift(int node) => this._minShift.Length > 0
+    ? this._minShift[node]
+    : this.Kind(node) == KindRoot ? this.Shift(node) - 1 : this.Shift(node);
 
   /// <summary>A root first spends a bit on growing its orientation trees (testing its own details), then behaves like an inner node with three children.</summary>
   private void SortRoot(int root, int mask) {
