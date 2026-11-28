@@ -349,11 +349,6 @@ internal sealed class H265PictureParameterSet {
       }
     }
 
-    if (colourTransform)
-      throw new NotSupportedException(
-        "This H.265 picture parameter set sets residual_adaptive_colour_transform_enabled_flag (clause 7.3.2.3.3). "
-        + "The adaptive colour transform is not implemented.");
-
     return new(currentPictureReference, colourTransform, sliceOffsets, offsetY, offsetCb, offsetCr, initializers);
   }
 

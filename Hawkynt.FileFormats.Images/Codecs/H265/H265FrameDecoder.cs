@@ -1116,6 +1116,14 @@ internal sealed class H265FrameDecoder : IH265MotionContext {
     var anyChroma = !monochrome
                     && (flags.Cb0 || flags.Cr0 || (stackedChroma && (flags.Cb1 || flags.Cr1)));
 
+    // tu_residual_act_flag comes before everything else a transform unit with a residual sends — clause
+    // 7.3.8.10 — and only where all three residuals can be the same kind of thing: an inter unit, or
+    // an intra one whose chrominance follows the luminance mode in every prediction block.
+    var colourTransform = (cbfLuma || anyChroma)
+                          && this._pps.AdaptiveColourTransformEnabled
+                          && this._ColourTransformMayApply(x0, y0)
+                          && this._cabac.DecodeBin(H265CabacContexts.TU_RESIDUAL_ACT_FLAG) != 0;
+
     if ((cbfLuma || anyChroma)
         && this._pps.CuQpDeltaEnabled && !this._quantiserDeltaCoded) {
       this._quantiserDeltaCoded = true;
@@ -1143,6 +1151,11 @@ internal sealed class H265FrameDecoder : IH265MotionContext {
 
     var qp = this._QuantiserAt(x0, y0);
     this._lumaResidualPresent = false;
+
+    if (colourTransform) {
+      this._ReconstructColourTransformed(x0, y0, log2TrafoSize, cbfLuma, flags, qp);
+      return;
+    }
 
     if (this._cuPredictionMode == H265PredictionMode.Intra)
       this._ReconstructIntraLuma(x0, y0, log2TrafoSize, cbfLuma, qp);
@@ -1182,6 +1195,114 @@ internal sealed class H265FrameDecoder : IH265MotionContext {
       }
     }
   }
+
+  /// <summary>
+  /// Whether a transform unit at (<paramref name="x0"/>, <paramref name="y0"/>) may send
+  /// <c>tu_residual_act_flag</c>.
+  /// </summary>
+  private bool _ColourTransformMayApply(int x0, int y0) {
+    if (this._cuPredictionMode != H265PredictionMode.Intra)
+      return true;
+
+    if (this._cuPartitionMode == H265PartitionMode.Square)
+      return this._chromaModeDerived[this._BlockIndex(x0, y0)];
+
+    var half = 1 << (this._cuLog2Size - 1);
+    return this._chromaModeDerived[this._BlockIndex(this._cuX, this._cuY)]
+           && this._chromaModeDerived[this._BlockIndex(this._cuX + half, this._cuY)]
+           && this._chromaModeDerived[this._BlockIndex(this._cuX, this._cuY + half)]
+           && this._chromaModeDerived[this._BlockIndex(this._cuX + half, this._cuY + half)];
+  }
+
+  /// <summary>
+  /// Reconstructs a transform unit whose residuals were coded in YCgCo — the residual modification
+  /// process of clause 8.6.8.
+  /// </summary>
+  /// <remarks>
+  /// The three residuals only mean anything together, so none of the three components can be
+  /// reconstructed until all three are decoded; and a component that coded no residual of its own
+  /// still receives one, because the inverse transform spreads the others into it. The
+  /// predictions do not depend on each other — this is 4:4:4, where each component predicts from
+  /// its own neighbours — so they are all made first and the reconstruction written last.
+  /// </remarks>
+  private void _ReconstructColourTransformed(int x0, int y0, int log2Size, bool cbfLuma, ChromaCodedBlockFlags flags, int qp) {
+    var count = 1 << (log2Size << 1);
+    var size = 1 << log2Size;
+    var intra = this._cuPredictionMode == H265PredictionMode.Intra;
+    this._colourTransformed = true;
+
+    var lumaMode = intra ? this._intraPredModeY[this._BlockIndex(x0, y0)] : -1;
+    if (intra) {
+      this._GatherReference(x0, y0, size, lumaMode);
+      H265IntraPrediction.Predict(
+        this._prediction, this._reference, size, lumaMode, this._lumaBoundaryFilters, this._sps.BitDepthLuma,
+        this._DisableBoundaryFilters);
+      Array.Copy(this._prediction, this._colourPrediction[0], count);
+    }
+
+    if (cbfLuma) {
+      var form = this._DecodeResidual(log2Size, 0, lumaMode);
+      this._TransformResidual(log2Size, form, this._LumaQuantiser(qp), 0, this._sps.BitDepthLuma);
+      this._KeepLumaResidual(log2Size);
+      Array.Copy(this._coefficients, this._colourResidual[0], count);
+    } else
+      Array.Clear(this._colourResidual[0], 0, count);
+
+    var crossComponent = this._pps.CrossComponentPredictionEnabled && cbfLuma
+                         && (!intra || this._chromaModeDerived[this._BlockIndex(x0, y0)]);
+
+    for (var component = 1; component <= 2; ++component) {
+      var resScale = crossComponent ? this._DecodeResidualScale(component - 1) : 0;
+      var hasResidual = component == 1 ? flags.Cb0 : flags.Cr0;
+      var mode = intra ? this._ChromaModeAt(x0, y0) : -1;
+
+      if (intra) {
+        this._GatherReferenceChroma(x0, y0, size, component, mode);
+        H265IntraPrediction.Predict(
+          this._prediction, this._reference, size, mode, false, this._sps.BitDepthChroma,
+          this._DisableBoundaryFilters);
+        Array.Copy(this._prediction, this._colourPrediction[component], count);
+      }
+
+      if (hasResidual || resScale != 0) {
+        this._ChromaResidual(log2Size, component, mode, hasResidual, qp, resScale);
+        Array.Copy(this._coefficients, this._colourResidual[component], count);
+      } else
+        Array.Clear(this._colourResidual[component], 0, count);
+    }
+
+    this._colourTransformed = false;
+
+    H265Transform.InverseColourTransform(
+      this._colourResidual[0], this._colourResidual[1], this._colourResidual[2], count,
+      this._sps.BitDepthLuma, this._sps.BitDepthChroma, this._log2TransformRangeLuma, this._log2TransformRangeChroma,
+      this._cuTransquantBypass);
+
+    for (var component = 0; component < 3; ++component) {
+      var plane = component == 0 ? this._picture.Luma : this._picture.Chroma(component - 1);
+      var stride = component == 0 ? this._picture.Width : this._picture.ChromaWidth;
+      var maximum = (1 << (component == 0 ? this._sps.BitDepthLuma : this._sps.BitDepthChroma)) - 1;
+      var residual = this._colourResidual[component];
+      var prediction = this._colourPrediction[component];
+
+      for (var y = 0; y < size; ++y) {
+        var row = (y0 + y) * stride + x0;
+        for (var x = 0; x < size; ++x) {
+          var start = intra ? prediction[(y << log2Size) + x] : plane[row + x];
+          plane[row + x] = (ushort)Math.Clamp(start + residual[(y << log2Size) + x], 0, maximum);
+        }
+      }
+    }
+  }
+
+  /// <summary>
+  /// <c>tu_residual_act_flag</c> of the transform unit being dequantised: its quantisers take the
+  /// colour transform's offsets instead of the usual chrominance ones.
+  /// </summary>
+  private bool _colourTransformed;
+
+  private readonly int[][] _colourResidual = [new int[32 * 32], new int[32 * 32], new int[32 * 32]];
+  private readonly int[][] _colourPrediction = [new int[32 * 32], new int[32 * 32], new int[32 * 32]];
 
   /// <summary>
   /// <c>cross_comp_pred(x0, y0, c)</c>: <c>ResScaleVal</c>, the scale one chrominance residual takes
@@ -1291,7 +1412,17 @@ internal sealed class H265FrameDecoder : IH265MotionContext {
   /// indexed from zero, so the offset goes back in here. It stays out of everything that compares
   /// quantisers to each other, which is what the deblocking filter and the chroma table do.
   /// </summary>
-  private int _LumaQuantiser(int qpY) => qpY + this._sps.QpBdOffsetLuma;
+  /// <remarks>
+  /// A unit coded in YCgCo adds the colour transform's luma offset and clips to the range the
+  /// scaling process accepts (equation 8-291): the transform is not orthonormal, so its residuals
+  /// are quantised a few steps finer than the components they become.
+  /// </remarks>
+  private int _LumaQuantiser(int qpY)
+    => this._colourTransformed
+      ? Math.Clamp(
+        qpY + this._sps.QpBdOffsetLuma + this._pps.ActQpOffsetY + this._header.SliceActQpOffsetY, 0,
+        51 + this._sps.QpBdOffsetLuma)
+      : qpY + this._sps.QpBdOffsetLuma;
 
   private void _ReconstructIntraChroma(
     int chromaX, int chromaY, int log2Size, int component, bool hasResidual, int qp, int resScale) {
@@ -1357,9 +1488,15 @@ internal sealed class H265FrameDecoder : IH265MotionContext {
   /// bounded at 51.
   /// </remarks>
   private int _ChromaQuantiser(int lumaQp, int component) {
-    var offset = component == 1
-      ? this._pps.CbQpOffset + this._header.SliceCbQpOffset + this._cuQpOffsetCb
-      : this._pps.CrQpOffset + this._header.SliceCrQpOffset + this._cuQpOffsetCr;
+    // A unit coded in YCgCo takes the colour transform's offsets in place of the picture's and the
+    // slice's chrominance ones, not on top of them — equations 8-287 and 8-288.
+    var offset = this._colourTransformed
+      ? component == 1
+        ? this._pps.ActQpOffsetCb + this._header.SliceActQpOffsetCb + this._cuQpOffsetCb
+        : this._pps.ActQpOffsetCr + this._header.SliceActQpOffsetCr + this._cuQpOffsetCr
+      : component == 1
+        ? this._pps.CbQpOffset + this._header.SliceCbQpOffset + this._cuQpOffsetCb
+        : this._pps.CrQpOffset + this._header.SliceCrQpOffset + this._cuQpOffsetCr;
     var index = Math.Clamp(lumaQp + offset, -this._sps.QpBdOffsetChroma, 57);
     var mapped = this._chromaArrayType == 1 ? H265Dequantiser.ChromaQp(index) : Math.Min(index, 51);
     return mapped + this._sps.QpBdOffsetChroma;

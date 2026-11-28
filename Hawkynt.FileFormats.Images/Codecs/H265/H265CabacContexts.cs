@@ -82,7 +82,11 @@ internal static class H265CabacContexts {
   internal const int CU_CHROMA_QP_OFFSET_IDX = CU_CHROMA_QP_OFFSET_FLAG + 1;
 
   /// <summary>How many context variables one entropy coder holds.</summary>
-  internal const int COUNT = CU_CHROMA_QP_OFFSET_IDX + 1;
+  // The screen content coding extensions' own syntax elements, appended after the range
+  // extensions' for the same reason.
+  internal const int TU_RESIDUAL_ACT_FLAG = CU_CHROMA_QP_OFFSET_IDX + 1;
+
+  internal const int COUNT = TU_RESIDUAL_ACT_FLAG + 1;
 
   /// <summary>
   /// The initialisation values, one row per initialisation type: intra, predicted, bidirectional.
@@ -290,6 +294,9 @@ internal static class H265CabacContexts {
     // cu_chroma_qp_offset_flag and cu_chroma_qp_offset_idx.
     _Set(tables, CU_CHROMA_QP_OFFSET_FLAG, [154], [154], [154]);
     _Set(tables, CU_CHROMA_QP_OFFSET_IDX, [154], [154], [154]);
+
+    // Table 9-39: the colour transform flag starts at even odds in every slice type.
+    _Set(tables, TU_RESIDUAL_ACT_FLAG, [154], [154], [154]);
 
     return tables;
   }

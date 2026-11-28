@@ -209,6 +209,47 @@ internal static class H265Transform {
     }
   }
 
+  /// <summary>
+  /// Turns three YCgCo residuals back into the picture's own components — the adaptive colour
+  /// transformation of clause 8.6.8.2, in place.
+  /// </summary>
+  /// <remarks>
+  /// The transform is the lifting form of YCgCo, which is exactly invertible in integers; that is
+  /// what lets a lossless coding unit use it too, unscaled. A lossy one first brings all three
+  /// residuals to the deeper of the two sample depths and gives the chroma pair one bit more, the
+  /// two halvings the lifting steps make, and takes each component back to its own depth after.
+  /// </remarks>
+  internal static void InverseColourTransform(
+    int[] luma, int[] cg, int[] co, int count, int bitDepthLuma, int bitDepthChroma, int log2RangeLuma,
+    int log2RangeChroma, bool lossless) {
+    var minimumLuma = -(1 << log2RangeLuma);
+    var maximumLuma = (1 << log2RangeLuma) - 1;
+    var minimumChroma = -(1 << log2RangeChroma);
+    var maximumChroma = (1 << log2RangeChroma) - 1;
+
+    var deepest = Math.Max(bitDepthLuma, bitDepthChroma);
+    var shiftLuma = lossless ? 0 : deepest - bitDepthLuma;
+    var shiftChroma = lossless ? 0 : deepest - bitDepthChroma;
+    var chromaUp = lossless ? 0 : shiftChroma + 1;
+    var roundLuma = shiftLuma > 0 ? 1 << (shiftLuma - 1) : 0;
+    var roundChroma = shiftChroma > 0 ? 1 << (shiftChroma - 1) : 0;
+
+    for (var i = 0; i < count; ++i) {
+      var y = Math.Clamp(luma[i], minimumLuma, maximumLuma) << shiftLuma;
+      var g = Math.Clamp(cg[i], minimumChroma, maximumChroma) << chromaUp;
+      var o = Math.Clamp(co[i], minimumChroma, maximumChroma) << chromaUp;
+
+      var t = y - (g >> 1);
+      var first = t + g;
+      var second = t - (o >> 1);
+      var third = o + second;
+
+      luma[i] = (first + roundLuma) >> shiftLuma;
+      cg[i] = (second + roundChroma) >> shiftChroma;
+      co[i] = (third + roundChroma) >> shiftChroma;
+    }
+  }
+
   private static void _TransformColumns(int[] source, Span<int> target, int size, int log2Size, bool sine) {
     // Row k of the matrix for a block this size is row k * 32/size of the tabulated one, which is
     // what makes one table serve all four sizes.
