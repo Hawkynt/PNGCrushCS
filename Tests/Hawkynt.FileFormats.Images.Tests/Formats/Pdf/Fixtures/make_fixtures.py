@@ -543,10 +543,51 @@ def color():
     return page(bytes(c), resources, extra=extra)
 
 
+def jpx_alpha():
+    """JPX images carrying their own opacity: /SMaskInData 1 and 2 (with and without /Matte), 0, and CMYK."""
+    extra = []
+
+    def add(body):
+        extra.append(body)
+        return 4 + len(extra)
+
+    def jp2(mode, data, size):
+        buffer = io.BytesIO()
+        Image.frombytes(mode, size, data).save(buffer, "JPEG2000", irreversible=False)
+        return buffer.getvalue()
+
+    w, h = 24, 16
+    rgb = picture(w, h, 3)
+    opacity = [int(255 * x / (w - 1)) for y in range(h) for x in range(w)]
+    straight = bytearray()
+    for i in range(w * h):
+        straight += rgb[3 * i:3 * i + 3] + bytes((opacity[i],))
+    matte = (0.0, 1.0, 0.0)
+    pre = bytearray()
+    for i in range(w * h):
+        a = opacity[i] / 255
+        pre += bytes(int(round((rgb[3 * i + c] / 255 * a + matte[c] * (1 - a)) * 255)) for c in range(3)) + bytes((opacity[i],))
+    gray_alpha = bytearray()
+    for i in range(w * h):
+        gray_alpha += bytes((rgb[3 * i], 255 - opacity[i]))
+
+    def jpx_image(data, extra_entries):
+        return b"<< /Type /XObject /Subtype /Image /Width %d /Height %d /BitsPerComponent 8 /Filter /JPXDecode %s /Length %d >>\nstream\n" % (w, h, extra_entries, len(data)) + data + b"\nendstream"
+
+    one = add(jpx_image(jp2("RGBA", bytes(straight), (w, h)), b"/ColorSpace /DeviceRGB /SMaskInData 1"))
+    two = add(jpx_image(jp2("RGBA", bytes(pre), (w, h)), b"/ColorSpace /DeviceRGB /SMaskInData 2 /Matte [0 1 0]"))
+    zero = add(jpx_image(jp2("RGBA", bytes(straight), (w, h)), b"/ColorSpace /DeviceRGB"))
+    gray = add(jpx_image(jp2("LA", bytes(gray_alpha), (w, h)), b"/ColorSpace /DeviceGray /SMaskInData 1"))
+    resources = b"<< /XObject << /One %d 0 R /Two %d 0 R /Zero %d 0 R /Gray %d 0 R >> >>" % (one, two, zero, gray)
+    c = b"0.5 0.5 0.9 rg 0 0 200 100 re f 0.9 0.4 0.1 rg 0 40 200 20 re f\n"
+    c += b"q 80 0 0 40 10 50 cm /One Do Q q 80 0 0 40 110 50 cm /Two Do Q q 80 0 0 40 10 5 cm /Zero Do Q q 80 0 0 40 110 5 cm /Gray Do Q\n"
+    return page(c, resources, media=b"[0 0 200 100]", extra=extra)
+
+
 if __name__ == "__main__":
     target = sys.argv[1]
     os.makedirs(os.path.join(target, "Render"), exist_ok=True)
-    for name, maker in [("images", images), ("vector", vector), ("bilevel", bilevel), ("shading", shading), ("text", text), ("transparency", transparency), ("color", color)]:
+    for name, maker in [("images", images), ("vector", vector), ("bilevel", bilevel), ("shading", shading), ("text", text), ("transparency", transparency), ("color", color), ("jpx-alpha", jpx_alpha)]:
         with open(os.path.join(target, "Render", name + ".pdf"), "wb") as handle:
             handle.write(maker())
     os.makedirs(os.path.join(target, "Color"), exist_ok=True)

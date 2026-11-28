@@ -52,6 +52,51 @@ public sealed class PdfRenderTests {
     });
   }
 
+  /// <summary>
+  /// Fixtures poppler cannot judge, held to Ghostscript's render (png16m, -dUseCropBox, text and
+  /// graphics alpha bits 4, at 72 dpi) stored beside them as <c>.ghostscript.png</c>.
+  /// </summary>
+  /// <remarks>
+  /// jpx-alpha: poppler ignores /SMaskInData and reads a four-channel codestream as three-channel
+  /// samples. Ghostscript applies the opacity channel; it does not interpolate the upscaled images,
+  /// and for /SMaskInData 2 it blends the /Matte colour in instead of removing it (the image at top
+  /// right turns green where it fades out), which is where the remaining difference lies.
+  /// </remarks>
+  [TestCase("Render/jpx-alpha", 72, 3.5, 4.0)]
+  [Category("Unit")]
+  public void Fixture_AgreesWithGhostscript(string name, double resolution, double maxMeanError, double maxBadPercent) {
+    var file = _Read(name + ".pdf");
+    var rendered = PdfFile.RenderPage(file, 0, new PdfRenderOptions { Resolution = resolution });
+    var reference = PdfRenderComparison.ReadPng(PdfDocumentTests.Fixture(name + ".ghostscript.png"));
+    var comparison = PdfRenderComparison.Of(rendered.Image, reference);
+    Assert.Multiple(() => {
+      Assert.That(comparison.SameSize, Is.True);
+      Assert.That(comparison.MeanAbsoluteError, Is.LessThanOrEqualTo(maxMeanError), comparison.ToString());
+      Assert.That(comparison.BadPercent, Is.LessThanOrEqualTo(maxBadPercent), comparison.ToString());
+      Assert.That(rendered.Omissions, Is.Empty);
+    });
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void JpxOpacity_FollowsSMaskInData() {
+    var file = _Read("Render/jpx-alpha.pdf");
+    var image = PdfFile.RenderPage(file, 0, new PdfRenderOptions { Resolution = 72 }).Image;
+    var rgb = image.Format == PixelFormat.Rgb24 ? image : PixelConverter.Convert(image, PixelFormat.Rgb24);
+    int[] Pixel(int x, int y) => [rgb.PixelData[(y * rgb.Width + x) * 3], rgb.PixelData[(y * rgb.Width + x) * 3 + 1], rgb.PixelData[(y * rgb.Width + x) * 3 + 2]];
+    int[] backdrop = [128, 128, 230];
+
+    Assert.Multiple(() => {
+      // The left edge of each image has zero opacity: under 1 and 2 the backdrop shows, under 0 the
+      // opacity channel is ignored and the picture's own colour does.
+      Assert.That(Pixel(11, 30), Is.EqualTo(backdrop).Within(6), "SMaskInData 1");
+      Assert.That(Pixel(111, 30), Is.EqualTo(backdrop).Within(6), "SMaskInData 2 with /Matte");
+      Assert.That(Pixel(11, 75), Is.Not.EqualTo(backdrop), "SMaskInData 0");
+      // The right edge is opaque under 1.
+      Assert.That(Pixel(88, 30), Is.Not.EqualTo(backdrop), "opaque edge");
+    });
+  }
+
   [Test]
   [Category("Unit")]
   public void ImageCount_IsThePageCount_AndEachPageHasItsOwnSize() {

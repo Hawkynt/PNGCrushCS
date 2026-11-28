@@ -61,6 +61,9 @@ internal static class PdfImageDecoder {
     var decodeArray = document.Numbers(dict.Raw(inline ? _Key(dict, "D", "Decode") : "Decode"));
 
     var bytes = PdfFilters.Decode(document, dict, encoded, out var imageFilter, out var imageParms, inline);
+    byte[]? jpxAlpha = null;
+    var jpxPremultiplied = false;
+    var smaskInData = 0;
 
     // The colour space; an image filter can supply it when the dictionary does not.
     var csValue = dict.Raw(inline ? _Key(dict, "CS", "ColorSpace") : "ColorSpace");
@@ -79,12 +82,32 @@ internal static class PdfImageDecoder {
         break;
       }
       case "JPXDecode": {
-        var jpx = Jpeg2000Reader.FromBytes(bytes);
+        var jpxData = bytes;
+        var jpx = Jpeg2000Reader.AllComponents(jpxData);
         components = jpx.ComponentCount;
         bytes = _Resize(jpx.PixelData, components, jpx.Width, jpx.Height, width, height);
         bpc = 8;
-        if (space == null || space.Components != components)
-          space = components switch { 1 => PdfColorModel.DeviceGray, 4 => PdfColorModel.DeviceCmyk, _ => PdfColorModel.DeviceRgb };
+        smaskInData = document.Integer(dict, "SMaskInData", 0);
+        // An opacity channel is never colour: it is the soft mask under /SMaskInData 1 or 2, and
+        // dropped under 0.
+        if (components > 1 && _JpxOpacityChannel(jpxData, components, smaskInData != 0) is { } opacity) {
+          (bytes, var channel) = _SplitChannel(bytes, components, opacity.Channel, width * height);
+          --components;
+          if (smaskInData != 0) {
+            jpxAlpha = channel;
+            jpxPremultiplied = opacity.Premultiplied || smaskInData == 2;
+          }
+        }
+
+        // Without a /ColorSpace the codestream's component count decides (a second channel of two is
+        // grey's opacity); with one, components are padded with zeros or cut to what it takes, as
+        // pdf.js does — poppler instead reads the samples as if they had the space's count.
+        space ??= components switch { 1 or 2 => PdfColorModel.DeviceGray, 4 => PdfColorModel.DeviceCmyk, _ => PdfColorModel.DeviceRgb };
+        if (space.Components != components) {
+          bytes = _Refit(bytes, components, space.Components, width * height);
+          components = space.Components;
+        }
+
         // A JPX image's own bit depth is what /Decode is measured against, but the decoder has
         // already scaled it to eight bits.
         break;
@@ -127,6 +150,12 @@ internal static class PdfImageDecoder {
       alphaHeight = soft.Height;
       if (document.Numbers(smaskStream.Dictionary.Raw("Matte")) is { } matte && alphaWidth == width && alphaHeight == height)
         _Unmatte(space, matte, rgb, alpha);
+    } else if (!forSoftMask && jpxAlpha != null) {
+      // /SMaskInData (§8.9.5.4, table 89): the JPX opacity channel is the soft mask; with 2 the colour
+      // was preblended with the matte — /Matte if the dictionary gives one, else black.
+      alpha = jpxAlpha;
+      if (jpxPremultiplied)
+        _Unmatte(space, document.Numbers(dict.Raw("Matte")) ?? new double[space.Components], rgb, alpha);
     } else if (!forSoftMask && document.Get(dict, inline ? "Mask" : "Mask") is { } mask) {
       if (mask is PdfStreamObject maskStream) {
         var stencil = Decode(document, maskStream.Dictionary, maskStream.Data, resources, false, true);
@@ -148,6 +177,76 @@ internal static class PdfImageDecoder {
     }
 
     return new PdfRasterImage { Width = width, Height = height, Rgb = rgb, Alpha = alpha, AlphaWidth = alphaWidth, AlphaHeight = alphaHeight };
+  }
+
+  /// <summary>
+  /// Which JPX channel is opacity, from the JP2 channel definition box (type 1 opacity, 2 premultiplied
+  /// opacity); for a bare codestream, or a header without one, the channel past the colour ones.
+  /// </summary>
+  private static (int Channel, bool Premultiplied)? _JpxOpacityChannel(byte[] data, int components, bool guess) {
+    if (data.Length >= 12 && data[4] == (byte)'j' && data[5] == (byte)'P') {
+      var header = _FindBox(data, 0, data.Length, "jp2h");
+      if (header is var (hs, he) && _FindBox(data, hs, he, "cdef") is var (cs, ce) && ce - cs >= 2) {
+        var n = data[cs] << 8 | data[cs + 1];
+        for (var i = 0; i < n && cs + 2 + 6 * i + 6 <= ce; ++i) {
+          var at = cs + 2 + 6 * i;
+          var channel = data[at] << 8 | data[at + 1];
+          var type = data[at + 2] << 8 | data[at + 3];
+          if (type is 1 or 2 && channel < components)
+            return (channel, type == 2);
+        }
+
+        return null;
+      }
+    }
+
+    return guess && components is 2 or 4 or 5 ? (components - 1, false) : null;
+  }
+
+  /// <summary>The content of the first box of a type between two offsets.</summary>
+  private static (int Start, int End)? _FindBox(byte[] data, int start, int end, string type) {
+    var p = start;
+    while (p + 8 <= end) {
+      long length = (uint)(data[p] << 24 | data[p + 1] << 16 | data[p + 2] << 8 | data[p + 3]);
+      var headerLength = 8;
+      if (length == 1 && p + 16 <= end) {
+        length = (long)((ulong)data[p + 8] << 56 | (ulong)data[p + 9] << 48 | (ulong)data[p + 10] << 40 | (ulong)data[p + 11] << 32 | (ulong)data[p + 12] << 24 | (ulong)data[p + 13] << 16 | (ulong)data[p + 14] << 8 | data[p + 15]);
+        headerLength = 16;
+      } else if (length == 0)
+        length = end - p;
+      if (length < headerLength || p + length > end)
+        return null;
+      if (data[p + 4] == type[0] && data[p + 5] == type[1] && data[p + 6] == type[2] && data[p + 7] == type[3])
+        return (p + headerLength, (int)(p + length));
+      p += (int)length;
+    }
+
+    return null;
+  }
+
+  /// <summary>Interleaved 8-bit samples with their channel count padded with zeros or cut.</summary>
+  private static byte[] _Refit(byte[] samples, int from, int to, int pixels) {
+    var result = new byte[pixels * to];
+    var copy = Math.Min(from, to);
+    for (var p = 0; p < pixels; ++p)
+      Array.Copy(samples, p * from, result, p * to, copy);
+    return result;
+  }
+
+  /// <summary>Takes one channel out of interleaved 8-bit samples.</summary>
+  private static (byte[] Remaining, byte[] Channel) _SplitChannel(byte[] samples, int components, int channel, int pixels) {
+    var rest = new byte[pixels * (components - 1)];
+    var taken = new byte[pixels];
+    for (int p = 0, r = 0; p < pixels; ++p)
+      for (var c = 0; c < components; ++c) {
+        var v = samples[p * components + c];
+        if (c == channel)
+          taken[p] = v;
+        else
+          rest[r++] = v;
+      }
+
+    return (rest, taken);
   }
 
   /// <summary>The luminosity of a decoded image as one byte a pixel, which is what a soft-mask image is.</summary>

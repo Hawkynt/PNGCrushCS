@@ -25,17 +25,26 @@ public static class Jpeg2000Reader {
     return FromSpan(data);
   }
 
-  public static Jpeg2000File FromSpan(ReadOnlySpan<byte> data) {
+  public static Jpeg2000File FromSpan(ReadOnlySpan<byte> data) => _Read(data, false);
+
+  /// <summary>
+  /// Decodes every component, alpha and spot channels included, at eight bits each, interleaved in
+  /// codestream order — what a PDF JPXDecode stream needs, where the colour space or /SMaskInData
+  /// says what the components mean.
+  /// </summary>
+  internal static Jpeg2000File AllComponents(ReadOnlySpan<byte> data) => _Read(data, true);
+
+  private static Jpeg2000File _Read(ReadOnlySpan<byte> data, bool all) {
     if (data.Length < _MINIMUM_SIZE)
       throw new InvalidDataException("Data too small for a valid JPEG 2000 file.");
 
     var bytes = data.ToArray();
 
     if (_IsJp2Container(bytes))
-      return _ParseJp2(bytes);
+      return _ParseJp2(bytes, all);
 
     if (bytes[0] == 0xFF && bytes[1] == 0x4F)
-      return _Decode(bytes, 0, bytes.Length);
+      return _Decode(bytes, 0, bytes.Length, all);
 
     throw new InvalidDataException("Invalid JPEG 2000 signature: expected a JP2 box or a J2K SOC marker.");
   }
@@ -51,20 +60,20 @@ public static class Jpeg2000Reader {
     return true;
   }
 
-  private static Jpeg2000File _ParseJp2(byte[] data) {
+  private static Jpeg2000File _ParseJp2(byte[] data, bool all) {
     foreach (var box in Jp2Box.ReadBoxes(data, 0, data.Length))
       if (box.Type == Jp2Box.TYPE_CODESTREAM)
-        return _Decode(box.Data, 0, box.Data.Length);
+        return _Decode(box.Data, 0, box.Data.Length, all);
 
     throw new InvalidDataException("JP2 file has no contiguous codestream (jp2c) box.");
   }
 
-  private static Jpeg2000File _Decode(byte[] data, int offset, int length) {
+  private static Jpeg2000File _Decode(byte[] data, int offset, int length, bool all) {
     var decoded = Jp2CodestreamDecoder.Decode(data, offset, length);
 
     // The public model carries eight-bit grey or RGB. A codestream with an alpha or a spot channel
     // still decodes; the extra components simply do not reach the raster.
-    var componentCount = decoded.Components.Length >= 3 ? 3 : 1;
+    var componentCount = all ? decoded.Components.Length : decoded.Components.Length >= 3 ? 3 : 1;
     var width = decoded.Width;
     var height = decoded.Height;
     var pixels = new byte[width * height * componentCount];
