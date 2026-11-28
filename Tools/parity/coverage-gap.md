@@ -941,7 +941,7 @@ Windows only, so nothing here has ever been able to compare against them either.
 | ecc | .ecc |  |
 | eidi | .ei .eidi | read; eighteen samples, every pixel agreeing with XnView |
 | eif | .eif | read; the document's pages are whole TIFF streams |
-| eri | .eri | Windows only |
+| eri | .eri | read and write: every lossless variant and the lossy DCT key frames, against both Entis libraries; LOT and motion-compensated MEI refused by name |
 | fbm | .cbm |  |
 | fff | .fff | read; its signature stands at 452 and its JPEG at 3272 |
 | fi | .fi | read; a zlib stream holding the palette and then the rows, or a JPEG at 598 |
@@ -1075,7 +1075,7 @@ Windows only, so nothing here has ever been able to compare against them either.
 | xif | .xif | read by the TIFF reader, which is what XnView reads it with |
 | xim | .xim | read; Thompson's Xim, eight-bit planes; netpbm's header and XnView's reader agree |
 | xp0 | .xp0 | read; 00 00 00 01 and a JPEG at 1779, which two sources agree on |
-| ypc | .ypc | Windows only |
+| ypc | .ypc | read and write, byte for byte what the reference encoder writes |
 | yuv411 | .qtl | raw YUV; nothing states the size, and five names share this extension |
 | yuv422 | .qtl | raw YUV; nothing states the size, and five names share this extension |
 | yuv444 | .qtl | raw YUV; nothing states the size, and five names share this extension |
