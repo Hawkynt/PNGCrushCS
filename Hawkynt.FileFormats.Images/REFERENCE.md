@@ -28508,10 +28508,12 @@ Implements `IEquatable<PdfPageRendering>`.
 | `PdfRenderOptions` | `PdfRenderOptions()` |  |
 | `DefaultMaximumPixels` | `const long DefaultMaximumPixels` |  |
 | `Default` | `static PdfRenderOptions Default { get; }` |  |
+| `FontDirectories` | `IReadOnlyList<string> FontDirectories { get; init; }` |  |
 | `MaximumPixels` | `long MaximumPixels { get; init; }` |  |
 | `RenderAnnotations` | `bool RenderAnnotations { get; init; }` |  |
 | `Resolution` | `double Resolution { get; init; }` |  |
 | `SimulateOverprint` | `bool SimulateOverprint { get; init; }` |  |
+| `UseSystemFonts` | `bool UseSystemFonts { get; init; }` |  |
 
 #### `PdfWriter`
 

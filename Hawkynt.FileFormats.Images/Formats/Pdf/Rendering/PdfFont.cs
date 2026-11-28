@@ -24,8 +24,10 @@ namespace FileFormat.Pdf.Rendering;
 /// <para/>
 /// A font that is not embedded is drawn with a bundled Liberation face standing in for Helvetica,
 /// Times or Courier — the families those are metric-compatible with — chosen from the base font name
-/// and the descriptor's flags; Symbol and ZapfDingbats with the bundled Noto-based symbol face. Where
-/// nothing can stand in (a non-embedded CID font) the text is not drawn and the omission is reported.
+/// and the descriptor's flags; Symbol and ZapfDingbats with the bundled Noto-based symbol face. A
+/// non-embedded CID font of Adobe-Japan1, -GB1, -CNS1 or -Korea1 is drawn with an installed font that
+/// covers its collection (<see cref="PdfSystemFonts"/>, <see cref="PdfCidSubstitute"/>), at the PDF
+/// font's own widths. Where nothing can stand in the text is not drawn and the omission is reported.
 /// </remarks>
 internal sealed class PdfFont {
 
@@ -70,11 +72,20 @@ internal sealed class PdfFont {
   private readonly Dictionary<int, (double W1, double Vx, double Vy)> _cidVertical = [];
   private (double Vy, double W1) _defaultVertical = (880, -1000);
 
-  private PdfFont(PdfDocument document) => this._document = document;
+  private PdfCidSubstitute? _substitute;
+  private readonly PdfSystemFonts? _systemFonts;
 
-  /// <summary>Reads a font dictionary.</summary>
-  public static PdfFont Load(PdfDocument document, PdfDict dict) {
-    var font = new PdfFont(document);
+  private PdfFont(PdfDocument document, PdfSystemFonts? systemFonts) {
+    this._document = document;
+    this._systemFonts = systemFonts;
+  }
+
+  /// <summary>The installed font drawing a non-embedded CID font, or null.</summary>
+  internal PdfCidSubstitute? Substitute => this._substitute;
+
+  /// <summary>Reads a font dictionary; a non-embedded CJK CID font is looked for among the given installed fonts.</summary>
+  public static PdfFont Load(PdfDocument document, PdfDict dict, PdfSystemFonts? systemFonts = null) {
+    var font = new PdfFont(document, systemFonts);
     font.Name = document.Name(dict, "BaseFont") ?? "unnamed";
     var subtype = document.Name(dict, "Subtype");
     switch (subtype) {
@@ -250,8 +261,20 @@ internal sealed class PdfFont {
       }
 
     this._program = this._LoadProgram(descriptor, true);
-    if (this._program == null && this.MissingReason == null)
-      this.MissingReason = $"the CID font {this.Name} is not embedded, and no substitute for a CID font is bundled";
+    if (this._program == null && this.MissingReason == null) {
+      this._substitute = this._FindSubstitute(cidFont, descriptor, out var collection);
+      if (this._substitute != null) {
+        // The installed face is reached through the collection, never through a CIDToGIDMap.
+        this._program = this._substitute.Face.Program;
+        return;
+      }
+
+      this.MissingReason = collection is "Adobe-Japan1" or "Adobe-GB1" or "Adobe-CNS1" or "Adobe-Korea1"
+        ? this._systemFonts == null
+          ? $"the CID font {this.Name} is not embedded, and installed fonts are not searched"
+          : $"the CID font {this.Name} is not embedded, and no installed font covers {collection}"
+        : $"the CID font {this.Name} is not embedded, and its character collection {collection ?? "(none)"} is not one an installed font can stand in for";
+    }
 
     var map = document.Resolve(cidFont.Raw("CIDToGIDMap"));
     if (map is PdfStreamObject mapStream) {
@@ -260,6 +283,31 @@ internal sealed class PdfFont {
       for (var i = 0; i < this._cidToGid.Length; ++i)
         this._cidToGid[i] = (bytes[2 * i] << 8) | bytes[2 * i + 1];
     }
+  }
+
+  // A non-embedded CID font of one of Adobe's CJK collections is drawn with an installed font that
+  // covers the collection, chosen by the descendant's name, the descriptor's serif, fixed-pitch and
+  // bold flags and its weight.
+  private PdfCidSubstitute? _FindSubstitute(PdfDict cidFont, PdfDict? descriptor, out string? collection) {
+    var document = this._document;
+    var info = document.Dict(cidFont.Raw("CIDSystemInfo"));
+    var registry = document.Get(info, "Registry") is byte[] r ? System.Text.Encoding.Latin1.GetString(r) : null;
+    var ordering = document.Get(info, "Ordering") is byte[] o ? System.Text.Encoding.Latin1.GetString(o) : null;
+    collection = registry != null && ordering != null ? registry + "-" + ordering : null;
+    if (this._systemFonts == null || registry != "Adobe" || ordering == null || PdfCidToUnicode.For(ordering) is not { } table)
+      return null;
+
+    var name = _StripSubset(document.Name(cidFont, "BaseFont") ?? this.Name);
+    var comma = name.IndexOf(',');
+    var style = comma >= 0 ? name[(comma + 1)..] : "";
+    if (comma >= 0)
+      name = name[..comma];
+
+    var flags = document.Integer(descriptor, "Flags");
+    var serif = PdfFontNames.IsSerif(name) ?? (flags & 2) != 0;
+    var bold = PdfFontNames.IsBold(name) || PdfFontNames.IsBold(style) || (flags & 0x40000) != 0 || document.Number(descriptor, "FontWeight") >= 600;
+    var face = this._systemFonts.Find(ordering, name, serif, bold, (flags & 1) != 0);
+    return face == null ? null : new PdfCidSubstitute(face, table, this.IsVertical);
   }
 
   #endregion
@@ -356,7 +404,7 @@ internal sealed class PdfFont {
 
     if (!this._outlines.TryGetValue(gid, out var outline)) {
       try {
-        outline = this._program.Outline(gid);
+        outline = this._substitute != null ? this._substitute.Outline(gid) : this._program.Outline(gid);
       } catch (Exception e) when (e is InvalidDataException or IndexOutOfRangeException or ArgumentException or InvalidOperationException) {
         outline = null;
       }
@@ -369,6 +417,8 @@ internal sealed class PdfFont {
 
   private int _GlyphOf(int code) {
     var program = this._program!;
+    if (this._substitute != null)
+      return this._substitute.GlyphOf(code);
     if (this.IsComposite) {
       var cid = code;
       if (program is CffFontProgram { IsCidKeyed: true } cidCff)

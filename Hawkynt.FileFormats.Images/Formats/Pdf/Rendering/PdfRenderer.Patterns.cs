@@ -105,7 +105,7 @@ internal sealed partial class PdfRenderer {
 
     // Pattern space to cell raster: y up in pattern space, down in the raster.
     var toCell = new Matrix2D(cellScaleX, 0, 0, -cellScaleY, -bx0 * cellScaleX, by1 * cellScaleY);
-    var cell = new PdfRenderer(this._document, cellWidth, cellHeight, this._omissions, this._formDepth + 1, this._activeForms);
+    var cell = new PdfRenderer(this._document, cellWidth, cellHeight, this._omissions, this._formDepth + 1, this._activeForms) { SystemFonts = this.SystemFonts };
     cell.BeginTransparent(toCell);
     var content = this._document.Decode(stream);
     var resources = this._document.Dict(dict.Raw("Resources")) ?? this._resources;

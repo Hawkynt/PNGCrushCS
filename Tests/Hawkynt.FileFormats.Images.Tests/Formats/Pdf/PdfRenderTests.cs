@@ -186,14 +186,14 @@ public sealed class PdfRenderTests {
   [Test]
   [Category("Unit")]
   public void TextInAFontWithNoSubstitute_IsLeftOut_AndSaidSo() {
-    // A CJK CID font that is not embedded: no CJK face is bundled.
+    // A CJK CID font that is not embedded: no CJK face is bundled, and installed ones are not searched.
     var pdf = _Build(
       "<< /Type /Catalog /Pages 2 0 R >>",
       "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
       "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 100 30] /Resources << /Font << /J 5 0 R /H << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> >> >> /Contents 4 0 R >>",
       _Stream("BT /J 20 Tf 5 5 Td <30423044> Tj /H 20 Tf (Hi) Tj ET"),
       "<< /Type /Font /Subtype /Type0 /BaseFont /MS-Mincho /Encoding /UniJIS-UCS2-H /DescendantFonts [<< /Type /Font /Subtype /CIDFontType2 /BaseFont /MS-Mincho /CIDSystemInfo << /Registry (Adobe) /Ordering (Japan1) /Supplement 2 >> >>] >>");
-    var rendering = PdfFile.RenderPage(PdfReader.FromBytes(pdf), 0);
+    var rendering = PdfFile.RenderPage(PdfReader.FromBytes(pdf), 0, new PdfRenderOptions { UseSystemFonts = false });
     Assert.Multiple(() => {
       Assert.That(rendering.Omissions, Has.Count.EqualTo(1));
       Assert.That(rendering.Omissions[0], Does.Contain("MS-Mincho"));

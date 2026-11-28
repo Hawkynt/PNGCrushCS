@@ -86,6 +86,16 @@
                       LogicalName="FileFormat.Pdf.Fonts.Data.CMaps.LICENSE-cmap-resources.txt" />
   </ItemGroup>
 
+  <!-- Adobe's CID-to-Unicode maps (mapping-resources-pdf, BSD-3-Clause), packed by
+       pack_cid_unicode.py and Brotli-compressed, for drawing a non-embedded CID font with an
+       installed one; the licence travels inside the assembly beside them. -->
+  <ItemGroup>
+    <EmbeddedResource Include="Formats\Pdf\Fonts\Data\CMaps\cid2unicode.bin.br"
+                      LogicalName="FileFormat.Pdf.Fonts.Data.CMaps.cid2unicode.bin.br" />
+    <EmbeddedResource Include="Formats\Pdf\Fonts\Data\CMaps\LICENSE-mapping-resources-pdf.txt"
+                      LogicalName="FileFormat.Pdf.Fonts.Data.CMaps.LICENSE-mapping-resources-pdf.txt" />
+  </ItemGroup>
+
   <ItemGroup>
     <None Include="README.md" Pack="true" PackagePath="\" />
     <!-- Expose <FileFormatRegistryNamespace> to the source generator's AnalyzerConfigOptions. -->

@@ -694,6 +694,55 @@ def symbols():
     return page(c, resources)
 
 
+def cjk():
+    """Non-embedded CID fonts of Adobe-Japan1 and Adobe-GB1, horizontal and vertical, for an installed font to draw.
+
+    The tests point the renderer at CjkFonts/ alone and pdftoppm at the same folder through a private
+    fontconfig file (see PdfRenderTests.NonEmbeddedCjkFixture_AgreesWithPoppler), so MS-Gothic is
+    drawn with "Fixture Sans CJK JP" (CFF, reached through Unicode), MS-Mincho with "Fixture Serif CJK
+    JP" (CFF keyed by Adobe-Japan1, read by CID) and STHeiti with "Fixture Sans CJK SC" (TrueType).
+    The Identity lines name CIDs: horizontal forms, and the vertical forms 7887-7912 of 、。「」.
+    """
+    extra = []
+
+    def add(body):
+        extra.append(body)
+        return 4 + len(extra)
+
+    def descendant(name, ordering, supplement, flags):
+        descriptor = add(b"<< /Type /FontDescriptor /FontName /%s /Flags %d /FontBBox [0 -141 1000 859] /ItalicAngle 0 /Ascent 859 /Descent -141 /CapHeight 700 /StemV 80 >>" % (name, flags))
+        return add(b"<< /Type /Font /Subtype /CIDFontType0 /BaseFont /%s /CIDSystemInfo << /Registry (Adobe) /Ordering (%s) /Supplement %d >> /FontDescriptor %d 0 R /DW 1000 /W [1 95 500] >>" % (name, ordering, supplement, descriptor))
+
+    gothic = descendant(b"MS-Gothic", b"Japan1", 6, 4)
+    mincho = descendant(b"MS-Mincho", b"Japan1", 6, 6)
+    heiti = descendant(b"STHeiti-Regular", b"GB1", 5, 4)
+    fonts = {}
+    for key, name, encoding, cid in [(b"J", b"MS-Gothic", b"UniJIS-UCS2-H", gothic), (b"JV", b"MS-Gothic", b"UniJIS-UCS2-V", gothic),
+                                     (b"JI", b"MS-Gothic", b"Identity-H", gothic), (b"M", b"MS-Mincho", b"UniJIS-UCS2-H", mincho),
+                                     (b"MV", b"MS-Mincho", b"UniJIS-UCS2-V", mincho), (b"MI", b"MS-Mincho", b"Identity-V", mincho),
+                                     (b"S", b"STHeiti-Regular", b"UniGB-UCS2-H", heiti), (b"SV", b"STHeiti-Regular", b"UniGB-UCS2-V", heiti)]:
+        fonts[key] = add(b"<< /Type /Font /Subtype /Type0 /BaseFont /%s /Encoding /%s /DescendantFonts [%d 0 R] >>" % (name, encoding, cid))
+    resources = b"<< /Font << " + b" ".join(b"/%s %d 0 R" % (k, v) for k, v in fonts.items()) + b" >> >>"
+
+    def u(text):
+        return b"<" + text.encode("utf-16-be").hex().upper().encode() + b">"
+
+    japanese = "日本語のテキスト、縦書き。「ー」（漢字）ＡＢ ABab12"
+    chinese = "中文简体字，这是测试。“国”（汉字）AB12"
+    cids = b"<" + b"".join(b"%04X" % c for c in (843, 845, 847, 634, 635, 686, 687, 7887, 7888, 7911, 7912, 1533, 2248, 34, 35, 66, 67, 18)) + b">"
+    c = b"BT\n"
+    c += b"/J 10 Tf 1 0 0 1 8 312 Tm %s Tj\n" % u(japanese)
+    c += b"/M 10 Tf 1 0 0 1 8 296 Tm %s Tj\n" % u(japanese)
+    c += b"/S 10 Tf 1 0 0 1 8 280 Tm %s Tj\n" % u(chinese)
+    c += b"/JI 10 Tf 1 0 0 1 8 264 Tm %s Tj\n" % cids
+    c += b"/JV 9 Tf 1 0 0 1 20 250 Tm %s Tj\n" % u(japanese)
+    c += b"/MV 9 Tf 1 0 0 1 42 250 Tm %s Tj\n" % u(japanese)
+    c += b"/MI 9 Tf 1 0 0 1 64 250 Tm %s Tj\n" % cids
+    c += b"/SV 9 Tf 1 0 0 1 86 250 Tm %s Tj\n" % u(chinese)
+    c += b"ET\n"
+    return page(c, resources, media=b"[0 0 275 325]", extra=extra)
+
+
 def jpx_alpha():
     """JPX images carrying their own opacity: /SMaskInData 1 and 2 (with and without /Matte), 0, and CMYK."""
     extra = []
@@ -738,7 +787,7 @@ def jpx_alpha():
 if __name__ == "__main__":
     target = sys.argv[1]
     os.makedirs(os.path.join(target, "Render"), exist_ok=True)
-    for name, maker in [("images", images), ("vector", vector), ("bilevel", bilevel), ("shading", shading), ("text", text), ("transparency", transparency), ("color", color), ("jpx-alpha", jpx_alpha), ("cmaps", cmaps), ("type1cff", type1cff), ("overprint", overprint), ("symbols", symbols)]:
+    for name, maker in [("images", images), ("vector", vector), ("bilevel", bilevel), ("shading", shading), ("text", text), ("transparency", transparency), ("color", color), ("jpx-alpha", jpx_alpha), ("cmaps", cmaps), ("type1cff", type1cff), ("overprint", overprint), ("symbols", symbols), ("cjk", cjk)]:
         with open(os.path.join(target, "Render", name + ".pdf"), "wb") as handle:
             handle.write(maker())
     os.makedirs(os.path.join(target, "Fonts"), exist_ok=True)

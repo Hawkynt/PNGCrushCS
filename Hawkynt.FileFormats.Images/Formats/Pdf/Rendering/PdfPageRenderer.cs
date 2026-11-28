@@ -29,7 +29,7 @@ internal static class PdfPageRenderer {
     height = Math.Max(1, height);
 
     var omissions = new List<string>();
-    var renderer = new PdfRenderer(document, width, height, omissions);
+    var renderer = new PdfRenderer(document, width, height, omissions) { SystemFonts = Fonts.PdfSystemFonts.For(options.FontDirectories, options.UseSystemFonts) };
     if (options.SimulateOverprint)
       renderer.Surface.Shadow = new PdfOverprintShadow(width, height);
     renderer.BeginPage(BaseTransform(crop, page.Rotate, scale * page.UserUnit));

@@ -34,11 +34,30 @@ public sealed class PdfRenderOptions {
   /// </summary>
   public bool SimulateOverprint { get; init; }
 
+  /// <summary>
+  /// Whether a CJK CID font the document does not embed is drawn with a font installed on this
+  /// machine that covers its character collection (Adobe-Japan1, -GB1, -CNS1 or -Korea1), as viewers
+  /// and poppler do; on by default. The platform's font folders are searched — the Windows, macOS or
+  /// XDG and fontconfig ones — after any in <see cref="FontDirectories"/>. Where no installed font
+  /// covers the collection the text is left out and reported in <see cref="PdfPageRendering.Omissions"/>.
+  /// Turned off, only <see cref="FontDirectories"/> is searched, so a render no longer depends on
+  /// what the machine has installed.
+  /// </summary>
+  public bool UseSystemFonts { get; init; } = true;
+
+  /// <summary>
+  /// Folders of TrueType and OpenType fonts and collections (.ttf, .otf, .ttc, .otc), searched with
+  /// their subfolders before the system's for a font to draw a non-embedded CJK CID font with.
+  /// Empty by default. Each set of folders is read once per process, the first time a page needs it.
+  /// </summary>
+  public IReadOnlyList<string> FontDirectories { get; init; } = [];
+
   internal void Validate() {
     if (!(this.Resolution > 0) || !double.IsFinite(this.Resolution))
       throw new ArgumentOutOfRangeException(nameof(this.Resolution), "The resolution must be a positive number.");
     if (this.MaximumPixels < 1)
       throw new ArgumentOutOfRangeException(nameof(this.MaximumPixels), "The pixel cap must be at least one.");
+    ArgumentNullException.ThrowIfNull(this.FontDirectories, nameof(this.FontDirectories));
   }
 }
 

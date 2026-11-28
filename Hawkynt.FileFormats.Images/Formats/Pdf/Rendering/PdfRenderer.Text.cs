@@ -46,7 +46,7 @@ internal sealed partial class PdfRenderer {
     }
 
     if (!this._fonts.TryGetValue(dict, out var font)) {
-      font = PdfFont.Load(this._document, dict);
+      font = PdfFont.Load(this._document, dict, this.SystemFonts);
       this._fonts[dict] = font;
     }
 

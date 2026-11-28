@@ -74,6 +74,9 @@ internal sealed partial class PdfRenderer {
   /// <summary>The surface being drawn on.</summary>
   public PdfSurface Surface => this._surface;
 
+  /// <summary>The installed fonts a non-embedded CJK CID font may be drawn with, or null to search none.</summary>
+  public Fonts.PdfSystemFonts? SystemFonts { get; init; }
+
   /// <summary>Sets the transform from default user space to device pixels and clears to white.</summary>
   public void BeginPage(Matrix2D baseTransform) {
     this._baseTransform = baseTransform;

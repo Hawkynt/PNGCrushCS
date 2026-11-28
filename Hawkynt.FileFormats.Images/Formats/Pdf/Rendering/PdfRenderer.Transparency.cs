@@ -133,7 +133,7 @@ internal sealed partial class PdfRenderer {
       transfer = PdfFunction.Parse(this._document, tr);
 
     var luminosity = kind == "Luminosity";
-    var renderer = new PdfRenderer(this._document, this._width, this._height, this._omissions, this._formDepth + 1, this._activeForms);
+    var renderer = new PdfRenderer(this._document, this._width, this._height, this._omissions, this._formDepth + 1, this._activeForms) { SystemFonts = this.SystemFonts };
     renderer.BeginTransparent(this._state.Ctm);
     renderer._resources = this._resources;
 
