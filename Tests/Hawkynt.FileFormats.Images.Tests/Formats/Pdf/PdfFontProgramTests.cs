@@ -195,6 +195,23 @@ public sealed class PdfFontProgramTests {
   [Category("Unit")]
   public void Type1_HexEexec() => _AssertType1(Type1FontProgram.Parse(_Fixture("type1-hex.pfa"), 0, 0));
 
+  /// <summary>
+  /// type1-charstrings.cff is type1.pfa recast by make_fixtures.py as a bare CFF with
+  /// CharstringType 1 — the same decrypted charstrings and Subrs — so every glyph, flex, hint
+  /// replacement and seac included, must come out as the Type 1 program's does.
+  /// </summary>
+  [Test]
+  [Category("Unit")]
+  public void Cff_WithType1Charstrings_DrawsAsTheType1Program() {
+    var font = CffFontProgram.Parse(_Fixture("type1-charstrings.cff"));
+    Assert.That(font.GlyphCount, Is.EqualTo(_Type1Expected.Length));
+    foreach (var (name, bounds, area, width) in _Type1Expected) {
+      var gid = font.GlyphIdOfName(name);
+      Assert.That(gid, Is.GreaterThanOrEqualTo(0), name);
+      _AssertGlyph(font, gid, bounds, area, width);
+    }
+  }
+
   [Test]
   [Category("Unit")]
   public void Type1_PfbSegments() {

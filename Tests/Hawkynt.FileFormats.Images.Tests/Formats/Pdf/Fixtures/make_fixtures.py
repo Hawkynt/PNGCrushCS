@@ -543,6 +543,69 @@ def color():
     return page(bytes(c), resources, extra=extra)
 
 
+def _cff_index(items):
+    if not items:
+        return b"\0\0"
+    offsets = [1]
+    for item in items:
+        offsets.append(offsets[-1] + len(item))
+    return len(items).to_bytes(2, "big") + b"\x04" + b"".join(o.to_bytes(4, "big") for o in offsets) + b"".join(items)
+
+
+def _cff_int(v):
+    return b"\x1d" + v.to_bytes(4, "big", signed=True)
+
+
+def type1_charstring_cff():
+    """Fonts/type1.pfa recast as a bare CFF with CharstringType 1: same glyphs, same subroutines."""
+    from fontTools import t1Lib
+    from fontTools.cffLib import cffStandardStrings
+
+    here = os.path.dirname(os.path.abspath(__file__))
+    t1 = t1Lib.T1Font(os.path.join(here, "Fonts", "type1.pfa"))
+    t1.parse()
+    names = list(t1.font["CharStrings"].keys())
+    names.remove(".notdef")
+    names.insert(0, ".notdef")
+
+    def code(cs):
+        cs.compile()
+        return cs.bytecode
+    charstrings = [code(t1.font["CharStrings"][n]) for n in names]
+    subrs = [code(s) for s in t1.font["Private"]["Subrs"]]
+    charset = b"\0" + b"".join(cffStandardStrings.index(n).to_bytes(2, "big") for n in names[1:])
+    private_head = _cff_int(0) + b"\x13"  # Subrs, offset patched below
+    private = _cff_int(len(private_head)) + b"\x13"
+
+    header = b"\x01\x00\x04\x04"
+    name_index = _cff_index([b"T1CffTest"])
+    top_len = len(_cff_index([_cff_int(0) + b"\x0f" + _cff_int(0) + b"\x11" + _cff_int(0) + _cff_int(0) + b"\x12" + b"\x8c\x0c\x06"]))
+    start = len(header) + len(name_index) + top_len + len(_cff_index([])) + len(_cff_index([]))
+    charset_at = start
+    charstrings_at = charset_at + len(charset)
+    charstrings_index = _cff_index(charstrings)
+    private_at = charstrings_at + len(charstrings_index)
+    top = _cff_int(charset_at) + b"\x0f" + _cff_int(charstrings_at) + b"\x11" + _cff_int(len(private)) + _cff_int(private_at) + b"\x12" + b"\x8c\x0c\x06"
+    return header + name_index + _cff_index([top]) + _cff_index([]) + _cff_index([]) + charset + charstrings_index + private + _cff_index(subrs)
+
+
+def type1cff():
+    """A Type1C font program carrying Type 1 charstrings, as simple font and as CIDFontType0."""
+    extra = []
+
+    def add(body):
+        extra.append(body)
+        return 4 + len(extra)
+
+    program = add(stream(b"/Subtype /Type1C", type1_charstring_cff(), flate=False))
+    d = add(b"<< /Type /FontDescriptor /FontName /T1CffTest /Flags 34 /FontBBox [0 0 1000 1000] /ItalicAngle 0 /Ascent 800 /Descent -200 /CapHeight 700 /StemV 80 /FontFile3 %d 0 R >>" % program)
+    widths = b"[" + b" ".join(b"600" for _ in range(224)) + b"]"
+    simple = add(b"<< /Type /Font /Subtype /Type1 /BaseFont /T1CffTest /FirstChar 32 /LastChar 255 /Widths %s /FontDescriptor %d 0 R /Encoding << /Differences [66 /Aacute] >> >>" % (widths, d))
+    resources = b"<< /Font << /F %d 0 R >> >>" % simple
+    c = b"BT /F 36 Tf 10 120 Td (AFOS) Tj 0 -50 Td 0.7 0 0 rg (WISO) Tj 1 Tr 0 0 1 RG 0 -50 Td (AW) Tj ET\n"
+    return page(c, resources, extra=extra)
+
+
 def cmaps():
     """Composite fonts under predefined CMaps of every collection, one- and two-byte and vertical, plus CIDToGIDMap streams.
 
@@ -639,9 +702,12 @@ def jpx_alpha():
 if __name__ == "__main__":
     target = sys.argv[1]
     os.makedirs(os.path.join(target, "Render"), exist_ok=True)
-    for name, maker in [("images", images), ("vector", vector), ("bilevel", bilevel), ("shading", shading), ("text", text), ("transparency", transparency), ("color", color), ("jpx-alpha", jpx_alpha), ("cmaps", cmaps)]:
+    for name, maker in [("images", images), ("vector", vector), ("bilevel", bilevel), ("shading", shading), ("text", text), ("transparency", transparency), ("color", color), ("jpx-alpha", jpx_alpha), ("cmaps", cmaps), ("type1cff", type1cff)]:
         with open(os.path.join(target, "Render", name + ".pdf"), "wb") as handle:
             handle.write(maker())
+    os.makedirs(os.path.join(target, "Fonts"), exist_ok=True)
+    with open(os.path.join(target, "Fonts", "type1-charstrings.cff"), "wb") as handle:
+        handle.write(type1_charstring_cff())
     os.makedirs(os.path.join(target, "Color"), exist_ok=True)
     for name, _, profile in icc_profiles():
         with open(os.path.join(target, "Color", name.decode() + ".icc"), "wb") as handle:

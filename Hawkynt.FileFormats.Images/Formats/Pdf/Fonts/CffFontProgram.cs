@@ -52,9 +52,12 @@ internal sealed class CffFontProgram : IPdfFontProgram {
   private readonly GlyphOutline?[] _outlines;
   private readonly double[] _widths;
   private readonly bool[] _parsed;
+  private readonly bool _type1Charstrings;
+  private readonly Dictionary<CffFontDict, byte[]?[]> _type1Subrs = [];
 
-  private CffFontProgram(byte[] data, CffIndex charStrings, CffIndex globalSubrs, CffFontDict[] fonts, byte[]? fdSelect, string[]? glyphNames, int[]? glyphCids, Dictionary<int, string>? encoding) {
+  private CffFontProgram(byte[] data, CffIndex charStrings, CffIndex globalSubrs, CffFontDict[] fonts, byte[]? fdSelect, string[]? glyphNames, int[]? glyphCids, Dictionary<int, string>? encoding, bool type1Charstrings) {
     this._data = data;
+    this._type1Charstrings = type1Charstrings;
     this._charStrings = charStrings;
     this._globalSubrs = globalSubrs;
     this._fonts = fonts;
@@ -115,7 +118,7 @@ internal sealed class CffFontProgram : IPdfFontProgram {
 
   /// <summary>Reads a CFF program.</summary>
   /// <exception cref="InvalidDataException">The data is not a CFF font.</exception>
-  /// <exception cref="NotSupportedException">The font uses Type 1 charstrings inside CFF.</exception>
+  /// <exception cref="NotSupportedException">The font declares a charstring type other than 1 or 2.</exception>
   public static CffFontProgram Parse(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
 
@@ -141,8 +144,11 @@ internal sealed class CffFontProgram : IPdfFontProgram {
       strings[i] = Encoding.Latin1.GetString(stringIndex.Get(data, i));
 
     var top = ParseDict(topDicts.Get(data, 0));
-    if (_Number(top, _OpCharstringType, 2) != 2)
-      throw new NotSupportedException("CFF fonts with Type 1 charstrings (CharstringType 1) are not supported.");
+    // CharstringType 1: the charstrings and subroutines are Type 1 ones, unencrypted (CFF has no
+    // lenIV), run by the Type 1 interpreter (Technical Note #5176, Top DICT CharstringType).
+    var charstringType = _Number(top, _OpCharstringType, 2);
+    if (charstringType is not (1 or 2))
+      throw new NotSupportedException($"CFF fonts with CharstringType {charstringType} are not supported.");
 
     var charStringsOffset = (int)_Number(top, _OpCharStrings, 0);
     if (charStringsOffset <= 0 || charStringsOffset >= data.Length)
@@ -184,7 +190,7 @@ internal sealed class CffFontProgram : IPdfFontProgram {
       encoding = _ReadEncoding(data, (int)_Number(top, _OpEncoding, 0), glyphNames, strings);
     }
 
-    return new(data, charStrings, globalSubrs, fonts, fdSelect, glyphNames, glyphCids, encoding);
+    return new(data, charStrings, globalSubrs, fonts, fdSelect, glyphNames, glyphCids, encoding, charstringType == 1);
   }
 
   /// <summary>Parses a DICT into its operators and their operands.</summary>
@@ -282,6 +288,9 @@ internal sealed class CffFontProgram : IPdfFontProgram {
   private double _Interpret(int glyphId, GlyphOutline outline, double offsetX, double offsetY, int seacDepth) {
     var font = this._FontOf(glyphId);
     var code = this._charStrings.Get(this._data, glyphId);
+    if (this._type1Charstrings)
+      return this._InterpretType1(font, code.ToArray(), glyphId, outline, offsetX, offsetY, seacDepth);
+
     var interpreter = new CffCharStringInterpreter(this._data, this._globalSubrs, font.Subrs, font.DefaultWidthX, font.NominalWidthX, outline, offsetX, offsetY);
     interpreter.Run(code);
 
@@ -293,6 +302,30 @@ internal sealed class CffFontProgram : IPdfFontProgram {
         this._Interpret(baseGid, outline, offsetX, offsetY, seacDepth + 1);
       if (accentGid >= 0)
         this._Interpret(accentGid, outline, offsetX + adx, offsetY + ady, seacDepth + 1);
+    }
+
+    outline.Close();
+    return interpreter.Width;
+  }
+
+  /// <summary>A Type 1 charstring inside CFF, with the font DICT's Subrs INDEX as its subroutines.</summary>
+  private double _InterpretType1(CffFontDict font, byte[] code, int glyphId, GlyphOutline outline, double offsetX, double offsetY, int seacDepth) {
+    if (!this._type1Subrs.TryGetValue(font, out var subrs)) {
+      subrs = new byte[]?[font.Subrs.Count];
+      for (var i = 0; i < subrs.Length; ++i)
+        subrs[i] = font.Subrs.Get(this._data, i).ToArray();
+      this._type1Subrs[font] = subrs;
+    }
+
+    var interpreter = new Type1CharStringInterpreter(subrs, outline, offsetX, offsetY);
+    interpreter.Run(code);
+    if (interpreter.Seac is { } seac && seacDepth == 0) {
+      var baseGid = this._GlyphOfStandardCode(seac.BaseCode);
+      var accentGid = this._GlyphOfStandardCode(seac.AccentCode);
+      if (baseGid >= 0)
+        this._Interpret(baseGid, outline, offsetX, offsetY, seacDepth + 1);
+      if (accentGid >= 0)
+        this._Interpret(accentGid, outline, offsetX + seac.Adx, offsetY + seac.Ady, seacDepth + 1);
     }
 
     outline.Close();

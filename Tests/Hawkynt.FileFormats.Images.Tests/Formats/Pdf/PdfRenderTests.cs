@@ -39,6 +39,7 @@ public sealed class PdfRenderTests {
   // resampling of the two upscaled images.
   [TestCase("Render/color", 72, 0.3, 0.1)]
   [TestCase("Render/cmaps", 144, 0.4, 0.2)]
+  [TestCase("Render/type1cff", 72, 1.2, 1.0)]
   [Category("Unit")]
   public void Fixture_AgreesWithPoppler(string name, double resolution, double maxMeanError, double maxBadPercent) {
     var file = _Read(name + ".pdf");
