@@ -283,7 +283,10 @@ internal sealed class FifRegionProfile {
   // Decoding
   // ============================================================================================
 
-  public (int Width, int Height, byte[] Rgb) Decode(FifTemplateRaster? template, bool deblock) {
+  public (int Width, int Height, byte[] Rgb) Decode(FifTemplateRaster? template, bool deblock)
+    => Decode(template, deblock, FifOutputPlan.For(OutputWidth, OutputHeight, OutputWidth, OutputHeight));
+
+  public (int Width, int Height, byte[] Rgb) Decode(FifTemplateRaster? template, bool deblock, FifOutputPlan plan) {
     if (_rangeSize != 4)
       throw new InvalidDataException("FTC 8×8 range blocks are not supported.");
     if (Templates.Count > 1)
@@ -294,19 +297,8 @@ internal sealed class FifRegionProfile {
     if (OutputWidth > canvasWidth || OutputHeight > canvasHeight)
       throw new InvalidDataException("The FTC picture is larger than the regions that code it.");
 
-    var rgb = new byte[canvasWidth * canvasHeight * 3];
     var covered = new bool[canvasWidth * canvasHeight];
-    for (var index = 0; index < _regions.Length; ++index) {
-      var region = _regions[index];
-      var records = _codecProfile == 2 ? _ParseArithmetic(_segments[index], region, template) : _ParseBits(_segments[index], region, template);
-      var packed = FifReconstruction.Reconstruct(records, region.Width, region.Height, _color, template);
-      if (deblock)
-        FifReconstruction.TransformFilter(records, packed, region.Width, region.Height, _color);
-
-      var block = _color
-        ? FifReconstruction.ToRgb(packed, region.Width, region.Height, _errorUv, OutputWidth - region.X, OutputHeight - region.Y)
-        : FifReconstruction.GrayToRgb(packed, region.Width * region.Height);
-
+    foreach (var region in _regions)
       for (var row = 0; row < region.Height; ++row) {
         var target = (region.Y + row) * canvasWidth + region.X;
         for (var i = 0; i < region.Width; ++i)
@@ -314,24 +306,31 @@ internal sealed class FifRegionProfile {
             throw new InvalidDataException("FTC regions overlap.");
           else
             covered[target + i] = true;
-
-        Buffer.BlockCopy(block, row * region.Width * 3, rgb, target * 3, region.Width * 3);
       }
-    }
 
     for (var row = 0; row < OutputHeight; ++row)
     for (var x = 0; x < OutputWidth; ++x)
       if (!covered[row * canvasWidth + x])
         throw new InvalidDataException("FTC regions do not cover the picture.");
 
-    var output = new byte[OutputWidth * OutputHeight * 3];
-    for (var row = 0; row < OutputHeight; ++row)
-      Buffer.BlockCopy(rgb, row * canvasWidth * 3, output, row * OutputWidth * 3, OutputWidth * 3);
+    var level = plan.Level;
+    var rects = plan.Rectangles(_regions.Select(r => (r.X, r.Y, r.Width, r.Height)).ToArray());
+    var output = new byte[plan.Width * plan.Height * 3];
+    for (var index = 0; index < _regions.Length; ++index) {
+      var region = _regions[index];
+      var records = _codecProfile == 2 ? _ParseArithmetic(_segments[index], region, template) : _ParseBits(_segments[index], region, template);
+      var packed = FifReconstruction.Reconstruct(records, region.Width, region.Height, _color, template, level);
+      if (deblock)
+        FifReconstruction.TransformFilter(records, packed, region.Width, region.Height, _color, level);
+
+      FifReconstruction.Place(output, plan, rects[index], packed, FifReconstruction.AtLevel(region.Width, level),
+        FifReconstruction.AtLevel(region.Height, level), _color, _errorUv);
+    }
 
     if (deblock)
-      FifReconstruction.RegionBoundaryFilter(output, OutputWidth, OutputHeight, _regions.Select(r => (r.X, r.Y, r.Width, r.Height)));
+      FifReconstruction.RegionBoundaryFilter(output, plan.Width, plan.Height, rects);
 
-    return (OutputWidth, OutputHeight, output);
+    return (plan.Width, plan.Height, output);
   }
 
   private FifRecord _ReadRecord(FifBitReader bits, int domainWidth, int domainHeight, int kind) {

@@ -26,7 +26,19 @@ internal static class FifReconstruction {
   /// <summary>Bytes after a half-resolution image that a domain at the bottom edge may read.</summary>
   private const int _APRON = 4096;
 
-  public static byte[] Reconstruct(IReadOnlyList<FifRecord> records, int width, int height, bool color, FifTemplateRaster? template) {
+  public static byte[] Reconstruct(IReadOnlyList<FifRecord> records, int width, int height, bool color, FifTemplateRaster? template)
+    => Reconstruct(records, width, height, color, template, 1);
+
+  /// <summary>
+  /// Draws the packed plane at <paramref name="level"/>: 0 is half resolution, 1 the coded size, and
+  /// each further level doubles it.
+  /// </summary>
+  /// <remarks>
+  /// Past the converged half-resolution image the DLL never iterates again: each level applies every
+  /// transform once to the level below, its range blocks twice as wide, its domains read sample for
+  /// sample from the previous level, its domain origins doubled.
+  /// </remarks>
+  public static byte[] Reconstruct(IReadOnlyList<FifRecord> records, int width, int height, bool color, FifTemplateRaster? template, int level) {
     var packedHeight = color ? height * 3 / 2 : height;
     var expected = width / 4 * (height / 4 + (color ? height / 8 : 0));
     if (records.Count != expected)
@@ -34,8 +46,81 @@ internal static class FifReconstruction {
 
     var half = _InitializeHalf(records, width, packedHeight, template, out var nodeCount);
     _ConvergeHalf(records, half, width, nodeCount);
-    return _ExpandFull(records, half, width, packedHeight, template);
+    if (level == 0)
+      return half[..nodeCount];
+
+    var image = half;
+    var raster = template;
+    for (var step = 1; step <= level; ++step) {
+      if (step >= 2 && raster != null)
+        raster = UpsampleTemplate(raster);
+      image = _Expand(records, image, width, packedHeight, raster, step);
+    }
+
+    return image;
   }
+
+  /// <summary>
+  /// A template block at <paramref name="level"/>, in source orientation: the template drawn at that
+  /// level supplies all but the last 2^(level-1) − 1 rows and columns, which continue the last step
+  /// of each row and then of each column, as the DLL extrapolates them.
+  /// </summary>
+  private static int[] _TemplateBlock(FifTemplateRaster raster, int baseX, int baseY, int side, int level, int quantized) {
+    var read = side + 1 - (1 << (level - 1));
+    var block = new int[side * side];
+    for (var row = 0; row < read; ++row) {
+      var y = Math.Clamp(baseY + row, 0, raster.Height - 1);
+      for (var column = 0; column < read; ++column) {
+        var x = Math.Clamp(baseX + column, 0, raster.Width - 1);
+        block[row * side + column] = FifTransforms.Clamp10(raster.Pixels[y * raster.Width + x] + quantized);
+      }
+
+      var step = block[row * side + read - 1] - block[row * side + read - 2];
+      for (var column = read; column < side; ++column)
+        block[row * side + column] = FifTransforms.Clamp10(block[row * side + column - 1] + step);
+    }
+
+    for (var column = 0; column < side; ++column) {
+      var step = block[(read - 1) * side + column] - block[(read - 2) * side + column];
+      for (var row = read; row < side; ++row)
+        block[row * side + column] = FifTransforms.Clamp10(block[(row - 1) * side + column] + step);
+    }
+
+    return block;
+  }
+
+  /// <summary>
+  /// The template at the next level: every sample kept at even positions, the odd ones the rounded
+  /// mean of their neighbours along the row and then the column, the last column and row repeated.
+  /// </summary>
+  public static FifTemplateRaster UpsampleTemplate(FifTemplateRaster raster) {
+    int width = raster.Width, height = raster.Height, outputWidth = width * 2;
+    var source = raster.Pixels;
+    var output = new byte[outputWidth * height * 2];
+    for (var row = 0; row < height; ++row) {
+      var from = row * width;
+      var to = row * 2 * outputWidth;
+      for (var x = 0; x < width - 1; ++x) {
+        output[to + 2 * x] = source[from + x];
+        output[to + 2 * x + 1] = (byte)((source[from + x] + source[from + x + 1] + 1) >> 1);
+      }
+
+      output[to + outputWidth - 2] = output[to + outputWidth - 1] = source[from + width - 1];
+    }
+
+    for (var row = 1; row < height * 2; row += 2) {
+      var at = row * outputWidth;
+      for (var x = 0; x < outputWidth; ++x)
+        output[at + x] = row == height * 2 - 1
+          ? output[at - outputWidth + x]
+          : (byte)((output[at - outputWidth + x] + output[at + outputWidth + x] + 1) >> 1);
+    }
+
+    return raster with { Width = outputWidth, Height = height * 2, Pixels = output };
+  }
+
+  /// <summary>Width of a plane <paramref name="width"/> wide when drawn at <paramref name="level"/>.</summary>
+  public static int AtLevel(int width, int level) => level == 0 ? width >> 1 : width << (level - 1);
 
   private static int _Linear(int baseX, int baseY, int x, int y, int rowWidth) => (baseY + y) * rowWidth + baseX + x;
 
@@ -180,28 +265,28 @@ internal static class FifReconstruction {
     } while (anyChanged);
   }
 
-  private static byte[] _ExpandFull(IReadOnlyList<FifRecord> records, byte[] half, int width, int packedHeight, FifTemplateRaster? template) {
-    var halfWidth = width / 2;
+  private static byte[] _Expand(IReadOnlyList<FifRecord> records, byte[] previous, int width, int packedHeight, FifTemplateRaster? template, int level) {
+    var previousWidth = AtLevel(width, level - 1);
+    var levelWidth = AtLevel(width, level);
+    var side = 4 << (level - 1);
     var blockWidth = width / 4;
-    var packed = new byte[width * packedHeight];
+    var packed = new byte[levelWidth * AtLevel(packedHeight, level)];
     for (var block = 0; block < records.Count; ++block) {
       var record = records[block];
-      var target = block / blockWidth * 4 * width + block % blockWidth * 4;
-      var baseX = record.DomainX / 2;
-      var baseY = record.DomainY / 2;
-      for (var row = 0; row < 4; ++row)
-      for (var column = 0; column < 4; ++column) {
-        var (sourceY, sourceX) = FifTransforms.Transform(record.Symmetry & 7, row, column, 4);
+      var target = block / blockWidth * side * levelWidth + block % blockWidth * side;
+      var baseX = (record.DomainX << (level - 1)) / 2;
+      var baseY = (record.DomainY << (level - 1)) / 2;
+      var templateBlock = record.Kind >= 4 ? _TemplateBlock(template!, baseX, baseY, side, level, record.Quantized) : null;
+      for (var row = 0; row < side; ++row)
+      for (var column = 0; column < side; ++column) {
+        var (sourceY, sourceX) = FifTransforms.Transform(record.Symmetry & 7, row, column, side);
         int value;
-        if (record.Kind >= 4) {
-          var raster = template!;
-          var x = Math.Clamp(baseX + sourceX, 0, raster.Width - 1);
-          var y = Math.Clamp(baseY + sourceY, 0, raster.Height - 1);
-          value = FifTransforms.Clamp10(raster.Pixels[y * raster.Width + x] + record.Quantized);
-        } else
-          value = FifTransforms.Affine(record.Quantized, _Read(half, _Linear(baseX, baseY, sourceX, sourceY, halfWidth)), record.Slope);
+        if (record.Kind >= 4)
+          value = templateBlock![sourceY * side + sourceX];
+        else
+          value = FifTransforms.Affine(record.Quantized, _Read(previous, _Linear(baseX, baseY, sourceX, sourceY, previousWidth)), record.Slope);
 
-        packed[target + row * width + column] = (byte)value;
+        packed[target + row * levelWidth + column] = (byte)value;
       }
     }
 
@@ -244,6 +329,12 @@ internal static class FifReconstruction {
 
   private static readonly sbyte[] _farDefault = FilterFar(6);
 
+  private static readonly (int Category, int GroupSize)[] _colorGroups = [(1, 1), (2, 2), (4, 4), (16, 1), (32, 2), (64, 4)];
+  private static readonly (int Category, int GroupSize)[] _grayGroups = [(2, 2), (4, 4), (32, 2), (64, 4)];
+
+  /// <summary>The group-width threshold of an FTC picture, whose quality byte is zero.</summary>
+  private const int _TRANSFORM_FILTER_THRESHOLD = 4;
+
   /// <summary>
   /// Smooths one boundary: <paramref name="flags"/> bit 0 adjusts the samples at and after it, bit 1
   /// those before it.
@@ -264,7 +355,18 @@ internal static class FifReconstruction {
   }
 
   /// <summary>The transform-group boundary filter over one packed FTC region.</summary>
-  public static void TransformFilter(IReadOnlyList<FifRecord> records, byte[] packed, int width, int height, bool color) {
+  public static void TransformFilter(IReadOnlyList<FifRecord> records, byte[] packed, int width, int height, bool color)
+    => TransformFilter(records, packed, width, height, color, 1);
+
+  /// <summary>The transform-group filter on a plane drawn at <paramref name="level"/>.</summary>
+  /// <remarks>
+  /// The mask is the same at every level; each block edge is smoothed along its whole drawn length.
+  /// A group only marks its edges while the drawn group is wider than four pixels, which at half
+  /// resolution drops the 2×2 groups.
+  /// </remarks>
+  public static void TransformFilter(IReadOnlyList<FifRecord> records, byte[] packed, int width, int height, bool color, int level) {
+    var cell = level == 0 ? 2 : 4 << (level - 1);
+    var levelWidth = AtLevel(width, level);
     var blockColumns = width / 4;
     var blockRows = height / 4 + (color ? height / 8 : 0);
     var stride = blockColumns + 1;
@@ -273,7 +375,8 @@ internal static class FifReconstruction {
     for (var i = 0; i < records.Count; ++i)
       markers[i / blockColumns * stride + i % blockColumns] = 1 << records[i].Kind;
 
-    foreach (var (category, groupSize) in new[] { (2, 2), (4, 4), (32, 2), (64, 4) })
+    foreach (var (category, groupSize) in color ? _colorGroups : _grayGroups)
+      if (cell * groupSize > _TRANSFORM_FILTER_THRESHOLD)
       for (var groupY = 0; groupY < blockRows / groupSize * groupSize; groupY += groupSize)
       for (var groupX = 0; groupX < blockColumns / groupSize * groupSize; groupX += groupSize)
       for (var offset = 0; offset < groupSize; ++offset) {
@@ -305,19 +408,19 @@ internal static class FifReconstruction {
     for (var blockY = 0; blockY < blockRows; ++blockY)
     for (var blockX = 0; blockX < blockColumns; ++blockX) {
       var flags = mask[blockY * stride + blockX];
-      var origin = blockY * 4 * width + blockX * 4;
+      var origin = blockY * cell * levelWidth + blockX * cell;
       var vertical = flags & 3;
       if (vertical != 0)
-        for (var offset = 0; offset < 4; ++offset) {
-          var position = origin + offset * width;
+        for (var offset = 0; offset < cell; ++offset) {
+          var position = origin + offset * levelWidth;
           _FilterSide(packed, _farDefault, position - 2, position - 1, position, position + 1, vertical);
         }
 
       var horizontal = (flags >> 2) & 3;
       if (horizontal != 0)
-        for (var offset = 0; offset < 4; ++offset) {
+        for (var offset = 0; offset < cell; ++offset) {
           var position = origin + offset;
-          _FilterSide(packed, _farDefault, position - 2 * width, position - width, position, position + width, horizontal);
+          _FilterSide(packed, _farDefault, position - 2 * levelWidth, position - levelWidth, position, position + levelWidth, horizontal);
         }
     }
   }
@@ -358,11 +461,20 @@ internal static class FifReconstruction {
   /// smoothing when larger than the quality's threshold, and clears them otherwise; finer transforms
   /// clear their cell. Only edges on an 8-pixel grid are then smoothed, both sides.
   /// </remarks>
-  public static void ProgressiveTileFilter(byte[] tile, int width, int height, IReadOnlyList<(int X, int Y, int Size)> blocks, int quality) {
-    var threshold = quality == 0 ? 4 : quality > 0x5A ? 8 : quality > 0x19 ? 4 : 2;
+  public static void ProgressiveTileFilter(byte[] tile, int width, int height, IReadOnlyList<(int X, int Y, int Size)> blocks, int quality)
+    => ProgressiveTileFilter(tile, width, height, blocks, quality, 1);
+
+  /// <summary>The FIF1 tile filter on a tile drawn at <paramref name="level"/>, positions and sizes in that level's pixels.</summary>
+  /// <remarks>Past the second level the cells grow with the level and every marked cell edge is smoothed.</remarks>
+  /// <summary>The transform width a FIF1 tile filter marks edges above, by the file's quality byte.</summary>
+  public static int ProgressiveThreshold(int quality) => quality == 0 ? 4 : quality > 0x5A ? 8 : quality > 0x19 ? 4 : 2;
+
+  public static void ProgressiveTileFilter(byte[] tile, int width, int height, IReadOnlyList<(int X, int Y, int Size)> blocks, int quality, int level) {
+    var threshold = ProgressiveThreshold(quality);
     var divisor = quality == 0 || quality >= 0x47 ? 6 : quality > 0x1E ? 8 : 10;
     var far = divisor == 6 ? _farDefault : FilterFar(divisor);
-    const int cell = 2;
+    var cell = level <= 2 ? 2 : 1 << (level - 1);
+    var everyFourth = cell == 2;
     var columns = width / cell;
     var rows = height / cell;
     var stride = columns + 1;
@@ -406,7 +518,7 @@ internal static class FifReconstruction {
 
     for (; index < blocks.Count; ++index) {
       var (x, y, _) = blocks[index];
-      var q = (y >> 1) * stride + (x >> 1);
+      var q = y / cell * stride + x / cell;
       if ((uint)q < (uint)grid.Length)
         grid[q] &= 0xF0;
     }
@@ -421,14 +533,14 @@ internal static class FifReconstruction {
       var flags = grid[cy * stride + cx];
       var origin = cy * cell * width + cx * cell;
       var vertical = flags & 3;
-      if (vertical != 0 && cx % 4 == 0)
+      if (vertical != 0 && (!everyFourth || cx % 4 == 0))
         for (var r = 0; r < cell; ++r) {
           var q = origin + r * width;
           _FilterSide(tile, far, q - 2, q - 1, q, q + 1, vertical);
         }
 
       var horizontal = (flags >> 2) & 3;
-      if (horizontal != 0 && cy % 4 == 0)
+      if (horizontal != 0 && (!everyFourth || cy % 4 == 0))
         for (var c = 0; c < cell; ++c) {
           var q = origin + c;
           _FilterSide(tile, far, q - 2 * width, q - width, q, q + width, horizontal);
@@ -474,56 +586,66 @@ internal static class FifReconstruction {
   /// the region — as the DLL converts every region on its own.
   /// </summary>
   public static byte[] ToRgb(byte[] packed, int width, int height, bool errorUv, int limitWidth, int limitHeight) {
-    var chromaWidth = width / 2;
-    var clampWidth = (Math.Min(limitWidth, width) + 1) / 2;
-    var clampHeight = (Math.Min(limitHeight, height) + 1) / 2;
     var chroma = width * height;
+    return ToRgb(packed, 0, width, packed, chroma, packed, chroma + width / 2, width, width, height, errorUv,
+      (Math.Min(limitWidth, width) + 1) / 2, (Math.Min(limitHeight, height) + 1) / 2);
+  }
+
+  /// <summary>
+  /// Converts a luma plane and two half-resolution chroma planes to RGB; chroma interpolation stops
+  /// at chroma column <paramref name="clampWidth"/> − 1 and row <paramref name="clampHeight"/> − 1.
+  /// </summary>
+  public static byte[] ToRgb(byte[] luma, int lumaOffset, int lumaStride, byte[] first, int firstOffset, byte[] second, int secondOffset,
+    int chromaStride, int width, int height, bool errorUv, int clampWidth, int clampHeight) {
     var rgb = new byte[width * height * 3];
     for (var y = 0; y < height; ++y) {
       var chromaY = y / 2;
       var nextY = Math.Min(chromaY + 1, clampHeight - 1);
       var oddY = (y & 1) != 0;
+      var a = chromaY * chromaStride;
+      var b = nextY * chromaStride;
       for (var x = 0; x < width; ++x) {
         var chromaX = x / 2;
         var nextX = Math.Min(chromaX + 1, clampWidth - 1);
         var oddX = (x & 1) != 0;
-        var a = chroma + chromaY * width;
-        var b = chroma + nextY * width;
-        int first00 = packed[a + chromaX], second00 = packed[a + chromaWidth + chromaX];
-        var luminance = packed[y * width + x];
+        int first00 = first[firstOffset + a + chromaX], second00 = second[secondOffset + a + chromaX];
+        int first01 = first[firstOffset + a + nextX], second01 = second[secondOffset + a + nextX];
+        int first10 = first[firstOffset + b + chromaX], second10 = second[secondOffset + b + chromaX];
+        int first11 = first[firstOffset + b + nextX], second11 = second[secondOffset + b + nextX];
+        var luminance = luma[lumaOffset + y * lumaStride + x];
         var output = (y * width + x) * 3;
         if (errorUv) {
           // The DLL keeps the interpolated E and S at twice their scale.
-          int first, second;
+          int e, s;
           if (oddX && oddY) {
-            first = (2 * (first00 + packed[a + nextX] + packed[b + chromaX] + packed[b + nextX]) + 2) >> 2;
-            second = (2 * (second00 + packed[a + chromaWidth + nextX] + packed[b + chromaWidth + chromaX] + packed[b + chromaWidth + nextX]) + 2) >> 2;
+            e = (2 * (first00 + first01 + first10 + first11) + 2) >> 2;
+            s = (2 * (second00 + second01 + second10 + second11) + 2) >> 2;
           } else if (oddX) {
-            first = first00 + packed[a + nextX];
-            second = second00 + packed[a + chromaWidth + nextX];
+            e = first00 + first01;
+            s = second00 + second01;
           } else if (oddY) {
-            first = first00 + packed[b + chromaX];
-            second = second00 + packed[b + chromaWidth + chromaX];
+            e = first00 + first10;
+            s = second00 + second10;
           } else {
-            first = first00 * 2;
-            second = second00 * 2;
+            e = first00 * 2;
+            s = second00 * 2;
           }
 
-          var shared = ((first + second + 1) / 3 + luminance + 0x56) & 0x3FF;
-          rgb[output] = (byte)FifTransforms.Clamp10(shared - first);
+          var shared = ((e + s + 1) / 3 + luminance + 0x56) & 0x3FF;
+          rgb[output] = (byte)FifTransforms.Clamp10(shared - e);
           rgb[output + 1] = (byte)FifTransforms.Clamp10(shared - 0x100);
-          rgb[output + 2] = (byte)FifTransforms.Clamp10(shared - second);
+          rgb[output + 2] = (byte)FifTransforms.Clamp10(shared - s);
         } else {
           int u, v;
           if (oddX && oddY) {
-            u = (first00 + packed[a + nextX] + packed[b + chromaX] + packed[b + nextX] + 2) / 4;
-            v = (second00 + packed[a + chromaWidth + nextX] + packed[b + chromaWidth + chromaX] + packed[b + chromaWidth + nextX] + 2) / 4;
+            u = (first00 + first01 + first10 + first11 + 2) / 4;
+            v = (second00 + second01 + second10 + second11 + 2) / 4;
           } else if (oddX) {
-            u = (first00 + packed[a + nextX] + 1) / 2;
-            v = (second00 + packed[a + chromaWidth + nextX] + 1) / 2;
+            u = (first00 + first01 + 1) / 2;
+            v = (second00 + second01 + 1) / 2;
           } else if (oddY) {
-            u = (first00 + packed[b + chromaX] + 1) / 2;
-            v = (second00 + packed[b + chromaWidth + chromaX] + 1) / 2;
+            u = (first00 + first10 + 1) / 2;
+            v = (second00 + second10 + 1) / 2;
           } else
             (u, v) = (first00, second00);
 
@@ -535,6 +657,58 @@ internal static class FifReconstruction {
     }
 
     return rgb;
+  }
+
+  /// <summary>
+  /// Draws one region's packed plane, as drawn at the plan's level, into the output at its
+  /// rectangle, area-averaging each plane down first when the plan resamples.
+  /// </summary>
+  public static void Place(byte[] output, in FifOutputPlan plan, (int X, int Y, int Width, int Height) rect, byte[] packed,
+    int levelWidth, int levelHeight, bool color, bool errorUv) {
+    var (width, height) = (rect.Width, rect.Height);
+    if (width <= 0 || height <= 0)
+      return;
+
+    byte[] block;
+    var limitWidth = Math.Min(plan.Width - rect.X, width);
+    var limitHeight = Math.Min(plan.Height - rect.Y, height);
+    if (limitWidth <= 0 || limitHeight <= 0)
+      return;
+
+    if (!plan.Resamples) {
+      if (width != levelWidth || height != levelHeight)
+        throw new InvalidOperationException("An unscaled region must keep its drawn size.");
+
+      block = color
+        ? ToRgb(packed, width, height, errorUv, limitWidth, limitHeight)
+        : GrayToRgb(packed, width * height);
+    } else {
+      var luma = FifOutputPlan.AreaResample(_Plane(packed, 0, levelWidth, levelWidth, levelHeight), levelWidth, levelHeight, width, height);
+      if (!color)
+        block = GrayToRgb(luma, width * height);
+      else {
+        var chromaWidth = (levelWidth + 1) / 2;
+        var chromaHeight = (levelHeight + 1) / 2;
+        var outputChromaWidth = (width + 1) / 2;
+        var outputChromaHeight = (height + 1) / 2;
+        var chroma = levelWidth * levelHeight;
+        var first = FifOutputPlan.AreaResample(_Plane(packed, chroma, levelWidth, chromaWidth, chromaHeight), chromaWidth, chromaHeight, outputChromaWidth, outputChromaHeight);
+        var second = FifOutputPlan.AreaResample(_Plane(packed, chroma + levelWidth / 2, levelWidth, chromaWidth, chromaHeight), chromaWidth, chromaHeight, outputChromaWidth, outputChromaHeight);
+        block = ToRgb(luma, 0, width, first, 0, second, 0, outputChromaWidth, width, height, errorUv,
+          (limitWidth + 1) / 2, (limitHeight + 1) / 2);
+      }
+    }
+
+    var stride = plan.Width * 3;
+    for (var row = 0; row < limitHeight; ++row)
+      Buffer.BlockCopy(block, row * width * 3, output, (rect.Y + row) * stride + rect.X * 3, limitWidth * 3);
+  }
+
+  private static byte[] _Plane(byte[] packed, int offset, int stride, int width, int height) {
+    var plane = new byte[width * height];
+    for (var row = 0; row < height; ++row)
+      Buffer.BlockCopy(packed, offset + row * stride, plane, row * width, width);
+    return plane;
   }
 
   /// <summary>Grey replicated into R, G and B.</summary>

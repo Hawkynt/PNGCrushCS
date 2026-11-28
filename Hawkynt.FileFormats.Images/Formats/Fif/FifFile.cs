@@ -19,7 +19,8 @@ public enum FifVariant {
 /// Iterated Systems' fractal transform coding (1990s; Microsoft Encarta, the ColorBox and Fractal
 /// Imager products): every 4×4 block is an affine copy of a larger block elsewhere in the picture,
 /// and the picture is whatever those copies converge to. The pixels held here are the decode at the
-/// image's original size, as Iterated's own decoder produces it. Writing produces an FTC 3.1 file
+/// image's original size, as Iterated's own decoder produces it, or at the size passed to
+/// <see cref="FifReader.FromFile(FileInfo, int, int)"/>. Writing produces an FTC 3.1 file
 /// from a fractal search of the picture.
 /// </remarks>
 [FormatMagicBytes([0x46, 0x54, 0x43, 0x00])]

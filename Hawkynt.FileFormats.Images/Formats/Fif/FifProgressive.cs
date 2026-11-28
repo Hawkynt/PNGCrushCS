@@ -30,6 +30,15 @@ internal sealed class FifProgressive {
     public int Affine;
     public int LevelValue;
     public bool Constant;
+
+    // The DLL's working state past the coded size: domain means fixed at the coded size, and
+    // positions that double with every level drawn.
+    public int Mean;
+    public int StoredRangeX;
+    public int StoredRangeY;
+    public int StoredDomainX;
+    public int StoredDomainY;
+    public int StoredRangeCode;
   }
 
   private static readonly int[] _nibbleValues = [0, 1, 2, 3, 4, 5, 6, 7, 8, 12, 16, 24, 32, 48, 64, 128];
@@ -318,7 +327,7 @@ internal sealed class FifProgressive {
     }
   }
 
-  private List<Transform> _DecodeComponent(Region region, int component, FifBitReader[] readers, Model[][] models) {
+  private List<Transform> _DecodeComponent(Region region, int component, FifBitReader[] readers, Model[][] models, int lastLevel) {
     var subsampled = component != 0;
     // Half-size chroma reaches unit ranges one level before luminance and has nothing at the last.
     var componentLevels = _levels - (subsampled ? 1 : 0);
@@ -463,10 +472,23 @@ internal sealed class FifProgressive {
         output.AddRange(transforms);
       if (level == componentLevels - 1)
         output.AddRange(parents);
+      else if (level == lastLevel) {
+        // Decoding stops early: what would split further is drawn flat at its own brightness.
+        foreach (var parent in parents) {
+          parent.RangeCode = rangeCode / 2;
+          parent.Affine = Flat;
+        }
+
+        output.AddRange(parents);
+        break;
+      }
     }
 
     return output;
   }
+
+  /// <summary>The affine index the DLL gives a block drawn flat at its brightness.</summary>
+  private const int Flat = 0xFF;
 
   // ============================================================================================
   // Rendering
@@ -491,9 +513,11 @@ internal sealed class FifProgressive {
         var t = ordered[index];
         var side = t.RangeCode / 2;
         for (var row = 0; row < side; ++row) {
-          var y = Math.Clamp(t.DomainY + row, 0, height - 1);
+          // Addressed linearly, as the DLL marks them: a domain past a row's end wraps onto the next.
+          var at = (t.DomainY + row) * width + t.DomainX;
           for (var column = 0; column < side; ++column)
-            mask[y * width + Math.Clamp(t.DomainX + column, 0, width - 1)] = true;
+            if ((uint)(at + column) < (uint)mask.Length)
+              mask[at + column] = true;
         }
       }
 
@@ -504,9 +528,9 @@ internal sealed class FifProgressive {
         var side = t.RangeCode / 2;
         var found = false;
         for (var row = 0; row < side && !found; ++row) {
-          var y = Math.Clamp(t.RangeY + row, 0, height - 1);
+          var at = (t.RangeY + row) * width + t.RangeX;
           for (var column = 0; column < side; ++column)
-            if (mask[y * width + Math.Clamp(t.RangeX + column, 0, width - 1)]) {
+            if ((uint)(at + column) < (uint)mask.Length && mask[at + column]) {
               found = true;
               break;
             }
@@ -554,34 +578,70 @@ internal sealed class FifProgressive {
   private static int _Sample(byte[] source, int width, int height, int x, int y)
     => source[Math.Clamp(y, 0, height - 1) * width + Math.Clamp(x, 0, width - 1)];
 
-  private static void _TransformBlock(byte[] source, byte[] output, int sourceWidth, int sourceHeight, int targetWidth, int targetHeight,
-    Transform transform, int side, int targetScale, int domainScale, bool boxReduce) {
-    var samples = new int[side * side];
-    var sum = 0;
-    for (var row = 0; row < side; ++row)
-    for (var column = 0; column < side; ++column) {
+  private static int _TransformBlock(byte[] source, byte[] output, int sourceWidth, int sourceHeight, int targetWidth, int targetHeight,
+    Transform transform, int side, int targetScale, int domainScale, bool boxReduce, bool streaming = false, int? knownMean = null)
+    => _TransformBlock(source, output, sourceWidth, sourceHeight, targetWidth, targetHeight, transform,
+      transform.RangeX * targetScale, transform.RangeY * targetScale, transform.DomainX * domainScale, transform.DomainY * domainScale,
+      side, boxReduce, streaming, knownMean);
+
+  /// <summary>
+  /// Draws one range block from its domain and returns the domain mean it used. A streaming block
+  /// reads each sample just before writing its pixel, as the DLL does for same-scale transforms,
+  /// so a domain overlapping its own range sees the pixels already drawn.
+  /// </summary>
+  private static int _TransformBlock(byte[] source, byte[] output, int sourceWidth, int sourceHeight, int targetWidth, int targetHeight,
+    Transform transform, int rangeX, int rangeY, int domainX, int domainY, int side, bool boxReduce, bool streaming, int? knownMean) {
+    int Read(int row, int column) {
       var (sy, sx) = FifTransforms.Transform(transform.Symmetry & 7, row, column, side);
-      var x = transform.DomainX * domainScale + sx * (boxReduce ? 2 : 1);
-      var y = transform.DomainY * domainScale + sy * (boxReduce ? 2 : 1);
-      var sample = boxReduce
+      var x = domainX + sx * (boxReduce ? 2 : 1);
+      var y = domainY + sy * (boxReduce ? 2 : 1);
+      return boxReduce
         ? _Sample(source, sourceWidth, sourceHeight, x, y) + _Sample(source, sourceWidth, sourceHeight, x + 1, y)
           + _Sample(source, sourceWidth, sourceHeight, x, y + 1) + _Sample(source, sourceWidth, sourceHeight, x + 1, y + 1)
         : _Sample(source, sourceWidth, sourceHeight, x, y);
-      samples[row * side + column] = sample;
-      sum += sample;
     }
 
-    var mean = (sum + samples.Length / 2) / samples.Length;
-    var rangeX = transform.RangeX * targetScale;
-    var rangeY = transform.RangeY * targetScale;
     if (rangeX < 0 || rangeY < 0 || rangeX + side > targetWidth || rangeY + side > targetHeight)
       throw new InvalidDataException("A FIF1 range block leaves its tile.");
 
-    for (var i = 0; i < samples.Length; ++i)
-      output[(rangeY + i / side) * targetWidth + rangeX + i % side] = (byte)_Contrast(transform.Affine, transform.LevelValue, samples[i], mean, boxReduce);
+    var count = side * side;
+    int[]? samples = streaming ? null : new int[count];
+    int mean;
+    if (knownMean is { } given && streaming)
+      mean = given;
+    else {
+      var sum = 0;
+      for (var i = 0; i < count; ++i) {
+        var sample = Read(i / side, i % side);
+        if (samples != null)
+          samples[i] = sample;
+        sum += sample;
+      }
+
+      mean = knownMean ?? (sum + count / 2) / count;
+    }
+
+    for (var i = 0; i < count; ++i) {
+      var sample = samples?[i] ?? Read(i / side, i % side);
+      output[(rangeY + i / side) * targetWidth + rangeX + i % side] = (byte)_Contrast(transform.Affine, transform.LevelValue, sample, mean, boxReduce);
+    }
+
+    return mean;
   }
 
-  private static byte[] _RenderRegion(Region region, int component, List<Transform> transforms) {
+  /// <summary>
+  /// Draws one component of one tile at <paramref name="level"/> into <paramref name="result"/>, the
+  /// component's own buffer, using <paramref name="scratch"/> as the DLL uses its shared one.
+  /// </summary>
+  /// <remarks>
+  /// The DLL renders in two buffers it swaps after every pass and every level, and never clears
+  /// them: the component's buffer still holds the previous tile's (filtered) picture, and the
+  /// shared one whatever the last component left there. Same-scale transforms draw in place in
+  /// dependency order, and where that order has a cycle a domain is read before its pixels are
+  /// drawn, so the stale contents are part of the picture. Both buffers are therefore kept across
+  /// components and tiles exactly as the DLL keeps them.
+  /// </remarks>
+  private static void _RenderRegion(Region region, int component, List<Transform> transforms, int level, byte[] result, byte[] scratch) {
     var divisor = component == 0 ? 1 : 2;
     var width = region.Width / divisor;
     var height = region.Height / divisor;
@@ -590,8 +650,11 @@ internal sealed class FifProgressive {
     if (transforms.Count == 0 || halfWidth == 0 || halfHeight == 0)
       throw new InvalidDataException("A FIF1 reconstruction tile is empty.");
 
-    var half = new byte[halfWidth * halfHeight];
-    var halfCovered = new bool[half.Length];
+    // Which buffer is drawn into first depends on the parity of the level, so that the last level
+    // lands in the component's own buffer.
+    byte[] source = (level & 1) != 0 ? scratch : result, target = (level & 1) != 0 ? result : scratch;
+    var halfCount = halfWidth * halfHeight;
+    var halfCovered = new bool[halfCount];
     var constants = new List<Transform>();
     var ordinary = new List<Transform>();
     foreach (var t in transforms) {
@@ -600,7 +663,7 @@ internal sealed class FifProgressive {
         continue;
       }
 
-      if (t.RangeCode is not (2 or 4 or 8 or 16))
+      if (t.Affine == Flat ? t.RangeCode < 2 || level != 0 : t.RangeCode is not (2 or 4 or 8 or 16))
         throw new InvalidDataException("A FIF1 transform has an invalid range code.");
 
       var side = t.RangeCode / 2;
@@ -610,7 +673,7 @@ internal sealed class FifProgressive {
       for (var row = 0; row < side; ++row)
       for (var column = 0; column < side; ++column) {
         var at = (t.RangeY + row) * halfWidth + t.RangeX + column;
-        half[at] = (byte)t.LevelValue;
+        source[at] = (byte)t.LevelValue;
         halfCovered[at] = true;
       }
 
@@ -625,28 +688,30 @@ internal sealed class FifProgressive {
       if ((uint)x >= (uint)halfWidth || (uint)y >= (uint)halfHeight)
         throw new InvalidDataException("A finest FIF1 constant leaves its tile.");
 
-      half[y * halfWidth + x] = (byte)((constants[i].LevelValue + constants[i + 1].LevelValue + constants[i + 2].LevelValue + constants[i + 3].LevelValue) >> 2);
+      source[y * halfWidth + x] = (byte)((constants[i].LevelValue + constants[i + 1].LevelValue + constants[i + 2].LevelValue + constants[i + 3].LevelValue) >> 2);
       halfCovered[y * halfWidth + x] = true;
     }
 
     if (halfCovered.Contains(false))
       throw new InvalidDataException("FIF1 transforms do not cover the half-resolution tile.");
 
+    Buffer.BlockCopy(source, 0, target, 0, halfCount);
     var special = _SpecialOrder(ordinary, halfWidth, halfHeight);
     var normal = ordinary.Where(t => (t.Symmetry & 8) == 0).ToList();
     for (var pass = 0; pass < 4; ++pass) {
-      var next = half[..];
       foreach (var t in normal)
-        if (t.RangeCode / 2 > 1)
-          _TransformBlock(half, next, halfWidth, halfHeight, halfWidth, halfHeight, t, t.RangeCode / 2, 1, 1, true);
+        if (t.RangeCode / 2 > 1 && t.Affine != Flat)
+          _TransformBlock(source, target, halfWidth, halfHeight, halfWidth, halfHeight, t, t.RangeCode / 2, 1, 1, true);
       foreach (var t in special)
         if (t.RangeCode / 2 > 1)
-          _TransformBlock(next, next, halfWidth, halfHeight, halfWidth, halfHeight, t, t.RangeCode / 2, 1, 1, false);
-      half = next;
+          _TransformBlock(target, target, halfWidth, halfHeight, halfWidth, halfHeight, t, t.RangeCode / 2, 1, 1, false, true);
+      (source, target) = (target, source);
     }
 
-    var full = new byte[width * height];
-    var covered = new bool[full.Length];
+    if (level == 0)
+      return;
+
+    var covered = new bool[width * height];
     void Cover(Transform t) {
       for (var row = 0; row < t.RangeCode; ++row)
       for (var column = 0; column < t.RangeCode; ++column)
@@ -654,95 +719,171 @@ internal sealed class FifProgressive {
     }
 
     foreach (var t in normal) {
-      _TransformBlock(half, full, halfWidth, halfHeight, width, height, t, t.RangeCode, 2, 1, false);
+      t.Mean = _TransformBlock(source, target, halfWidth, halfHeight, width, height, t, t.RangeCode, 2, 1, false);
       Cover(t);
     }
 
     foreach (var t in constants) {
       if ((uint)t.RangeX >= (uint)width || (uint)t.RangeY >= (uint)height)
         throw new InvalidDataException("A full-resolution FIF1 constant leaves its tile.");
-      full[t.RangeY * width + t.RangeX] = (byte)t.LevelValue;
+      target[t.RangeY * width + t.RangeX] = (byte)t.LevelValue;
       covered[t.RangeY * width + t.RangeX] = true;
     }
 
     foreach (var t in special) {
-      _TransformBlock(full, full, width, height, width, height, t, t.RangeCode, 2, 2, false);
+      t.Mean = _TransformBlock(target, target, width, height, width, height, t, t.RangeCode, 2, 2, false, true);
       Cover(t);
     }
 
     if (covered.Contains(false))
       throw new InvalidDataException("FIF1 transforms do not cover the full-resolution tile.");
 
-    return full;
-  }
+    (source, target) = (target, source);
+    if (level == 1)
+      return;
 
-  public (int Width, int Height, byte[] Rgb) Decode(bool deblock) {
-    var componentCount = _color ? 3 : 1;
-    var planes = new byte[componentCount][];
-    for (var c = 0; c < componentCount; ++c) {
-      var divisor = c == 0 ? 1 : 2;
-      planes[c] = new byte[_canvasWidth / divisor * (_canvasHeight / divisor)];
+    // The DLL's state after the coded size: every position in that level's units.
+    foreach (var t in normal.Concat(special)) {
+      (t.StoredRangeX, t.StoredRangeY) = (t.RangeX * 2, t.RangeY * 2);
+      (t.StoredDomainX, t.StoredDomainY) = (t.DomainX * 2, t.DomainY * 2);
+      t.StoredRangeCode = t.RangeCode;
     }
 
+    int previousWidth = width, previousHeight = height;
+    for (var step = 2; step <= level; ++step) {
+      int levelWidth = previousWidth * 2, levelHeight = previousHeight * 2;
+      foreach (var t in normal)
+        _Advance(source, target, previousWidth, previousHeight, levelWidth, levelHeight, t, step);
+
+      if (step == 2)
+        foreach (var t in constants) {
+          // A unit constant becomes four pixels, each the contrast of its 2×2 neighbourhood about the
+          // constant's own value, and from then on an ordinary transform reading that neighbourhood.
+          int x = t.RangeX, y = t.RangeY, sum = 0;
+          for (var dy = 0; dy < 2; ++dy)
+          for (var dx = 0; dx < 2; ++dx) {
+            var at = (y - 1 + dy) * previousWidth + x - 1 + dx;
+            var average = (_Linear(source, at) + _Linear(source, at + 1) + _Linear(source, at + previousWidth) + _Linear(source, at + previousWidth + 1)) >> 2;
+            sum += average;
+            target[(2 * y + dy) * levelWidth + 2 * x + dx] = (byte)_Contrast(t.Affine, t.LevelValue, average, t.LevelValue, false);
+          }
+
+          t.Mean = (sum & 0xFFFF) >> 2;
+          t.StoredRangeCode = 1;
+          (t.StoredRangeX, t.StoredRangeY) = (2 * x, 2 * y);
+          (t.StoredDomainX, t.StoredDomainY) = (2 * x - 1, 2 * y - 1);
+        }
+      else
+        foreach (var t in constants)
+          _Advance(source, target, previousWidth, previousHeight, levelWidth, levelHeight, t, step);
+
+      foreach (var t in special) {
+        _TransformBlock(target, target, levelWidth, levelHeight, levelWidth, levelHeight, t,
+          t.StoredRangeX * 2, t.StoredRangeY * 2, t.StoredDomainX * 2, t.StoredDomainY * 2, t.StoredRangeCode << (step - 1), false, true, t.Mean);
+        (t.StoredRangeX, t.StoredRangeY, t.StoredDomainX, t.StoredDomainY) = (t.StoredRangeX * 2, t.StoredRangeY * 2, t.StoredDomainX * 2, t.StoredDomainY * 2);
+      }
+
+      (source, target) = (target, source);
+      (previousWidth, previousHeight) = (levelWidth, levelHeight);
+    }
+  }
+
+  /// <summary>One transform drawn at <paramref name="step"/> from the level below, its mean fixed and its positions then doubled.</summary>
+  private static void _Advance(byte[] previous, byte[] image, int previousWidth, int previousHeight, int levelWidth, int levelHeight, Transform t, int step) {
+    _TransformBlock(previous, image, previousWidth, previousHeight, levelWidth, levelHeight, t,
+      t.StoredRangeX * 2, t.StoredRangeY * 2, t.StoredDomainX, t.StoredDomainY, t.StoredRangeCode << (step - 1), false, true, t.Mean);
+    (t.StoredRangeX, t.StoredRangeY, t.StoredDomainX, t.StoredDomainY) = (t.StoredRangeX * 2, t.StoredRangeY * 2, t.StoredDomainX * 2, t.StoredDomainY * 2);
+  }
+
+  private static int _Linear(byte[] plane, int index) => plane[Math.Clamp(index, 0, plane.Length - 1)];
+
+  public (int Width, int Height, byte[] Rgb) Decode(bool deblock) => Decode(deblock, null);
+
+  /// <summary>Draws the picture at the requested size, or at its coded size when none is given.</summary>
+  /// <remarks>
+  /// Each tile is drawn at the plan's level: its half-resolution attractor as usual, the coded size
+  /// from it, and every further level from the one below with each transform's domain mean fixed at
+  /// the coded size. Unit constants turn into ordinary transforms from the second level on.
+  /// </remarks>
+  public (int Width, int Height, byte[] Rgb) Decode(bool deblock, (int Width, int Height)? size) {
+    var plan = FifOutputPlan.For(OutputWidth, OutputHeight, size?.Width ?? OutputWidth, size?.Height ?? OutputHeight);
+    // Below half size the DLL leaves out the finest levels altogether.
+    var lastLevel = Math.Max(0, _levels - 1 - plan.ExtraHalvings);
+    var level = plan.Level;
+    var componentCount = _color ? 3 : 1;
     var models = new Model[_levels][];
-    for (var level = 0; level < _levels; ++level)
-      models[level] = _Models(level);
+    for (var index = 0; index < _levels; ++index)
+      models[index] = _Models(index);
+
+    var rects = plan.Rectangles(_regions.Select(r => (r.X, r.Y, r.Width, r.Height)).ToArray());
+    var output = new byte[plan.Width * plan.Height * 3];
+    var bufferSize = _regions.Max(r => FifReconstruction.AtLevel(r.Width, Math.Max(level, 1)) * FifReconstruction.AtLevel(r.Height, Math.Max(level, 1)));
+    var scratch = new byte[bufferSize];
+    var buffers = new byte[componentCount][];
+    for (var c = 0; c < componentCount; ++c)
+      buffers[c] = new byte[bufferSize];
 
     // The final restart has no physical end: the DLL reads zeros past its buffer, bounded here by
     // the transform limit.
     var virtualEnd = _data.Length + (long)_aggregateLimit * 16 + 32;
-    foreach (var region in _regions) {
+    for (var regionIndex = 0; regionIndex < _regions.Length; ++regionIndex) {
+      var region = _regions[regionIndex];
       var readers = region.Offsets.Select(start => new FifBitReader(_data, start, virtualEnd)).ToArray();
       var decoded = new List<Transform>[componentCount];
       for (var c = 0; c < componentCount; ++c)
-        decoded[c] = _DecodeComponent(region, c, readers, models);
+        decoded[c] = _DecodeComponent(region, c, readers, models, lastLevel);
 
       if (decoded[0].Count > _primaryLimit || decoded.Sum(d => d.Count) > _aggregateLimit)
         throw new InvalidDataException("A FIF1 transform limit is exceeded.");
 
+      var lumaWidth = FifReconstruction.AtLevel(region.Width, level);
+      var lumaHeight = FifReconstruction.AtLevel(region.Height, level);
+      // The DLL filters a tile only when some component coded a transform wider, as drawn, than the
+      // quality's threshold; a tile drawn from flat blocks alone is left as it is.
+      var threshold = FifReconstruction.ProgressiveThreshold(_quality);
+      var filter = deblock && decoded.Any(list => list.Any(t => !t.Constant && t.Affine != Flat
+        && (level == 0 ? t.RangeCode >> 1 : t.RangeCode << (level - 1)) > threshold));
+      var tiles = new byte[componentCount][];
       for (var c = 0; c < componentCount; ++c) {
-        var tile = _RenderRegion(region, c, decoded[c]);
         var divisor = c == 0 ? 1 : 2;
-        int tileWidth = region.Width / divisor, tileHeight = region.Height / divisor;
-        if (deblock)
-          FifReconstruction.ProgressiveTileFilter(tile, tileWidth, tileHeight,
-            decoded[c].Select(t => t.Constant ? (t.RangeX, t.RangeY, 1) : (t.RangeX * 2, t.RangeY * 2, t.RangeCode)).ToList(), _quality);
-
-        var planeWidth = _canvasWidth / divisor;
-        for (var row = 0; row < tileHeight; ++row)
-          Buffer.BlockCopy(tile, row * tileWidth, planes[c], (region.Y / divisor + row) * planeWidth + region.X / divisor, tileWidth);
+        int tileWidth = FifReconstruction.AtLevel(region.Width / divisor, level), tileHeight = FifReconstruction.AtLevel(region.Height / divisor, level);
+        _RenderRegion(region, c, decoded[c], level, buffers[c], scratch);
+        if (filter)
+          FifReconstruction.ProgressiveTileFilter(buffers[c], tileWidth, tileHeight, _FilterBlocks(decoded[c], level), _quality, level);
+        tiles[c] = buffers[c][..(tileWidth * tileHeight)];
       }
+
+      byte[] packed;
+      if (!_color)
+        packed = tiles[0];
+      else {
+        // Each tile converts on its own, so chroma never interpolates across a tile seam.
+        packed = new byte[lumaWidth * lumaHeight * 3 / 2];
+        Buffer.BlockCopy(tiles[0], 0, packed, 0, lumaWidth * lumaHeight);
+        var chromaWidth = lumaWidth / 2;
+        for (var row = 0; row < lumaHeight / 2; ++row) {
+          var target = lumaWidth * lumaHeight + row * lumaWidth;
+          Buffer.BlockCopy(tiles[1], row * chromaWidth, packed, target, chromaWidth);
+          Buffer.BlockCopy(tiles[2], row * chromaWidth, packed, target + chromaWidth, chromaWidth);
+        }
+      }
+
+      FifReconstruction.Place(output, plan, rects[regionIndex], packed, lumaWidth, lumaHeight, _color, errorUv: true);
     }
 
-    var canvas = new byte[_canvasWidth * _canvasHeight * 3];
-    if (!_color)
-      canvas = FifReconstruction.GrayToRgb(planes[0], _canvasWidth * _canvasHeight);
-    else
-      foreach (var region in _regions) {
-        // Each tile converts on its own, so chroma never interpolates across a tile seam.
-        int rw = region.Width, rh = region.Height, halfWidth = _canvasWidth / 2;
-        var packed = new byte[rw * rh * 3 / 2];
-        for (var row = 0; row < rh; ++row)
-          Buffer.BlockCopy(planes[0], (region.Y + row) * _canvasWidth + region.X, packed, row * rw, rw);
-        for (var row = 0; row < rh / 2; ++row) {
-          var source = (region.Y / 2 + row) * halfWidth + region.X / 2;
-          var target = rw * rh + row * rw;
-          Buffer.BlockCopy(planes[1], source, packed, target, rw / 2);
-          Buffer.BlockCopy(planes[2], source, packed, target + rw / 2, rw / 2);
-        }
-
-        var block = FifReconstruction.ToRgb(packed, rw, rh, errorUv: true, OutputWidth - region.X, OutputHeight - region.Y);
-        for (var row = 0; row < rh; ++row)
-          Buffer.BlockCopy(block, row * rw * 3, canvas, ((region.Y + row) * _canvasWidth + region.X) * 3, rw * 3);
-      }
-
-    var output = new byte[OutputWidth * OutputHeight * 3];
-    for (var row = 0; row < OutputHeight; ++row)
-      Buffer.BlockCopy(canvas, row * _canvasWidth * 3, output, row * OutputWidth * 3, OutputWidth * 3);
-
     if (deblock)
-      FifReconstruction.RegionBoundaryFilter(output, OutputWidth, OutputHeight, _regions.Select(r => (r.X, r.Y, r.Width, r.Height)));
+      FifReconstruction.RegionBoundaryFilter(output, plan.Width, plan.Height, rects);
 
-    return (OutputWidth, OutputHeight, output);
+    return (plan.Width, plan.Height, output);
   }
+
+  /// <summary>Each transform's position and size in the units of the level drawn, as the tile filter reads them.</summary>
+  private static List<(int X, int Y, int Size)> _FilterBlocks(List<Transform> transforms, int level)
+    => transforms.Select(t => level switch {
+      0 => t.Constant ? (t.RangeX / 2, t.RangeY / 2, 0) : (t.RangeX, t.RangeY, t.RangeCode / 2),
+      1 => t.Constant ? (t.RangeX, t.RangeY, 0) : (t.RangeX * 2, t.RangeY * 2, t.RangeCode),
+      _ => t.Constant
+        ? (t.RangeX << (level - 1), t.RangeY << (level - 1), 1 << (level - 1))
+        : (t.RangeX << level, t.RangeY << level, t.RangeCode << (level - 1)),
+    }).ToList();
 }

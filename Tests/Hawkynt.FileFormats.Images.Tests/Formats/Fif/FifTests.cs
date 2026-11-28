@@ -13,21 +13,15 @@ namespace FileFormat.Fif.Tests;
 /// <summary>Iterated Systems fractal images, held to Iterated's own DECO_32.DLL.</summary>
 /// <remarks>
 /// The committed fixtures are pictures made here, with the DLL's decode beside them (see
-/// Fixtures/PROVENANCE.txt). The real files — 34 still images across FTC 1.1, FTC 3.1–3.3 (bit and
-/// arithmetic coded, YUV, error-UV and grey, with and without FTT templates) and FIF1 — are not
-/// redistributable and are checked by <see cref="Corpus_EveryFileMatchesTheDllDecode"/> when present.
+/// Fixtures/PROVENANCE.txt), at the coded size and at other output sizes. The real files — 34 still
+/// images across FTC 1.1, FTC 3.1–3.3 (bit and arithmetic coded, YUV, error-UV and grey, with and
+/// without FTT templates) and FIF1 — are not redistributable and are checked by
+/// <see cref="Corpus_EveryFileMatchesTheDllDecode"/> when present.
 /// </remarks>
 [TestFixture]
 public sealed class FifTests {
 
   private const string _CORPUS_VARIABLE = "FIF_CORPUS";
-
-  /// <summary>Files whose decode is known to differ from the DLL's, and by how much at most.</summary>
-  /// <remarks>
-  /// m8158.fif: 87 pixels in one FIF1 tile differ by at most 2 in a chroma plane. The cause has not
-  /// been found; every other FIF1 file, including its two siblings from the same source, is exact.
-  /// </remarks>
-  private static readonly Dictionary<string, int> _knownDeviations = new(StringComparer.OrdinalIgnoreCase) { ["m8158.fif"] = 2 };
 
   private static byte[] _Fixture(string name) {
     var path = Path.Combine(TestContext.CurrentContext.TestDirectory, "Fixtures", "Fif", name);
@@ -70,9 +64,109 @@ public sealed class FifTests {
     });
   }
 
+  [TestCase("selfmade_ftc11_32x16", 8, 4)]
+  [TestCase("selfmade_ftc11_32x16", 16, 8)]
+  [TestCase("selfmade_ftc11_32x16", 24, 12)]
+  [TestCase("selfmade_ftc11_32x16", 45, 19)]
+  [TestCase("selfmade_ftc11_32x16", 64, 32)]
+  [TestCase("selfmade_ftc11_32x16", 96, 48)]
+  [TestCase("selfmade_ftc11_32x16", 128, 64)]
+  [TestCase("selfmade_ftc31_37x23", 9, 5)]
+  [TestCase("selfmade_ftc31_37x23", 18, 11)]
+  [TestCase("selfmade_ftc31_37x23", 23, 13)]
+  [TestCase("selfmade_ftc31_37x23", 27, 17)]
+  [TestCase("selfmade_ftc31_37x23", 74, 46)]
+  [TestCase("selfmade_ftc31_37x23", 111, 69)]
+  [TestCase("selfmade_ftc31_37x23", 148, 92)]
+  [Category("Conformance")]
+  public void Fixture_DecodesAtAnotherSizeExactlyAsTheDllDoes(string name, int width, int height) {
+    var file = FifReader.FromBytes(_Fixture(name + ".fif"), null, width, height);
+    var (expectedWidth, expectedHeight, expected) = _Ppm(_Fixture($"{name}.{width}x{height}.ppm"));
+
+    Assert.Multiple(() => {
+      Assert.That((file.Width, file.Height), Is.EqualTo((expectedWidth, expectedHeight)));
+      Assert.That(file.PixelData, Is.EqualTo(expected));
+      Assert.That(FifFile.ToRawImage(file).Width, Is.EqualTo(width));
+    });
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void DecodingAtTheCodedSize_IsTheDefaultDecode() {
+    var data = _Fixture("selfmade_ftc31_37x23.fif");
+    Assert.Multiple(() => {
+      Assert.That(FifReader.CodedSize(data), Is.EqualTo((37, 23)));
+      Assert.That(FifReader.FromBytes(data, null, 37, 23).PixelData, Is.EqualTo(FifReader.FromBytes(data).PixelData));
+    });
+  }
+
+  [TestCase(0, 10)]
+  [TestCase(10, -1)]
+  [Category("Unit")]
+  public void NonPositiveOutputSize_IsRefused(int width, int height)
+    => Assert.Throws<ArgumentOutOfRangeException>(() => FifReader.FromBytes(_Fixture("selfmade_ftc31_37x23.fif"), null, width, height));
+
+  [Test]
+  [Category("Unit")]
+  public void OutputSizeBeyondTheDllsRange_IsRefused()
+    => Assert.Throws<ArgumentOutOfRangeException>(() => FifReader.FromBytes(_Fixture("selfmade_ftc11_32x16.fif"), null, 32 * 1024, 16));
+
+  // SetOutputResolution's plan: exactly half is drawn at half size; smaller requests at half size
+  // with FIF1's finest levels left out; larger ones at the next power-of-two multiple covering them.
+  [TestCase(640, 480, 320, 240, 0, 0, false)]
+  [TestCase(640, 480, 160, 120, 0, 2, true)]
+  [TestCase(640, 480, 80, 60, 0, 3, true)]
+  [TestCase(640, 480, 300, 240, 0, 1, true)]
+  [TestCase(640, 480, 480, 360, 1, 0, true)]
+  [TestCase(640, 480, 640, 480, 1, 0, false)]
+  [TestCase(640, 480, 641, 480, 2, 0, true)]
+  [TestCase(640, 480, 1280, 960, 2, 0, false)]
+  [TestCase(640, 480, 1920, 1440, 3, 0, true)]
+  [TestCase(161, 121, 80, 60, 0, 0, false)]
+  [Category("Unit")]
+  public void OutputPlan_ChoosesTheDllsLevel(int originalWidth, int originalHeight, int width, int height, int level, int extra, bool resamples) {
+    var plan = FifOutputPlan.For(originalWidth, originalHeight, width, height);
+    Assert.That((plan.Level, plan.ExtraHalvings, plan.Resamples), Is.EqualTo((level, extra, resamples)));
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void OutputPlan_RegionRectanglesTileTheOutput() {
+    var plan = FifOutputPlan.For(570, 380, 333, 211);
+    var regions = new (int X, int Y, int Width, int Height)[] { (0, 0, 192, 192), (192, 0, 192, 192), (384, 0, 192, 192), (0, 192, 192, 192), (192, 192, 192, 192), (384, 192, 192, 192) };
+    var rects = plan.Rectangles(regions);
+    Assert.Multiple(() => {
+      Assert.That(rects.Take(3).Sum(r => r.Width), Is.EqualTo(rects.Skip(3).Sum(r => r.Width)));
+      Assert.That(rects[2].X + rects[2].Width, Is.GreaterThanOrEqualTo(333));
+      Assert.That(rects[3].Y + rects[3].Height, Is.GreaterThanOrEqualTo(211));
+      Assert.That(rects.Where((r, i) => i % 3 != 2).All(r => r.Width % 2 == 0), Is.True, "Inner edges land on even pixels.");
+    });
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void AreaResample_AveragesWholeAndPartialCoverage() {
+    byte[] source = [0, 30, 60, 90, 120, 150];
+    Assert.Multiple(() => {
+      Assert.That(FifOutputPlan.AreaResample(source, 6, 1, 3, 1), Is.EqualTo(new byte[] { 15, 75, 135 }));
+      Assert.That(FifOutputPlan.AreaResample(source, 6, 1, 4, 1), Is.EqualTo(new byte[] { 10, 50, 100, 140 }));
+      Assert.That(FifOutputPlan.AreaResample(source, 6, 1, 6, 1), Is.EqualTo(source));
+      Assert.Throws<InvalidDataException>(() => FifOutputPlan.AreaResample(source, 6, 1, 7, 1));
+    });
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void TemplateUpsampling_KeepsSamplesAndAveragesBetweenThem() {
+    var raster = new FifTemplateRaster(2, 2, 0, [10, 20, 30, 41]);
+    var twice = FifReconstruction.UpsampleTemplate(raster);
+    Assert.That(twice.Pixels, Is.EqualTo(new byte[] { 10, 15, 20, 20, 20, 26, 31, 31, 30, 36, 41, 41, 30, 36, 41, 41 }));
+  }
+
   /// <summary>
   /// Decodes every file under <c>FIF_CORPUS</c> that has a <c>name.ppm</c> beside it — the DLL's
-  /// decode — and requires an exact match (FTT templates are found beside the files).
+  /// decode — and requires an exact match (FTT templates are found beside the files). A
+  /// <c>name.WxH.ppm</c> is the DLL's decode at that output size.
   /// </summary>
   [Test]
   [Category("Conformance")]
@@ -85,13 +179,24 @@ public sealed class FifTests {
     var failures = new List<string>();
     var checkedCount = 0;
     foreach (var expectedPath in Directory.EnumerateFiles(directory!, "*.ppm")) {
-      var path = Path.Combine(directory!, Path.GetFileNameWithoutExtension(expectedPath));
-      if (!File.Exists(path))
-        continue;
+      var stem = Path.GetFileNameWithoutExtension(expectedPath);
+      var path = Path.Combine(directory!, stem);
+      (int Width, int Height)? size = null;
+      if (!File.Exists(path)) {
+        var dot = stem.LastIndexOf('.');
+        var dimensions = dot < 0 ? [] : stem[(dot + 1)..].Split('x');
+        if (dimensions.Length != 2 || !int.TryParse(dimensions[0], out var w) || !int.TryParse(dimensions[1], out var h))
+          continue;
+
+        path = Path.Combine(directory!, stem[..dot]);
+        size = (w, h);
+        if (!File.Exists(path))
+          continue;
+      }
 
       ++checkedCount;
       try {
-        var file = FifReader.FromFile(new FileInfo(path));
+        var file = size is { } s ? FifReader.FromFile(new FileInfo(path), s.Width, s.Height) : FifReader.FromFile(new FileInfo(path));
         var (width, height, expected) = _Ppm(File.ReadAllBytes(expectedPath));
         if (file.Width != width || file.Height != height) {
           failures.Add($"{path}: {file.Width}x{file.Height}, the DLL says {width}x{height}");
@@ -102,9 +207,8 @@ public sealed class FifTests {
         for (var i = 0; i < expected.Length; ++i)
           maximum = Math.Max(maximum, Math.Abs(expected[i] - file.PixelData[i]));
 
-        var allowed = _knownDeviations.GetValueOrDefault(Path.GetFileName(path));
-        if (maximum > allowed)
-          failures.Add($"{path}: differs from the DLL by up to {maximum}");
+        if (maximum > 0)
+          failures.Add($"{expectedPath}: differs from the DLL by up to {maximum}");
       } catch (Exception exception) {
         failures.Add($"{path}: {exception.Message}");
       }

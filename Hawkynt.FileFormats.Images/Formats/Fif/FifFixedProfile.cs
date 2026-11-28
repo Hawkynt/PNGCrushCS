@@ -44,7 +44,12 @@ internal static class FifFixedProfile {
   public static bool Matches(ReadOnlySpan<byte> data)
     => data.Length >= 20 && data[..8].SequenceEqual(_template.AsSpan(0, 8)) && BinaryPrimitives.ReadUInt32LittleEndian(data[16..]) == HeaderSize;
 
-  public static (int Width, int Height, byte[] Rgb) Decode(byte[] data, bool deblock) {
+  public static (int Width, int Height) Size(byte[] data)
+    => (BinaryPrimitives.ReadUInt16LittleEndian(data.AsSpan(8)), BinaryPrimitives.ReadUInt16LittleEndian(data.AsSpan(10)));
+
+  public static (int Width, int Height, byte[] Rgb) Decode(byte[] data, bool deblock) => Decode(data, deblock, null);
+
+  public static (int Width, int Height, byte[] Rgb) Decode(byte[] data, bool deblock, (int Width, int Height)? size) {
     if (data.Length < HeaderSize)
       throw new InvalidDataException("FTC file is shorter than its 67-byte header.");
 
@@ -72,10 +77,15 @@ internal static class FifFixedProfile {
     records.AddRange(_ParsePlane(bits, width, height / 2, domainStep, (height + domainStep - 1) / domainStep));
     bits.Finish("FTC 1.1 payload");
 
-    var packed = FifReconstruction.Reconstruct(records, width, height, color: true, template: null);
+    var plan = FifOutputPlan.For(width, height, size?.Width ?? width, size?.Height ?? height);
+    var packed = FifReconstruction.Reconstruct(records, width, height, color: true, template: null, plan.Level);
     if (deblock)
-      FifReconstruction.TransformFilter(records, packed, width, height, color: true);
-    return (width, height, FifReconstruction.ToRgb(packed, width, height, errorUv: false, width, height));
+      FifReconstruction.TransformFilter(records, packed, width, height, color: true, plan.Level);
+
+    var output = new byte[plan.Width * plan.Height * 3];
+    var rect = plan.Rectangles([(0, 0, width, height)])[0];
+    FifReconstruction.Place(output, plan, rect, packed, FifReconstruction.AtLevel(width, plan.Level), FifReconstruction.AtLevel(height, plan.Level), color: true, errorUv: false);
+    return (plan.Width, plan.Height, output);
   }
 
   private static FifRecord _ReadRecord(FifBitReader bits, int domainWidth, int domainHeight, int domainStep, int kind) {

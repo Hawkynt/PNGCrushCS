@@ -8,7 +8,8 @@ namespace FileFormat.Fif;
 /// <summary>Reads Iterated Systems fractal images: FTC 1.1, FTC 3.1–3.3 and progressive FIF1.</summary>
 /// <remarks>
 /// Decoding follows Iterated's own DECO_32.DLL 6.1 with its default output settings: the result is
-/// the picture that DLL draws at the image's original size, deblocking included. An FTC 3.x file may
+/// the picture that DLL draws at the image's original size, deblocking included, or at any other size
+/// through <see cref="FromFile(FileInfo, int, int)"/> and <see cref="FromBytes(byte[], byte[], int, int)"/>. An FTC 3.x file may
 /// draw on an external FTT template (<c>*.FTT</c>); <see cref="FromFile(FileInfo)"/> finds it beside
 /// the file by the name the file records, and <see cref="FromBytes(byte[], byte[])"/> takes it
 /// directly. The FTC video profiles are refused by name.
@@ -17,6 +18,26 @@ public static class FifReader {
 
   /// <summary>Reads a fractal image, looking for any template it needs beside it.</summary>
   public static FifFile FromFile(FileInfo file) {
+    var (data, template) = _Load(file);
+    return _Read(data, template);
+  }
+
+  /// <summary>
+  /// Reads a fractal image drawn at <paramref name="width"/>×<paramref name="height"/>, looking for any
+  /// template it needs beside it.
+  /// </summary>
+  /// <remarks>
+  /// A fractal picture has no fixed pixel grid. Iterated's decoder draws the transforms at a
+  /// power-of-two multiple of the coded size (half resolution at the least) and area-averages that
+  /// down to the size asked for; this reader does the same, so the result is what DECO_32.DLL draws
+  /// after <c>SetOutputResolution(width, height)</c>.
+  /// </remarks>
+  public static FifFile FromFile(FileInfo file, int width, int height) {
+    var (data, template) = _Load(file);
+    return _Read(data, template, _Size(width, height));
+  }
+
+  private static (byte[] Data, byte[]? Template) _Load(FileInfo file) {
     ArgumentNullException.ThrowIfNull(file);
     if (!file.Exists)
       throw new FileNotFoundException("Fractal image file not found.", file.FullName);
@@ -31,7 +52,13 @@ public static class FifReader {
         template = File.ReadAllBytes(match.FullName);
     }
 
-    return _Read(data, template);
+    return (data, template);
+  }
+
+  private static (int, int) _Size(int width, int height) {
+    ArgumentOutOfRangeException.ThrowIfNegativeOrZero(width);
+    ArgumentOutOfRangeException.ThrowIfNegativeOrZero(height);
+    return (width, height);
   }
 
   public static FifFile FromStream(Stream stream) => FromBytes(StreamBytes.ReadAll(stream));
@@ -47,6 +74,32 @@ public static class FifReader {
   public static FifFile FromBytes(byte[] data, byte[]? template) {
     ArgumentNullException.ThrowIfNull(data);
     return _Read(data, template);
+  }
+
+  /// <summary>Reads a fractal image drawn at <paramref name="width"/>×<paramref name="height"/>, on the given FTT template if it needs one.</summary>
+  /// <remarks>See <see cref="FromFile(FileInfo, int, int)"/> for how other sizes are drawn.</remarks>
+  public static FifFile FromBytes(byte[] data, byte[]? template, int width, int height) {
+    ArgumentNullException.ThrowIfNull(data);
+    return _Read(data, template, _Size(width, height));
+  }
+
+  /// <summary>The coded size of a fractal still image: the size it is drawn at unless another is asked for.</summary>
+  public static (int Width, int Height) CodedSize(ReadOnlySpan<byte> data) {
+    var bytes = data.ToArray();
+    if (FifProgressive.Matches(bytes)) {
+      var fif = FifProgressive.Parse(bytes);
+      return (fif.OutputWidth, fif.OutputHeight);
+    }
+
+    if (FifRegionProfile.Matches(bytes)) {
+      var profile = FifRegionProfile.Parse(bytes);
+      return (profile.OutputWidth, profile.OutputHeight);
+    }
+
+    if (FifFixedProfile.Matches(bytes))
+      return FifFixedProfile.Size(bytes);
+
+    throw new InvalidDataException("Not an Iterated Systems fractal still image (FTC 1.1, FTC 3.x or FIF1).");
   }
 
   /// <summary>The file name (without directory) of the FTT template a picture needs, or <c>null</c>.</summary>
@@ -71,7 +124,9 @@ public static class FifReader {
   private static readonly byte[] _videoColor = "FTC\0\u0001\u0001\u0002\u0002"u8.ToArray();
   private static readonly byte[] _videoCompact = "FTC\0\u0002\u0002\u0002\u0002"u8.ToArray();
 
-  private static FifFile _Read(byte[] data, byte[]? templateData) {
+  private static FifFile _Read(byte[] data, byte[]? templateData) => _Read(data, templateData, null);
+
+  private static FifFile _Read(byte[] data, byte[]? templateData, (int Width, int Height)? size) {
     if (data.Length < 8)
       throw new InvalidDataException("Data too small for a fractal image.");
 
@@ -81,7 +136,7 @@ public static class FifReader {
 
     if (FifProgressive.Matches(data)) {
       var fif = FifProgressive.Parse(data);
-      var (w, h, rgb) = fif.Decode(deblock: true);
+      var (w, h, rgb) = fif.Decode(deblock: true, size);
       return new() { Width = w, Height = h, Variant = FifVariant.Progressive, PixelData = rgb };
     }
 
@@ -96,12 +151,13 @@ public static class FifReader {
         template = ParseTemplate(templateData, reference);
       }
 
-      var (w, h, rgb) = profile.Decode(template, deblock: true);
+      var plan = FifOutputPlan.For(profile.OutputWidth, profile.OutputHeight, size?.Width ?? profile.OutputWidth, size?.Height ?? profile.OutputHeight);
+      var (w, h, rgb) = profile.Decode(template, deblock: true, plan);
       return new() { Width = w, Height = h, Variant = FifVariant.Region, PixelData = rgb };
     }
 
     if (FifFixedProfile.Matches(data)) {
-      var (w, h, rgb) = FifFixedProfile.Decode(data, deblock: true);
+      var (w, h, rgb) = FifFixedProfile.Decode(data, deblock: true, size);
       return new() { Width = w, Height = h, Variant = FifVariant.Fixed, PixelData = rgb };
     }
 

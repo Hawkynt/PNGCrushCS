@@ -15373,9 +15373,12 @@ Implements `IEquatable<FifFile>`, `IImageFormatMetadata<FifFile>`, `IImageFormat
 
 | Member | Signature | Summary |
 | --- | --- | --- |
+| `CodedSize` | `static ValueTuple<int, int> CodedSize(ReadOnlySpan<byte> data)` |  |
 | `FromBytes` | `static FifFile FromBytes(byte[] data)` |  |
 | `FromBytes` | `static FifFile FromBytes(byte[] data, byte[] template)` |  |
+| `FromBytes` | `static FifFile FromBytes(byte[] data, byte[] template, int width, int height)` |  |
 | `FromFile` | `static FifFile FromFile(FileInfo file)` |  |
+| `FromFile` | `static FifFile FromFile(FileInfo file, int width, int height)` |  |
 | `FromSpan` | `static FifFile FromSpan(ReadOnlySpan<byte> data)` |  |
 | `FromStream` | `static FifFile FromStream(Stream stream)` |  |
 | `TemplateName` | `static string TemplateName(ReadOnlySpan<byte> data)` |  |
