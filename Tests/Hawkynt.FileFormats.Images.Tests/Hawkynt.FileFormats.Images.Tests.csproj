@@ -215,6 +215,15 @@
     </None>
   </ItemGroup>
 
+  <!-- Fractal images made for this suite, and Iterated's DECO_32.DLL decode of each. See
+       Formats\Fif\Fixtures\PROVENANCE.txt. -->
+  <ItemGroup>
+    <None Include="Formats\Fif\Fixtures\*">
+      <Link>Fixtures\Fif\%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
   <ItemGroup>
     <Using Include="NUnit.Framework" />
   </ItemGroup>

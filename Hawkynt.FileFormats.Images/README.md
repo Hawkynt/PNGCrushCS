@@ -333,6 +333,7 @@ The columns are the four things a caller can ask the registry for: **Read** deco
 | Fbm | `.fbm` | ✅ | ✅ | — | — | — | XnView |
 | Fff | `.fff` | ✅ | ✅ | — | — | — | XnView, ffmpeg |
 | Ffli | `.ffli`, `.ffl` | ✅ | ✅ | — | — | — | recoil2png, IrfanView |
+| Fif | `.fif`, `.fi`, `.fsm` | ✅ | ✅ | — | — | — | none |
 | FirstPublisher | `.art` | ✅ | ✅ | — | — | — | XnView |
 | Fits | `.fits`, `.fit`, `.fts` | ✅ | ✅ | — | — | — | XnView |
 | FitsDocument | `.fits`, `.fit`, `.fts` | ✅ | ✅ | — | ✅ | — | XnView |

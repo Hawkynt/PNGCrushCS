@@ -154,3 +154,19 @@ The PDF page renderer under `Formats/Pdf` is written from ISO 32000 except for t
 - `Formats/Pdf/Filters/` — the CCITT fax decoder is converted from pdf.js `ccitt.js`, itself a port of xpdf's CCITTFaxStream that Glyph & Cog, LLC relicensed under Apache 2.0 for pdf.js; the JBIG2 decoder from pdf.js `jbig2.js` and `arithmetic_decoder.js` (Apache License 2.0). See `Formats/Pdf/Filters/THIRD-PARTY-NOTICE.pdfjs.txt`.
 - `Formats/Pdf/Fonts/Data/` — encoding tables and standard-14 widths from pdf.js (Apache License 2.0), the **Adobe Glyph List** (BSD 3-Clause, Adobe), the Adobe Core 14 AFM metrics (redistributable under their own terms), all reproduced in `Formats/Pdf/Fonts/Data/THIRD-PARTY-NOTICE.txt`; and the unmodified **Liberation** Sans, Serif and Mono 2.1.5 fonts (SIL Open Font License 1.1, Red Hat), bundled as substitutes for non-embedded standard fonts, with the licence in `Formats/Pdf/Fonts/Data/Substitutes/OFL-Liberation.txt` and `THIRD-PARTY-NOTICE.Liberation.txt`.
 - The DeviceCMYK conversion uses the sixteen CMYK cube corner colours published with xpdf, as constants; poppler (GPL) was used only as a rendering oracle.
+
+## Iterated Systems fractal images (FIF / FTC)
+
+`Formats/Fif` is a conversion into C# of `fractalImageFormat.py` from the dexvert project (Sembiance), a decoder released under the Unlicense, corrected wherever it disagreed with the reference: Iterated Systems' own `DECO_32.DLL` 6.1, run under Wine and decompiled for the points of disagreement. The corrections are recorded in the code — per-region colour conversion and its edge clamp, doubled-precision error-UV interpolation, linear domain addressing, averaged FTT template sampling, the FTC 3.3 refined quantizers, and the deblocking filters. The writer is original.
+
+`Formats/Fif/FifProgressiveTables.cs` holds the FIF1 prefix-code books, which are constants of the format: the 10136 bytes at `DECO_32.DLL` addresses `0x110310D0`–`0x11033867`, copied verbatim.
+
+### dexvert license (Unlicense / public domain dedication)
+
+This is free and unencumbered software released into the public domain.
+
+Anyone is free to copy, modify, publish, use, compile, sell, or distribute this software, either in source code form or as a compiled binary, for any purpose, commercial or non-commercial, and by any means.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+Source: https://github.com/Sembiance/dexvert
