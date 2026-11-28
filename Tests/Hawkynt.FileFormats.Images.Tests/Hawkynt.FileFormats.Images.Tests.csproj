@@ -186,6 +186,16 @@
     </None>
   </ItemGroup>
 
+  <!-- LuraDocument files written by LuraTech's own encoder and by this package's writer, each beside
+       what LuraTech's own decoder (the IrfanView plug-in LDF.DLL 3.3.7) composed it to, plus
+       jbig-kit streams for the mask decoder. See Formats\LuraDocument\LuraDocumentOracleTests.cs. -->
+  <ItemGroup>
+    <None Include="Formats\LuraDocument\Fixtures\*">
+      <Link>Fixtures\LuraDocument\%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
   <!-- WhyPic pictures written by the reference encoder built from the distribution's source, the
        reference decoder's bitmaps of them, and the few this package's writer had to make because
        the reference encoder cannot. Fixtures\WhyPic\manifest.txt says which is which. -->

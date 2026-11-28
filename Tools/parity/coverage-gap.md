@@ -57,6 +57,8 @@ three times it was wrong, and each was overturned by checking rather than by rea
 
 The names still open are not waiting on effort. Recomputed against the catalogue rather than taken
 from this file's own history, they are eight: `sid`, `ldf`, `eri`, `fif`, `iwc`,
+
+from this file's own history, they are eight: `sid`, `eri`, `fif`, `iwc`,
 `wic` and `ypc` are Windows-only third-party plugins whose coding was never published, and the
 converter on this platform does not carry their readers either, so there is nothing here to ask;
 and `pax` is Blowfish under a password the file does not carry. (`prc` was the ninth: XnView's is
@@ -64,7 +66,7 @@ no reference for it, but Sony's own library is, and it is read and written now.)
 specification or a working decoder, not more searching — the per-name detail is in "Nothing credible
 describes these" and the table below.
 
-Beside those nine, one row is read under some of its names and not all: `ti` wants `.92i` as well
+Beside those eight, one row is read under some of its names and not all: `ti` wants `.92i` as well
 as the five now read, and the TI-92 really is a different container with its picture data compressed,
 so that half stays open on its merits. Two more are not extensions at all and never were — Amica
 Paint's is the literal `[b]` and ColoRIX's the wildcard `sc?` — which is recorded under "The two rows
@@ -501,8 +503,9 @@ reader for that name to take a JPEG, which every one of them refused:
     interlaced source image, and XnView's neighbouring `ttf` name is "Optigraphics Tiled". That is
     inference from what the company sold and not from anything about the file. No spec, no sample.
   - `ldf` is LuraDocument, LuraTech's mixed-raster-content scheme and the ancestor of their JPEG 2000
-    Part 6 work. Binary-only licensed, like LuraWave beside it in this table. Not worth further
-    effort.
+    Part 6 work, and it is read and written now. IrfanView's LuraDocument plug-in is built on LuraTech's
+    SDK and runs under Wine; a specification was derived from it (`Formats/LuraDocument/SPEC.md`), and
+    every page its encoder writes decodes to exactly what its decoder returns.
 
 ### Nothing credible describes these
 
@@ -981,7 +984,7 @@ Windows only, so nothing here has ever been able to compare against them either.
 | kqp | .kqp |  |
 | kskn | .thb | read by the Windows bitmap reader, which is what XnView reads it with |
 | lda | .lda | read; DC DC, a 512-byte header, Group 3, Group 4 or uncompressed |
-| ldf | .ldf | LuraTech, binary-only like LuraWave. Windows only |
+| ldf | .ldf | read and written; IrfanView's LuraDocument plug-in (LuraTech's SDK) is the oracle |
 | lvp | .lvp |  |
 | lwf | .lwf | read and written; LuraTech's Java decoder is the oracle |
 | lwi | .lwi |  |
