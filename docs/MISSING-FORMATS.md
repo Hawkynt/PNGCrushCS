@@ -37,7 +37,7 @@ issue quotes the recorded blocker and the route around it.
 | [Geospatial & remote sensing](#geospatial--remote-sensing) | [#515](https://github.com/Hawkynt/PNGCrushCS/issues/515) | 83 | 0 | 0 | 0 | 83 |
 | [Medical & scientific imaging](#medical--scientific-imaging) | [#516](https://github.com/Hawkynt/PNGCrushCS/issues/516) | 42 | 0 | 0 | 0 | 42 |
 | [GPU textures & game assets](#gpu-textures--game-assets) | [#517](https://github.com/Hawkynt/PNGCrushCS/issues/517) | 39 | 0 | 0 | 0 | 39 |
-| [Retro computer & legacy platforms](#retro-computer--legacy-platforms) | [#518](https://github.com/Hawkynt/PNGCrushCS/issues/518) | 101 | 0 | 0 | 0 | 101 |
+| [Retro computer & legacy platforms](#retro-computer--legacy-platforms) | [#518](https://github.com/Hawkynt/PNGCrushCS/issues/518) | 100 | 0 | 0 | 0 | 100 |
 | [Vector, document & print](#vector-document--print) | [#519](https://github.com/Hawkynt/PNGCrushCS/issues/519) | 90 | 0 | 0 | 0 | 90 |
 | [Fonts, text-mode & teletext](#fonts-text-mode--teletext) | [#520](https://github.com/Hawkynt/PNGCrushCS/issues/520) | 61 | 0 | 0 | 0 | 61 |
 | [Editor & application native](#editor--application-native) | [#521](https://github.com/Hawkynt/PNGCrushCS/issues/521) | 49 | 0 | 0 | 0 | 49 |
@@ -49,7 +49,7 @@ issue quotes the recorded blocker and the route around it.
 | [Lossless & uncompressed video](#lossless--uncompressed-video) | [#527](https://github.com/Hawkynt/PNGCrushCS/issues/527) | 0 | 11 | 0 | 2 | 13 |
 | [Cinema camera RAW video](#cinema-camera-raw-video) | [#528](https://github.com/Hawkynt/PNGCrushCS/issues/528) | 0 | 6 | 7 | 0 | 13 |
 | [Elementary streams & streaming manifests](#elementary-streams--streaming-manifests) | [#529](https://github.com/Hawkynt/PNGCrushCS/issues/529) | 0 | 0 | 18 | 0 | 18 |
-| **All** | | **561** | **147** | **274** | **19** | **1001** |
+| **All** | | **560** | **147** | **274** | **19** | **1000** |
 
 Each issue carries the labels `cat: <category>`, its kind (`image-format`, `video-codec`, `video-container`, `video-encoder`), `priority: high|medium|low`, and `documented-blocker` where that applies.
 
@@ -415,7 +415,6 @@ GPU/console texture containers, game sprites and engine assets. Tracked in [#517
 | RIFF DIB (RDIB) | Image | `.rdi`, `.rdib` | read + write | missing | low | [#862](https://github.com/Hawkynt/PNGCrushCS/issues/862) |
 | Signum! compressed image (IMC) and Signum bitmap (PAC) | Image | `.imc` | read + write | missing | low | [#863](https://github.com/Hawkynt/PNGCrushCS/issues/863) |
 | Sinclair QL screen dump | Image | `.scr` | read + write | missing | low | [#864](https://github.com/Hawkynt/PNGCrushCS/issues/864) |
-| Sony PictureGear Pocket (PRC) | Image | `.prc` | read + write | blocked | low | [#865](https://github.com/Hawkynt/PNGCrushCS/issues/865) |
 | Spectrum 512 Anispec (Atari ST animation) | Image | `.sps` | read + write | missing | low | [#866](https://github.com/Hawkynt/PNGCrushCS/issues/866) |
 | SprEd sprite (Atari 8-bit .spr) | Image | `.spr` | read + write | missing | low | [#867](https://github.com/Hawkynt/PNGCrushCS/issues/867) |
 | Sprite Master (SPR + ARY) | Image | `.spr`, `.ary` | read + write | missing | low | [#868](https://github.com/Hawkynt/PNGCrushCS/issues/868) |
