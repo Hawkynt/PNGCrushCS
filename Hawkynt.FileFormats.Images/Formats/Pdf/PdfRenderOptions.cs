@@ -25,6 +25,15 @@ public sealed class PdfRenderOptions {
   /// <summary>Whether annotations' normal appearances are drawn over the page, as viewers do.</summary>
   public bool RenderAnnotations { get; init; } = true;
 
+  /// <summary>
+  /// Whether overprinting (the OP, op and OPM graphics state entries) is simulated, as an overprint
+  /// preview shows it: the page is drawn on CMYK and spot separations and each pixel's colour taken
+  /// from them, so a colour that overprints leaves the inks it does not use. Off by default, as in
+  /// viewers and poppler's pdftoppm without <c>-overprint</c>, which ignore overprinting on screen.
+  /// With it on, every colour goes through CMYK, as it does in pdftoppm with <c>-overprint</c>.
+  /// </summary>
+  public bool SimulateOverprint { get; init; }
+
   internal void Validate() {
     if (!(this.Resolution > 0) || !double.IsFinite(this.Resolution))
       throw new ArgumentOutOfRangeException(nameof(this.Resolution), "The resolution must be a positive number.");

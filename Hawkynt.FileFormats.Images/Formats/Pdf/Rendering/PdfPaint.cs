@@ -22,6 +22,9 @@ internal sealed class PdfSolidPaint(float r, float g, float b) : PdfPaint {
 
   public float B { get; } = b;
 
+  /// <summary>What it puts on the separations when overprint is simulated, or null to go by its RGB.</summary>
+  public PdfInk? Ink { get; set; }
+
   public override void Fill(int y, int x0, int count, Span<float> rgb, Span<float> alpha) {
     for (var i = 0; i < count; ++i) {
       rgb[i * 3] = this.R;

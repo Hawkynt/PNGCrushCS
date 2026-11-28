@@ -44,6 +44,9 @@ internal sealed class PdfSurface {
   /// <summary>For a knockout group, what each element is composited against instead of what is there.</summary>
   public float[]? KnockoutBackdrop { get; set; }
 
+  /// <summary>The separations the page is also drawn on when overprint is simulated, or null.</summary>
+  public PdfOverprintShadow? Shadow { get; set; }
+
   public PdfSurface(int originX, int originY, int width, int height) {
     this.OriginX = originX;
     this.OriginY = originY;
@@ -162,6 +165,21 @@ internal sealed class PdfSurface {
         rg = p[at + 1] * keep + rg * cover;
         rb = p[at + 2] * keep + rb * cover;
         ra = p[at + 3] * keep + ra * cover;
+      }
+
+      if (this.Shadow is { } shadow && knockout == null) {
+        // Overprint simulation: the separations decide the colour (see PdfOverprintShadow).
+        float cr, cg, cb;
+        if (mode == PdfBlendMode.Normal)
+          (cr, cg, cb) = shadow.Composite(x - this.OriginX, row, a, sr, sg, sb, true);
+        else {
+          var inv = ra > 0 ? 1 / ra : 0;
+          (cr, cg, cb) = shadow.Composite(x - this.OriginX, row, 1, Math.Clamp(rr * inv, 0, 1), Math.Clamp(rg * inv, 0, 1), Math.Clamp(rb * inv, 0, 1), false);
+        }
+
+        rr = cr * ra;
+        rg = cg * ra;
+        rb = cb * ra;
       }
 
       p[at] = rr;
@@ -283,6 +301,8 @@ internal sealed class PdfSurface {
   /// <param name="mask">A page-sized soft mask, or null.</param>
   /// <param name="clip">A page-sized clip coverage, or null.</param>
   public void CompositeSurface(PdfSurface group, float opacity, PdfBlendMode mode, PdfSoftMask? mask, PdfClipMask? clip) {
+    if (this.Shadow != null)
+      this.Shadow.Ink = null;
     var box = group.Box.Intersect(this.Box);
     if (box.IsEmpty)
       return;

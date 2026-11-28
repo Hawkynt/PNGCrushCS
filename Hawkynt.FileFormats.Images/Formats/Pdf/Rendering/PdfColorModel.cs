@@ -31,6 +31,12 @@ internal abstract class PdfColorModel {
   /// </summary>
   public virtual PdfColorModel ForIntent(string? intent) => this;
 
+  /// <summary>The colorant names of a Separation or DeviceN space, or null for any other.</summary>
+  public virtual IReadOnlyList<string>? Colorants => null;
+
+  /// <summary>One colorant alone at a tint, through the tint transform, as CMYK (§8.6.6.4/5).</summary>
+  public virtual double[] ColorantCmyk(int colorant, double tint) => [0, 0, 0, 0];
+
   /// <summary>Whether this is the special Pattern space.</summary>
   public virtual bool IsPattern => false;
 
@@ -128,9 +134,9 @@ internal abstract class PdfColorModel {
         if (colorant == "None")
           return new TintSpace(1, alternate, null, "Separation /None", true);
         if (colorant == "All")
-          return new TintSpace(1, alternate, null, "Separation /All", false);
+          return new TintSpace(1, alternate, null, "Separation /All", false, ["All"]);
 
-        return new TintSpace(1, alternate, PdfFunction.Parse(document, array[3]), $"Separation /{colorant}", false);
+        return new TintSpace(1, alternate, PdfFunction.Parse(document, array[3]), $"Separation /{colorant}", false, [colorant ?? "Unnamed"]);
       }
       case "DeviceN": {
         if (array.Count < 4)
@@ -141,7 +147,10 @@ internal abstract class PdfColorModel {
         var allNone = names.Count > 0;
         foreach (var n in names)
           allNone &= document.Resolve(n) as string == "None";
-        return new TintSpace(names.Count, alternate, allNone ? null : PdfFunction.Parse(document, array[3]), "DeviceN", allNone);
+        var colorantNames = new List<string>();
+        foreach (var n in names)
+          colorantNames.Add(document.Resolve(n) as string ?? "None");
+        return new TintSpace(names.Count, alternate, allNone ? null : PdfFunction.Parse(document, array[3]), "DeviceN", allNone, colorantNames);
       }
       case "Pattern":
         return new PatternSpace(array.Count > 1 ? Parse(document, array[1], resources, depth + 1) : null);
@@ -401,8 +410,25 @@ internal abstract class PdfColorModel {
   }
 
   /// <summary>Separation and DeviceN: tints through the tint transform into the alternate space.</summary>
-  private sealed class TintSpace(int n, PdfColorModel alternate, PdfFunction? transform, string name, bool none) : PdfColorModel {
+  private sealed class TintSpace(int n, PdfColorModel alternate, PdfFunction? transform, string name, bool none, IReadOnlyList<string>? colorants = null) : PdfColorModel {
     private readonly Dictionary<long, (double, double, double)> _cache = [];
+
+    public override IReadOnlyList<string>? Colorants => colorants;
+
+    public override double[] ColorantCmyk(int colorant, double tint) {
+      if (transform == null)
+        return [tint, tint, tint, tint];
+      var input = new double[n];
+      input[colorant] = tint;
+      var output = new double[Math.Max(alternate.Components, transform.Outputs)];
+      transform.Evaluate(input, output);
+      if (alternate.Components == 4)
+        return output[..4];
+      Span<double> rgb = stackalloc double[3];
+      alternate.ToRgb(output, rgb);
+      var (c, m, y, k) = PdfOverprintShadow.RgbToCmyk((float)rgb[0], (float)rgb[1], (float)rgb[2]);
+      return [c, m, y, k];
+    }
 
     public override int Components => n;
     public override string Name => name;
@@ -410,7 +436,7 @@ internal abstract class PdfColorModel {
 
     public override PdfColorModel ForIntent(string? intent) {
       var a = alternate.ForIntent(intent);
-      return ReferenceEquals(a, alternate) ? this : new TintSpace(n, a, transform, name, none);
+      return ReferenceEquals(a, alternate) ? this : new TintSpace(n, a, transform, name, none, colorants);
     }
 
     public override double[] InitialColor() {

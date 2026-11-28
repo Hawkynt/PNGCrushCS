@@ -30,6 +30,8 @@ internal static class PdfPageRenderer {
 
     var omissions = new List<string>();
     var renderer = new PdfRenderer(document, width, height, omissions);
+    if (options.SimulateOverprint)
+      renderer.Surface.Shadow = new PdfOverprintShadow(width, height);
     renderer.BeginPage(BaseTransform(crop, page.Rotate, scale * page.UserUnit));
 
     var content = _Content(document, page.Dictionary);

@@ -40,6 +40,7 @@ public sealed class PdfRenderTests {
   [TestCase("Render/color", 72, 0.3, 0.1)]
   [TestCase("Render/cmaps", 144, 0.4, 0.2)]
   [TestCase("Render/type1cff", 72, 1.2, 1.0)]
+  [TestCase("Render/overprint", 72, 0.3, 0.1)]
   [Category("Unit")]
   public void Fixture_AgreesWithPoppler(string name, double resolution, double maxMeanError, double maxBadPercent) {
     var file = _Read(name + ".pdf");
@@ -76,6 +77,25 @@ public sealed class PdfRenderTests {
       Assert.That(comparison.MeanAbsoluteError, Is.LessThanOrEqualTo(maxMeanError), comparison.ToString());
       Assert.That(comparison.BadPercent, Is.LessThanOrEqualTo(maxBadPercent), comparison.ToString());
       Assert.That(rendered.Omissions, Is.Empty);
+    });
+  }
+
+  /// <summary>
+  /// Overprint simulation, held to <c>pdftoppm -overprint -png</c> (poppler 26.11, -cropbox -aa yes
+  /// -aaVector yes, 72 dpi) stored as <c>.poppler-overprint.png</c>; without the option the same
+  /// page is held to plain pdftoppm, which ignores overprinting, by Fixture_AgreesWithPoppler.
+  /// </summary>
+  [TestCase("Render/overprint", 72, 0.8, 0.1)]
+  [Category("Unit")]
+  public void Fixture_WithOverprint_AgreesWithPopplerOverprint(string name, double resolution, double maxMeanError, double maxBadPercent) {
+    var file = _Read(name + ".pdf");
+    var rendered = PdfFile.RenderPage(file, 0, new PdfRenderOptions { Resolution = resolution, SimulateOverprint = true });
+    var reference = PdfRenderComparison.ReadPng(PdfDocumentTests.Fixture(name + ".poppler-overprint.png"));
+    var comparison = PdfRenderComparison.Of(rendered.Image, reference);
+    Assert.Multiple(() => {
+      Assert.That(comparison.SameSize, Is.True);
+      Assert.That(comparison.MeanAbsoluteError, Is.LessThanOrEqualTo(maxMeanError), comparison.ToString());
+      Assert.That(comparison.BadPercent, Is.LessThanOrEqualTo(maxBadPercent), comparison.ToString());
     });
   }
 

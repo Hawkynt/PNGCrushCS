@@ -494,6 +494,17 @@ internal sealed partial class PdfRenderer {
           if (value is string intent)
             this._state.Intent = intent;
           break;
+        case "OP":
+          this._state.StrokeOverprint = value is true;
+          if (!gs.ContainsKey("op"))
+            this._state.FillOverprint = value is true;
+          break;
+        case "op":
+          this._state.FillOverprint = value is true;
+          break;
+        case "OPM":
+          this._state.OverprintMode = PdfValues.IsNumber(value) ? PdfValues.Integer(value) : 0;
+          break;
         case "LW":
           this._state.LineWidth = Math.Abs(PdfValues.Number(value, this._state.LineWidth));
           break;
@@ -730,7 +741,58 @@ internal sealed partial class PdfRenderer {
     if (space.IsPattern)
       return this._PatternPaint(stroke);
 
-    return _SolidPaint(space, stroke ? this._state.StrokeColor : this._state.FillColor);
+    var paint = _SolidPaint(space, stroke ? this._state.StrokeColor : this._state.FillColor);
+    if (this._surface.Shadow is { } shadow)
+      paint.Ink = _InkFor(shadow, space, stroke ? this._state.StrokeColor : this._state.FillColor, stroke ? this._state.StrokeOverprint : this._state.FillOverprint, this._state.OverprintMode);
+    return paint;
+  }
+
+  /// <summary>The separations a solid colour paints, or null for a space that goes through RGB.</summary>
+  private static PdfInk? _InkFor(PdfOverprintShadow shadow, PdfColorModel space, double[] color, bool overprint, int mode) {
+    double Component(int i) => i < color.Length ? Math.Clamp(color[i], 0, 1) : 0;
+    if (ReferenceEquals(space, PdfColorModel.DeviceCmyk)) {
+      var process = new float[4];
+      var paints = new bool[4];
+      for (var c = 0; c < 4; ++c) {
+        process[c] = (float)Component(c);
+        // OPM 1: a zero component of a DeviceCMYK colour leaves what is under it (§8.6.7).
+        paints[c] = !overprint || mode != 1 || process[c] != 0;
+      }
+
+      return new PdfInk(process, paints, [], [], overprint);
+    }
+
+    if (space.Colorants is not { } names)
+      return overprint ? PdfInk.FromRgbOverprinting : null;
+
+    var ink = new PdfInk(new float[4], new bool[4], new int[names.Count], new float[names.Count], overprint);
+    var spots = 0;
+    for (var i = 0; i < names.Count; ++i) {
+      var process = names[i] switch { "Cyan" => 0, "Magenta" => 1, "Yellow" => 2, "Black" => 3, _ => -1 };
+      if (process >= 0) {
+        ink.Process![process] = (float)Component(i);
+        ink.PaintsProcess[process] = true;
+        continue;
+      }
+
+      if (names[i] == "All") {
+        // Every separation at the tint (§8.6.6.4).
+        for (var c = 0; c < 4; ++c) {
+          ink.Process![c] = (float)Component(i);
+          ink.PaintsProcess[c] = true;
+        }
+
+        continue;
+      }
+
+      if (names[i] == "None")
+        continue;
+      var index = i;
+      ink.Spots[spots] = shadow.Spot(names[i], tint => space.ColorantCmyk(index, tint));
+      ink.Tints[spots++] = (float)Component(i);
+    }
+
+    return ink with { Spots = ink.Spots[..spots], Tints = ink.Tints[..spots] };
   }
 
   private static PdfSolidPaint _SolidPaint(PdfColorModel space, double[] color) {
@@ -757,6 +819,8 @@ internal sealed partial class PdfRenderer {
     var mode = this._state.BlendMode;
     var surface = this._surface;
     var knockout = surface.KnockoutBackdrop != null;
+    if (surface.Shadow != null)
+      surface.Shadow.Ink = paint is PdfSolidPaint solid ? solid.Ink : this._state.FillOverprint ? PdfInk.FromRgbOverprinting : null;
 
     this._rasterizer.Fill(devicePath, rule, limit, (y, x0, x1, coverage) => {
       var count = x1 - x0;

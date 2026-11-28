@@ -37,6 +37,11 @@ internal sealed class PdfGraphicsState {
   /// <summary>The rendering intent set by <c>ri</c> or /RI, or null for the default (relative colorimetric).</summary>
   public string? Intent;
 
+  /// <summary>OP and op, and OPM (§8.6.7), used only when overprint is simulated.</summary>
+  public bool StrokeOverprint;
+  public bool FillOverprint;
+  public int OverprintMode;
+
   public PdfFont? Font;
   public double FontSize;
   public double CharSpacing;

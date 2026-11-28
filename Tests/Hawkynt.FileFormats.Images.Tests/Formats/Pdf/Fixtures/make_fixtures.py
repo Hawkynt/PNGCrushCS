@@ -658,6 +658,32 @@ def cmaps():
     return page(bytes(c), resources, extra=extra)
 
 
+def overprint():
+    """Overprinting fills over a cyan backdrop: OPM 0 and 1, a spot colour, RGB, grey, black alone and all-zero CMYK."""
+    extra = []
+
+    def add(body):
+        extra.append(body)
+        return 4 + len(extra)
+
+    fn = add(b"<< /FunctionType 2 /Domain [0 1] /C0 [0 0 0 0] /C1 [0 0.6 1 0] /N 1 >>")
+    fn2 = add(b"<< /FunctionType 2 /Domain [0 1] /C0 [0 0 0 0] /C1 [0.2 0 0.9 0.1] /N 1 >>")
+    resources = (b"<< /ExtGState << /OP << /OP true /op true /OPM 0 >> /OPM1 << /OP true /op true /OPM 1 >> /NoOP << /OP false /op false >> /SOP << /OP true >> >>"
+                 b" /ColorSpace << /Spot [/Separation /Orange /DeviceCMYK %d 0 R] /Spot2 [/Separation /Lime /DeviceCMYK %d 0 R] >> >>" % (fn, fn2))
+    c = b"0.8 0 0 0 k 0 0 200 200 re f 0 0.3 0 0 k 0 0 40 200 re f\n"  # cyan backdrop, magenta stripe on the left
+    c += b"q /OP gs 0 0.9 0 0 k 10 140 50 50 re f Q\n"
+    c += b"q /OPM1 gs 0 0.9 0 0 k 70 140 50 50 re f Q\n"
+    c += b"q /NoOP gs 0 0.9 0 0 k 130 140 50 50 re f Q\n"
+    c += b"q /OP gs /Spot cs 1 scn 10 80 50 50 re f /Spot2 cs 0.7 scn 30 90 50 30 re f Q\n"
+    c += b"q /OP gs 0 0 1 rg 70 80 50 50 re f Q\n"
+    c += b"q /OP gs 0.5 g 130 80 50 50 re f Q\n"
+    c += b"q /OPM1 gs 0 0 0 0.5 k 10 20 50 50 re f Q\n"
+    c += b"q /OPM1 gs 0 0 0 0 k 70 20 50 50 re f Q\n"
+    c += b"q /OP gs 0 0 0 0 k 130 20 50 50 re f Q\n"
+    c += b"q /SOP gs 0 0.9 0 0 K 6 w 5 5 m 195 195 l S Q\n"  # OP alone sets op too
+    return page(c, resources, extra=extra)
+
+
 def jpx_alpha():
     """JPX images carrying their own opacity: /SMaskInData 1 and 2 (with and without /Matte), 0, and CMYK."""
     extra = []
@@ -702,7 +728,7 @@ def jpx_alpha():
 if __name__ == "__main__":
     target = sys.argv[1]
     os.makedirs(os.path.join(target, "Render"), exist_ok=True)
-    for name, maker in [("images", images), ("vector", vector), ("bilevel", bilevel), ("shading", shading), ("text", text), ("transparency", transparency), ("color", color), ("jpx-alpha", jpx_alpha), ("cmaps", cmaps), ("type1cff", type1cff)]:
+    for name, maker in [("images", images), ("vector", vector), ("bilevel", bilevel), ("shading", shading), ("text", text), ("transparency", transparency), ("color", color), ("jpx-alpha", jpx_alpha), ("cmaps", cmaps), ("type1cff", type1cff), ("overprint", overprint)]:
         with open(os.path.join(target, "Render", name + ".pdf"), "wb") as handle:
             handle.write(maker())
     os.makedirs(os.path.join(target, "Fonts"), exist_ok=True)
