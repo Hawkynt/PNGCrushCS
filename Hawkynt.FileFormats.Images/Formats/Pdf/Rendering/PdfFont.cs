@@ -24,8 +24,8 @@ namespace FileFormat.Pdf.Rendering;
 /// <para/>
 /// A font that is not embedded is drawn with a bundled Liberation face standing in for Helvetica,
 /// Times or Courier — the families those are metric-compatible with — chosen from the base font name
-/// and the descriptor's flags. Where nothing can stand in (Symbol, ZapfDingbats, a non-embedded CID
-/// font) the text is not drawn and the omission is reported.
+/// and the descriptor's flags; Symbol and ZapfDingbats with the bundled Noto-based symbol face. Where
+/// nothing can stand in (a non-embedded CID font) the text is not drawn and the omission is reported.
 /// </remarks>
 internal sealed class PdfFont {
 
@@ -251,7 +251,7 @@ internal sealed class PdfFont {
 
     this._program = this._LoadProgram(descriptor, true);
     if (this._program == null && this.MissingReason == null)
-      this.MissingReason = $"the CID font {this.Name} is not embedded and no substitute is available";
+      this.MissingReason = $"the CID font {this.Name} is not embedded, and no substitute for a CID font is bundled";
 
     var map = document.Resolve(cidFont.Raw("CIDToGIDMap"));
     if (map is PdfStreamObject mapStream) {

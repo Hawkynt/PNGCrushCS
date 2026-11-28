@@ -684,6 +684,16 @@ def overprint():
     return page(c, resources, extra=extra)
 
 
+def symbols():
+    """The non-embedded Symbol and ZapfDingbats, drawn with whatever each renderer substitutes."""
+    resources = (b"<< /Font << /S << /Type /Font /Subtype /Type1 /BaseFont /Symbol >>"
+                 b" /Z << /Type /Font /Subtype /Type1 /BaseFont /ZapfDingbats >> >> >>")
+    c = b"BT /S 18 Tf 8 170 Td (abgdpqwW) Tj 0 -24 Td (\\042\\044\\245\\326\\362\\345\\260) Tj"
+    c += b" 0 -24 Td (\\346\\347\\350 \\351\\352\\353 \\355 \\374\\375\\376) Tj ET\n"
+    c += b"BT /Z 18 Tf 8 90 Td (3456789:;<) Tj 0 -24 Td (\\254\\255\\256\\257\\330\\331) Tj 0 -24 Td (nopqrs) Tj ET\n"
+    return page(c, resources)
+
+
 def jpx_alpha():
     """JPX images carrying their own opacity: /SMaskInData 1 and 2 (with and without /Matte), 0, and CMYK."""
     extra = []
@@ -728,7 +738,7 @@ def jpx_alpha():
 if __name__ == "__main__":
     target = sys.argv[1]
     os.makedirs(os.path.join(target, "Render"), exist_ok=True)
-    for name, maker in [("images", images), ("vector", vector), ("bilevel", bilevel), ("shading", shading), ("text", text), ("transparency", transparency), ("color", color), ("jpx-alpha", jpx_alpha), ("cmaps", cmaps), ("type1cff", type1cff), ("overprint", overprint)]:
+    for name, maker in [("images", images), ("vector", vector), ("bilevel", bilevel), ("shading", shading), ("text", text), ("transparency", transparency), ("color", color), ("jpx-alpha", jpx_alpha), ("cmaps", cmaps), ("type1cff", type1cff), ("overprint", overprint), ("symbols", symbols)]:
         with open(os.path.join(target, "Render", name + ".pdf"), "wb") as handle:
             handle.write(maker())
     os.makedirs(os.path.join(target, "Fonts"), exist_ok=True)

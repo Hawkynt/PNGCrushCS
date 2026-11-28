@@ -18,10 +18,13 @@ namespace FileFormat.Pdf.Fonts.Data;
 /// Name "Liberation" stays theirs; a subset or edited copy could not keep it. The licence travels
 /// beside them as <c>Substitutes/OFL-Liberation.txt</c>.
 /// <para/>
-/// Symbol and ZapfDingbats have no freely licensed counterpart with their glyph sets and widths that
-/// could be bundled under compatible terms (the URW replacements are AGPL), so there is nothing to
-/// substitute for them; <see cref="Omitted"/> says so, and the caller is expected to draw nothing for
-/// such text rather than something that looks like it.
+/// Symbol and ZapfDingbats have no freely licensed metric-compatible counterpart (the URW
+/// replacements are AGPL), so they are drawn with <c>NotoSymbolSubstitute</c>: the 384 characters
+/// their encodings name, taken from Noto Sans Math, Noto Sans Symbols 2, Noto Sans Symbols and Noto
+/// Sans (SIL OFL 1.1, no Reserved Font Names) by <c>Substitutes/make_symbol_substitute.py</c> and
+/// renamed, 34 KB compressed. Their glyphs differ in design from Adobe's; their advances come from
+/// the document's /Widths or the standard AFM widths as for every standard font. The licence and
+/// copyright lines travel beside it as <c>Substitutes/OFL-Noto.txt</c>.
 /// </remarks>
 internal static class SubstituteFonts {
 
@@ -29,8 +32,8 @@ internal static class SubstituteFonts {
 
   private static readonly ConcurrentDictionary<string, byte[]> _Loaded = new(StringComparer.Ordinal);
 
-  /// <summary>The standard fonts no substitute is bundled for.</summary>
-  public static IReadOnlyList<string> Omitted { get; } = ["Symbol", "ZapfDingbats"];
+  /// <summary>The standard fonts no substitute is bundled for: none, now that Symbol and ZapfDingbats have one.</summary>
+  public static IReadOnlyList<string> Omitted { get; } = [];
 
   /// <summary>The TrueType bytes of the substitute for a canonical standard font name, or null when there is none.</summary>
   /// <remarks>
@@ -55,6 +58,7 @@ internal static class SubstituteFonts {
     "Courier-Bold" => "LiberationMono-Bold",
     "Courier-Oblique" => "LiberationMono-Italic",
     "Courier-BoldOblique" => "LiberationMono-BoldItalic",
+    "Symbol" or "ZapfDingbats" => "NotoSymbolSubstitute",
     _ => null,
   };
 

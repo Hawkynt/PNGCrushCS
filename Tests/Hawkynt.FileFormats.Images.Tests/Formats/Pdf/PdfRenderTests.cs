@@ -41,6 +41,10 @@ public sealed class PdfRenderTests {
   [TestCase("Render/cmaps", 144, 0.4, 0.2)]
   [TestCase("Render/type1cff", 72, 1.2, 1.0)]
   [TestCase("Render/overprint", 72, 0.3, 0.1)]
+  // Symbol and ZapfDingbats are not embedded: poppler draws them in URW's Standard Symbols PS and
+  // D050000L, this renderer in its Noto-based substitute, so the glyphs differ in design (and where a
+  // Noto glyph is wider than the Adobe advance, in overlap) though not in place.
+  [TestCase("Render/symbols", 144, 6.0, 4.0)]
   [Category("Unit")]
   public void Fixture_AgreesWithPoppler(string name, double resolution, double maxMeanError, double maxBadPercent) {
     var file = _Read(name + ".pdf");
@@ -182,16 +186,46 @@ public sealed class PdfRenderTests {
   [Test]
   [Category("Unit")]
   public void TextInAFontWithNoSubstitute_IsLeftOut_AndSaidSo() {
+    // A CJK CID font that is not embedded: no CJK face is bundled.
     var pdf = _Build(
       "<< /Type /Catalog /Pages 2 0 R >>",
       "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
-      "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 100 30] /Resources << /Font << /S << /Type /Font /Subtype /Type1 /BaseFont /Symbol >> /H << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> >> >> /Contents 4 0 R >>",
-      _Stream("BT /S 20 Tf 5 5 Td (abg) Tj /H 20 Tf (Hi) Tj ET"));
+      "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 100 30] /Resources << /Font << /J 5 0 R /H << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> >> >> /Contents 4 0 R >>",
+      _Stream("BT /J 20 Tf 5 5 Td <30423044> Tj /H 20 Tf (Hi) Tj ET"),
+      "<< /Type /Font /Subtype /Type0 /BaseFont /MS-Mincho /Encoding /UniJIS-UCS2-H /DescendantFonts [<< /Type /Font /Subtype /CIDFontType2 /BaseFont /MS-Mincho /CIDSystemInfo << /Registry (Adobe) /Ordering (Japan1) /Supplement 2 >> >>] >>");
     var rendering = PdfFile.RenderPage(PdfReader.FromBytes(pdf), 0);
     Assert.Multiple(() => {
       Assert.That(rendering.Omissions, Has.Count.EqualTo(1));
-      Assert.That(rendering.Omissions[0], Does.Contain("Symbol"));
+      Assert.That(rendering.Omissions[0], Does.Contain("MS-Mincho"));
       Assert.That(rendering.Image.PixelData, Has.Some.LessThan(128), "the Helvetica text after it is still drawn");
+    });
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void NonEmbeddedSymbolAndZapfDingbats_AreDrawnWithTheSubstitute() {
+    var pdf = _Build(
+      "<< /Type /Catalog /Pages 2 0 R >>",
+      "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+      "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 100 60] /Resources << /Font << /S << /Type /Font /Subtype /Type1 /BaseFont /Symbol >> /Z << /Type /Font /Subtype /Type1 /BaseFont /ZapfDingbats >> >> >> /Contents 4 0 R >>",
+      _Stream("BT /S 20 Tf 5 35 Td (abg\\346) Tj /Z 20 Tf 0 -30 Td (3456) Tj ET"));
+    var rendering = PdfFile.RenderPage(PdfReader.FromBytes(pdf), 0);
+    var image = rendering.Image.Format == PixelFormat.Rgb24 ? rendering.Image : PixelConverter.Convert(rendering.Image, PixelFormat.Rgb24);
+    var top = 0;
+    var bottom = 0;
+    for (var y = 0; y < image.Height; ++y)
+      for (var x = 0; x < image.Width; ++x)
+        if (image.PixelData[(y * image.Width + x) * 3] < 128) {
+          if (y < 30)
+            ++top;
+          else
+            ++bottom;
+        }
+
+    Assert.Multiple(() => {
+      Assert.That(rendering.Omissions, Is.Empty);
+      Assert.That(top, Is.GreaterThan(40), "the Symbol line");
+      Assert.That(bottom, Is.GreaterThan(40), "the ZapfDingbats line");
     });
   }
 

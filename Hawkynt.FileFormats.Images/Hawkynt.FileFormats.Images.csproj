@@ -73,6 +73,8 @@
                       LogicalName="FileFormat.Pdf.Fonts.Data.Substitutes.%(Filename)%(Extension)" />
     <EmbeddedResource Include="Formats\Pdf\Fonts\Data\Substitutes\OFL-Liberation.txt"
                       LogicalName="FileFormat.Pdf.Fonts.Data.Substitutes.OFL-Liberation.txt" />
+    <EmbeddedResource Include="Formats\Pdf\Fonts\Data\Substitutes\OFL-Noto.txt"
+                      LogicalName="FileFormat.Pdf.Fonts.Data.Substitutes.OFL-Noto.txt" />
   </ItemGroup>
 
   <!-- Adobe's predefined CMaps (cmap-resources, BSD-3-Clause), repacked by pack_cmaps.py and

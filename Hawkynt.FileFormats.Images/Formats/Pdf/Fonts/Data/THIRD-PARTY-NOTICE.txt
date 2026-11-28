@@ -101,3 +101,14 @@ CMaps/pack_cmaps.py into a compact binary form with every codespace range,
 CID range, CID mapping, notdef range, usecmap and WMode kept, and compressed
 with Brotli. Copyright 1990-2023 Adobe. The licence text travels beside it as
 CMaps/LICENSE-cmap-resources.txt and inside the assembly.
+
+
+6. Noto fonts (SIL Open Font License 1.1)
+----------------------------------------
+Substitutes/NotoSymbolSubstitute.ttf.br is a subset of Noto Sans Math 3.000,
+Noto Sans Symbols 2 2.008, Noto Sans Symbols 2.003 and Noto Sans 2.015
+(https://github.com/notofonts), the characters of the Symbol and ZapfDingbats
+encodings recombined into one renamed font by
+Substitutes/make_symbol_substitute.py. Copyright 2022 Google LLC and 2022 The
+Noto Project Authors. See Substitutes/OFL-Noto.txt, which also travels inside
+the assembly.

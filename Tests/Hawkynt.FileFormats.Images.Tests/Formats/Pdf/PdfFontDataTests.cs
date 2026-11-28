@@ -1,6 +1,7 @@
 using System;
 using System.Buffers.Binary;
 using System.Text;
+using FileFormat.Pdf.Fonts;
 using FileFormat.Pdf.Fonts.Data;
 
 namespace FileFormat.Pdf.Tests;
@@ -141,12 +142,34 @@ public sealed class PdfFontDataTests {
 
   [Test]
   [Category("Unit")]
-  public void Substitutes_LeaveOutTheSymbolFonts() {
-    Assert.Multiple(() => {
-      Assert.That(SubstituteFonts.TrueTypeFor("Symbol"), Is.Null);
-      Assert.That(SubstituteFonts.TrueTypeFor("ZapfDingbats"), Is.Null);
-      Assert.That(SubstituteFonts.Omitted, Is.EquivalentTo(new[] { "Symbol", "ZapfDingbats" }));
-    });
+  public void Substitutes_CoverEveryCharacterOfTheSymbolFonts() {
+    var bytes = SubstituteFonts.TrueTypeFor("Symbol");
+    Assert.That(bytes, Is.Not.Null);
+    Assert.That(SubstituteFonts.TrueTypeFor("ZapfDingbats"), Is.SameAs(bytes));
+    Assert.That(SubstituteFonts.Omitted, Is.Empty);
+    var font = TrueTypeFontProgram.Parse(bytes!);
+    foreach (var encoding in new[] { "SymbolSetEncoding", "ZapfDingbatsEncoding" })
+      foreach (var name in PdfEncodings.ByName(encoding)!) {
+        if (name == null)
+          continue;
+        var unicode = GlyphList.UnicodeOf(name);
+        Assert.That(unicode, Is.GreaterThan(0), name);
+        var gid = font.CmapLookup(3, 1, unicode);
+        Assert.That(gid, Is.GreaterThan(0), $"{encoding} {name} U+{unicode:X4}");
+        if (name != "space")
+          Assert.That(font.Outline(gid)!.IsEmpty, Is.False, name);
+      }
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void Substitutes_CarryTheNotoLicence() {
+    using var stream = typeof(SubstituteFonts).Assembly.GetManifestResourceStream("FileFormat.Pdf.Fonts.Data.Substitutes.OFL-Noto.txt");
+    Assert.That(stream, Is.Not.Null);
+    using var reader = new System.IO.StreamReader(stream!);
+    var text = reader.ReadToEnd();
+    Assert.That(text, Does.Contain("SIL OPEN FONT LICENSE Version 1.1"));
+    Assert.That(text, Does.Contain("Noto Project Authors"));
   }
 
   [Test]
