@@ -123,7 +123,7 @@ public sealed class JpegXrReaderTests {
     _WriteEntry(span, ref pos, 0xBCC0, 4, 1, (uint)(ifdOffset + ifdSize));
     _WriteEntry(span, ref pos, 0xBCC1, 4, 1, 16);
 
-    Assert.Throws<InvalidOperationException>(() => JpegXrReader.FromBytes(data));
+    Assert.Throws<InvalidDataException>(() => JpegXrReader.FromBytes(data));
   }
 
   private static void _WriteEntry(Span<byte> span, ref int pos, ushort tag, ushort type, uint count, uint value) {

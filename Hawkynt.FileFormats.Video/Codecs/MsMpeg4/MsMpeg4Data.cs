@@ -858,4 +858,41 @@ internal static class MsMpeg4Data {
     14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 4,
   ];
 
+  /// <summary>The step WMV1 quantises an intra luminance DC with, by quantiser: FFmpeg's <c>ff_wmv1_y_dc_scale_table</c>.</summary>
+  internal static readonly int[] Wmv1LuminanceDcStep = [
+    0, 8, 8, 8, 8, 8, 9, 9, 10, 10, 11, 11, 12, 12, 13, 13,
+    14, 14, 15, 15, 16, 16, 17, 17, 18, 18, 19, 19, 20, 20, 21, 21,
+  ];
+
+  /// <summary>The order a WMV1 inter block's coefficients are read in: FFmpeg's <c>ff_wmv1_scantable[0]</c>.</summary>
+  internal static readonly int[] Wmv1InterScan = [
+    0, 8, 1, 2, 9, 16, 24, 17, 10, 3, 4, 11, 18, 25, 32, 40,
+    48, 56, 41, 33, 26, 19, 12, 5, 6, 13, 20, 27, 34, 49, 57, 58,
+    50, 42, 35, 28, 21, 14, 7, 15, 22, 29, 36, 43, 51, 59, 60, 52,
+    44, 37, 30, 23, 31, 38, 45, 53, 61, 62, 54, 46, 39, 47, 55, 63,
+  ];
+
+  /// <summary>The order a WMV1 intra block without AC prediction is read in: <c>ff_wmv1_scantable[1]</c>.</summary>
+  internal static readonly int[] Wmv1IntraScan = [
+    0, 8, 1, 2, 9, 16, 24, 17, 10, 3, 4, 11, 18, 25, 32, 40,
+    33, 48, 26, 19, 12, 5, 6, 13, 20, 27, 34, 41, 56, 49, 57, 42,
+    35, 28, 21, 14, 7, 15, 22, 29, 36, 43, 50, 58, 51, 59, 44, 37,
+    30, 23, 31, 38, 45, 52, 60, 53, 61, 46, 39, 47, 54, 62, 55, 63,
+  ];
+
+  /// <summary>The order of a WMV1 intra block predicted from above: <c>ff_wmv1_scantable[2]</c>.</summary>
+  internal static readonly int[] Wmv1HorizontalScan = [
+    0, 1, 8, 2, 3, 9, 16, 24, 17, 10, 4, 5, 11, 18, 25, 32,
+    40, 48, 33, 26, 19, 12, 6, 7, 13, 20, 27, 34, 41, 56, 49, 57,
+    42, 35, 28, 21, 14, 15, 22, 29, 36, 43, 50, 58, 51, 44, 37, 30,
+    23, 31, 38, 45, 52, 59, 60, 53, 46, 39, 47, 54, 61, 62, 55, 63,
+  ];
+
+  /// <summary>The order of a WMV1 intra block predicted from the left: <c>ff_wmv1_scantable[3]</c>.</summary>
+  internal static readonly int[] Wmv1VerticalScan = [
+    0, 8, 16, 1, 24, 32, 40, 9, 2, 3, 10, 17, 25, 48, 56, 41,
+    33, 26, 18, 11, 4, 5, 12, 19, 27, 34, 49, 57, 50, 42, 35, 28,
+    20, 13, 6, 7, 14, 21, 29, 36, 43, 51, 58, 59, 52, 44, 37, 30,
+    22, 15, 23, 31, 38, 45, 60, 53, 46, 39, 47, 54, 61, 62, 55, 63,
+  ];
 }

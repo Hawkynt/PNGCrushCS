@@ -1,0 +1,23 @@
+The NewTek SpeedHQ decoder in this directory, and the DC and AC block coding in its encoder, are
+converted from FFmpeg (https://github.com/FFmpeg/FFmpeg):
+
+  libavcodec/speedhqdec.c  fields and slices, DC prediction, the AC run-level loop with its escape,
+                           run-length and DCT alpha, and the half-macroblock border column
+  libavcodec/speedhqenc.c  encode_dc and encode_block: the DC and AC bit coding the encoder writes
+                           (its picture layer, which rests on FFmpeg's MPEG encoder, is not taken)
+  libavcodec/speedhq.c     the AC codes, levels and runs
+  libavcodec/mpeg12data.c  the MPEG-2 DC size codes SpeedHQ shares
+
+  Copyright 2017 Steinar H. Gunderson (speedhqdec.c, speedhq.c)
+  Copyright (c) 2000, 2001 Fabrice Bellard, (c) 2003 Alex Beregszaszi,
+  (c) 2003-2004 Michael Niedermayer, (c) 2020 FFmpeg (speedhqenc.c)
+  and the FFmpeg developers named in the files above.
+
+FFmpeg distributes those sources under the GNU Lesser General Public License, version 2.1 or (at your
+option) any later version. This work is distributed under the GNU Lesser General Public License
+version 3 or later, which the "or later" clause permits; the licence text is in LICENSE at the root of
+this repository.
+
+The algorithms are carried across into managed C#, not vendored. The tables in SpeedHqTables.cs are
+reproduced exactly because they are fixed codec data required for interoperability. The encoder's
+forward transform, quantisation, slice assembly, border column and alpha coding are this package's own.

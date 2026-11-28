@@ -1,0 +1,16 @@
+The Deluxe Paint Animation decoder in this directory, and the Deluxe Paint Animation container in
+Formats/DeluxePaintAnm, are converted from FFmpeg (https://github.com/FFmpeg/FFmpeg):
+
+  libavcodec/anm.c      the RunSkipDump operations and the header's palette
+  libavformat/anm.c     the large-page header, the page table, and the order records are read in
+
+  Copyright (c) 2009 Peter Ross (anm.c, both)
+  and the FFmpeg developers named in the files above.
+
+FFmpeg distributes those sources under the GNU Lesser General Public License, version 2.1 or (at your
+option) any later version. This work is distributed under the GNU Lesser General Public License
+version 3 or later, which the "or later" clause permits; the licence text is in LICENSE at the root of
+this repository.
+
+The algorithms are carried across into managed C#, not vendored. The encoder and the container writer
+are this package's own.

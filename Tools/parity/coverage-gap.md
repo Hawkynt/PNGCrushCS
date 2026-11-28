@@ -1,15 +1,19 @@
 # What we do not read that XnView says it does
 
-Generated from XnView's own `Formats.txt` against `Decode --extensions`. RECOIL's catalogue is
-covered but for `.gr10p`, which RECOIL comments out of its own list for having a five-character
-extension, so this is the whole of the known coverage gap.
+Generated from XnView's own `Formats.txt` against `Decode --extensions`. This is XnView's gap and
+not the whole of the known one. An earlier line here said RECOIL's catalogue was covered, and counted
+by extension it nearly is — `.gr10p` is read now too — but by format it is not: RECOIL also reads
+`.mcm` and `.tcu`, which nothing here claims, and some thirty of its formats share an extension
+(`.art`, `.pic`, `.rgb`, `.fnt`, `.spr`, …) with a reader here that decodes a different format under
+the name. Those, and everything else known to be missing from any catalogue, are tracked one issue
+each in [`docs/MISSING-FORMATS.md`](../../docs/MISSING-FORMATS.md).
 
 A name here is a file we cannot open. That is counted and closed rather than explained — unlike
 the rendering differences in [the report beside this](README.md), which are cases of the tool giving
 something up and are correct as they stand.
 
 **Every count in this file was measured on 2026-08-09 and has not been re-measured since.** The
-registry has grown from 741 entries to 884 in the meantime, and the formats added since — Aseprite,
+registry has grown from 741 entries to 893 (as of 2026-11-23) in the meantime, and the formats added since — Aseprite,
 Garmin JNX, Brother PES, AVCI, Canon CR3 — came out of a comparison against ImageMagick rather than
 against this catalogue, so none of them closes a row here. Re-measure before quoting a number:
 `Decode --extensions` against XnView's own `Formats.txt` is where the gap list comes from, and this
@@ -52,15 +56,17 @@ three times it was wrong, and each was overturned by checking rather than by rea
     extracted payload and matches it on every pixel.
 
 The names still open are not waiting on effort. Recomputed against the catalogue rather than taken
-from this file's own history, they are eleven: `sid`, `lwf`, `ldf`, `eri`, `fif`, `pwc`, `iwc`,
+from this file's own history, they are eight: `sid`, `ldf`, `eri`, `fif`, `iwc`,
+
+from this file's own history, they are eight: `sid`, `eri`, `fif`, `iwc`,
 `wic` and `ypc` are Windows-only third-party plugins whose coding was never published, and the
 converter on this platform does not carry their readers either, so there is nothing here to ask;
-`prc`'s only reference implementation cannot read its own output, and writes a file it then refuses;
-and `pax` is Blowfish under a password the file does not carry. What would move any of them is a
+and `pax` is Blowfish under a password the file does not carry. (`prc` was the ninth: XnView's is
+no reference for it, but Sony's own library is, and it is read and written now.) What would move any of them is a
 specification or a working decoder, not more searching — the per-name detail is in "Nothing credible
 describes these" and the table below.
 
-Beside those eleven, one row is read under some of its names and not all: `ti` wants `.92i` as well
+Beside those eight, one row is read under some of its names and not all: `ti` wants `.92i` as well
 as the five now read, and the TI-92 really is a different container with its picture data compressed,
 so that half stays open on its merits. Two more are not extensions at all and never were — Amica
 Paint's is the literal `[b]` and ColoRIX's the wildcard `sc?` — which is recorded under "The two rows
@@ -215,8 +221,12 @@ render with its name in the message, so a file that would have come out wrong co
   - `.frm` is not one format and mostly not pictures: sixteen of the samples are EZ-Forms form
     definitions, six are character-cell templates, one is an unidentified object format and one is a
     JPEG under the wrong name. There is no raster `.frm` here to implement.
-  - `.lwf` is LuraWave. No description of its subband coding has ever been published and the
-    decoder was licensed as a binary. This one is not worth further effort.
+  - `.lwf` is LuraWave, and it is read and written now. Its coding was never published. A
+    specification was derived (`Formats/LuraWave/SPEC.md`) from the licensed Java decoder the MBF
+    ImageJ bundle redistributes and from the C codec inside LuraTech's own SmartCompress 3.0, which
+    runs under Wine and is the reference where the two disagree. LuraTech-encoded streams in every
+    colour mode decode to exactly what that codec returns: rendered modes as pictures, and modes 5,
+    20 and 21 as their raw channels. *Closed:* #567.
 
 ### The corpus was the limit, and it need not have been
 
@@ -245,8 +255,11 @@ of them — the file's own stated page, and nothing invented where it states one
     geometry does too. Three are refused as malformed XML — an undeclared `xlink` prefix, a
     redefined `xmlns`, and a file that is not XML at all — and librsvg refuses all three for the
     same reasons. One more states a height of zero, which librsvg also calls sizeless.
-  - `cgm` reads the six binary samples and refuses the character and clear-text encodings, which
-    are different grammars rather than variants. `abydos` is in the corpus as a metafile, an SVG
+  - `cgm` reads the six binary samples, and the character (ISO 8632-2) and clear-text (ISO 8632-4)
+    encodings by translating them into binary commands. RAL-CGM 3.50's translations of every
+    sample into both draw pixel-identical to the binaries, except where RAL-CGM's own writers cut
+    long point lists short; the one native character-encoded sample draws identical to RAL-CGM's
+    binary translation of it. *Closed:* #907. `abydos` is in the corpus as a metafile, an SVG
     and a plot; ours of the metafile against librsvg's of the SVG is 1.3% RMSE at 512x384.
   - `hpgl` reads all five. Nothing here renders HP-GL, so the evidence is the parse: a second
     reading written separately agrees on the extent of all five.
@@ -449,8 +462,9 @@ reader for that name to take a JPEG, which every one of them refused:
   - `iwc` is WaveL's wavelet codec, and its header is fully recovered — from WaveL's own Java decoder
     applet, whose class fields survived: `IWC`, a version byte, the two sizes, a level count and a
     quality, then float scale factors and minima, nine floats per level, and a byte count that
-    matches the payload of the sample exactly. What is not recovered is the coding, which is an
-    entropy-coded subband scheme that would have to be written out of decompiled Java. XnView cannot
+    matches the payload of the sample exactly. The coding is recovered now too — a splay-tree
+    entropy coder over the subbands, read out of the same classes and checked against them run on a
+    desktop JVM. *Closed:* #589. XnView cannot
     read it on this platform either.
   - `mbig` is the Michelin road atlas, and it has no magic bytes at all: four 32-bit words giving a
     tile size and a grid, then a directory of two words per tile where a second word of zero means
@@ -489,8 +503,9 @@ reader for that name to take a JPEG, which every one of them refused:
     interlaced source image, and XnView's neighbouring `ttf` name is "Optigraphics Tiled". That is
     inference from what the company sold and not from anything about the file. No spec, no sample.
   - `ldf` is LuraDocument, LuraTech's mixed-raster-content scheme and the ancestor of their JPEG 2000
-    Part 6 work. Binary-only licensed, like LuraWave beside it in this table. Not worth further
-    effort.
+    Part 6 work, and it is read and written now. IrfanView's LuraDocument plug-in is built on LuraTech's
+    SDK and runs under Wine; a specification was derived from it (`Formats/LuraDocument/SPEC.md`), and
+    every page its encoder writes decodes to exactly what its decoder returns.
 
 ### Nothing credible describes these
 
@@ -683,19 +698,21 @@ One cannot be read at all: `pax` is Smaller Animals Software's Pick Ax format, w
 to guess that password. Its codec is a closed Windows DLL — `pax` is the one name of the 178 that
 XnView's own Linux converter does not carry at all, so there is nothing here to interrogate either.
 
-Two are identified down to their first bytes and no further, because the coding was never published:
-`pwc` is the piecewise-constant image model, `4yVa`, distributed as a Windows binary from its
-author's research page; `wic` is the J Wavelet Image Codec, `FA DE BA BE 01 01` in its later form
-and `1B 7A FB 30` in its earlier. Both are marked Windows-only in XnView's catalogue, so nothing
-here has ever seen one decoded either.
+Two were identified down to their first bytes and no further, because the coding was never published,
+and both are read and written now. `pwc` is the piecewise-constant image model, `4yVa`, distributed
+as a Windows binary from its author's research page; its bitstream was recovered from the author's
+own encoder and decoder — see `Hawkynt.FileFormats.Images/Formats/Pwc/SPEC.md`. `wic` is the J
+Wavelet Image Codec, `FA DE BA BE 01 01` in its later form and `1B 7A FB 30` in its earlier, marked
+Windows-only in XnView's catalogue; its author's translator source survived, and from it, Lehtinen's
+papers and the javawic applet the codec is read and written, both generations. *Closed:* #554, #577.
 
 Three have a shape worth writing down for whoever comes back to them:
 
   - `prc` is Sony's Picture Gear Pocket, and it is a Palm resource database — the 78-byte Palm
     header, type and creator both `IMVS`, then resources named `iINF`, `iFRI`, `iPLT` and `iTIL`.
     The picture is in the `iTIL` tiles against the `iPLT` palette. `nconvert` writes one given
-    `-colours 16`, so unlike everything else in this list it can be worked on with a sample in hand
-    — but not a trustworthy one. See the measurements further down.
+    `-colours 16`, but not a trustworthy one; Sony's own `libprcim.dll` was the reference instead,
+    and the format is read and written — see further down.
   - `pseg` is an IBM printer page segment: MO:DCA structured fields, each introduced by `5A`. The
     architecture allows an IOCA image inside one and there is an IOCA reader here already, but that
     is not what XnView reads: its page-segment loader handles the IM1 image and nothing else. See
@@ -871,14 +888,14 @@ than the vendor's name:
     walk of length-prefixed records rather than a signature search, and it was not finished. The
     entry above still calls PowerPoint "not a picture format", which is true of the container and no
     longer the whole story — the row is closable the way `pzp` was closed.
-  - `prc`, Picture Gear Pocket: the Palm resource database named above, now measured. `iINF` is
-    eighteen bytes — width, height, a zero, the depth, a zero, a stride in pixels, `00 FF`, the
-    record id — `iPLT` is a count and four bytes an entry, `iFRI` names the tile records, and each
-    `iTIL` is a two-byte length and a 32x32 tile. It is still not implemented, and the reason is that
-    there is nothing to check it against: the converter cannot read `prc` at all, not even the file
-    it has just written, and the file it writes is wrong — a 16x12 picture comes back with rows 0, 2,
-    4 and so on in the first half of the tile and the rest of it blank. A reader built on that would
-    be agreeing with a bug.
+  - `prc`, Picture Gear Pocket: the Palm resource database named above, read and written now. The
+    converter was no help — it cannot read `prc` at all, not even the file it has just written, and
+    the file it writes is four bits a pixel, which no Sony software reads, and is cut off before its
+    last tile. The reference is Sony's own picture library, `libprcim.dll`, from PictureGear Lite
+    and Image Converter on the CLIÉ discs at ftp.sonyclie.org, driven under Wine, together with the
+    sample pictures on those discs: eight bits against a palette of up to 224 colours, or sixteen
+    bits of RGB 5:6:5, in 32- or 64-pixel tiles with a byte-pair run-length coding. See
+    `Hawkynt.FileFormats.Images/Formats/PictureGearPocket/SPEC.md`. *Closed:* #865.
 
 The last column marks the ones XnView itself cannot load on this platform: its catalogue says
 Windows only, so nothing here has ever been able to compare against them either.
@@ -914,7 +931,7 @@ Windows only, so nothing here has ever been able to compare against them either.
 | cbmf | .bmf |  |
 | cdr | .cdr |  |
 | cft | .ctf | read; XnView's reader for the name is its TIFF reader, function for function |
-| cgm | .cgm | binary encoding read; character and clear-text refused |
+| cgm | .cgm | binary, character and clear-text encodings read; binary written |
 | cloe | .cloe | read |
 | cmt | .cmt | read; the demosaic in double, which is where XnView and cmttoppm.c part company |
 | cmx | .cmx |  |
@@ -929,11 +946,11 @@ Windows only, so nothing here has ever been able to compare against them either.
 | ecc | .ecc |  |
 | eidi | .ei .eidi | read; eighteen samples, every pixel agreeing with XnView |
 | eif | .eif | read; the document's pages are whole TIFF streams |
-| eri | .eri | Windows only |
+| eri | .eri | read and write: every lossless variant, DCT and LOT lossy pictures and motion-compensated MEI films, bit for bit against the shipped ERISA build; withdrawn and unwritten variants refused by name |
 | fbm | .cbm |  |
 | fff | .fff | read; its signature stands at 452 and its JPEG at 3272 |
 | fi | .fi | read; a zlib stream holding the palette and then the rows, or a JPEG at 598 |
-| fif | .fif | Windows only |
+| fif | .fif | FTC 1.1, FTC 3.1-3.3 and FIF1 read at any output size, FTC 3.1 written; all 34 real samples exact against Iterated's DECO_32.DLL; the video profiles refused by name |
 | fre | .fre | read; a GE Genesis image, met as the Visible Human CT slices, and the Male MRI slices too |
 | frm | .frm |  |
 | frm2 | .frm |  |
@@ -958,7 +975,7 @@ Windows only, so nothing here has ever been able to compare against them either.
 | ioca | .mod |  |
 | ipg | .ipg |  |
 | iss | .iss | read; 3KCBIMSP, one or eight bits a pixel, counting upward from white |
-| iwc | .iwc | header recovered from WaveL's own applet; the subband coding is not. Windows only |
+| iwc | .iwc | read and write, pixel-exact against WaveL's own Java applet run on a desktop JVM |
 | jbf | .jbf | version 2 read; version 1's bitmap coding refused |
 | jig | .jig |  |
 | jig2 | .jig |  |
@@ -967,9 +984,9 @@ Windows only, so nothing here has ever been able to compare against them either.
 | kqp | .kqp |  |
 | kskn | .thb | read by the Windows bitmap reader, which is what XnView reads it with |
 | lda | .lda | read; DC DC, a 512-byte header, Group 3, Group 4 or uncompressed |
-| ldf | .ldf | LuraTech, binary-only like LuraWave. Windows only |
+| ldf | .ldf | read and written; IrfanView's LuraDocument plug-in (LuraTech's SDK) is the oracle |
 | lvp | .lvp |  |
-| lwf | .lwf | Windows only |
+| lwf | .lwf | read and written; LuraTech's Java decoder is the oracle |
 | lwi | .lwi |  |
 | mbig | .big | read; four numbers in range, then a directory of tiles each of which is a whole GIF, which is the signature the four numbers are not |
 | mdl | .mdl | read; IDST and version 10, and the skin table at 0xB4 where studiohdr_t puts it, not at 0xAC |
@@ -990,7 +1007,7 @@ Windows only, so nothing here has ever been able to compare against them either.
 | nsr | .bn .ph | read; a ten-byte header, and the panel it states cannot be the 320x192 the old reader assumed |
 | oil | .oil | read, from the Open Image Library's own specification; no sample was available |
 | pan | .pan |  |
-| pax | .pax | Pick Ax, Blowfish under a password the file does not carry; XnView's Linux converter does not carry it either |
+| pax | .pax | read and write, every cipher, against Smaller Animals' own PAXIO and ImgSource; the password is the caller's to give |
 | pbt | .pbt | read; 02 00 and PBIT, the size at 0x0C and 0x10 big-endian, Group 4 from 512 |
 | pcl | .pcl | the raster subset read; text and HP-GL/2 passed over |
 | pd | .pd .t1 .t2 | read by the GE Genesis reader, which is the loader XnView reads it with |
@@ -1008,7 +1025,7 @@ Windows only, so nothing here has ever been able to compare against them either.
 | pp5 | .pp5 |  |
 | pps | .pps | read; one reader with `ppt`, walking the OfficeArt records from offset 512 for the first JPEG or PNG BLIP |
 | ppt | .ppt | read; one reader with `pps` |
-| prc | .prc | Picture Gear Pocket, measured but not built: the converter cannot read one, and the one it writes is wrong |
+| prc | .prc | read and written; held to Sony's own libprcim.dll and the CLIÉ disc samples (Formats/PictureGearPocket/SPEC.md) |
 | prf | .prf |  |
 | prisms | .pri .lff | read; EB E8 00 00 and R8G8B8A8, a two-byte command stream, rows from the bottom up |
 | pseg | .pse .psg | read; the IM1 image cells are uncompressed bits, a cell width's worth to a row, placed where the cell positions say |
@@ -1016,7 +1033,7 @@ Windows only, so nothing here has ever been able to compare against them either.
 | pspf | .pfr .pspframe | read by the Paint Shop Pro reader |
 | pspm | .pspmask |  |
 | pspt | .tex | read by the Paint Shop Pro reader |
-| pwc | .pwc | the piecewise-constant image model; its coding was never published; Windows only |
+| pwc | .pwc | read and written; bitstream recovered from pwcencode/pwcdecode 1.5.1 and held byte-exact to both (Formats/Pwc/SPEC.md) |
 | pxa | .pxa |  |
 | pzl | .pzl |  |
 | pzp | .pzp | read; a compound document, walked from 512 for the first whole PNG in it |
@@ -1028,7 +1045,7 @@ Windows only, so nothing here has ever been able to compare against them either.
 | sct | .ch | read by the Scitex CT reader |
 | sdg | .sdg |  |
 | sfax | .001 | read; FAX1D, the row length at 5, Group 3 from 16 with the bits the other way up |
-| sid | .sid | Windows only |
+| sid | .sid | header, metadata and georeferencing of MG2/MG3/MG4 read; pixels refused by name, the codestream being unpublished and the vendor SDK's licence ruling it out as source or oracle (Formats/MrSid/SPEC.md) |
 | skf | .skf |  |
 | skn | .skn | read; the 740-byte header, then Group 4 with the bits running from the bottom of each byte up |
 | smp | .smp | read; the 70-byte header, uncompressed, Group 3 and Group 4; its own run-length scheme refused |
@@ -1055,7 +1072,7 @@ Windows only, so nothing here has ever been able to compare against them either.
 | uyvyi | .qtl | raw YUV; nothing states the size, and five names share this extension |
 | vit | .vit |  |
 | vob | .vob |  |
-| wic | .wic | the J Wavelet Image Codec; its coding was never published; Windows only |
+| wic | .wic | read and write, both header generations, pixel-exact against the 1.01 translator's own coder and the javawic applet |
 | wrl | .wrl | read; the `PixelTexture` node the converter writes and cannot read back, bottom row first |
 | wzl | .wzl |  |
 | x3f | .x3f |  |
@@ -1063,7 +1080,7 @@ Windows only, so nothing here has ever been able to compare against them either.
 | xif | .xif | read by the TIFF reader, which is what XnView reads it with |
 | xim | .xim | read; Thompson's Xim, eight-bit planes; netpbm's header and XnView's reader agree |
 | xp0 | .xp0 | read; 00 00 00 01 and a JPEG at 1779, which two sources agree on |
-| ypc | .ypc | Windows only |
+| ypc | .ypc | read and write, byte for byte what the reference encoder writes |
 | yuv411 | .qtl | raw YUV; nothing states the size, and five names share this extension |
 | yuv422 | .qtl | raw YUV; nothing states the size, and five names share this extension |
 | yuv444 | .qtl | raw YUV; nothing states the size, and five names share this extension |

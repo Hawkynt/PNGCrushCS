@@ -1,0 +1,20 @@
+Liberation fonts 2.1.5
+======================
+
+Substitutes/*.ttf.br are the twelve TrueType files of Liberation Sans, Liberation
+Serif and Liberation Mono, version 2.1.5 (https://github.com/liberationfonts/liberation-fonts),
+each compressed with Brotli. Decompressing one gives the original file byte
+for byte; the fonts are not subset, renamed or otherwise modified, so they are
+the Font Software as the copyright holders distribute it and keep their
+Reserved Font Names.
+
+They are used to draw text in PDF documents that name one of the standard
+Helvetica, Times or Courier faces without embedding it. They are bundled with,
+not sold as, this software, and remain under the SIL Open Font License 1.1,
+whose full text is in Substitutes/OFL-Liberation.txt (also embedded in the
+assembly as FileFormat.Pdf.Fonts.Data.Substitutes.OFL-Liberation.txt).
+
+Digitized data copyright (c) 2010 Google Corporation
+	with Reserved Font Arimo, Tinos and Cousine.
+Copyright (c) 2012 Red Hat, Inc.
+	with Reserved Font Name Liberation.

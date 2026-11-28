@@ -1,0 +1,45 @@
+PictureGear Pocket fixtures
+===========================
+
+Every sony*.prc was written by Sony's own libprcim.dll, driven under Wine by prcim.c (in this
+directory), from a picture made for this suite. The three releases of the library:
+
+  v2000  PictureGear Lite 4.2, PEG-S300 disc   (s300.iso, PictureGearLite\data1.cab)   md5 0eb0483c35fa230c601194948581ffb3
+  v2001  PictureGear Lite 4.2, PEG-S320 disc   (s320.iso, PictureGear Lite\PictureGear) md5 9f295cb4e79d1fc4407625836b37cce2
+  v2003  Image Converter 1.1                   (ImageConverter1.1.zip)                  md5 24099fd408a7da6a1bdbbe34542e8f85
+
+all from https://ftp.sonyclie.org/ (discs/ and PC/), unpacked with unshield.
+
+  file                                  library  comp  depth  source picture
+  sony2000_flat_37x23_rle8.prc          v2000    1     8      flat_37x23.ppm
+  sony2001_flat_37x23_plain8.prc        v2001    255   8      flat_37x23.ppm
+  sony2001_grad_100x70_rle8.prc         v2001    1     8      100x70 gradient with a busy checker (not kept)
+  sony2003_blocks_330x324_rle8.prc      v2003    1     8      330x324 flat 40x36 blocks (not kept)
+  sony2003_sweep_61x45_rle16.prc        v2003    1     16     sweep_61x45.ppm
+  sony2003_sweep_61x45_plain16.prc      v2003    255   16     sweep_61x45.ppm
+  sony2003_blocks_330x324_rle16.prc     v2003    1     16     330x324 flat 40x36 blocks (not kept)
+
+The SHA-256 values in PictureGearPocketTests are of the picture Sony's own decoder
+(prc_read_rgb_image) gives back for each file, as top-down R, G, B. The eight-bit files were
+decoded by the library that wrote them and by v2003 (and the 64-pixel-tile one by v2001 as well);
+every library gave the same picture. Sixteen bits only the 2003 library reads.
+
+flat_37x23.ppm has six colours, which Sony's quantiser keeps exactly, so its files decode to it.
+
+nconvert_40x36_colours16.prc was written by XnView's NConvert 7.300 (Linux build,
+`nconvert -out prc -colours 16`) from a 40x36 picture: four bits a pixel, a blank thumbnail, and the
+file ends before its fourth tile, which the resource list still points to. NConvert cannot read it
+back, nor any file Sony's software wrote; Sony's v2003 decoder refuses it. It is kept to show the
+reader refuses it too.
+
+Outside this suite:
+
+- the twelve sample pictures on the PEG-S300 and PEG-S320 discs (Applications/PGPocketData and
+  CLIE/PGPocket samples) decode to exactly what v2001 decodes, and eleven are written back byte for
+  byte; the twelfth ("sample Fruit") has been through a handheld and HotSync (name padded with 0xFF,
+  two bytes after the resource list, modification number 1, seed 0xFFFFFFFF) and is written back as
+  the same picture. They are Sony's photographs and are not committed; the explicit corpus test
+  runs over a directory of them named by PRC_CORPUS.
+- files this package's writer made (eight and sixteen bits, 1x1, 33x1, 1x65, 37x23 to 330x324,
+  plain and run-length coded) are read by all three libraries — sixteen bits by v2003 — to exactly
+  the picture this reader gives.

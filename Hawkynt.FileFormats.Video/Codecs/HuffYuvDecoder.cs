@@ -20,6 +20,7 @@ public sealed class HuffYuvDecoder : IVideoCodecDecoder<HuffYuvDecoder> {
   private static readonly CodecTag _HFYU = CodecTag.FromCharacters("HFYU");
   private static readonly CodecTag _FFVH = CodecTag.FromCharacters("FFVH");
   private static readonly CodecTag[] _Tags = [_HFYU, _FFVH];
+  private static readonly CodecTag _HYMT = CodecTag.FromCharacters("HYMT");
 
   private readonly int _width;
   private readonly int _height;
@@ -81,7 +82,8 @@ public sealed class HuffYuvDecoder : IVideoCodecDecoder<HuffYuvDecoder> {
     if (data.Length >= BitmapInfoHeader.StructSize) {
       var headerSize = BinaryPrimitives.ReadUInt32LittleEndian(data);
       var code = new CodecTag(BinaryPrimitives.ReadUInt32LittleEndian(data[16..]));
-      if (headerSize >= BitmapInfoHeader.StructSize && headerSize <= (uint)data.Length && (code.EqualsIgnoringCase(_HFYU) || code.EqualsIgnoringCase(_FFVH)))
+      if (headerSize >= BitmapInfoHeader.StructSize && headerSize <= (uint)data.Length
+          && (code.EqualsIgnoringCase(_HFYU) || code.EqualsIgnoringCase(_FFVH) || code.EqualsIgnoringCase(_HYMT)))
         return data[BitmapInfoHeader.StructSize..];
     }
     return data;
@@ -119,20 +121,44 @@ public sealed class HuffYuvDecoder : IVideoCodecDecoder<HuffYuvDecoder> {
   }
 
   public bool TryDecode(CodedPacket packet, out RawImage frame) {
-    var bits = new HuffYuvBitReader(packet.Data.Span);
-    var tables = this._tables;
-    if (tables == null) {
-      var read = HuffYuvHuffmanTable.ReadAll(bits.Swapped, 0, this._format.TableCount, this._format.HuffmanSymbolCount, out var start);
-      tables = read;
+    frame = this.DecodeSlice(packet.Data.Span, null, 0);
+    return true;
+  }
+
+  /// <summary>The stream's format, for HuffYUV MT to know how its slices are placed.</summary>
+  internal HuffYuvFormat Format => this._format;
+
+  /// <summary>The same decoder for pictures <paramref name="height"/> rows tall: HuffYUV MT decodes each slice as one.</summary>
+  internal HuffYuvDecoder WithHeight(int height) => new(this._width, height, this._format, this._tables);
+
+  /// <summary>A frame's own code tables and the bytes they take, or none where the stream's description holds them.</summary>
+  internal (IHuffYuvDecoderTable[]? Tables, int Size) FrameTables(ReadOnlySpan<byte> packet) {
+    if (this._tables != null)
+      return (null, 0);
+    var bits = new HuffYuvBitReader(packet);
+    var tables = HuffYuvHuffmanTable.ReadAll(bits.Swapped, 0, this._format.TableCount, this._format.HuffmanSymbolCount, out var start);
+    return (tables, start);
+  }
+
+  /// <summary>
+  /// Decodes one picture, or one HuffYUV MT slice: its bits start <paramref name="skip"/> bytes in, under
+  /// <paramref name="frameTables"/> where the frame carries its own, as FFmpeg's <c>decode_slice</c> starts.
+  /// </summary>
+  internal RawImage DecodeSlice(ReadOnlySpan<byte> data, IHuffYuvDecoderTable[]? frameTables, int skip) {
+    var bits = new HuffYuvBitReader(data);
+    var tables = this._tables ?? frameTables;
+    if (tables != null)
+      bits.SeekToByte(skip);
+    else {
+      tables = HuffYuvHuffmanTable.ReadAll(bits.Swapped, 0, this._format.TableCount, this._format.HuffmanSymbolCount, out var start);
       bits.SeekToByte(start);
     }
 
-    frame = this._format.BitsPerSample > 8
+    return this._format.BitsPerSample > 8
       ? this._DecodeHighDepth(bits, tables)
       : this._format.ColourSpace == HuffYuvColourSpace.PackedBgr
         ? this._DecodePackedColour(bits, tables)
         : this._Compose(this._format.Version >= 3 ? this._DecodePlaneAtATime(bits, tables) : this._DecodeInterleavedRows(bits, tables));
-    return true;
   }
 
   // ============================================================================================

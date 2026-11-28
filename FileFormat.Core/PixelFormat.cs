@@ -126,4 +126,6 @@ public enum PixelFormat {
   Yuv422P14,
   /// <summary>Planar 14-bit YUV 4:4:4 in right-justified little-endian ushort samples.</summary>
   Yuv444P14,
+  /// <summary>Planar 8-bit YUV 4:1:0: Y, then U and V each one sample per 4x4 luma block (Sorenson Video, Indeo).</summary>
+  Yuv410P8,
 }

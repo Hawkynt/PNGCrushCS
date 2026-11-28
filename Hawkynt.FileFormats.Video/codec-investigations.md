@@ -106,8 +106,9 @@ route was recovering the tables from files. The route actually taken was to copy
 whose sources are LGPL and therefore the first rung of `AGENTS.md`'s ladder, where constants are
 copied exactly rather than re-derived. What the frame sizes ruled out was reverse-engineering, not
 implementation. Indeo 4 and 5 now agree with FFmpeg on 2,846,698,740 samples across 22,777 pictures
-with nothing differing; the codec table says so and `codec-notes.md` has the detail. The two
-TrueMotion entries are untouched by this and remain where they are.
+with nothing differing; the codec table says so and `codec-notes.md` has the detail. The same
+route later closed TrueMotion 1, whose tables FFmpeg's `truemotion1data.h` carries; it is decoded
+and measured in `codec-notes.md`.
 
 Indeo 3 was mapped anyway, because it was first and because the mapping is worth having if the
 question is ever revisited. Its header is fully recovered and verified over roughly 3000 frames in
@@ -174,6 +175,11 @@ is indistinguishable from the codec working, which is the failure mode this proj
 time removing from other readers.
 
 # VP6, where the tables are published and the decode still does not come out
+
+*Closed.* VP6 is decoded now, converted from FFmpeg's LGPL-2.1-or-later `vp6.c` and `vp56.c`, and agrees
+with FFmpeg on every one of 15,194 pictures across all three of its forms; `codec-notes.md` has the
+measurement. The record below is kept for what it shows about building a decoder from the
+specification alone.
 
 VP6 — `VP60`, `VP61` and `VP62` in an AVI, code 4 in Flash Video — is the odd one out here, and it is
 worth separating from the five above for exactly that reason. It has a specification, the On2 *VP6
@@ -315,6 +321,12 @@ available and equally untried; what is written above is the record of one method
 the format being unreachable.
 
 # Lagarith, where the entropy coder's state is a floating-point number
+
+*Closed.* Lagarith is decoded and encoded now, converted from FFmpeg's LGPL-2.1-or-later `lagarith.c` and
+`lagarithrac.c`, whose soft-float rescaling reproduces the reference encoder's x86 rounding in integers;
+`codec-notes.md` has the measurement. The second wall below stands in part: the measure is FFmpeg's decode,
+which now includes the FATE sample named for the off-by-one report, and the reference decoder itself — the
+`lagarith.dll` beside the samples — was not run.
 
 Lagarith (`LAGS`) is a lossless codec of the HuffYUV family: median prediction, a run-length pass over
 the zeroes, and then a range coder rather than a Huffman table. It was investigated because lossless
@@ -515,6 +527,10 @@ whoever picks this up again starts from the block layer and not from the contain
 
 # Windows Media Video 7 (WMV1), where the tables are MS-MPEG4v3's own
 
+*Closed.* WMV1 is decoded and encoded now: the tables this entry found missing are the ones the Microsoft
+MPEG-4 decoder already took from FFmpeg's LGPL-2.1-or-later sources, and WMV1's own differences are
+converted from the WMV1 paths of `msmpeg4dec.c`; `codec-notes.md` has the measurement.
+
 WMV1 — Microsoft's name is Windows Media Video 7 — was investigated because it looked like it might
 have an advantage MS-MPEG4v3 did not: ffmpeg carries a real `wmv1` encoder, so a corpus can be built and
 driven toward whatever codeword needs to be seen, which is exactly how Microsoft MPEG-4 version 2's
@@ -617,6 +633,14 @@ demonstration that WMV1's tables are genuinely smaller or differently shaped tha
 the shared escape constants above argue against, but do not by themselves rule out beyond doubt.
 
 # Windows Media Video 8 (WMV2), which adds a private table on top of WMV1's wall
+
+*Closed.* WMV2 is decoded and encoded now, IntraX8 pictures included. The tables this entry found
+missing are FFmpeg's, under LGPL-2.1-or-later — the run-level, DC and motion-vector tables the WMV1
+decoder already took, and the three predicted-macroblock tables, WMV2's scans and IntraX8's Huffman
+tables transcribed by script from `msmpeg4data.c`, `wmv2data.c` and `intrax8huf.h`; the macroblock
+layer, transforms, quarter-sample motion and IntraX8 are converted from `wmv2dec.c`, `wmv2dsp.c`,
+`intrax8.c` and `intrax8dsp.c`. `codec-notes.md` has the measurement: 30,209 pictures of eight real
+films, every one identical to FFmpeg's.
 
 WMV2 — Windows Media Video 8 — was investigated alongside WMV1 for the same reason: ffmpeg carries a
 real `wmv2` encoder, which is more than MS-MPEG4v3's own investigation had to work with. It stops at the
@@ -750,6 +774,12 @@ identifiers and pixel formats, or an independent reverse-engineering write-up th
 was produced and from what.
 
 # Microsoft Screen Codec 2 (MSS2), which adds an embedded codec to MSS1's wall
+
+*Closed.* MSS2 is decoded and encoded now. The source this entry found absent is FFmpeg's `mss2.c`,
+`mss12.c` and `mss2dsp.c`, under LGPL-2.1-or-later, and the boundaries of the WMV9 rectangles within a
+packet are stated there: each coded rectangle is preceded by its size in 24 bits, little-endian. The
+rectangles themselves go through the package's VC-1 intra decoder. All 1,438 pictures of the four
+public films decode to FFmpeg's; `codec-notes.md` has the details.
 
 MSS2 — Windows Media Screen Codec version 9, FourCC `MSS2` — was investigated alongside MSS1. It stops
 for the same reason MSS1 does, with one further complication that makes it strictly harder rather than
@@ -1009,6 +1039,10 @@ skip-count rule to confirm against.
 
 # NewTek SpeedHQ, an MPEG-2-shaped codec that agrees with the real standard almost everywhere and not quite everywhere
 
+*Closed.* SpeedHQ is decoded and encoded now, converted from FFmpeg's LGPL-2.1-or-later `speedhqdec.c`,
+whose reassigned AC table is the one this entry could not find printed anywhere else; `codec-notes.md` has the
+measurement.
+
 SpeedHQ (`SHQ0` through `SHQ5`, `SHQ7`, `SHQ9`) was investigated as the next professional/intermediate
 codec after Hap, on the strength of MultimediaWiki's own note for it — unlike Canopus's pages above,
 this one states plainly that "NewTek has provided samples and support in understanding the format,"
@@ -1119,6 +1153,10 @@ codeword be resolved by elimination the way this project's VP6 investigation att
 the single-bit-flip guessing that this investigation's evidence explicitly cannot support.
 
 # Canopus HQ, HQA and HQX, where the vendor's own papers say nothing about the bitstream
+
+*Closed.* All three are decoded and encoded now, converted from FFmpeg's LGPL-2.1-or-later `libavcodec/hqx.c`,
+`hqxdsp.c`, `hq_hqa.c` and `hq_hqadsp.c`, with the tables of `hqxvlc.h`, `hq_hqadata.h` and `hq_common.c`.
+Every FATE sample of all three decodes exactly as FFmpeg decodes it; `codec-notes.md` has the measurement.
 
 Canopus HQ (`CUVC`) and its alpha-carrying sibling HQA share one ffmpeg decoder, `hq_hqa`; their
 successor HQX (`CHQX`) is a second. Both were investigated on the strength of what the coverage notes
@@ -1410,6 +1448,10 @@ implementation.
 
 # Go2Meeting (G2M), where the one detailed page is the decoder's own author's account of it
 
+*Closed.* Go2Meeting is decoded and encoded now, converted from FFmpeg's `g2meet.c` and `elsdec.c` under
+LGPL-2.1-or-later rather than from the page this entry would not build on. All three coding paths are in
+it, and 1,287 pictures of five public films decode to FFmpeg's; `codec-notes.md` has the details.
+
 Go2Meeting's screen codec (`G2M2`, `G2M3`, `G2M4`) was investigated fifth, flagged going in as large and
 partly JPEG-based, and it stops on documentation grounds before its size becomes the deciding factor.
 
@@ -1451,6 +1493,12 @@ to make the check (which this investigation does not do), would settle the quest
 
 # ScreenPressor (SCPR), where the only "documentation" is somebody else's open-source rebuild
 
+*Closed.* All three generations are decoded, and the second encoded, now, converted from FFmpeg's
+LGPL-2.1-or-later `libavcodec/scpr.c`, `scpr.h` and `scpr3.c`; every picture of the one sample decodes
+exactly as FFmpeg decodes it. The third generation still has no published film; it closed by the other
+route this file allows — FFmpeg's decoder as the oracle for streams the package writes, built to reach
+every model type, operation and block kind — with the details in `codec-notes.md`.
+
 ScreenPressor was investigated sixth. `samples.ffmpeg.org/V-codecs/` carries one file, `SCPR.avi`, and
 `ffmpeg -h encoder=scpr` reports none, so the same one-file ceiling MWSC stops at applies here before the
 documentation question is even reached. No MultimediaWiki page exists under `ScreenPressor` or `SCPR`,
@@ -1487,6 +1535,10 @@ not an implementation.
 
 # TechSmith Screen Codec 2 (TSCC2), the DCT-based codec that shares only a vendor with TSCC
 
+*Closed.* TSCC2 is decoded and encoded now, converted from FFmpeg's LGPL-2.1-or-later `libavcodec/tscc2.c`
+with its tables transcribed mechanically from `tscc2data.h`. Every whole picture of the FATE sample decodes
+exactly as FFmpeg decodes it; `codec-notes.md` has the measurement.
+
 TSCC2 was investigated last, as the brief for this batch of work expected: despite the name, it is not a
 variant of this package's own TSCC decoder — DEFLATE over a run-length coding — but a block-transform
 codec, and it stops on the same evidence Canopus HQ, HQA and HQX do above.
@@ -1516,6 +1568,11 @@ not derived from reading an implementation, or a second reverse-engineering writ
 it was produced and from what.
 
 # On2 VP4, where the wiring is published and one wire is not
+
+*Closed.* VP4 is decoded and encoded now. The motion-vector codes this entry found printed nowhere are
+in FFmpeg's `vp4data.h`, under LGPL-2.1-or-later, with every other VP4 table; they and the VP4 paths of
+`vp3.c` and `vp3dsp.c` are converted, and the one public film, `ot171_vp40.avi`, decodes to FFmpeg's
+pictures exactly. `codec-notes.md` has the details.
 
 VP4 — FourCC `VP40` — was investigated first among the two On2 codecs this task targeted, on the
 strength of a real advantage the note above already gives it: it shares almost all of its structure
@@ -1652,6 +1709,11 @@ by inspection alone.
 
 # VP7, where the document names the two files it will not print
 
+*Closed.* VP7 is decoded and encoded now. The decoder is converted from the VP7 paths of FFmpeg's
+LGPL-2.1-or-later `vp8.c`, which carry the dequantisation tables and the census this entry could not
+find printed; `codec-notes.md` has the measurement. `VP72` is not claimed: FFmpeg maps only `VP70` and
+`VP71`, and no `VP72` sample has been seen.
+
 VP7 (`VP70`, `VP71`, `VP72`) is VP8's immediate ancestor, and On2 published its own specification for
 it — "VP7 Data Format and Decoder," document version 1.5 of March 28, 2005, mirrored at
 `multimedia.cx/mirror/VP7_Data_Format_and_Decoder_Overview.pdf` — nine years before ffmpeg's own VP7
@@ -1751,6 +1813,9 @@ not derive from ffmpeg's reverse-engineered decoder.
 
 # Sorenson Video 1 (SVQ1), where the codebook is the whole codec and nobody has printed it
 
+*Closed.* SVQ1 is decoded and encoded now, converted from FFmpeg's LGPL-2.1-or-later `svq1dec.c`, whose
+codebooks are the ones this entry could not find printed; `codec-notes.md` has the measurement.
+
 SVQ1 — Sorenson Vector Quantizer 1, FourCC `SVQ1` — is a hierarchical multistage vector quantizer over
 16x16 blocks down to 4x2, with mean removal and motion compensation between frames. The brief for this
 investigation named the question to ask before writing anything: is that codebook published anywhere
@@ -1798,6 +1863,13 @@ Sorenson technical document, or a second patent that prints the tables themselve
 their existence and size. Neither exists today.
 
 # Sorenson Video 3 (SVQ3), an H.264 draft with nobody publishing where it departs
+
+*Closed.* Sorenson Video 3 is decoded and encoded now, converted from FFmpeg's `svq3.c` and the H.264
+code it calls, under LGPL-2.1-or-later — the "Licence-compatible reference sources" route, which makes
+the provenance question below moot rather than answering it: the decoder that reverse-engineered the
+format is itself absorbable. I, P and B pictures, third-sample motion and watermarked streams all
+decode to FFmpeg's pictures on every public film read; `codec-notes.md` has the details, including the
+one FFmpeg quirk that took finding.
 
 SVQ3 — Sorenson Vector Quantizer 3, FourCC `SVQ3` — sits differently from SVQ1: this package already
 carries a verified H.264 decoder (`Codecs/H264/`), and every account of SVQ3 agrees it is a variant of
@@ -1990,6 +2062,12 @@ one.
 
 # Electronic Arts TGQ, TQI and MAD, whose only documentation is their own decoder's author
 
+*Closed.* All three are decoded and encoded now, converted from FFmpeg's LGPL-2.1-or-later `eatgq.c`,
+`eatqi.c`, `eamad.c` and the `eaidct.c` they share, which settles the transform and zigzag this section
+could find no description of. Every picture of the real films found decodes exactly as FFmpeg decodes it;
+`codec-notes.md` has the measurement and the two details no description states — MAD's matrix is read
+through a signed pointer, and TGQ's bitstream runs least-significant bit first.
+
 TGQ (`pQTG`/`TGQs`), TQI (`pIQT`) and MAD (`MADk`/`MADm`/`MADe`) are three of the DCT-based codecs in
 Electronic Arts' own game-cinematic family — see `EaReader`'s container above, which the CMV and TGV
 sections of `README.md` already read two siblings of. All three were investigated together because they
@@ -2064,6 +2142,10 @@ share with MAD's own MPEG-1-derived run-length coding were not themselves mapped
 provenance question was settled first, as it is meant to be, before any of that work was spent.
 
 # Electronic Arts TGV, recovered as far as its own published errors allow
+
+*Closed.* TGV is decoded and encoded now, converted from FFmpeg's LGPL-2.1-or-later `eatgv.c` rather than
+from the page this section measures; all 2,309 pictures of five real films match FFmpeg's. The record of the
+page's own errors below stands as it was.
 
 TGV (`kVGT`/`fVGT`) is Electronic Arts' lossless-intra, block-VQ-inter codec, and it clears the bar TGQ,
 TQI and MAD do not: `Electronic_Arts_TGV`'s MultimediaWiki page was created on 14 March 2006 and
@@ -2173,6 +2255,11 @@ three-byte form's true bit layout is not yet pinned down by even a second occurr
 # Deluxe Paint Animation (ANM), where the container is Electronic Arts' own documentation and the
 codec is only their source code
 
+*Closed.* ANM is demuxed, muxed, decoded and encoded now, converted from FFmpeg's LGPL-2.1-or-later
+`libavformat/anm.c` and `libavcodec/anm.c`, which settles the RunSkipDump opcodes this section could find
+only in Electronic Arts' unlicensed source. Every picture of five real films decodes exactly as FFmpeg
+decodes it; `codec-notes.md` has the measurement.
+
 ANM (`anm`, FourCC-less, magic `LPF `) was investigated because it looked like the cheapest of the
 remaining game formats on the same promise several already-decoded ones had: a container recovered from
 prose, a small alphabet of frame-to-frame operations, and real samples to check either against. The
@@ -2251,6 +2338,13 @@ file format around them.
 # Chronomaster DFA, whose page is the cleanest case of a paraphrase this project has found without a
 citation to prove it
 
+*Closed.* DFA is demuxed, muxed, decoded and encoded now, converted from FFmpeg's LGPL-2.1-or-later
+`libavformat/dfa.c` and `libavcodec/dfa.c`. One correction to what follows: FFmpeg does not decode all four
+films. Its `DDS1` skip compares `frame - frame_end < v`, which no skip inside the picture can pass, so it
+refuses every `DDS1` frame, the last 56 pictures of `0000.dfa`. This decoder makes the comparison FFmpeg
+meant, and is held to FFmpeg's own chunk decoders built with that one comparison corrected. `codec-notes.md`
+has the measurement.
+
 DFA (`dfa`, magic `DFIA`) was investigated as the next Amiga-and-legacy-adjacent item on the list —
 DreamForge's FMV format for *Chronomaster* and *Anvil of Dawn* — and it stops before a byte of it was
 written, on provenance alone.
@@ -2314,6 +2408,10 @@ back-reference and fill codes. Neither was attempted here because the page's own
 question before either was needed.
 
 # 8088flex TMV, which has neither a description nor a whole sample
+
+*Closed.* TMV is demuxed, muxed, decoded and encoded now, converted from FFmpeg's LGPL-2.1-or-later
+`libavformat/tmv.c` and `libavcodec/tmv.c`; the truncated sample decodes, as far as it goes, exactly as FFmpeg
+decodes it. `codec-notes.md` has the measurement.
 
 TMV (magic `TMAV`) was investigated next and stops earliest of anything in this file: it clears none of
 the three things every other entry here had at least one of — a published document, a paraphrase-shaped
@@ -2515,6 +2613,10 @@ documentation, there is nothing else to derive.
 
 # Dxtory, whose description stops exactly where the compression starts
 
+*Closed.* Dxtory is decoded and encoded now, converted from FFmpeg's LGPL-2.1-or-later `libavcodec/dxtory.c`,
+which supplies the move-to-front coding this section found no description of. `codec-notes.md` has the
+measurement, and the three places FFmpeg's odd-size handling cannot be matched or matched usefully.
+
 Dxtory (`xtor`) is the capture codec of the Windows screen-recording tool of the same name, written for
 recording high frame-rate games. It was investigated with the lossless group, and it stops twice over:
 the description that exists does not describe the compression at all, and what description there is
@@ -2627,6 +2729,11 @@ names him as its source, or from a reverse-engineering write-up that says plainl
 and from what, the way this project would need for LOCO or Canopus Lossless above.
 
 # HuffYUV MT (HYMT), where the only thing missing is the only thing not written down
+
+*Closed.* HYMT is decoded and encoded now: the slice table, the trailer and the slices' placement are
+converted from FFmpeg's LGPL-2.1-or-later `libavcodec/huffyuvdec.c`, and each slice is this package's HuffYUV.
+Still no real file has been found; FFmpeg reads the slices this package writes back to the pictures given, and
+`codec-notes.md` records the one place it needs its vector routines turned off to do so.
 
 HYMT is a community fork of Ben Rudiak-Gould's HuffYUV, made multithreadable. This package already
 decodes HuffYUV and FFVHUFF exactly — the median, left and gradient predictors, the Huffman tables in
@@ -2752,6 +2859,10 @@ sketch above is reproduced here so that whoever finds either does not have to lo
 
 # Brooktree ProSumer Video (BT20), one sentence written four years late
 
+*Closed.* BT20 is decoded and encoded now, converted from FFmpeg's LGPL-2.1-or-later `libavcodec/prosumer.c`,
+whose code table is the codebook this section found named and never printed. Every picture of the two real
+films found decodes exactly as FFmpeg decodes it; `codec-notes.md` has the measurement.
+
 ProSumer (`BT20`) is the capture codec of the Brooktree — later Conexant — Bt848 capture cards, whose
 binary decoder answers to the filename `btvvc32.drv`. It is intra-only, 4:1:1, in an AVI, and its frame
 payloads open with the four ASCII characters `BTIC`. It was investigated with the lossless group and
@@ -2803,6 +2914,11 @@ and says how it was produced. Failing that, an encoder would at least open the s
 packed layouts in this group.
 
 # SheerVideo, whose provenance is clean and whose tables are still in the binary
+
+*Closed.* SheerVideo is decoded and encoded now, converted from FFmpeg's LGPL-2.1-or-later
+`libavcodec/sheervideo.c` and `sheervideodata.h`, whose tables are the ones this section found only in the
+binary. No real file has been found; frames of random bits in every layout decode exactly as FFmpeg decodes
+them. `codec-notes.md` has the method.
 
 SheerVideo is BitJazz's commercial lossless codec, `Shr0` through `Shr7` in a QuickTime file, covering
 RGB and Y'CbCr with and without alpha, 8-bit and 10-bit, full and video range, 4:4:4 and 4:2:2,
@@ -2879,6 +2995,9 @@ has written them down outside an implementation. Everything else about this code
 documented well enough to build from, which is what makes it the most frustrating entry in this file
 rather than the most obscure.
 # YLC, which reads as a complete description until one clause of it is taken seriously
+
+*Closed.* YLC is decoded and encoded now, converted from FFmpeg's LGPL-2.1-or-later `ylc.c`, which prints the
+225-entry quad table this entry could not find; `codec-notes.md` has the measurement.
 
 YLC — "YUY2 Lossless Codec", `YLC0` in an AVI — comes from a Japanese AviUtl plugin author's own tool.
 It was investigated with the lossless group, and it is the closest call in this file: everything about
@@ -2960,6 +3079,10 @@ against the oracle. The header, the prediction rule and the sample above are rec
 has either does not start from the container.
 # FM Screen Capture Codec (FMVC), whose real page arrived five years after its decoder
 
+*Closed.* FMVC is decoded and encoded now, converted from FFmpeg's LGPL-2.1-or-later `libavcodec/fmvc.c`,
+which settles the two LZ77 variants this section found named but not stated. Every picture of the four real
+films found decodes exactly as FFmpeg decodes it; `codec-notes.md` has the measurement.
+
 FM Screen Capture Codec (`FMVC`) was investigated as one of the screen-capture and lossless names this
 project's coverage still lacked, and looked promising on first sight: a real sample corpus and a
 MultimediaWiki page describing tile sizes, header fields and byte counts in some detail. It stops on
@@ -3025,7 +3148,11 @@ equal-probability literal bits where AV1 uses context-indexed CDFs and carries n
 default tables, so it desynchronises at the first partition decision: on a 32x32 still it returns a
 flat 130 across the plane where the reference has structure, 1024 samples of 1024 wrong. That path
 now refuses. A real AV1 decoder has to be built from the specification, and that is a job on the
-scale of this package's H.265 work rather than a gap to be filled in passing.
+scale of this package's H.265 work rather than a gap to be filled in passing. *(Superseded for stills: the AVIF reader's
+decoder was rewritten from the specification afterwards — context-indexed CDFs, the normative default
+tables, tile decoding — and decodes key frames; see `Hawkynt.FileFormats.Images/Formats/Avif/Codec/`.
+The video registry still has no AV1 codec: inter prediction, reference frames and film grain are
+what remains.)*
 
 **Windows Media before VC-1** — `wmv1`, `wmv2`, `msmpeg4v1`, `msmpeg4` (that is version 3), `msp2`,
 `mss1`, `mss2`, `msa1`, `mts2`. Version 2 is done. Versions 1 and 3 are argued in `README.md` to be
@@ -3041,7 +3168,8 @@ on top of that. MSS1 and MSS2 stop somewhere else: no independent description of
 coder exists, the one detailed write-up tracks libavcodec's own function names down to a shared
 spelling mistake, and MSS2 additionally embeds Windows Media Video 9 rectangles located by the very
 structure that coder would decode. What is left of this family is `msmpeg4v1`, `msmpeg4` (version 3),
-`msp2`, `msa1` and `mts2`.
+`msp2`, `msa1` and `mts2`. *(Superseded: versions 1 and 3, WMV1, MSS1 and WMV2 have since been converted from FFmpeg's
+LGPL-2.1-or-later sources under the sourcing ladder; each section above says so.)*
 
 **On2 and RealVideo** — `vp4`, `vp5`, `vp6`, `vp7`, `rv30`, `rv40`, `rv60`. VP3 shares almost all of
 its structure with Theora, which is done and exact, so it is the cheapest of these by a wide margin.

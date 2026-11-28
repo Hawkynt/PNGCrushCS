@@ -1,0 +1,26 @@
+PWC fixtures and what produced them
+===================================
+
+Every picture here was generated for this repository (rectangles, scattered pixels, a gradient, a flat
+fill) and written as a BMP. Nothing in this directory comes from the PWC distribution itself.
+
+  NAME__OPTION.pwc   written by pwcencode.exe 1.5.1 from that BMP with the switch named by OPTION:
+                       default   (no switch)
+                       noq2      -noq2
+                       noq5      -noq5
+                       gray      -gray
+                       flip      -flip
+                       lps3      -maxlps 3
+                       lps30     -maxlps 30
+  NAME__OPTION.bmp   pwcdecode.exe 1.5.1's decode of the .pwc beside it - the captured oracle output
+                     the reader is compared against, and the picture the writer is asked to re-encode
+                     to the very same bytes.
+
+Both programs were run under Wine 11.22 (WINEDEBUG=-all), from pwc.zip, the author's 1999 demonstration
+package (sha256 b7a56255e413e81257fca6d309621cc16636013c91cc83372c2547443dea6662):
+
+  pwcencode.exe  sha256 703fe67f6b5c53a635d0bec573375c068065a638940cab676c652fde367f17eb
+  pwcdecode.exe  sha256 d18958228441ecfd928b5bc664008f71a737819be61e7b5ecd4e059489c537a7
+
+The name prefix gives the coded depth (d1/d4/d8) and the picture: shapes, grad, gray (a 256-step grey
+ramp coded with -gray), flat, or a size such as 1x5.

@@ -150,6 +150,33 @@ internal readonly record struct Vc1PictureHeader(
       fractionDenominator);
   }
 
+  /// <summary>
+  /// The picture header of a WMV9 rectangle inside an MS Screen 2 frame, as FFmpeg's
+  /// <c>ff_vc1_parse_frame_header</c> reads it for <c>AV_CODEC_ID_MSS2</c>: the two frame-count bits
+  /// become one flag that switches range reduction and resolution scaling on together, and the rest is
+  /// a Main profile I picture with an implicit quantiser and no B pictures.
+  /// </summary>
+  /// <param name="reader">The bitstream at the start of the rectangle's picture.</param>
+  /// <param name="rangeReducedFrame">Whether the picture is range reduced.</param>
+  internal static Vc1PictureHeader ReadMss2Intra(ref Vc1BitReader reader, out bool rangeReducedFrame) {
+    var flag = reader.ReadBits(2) == 1;
+    rangeReducedFrame = flag && reader.ReadBit() != 0;
+    if (reader.ReadBit() != 0)
+      throw new InvalidDataException("An MS Screen 2 WMV9 rectangle is a predicted picture; only intra ones are allowed.");
+    reader.ReadBits(7); // buffer fullness
+
+    var sequence = new Vc1SequenceHeader(
+      Vc1Profile.Main, 7, 31, true, flag, false, false, 1, true, false, false, flag, 0, 0, false);
+    var (quantiserIndex, quantiser, halfStep, uniform) = _ReadQuantiser(ref reader, sequence);
+    var resolutionIndex = flag ? reader.ReadBits(2) : 0;
+    var chromaCodingSetIndex = _ReadCodingSetIndex(ref reader);
+    var lumaCodingSetIndex = _ReadCodingSetIndex(ref reader);
+    var highMotionDcTable = reader.ReadBit() != 0;
+    return new(
+      Vc1PictureType.Intra, rangeReducedFrame, quantiserIndex, quantiser, halfStep, uniform,
+      lumaCodingSetIndex, chromaCodingSetIndex, highMotionDcTable, resolutionIndex);
+  }
+
   private static (int Index, int Quantiser, bool HalfStep, bool Uniform) _ReadQuantiser(
     ref Vc1BitReader reader,
     Vc1SequenceHeader sequence) {

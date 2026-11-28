@@ -132,6 +132,38 @@ public sealed class ConversionServiceTests {
     Assert.That(seen, Is.EqualTo(new[] { (0, 2), (1, 2), (2, 2) }));
   }
 
+  [Test]
+  public void ConvertBatch_PngToPwcAndBack_KeepsEveryPixel() {
+    using var scratch = new ScratchFolder("batch-pwc");
+    var source = scratch.Sub("in");
+    var middle = scratch.Sub("pwc");
+    var destination = scratch.Sub("out");
+
+    // A palette picture is what PWC is for: five colours in blocks, which it stores losslessly.
+    var picture = ViewerTestPictures.Flat(23, 11, 0, 0, 0);
+    for (var y = 0; y < picture.Height; ++y)
+    for (var x = 0; x < picture.Width; ++x) {
+      var at = (y * picture.Width + x) * 4;
+      var shade = (byte)((x / 5 + y / 4) % 5 * 60);
+      picture.PixelData[at] = shade;
+      picture.PixelData[at + 1] = (byte)(255 - shade);
+    }
+
+    var png = new FileInfo(Path.Combine(source.FullName, "blocks.png"));
+    Assert.That(FormatRegistry.Write(picture, ImageFormat.Png, png), Is.True);
+
+    var toPwc = ConversionService.ConvertBatch([png], FormatRegistry.GetEntry(ImageFormat.Pwc)!, middle, overwrite: true);
+    Assert.That(toPwc.Where(r => !r.Succeeded).Select(r => r.Message), Is.Empty);
+    var pwc = middle.GetFiles("*.pwc").Single();
+
+    var toPng = ConversionService.ConvertBatch([pwc], FormatRegistry.GetEntry(ImageFormat.Png)!, destination, overwrite: true);
+    Assert.That(toPng.Where(r => !r.Succeeded).Select(r => r.Message), Is.Empty);
+
+    var expected = picture.ToRgb24();
+    Assert.That(FormatRegistry.Read(pwc)!.ToRgb24(), Is.EqualTo(expected));
+    Assert.That(FormatRegistry.Read(destination.GetFiles("*.png").Single())!.ToRgb24(), Is.EqualTo(expected));
+  }
+
   [TestCase(0, 1, ".png", "picture.01.png")]
   [TestCase(9, 10, ".png", "picture.10.png")]
   [TestCase(0, 100, ".bmp", "picture.001.bmp")]

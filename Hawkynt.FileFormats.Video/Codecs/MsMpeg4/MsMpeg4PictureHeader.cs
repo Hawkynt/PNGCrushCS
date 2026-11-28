@@ -81,6 +81,24 @@ internal sealed class MsMpeg4PictureHeader {
   /// <summary>Which of version 3's two motion vector tables it uses; nought for versions 1 and 2.</summary>
   internal required int MotionVectorTableIndex { get; init; }
 
+  /// <summary>WMV1: whether each coded macroblock restates its run-level table.</summary>
+  internal bool PerMacroblockRunLevel { get; init; }
+
+  /// <summary>WMV1: whether intra macroblocks of a predicted picture predict their DC from samples, with a stated direction.</summary>
+  internal bool InterIntraPrediction { get; init; }
+
+  /// <summary>WMV1: the bit rate the last intra picture's extension header stated, in bits a second.</summary>
+  internal int BitRate { get; init; }
+
+  /// <summary>WMV1: whether predicted pictures alternate their rounding, from the extension header.</summary>
+  internal bool FlipFlopRounding { get; init; }
+
+  /// <summary>The bit rate above which WMV1 restates run-level tables per macroblock: FFmpeg's <c>MBAC_BITRATE</c>.</summary>
+  private const int _PER_MACROBLOCK_BIT_RATE = 50 * 1024;
+
+  /// <summary>The bit rate at or below which small WMV1 pictures use inter-intra prediction: FFmpeg's <c>II_BITRATE</c>.</summary>
+  private const int _INTER_INTRA_BIT_RATE = 128 * 1024;
+
   /// <summary>
   /// Reads a picture header from the first bit of a packet.
   /// </summary>
@@ -90,8 +108,11 @@ internal sealed class MsMpeg4PictureHeader {
   /// <param name="previousSliceHeight">
   /// What the last intra picture said, for a predicted picture that does not say.
   /// </param>
+  /// <param name="previous">The last picture's header, whose bit rate and rounding a WMV1 predicted picture inherits.</param>
+  /// <param name="pictureArea">Width times height, which decides WMV1's inter-intra prediction.</param>
   internal static MsMpeg4PictureHeader Parse(
-    ref Mpeg4BitReader reader, MsMpeg4Version version, int macroblockHeight, int previousSliceHeight) {
+    ref Mpeg4BitReader reader, MsMpeg4Version version, int macroblockHeight, int previousSliceHeight,
+    MsMpeg4PictureHeader? previous = null, int pictureArea = 0) {
     if (version == MsMpeg4Version.Version1) {
       var startCode = (reader.ReadBits(16) << 16) | reader.ReadBits(16);
       if (startCode != _VERSION1_START_CODE)
@@ -117,6 +138,11 @@ internal sealed class MsMpeg4PictureHeader {
       throw new InvalidDataException(
         "This Microsoft MPEG-4 picture states a quantiser of zero, which is not a step size and would reconstruct "
         + "every coefficient as zero. The field holds 1 to 31.");
+
+    if (version == MsMpeg4Version.Wmv1)
+      return codingType == IntraCoded
+        ? _ParseWmv1Intra(ref reader, quantiser, macroblockHeight)
+        : _ParseWmv1Predicted(ref reader, quantiser, previousSliceHeight, previous, pictureArea);
 
     return codingType == IntraCoded
       ? _ParseIntra(ref reader, version, quantiser, macroblockHeight)
@@ -197,6 +223,65 @@ internal sealed class MsMpeg4PictureHeader {
   /// the other way looks more natural and puts the boundary in the wrong place, which shows up as a
   /// row of macroblocks predicted from neighbours the encoder treated as absent.
   /// </remarks>
+  /// <summary>
+  /// A WMV1 intra picture: the slice count, then the extension header that version 3 puts after the
+  /// picture — frame rate, bit rate and the rounding flag — and the tables, as FFmpeg's
+  /// <c>msmpeg4_decode_picture_header</c> reads them.
+  /// </summary>
+  private static MsMpeg4PictureHeader _ParseWmv1Intra(ref Mpeg4BitReader reader, int quantiser, int macroblockHeight) {
+    var sliceHeight = _ParseSliceField(ref reader, MsMpeg4Version.Wmv1, macroblockHeight);
+    reader.Skip(5);
+    var bitRate = reader.ReadBits(11) * 1024;
+    var flipFlop = reader.ReadBit() == 1;
+
+    var perMacroblock = bitRate > _PER_MACROBLOCK_BIT_RATE && reader.ReadBit() == 1;
+    int chroma = 0, luminance = 0;
+    if (!perMacroblock) {
+      chroma = _ReadZeroOneOrTwo(ref reader);
+      luminance = _ReadZeroOneOrTwo(ref reader);
+    }
+
+    return new() {
+      CodingType = IntraCoded,
+      Quantiser = quantiser,
+      SliceHeight = sliceHeight,
+      SkipBitsArePresent = false,
+      RunLevelTableIndex = luminance,
+      ChromaRunLevelTableIndex = chroma,
+      DcTableIndex = reader.ReadBit(),
+      MotionVectorTableIndex = 0,
+      PerMacroblockRunLevel = perMacroblock,
+      BitRate = bitRate,
+      FlipFlopRounding = flipFlop,
+    };
+  }
+
+  private static MsMpeg4PictureHeader _ParseWmv1Predicted(
+    ref Mpeg4BitReader reader, int quantiser, int previousSliceHeight, MsMpeg4PictureHeader? previous, int pictureArea) {
+    var bitRate = previous?.BitRate ?? 0;
+    var skipBitsArePresent = reader.ReadBit() == 1;
+    var perMacroblock = bitRate > _PER_MACROBLOCK_BIT_RATE && reader.ReadBit() == 1;
+    var runLevel = perMacroblock ? 0 : _ReadZeroOneOrTwo(ref reader);
+
+    return new() {
+      CodingType = PredictiveCoded,
+      Quantiser = quantiser,
+      SliceHeight = previousSliceHeight,
+      SkipBitsArePresent = skipBitsArePresent,
+      RunLevelTableIndex = runLevel,
+      ChromaRunLevelTableIndex = runLevel,
+      DcTableIndex = reader.ReadBit(),
+      MotionVectorTableIndex = reader.ReadBit(),
+      PerMacroblockRunLevel = perMacroblock,
+      InterIntraPrediction = pictureArea < 320 * 240 && bitRate <= _INTER_INTRA_BIT_RATE,
+      BitRate = bitRate,
+      FlipFlopRounding = previous?.FlipFlopRounding ?? false,
+    };
+  }
+
+  /// <summary>Zero, one or two, written as 0, 10 and 11: FFmpeg's <c>decode012</c>.</summary>
+  internal static int ReadZeroOneOrTwo(ref Mpeg4BitReader reader) => _ReadZeroOneOrTwo(ref reader);
+
   private static int _ParseSliceField(ref Mpeg4BitReader reader, MsMpeg4Version version, int macroblockHeight) {
     var code = reader.ReadBits(5);
 

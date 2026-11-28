@@ -17,6 +17,16 @@ internal static class EaChunkType {
   internal const uint kVGT = 0x5447566B; // "kVGT"
   internal const uint fVGT = 0x54475666; // "fVGT"
 
+  // ---- Electronic Arts MAD ----
+  internal const uint MADk = 0x6B44414D; // "MADk" key frame
+  internal const uint MADm = 0x6D44414D; // "MADm" predicted frame
+  internal const uint MADe = 0x6544414D; // "MADe" lower-quality predicted frame
+
+  // ---- Electronic Arts TGQ and TQI ----
+  internal const uint TGQs = 0x73514754; // "TGQs" TGQ picture, in .TGQ files
+  internal const uint pQGT = 0x54475170; // "pQGT" TGQ picture, in .UV files
+  internal const uint pIQT = 0x54514970; // "pIQT" TQI picture, in .UV2 and .WVE files
+
   // ---- Electronic Arts SEAD ----
   internal const uint SEAD = 0x44414553; // "SEAD" header
   internal const uint SNDC = 0x43444E53; // "SNDC" data
@@ -42,6 +52,10 @@ internal static class EaChunkType {
   internal static bool IsCmv(uint fourCc) => fourCc is MVIh or MVIf or MVIe;
 
   internal static bool IsTgv(uint fourCc) => fourCc is kVGT or fVGT;
+
+  internal static bool IsMad(uint fourCc) => fourCc is MADk or MADm or MADe;
+
+  internal static bool IsTgq(uint fourCc) => fourCc is TGQs or pQGT;
 
   /// <summary>
   /// Whether a chunk is structural or coded data belonging to one of EA's documented sound families.

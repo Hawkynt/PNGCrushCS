@@ -1,0 +1,20 @@
+The 8088flex TMV decoder in this directory, and the TMV container in Formats/Tmv, are converted from
+FFmpeg (https://github.com/FFmpeg/FFmpeg):
+
+  libavcodec/tmv.c          the screen layout and the drawing of each character cell
+  libavformat/tmv.c         the TMV header, its features, and the interleaving of screens and sound
+  libavutil/xga_font_data.c the IBM CGA 8x8 font
+  libavcodec/cga_data.c     the sixteen-colour CGA palette
+
+  Copyright (c) 2009 Daniel Verkamp (tmv.c, both)
+  and the FFmpeg developers named in the files above.
+
+FFmpeg distributes those sources under the GNU Lesser General Public License, version 2.1 or (at your
+option) any later version. This work is distributed under the GNU Lesser General Public License
+version 3 or later, which the "or later" clause permits; the licence text is in LICENSE at the root of
+this repository.
+
+The algorithms are carried across into managed C#, not vendored. The font and palette in TmvTables.cs
+were transcribed mechanically, by a script that parsed the C initialisers, and are reproduced exactly
+because they are fixed data required for interoperability. The encoder and the container writer are
+this package's own.

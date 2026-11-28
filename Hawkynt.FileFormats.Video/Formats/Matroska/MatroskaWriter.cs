@@ -132,8 +132,9 @@ public sealed class MatroskaWriter : IVideoContainerWriter<MatroskaWriter> {
           ContainerWriterTools.WriteEbmlUnsigned(entry, 0x73C5, number); // TrackUID
           ContainerWriterTools.WriteEbmlUnsigned(entry, MatroskaElementId.TRACK_TYPE, _TrackType(stream.Kind));
           ContainerWriterTools.WriteEbmlText(entry, MatroskaElementId.CODEC_ID, _CodecId(stream));
-          if (!stream.CodecPrivateData.IsEmpty)
-            ContainerWriterTools.WriteEbml(entry, MatroskaElementId.CODEC_PRIVATE, stream.CodecPrivateData.Span);
+          var codecPrivate = _CodecPrivate(stream);
+          if (!codecPrivate.IsEmpty)
+            ContainerWriterTools.WriteEbml(entry, MatroskaElementId.CODEC_PRIVATE, codecPrivate.Span);
           if (!string.IsNullOrEmpty(stream.Language)) {
             ContainerWriterTools.WriteEbmlText(entry, MatroskaElementId.LANGUAGE_BCP47, stream.Language);
             var legacy = stream.Language.Split('-')[0];
@@ -195,6 +196,30 @@ public sealed class MatroskaWriter : IVideoContainerWriter<MatroskaWriter> {
       _ => throw new NotSupportedException($"Matroska writer has no TrackType for {kind}."),
     };
 
+  private const string _VFW = "V_MS/VFW/FOURCC";
+
+  /// <summary>
+  /// The CodecPrivate a track is written with: the stream's own, except that a V_MS/VFW/FOURCC track
+  /// must carry a BITMAPINFOHEADER and is given one when the stream does not hold one.
+  /// </summary>
+  private static ReadOnlyMemory<byte> _CodecPrivate(MediaStreamInfo stream) {
+    if (_CodecId(stream) != _VFW)
+      return stream.CodecPrivateData;
+
+    var data = stream.CodecPrivateData;
+    if (data.Length >= 40 && BinaryPrimitives.ReadUInt32LittleEndian(data.Span) >= 40)
+      return data;
+
+    var header = new byte[40];
+    BinaryPrimitives.WriteUInt32LittleEndian(header, 40);
+    BinaryPrimitives.WriteInt32LittleEndian(header.AsSpan(4), stream.Width);
+    BinaryPrimitives.WriteInt32LittleEndian(header.AsSpan(8), stream.Height);
+    BinaryPrimitives.WriteUInt16LittleEndian(header.AsSpan(12), 1);
+    BinaryPrimitives.WriteUInt16LittleEndian(header.AsSpan(14), (ushort)(stream.BitsPerPixel > 0 ? stream.BitsPerPixel : 24));
+    BinaryPrimitives.WriteUInt32LittleEndian(header.AsSpan(16), stream.Codec.Value);
+    return header;
+  }
+
   private static string _CodecId(MediaStreamInfo stream) {
     if (!string.IsNullOrWhiteSpace(stream.CodecId))
       return stream.CodecId;
@@ -211,6 +236,16 @@ public sealed class MatroskaWriter : IVideoContainerWriter<MatroskaWriter> {
     if (code.EqualsIgnoringCase(CodecTag.FromCharacters(".mp3")) || code.EqualsIgnoringCase(CodecTag.FromCharacters("mpga"))) return "A_MPEG/L3";
     if (code.EqualsIgnoringCase(CodecTag.FromCharacters("ac-3"))) return "A_AC3";
     if (code.EqualsIgnoringCase(CodecTag.FromCharacters("dts "))) return "A_DTS";
+
+    // Anything else Matroska carries the way FFmpeg does: a VfW video stream as V_MS/VFW/FOURCC with
+    // its BITMAPINFOHEADER as CodecPrivate, an ACM sound stream as A_MS/ACM with its WAVEFORMATEX.
+    // An AVI stream arrives with exactly those structures; a video stream from anywhere else gets a
+    // BITMAPINFOHEADER built from what it states.
+    if (stream.Kind == MediaStreamKind.Video && code != CodecTag.None)
+      return _VFW;
+    if (stream.Kind == MediaStreamKind.Audio && stream.CodecPrivateData.Length >= 16)
+      return "A_MS/ACM";
+
     throw new NotSupportedException($"No Matroska CodecID is known for stream {stream.Index} tagged '{stream.Codec}'. Supply CodecId explicitly.");
   }
 

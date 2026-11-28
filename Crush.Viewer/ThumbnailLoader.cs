@@ -82,7 +82,7 @@ internal sealed class ThumbnailLoader : IDisposable {
 
       int[] pixels;
       try {
-        var raw = FormatRegistry.Read(file);
+        var raw = FormatRegistry.Read(file) ?? VideoService.FirstFrame(file);
         pixels = raw == null ? new int[this._edge * this._edge] : ImageBridge.ToThumbnailArgb(raw, this._edge);
       } catch {
         pixels = new int[this._edge * this._edge];

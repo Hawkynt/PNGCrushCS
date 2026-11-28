@@ -11,6 +11,8 @@ public static class JpegXrWriter {
 
   public static byte[] ToBytes(JpegXrFile file) {
     ArgumentNullException.ThrowIfNull(file);
+    if (file.Format is { } format && format is not (FileFormat.Core.PixelFormat.Gray8 or FileFormat.Core.PixelFormat.Rgb24 or FileFormat.Core.PixelFormat.Rgba32))
+      file = JpegXrFile.FromRawImage(JpegXrFile.ToRawImage(file));
     return _Assemble(file.PixelData, file.Width, file.Height, file.ComponentCount);
   }
 

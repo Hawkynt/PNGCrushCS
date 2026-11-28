@@ -298,6 +298,21 @@ public sealed class VideoFormatGenerator : IIncrementalGenerator {
     }
 
     sb.AppendLine();
+    sb.AppendLine("    // Muxers — joined to the container they write by the reader's name plus \"Writer\".");
+    foreach (var container in discovery.Containers) {
+      if (!container.HasReader)
+        continue;
+
+      foreach (var candidate in discovery.Containers)
+        if (candidate.HasWriter && (candidate.FormatId == container.FormatId + "Writer"
+                                    || (candidate.FormatId == container.FormatId && container.HasWriter))) {
+          sb.Append("    _RegisterWriter<").Append(candidate.FullTypeName).Append(">(VideoFormat.")
+            .Append(container.FormatId).AppendLine(");");
+          break;
+        }
+    }
+
+    sb.AppendLine();
     sb.AppendLine("    // Codec registrations — one per decoder, keyed by nothing the containers know about.");
     foreach (var codec in discovery.Codecs) {
       if (!codec.HasDecoder)

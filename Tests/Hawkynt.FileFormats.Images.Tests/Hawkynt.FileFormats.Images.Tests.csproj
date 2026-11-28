@@ -35,6 +35,32 @@
     <ProjectReference Include="..\..\Compression.Core\Compression.Core.csproj" />
   </ItemGroup>
 
+  <!-- BPG files libbpg's bpgenc wrote; the tests hold the hash of what libbpg decodes each to. -->
+  <ItemGroup>
+    <None Include="Formats\Bpg\Fixtures\*.bpg">
+      <Link>BpgFixtures\%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+  <!-- JPEG XR files jxrlib's encoder wrote, each beside jxrlib's own decode of it in the file's
+       native pixel format, so the managed decoder is measured against the reference byte for byte. -->
+  <ItemGroup>
+    <None Include="Formats\JpegXr\Fixtures\*.jxr;Formats\JpegXr\Fixtures\*.raw">
+      <Link>JxrFixtures\%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+  <!-- Small self-made PDFs and the poppler renders they are held to. Copied under Fixtures\Pdf\
+       keeping their folders, so each stage of the renderer has its own set. -->
+  <ItemGroup>
+    <None Include="Formats\Pdf\Fixtures\**\*.*" Exclude="Formats\Pdf\Fixtures\**\*.py">
+      <Link>Fixtures\Pdf\%(RecursiveDir)%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
   <!-- Real JPEG XL files from libjxl's test corpus, validating our parsers against bitstreams a
        reference encoder produced rather than only against synthetic round-trips. -->
   <ItemGroup>
@@ -88,6 +114,15 @@
     </None>
   </ItemGroup>
 
+  <!-- H.265 range extension streams: JCT-VC conformance bitstreams and a few the HM reference
+       encoder wrote, each with the MD5 the HM reference decoder's output has. -->
+  <ItemGroup>
+    <None Include="Codecs\H265\Fixtures\*">
+      <Link>Fixtures\H265\%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
   <!-- A CR3 built to the layout ExifTool reads, carrying a preview and a thumbnail. -->
   <ItemGroup>
     <None Include="Formats\Cr3\Fixtures\*">
@@ -111,6 +146,108 @@
   <ItemGroup>
     <None Include="Formats\WindowsPe\Fixtures\*">
       <Link>Fixtures\WindowsPe\%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+  <!-- JWIC files the translator's own coder wrote from the pictures beside them, and its decode of
+       each. See Formats\Wic\Fixtures\README.txt. -->
+  <ItemGroup>
+    <None Include="Formats\Wic\Fixtures\*">
+      <Link>Fixtures\Wic\%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+  <!-- IWC files this package's writer produced, and the WaveL applet's own decode of each. See
+       Formats\Iwc\Fixtures\README.txt. -->
+  <ItemGroup>
+    <None Include="Formats\Iwc\Fixtures\*">
+      <Link>Fixtures\Iwc\%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+  <!-- Pictures made here, coded by the author's pwcencode and decoded by his pwcdecode, so the PWC reader
+       and writer are held to the reference programs rather than to each other. See Fixtures\ORIGIN.txt. -->
+  <ItemGroup>
+    <None Include="Formats\Pwc\Fixtures\*">
+      <Link>Fixtures\Pwc\%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+  <!-- LuraWave streams in every colour mode and layout, each beside what LuraTech's own Java
+       decoder (lwf_jsdk2.6) decoded it to. See Formats\LuraWave\LuraWaveOracleTests.cs. -->
+  <ItemGroup>
+    <None Include="Formats\LuraWave\Fixtures\*">
+      <Link>Fixtures\LuraWave\%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+  <!-- MrSID MG2 and MG3 files from GDAL's own test suite. See Formats\MrSid\Fixtures\THIRD-PARTY-NOTICE.GDAL.txt. -->
+  <ItemGroup>
+    <None Include="Formats\MrSid\Fixtures\*">
+      <Link>Fixtures\MrSid\%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+  <!-- LuraDocument files written by LuraTech's own encoder and by this package's writer, each beside
+       what LuraTech's own decoder (the IrfanView plug-in LDF.DLL 3.3.7) composed it to, plus
+       jbig-kit streams for the mask decoder. See Formats\LuraDocument\LuraDocumentOracleTests.cs. -->
+  <ItemGroup>
+    <None Include="Formats\LuraDocument\Fixtures\*">
+      <Link>Fixtures\LuraDocument\%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+  <!-- WhyPic pictures written by the reference encoder built from the distribution's source, the
+       reference decoder's bitmaps of them, and the few this package's writer had to make because
+       the reference encoder cannot. Fixtures\WhyPic\manifest.txt says which is which. -->
+  <ItemGroup>
+    <None Include="Formats\WhyPic\Fixtures\*">
+      <Link>Fixtures\WhyPic\%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+  <!-- ERI pictures and animations written by the Entis libraries built from their published
+       source, with their decodes, and this package's writer's files with the libraries' decodes of
+       them. Fixtures\Eri\manifest.txt says which is which. -->
+  <ItemGroup>
+    <None Include="Formats\Eri\Fixtures\*">
+      <Link>Fixtures\Eri\%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+  <!-- Pick Ax pictures written by Smaller Animals' own PAXIO.dll and ImgSource 5, from the two
+       pictures given beside them. See Formats\Pax\Fixtures\PROVENANCE.txt. -->
+  <ItemGroup>
+    <None Include="Formats\Pax\Fixtures\*">
+      <Link>Fixtures\Pax\%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+  <!-- PictureGear Pocket pictures written by Sony's own libprcim.dll from pictures made for this
+       suite, the harness that drove it, and one file XnView's converter wrote. See
+       Formats\PictureGearPocket\Fixtures\PROVENANCE.txt. -->
+  <ItemGroup>
+    <None Include="Formats\PictureGearPocket\Fixtures\*">
+      <Link>Fixtures\PictureGearPocket\%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+  <!-- Fractal images made for this suite, and Iterated's DECO_32.DLL decode of each. See
+       Formats\Fif\Fixtures\PROVENANCE.txt. -->
+  <ItemGroup>
+    <None Include="Formats\Fif\Fixtures\*">
+      <Link>Fixtures\Fif\%(Filename)%(Extension)</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>

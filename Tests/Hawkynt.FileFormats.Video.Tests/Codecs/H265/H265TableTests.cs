@@ -1,4 +1,8 @@
+extern alias Images;
+
 using System;
+
+using Images::FileFormat.Codecs.H265;
 
 namespace FileFormat.Codecs.H265.Tests;
 
@@ -207,8 +211,12 @@ public sealed class H265TableTests {
     // The offsets are declared one after another, each the previous plus its own count, so the last
     // of them plus its count is the total. A syntax element inserted without moving the ones after
     // it would break this — and would otherwise show up only as a stream that decodes to noise.
-    Assert.That(H265CabacContexts.COEFF_ABS_LEVEL_GREATER2_FLAG + 6, Is.EqualTo(H265CabacContexts.COUNT));
-    Assert.That(H265CabacContexts.SIG_COEFF_FLAG + 42, Is.EqualTo(H265CabacContexts.COEFF_ABS_LEVEL_GREATER1_FLAG));
+    Assert.That(H265CabacContexts.PALETTE_TRANSPOSE_FLAG + 1, Is.EqualTo(H265CabacContexts.COUNT));
+    Assert.That(H265CabacContexts.CU_CHROMA_QP_OFFSET_IDX + 1, Is.EqualTo(H265CabacContexts.PALETTE_MODE_FLAG));
+    Assert.That(H265CabacContexts.PALETTE_RUN_PREFIX + 8, Is.EqualTo(H265CabacContexts.COPY_ABOVE_PALETTE_INDICES_FLAG));
+    Assert.That(H265CabacContexts.COEFF_ABS_LEVEL_GREATER2_FLAG + 6, Is.EqualTo(H265CabacContexts.EXPLICIT_RDPCM_FLAG));
+    Assert.That(H265CabacContexts.SIG_COEFF_FLAG + 44, Is.EqualTo(H265CabacContexts.COEFF_ABS_LEVEL_GREATER1_FLAG));
+    Assert.That(H265CabacContexts.CBF_CHROMA + 5, Is.EqualTo(H265CabacContexts.ABS_MVD_GREATER0_FLAG));
     Assert.That(H265CabacContexts.LAST_SIG_COEFF_X_PREFIX + 18, Is.EqualTo(H265CabacContexts.LAST_SIG_COEFF_Y_PREFIX));
   }
 

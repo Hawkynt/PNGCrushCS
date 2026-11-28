@@ -1,0 +1,22 @@
+CrxDecoder.cs is this package's own implementation of Canon's CRX codec, written
+from a description and checked against LibRaw's output sample for sample.
+
+The description was assembled from:
+
+  Laurent Clevy, "Describing the Canon Raw v3 (CR3) file format"
+  https://github.com/lclevy/canon_cr3 - the container, the CMP1 header and the
+  codec's structure.
+
+  LibRaw, src/decoders/crx.cpp (Alexey Danilchenko, LibRaw LLC; LGPL-2.1 or
+  CDDL-1.0) and DNGLab's rawler/src/decompressors/crx (Daniel Vogelbacher;
+  LGPL-2.1). Neither licence lets this LGPL-3.0-or-later library absorb their
+  code, so they were read to establish the bit-level behaviour and not
+  converted: the band decoding, the quantiser tables and the inverse wavelet
+  here are structured differently (whole bands decoded, then whole-array
+  lifting, where both stream line by line).
+
+Constants copied exactly, as facts of the format: the run-length step table
+(JPEG-LS's), the six quantiser steps 0x28-0x48, and the table of extra
+coefficients a band carries towards a neighbouring tile.
+
+The system LibRaw (raw_image from LibRaw::unpack) is the oracle.

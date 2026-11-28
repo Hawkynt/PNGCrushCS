@@ -368,17 +368,30 @@ public sealed class Mp4Writer : IVideoContainerWriter<Mp4Writer> {
   private static ReadOnlySpan<byte> _SampleEntry(MediaStreamInfo info) {
     if (!_HasWholeSampleEntry(info.CodecPrivateData.Span)) {
       if (info.Kind == MediaStreamKind.Video && info.Codec.EqualsIgnoringCase(CodecTag.FromCharacters("MJPG")))
-        return _JpegSampleEntry(info);
+        return _JpegSampleEntry(info, "jpeg");
+      if (_IsConfigurationFree(info))
+        return _JpegSampleEntry(info, info.Codec.ToString());
       throw new NotSupportedException(
         $"MP4 track {info.Index} needs a complete sample entry in CodecPrivateData; synthesising codec configuration from '{info.Codec}' would cross into codec parsing.");
     }
     return info.CodecPrivateData.Span;
   }
 
-  private static byte[] _JpegSampleEntry(MediaStreamInfo info) {
+  /// <summary>
+  /// QuickTime video codecs whose sample entry is the plain visual one and nothing more, so writing it
+  /// from the stream's size and code synthesises no configuration: each is listed because its decoder
+  /// reads every parameter from the frames themselves.
+  /// </summary>
+  private static readonly CodecTag[] _ConfigurationFree = [CodecTag.FromCharacters("SVQ1")];
+
+  private static bool _IsConfigurationFree(MediaStreamInfo info)
+    => info.Kind == MediaStreamKind.Video && info.CodecPrivateData.IsEmpty
+       && Array.Exists(_ConfigurationFree, tag => info.Codec.Equals(tag));
+
+  private static byte[] _JpegSampleEntry(MediaStreamInfo info, string code) {
     return ContainerWriterTools.Build(entry => {
       ContainerWriterTools.WriteUInt32BigEndian(entry, 86);
-      ContainerWriterTools.WriteAscii(entry, "jpeg");
+      ContainerWriterTools.WriteAscii(entry, code);
       entry.Write(new byte[6]);
       ContainerWriterTools.WriteUInt16BigEndian(entry, 1);
       ContainerWriterTools.WriteUInt16BigEndian(entry, 0);
@@ -402,6 +415,8 @@ public sealed class Mp4Writer : IVideoContainerWriter<Mp4Writer> {
     if (_HasWholeSampleEntry(info.CodecPrivateData.Span))
       return;
     if (info.Kind == MediaStreamKind.Video && info.Codec.EqualsIgnoringCase(CodecTag.FromCharacters("MJPG")))
+      return;
+    if (_IsConfigurationFree(info))
       return;
     throw new NotSupportedException(
       $"MP4 track {info.Index} cannot be written without a complete sample entry in CodecPrivateData. The current bytes are container-specific to another format or absent.");

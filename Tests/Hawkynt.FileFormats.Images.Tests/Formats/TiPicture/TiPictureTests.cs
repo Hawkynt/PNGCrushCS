@@ -50,11 +50,12 @@ public sealed class TiPictureTests {
   public void FromBytes_WrongMagic_ThrowsInvalidDataException()
     => Assert.Throws<InvalidDataException>(() => TiPictureReader.FromBytes(new byte[128]));
 
-  /// <summary>The TI-92 is a different container and its picture data is compressed.</summary>
+  /// <summary>The TI-92 is a different container, read by <c>Ti92PictureFile</c>.</summary>
   /// <remarks>
   /// This used to be asserted of the TI-73, which was wrong: that one is the TI-82's container and
   /// the TI-82's screen under another signature, and XnView's converter reads a picture built under
-  /// both signatures identically. The TI-92 is the one that really is something else.
+  /// both signatures identically. The TI-92 is the one that really is something else — a directory of
+  /// entries at absolute offsets — though its pictures are plain bitmaps, not compressed.
   /// </remarks>
   [Test]
   [Category("Unit")]

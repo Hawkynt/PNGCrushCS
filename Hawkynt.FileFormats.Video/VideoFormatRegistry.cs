@@ -51,6 +51,12 @@ public static class VideoFormatRegistry {
       _byMimeType.TryAdd(mime, entry.Format);
   }
 
+  /// <summary>Attaches a container's muxer to the entry its reader registered.</summary>
+  internal static void RegisterWriter(VideoFormat format, VideoMuxer mux) {
+    if (_byFormat.TryGetValue(format, out var entry))
+      _byFormat[format] = entry with { Mux = mux };
+  }
+
   internal static void RegisterCodec(VideoCodecEntry entry) => _codecs.Add(entry);
 
   internal static void RegisterEncoder(VideoCodecEncoderEntry entry, Func<MediaStreamInfo, bool> accepts) {
@@ -68,6 +74,28 @@ public static class VideoFormatRegistry {
   // ============================================================================================
   // Lookup
   // ============================================================================================
+
+  /// <summary>Every registered container that can also be written, in detection order.</summary>
+  public static IEnumerable<VideoFormatEntry> WritableFormats => _detectionOrder.Where(static e => e.Mux != null);
+
+  /// <summary>
+  /// Writes coded packets into the container <paramref name="format"/> names, chosen at run time.
+  /// </summary>
+  /// <remarks>
+  /// The run-time counterpart of <c>VideoIO.Mux&lt;TWriter&gt;</c> for a caller — a viewer, a
+  /// converter — that learns the target container from a person rather than from its own source.
+  /// Like that method it remuxes: no decoder or encoder is built.
+  /// </remarks>
+  /// <exception cref="NotSupportedException">No muxer is registered for <paramref name="format"/>.</exception>
+  public static byte[] Mux(
+    VideoFormat format,
+    IReadOnlyList<MediaStreamInfo> streams,
+    IEnumerable<CodedPacket> packets,
+    VideoMetadata? metadata = null) {
+    var mux = GetEntry(format)?.Mux
+      ?? throw new NotSupportedException($"No muxer is registered for the {format} container.");
+    return mux(streams, packets, metadata);
+  }
 
   /// <summary>Every registered container, in detection order.</summary>
   public static IEnumerable<VideoFormatEntry> AllFormats => _detectionOrder;

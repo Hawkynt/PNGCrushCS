@@ -91,28 +91,35 @@ public sealed class H265VideoDecoderTests {
   }
 
   /// <summary>
-  /// Sixteen-bit samples belong to the range-extension profiles, which nothing here implements.
-  /// Eight, ten and twelve are all decoded, so the refusal has to name the depth rather than reject
-  /// everything past eight.
+  /// Sixteen-bit samples belong to the range-extension profiles, and are decoded; seventeen is not a
+  /// depth H.265 can state, so a parameter set claiming it is malformed rather than unsupported.
   /// </summary>
   /// <remarks>
-  /// This one is refused for want of an oracle rather than for want of syntax. The profiles that
-  /// carry deeper samples — Main 4:4:4 16 Intra and its high-throughput sibling — are not something
-  /// any encoder to hand will write: x265 builds eight, ten and twelve bits and nothing else, and
-  /// libheif encodes HEVC through x265. Implementing a decoding process with nothing to check it
-  /// against would be writing code that compiles and looks plausible, which is what this repository
-  /// refuses instead.
+  /// The decoding process above twelve bits is held to the JCT-VC RExt conformance streams and to the
+  /// HM reference decoder by the image package's range extension tests.
   /// </remarks>
-  [Test]
+  [TestCase(14)]
+  [TestCase(16)]
   [Category("Unit")]
-  public void SamplesDeeperThanTwelveBits_AreRefusedByTheirDepth() {
-    var message = _Refusal(new H265TestStream()
+  public void SamplesUpToSixteenBits_AreNotRefusedByTheirDepth(int depth) {
+    var failure = _Decode(new H265TestStream()
       .VideoParameterSet()
-      .SequenceParameterSet(bitDepthLuma: 16, bitDepthChroma: 16, profileIdc: 4)
+      .SequenceParameterSet(bitDepthLuma: depth, bitDepthChroma: depth, profileIdc: 4)
       .ToArray());
 
-    Assert.That(message, Does.Contain("16-bit"));
-    Assert.That(message, Does.Contain("twelve bits"));
+    Assert.That(failure, Is.Null, failure?.Message);
+  }
+
+  [Test]
+  [Category("Unit")]
+  public void SamplesDeeperThanSixteenBits_AreRefusedAsMalformed() {
+    var failure = _Decode(new H265TestStream()
+      .VideoParameterSet()
+      .SequenceParameterSet(bitDepthLuma: 17, bitDepthChroma: 8, profileIdc: 4)
+      .ToArray());
+
+    Assert.That(failure, Is.InstanceOf<InvalidDataException>());
+    Assert.That(failure!.Message, Does.Contain("17-bit"));
   }
 
   [TestCase(8)]
@@ -143,24 +150,24 @@ public sealed class H265VideoDecoderTests {
 
   [Test]
   [Category("Unit")]
-  public void TheFormatRangeExtensions_AreRefusedByTheFlagThatIsSet() {
-    var message = _Refusal(new H265TestStream()
+  public void TheFormatRangeExtensions_AreAccepted() {
+    var failure = _Decode(new H265TestStream()
       .VideoParameterSet()
       .SequenceParameterSet(rangeExtension: true, profileIdc: 4)
       .ToArray());
 
-    Assert.That(message, Does.Contain("transform_skip_rotation_enabled_flag"));
+    Assert.That(failure, Is.Null, failure?.Message);
   }
 
   [Test]
   [Category("Unit")]
-  public void TheScreenContentExtensions_AreRefusedByName() {
-    var message = _Refusal(new H265TestStream()
+  public void TheScreenContentExtensions_AreAccepted() {
+    var failure = _Decode(new H265TestStream()
       .VideoParameterSet()
       .SequenceParameterSet(screenContentExtension: true, profileIdc: 9)
       .ToArray());
 
-    Assert.That(message, Does.Contain("screen content"));
+    Assert.That(failure, Is.Null, failure?.Message);
   }
 
   [Test]
@@ -189,26 +196,26 @@ public sealed class H265VideoDecoderTests {
 
   [Test]
   [Category("Unit")]
-  public void CrossComponentPrediction_IsRefusedByName() {
-    var message = _Refusal(new H265TestStream()
+  public void CrossComponentPrediction_IsAccepted() {
+    var failure = _Decode(new H265TestStream()
       .VideoParameterSet()
       .SequenceParameterSet()
       .PictureParameterSet(rangeExtension: true, crossComponentPrediction: true)
       .ToArray());
 
-    Assert.That(message, Does.Contain("cross_component_prediction_enabled_flag"));
+    Assert.That(failure, Is.Null, failure?.Message);
   }
 
   [Test]
   [Category("Unit")]
-  public void AScaledSampleAdaptiveOffset_IsRefusedByName() {
-    var message = _Refusal(new H265TestStream()
+  public void AScaledSampleAdaptiveOffset_IsAccepted() {
+    var failure = _Decode(new H265TestStream()
       .VideoParameterSet()
       .SequenceParameterSet()
       .PictureParameterSet(rangeExtension: true, saoOffsetScale: 2)
       .ToArray());
 
-    Assert.That(message, Does.Contain("log2_sao_offset_scale"));
+    Assert.That(failure, Is.Null, failure?.Message);
   }
 
   [TestCase(1)]

@@ -1,0 +1,41 @@
+The JPEG XR decoder in this folder (namespace FileFormat.JpegXr.JxrLib) is converted from Microsoft's
+jxrlib, as maintained at https://github.com/4creators/jxrlib:
+
+  image/sys/strcodec.c, strcodec.h       bit I/O, tile and quantiser bookkeeping, index tables
+  image/sys/adapthuff.c                  adaptive VLC tables and discriminant adaptation
+  image/sys/strPredQuant.c, image.c      quantiser mapping, prediction modes, scan tables, models
+  image/sys/strTransform.c               2x2 transform kernels
+  image/sys/windowsmediaphoto.h, common.h  enumerations and limits
+  image/decode/strdec.c                  headers, decode driver, output stage (outputMBRow)
+  image/decode/segdec.c, decode.c        entropy decoding and coding contexts
+  image/decode/strInvTransform.c         inverse transform and overlap filters
+  image/decode/strPredQuantDec.c         inverse prediction and dequantisation
+  jxrgluelib/JXRGlueJxr.c, JXRGlue.c     container parsing, pixel format table, PKImageDecode_Copy_WMP
+
+jxrlib is distributed under this licence:
+
+BSD 2-Clause License
+
+Copyright (c) Microsoft Corp.
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+
+* Redistributions of source code must retain the above copyright notice, this
+  list of conditions and the following disclaimer.
+
+* Redistributions in binary form must reproduce the above copyright notice,
+  this list of conditions and the following disclaimer in the documentation
+  and/or other materials provided with the distribution.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.

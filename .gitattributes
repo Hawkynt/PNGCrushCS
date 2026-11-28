@@ -20,3 +20,23 @@ Hawkynt.FileFormats.Images/README.md text eol=crlf
 *.exe binary
 *.cur binary
 *.ico binary
+
+# JWIC and IWC fixtures: coded streams the tests compare byte for byte with what the writers produce.
+*.wic binary
+*.iwc binary
+
+# H.265 elementary streams the range extension tests decode. They begin with a start code and so
+# with a NUL, but a conformance bitstream is evidence and nothing may rewrite it in a checkout.
+*.bit binary
+
+# WhyPic is one arithmetic code after two letters, so a short file can hold no zero byte at all
+# and would be taken for text; two of its fixtures are exactly that.
+*.ypc binary
+
+# ERI fixtures: the Entis libraries' files and their palettes, which are evidence only byte for byte.
+*.eri binary
+*.mei binary
+*.pal binary
+
+# PictureGear Pocket fixtures: Sony's libprcim wrote them, and the tests compare our writer's bytes with them.
+*.prc binary

@@ -1,0 +1,30 @@
+Pick Ax fixtures and where they came from
+=========================================
+
+Every .pax here was written by Smaller Animals Software's own code, run under Wine through
+paxtool.c (beside this file, built with clang --target=i686-pc-windows-msvc and lld-link), from
+pictures made for this test suite:
+
+  rgb_16x4.ppm      16x4 RGB: R = 16x, G = 60y, B = x*y (each mod 256)
+  indexed_13x5.ppm  13x5, index (5x + 17y) mod 256 into a palette whose entry i is
+                    R = 7i, G = 255 - i, B = 3i (each mod 256), shown expanded to RGB
+
+paxio_*.pax
+  PAXIO.dll 1.0 (1999, http://www.smalleranimals.com/zips/paxio.zip), PA_RGBToPAX with
+  encryptType 0, 1, 2 (stored as types 1 Blowfish, 2 Blowfish CBC, 3 Sapphire II).
+  Password "password". PA_PAXToRGB reads each back as rgb_16x4.ppm.
+
+imgsource_rgb_type<N>.pax
+  _ISource50.dll (ImgSource 5.0, unregistered,
+  http://www.smalleranimals.com/zips/ImgSource5/isource50.zip), is5_WritePAX at 24 bpp with
+  uEncType N, after is5_SetPAXOutputInfo("TestApp", "TestAuthor", id[i] = 7i mod 256) and
+  is5_AddPAXOutputTag("TAG1", "hello tag", 9) and ("ZZZZ", "0123456789abcdef", 16).
+  Password "pass word<N>".
+
+imgsource_indexed_type<N>.pax
+  The same library, is5_WritePAX at 8 bpp with a 256-entry palette and uEncType N, no tags.
+  Password "pw<N>". The palette's fourth byte is whatever the library left in memory.
+
+The unregistered ImgSource stamps a red cross into pictures above a certain size, in what it writes
+and in what it reads; at these sizes it does not, and both fixtures decode to exactly the pictures
+above.

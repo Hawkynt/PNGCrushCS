@@ -46,6 +46,11 @@ internal static partial class VideoFormatRegistration {
     VideoFormatRegistry.Register(entry);
   }
 
+  private static void _RegisterWriter<TWriter>(VideoFormat format) where TWriter : IVideoContainerWriter<TWriter>
+    => VideoFormatRegistry.RegisterWriter(
+      format,
+      static (streams, packets, metadata) => VideoIO.Mux<TWriter>(streams, packets, metadata));
+
   private static void _RegisterDecoder<T>() where T : IVideoCodecDecoder<T>
     => VideoFormatRegistry.RegisterCodec(new(
       CodecName: T.CodecName,

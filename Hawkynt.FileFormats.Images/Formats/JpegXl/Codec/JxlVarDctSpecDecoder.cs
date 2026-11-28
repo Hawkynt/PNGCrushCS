@@ -437,10 +437,10 @@ internal static class JxlVarDctSpecDecoder {
           channels, width, height,
           perBlockQuant, sharpnessPlane, dcGroupBlocksX, dcGroupBlocksY,
           quantParams.InvGlobalScale, epfParams.Iters);
-    } catch (System.NotImplementedException) {
-      // Some sub-feature isn't ready; skip.
-    } catch (System.ArgumentException) {
-      // Degenerate dimensions; skip.
+    } catch (System.ArgumentException thrown) {
+      // A filter left out is a picture libjxl would not draw: weights that
+      // cannot be normalised are refused there too.
+      throw new System.IO.InvalidDataException($"A VarDCT frame states loop-filter parameters that cannot be applied: {thrown.Message}", thrown);
     }
 
     if (extraChannels.Length > 0)

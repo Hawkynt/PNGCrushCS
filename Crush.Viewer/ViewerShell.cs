@@ -44,6 +44,7 @@ internal sealed class ViewerShell : Form {
   private readonly ViewportPanel _viewport = new() { Dock = DockStyle.Fill, MinZoom = 1.0 / 64, MaxZoom = 64 };
   private readonly TextBox _information = new() { Dock = DockStyle.Fill, Multiline = true, ReadOnly = true };
   private readonly Timer _slideshow = new();
+  private readonly Timer _playback = new();
 
   private readonly ToolStripStatusLabel _statusFormat = new("Ready");
   private readonly ToolStripStatusLabel _statusDimensions = new("");
@@ -63,11 +64,14 @@ internal sealed class ViewerShell : Form {
   private readonly RibbonButton _nextPage = new("Next page", RibbonItemSize.Small);
   private readonly RibbonButton _extractPages = new("Extract pages…", RibbonItemSize.Small);
   private readonly RibbonButton _redEye = new("Red-eye…", RibbonItemSize.Large);
+  private readonly RibbonToggleButton _play = new("Play", RibbonItemSize.Large);
+  private readonly RibbonButton _convertVideo = new("Convert video…", RibbonItemSize.Small);
 
   private IImage? _displayed;
   private RawImage? _raw;
   private FileInfo? _file;
   private FormatEntry? _entry;
+  private VideoDocument? _video;
   private ImageFormat _format = ImageFormat.Unknown;
   private int _page;
   private int _pageCount = 1;
@@ -101,6 +105,7 @@ internal sealed class ViewerShell : Form {
     this._viewport.ZoomChanged += (_, _) => this._OnZoomChanged();
     this._viewport.AreaSelected += (_, area) => this._OnRedEyeArea(area);
     this._slideshow.Tick += (_, _) => this._OnSlideshowTick();
+    this._playback.Tick += (_, _) => this._OnPlaybackTick();
 
     this._BuildRibbon();
     this._BuildBody();
@@ -216,6 +221,17 @@ internal sealed class ViewerShell : Form {
     this._icons.Apply(assemble, "merge");
     pages.Items.Add(assemble);
     tab.Groups.Add(pages);
+
+    var video = new RibbonGroup("Video");
+    this._icons.Apply(this._play, "media-playback-start", RibbonItemSize.Large);
+    this._play.ToolTipText = "Plays the video at its own frame rate; the page buttons step a frame at a time.";
+    this._play.CheckedChanged += (_, _) => this._TogglePlayback();
+    video.Items.Add(this._play);
+    this._icons.Apply(this._convertVideo, "document-export");
+    this._convertVideo.ToolTipText = "Writes the whole video into another container, keeping or re-encoding its codec.";
+    this._convertVideo.Click += (_, _) => this._ConvertVideo();
+    video.Items.Add(this._convertVideo);
+    tab.Groups.Add(video);
 
     var save = new RibbonGroup("Save");
     this._save.ToolTipText = "Writes the edited picture back over the file it came from.";
@@ -718,10 +734,22 @@ internal sealed class ViewerShell : Form {
       var format = ImageRegistry.DetectFromFile(file);
       var entry = ImageRegistry.GetEntry(format);
       var raw = ImageRegistry.Read(file);
+      VideoDocument? video = null;
       if (raw == null) {
-        this._Note($"{file.Name}: no registered reader could decode it ({format}).");
-        return;
+        // Not a picture any reader takes; a video's frames are its pages.
+        video = VideoService.Open(file);
+        raw = video?.Frame(0);
+        if (raw == null) {
+          this._Note($"{file.Name}: no registered reader could decode it ({format}).");
+          return;
+        }
+
+        format = ImageFormat.Unknown;
+        entry = null;
       }
+
+      this._StopPlayback();
+      this._video = video;
 
       this._file = file;
       this._format = format;
@@ -1503,6 +1531,63 @@ internal sealed class ViewerShell : Form {
     this._slideshow.Start();
   }
 
+  // ============================================================================================
+  // Video
+  // ============================================================================================
+
+  private void _TogglePlayback() {
+    if (!this._play.Checked) {
+      this._playback.Stop();
+      return;
+    }
+
+    if (this._video == null || this._pageCount < 2) {
+      this._play.Checked = false;
+      return;
+    }
+
+    if (this._page >= this._pageCount - 1)
+      this._GoPage(-this._page);
+
+    this._playback.Interval = Math.Max(1, (int)Math.Round(1000 / this._video.FramesPerSecond));
+    this._playback.Start();
+  }
+
+  private void _StopPlayback() {
+    this._playback.Stop();
+    if (this._play.Checked)
+      this._play.Checked = false;
+  }
+
+  private void _OnPlaybackTick() {
+    if (this._video == null || this._page >= this._pageCount - 1) {
+      this._StopPlayback();
+      return;
+    }
+
+    this._GoPage(1);
+  }
+
+  private void _ConvertVideo() {
+    if (this._video == null || this._file == null) {
+      this._Complain("Convert video", "Open a video first.");
+      return;
+    }
+
+    this._StopPlayback();
+    var dialog = new VideoConvertDialog(this._video, this._folder.Folder?.FullName ?? this._file.DirectoryName ?? "");
+    if (dialog.ShowDialog(this) != DialogResult.OK)
+      return;
+
+    var target = new FileInfo(Path.Combine(
+      dialog.Destination.FullName,
+      Path.GetFileNameWithoutExtension(this._file.Name) + dialog.Container.PrimaryExtension));
+    var result = VideoService.Convert(this._file, dialog.Container.Format, dialog.Codec, target, dialog.Overwrite);
+    ConvertOptionsDialog.ShowReport(this, "Convert this video", [result]);
+    this._folder.Refresh();
+    this._RefreshBrowser();
+  }
+
   private void _OnSlideshowTick() {
     var next = this._folder.Step(1);
     if (next < 0) {
@@ -1523,10 +1608,13 @@ internal sealed class ViewerShell : Form {
     this._previousPage.Enabled = multi && this._page > 0;
     this._nextPage.Enabled = multi && this._page < this._pageCount - 1;
     this._extractPages.Enabled = this._file != null;
+    this._play.Enabled = this._video != null && this._pageCount > 1;
+    this._convertVideo.Enabled = this._video != null;
   }
 
   private void _UpdateStatus() {
-    this._statusFormat.Text = this._notice ?? this._entry?.Name ?? "Ready";
+    this._statusFormat.Text = this._notice ?? this._entry?.Name
+      ?? (this._video != null ? $"{this._video.Container.Name}, {this._video.CodecName}" : "Ready");
     this._statusDimensions.Text = this._raw == null ? "" : $"{this._raw.Width} x {this._raw.Height}";
     this._statusBytes.Text = this._file is { Exists: true } file ? _FormatSize(file.Length) : "";
     this._statusZoom.Text = $"{this._viewport.Zoom * 100:0.#}%";
@@ -1535,7 +1623,8 @@ internal sealed class ViewerShell : Form {
     var position = this._folder.Files.Count == 0
       ? walk
       : $"picture {this._folder.Index + 1}/{this._folder.Files.Count}, {walk}";
-    this._statusPosition.Text = this._pageCount > 1 ? $"{position} — page {this._page + 1}/{this._pageCount}" : position;
+    var unit = this._video != null ? "frame" : "page";
+    this._statusPosition.Text = this._pageCount > 1 ? $"{position} — {unit} {this._page + 1}/{this._pageCount}" : position;
 
     this._save.Enabled = this._raw != null;
     this._print.Enabled = this._raw != null && PrintService.Unavailable == null;
@@ -1552,13 +1641,23 @@ internal sealed class ViewerShell : Form {
     var text = new StringBuilder();
     text.AppendLine($"File: {this._file.Name}");
     text.AppendLine($"Path: {this._file.FullName}");
-    text.AppendLine($"Format: {this._entry?.Name ?? this._format.ToString()} ({this._format})");
+    text.AppendLine(this._video is { } shown
+      ? $"Format: {shown.Container.Name} video"
+      : $"Format: {this._entry?.Name ?? this._format.ToString()} ({this._format})");
     text.AppendLine($"Size on disk: {(this._file.Exists ? _FormatSize(this._file.Length) : "unknown")}");
     text.AppendLine($"Dimensions: {image.Width} x {image.Height}");
     text.AppendLine($"Pixel format: {image.Format}");
     text.AppendLine($"Alpha: {(image.HasAlpha ? "yes" : "no")}");
     text.AppendLine($"Indexed: {(image.IsIndexed ? $"yes, {image.PaletteCount} colours" : "no")}");
-    text.AppendLine($"Pages: {this._pageCount}");
+    if (this._video is { } video) {
+      text.AppendLine($"Container: {video.Container.Name}");
+      text.AppendLine($"Video codec: {video.CodecName} ({video.Video.Codec})");
+      text.AppendLine($"Frame rate: {video.FramesPerSecond:0.###} fps");
+      text.AppendLine($"Streams: {video.Streams.Count}");
+      text.AppendLine($"Frames: {this._pageCount}");
+    } else {
+      text.AppendLine($"Pages: {this._pageCount}");
+    }
     text.AppendLine($"Writable: {(this._entry?.SupportsWrite == true ? "yes" : "no")}");
     text.AppendLine($"Pixel aspect: {this._pixelAspect:0.###}:1");
     text.AppendLine($"Display filter: {this._filterOverride?.ToString() ?? $"as the format says ({this._formatFilter})"}");

@@ -44,6 +44,8 @@ public static class FlvReader {
 
   /// <summary>The video codec id whose packets carry an AVC packet type and a composition time.</summary>
   private const int _AVC_CODEC = 7;
+  private const int _VP6_CODEC = 4;
+  private const int _VP6_ALPHA_CODEC = 5;
 
   /// <summary>The sound format id whose packets carry an AAC packet type.</summary>
   private const int _AAC_FORMAT = 10;
@@ -342,6 +344,7 @@ public static class FlvReader {
     var start = 1;
     var composition = 0;
     var isKeyFrame = true;
+    var containerPrivate = ReadOnlyMemory<byte>.Empty;
 
     if (tag.Type == FlvTagType.Video) {
       if ((payload[0] & _EXTENDED_VIDEO_HEADER) != 0)
@@ -373,6 +376,12 @@ public static class FlvReader {
 
         composition = _Signed24(payload, 2);
         start = _AVC_PREFIX;
+      } else if ((payload[0] & 0x0F) is _VP6_CODEC or _VP6_ALPHA_CODEC && payload.Length > 1) {
+        // VP6 in FLV carries a byte ahead of the coded frame saying how many columns and rows of the
+        // coded picture are not shown. It is the container's statement about the frame and not part of
+        // the bitstream, so it is handed over beside the packet, as FFmpeg hands it over as extradata.
+        containerPrivate = tag.Data.Slice(1, 1);
+        start = 2;
       }
     } else if ((payload[0] >> 4) == _AAC_FORMAT) {
       if (payload.Length < _AAC_PREFIX)
@@ -393,7 +402,8 @@ public static class FlvReader {
     // The composition time is how far the picture's presentation is ahead of its decoding, and it is
     // signed: a stream with bidirectional prediction has pictures due before the one being decoded.
     // The decode timestamp is the tag's own, whatever the codec.
-    packet = new(index, tag.Data[start..], tag.Timestamp + composition, tag.Timestamp, IsKeyFrame: isKeyFrame);
+    packet = new(index, tag.Data[start..], tag.Timestamp + composition, tag.Timestamp, IsKeyFrame: isKeyFrame,
+      ContainerPrivateData: containerPrivate);
     return true;
   }
 

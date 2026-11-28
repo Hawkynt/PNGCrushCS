@@ -1,0 +1,39 @@
+The MS Screen 2 decoder in this directory (with Mss2VideoDecoder.cs beside it)
+is converted from FFmpeg (https://ffmpeg.org), whose decoder is where the
+format was reverse-engineered. Microsoft published no specification for it.
+
+Files used, all from libavcodec:
+
+  mss2.c       the frame header, the WMV9 rectangle list, the second arithmetic
+               coder (arith2), the palette update, the run-length and 15-bit
+               modes, the draw region and slice split, and the WMV9 picture
+               header variant and rectangle decode
+  mss12.c      the adaptive models, the pixel contexts and colour cache, and
+               the region coder: splits, flat, coded, copied, moved and masked
+               regions
+  mss2dsp.c    the WMV9 rectangle's YUV to RGB blit, its masked form, the grey
+               fill and the half-resolution upsampling
+  vc1.c        ff_vc1_parse_frame_header's MSS2 branch
+  vc1_loopfilter.c, vc1dsp.c
+               the I-picture loop filter, now in ../Vc1/Vc1LoopFilter.cs
+
+Copyright (c) 2012 Konstantin Shishkov (mss12.c; mss2.c and mss2dsp.c carry no
+copyright line of their own)
+
+FFmpeg is free software; you can redistribute it and/or modify it under the
+terms of the GNU Lesser General Public License as published by the Free
+Software Foundation; either version 2.1 of the License, or (at your option)
+any later version.
+
+FFmpeg is distributed in the hope that it will be useful, but WITHOUT ANY
+WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
+A PARTICULAR PURPOSE.  See the GNU Lesser General Public License for more
+details.
+
+You should have received a copy of the GNU Lesser General Public License along
+with FFmpeg; if not, write to the Free Software Foundation, Inc., 51 Franklin
+Street, Fifth Floor, Boston, MA 02110-1301 USA.
+
+This library is licensed LGPL-3.0-or-later, which is a permitted "any later
+version" of the LGPL-2.1 FFmpeg offers, so the two are compatible in this
+direction and in no other.

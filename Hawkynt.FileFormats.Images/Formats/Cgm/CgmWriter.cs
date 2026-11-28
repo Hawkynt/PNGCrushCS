@@ -131,7 +131,7 @@ public static class CgmWriter {
   private static byte[] _CellArray(byte[] rgb, int width, int height) {
     var rowBytes = width * 3;
     var padded = rowBytes + (rowBytes & 1);
-    var parameters = new byte[6 * 2 + 3 * 2 + padded * height];
+    var parameters = new byte[6 * 2 + 3 * 2 + 2 + padded * height];
 
     var at = 0;
     void Point(int x, int y) {
@@ -151,7 +151,8 @@ public static class CgmWriter {
     Point(width, height);      // R: the third corner, so a row runs left to right
     Integer(width);
     Integer(height);
-    Integer(0);                // The colours are at the file's own precision.
+    Integer(0);                // The colours are at the file's own precision,
+    Integer(1);                // packed, every cell stated (the cell representation mode).
 
     for (var y = 0; y < height; ++y) {
       Array.Copy(rgb, y * rowBytes, parameters, at, rowBytes);

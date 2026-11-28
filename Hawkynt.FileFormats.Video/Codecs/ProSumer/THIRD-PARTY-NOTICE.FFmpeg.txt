@@ -1,0 +1,15 @@
+The Brooktree ProSumer decoder in this directory is converted from FFmpeg (https://github.com/FFmpeg/FFmpeg):
+
+  libavcodec/prosumer.c   the code table, the look-ahead table built from it, the decompressor, the
+                          vertical predictor and the 4:1:1 layout
+
+  Copyright (c) 2018 Paul B Mahol (prosumer.c)
+  and the FFmpeg developers named in the file above.
+
+FFmpeg distributes that source under the GNU Lesser General Public License, version 2.1 or (at your
+option) any later version. This work is distributed under the GNU Lesser General Public License
+version 3 or later, which the "or later" clause permits; the licence text is in LICENSE at the root of
+this repository.
+
+The algorithms are carried across into managed C#, not vendored. The code table in ProSumerCodec.cs is
+reproduced exactly because it is fixed data required for interoperability. The encoder is this package's own.

@@ -17,10 +17,15 @@ namespace FileFormat.X3f;
 /// data, coded with a Huffman scheme and needing a large block of per-camera correction values to
 /// turn three stacked layers into colour, and carry nothing else above thumbnail size.
 /// <para/>
-/// Only the two plain storages are read: a JPEG stream, and uncompressed twenty-four bit samples.
-/// A file whose largest readable picture is a small fraction of the size it claims is refused rather
-/// than answered with its preview, because a preview drawn as the picture is the wrong answer given
-/// confidently.
+/// The Foveon sensor data is read too, in every storage LibRaw reads: the Polaroid x530's packed
+/// and the Sigma SD9/SD10/SD14 bodies' compressed Huffman coding of mapped 10-bit differences, and
+/// the TRUE engines of the DP and Merrill bodies and the Quattro's with its half-size lower layers.
+/// It is handed out as <see cref="Sensor"/>, three 16-bit layers a site exactly as LibRaw unpacks
+/// them, with no black level, gain or colour correction, because those come from the camera's
+/// correction block through a processing chain the format does not define. The picture is the
+/// full-size JPEG the camera stored where it stored one; a file with only sensor data hands out the
+/// layers themselves as 48-bit samples rather than a preview drawn as the picture, which would be
+/// the wrong answer given confidently, and a file with neither is refused.
 /// <para/>
 /// Writing uses the public X3F 2.2 container's processed-image path: one full-size, uncompressed
 /// RGB24 <c>IMAG</c> section with four-byte row alignment. It deliberately does not invent Foveon
@@ -71,10 +76,24 @@ public readonly record struct X3fFile
   /// <summary>Image height in pixels.</summary>
   public int Height { get; init; }
 
-  /// <summary>Raw pixel data in RGB24 interleaved order.</summary>
+  /// <summary>The picture in RGB24 interleaved order, or <c>null</c> where the file stores only sensor data.</summary>
   public byte[] PixelData { get; init; }
 
+  /// <summary>The Foveon sensor's three layers, unprocessed, where the file stores them.</summary>
+  public X3fSensor? Sensor { get; init; }
+
+  /// <summary>
+  /// The full-size picture the camera stored where it stored one; otherwise the sensor's three layers
+  /// as <see cref="PixelFormat.Rgb48"/>, top layer first, linear and uncorrected.
+  /// </summary>
   public static RawImage ToRawImage(X3fFile file) {
+    if (file.PixelData == null && file.Sensor is { } sensor) {
+      var pixels = new byte[sensor.Layers.Length * 2];
+      for (var i = 0; i < sensor.Layers.Length; ++i)
+        System.Buffers.Binary.BinaryPrimitives.WriteUInt16BigEndian(pixels.AsSpan(2 * i), sensor.Layers[i]);
+      return new() { Width = sensor.Width, Height = sensor.Height, Format = PixelFormat.Rgb48, PixelData = pixels };
+    }
+
     return new() {
       Width = file.Width,
       Height = file.Height,

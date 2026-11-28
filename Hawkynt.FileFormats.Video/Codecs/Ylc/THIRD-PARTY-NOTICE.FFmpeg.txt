@@ -1,0 +1,16 @@
+The YLC decoder in this directory is converted from FFmpeg (https://github.com/FFmpeg/FFmpeg):
+
+  libavcodec/ylc.c   the packet layout, the count tables and build_vlc/get_tree_codes' Huffman
+                     construction, the group coding with its residue tables and runs, and the
+                     gradient prediction
+
+  The file carries no copyright line of its own; it is the FFmpeg developers' work.
+
+FFmpeg distributes that source under the GNU Lesser General Public License, version 2.1 or (at your
+option) any later version. This work is distributed under the GNU Lesser General Public License
+version 3 or later, which the "or later" clause permits; the licence text is in LICENSE at the root of
+this repository.
+
+The algorithm is carried across into managed C#, not vendored. The four residue tables in YlcTables.cs
+were transcribed mechanically, by a script that parsed the C initialisers, and are reproduced exactly
+because they are fixed codec data required for interoperability. The encoder is this package's own.

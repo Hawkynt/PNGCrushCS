@@ -1,0 +1,18 @@
+The Chronomaster DFA decoder in this directory, and the DFA container in Formats/Dfa, are converted
+from FFmpeg (https://github.com/FFmpeg/FFmpeg):
+
+  libavcodec/dfa.c      the chunk decoders, the 6-bit palette, and the interleaved version 0x100 layout
+  libavformat/dfa.c     the DFIA header and the frames each EOFR chunk ends
+  libavutil/mem.c       av_memcpy_backptr's handling of short and zero distances
+
+  Copyright (c) 2011 Konstantin Shishkov (dfa.c, both)
+  and the FFmpeg developers named in the files above.
+
+FFmpeg distributes those sources under the GNU Lesser General Public License, version 2.1 or (at your
+option) any later version. This work is distributed under the GNU Lesser General Public License
+version 3 or later, which the "or later" clause permits; the licence text is in LICENSE at the root of
+this repository.
+
+The algorithms are carried across into managed C#, not vendored. One comparison in the DDS1 skip is
+deliberately turned round from FFmpeg's, which refuses every DDS1 chunk; DfaCodec.cs says why. The
+encoder and the container writer are this package's own.

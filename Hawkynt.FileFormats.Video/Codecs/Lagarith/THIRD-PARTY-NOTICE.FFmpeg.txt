@@ -1,0 +1,20 @@
+The Lagarith decoder in this directory is converted from FFmpeg (https://github.com/FFmpeg/FFmpeg):
+
+  libavcodec/lagarith.c      the frame types and their plane layouts, the probability header with its
+                             variable-length code and soft-float rescaling, the four plane codings,
+                             the zero-run escape, and the three predictors
+  libavcodec/lagarithrac.c   the range decoder's initialisation
+  libavcodec/lagarithrac.h   the range decoder
+
+  Copyright (c) 2009 Nathan Caldwell <saintdev (at) gmail.com>
+  Copyright (c) 2009 David Conrad
+  and the FFmpeg developers named in the files above.
+
+FFmpeg distributes those sources under the GNU Lesser General Public License, version 2.1 or (at your
+option) any later version. This work is distributed under the GNU Lesser General Public License
+version 3 or later, which the "or later" clause permits; the licence text is in LICENSE at the root of
+this repository.
+
+The algorithms are carried across into managed C#, not vendored. The probability header's code table
+is reproduced exactly because it is fixed codec data required for interoperability. The encoder — the
+predictors run forwards, the probability table written, and the range encoder — is this package's own.

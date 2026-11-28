@@ -1,112 +1,71 @@
 using System;
+using System.Collections.Generic;
+using System.IO;
 using FileFormat.Codecs.H265;
 
 namespace FileFormat.Bpg.Codec;
 
-/// <summary>Top-level decoder that wires BPG container data through the HEVC I-frame decoder pipeline.</summary>
+/// <summary>Decodes a BPG file's pictures: its own uniform-PCM writer output directly, everything else through the general H.265 decoder.</summary>
 internal static class BpgHevcDecoder {
 
-  /// <summary>Decodes the HEVC bitstream embedded in a BPG file and returns pixel data.</summary>
-  /// <param name="bpg">The parsed BPG file with raw HEVC data in <see cref="BpgFile.PixelData"/>.</param>
-  /// <returns>Decoded pixel data: Gray8 for grayscale, RGB24 for color, or RGBA32 if alpha is present.</returns>
-  public static byte[] Decode(BpgFile bpg) {
+  /// <summary>One decoded frame: interleaved samples and how many animation periods it lasts.</summary>
+  internal sealed record DecodedFrame(byte[] Pixels, int Duration);
+
+  /// <summary>
+  /// Decodes every frame of a BPG file: Gray8, RGB24 or RGBA32 for an eight-bit picture, the
+  /// sixteen-bit (big-endian) Gray16, RGB48 or RGBA64 for a deeper one.
+  /// </summary>
+  public static IReadOnlyList<DecodedFrame> Decode(BpgFile bpg) {
     ArgumentNullException.ThrowIfNull(bpg);
 
     if (bpg.PixelData.Length == 0)
       throw new InvalidOperationException("BPG file contains no HEVC data.");
 
-    if (bpg.IsAnimation)
-      throw new NotSupportedException("Animated BPG decoding is not supported.");
-
-    // alpha1_flag clear with alpha2_flag set is how BPG says the extra plane holds CMYK's W rather
-    // than an alpha channel, which is a fourth ink and not a transparency.
-    if (bpg is { HasAlpha: false, HasAlpha2: true })
-      throw new NotSupportedException("A CMYK BPG picture is not supported for decoding.");
-
     if (_TryDecodeUniformPcm(bpg, out var pcm))
-      return pcm;
+      return [new(pcm, 1)];
 
-    // Parse NAL units from the BPG HEVC data
-    var (vps, sps, pps, sliceHeader, sliceData) = HevcNalParser.ParseBpgHevcData(bpg.PixelData);
+    // alpha1_flag set: an alpha plane, premultiplied when alpha2_flag is set too. alpha1_flag clear
+    // with alpha2_flag set: the plane is CMYK's W, which multiplies the colour rather than being a
+    // transparency.
+    var hasPlane = bpg.HasAlpha || bpg.HasAlpha2;
+    var wPlane = !bpg.HasAlpha && bpg.HasAlpha2;
+    var chroma = bpg.PixelFormat switch {
+      BpgPixelFormat.Grayscale => 0,
+      BpgPixelFormat.YCbCr420 or BpgPixelFormat.YCbCr420Mpeg2 => 1,
+      BpgPixelFormat.YCbCr422 or BpgPixelFormat.YCbCr422Mpeg2 => 2,
+      BpgPixelFormat.YCbCr444 => 3,
+      _ => throw new InvalidDataException($"A BPG file states pixel format {(int)bpg.PixelFormat}, which the specification reserves."),
+    };
+    if (bpg.BitDepth > 14)
+      throw new InvalidDataException($"A BPG file states {bpg.BitDepth}-bit samples; the specification stops at fourteen.");
+    if (bpg.ColorSpace == BpgColorSpace.YCbCrBT2020Cl || (int)bpg.ColorSpace > 5)
+      throw new NotSupportedException($"BPG colour space {bpg.ColorSpace} is reserved by the specification and has no conversion.");
 
-    // Validate that this is an I-slice
-    if (sliceHeader.SliceType != 2)
-      throw new NotSupportedException($"Only I-slices are supported for BPG decoding (got slice type {sliceHeader.SliceType}).");
-
-    // Validate bit depth
-    var bitDepthY = sps.BitDepthLumaMinus8 + 8;
-    var bitDepthC = sps.BitDepthChromaMinus8 + 8;
-    if (bitDepthY != 8 && bitDepthY != 10)
-      throw new NotSupportedException($"Only 8-bit and 10-bit luma bit depths are supported (got {bitDepthY}).");
-
-    // Validate dimensions match BPG header
-    var width = sps.PicWidthInLumaSamples;
-    var height = sps.PicHeightInLumaSamples;
-
-    // Apply conformance window cropping
-    if (sps.ConformanceWindowPresent) {
-      var cropUnitX = sps.ChromaFormatIdc is 1 or 2 ? 2 : 1;
-      var cropUnitY = sps.ChromaFormatIdc == 1 ? 2 : 1;
-      width -= (sps.ConfWinLeftOffset + sps.ConfWinRightOffset) * cropUnitX;
-      height -= (sps.ConfWinTopOffset + sps.ConfWinBottomOffset) * cropUnitY;
+    var frames = BpgStreamDecoder.Decode(bpg.PixelData, bpg.Width, bpg.Height, chroma, bpg.BitDepth, hasPlane);
+    var deep = bpg.BitDepth > 8;
+    var gray = chroma == 0;
+    var rgba = bpg.HasAlpha;
+    var result = new DecodedFrame[frames.Count];
+    for (var i = 0; i < frames.Count; ++i) {
+      var pixels = BpgColourOutput.ToPixels(
+        frames[i].Colour, frames[i].Alpha, bpg.Width, bpg.Height, bpg.PixelFormat, bpg.BitDepth,
+        bpg.ColorSpace, bpg.LimitedRange, premultiplied: bpg is { HasAlpha: true, HasAlpha2: true }, wPlane, rgba, deep);
+      if (gray && !rgba)
+        pixels = _FirstOfThree(pixels, deep);
+      result[i] = new(pixels, frames[i].Duration);
     }
 
-    // Create and run the I-slice decoder
-    var decoder = new HevcSliceDecoder(sps, pps, sliceHeader);
-    var (yPlane, cbPlane, crPlane, yStride, cStride) = decoder.Decode(sliceData);
+    return result;
+  }
 
-    // Apply conformance window offset to output
-    var cropX = 0;
-    var cropY = 0;
-    if (sps.ConformanceWindowPresent) {
-      var cropUnitX = sps.ChromaFormatIdc is 1 or 2 ? 2 : 1;
-      var cropUnitY = sps.ChromaFormatIdc == 1 ? 2 : 1;
-      cropX = sps.ConfWinLeftOffset * cropUnitX;
-      cropY = sps.ConfWinTopOffset * cropUnitY;
-    }
-
-    // Crop planes if needed
-    if (cropX > 0 || cropY > 0) {
-      yPlane = _CropPlane(yPlane, yStride, cropX, cropY, width, height);
-      yStride = width;
-
-      if (cbPlane.Length > 0) {
-        int chromaSubX, chromaSubY;
-        _GetChromaSubsampling(sps.ChromaFormatIdc, out chromaSubX, out chromaSubY);
-        var chromaCropX = cropX / chromaSubX;
-        var chromaCropY = cropY / chromaSubY;
-        var chromaWidth = (width + chromaSubX - 1) / chromaSubX;
-        var chromaHeight = (height + chromaSubY - 1) / chromaSubY;
-
-        cbPlane = _CropPlane(cbPlane, cStride, chromaCropX, chromaCropY, chromaWidth, chromaHeight);
-        crPlane = _CropPlane(crPlane, cStride, chromaCropX, chromaCropY, chromaWidth, chromaHeight);
-        cStride = chromaWidth;
-      }
-    }
-
-    // Convert to output pixel format
-    if (bpg.PixelFormat == BpgPixelFormat.Grayscale)
-      return HevcYuvToRgb.ConvertGrayscale(yPlane, yStride, width, height, bitDepthY, bpg.LimitedRange);
-
-    // Color space: either YCbCr->RGB or direct RGB
-    if (bpg.ColorSpace == BpgColorSpace.Rgb && sps.ChromaFormatIdc == 3)
-      return _ExtractDirectRgb(yPlane, cbPlane, crPlane, yStride, cStride, width, height, bitDepthY);
-
-    // YCbCr to RGB conversion
-    var chromaFormat = bpg.PixelFormat;
-    if (bpg.HasAlpha) {
-      // TODO: Alpha plane decoding requires a second HEVC stream in BPG
-      // For now, return RGB24 without alpha
-      return HevcYuvToRgb.Convert(
-        yPlane, cbPlane, crPlane, yStride, cStride,
-        width, height, chromaFormat, bpg.ColorSpace, bitDepthY, bpg.LimitedRange
-      );
-    }
-
-    return HevcYuvToRgb.Convert(
-      yPlane, cbPlane, crPlane, yStride, cStride,
-      width, height, chromaFormat, bpg.ColorSpace, bitDepthY, bpg.LimitedRange
-    );
+  /// <summary>A grey picture's RGB carries the same value three times; the raster keeps one.</summary>
+  private static byte[] _FirstOfThree(byte[] rgb, bool deep) {
+    var bytes = deep ? 2 : 1;
+    var result = new byte[rgb.Length / 3];
+    for (var i = 0; i < result.Length / bytes; ++i)
+      for (var b = 0; b < bytes; ++b)
+        result[i * bytes + b] = rgb[i * 3 * bytes + b];
+    return result;
   }
 
   /// <summary>
@@ -170,46 +129,5 @@ internal static class BpgHevcDecoder {
       }
 
     return result;
-  }
-
-  private static int[] _CropPlane(int[] plane, int stride, int cropX, int cropY, int width, int height) {
-    var result = new int[width * height];
-    for (var y = 0; y < height; ++y) {
-      var srcOffset = (cropY + y) * stride + cropX;
-      var dstOffset = y * width;
-      var count = Math.Min(width, plane.Length - srcOffset);
-      if (count > 0)
-        Array.Copy(plane, srcOffset, result, dstOffset, count);
-    }
-    return result;
-  }
-
-  /// <summary>Extracts direct RGB when BPG signals RGB color space with 4:4:4 chroma.</summary>
-  private static byte[] _ExtractDirectRgb(int[] gPlane, int[] bPlane, int[] rPlane, int gStride, int brStride, int width, int height, int bitDepth) {
-    // In BPG RGB mode with 4:4:4, the three planes store G, B, R (not Y, Cb, Cr)
-    var rgb = new byte[width * height * 3];
-    var maxVal = (1 << bitDepth) - 1;
-
-    for (var y = 0; y < height; ++y)
-      for (var x = 0; x < width; ++x) {
-        var idx = (y * width + x) * 3;
-        var gIdx = y * gStride + x;
-        var brIdx = y * brStride + x;
-
-        rgb[idx] = (byte)Math.Clamp(rPlane[brIdx] * 255 / maxVal, 0, 255);
-        rgb[idx + 1] = (byte)Math.Clamp(gPlane[gIdx] * 255 / maxVal, 0, 255);
-        rgb[idx + 2] = (byte)Math.Clamp(bPlane[brIdx] * 255 / maxVal, 0, 255);
-      }
-
-    return rgb;
-  }
-
-  private static void _GetChromaSubsampling(int chromaFormatIdc, out int subX, out int subY) {
-    switch (chromaFormatIdc) {
-      case 1: subX = 2; subY = 2; break;
-      case 2: subX = 2; subY = 1; break;
-      case 3: subX = 1; subY = 1; break;
-      default: subX = 1; subY = 1; break;
-    }
   }
 }

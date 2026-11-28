@@ -113,9 +113,16 @@ public sealed class FlvWriter : IVideoContainerWriter<FlvWriter> {
         body = _AvcBody(stream, packet, sequenceHeader: false, checked((int)composition));
       } else {
         var prefix = (byte)(((packet.IsKeyFrame ? 1 : 2) << 4) | format);
-        body = new byte[packet.Data.Length + 1];
+        // VP6 carries its crop byte between the tag header and the frame; it comes back from the
+        // reader as the packet's container data, or from the stream for a frame that has none.
+        var vp6 = format is 4 or 5;
+        var extra = vp6 ? 1 : 0;
+        body = new byte[packet.Data.Length + 1 + extra];
         body[0] = prefix;
-        packet.Data.CopyTo(body.AsMemory(1));
+        if (vp6)
+          body[1] = packet.ContainerPrivateData.Length == 1 ? packet.ContainerPrivateData.Span[0]
+            : stream.CodecPrivateData.Length == 1 ? stream.CodecPrivateData.Span[0] : (byte)0;
+        packet.Data.CopyTo(body.AsMemory(1 + extra));
       }
       this._WriteTag(9, checked((uint)timestamp), body);
     } else {

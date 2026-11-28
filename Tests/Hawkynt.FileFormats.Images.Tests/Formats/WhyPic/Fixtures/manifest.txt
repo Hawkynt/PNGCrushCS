@@ -1,0 +1,40 @@
+WhyPic fixtures and what produced them
+======================================
+
+Every picture here was generated for this repository (gradients, a circle on a checkerboard with
+two percent speckle, uniform noise); none is a third-party image.
+
+The reference is WhyPic 1.1 (Osamu Yamaji, 1998, GPL-2.0-or-later), built from the distribution's
+source.lzh with gcc on Linux x86-64:
+
+    gcc -std=gnu89 -O2 -w -o whypic whypic.c melt.c qmelt16.c arithlib.c -lm
+
+    whypic    -f <name>.bmp      version 1.1 coding  (ref11_*)
+    whypic -c -f <name>.bmp      version 1.0 coding  (ref10_*)
+    whypic -d -f <name>.ypc      decode
+
+refNN_*.ypc   written by the reference encoder from the source bitmap.
+oursNN_*.ypc  written by this repository's WhyPicWriter, for pictures the reference encoder cannot
+              write: it fails its own verification on pictures one dot wide (its encoder reads the
+              dot above-right of the current one, which in a one-wide picture is the current dot,
+              where its decoder reads zero) and whenever a fitted weight reaches exactly 1.0 (it then
+              stores 65536 in a field that holds 0 to 65535), which uniform noise provokes.
+*.bmp         the reference decoder's output for the .ypc beside it, as written by whypic -d:
+              palette and pixels are what the tests compare; the header's resolution field holds
+              4 x colours, which is what WhyPic writes there.
+
+The reference encoder's output was also confirmed to be byte-for-byte what WhyPicWriter writes for
+the same bitmap, and the Windows build shipped in the distribution (whypic.exe, run under wine)
+decodes the ours* files to the same pixels.
+
+name                                 coding  colours  palette   size
+ref11_1x1_16                         1.1     16       plain     1x1
+ref11_33x17_16                       1.1     16       plain     33x17
+ref10_33x17_256                      1.0     256      plain     33x17
+ref11_40x30_16_packed_palette        1.1     16       modelled  40x30
+ref10_40x30_16_packed_palette        1.0     16       modelled  40x30
+ref11_29x23_256_packed_palette       1.1     256      modelled  29x23
+ref10_29x23_256_packed_palette       1.0     256      modelled  29x23
+ours11_1x9_16                        1.1     16       plain     1x9
+ours11_4x4_16_noise                  1.1     16       plain     4x4
+ours10_80x50_256_noise               1.0     256      plain     80x50

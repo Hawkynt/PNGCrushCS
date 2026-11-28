@@ -32,6 +32,9 @@ internal static class PageService {
 
   /// <summary>How many pictures a file holds; 1 for an ordinary single-picture file.</summary>
   internal static int PageCount(FileInfo file, FormatEntry? entry) {
+    if (entry == null && VideoService.Open(file) is { } video)
+      return video.FrameCount;
+
     if (entry?.GetImageCount == null)
       return 1;
 
@@ -44,6 +47,9 @@ internal static class PageService {
 
   /// <summary>Reads one page out of a file.</summary>
   internal static RawImage? LoadPage(FileInfo file, FormatEntry? entry, int index) {
+    if (entry == null && VideoService.Open(file) is { } video)
+      return video.Frame(index);
+
     if (entry?.LoadRawImageAtIndex is { } atIndex)
       return atIndex(file, index);
 
@@ -59,6 +65,10 @@ internal static class PageService {
     bool overwrite,
     Action<int, int>? progress = null,
     CancellationToken token = default) {
+    // A video's frames are decoded one at a time on the way out rather than all held at once.
+    if (sourceEntry == null && VideoService.Open(source) is { } video)
+      return VideoService.ExtractFrames(video, target, destination, overwrite, progress, token);
+
     destination.Create();
     var stem = Path.GetFileNameWithoutExtension(source.Name);
     var results = new List<ConversionResult>();

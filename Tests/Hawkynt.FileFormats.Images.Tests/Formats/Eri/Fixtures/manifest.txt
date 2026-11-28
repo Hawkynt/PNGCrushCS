@@ -1,0 +1,65 @@
+ERI fixtures and what produced them
+===================================
+
+Every picture here is synthetic, made for this repository: 37x23 gradients with noise, the same
+with an opacity ramp, a grey ramp, a 16-colour indexed picture, an RGB555-exact picture, and short
+animations of a moving square. None is a third-party image.
+
+The references are the two Entis libraries, built for Linux x86-64 from their published sources
+with the portability fixes listed below, and the 2001 Windows converter ericvt.exe run under wine:
+
+  sa_*   written by ERISA-Library 1.07 (Leshade Entis, 2003-2004; olesya-wo's portable fork)
+  na_*   written by ERINA-Library 1.0A (Leshade Entis, 2000-2002)
+  ours_* written by this repository's EriWriter
+
+  <name>_<n>.pam   the reference decoder's frame n: top row first, R G B (A) or GRAYSCALE
+                   (palette indices for a paletted picture)
+  <name>_<n>.pal   the 256 palette entries the reference decoder read, 4 bytes each, B G R x
+
+sa_* and ours_* are decoded by ERISA; na_* and ours_pal8 (the 256-colour RL-MTF-G code, which
+ERISA does not read) by ERINA. Every lossless fixture decodes byte-for-byte the same in both
+libraries wherever both read it, and in ericvt.exe wherever it reads it (it has no ERISA code and
+no opacity); every ours_* file decodes in all three to exactly the picture it was written from.
+
+Lossy (sa_lossy_*, xs_*, ERISA's version-28H format): the references are the frames ERISA-Library
+1.07e's own shipped build decodes -- xerisa.lib as Entis released it, compiled with MSVC and
+carrying the library's x86 assembly, linked into a small host (clang-cl, lld-link, wine's msvcrt)
+and run under wine. That build picks its code path by processor; the frames here are its SSE path,
+which every processor since the Pentium III takes (the plain-SSE and SSE2 settings decode
+identically; the MMX-only and 486 paths differ, the 486 one never writing an RGBA frame at all).
+The library's portable C decoder is not a reference for the lossy format: it differs from the
+shipped build in every stage.
+
+  sa_lossy_*  written by the portable ERISA build above (the motion film has bidirectional frames)
+  xs_*        written by the shipped ERISA build: LOT 4:1:1 and 4:4:4, RGB and RGBA, DCT 4:1:1 RGBA,
+              the whole-picture loop filter on an odd and an even width, and films (6 to 8 frames
+              of a panning picture with a moving square) with predicted and bidirectional frames,
+              the intra-block filter, the LOT, opacity and a top-down picture
+
+The ERISA player numbers a film with bidirectional frames one frame longer than its records (its
+writer's frame count) and shows the last record under that extra number; that frame is stored
+here as the last record's.
+
+refused_* are files the libraries wrote that no faithful decoder reads, which the reader refuses by
+name: a grey lossy picture (the shipped ERISA decoder calls an output routine it never set and
+crashes; the portable build is no reference), an ERINA version-9 lossy picture (the shipped ERISA
+decoder returns an empty frame), an ERINA version-8 picture with run-length gamma symbols
+(ERINA writes it but cannot read it back; ERISA, portable and shipped, reads garbage), and two the
+shipped ERISA build wrote with its intra-block loop filter: a film 33 pixels wide, whose filter
+strip over the last block column is one pixel wide (the library's line filter writes nothing for
+it and smooths whatever its heap left in the line buffers, differently from run to run), and a
+picture 17 lines high, whose last block row is one line high (the library's filter runs off the end
+of the frame and crashes).
+
+Shipped-build host (xs_*): host.exe encode <out> <key interval> --movie --preset 0..6
+  [--dct|--lot] [--sampling 444|411] [--bidir 0|2|3] [--topdown] <frame0.pam> ...; host.exe decode
+  <in> <prefix>, run under wine; the films' frames come from a slowly panning picture with a small
+  square moving across it.
+
+Commands (paths relative to the scratch build): erisa_cli / erina_cli
+  encode <src.pam> <out.eri> --arch gamma|huffman|nemesis --version 0x00020100|0x00020200
+         --format rgb24|rgba32|rgb32|gray8|pal8|rgb16 [--pal pal16.pal] [--blocking N]
+         [--topdown] [--dependent|--independent] [--lossy dct --sampling 444|411 --preset N]
+         [--copyright T --description T]
+  encode-anim <out.mei> <keyframe> <frame0.pam> ...
+  decode <in> <prefix>

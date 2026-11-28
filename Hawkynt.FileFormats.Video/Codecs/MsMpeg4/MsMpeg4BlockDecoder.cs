@@ -53,9 +53,13 @@ internal sealed class MsMpeg4BlockDecoder {
   private readonly MsMpeg4Version _version;
   private readonly int _quantiser;
   private readonly int _dcTableIndex;
-  private readonly MsMpeg4RunLevelTable _intraLuminanceCodes;
-  private readonly MsMpeg4RunLevelTable _chrominanceCodes;
-  private readonly MsMpeg4RunLevelTable _predictedCodes;
+  private MsMpeg4RunLevelTable _intraLuminanceCodes;
+  private MsMpeg4RunLevelTable _chrominanceCodes;
+  private MsMpeg4RunLevelTable _predictedCodes;
+
+  // WMV1's third escape states its level and run lengths once a picture, at its first use.
+  private int _escapeLevelLength;
+  private int _escapeRunLength;
 
   /// <summary>The DC of the last intra block of each plane, which is all version 1 predicts from.</summary>
   private readonly int[] _lastDc = new int[3];
@@ -74,14 +78,25 @@ internal sealed class MsMpeg4BlockDecoder {
   }
 
   /// <summary>The step the luminance DC of an intra block is quantised with.</summary>
-  internal int LuminanceDcStep => this._version == MsMpeg4Version.Version3
-    ? MsMpeg4Data.Version3LuminanceDcStep[this._quantiser]
-    : FixedDcStep;
+  internal int LuminanceDcStep => this._version switch {
+    MsMpeg4Version.Version3 => MsMpeg4Data.Version3LuminanceDcStep[this._quantiser],
+    MsMpeg4Version.Wmv1 or MsMpeg4Version.Wmv2 => MsMpeg4Data.Wmv1LuminanceDcStep[this._quantiser],
+    _ => FixedDcStep,
+  };
 
   /// <summary>The same for a chrominance block.</summary>
-  internal int ChrominanceDcStep => this._version == MsMpeg4Version.Version3
-    ? MsMpeg4Data.Version3ChrominanceDcStep[this._quantiser]
-    : FixedDcStep;
+  internal int ChrominanceDcStep => this._version switch {
+    MsMpeg4Version.Version3 => MsMpeg4Data.Version3ChrominanceDcStep[this._quantiser],
+    MsMpeg4Version.Wmv1 or MsMpeg4Version.Wmv2 => MsMpeg4Data.Version3ChrominanceDcStep[this._quantiser],
+    _ => FixedDcStep,
+  };
+
+  /// <summary>Switches every run-level table at once, as a WMV1 macroblock that restates its table does.</summary>
+  internal void UseRunLevelTable(int index) {
+    this._intraLuminanceCodes = MsMpeg4Tables.RunLevel[index];
+    this._chrominanceCodes = MsMpeg4Tables.RunLevel[3 + index];
+    this._predictedCodes = MsMpeg4Tables.RunLevel[3 + index];
+  }
 
   /// <summary>
   /// Forgets what version 1 predicts a DC from, which happens at the start of every macroblock row.
@@ -108,9 +123,10 @@ internal sealed class MsMpeg4BlockDecoder {
   /// <param name="index">Which of the macroblock's six blocks.</param>
   /// <param name="predictAc">Whether the macroblock asked for the first row or column to be predicted.</param>
   /// <param name="hasCoefficients">Whether the coded block pattern says this block carries any.</param>
+  /// <param name="forced">A DC prediction and direction decided elsewhere: WMV1's inter-intra prediction.</param>
   internal void ReadIntra(
     ref Mpeg4BitReader reader, scoped Span<int> samples, MsMpeg4IntraPrediction prediction,
-    int address, int index, bool predictAc, bool hasCoefficients) {
+    int address, int index, bool predictAc, bool hasCoefficients, (bool FromAbove, int Dc)? forced = null) {
     Span<int> levels = stackalloc int[64];
     levels.Clear();
 
@@ -124,9 +140,10 @@ internal sealed class MsMpeg4BlockDecoder {
       // Settled before anything is read, because the gradient chooses the scan the coefficients are
       // written in as well as where the prediction comes from.
       var absentDc = MsMpeg4IntraPrediction.AbsentDc(step);
-      var fromAbove = prediction.PredictsFromAbove(address, index, absentDc);
-      var scan = !predictAc
-        ? Mpeg4Quantisation.ZigZag
+      var fromAbove = forced?.FromAbove ?? prediction.PredictsFromAbove(address, index, absentDc);
+      var scan = this._version >= MsMpeg4Version.Wmv1
+        ? !predictAc ? MsMpeg4Data.Wmv1IntraScan : fromAbove ? MsMpeg4Data.Wmv1HorizontalScan : MsMpeg4Data.Wmv1VerticalScan
+        : !predictAc ? Mpeg4Quantisation.ZigZag
         : fromAbove ? Mpeg4Quantisation.AlternateHorizontal : Mpeg4Quantisation.AlternateVertical;
 
       levels[0] = this._ReadDcDifferential(ref reader, isLuminance);
@@ -134,7 +151,7 @@ internal sealed class MsMpeg4BlockDecoder {
       if (hasCoefficients)
         this._ReadCoefficients(ref reader, levels, scan, codes, intra: true);
 
-      prediction.Apply(address, index, levels, predictAc, fromAbove, absentDc);
+      prediction.Apply(address, index, levels, predictAc, fromAbove, absentDc, forced?.Dc);
     }
 
     if (levels[0] < 0 || levels[0] > 256 * step)
@@ -144,7 +161,20 @@ internal sealed class MsMpeg4BlockDecoder {
         + "not the version the container says it is.");
 
     this._Dequantise(levels, samples, step);
-    Mpeg4InverseDct.Transform(samples);
+    this._InverseTransform(samples);
+  }
+
+  /// <summary>
+  /// WMV1 is held to FFmpeg's integer <c>simple_idct</c>, which is what FFmpeg decodes it with; the
+  /// three MPEG-4 versions keep the floating-point transform they were measured with.
+  /// </summary>
+  private void _InverseTransform(Span<int> samples) {
+    if (this._version == MsMpeg4Version.Wmv2)
+      Wmv2.Wmv2Transform.Transform(samples);
+    else if (this._version == MsMpeg4Version.Wmv1)
+      Dv.DvInverseDct.Transform(samples);
+    else
+      Mpeg4InverseDct.Transform(samples);
   }
 
   /// <summary>Reads the residual of a block of a predicted macroblock.</summary>
@@ -154,15 +184,24 @@ internal sealed class MsMpeg4BlockDecoder {
 
     // Reconstructed as they are read rather than afterwards: the codes of a predicted block state a
     // level already multiplied by the step, because the table a picture reads is chosen per quantiser.
-    this._ReadCoefficients(ref reader, levels, Mpeg4Quantisation.ZigZag, this._predictedCodes, intra: false);
+    var scan = this._version >= MsMpeg4Version.Wmv1 ? MsMpeg4Data.Wmv1InterScan : Mpeg4Quantisation.ZigZag;
+    this._ReadCoefficients(ref reader, levels, scan, this._predictedCodes, intra: false);
 
     levels.CopyTo(samples);
 
     // No mismatch control: that belongs to the standard's weighted quantisation method, which none of
     // these three has. The H.263 method's reconstruction levels are odd multiples of the step size,
     // which is what stops two conforming transforms drifting apart without it.
-    Mpeg4InverseDct.Transform(samples);
+    this._InverseTransform(samples);
   }
+
+  /// <summary>
+  /// Reads the residual levels of a predicted block in the scan given, already reconstructed and not
+  /// transformed: WMV2's entry, whose adaptive 8x4 and 4x8 halves bring scans and transforms of their
+  /// own and so cannot share <see cref="ReadInter"/>'s.
+  /// </summary>
+  internal void ReadInterLevels(ref Mpeg4BitReader reader, scoped Span<int> levels, int[] scan)
+    => this._ReadCoefficients(ref reader, levels, scan, this._predictedCodes, intra: false);
 
   // ============================================================================================
   // Version 1's intra blocks
@@ -205,7 +244,7 @@ internal sealed class MsMpeg4BlockDecoder {
   /// a differential no table entry stands for.
   /// </remarks>
   private int _ReadDcDifferential(ref Mpeg4BitReader reader, bool isLuminance) {
-    if (this._version != MsMpeg4Version.Version3)
+    if (this._version is MsMpeg4Version.Version1 or MsMpeg4Version.Version2)
       return MsMpeg4Tables.V2Dc[isLuminance ? 0 : 1].Read(ref reader) - MsMpeg4Tables.V2DcBias;
 
     var level = MsMpeg4Tables.Dc[this._dcTableIndex][isLuminance ? 0 : 1].Read(ref reader);
@@ -240,7 +279,8 @@ internal sealed class MsMpeg4BlockDecoder {
 
     // The second escape form's run is one short in versions 1 and 3 and exact in version 2. One added
     // integer, and every coefficient after it lands one position out when it is wrong.
-    var runOffset = intra || this._version == MsMpeg4Version.Version2 ? 0 : 1;
+    // WMV1 makes it one short in intra blocks too.
+    var runOffset = intra ? (this._version >= MsMpeg4Version.Wmv1 ? 1 : 0) : this._version == MsMpeg4Version.Version2 ? 0 : 1;
 
     var position = intra ? 0 : -1;
 
@@ -254,7 +294,9 @@ internal sealed class MsMpeg4BlockDecoder {
         level = _Sign(ref reader, codes.LevelOf(index) * multiplier + offset);
       } else if (this._version == MsMpeg4Version.Version1 || reader.NextBits(1) == 0) {
         if (this._version == MsMpeg4Version.Version1 || reader.NextBits(2) == 0) {
-          (advance, level) = _ReadThirdEscape(ref reader, this._version, multiplier, offset);
+          (advance, level) = this._version >= MsMpeg4Version.Wmv1
+            ? this._ReadWmv1ThirdEscape(ref reader, multiplier, offset)
+            : _ReadThirdEscape(ref reader, this._version, multiplier, offset);
         } else {
           reader.Skip(2);
           (advance, level) = _ReadSecondEscape(ref reader, codes, multiplier, offset, runOffset);
@@ -275,6 +317,13 @@ internal sealed class MsMpeg4BlockDecoder {
       }
 
       position -= _LAST_COEFFICIENT_BIAS;
+
+      // FFmpeg reads a WMV1 block that runs past its sixty-fourth coefficient as ending at the
+      // sixty-third, the stray coefficient dropped — Microsoft's encoders write a last level of -1 one
+      // position out — and every WMV1 decoder in use agrees with it.
+      if ((uint)position > 63 && this._version >= MsMpeg4Version.Wmv1)
+        return;
+
       if ((uint)position > 63)
         throw new InvalidDataException(
           $"The run-level codes of a block of this Microsoft MPEG-4 picture reach scan position "
@@ -338,6 +387,43 @@ internal sealed class MsMpeg4BlockDecoder {
     var level = reader.ReadBits(8);
     if (level >= 1 << 7)
       level -= 1 << 8;
+
+    return (run + 1 + (last ? _LAST_COEFFICIENT_BIAS : 0),
+      level > 0 ? level * multiplier + offset : level * multiplier - offset);
+  }
+
+  /// <summary>
+  /// WMV1's third escape: the level and run lengths are stated at the first one in a picture and kept,
+  /// and the level is a magnitude with its own sign bit. FFmpeg's <c>ff_msmpeg4_decode_block</c>.
+  /// </summary>
+  private (int Advance, int Level) _ReadWmv1ThirdEscape(ref Mpeg4BitReader reader, int multiplier, int offset) {
+    reader.Skip(2);
+    var last = reader.ReadBit() == 1;
+    if (this._escapeLevelLength == 0) {
+      int length;
+      if (this._quantiser < 8) {
+        length = reader.ReadBits(3);
+        if (length == 0)
+          length = 8 + reader.ReadBit();
+      } else {
+        length = 2;
+        while (length < 8 && reader.NextBits(1) == 0) {
+          ++length;
+          reader.Skip(1);
+        }
+        if (length < 8)
+          reader.Skip(1);
+      }
+
+      this._escapeLevelLength = length;
+      this._escapeRunLength = reader.ReadBits(2) + 3;
+    }
+
+    var run = reader.ReadBits(this._escapeRunLength);
+    var negative = reader.ReadBit() == 1;
+    var level = reader.ReadBits(this._escapeLevelLength);
+    if (negative)
+      level = -level;
 
     return (run + 1 + (last ? _LAST_COEFFICIENT_BIAS : 0),
       level > 0 ? level * multiplier + offset : level * multiplier - offset);

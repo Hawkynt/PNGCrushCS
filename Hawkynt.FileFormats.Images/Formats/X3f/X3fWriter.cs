@@ -1,5 +1,6 @@
 using System;
 using System.Buffers.Binary;
+using FileFormat.Core;
 using System.Security.Cryptography;
 
 namespace FileFormat.X3f;
@@ -17,6 +18,8 @@ public static class X3fWriter {
       throw new ArgumentOutOfRangeException(nameof(file), file.Width, "X3F width must be positive.");
     if (file.Height < 1)
       throw new ArgumentOutOfRangeException(nameof(file), file.Height, "X3F height must be positive.");
+    if (file.PixelData == null && file.Sensor != null)
+      file = file with { PixelData = PixelConverter.Convert(X3fFile.ToRawImage(file), PixelFormat.Rgb24).PixelData };
     ArgumentNullException.ThrowIfNull(file.PixelData);
 
     var packedRow = checked((long)file.Width * 3);

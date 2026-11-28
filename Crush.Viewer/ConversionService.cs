@@ -28,7 +28,8 @@ internal static class ConversionService {
       return new(source, destination.FullName, false, "A file of that name is already there.");
 
     try {
-      var raw = FormatRegistry.Read(source);
+      // A video converts to a picture as its first frame; the whole film is VideoService.Convert's.
+      var raw = FormatRegistry.Read(source) ?? VideoService.FirstFrame(source);
       if (raw == null)
         return new(source, destination.FullName, false, "No registered reader could decode it.");
 

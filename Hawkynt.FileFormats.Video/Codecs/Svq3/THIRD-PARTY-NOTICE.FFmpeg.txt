@@ -1,0 +1,42 @@
+The Sorenson Video 3 decoder in this directory (with Svq3VideoDecoder.cs beside
+it) is converted from FFmpeg (https://ffmpeg.org), whose decoder is where the
+format was reverse-engineered. Its maker published no specification for it.
+
+Files used, all from libavcodec:
+
+  svq3.c           the sequence header, the watermark, the slice header, the
+                   macroblock layer, motion prediction and compensation, the
+                   coefficient coding and its run/level tables, the transform
+                   and its dequantisation table, and the picture management
+  h264pred.c,      the intra 4x4, 16x16 and chroma predictors, with SVQ3's own
+  h264pred_template.c  down-left and plane variants
+  h264_parse.c     the intra mode checks against neighbour availability
+  h264data.c,      the coded-block-pattern, intra macroblock and chroma QP
+  h264data.h       tables
+  h264idct_template.c  the chroma DC transform
+  hpeldsp.c, hpel_template.c, tpeldsp.c   half- and third-sample motion
+                   compensation
+
+Copyright (c) 2003 The FFmpeg Project (svq3.c)
+Copyright (c) 2003 Michael Niedermayer (h264pred.c, h264data.c)
+Copyright (c) 2004-2011 Michael Niedermayer (h264idct_template.c)
+Copyright (c) 2000, 2001 Fabrice Bellard (hpeldsp.c)
+Copyright (c) 2002-2004 Michael Niedermayer (hpeldsp.c)
+
+FFmpeg is free software; you can redistribute it and/or modify it under the
+terms of the GNU Lesser General Public License as published by the Free
+Software Foundation; either version 2.1 of the License, or (at your option)
+any later version.
+
+FFmpeg is distributed in the hope that it will be useful, but WITHOUT ANY
+WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
+A PARTICULAR PURPOSE.  See the GNU Lesser General Public License for more
+details.
+
+You should have received a copy of the GNU Lesser General Public License along
+with FFmpeg; if not, write to the Free Software Foundation, Inc., 51 Franklin
+Street, Fifth Floor, Boston, MA 02110-1301 USA.
+
+This library is licensed LGPL-3.0-or-later, which is a permitted "any later
+version" of the LGPL-2.1 FFmpeg offers, so the two are compatible in this
+direction and in no other.

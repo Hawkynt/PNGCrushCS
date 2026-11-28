@@ -31,15 +31,18 @@ internal static class Vp8IntraPrediction {
   /// Receives <paramref name="count"/> + <paramref name="extra"/> + 1 samples, the first being the
   /// one above and to the left.
   /// </param>
+  /// <param name="abovePicture">What stands in above the picture: 127 for VP8, 128 for VP7.</param>
+  /// <param name="leftOfPicture">What stands in left of the picture: 129 for VP8, 128 for VP7.</param>
   internal static void GatherAbove(
-    byte[] plane, int stride, int planeWidth, int x, int y, int count, int extra, Span<byte> edge) {
+    byte[] plane, int stride, int planeWidth, int x, int y, int count, int extra, Span<byte> edge,
+    byte abovePicture = _ABOVE_THE_PICTURE, byte leftOfPicture = _LEFT_OF_THE_PICTURE) {
     if (y == 0) {
-      edge[..(count + extra + 1)].Fill(_ABOVE_THE_PICTURE);
+      edge[..(count + extra + 1)].Fill(abovePicture);
       return;
     }
 
     var row = (y - 1) * stride;
-    edge[0] = x == 0 ? _LEFT_OF_THE_PICTURE : plane[row + x - 1];
+    edge[0] = x == 0 ? leftOfPicture : plane[row + x - 1];
 
     for (var i = 0; i < count; ++i)
       edge[1 + i] = plane[row + x + i];
@@ -55,9 +58,10 @@ internal static class Vp8IntraPrediction {
   }
 
   /// <summary>Collects the samples immediately to the left of a block.</summary>
-  internal static void GatherLeft(byte[] plane, int stride, int x, int y, int count, Span<byte> left) {
+  internal static void GatherLeft(
+    byte[] plane, int stride, int x, int y, int count, Span<byte> left, byte leftOfPicture = _LEFT_OF_THE_PICTURE) {
     if (x == 0) {
-      left[..count].Fill(_LEFT_OF_THE_PICTURE);
+      left[..count].Fill(leftOfPicture);
       return;
     }
 

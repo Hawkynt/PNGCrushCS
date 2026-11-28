@@ -73,10 +73,10 @@ internal sealed class MsMpeg4PictureDecoder {
     this._vectorX = new short[count];
     this._vectorY = new short[count];
     this._isDecoded = new bool[count];
-    this._intraPrediction = new(macroblockWidth, macroblockHeight, header.SliceHeight);
+    this._intraPrediction = new(macroblockWidth, macroblockHeight, header.SliceHeight, wmv1: version == MsMpeg4Version.Wmv1);
     this._blocks = new(version, header);
 
-    this._codedBlock = version == MsMpeg4Version.Version3 && header.CodingType == MsMpeg4PictureHeader.IntraCoded
+    this._codedBlock = version is MsMpeg4Version.Version3 or MsMpeg4Version.Wmv1 && header.CodingType == MsMpeg4PictureHeader.IntraCoded
       ? new(macroblockWidth, macroblockHeight)
       : null;
   }
@@ -137,9 +137,11 @@ internal sealed class MsMpeg4PictureDecoder {
     bool predictCoefficients;
 
     switch (this._version) {
-      case MsMpeg4Version.Version3: {
+      case MsMpeg4Version.Version3:
+      case MsMpeg4Version.Wmv1: {
         pattern = this._ReadPredictedPattern(ref reader, address);
         predictCoefficients = reader.ReadBit() == 1;
+        this._ReadMacroblockRunLevel(ref reader, pattern);
         break;
       }
 
@@ -190,19 +192,75 @@ internal sealed class MsMpeg4PictureDecoder {
   }
 
   /// <summary>Reads the six blocks of an intra macroblock, in a picture of either type.</summary>
-  private void _DecodeIntra(ref Mpeg4BitReader reader, int address, int pattern, bool predictCoefficients) {
+  /// <summary>WMV1 above its bit rate threshold: a coded macroblock restates its run-level table.</summary>
+  private void _ReadMacroblockRunLevel(ref Mpeg4BitReader reader, int pattern) {
+    if (this._header.PerMacroblockRunLevel && pattern != 0)
+      this._blocks.UseRunLevelTable(MsMpeg4PictureHeader.ReadZeroOneOrTwo(ref reader));
+  }
+
+  /// <param name="interIntraDirection">WMV1's stated prediction direction for an intra macroblock of a predicted picture, or -1.</param>
+  private void _DecodeIntra(ref Mpeg4BitReader reader, int address, int pattern, bool predictCoefficients, int interIntraDirection = -1) {
     this._isDecoded[address] = true;
     this._vectorX[address] = 0;
     this._vectorY[address] = 0;
 
     Span<int> block = stackalloc int[64];
     for (var index = 0; index < 6; ++index) {
+      var forced = interIntraDirection < 0 ? ((bool, int)?)null : this._InterIntraPrediction(address, index, interIntraDirection);
       this._blocks.ReadIntra(
-        ref reader, block, this._intraPrediction, address, index, predictCoefficients, _IsCoded(pattern, index));
+        ref reader, block, this._intraPrediction, address, index, predictCoefficients, _IsCoded(pattern, index), forced);
 
       this._Store(address, index, block);
     }
   }
+
+  /// <summary>
+  /// WMV1's prediction of an intra macroblock in a predicted picture, FFmpeg's <c>ff_msmpeg4_pred_dc</c>
+  /// with <c>inter_intra_pred</c>: the second, third and fourth luminance blocks predict from the
+  /// macroblock's own blocks; the first and the chrominance from the mean of the reconstructed
+  /// samples beside or above them, in the direction the macroblock states.
+  /// </summary>
+  private (bool FromAbove, int Dc) _InterIntraPrediction(int address, int index, int direction) {
+    var step = index < 4 ? this._blocks.LuminanceDcStep : this._blocks.ChrominanceDcStep;
+    var absent = MsMpeg4IntraPrediction.AbsentDc(step);
+    switch (index) {
+      case 1:
+        return (false, this._intraPrediction.NeighbourDcs(address, 1, absent).Left);
+      case 2:
+        return (true, this._intraPrediction.NeighbourDcs(address, 2, absent).Above);
+      case 3: {
+        var (a, b, c) = this._intraPrediction.NeighbourDcs(address, 3, absent);
+        return Math.Abs(a - b) < Math.Abs(b - c) ? (true, c) : (false, a);
+      }
+    }
+
+    var column = address % this._macroblockWidth;
+    var row = address / this._macroblockWidth;
+    var (left, top) = this._BlockOrigin(address, index);
+    var fromLeft = column == 0 ? absent : this._SampleDc(index, left - 8, top, step);
+    var fromAbove = row == 0 ? absent : this._SampleDc(index, left, top - 8, step);
+    return direction switch {
+      0 => (false, fromLeft),
+      1 => index == 0 ? (true, fromAbove) : (false, fromLeft),
+      2 => index == 0 ? (false, fromLeft) : (true, fromAbove),
+      _ => (true, fromAbove),
+    };
+  }
+
+  /// <summary>The mean of an 8x8 block of the picture being decoded, in DC steps: FFmpeg's <c>get_dc</c>.</summary>
+  private int _SampleDc(int index, int x, int y, int step) {
+    var (plane, stride, origin, _, _) = this._target.PlaneOf(index);
+    var sum = 0;
+    for (var row = 0; row < 8; ++row)
+      for (var column = 0; column < 8; ++column)
+        sum += plane[origin + (y + row) * stride + x + column];
+    var scale = step * 8;
+    return (sum + (scale >> 1)) / scale;
+  }
+
+  /// <summary>WMV1's inter-intra direction: 0, 10, 110 or 111.</summary>
+  private static int _ReadInterIntraDirection(ref Mpeg4BitReader reader)
+    => reader.ReadBit() == 0 ? 0 : reader.ReadBit() == 0 ? 1 : reader.ReadBit() == 0 ? 2 : 3;
 
   // ============================================================================================
   // Predicted pictures
@@ -214,16 +272,19 @@ internal sealed class MsMpeg4PictureDecoder {
       return;
     }
 
-    if (this._version == MsMpeg4Version.Version3) {
+    if (this._version is MsMpeg4Version.Version3 or MsMpeg4Version.Wmv1) {
       var code = MsMpeg4Tables.MacroblockNonIntra.Read(ref reader);
 
       // Bit six clear says intra, which is the one place in the family where the flag reads inverted.
       if ((code & 0x40) == 0) {
         var predictCoefficients = reader.ReadBit() == 1;
-        this._DecodeIntra(ref reader, address, code & 0x3F, predictCoefficients);
+        var direction = this._header.InterIntraPrediction ? _ReadInterIntraDirection(ref reader) : -1;
+        this._ReadMacroblockRunLevel(ref reader, code & 0x3F);
+        this._DecodeIntra(ref reader, address, code & 0x3F, predictCoefficients, direction);
         return;
       }
 
+      this._ReadMacroblockRunLevel(ref reader, code & 0x3F);
       this._DecodePredicted(ref reader, address, code & 0x3F);
       return;
     }
@@ -265,7 +326,7 @@ internal sealed class MsMpeg4PictureDecoder {
     var predictedX = this._PredictVector(address, horizontal: true);
     var predictedY = this._PredictVector(address, horizontal: false);
 
-    var (vectorX, vectorY) = this._version == MsMpeg4Version.Version3
+    var (vectorX, vectorY) = this._version is MsMpeg4Version.Version3 or MsMpeg4Version.Wmv1
       ? this._ReadWholeVector(ref reader, predictedX, predictedY)
       : (_ReadVectorComponent(ref reader, predictedX), _ReadVectorComponent(ref reader, predictedY));
 

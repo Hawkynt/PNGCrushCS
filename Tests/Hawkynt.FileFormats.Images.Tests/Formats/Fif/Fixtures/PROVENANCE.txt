@@ -1,0 +1,25 @@
+Fractal image fixtures and where they came from
+===============================================
+
+Both pictures were made for this suite; the expected outputs are Iterated Systems' own decoder's.
+
+selfmade_ftc11_32x16.fif
+  A fixed-profile FTC 1.1 file (67-byte header, domain step 8) coded by a brute-force search of a
+  synthetic 32x16 picture: luminance (6x + 9y + 30 * checker(4x4)) mod 256, chroma rising across U
+  and falling down V.
+
+selfmade_ftc31_37x23.fif
+  This package's FifWriter output for a 37x23 picture: R = (7x + 3y) mod 256, G = xy mod 256,
+  B = 128. A single-region, bit-coded FTC 3.1 file on a 40x24 canvas.
+
+*.ppm
+  DECO_32.DLL 6.1 (Iterated Systems' "32-bit Fractal Image Decoder Library", as shipped in
+  XnView's Plugins folder), driven under Wine by fiforacle.c beside this file: SetFIFBuffer,
+  GetOriginalResolution, SetOutputResolution at the original size, SetOutputFormat(1, 2, 3, 4, 0)
+  for RGB, default filter and dither settings, DecompressToBuffer. Built with
+  clang --target=i686-pc-windows-msvc and lld-link.
+
+*.WxH.ppm
+  The same picture as DECO_32.DLL draws it at W x H: the same harness given outW outH, so
+  SetOutputResolution(W, H) before DecompressToBuffer. The sizes cover half and quarter size,
+  three quarters, two, three and four times, and sizes that fit no multiple (45x19, 23x13).

@@ -121,6 +121,18 @@ internal sealed class H265TestStream {
         for (var i = 1; i < 9; ++i)
           this.Flag(false);
       }
+
+      if (screenContentExtension) {
+        // sps_scc_extension(): intra block copy and a small palette without initialisers, adaptive
+        // motion vector resolution and the intra boundary filters off.
+        this.Flag(true);  // sps_curr_pic_ref_enabled_flag
+        this.Flag(true);  // palette_mode_enabled_flag
+        this.Unsigned(4); // palette_max_size
+        this.Unsigned(2); // delta_palette_max_predictor_size
+        this.Flag(false); // sps_palette_predictor_initializers_present_flag
+        this.Bits(2, 2);  // motion_vector_resolution_control_idc
+        this.Flag(true);  // intra_boundary_filtering_disabled_flag
+      }
     }
 
     return this.EndNal(33);

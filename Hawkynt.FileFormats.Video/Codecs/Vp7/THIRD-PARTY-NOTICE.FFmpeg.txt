@@ -1,0 +1,25 @@
+The On2 VP7 decoder in this directory is converted from FFmpeg (https://github.com/FFmpeg/FFmpeg):
+
+  libavcodec/vp8.c      the VP7 paths: vp7_decode_frame_header and its fading, vp7_get_quants, the
+                        twelve-neighbour census of vp7_decode_mvs with vp7_calculate_mb_offset, VP7's
+                        motion vector components, inter_predict_dc, decode_block_coeffs with its VP7
+                        end-of-block rule, the carried left contexts, and VP7's loop filter limits
+                        and edge order in filter_mb and filter_level_for_mb
+  libavcodec/vp8dsp.c   vp7_idct_add_c, vp7_idct_dc_add_c, vp7_luma_dc_wht_c, vp7_luma_dc_wht_dc_c and
+                        the vp7 loop filters
+  libavcodec/vp8data.h  the VP7 quantiser tables, census predictors and weights, mode contexts,
+                        default motion vector probabilities and feature value sizes
+
+  Copyright (C) 2010 David Conrad, (C) 2010 Ronald S. Bultje, (C) 2010 Fiona Glaser,
+  (C) 2012 Daniel Kang, (C) 2014 Peter Ross,
+  and the FFmpeg developers named in the files above.
+
+FFmpeg distributes those sources under the GNU Lesser General Public License, version 2.1 or (at your
+option) any later version. This work is distributed under the GNU Lesser General Public License
+version 3 or later, which the "or later" clause permits; the licence text is in LICENSE at the root of
+this repository.
+
+The algorithms are carried across into managed C#, not vendored. The tables in Vp7Tables.cs were
+transcribed mechanically, by a script that parsed the C initialisers, and are reproduced exactly because
+they are fixed codec data required for interoperability. What VP7 shares with VP8 comes from this
+package's own VP8 decoder. The encoder in Vp7Encoder.cs is this package's own; FFmpeg has no VP7 encoder.

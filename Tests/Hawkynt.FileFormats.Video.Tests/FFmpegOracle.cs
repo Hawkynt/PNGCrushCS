@@ -303,6 +303,83 @@ internal static class FFmpegOracle {
   }
 
   /// <summary>
+  /// Decodes the first video stream into a named pixel format at every picture's own size, and hands
+  /// back the bytes as FFmpeg wrote them.
+  /// </summary>
+  /// <remarks>
+  /// FFmpeg's command line scales every picture to the first one's size when a stream changes size
+  /// part-way, so a stream that legitimately does — TrueMotion 1's interpolated frames are coded
+  /// narrower than the key frames around them — reaches a fixed-size comparison through a scaler.
+  /// <c>-noautoscale</c> turns that off and the raw output becomes a run of pictures of varying size,
+  /// which only a caller that knows each picture's size can cut apart.
+  /// <para/>
+  /// The decoder is asked to be bit-exact. Without the flag FFmpeg's x86 half-sample averaging without
+  /// rounding — <c>put_no_rnd_pixels*_x2</c> and friends — is an approximation that differs from the
+  /// arithmetic it stands for on a scattering of samples, and a film it touched would look like a
+  /// decoder fault one level at a time.
+  /// </remarks>
+  /// <param name="tolerateDiagnostics">Hand the pictures back even when FFmpeg complained, for a damaged film
+  /// whose undamaged part is what is being compared; the complaint is returned as the output.</param>
+  /// <param name="withoutSimd">Decode with FFmpeg's plain C routines (<c>-cpuflags 0</c>), for the rare decoder
+  /// whose vector routine writes past a row into one already decoded.</param>
+  public static (bool Decoded, string Output, byte[] Pictures) TryDecodeUnscaled(
+    string path, string pixelFormat, int? maxFrames = null, bool tolerateDiagnostics = false, bool withoutSimd = false) {
+    var raw = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName() + ".raw");
+
+    try {
+      var startInfo = new ProcessStartInfo(ExecutablePath!) {
+        RedirectStandardOutput = true,
+        RedirectStandardError = true,
+        UseShellExecute = false,
+      };
+
+      if (withoutSimd) {
+        startInfo.ArgumentList.Add("-cpuflags");
+        startInfo.ArgumentList.Add("0");
+      }
+      foreach (var argument in new[] {
+        "-hide_banner", "-loglevel", "error", "-y", "-flags", "+bitexact", "-i", path,
+        "-map", "0:v:0", "-an", "-sn", "-dn", "-fps_mode", "passthrough", "-noautoscale",
+        "-frames:v", (maxFrames ?? int.MaxValue).ToString(System.Globalization.CultureInfo.InvariantCulture),
+        // image2pipe writes the same raw pictures as rawvideo; unlike it, it also writes a picture whose
+        // timestamp repeats the one before, which some old QuickTime films carry.
+        "-c:v", "rawvideo", "-pix_fmt", pixelFormat, "-f", "image2pipe", raw,
+      })
+        startInfo.ArgumentList.Add(argument);
+
+      using var process = Process.Start(startInfo);
+      if (process == null)
+        return (false, "ffmpeg would not start", []);
+
+      var stdout = process.StandardOutput.ReadToEndAsync();
+      var stderr = process.StandardError.ReadToEndAsync();
+
+      if (!process.WaitForExit(_TIMEOUT_MILLISECONDS * 4)) {
+        try { process.Kill(entireProcessTree: true); } catch { /* already gone */ }
+        return (false, "ffmpeg timed out", []);
+      }
+
+      // The muxer's complaint about a repeated timestamp is about the output file, not the decode.
+      var diagnostics = string.Join('\n', SignificantDiagnostics(string.Concat(stdout.Result, stderr.Result))
+        .Split('\n')
+        .Where(static line => !line.Contains("non monotonically increasing dts to muxer", StringComparison.Ordinal)))
+        .Trim();
+      if (diagnostics.Length != 0 && !(tolerateDiagnostics && File.Exists(raw)))
+        return (false, diagnostics, []);
+
+      return File.Exists(raw)
+        ? (true, diagnostics.Length == 0 ? "decoded" : diagnostics, File.ReadAllBytes(raw))
+        : (false, "it produced no decoded video bytes", []);
+    } catch (Win32Exception) {
+      return (false, "no ffmpeg on this machine", []);
+    } catch (Exception exception) {
+      return (false, $"{exception.GetType().Name}: {exception.Message}", []);
+    } finally {
+      try { File.Delete(raw); } catch { /* best effort */ }
+    }
+  }
+
+  /// <summary>
   /// What FFmpeg said that is about the file, with the one line that is about FFmpeg's own version
   /// dropped.
   /// </summary>

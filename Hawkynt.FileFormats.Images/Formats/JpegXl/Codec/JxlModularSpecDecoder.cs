@@ -376,17 +376,6 @@ internal static class JxlModularSpecDecoder {
     if (channels.Length == 0)
       return new JxlModularStream(new JxlModularImage { Channels = channels }, []);
 
-    // libjxl creates a fresh ANSSymbolReader per ModularDecode call (matches
-    // `encoding.cc::ModularDecode`). Distance multiplier = max channel width
-    // across non-empty channels in this sub-image.
-    var perCallDistanceMultiplier = 0u;
-    foreach (var ch in channels) {
-      if (ch.Width <= 0 || ch.Height <= 0) continue;
-      if ((uint)ch.Width > perCallDistanceMultiplier)
-        perCallDistanceMultiplier = (uint)ch.Width;
-    }
-    globalEntropy?.ResetForGroup(reader, perCallDistanceMultiplier);
-
     // ---------------------------------------------------------------
     // Step 2: Read GroupHeader (use_global_tree, wp_header, transforms).
     // ---------------------------------------------------------------
@@ -401,6 +390,30 @@ internal static class JxlModularSpecDecoder {
     foreach (var transform in transforms)
       if (transform.Type == JxlModularTransformType.Palette)
         ++metaChannels;
+
+    // The channels this stream codes are the ones up to the first that is too
+    // big for it; the LZ77 distance multiplier is the widest of those, taken
+    // after the transforms have reshaped them (libjxl encoding.cc ModularDecode).
+    // A stream left with none — a VarDCT frame's global stream when its extra
+    // channels are larger than a group — ends at its header: no tree, no
+    // histograms, and no arithmetic decoder whose state could be checked.
+    var codedChannels = 0;
+    var distanceMultiplier = 0u;
+    for (var idx = 0; idx < channels.Length; ++idx) {
+      var channel = channels[idx];
+      if (channel.Width == 0 || channel.Height == 0)
+        continue;
+      if (idx >= metaChannels
+          && (channel.Width > options.MaxChannelSize || channel.Height > options.MaxChannelSize))
+        break;
+      distanceMultiplier = Math.Max(distanceMultiplier, (uint)channel.Width);
+      ++codedChannels;
+    }
+
+    if (codedChannels == 0)
+      return new JxlModularStream(
+        new JxlModularImage { Channels = options.UndoTransforms ? _InvertTransformChainOrSkeleton(channels, transforms) : channels },
+        transforms);
 
     // ---------------------------------------------------------------
     // Step 3 + 4: Resolve MA tree + residual entropy decoder.
@@ -421,6 +434,9 @@ internal static class JxlModularSpecDecoder {
       var numContexts = Math.Max(1, maTree.LeafCount);
       entropy = JxlEntropyDecoder.Read(reader, numContexts, disallowLz77: false);
     }
+
+    // A fresh arithmetic decoder per stream, as libjxl creates one per call.
+    entropy.ResetForGroup(reader, distanceMultiplier);
 
     // ---------------------------------------------------------------
     // Step 5 + 6: For each channel, decode every pixel.

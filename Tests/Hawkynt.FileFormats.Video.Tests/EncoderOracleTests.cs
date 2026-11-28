@@ -286,6 +286,12 @@ public sealed class EncoderOracleTests {
     ("Mve", ".mve", static (streams, packets) => VideoIO.Mux<MveWriter>(streams, packets)),
     ("Mjpeg", ".mjpg", static (streams, packets) => VideoIO.Mux<MjpegWriter>(streams, packets)),
     ("Ogg", ".ogv", static (streams, packets) => VideoIO.Mux<OggWriter>(streams, packets)),
+    // TMV's text-mode video has no code any other container carries.
+    ("Tmv", ".tmv", static (streams, packets) => VideoIO.Mux<FileFormat.Tmv.TmvWriter>(streams, packets)),
+    // Nor has DFA's.
+    ("Dfa", ".dfa", static (streams, packets) => VideoIO.Mux<FileFormat.Dfa.DfaWriter>(streams, packets)),
+    // Nor has Deluxe Paint Animation's.
+    ("DeluxePaintAnm", ".anm", static (streams, packets) => VideoIO.Mux<FileFormat.DeluxePaintAnm.DeluxePaintAnmWriter>(streams, packets)),
   ];
 
   /// <summary>

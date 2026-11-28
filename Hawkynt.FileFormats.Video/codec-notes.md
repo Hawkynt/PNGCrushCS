@@ -724,6 +724,40 @@ whose blocks account for a different number of bytes than it states, a frame pre
 buffer the picture layout does not have, and an empty frame opening a stream or standing in for wavelet
 bands no buffer still holds.
 
+### Duck TrueMotion 1
+
+Adapted from FFmpeg's `libavcodec/truemotion1.c` (LGPL-2.1-or-later), with the delta and vector
+tables of `truemotion1data.h` copied value for value. None of those tables is in the stream — the
+smallest frame in the corpus is empty — which is why this codec waited in `codec-investigations.md`
+until a licence-compatible implementation counted as a source.
+
+Measured over the eleven films in `samples.ffmpeg.org/V-codecs/DUCK/`: nine sixteen-bit AVIs and
+QuickTime films from 288x144 to 336x168, `salsa.avi`, whose frames switch between 288 and 192 wide
+part-way through, and `sonic3dblast_intro.avi`, the one twenty-four-bit film. FFmpeg is asked for its
+native layout — `rgb555le`, or `bgr0` for the twenty-four-bit form — with `-noautoscale`, so that a
+change of size reaches the comparison as the coded pictures rather than through a scaler, and every
+coded bit is compared. 16,369 of 16,395 pictures are identical.
+
+The other 26 are all in `sonic3dblast_intro.avi`, and the disagreement is FFmpeg's. That film has 23
+frames whose compression type, 0, codes no picture. FFmpeg sizes such a frame as sixteen-bit at the
+header's unhalved width, which in a twenty-four-bit film is a change of format: it drops its picture,
+emits a blank one, drops it again on the next coded frame, and decodes the following inter frames onto
+that blank picture until the next key frame. This decoder repeats the previous picture for a frame that
+codes nothing, which is what such a frame is for. The comparison skips exactly the pictures FFmpeg
+decodes onto its blank one, and requires each empty frame here to repeat the picture before it.
+
+Two further points where the decoder does not follow the reference: where FFmpeg stops decoding a
+frame part-way because the index stream has run out or an index has run off its table, keeping the
+rest of the previous picture, this decoder refuses the frame; and the predictor tables are rebuilt when
+the depth changes as well as when the delta set or vector table does. Neither occurs in the corpus.
+
+The encoder is original — FFmpeg has none to adapt. It replays the decoder's walk and, at every byte
+the decoder would read, tries every byte and every escape pair, keeping the one whose reconstructed
+pixels come closest; each key frame is coded under all twelve delta-set and vector-table pairs and the
+best kept. On a 64x48 textured gradient that gives 34.0 dB at sixteen bits and 37.8 dB at twenty-four.
+FFmpeg decodes fourteen-picture clips it writes, at both depths, to exactly the pictures this decoder
+does (`TrueMotion1VideoCodecTests`).
+
 ### QuickTime Animation (RLE)
 
 Lossless, and line-based rather than block-based: a frame names the band of lines it touches and
@@ -822,6 +856,318 @@ every frame compared, not only the first — the registry's own oracle asks for 
 frame, so a miscounted coded-block run, a mode written for a macro block that carries none, or a vector
 in the wrong units would pass it and fail in a real player on frame two. A still scene is also required
 to converge, which is what demonstrates the coded-block flags firing at all.
+
+### On2 VP4
+
+Converted from the `version >= 2` paths of FFmpeg's `libavcodec/vp3.c` and from `vp3dsp.c`, with every
+table of `vp4data.h` and the token tables of `vp3data.h` transcribed by script, all LGPL-2.1-or-later.
+It is a decoder of its own rather than a branch of the VP3.1 one above, because VP4 changes almost every
+layer while keeping VP3's shape. Which blocks are coded comes as runs over every macroblock of the three
+planes — fully, partly, not — with a block pattern for the partly coded ones from one of two tables the
+previous pattern chooses. The eight coding modes are VP3's, but a vector is coded relative to the last
+one of its kind with one of seven tables picked by that vector's size, and golden-frame vectors keep a
+history of their own. The coefficients are read a block at a time in Hilbert order, with an end-of-block
+run counted per coefficient position — a run ends that many later blocks at the same position, and a run
+of nought ends every later one there — and the DC is predicted as it is read, from the mean of two
+same-kind neighbours or the last DC of that kind. The quantiser and filter tables are VP4's own, and
+there is no loop filter over the picture: a motion-compensated prediction that straddles a block edge of
+its reference has that edge filtered in a copy first. The picture is held as FFmpeg holds it, bottom row
+first and padded to whole macroblocks, and cropped from the top left.
+
+The left neighbours of the DC predictor carry from the last superblock of one row into the first of the
+next, which is FFmpeg's behaviour and is kept. Measured against FFmpeg's `yuv420p` planes decoded with
+`-flags +bitexact`: the 364 pictures of `samples.ffmpeg.org/V-codecs/VP4/ot171_vp40.avi`, 160x112, four
+key frames and every one of the eight coding modes — golden frames and four-vector macroblocks
+among them — with 29,519 predictions passing through the motion-compensation filter; every one
+identical. It is
+the only public VP4 film.
+
+FFmpeg has no VP4 encoder, so the encoder is the package's own. It writes a key frame every thirtieth
+picture and inter frames whose macroblocks are copied, partly coded or wholly coded with VP4's "inter,
+no motion vector" mode, using mode scheme 5 where that mode is one bit, the first coefficient table of
+every group, each DC as its difference from VP4's prediction, and an end-of-block run of one wherever a
+block stops short. It decodes each frame it writes with the decoder above to get the reference for the
+next. FFmpeg decodes what it writes, in AVI and Matroska and at sizes that are and are not whole
+macroblocks, to exactly this decoder's pictures.
+
+### MS Screen 2
+
+Converted from FFmpeg's `libavcodec/mss2.c`, `mss12.c` and `mss2dsp.c`, LGPL-2.1-or-later. The region
+coder is `mss12.c` in its second version — adaptive frequency models that swap a symbol upwards when it
+draws level with the one above it, a move-to-front colour cache seeded 1, 2, 4 for the inter-picture
+masks, second-order contexts chosen by how many distinct colours the four neighbours hold — driven by
+MS Screen 2's own arithmetic coder, which works in 24 bits a byte at a time and maps non-power-of-two
+ranges piecewise, after Stuiver and Moffat. A frame may move the whole last picture by one vector, in
+which case it is drawn into a fresh picture and copies and moves come from the last one; otherwise it
+is drawn over the last one in place, and FFmpeg's in-place moves, row by row, are kept. The picture can
+be cut into two slices with their own models, at a row the frame or the extradata states. The
+run-length mode builds a Huffman code each frame from the codes it lists and the rest of the alphabet in
+order; the 15-bit mode is byte-oriented runs.
+
+The WMV9 rectangles — up to twenty a frame, or one implicit rectangle over the whole picture — are each
+a Windows Media Video 9 Main profile intra picture preceded by its size in 24 bits. They are decoded by
+the package's VC-1 intra decoder, taught for this the I-picture deblocking filter (8.6: every horizontal
+block edge, then every vertical one, which is the order FFmpeg's trailing filter amounts to), per-frame
+range reduction, and MS Screen 2's variant of the picture header, in which the frame-count bits become
+the one flag that switches range reduction and resolution scaling on. A rectangle coded at half size in
+both directions is doubled with `mss2dsp.c`'s interpolation, converted to RGB with its fixed-point
+BT.601 matrix, and laid over the palette picture, only where the palette picture holds the mask colour
+when there is one; a rectangle with nothing coded is mid-grey.
+
+Measured against FFmpeg's `rgb24` output decoded with `-flags +bitexact`: the 1,438 pictures of
+`samples.ffmpeg.org/V-codecs/MSS2` — `intro_windows.wmv`, `msn08_VBRq70_800x600.wmv`, `mss2_speech.wmv`
+and `msscreencodec.wmv`, 320x240 to 800x608 — every one identical. Between them they hold 307 frames
+with WMV9 rectangles, 154 of them implicit, 307 masked, up to nine rectangles a frame, 163 range-reduced
+and half-resolution rectangles at quantisers 2 to 29, 375 moved frames and 220 two-slice frames. They
+hold no run-length or 15-bit frames, so those are checked instead against what this encoder writes and
+against hand-built 15-bit frames, which FFmpeg decodes to the same pictures. A rectangle scaled in one
+direction only, which FFmpeg asks for a sample of, is refused.
+
+FFmpeg has no MSS2 encoder, so the encoder is the package's own. It writes run-length frames: a key
+frame restates the palette, and an inter frame codes only the rectangle that changed, as runs of
+unchanged pixels, of the row above and of one colour, with the frame's own Huffman code. A picture of
+255 colours or fewer comes back exactly; one needing a colour the palette lacks starts a new key frame,
+and one of more colours is mapped to a 6x7x6 cube.
+
+### Go2Meeting
+
+Converted from FFmpeg's `libavcodec/g2meet.c` and `elsdec.c`, LGPL-2.1-or-later, with the ELS ladder,
+its allowable-value table and G2M's two quantisation matrices transcribed by script. A packet is a list
+of chunks — display information, tiles, cursor position and shape — painted into a frame buffer that
+every packet hands out, the cursor alpha-blended over the copy and never into the buffer. ePIC tiles are
+a lossless context model over the ELS binary coder: each pixel is the left or the upper neighbour, a
+run along the row or along the row above, the upper-left or upper-right neighbour, a colour that has
+followed the left one before in this tile, or a median-predicted colour coded in its green and two
+colour differences, with every candidate turned down pushed onto a stack so later ones skip it. A
+transparent colour marks where a JPEG part shows through, coded in 4:2:0 at G2M's fixed matrices for
+only the 8x8 blocks that hold it. Kempf tiles are a flat colour, a palette of up to 256 entries with
+deflated indices and per-row "unchanged" flags, the same with JPEG behind one palette entry, or JPEG
+alone.
+
+FFmpeg's quirks are kept where they change what is decoded. The ePIC tile is decoded into a buffer it
+keeps across tiles and pictures and never clears, and the block mask for the JPEG part reads whole 8x8
+blocks of it past the tile's edge, so the buffer here is kept the same way; ELS errors come back as
+negative bits that some contexts take as ones; a tile that fails is left as it was, and a packet FFmpeg
+refuses whole — shorter than twelve bytes, or with the wrong magic — gives no frame.
+
+Measured against FFmpeg's `rgb24` output decoded with `-flags +bitexact`: 1,287 pictures, every one
+identical, from `SarbanesOxelyReporting.wmv` (G2M2, 1280x1024, its first 381 pictures, as far as the
+comparison's memory budget reaches), `101807.wmv` and `smp3.wmv` (G2M3) and `labor.wmv` (G2M4). The films,
+decoded whole, hold 2,620 pure ePIC tiles and 5,177 with JPEG behind them, Kempf flat, palette and
+palette-plus-JPEG tiles, and both cursor formats; the pictures of `SarbanesOxelyReporting.wmv` past
+its 381st decode without a fault but are not compared. A tile of JPEG alone, in either coding, appears in none
+of them. The fifth film, `g2m4.wmv`, is cut short at ten megabytes, and the package's ASF reader finds
+no packet of it where FFmpeg reads up to the cut.
+
+FFmpeg has no G2M encoder, so the encoder is the package's own. It writes `G2M4` with Kempf tiles of
+64x64: the first picture states the display information and every tile, later ones only the tiles that
+changed, with each unchanged row flagged so the decoder keeps it. A tile of 256 colours or fewer comes
+back exactly; one of more is mapped to a 6x7x6 cube.
+
+### Star Control II 3DO TrueMotion
+
+The 3DO release of Star Control II plays its intro, ending and ship spins from Duck TrueMotion films
+split across four files of one name, which The Ur-Quan Masters reads as an add-on: `.hdr` (a version,
+1 or 3, the picture size in eight-pixel blocks and two eight-entry delta tables for luminance and
+chrominance), `.tbl` (256 codebook vectors of up to seven pairs of delta indices), `.frm` (the offset
+of every chunk) and `.duk` (the chunks: a sound length, a picture length, Duck's 4-bit stereo ADPCM at
+22,050 Hz and the picture). The only implementations are NihAV's `na_game_tool` (GPL-3.0) and The
+Ur-Quan Masters' own player (GPL-2.0), so this is rung two: the format was written up from
+`na_game_tool`'s reading of it, implemented from that description, and `na_game_tool` is the oracle.
+
+A picture is words of two RGB555 pixels. Each of its bytes names a codebook vector, read a pair of
+indices at a time. In the eight-row layout (method 1) every band is two rows of words, each predicted
+from the one above, the first starting from the band before's second; every four words open with a
+chrominance pair, which only the first row's running sum receives, then four luminance pairs a row.
+In the four-row layout (method 3) a band is one row of words with a chrominance pair every fourth.
+Each band row is shown four times. Chrominance adds its deltas to red and blue of both pixels;
+luminance adds half its delta to all three components of its own pixel, and in the eight-row layout
+the delta's odd bit toggles the pixel's spare top bit in a running XOR, which the next addition carries
+through — the arithmetic is wrapping 32-bit throughout, and the decoder keeps the spare bits so the
+carries come out the same. Every picture starts from black, so every picture stands alone.
+
+No film may be redistributed: the cutscenes exist only on the commercial 3DO disc, The Ur-Quan Masters
+leaves them out of its official packs, and the one prebuilt pack is described on its own forum as of
+questionable legality. The tests therefore build a seeded film of both layouts with codebook vectors
+of every length up to fourteen, odd and even deltas and junk in the codebook bytes no vector uses, and
+its six pictures are bit for bit — every 16-bit word, spare bits included — those `na_game_tool` 0.6.0
+writes to AVI for it; their hashes are committed, and an opt-in test reruns the tool. The sound is
+handed out as it is stored, under its own tag, since the package decodes no audio. The container's
+writer puts that film back byte for byte — `Finish` returns the `.duk`, and the header, codebook and
+chunk offsets are written beside it — so what `na_game_tool` read is also what the writer writes; it
+claims no oracle in the registry only because `na_game_tool` is not one the conformance fixture can
+run on CI. There is no picture encoder: nothing plays a new film of the format, and copying a film's
+pictures from one set of files to another needs none.
+
+### Sorenson Video 1
+
+Converted from FFmpeg's `libavcodec/svq1dec.c` with its codebooks, codes and frame-size table parsed
+out of `svq1_cb.h`, `svq1_vlc.h`, `svq1.c` and H.263's `h263data.c`, all LGPL-2.1-or-later. The vector
+reconstruction is kept in FFmpeg's packed form — four samples in a word, odd and even bytes summed in two
+16-bit lanes and clipped by a bit trick — because a lane that goes negative borrows from its neighbour,
+and the result is then not always the clamped per-sample sum; every SVQ1 decoder in use computes the word
+form. Output is `Yuv410P8`, a planar 4:1:0 format added to `FileFormat.Core` for it.
+
+Measured over `samples.ffmpeg.org/V-codecs/SVQ1/` and the FATE suite's `svq1/`: eleven of twelve films,
+128x72 to 800x200, 16,043 pictures, every one identical to FFmpeg's `yuv410p` planes. Three needed the
+comparison to be fair rather than the decoder changed: `audi_a4.mov` is truncated, and is compared up to
+the last sample its index can reach; `menace_640qt4.mov` has an edit list whose first six pictures are
+decoded and not shown, by either; and `101.mov` is 600x450, whose last chrominance row no decoder writes,
+because SVQ1 codes chrominance at a quarter of the picture rounded down to whole 16x16 blocks. The
+twelfth, `alice_lo_m.mov`, codes its pictures under a second sample description and this package's MP4
+reader reports the first; that is a demuxer gap, not a codec one.
+
+The encoder takes FFmpeg's `encode_block` from `svq1enc.c` — one to six codebook stages and the mean
+alone tried for every vector, then whether splitting it codes it more cheaply, each level's bits in a
+buffer of its own because the decoder reads the tree breadth first — and puts this package's own motion
+search and mode decision around it: whole-sample over ±8 then half-sample, and skip, inter or intra by
+squared error plus λ times bits at λ = 8. The temporal reference counts up, so the ±128 mean swap never
+applies. The reference is what the decoder makes of each packet. A 160x120 gradient comes back at 43.8
+dB luma; FFmpeg decodes fourteen-picture clips it writes, in AVI and in QuickTime, to exactly this
+decoder's planes. QuickTime needs a sample entry, and the MP4 writer now writes the plain visual one for
+SVQ1, the first of a list of codecs whose decoders read every parameter from the frames.
+
+### Sorenson Video 3
+
+Converted from FFmpeg's `libavcodec/svq3.c` and the H.264 pieces it calls — `h264pred.c`'s intra
+predictors, `h264_parse.c`'s mode checks, `hpeldsp.c` and `tpeldsp.c`'s motion compensation and
+`h264data.c`'s tables — all LGPL-2.1-or-later, with every table transcribed by script. SVQ3 is an early
+H.264 draft and keeps H.264's 4x4 block order, intra predictors, coded-block patterns and chroma DC
+transform, but codes everything in interleaved exp-Golomb codes with its own run/level tables, its own
+transform (13, 17 and 7 rather than H.264's 1 and 2) and dequantisation, its own intra 4x4 mode coding,
+and vectors at a third of a sample with a precision chosen per macroblock. The `SEQH` atom in the
+QuickTime sample description, found by searching it as FFmpeg does, states the picture size, which
+precisions the stream may use, whether it has B pictures and whether it carries a watermark; a
+watermarked stream's zlib logo is inflated and its CRC-16 taken as the key that unlocks four bytes at
+the head of every slice.
+
+FFmpeg's quirks are kept where they change what is decoded. A skipped P macroblock writes no vector, so
+its neighbours' predictions read whatever the reused picture buffer last held there — the three
+buffers rotate exactly as FFmpeg's do. A B macroblock's direct mode scales the co-located vector of the
+next anchor by the picture-number distances, and the 4x4 partitions of the direct and bidirectional
+modes use `hpeldsp`'s two-wide diagonal function for chrominance, which is marked "FIXME non put" in
+FFmpeg and is one: the averaging pass of a 2x2 chroma block at a diagonal half-sample position replaces
+the forward prediction instead of averaging with it. That was the last difference found, and it shows
+only on B pictures, only in chrominance, and only in 2x2 blocks. A packet FFmpeg drops whole — an
+unknown slice header byte, as `broken_sword_Large.mov` has at one point — is dropped here as well and
+the stream goes on.
+
+Measured against FFmpeg's `yuvj420p` output decoded with `-flags +bitexact` and `-fps_mode
+passthrough`: 10,710 pictures, every one identical, from `samples.ffmpeg.org/V-codecs/SVQ3/`'s
+`rotk_trailer_480x280.mov` (4,108, B pictures throughout), `broken_sword_Large.mov` (2,504, B
+pictures, 800x600; the opt-in comparison's memory budget reaches 2,083 of them, and the rest were
+compared from both decoders' raw output), `Vertical400kbit.sorenson3.mov` (1,308), `shrek2_tsr_qt_240.mov` (1,452),
+`lucy_letters_to_satan_2007.mov` (1,191, watermarked), `blade_2_m480.mov` and `gl2.mov` (124 and 23,
+ both truncated files read up to the cut). Two more watermarked films there, `finalfantasy_cc.mov` and
+`starfox2.mov`, open with a compressed `cmov` movie header that the package's QuickTime reader does
+not recognise, so their pictures never reach the decoder; that is the container's.
+
+FFmpeg has no SVQ3 encoder, so the encoder is the package's own. It writes a low-delay stream with
+whole-sample vectors only — the `SEQH` atom goes after the BITMAPINFOHEADER in AVI and Matroska — and
+uses nothing that predicts from inside the picture being coded: an intra macroblock is type 33, whose
+luminance and chrominance both predict from a flat 128, and an inter macroblock is a 16x16 block whose
+vector is nought. With every vector nought the median prediction is nought, so a difference of nought
+states it. Each macroblock is skipped, coded over the co-located reference block or coded intra by
+squared error plus weighted bits, and each 8x8 luminance group and the chroma DC and AC are coded only
+where they pay for themselves. The reference for the next picture is what the package's decoder makes
+of the packet just written, so the two cannot drift apart. At quantiser 18 a 480x264 trailer comes
+back at about 40 dB with slightly fewer bytes than the original stream spent with motion search and B
+pictures.
+
+### NewTek SpeedHQ
+
+Converted from FFmpeg's `libavcodec/speedhqdec.c`, with the AC run-level table and its codes taken from
+`speedhq.c` and MPEG-2's DC size codes from `mpeg12data.c`, all LGPL-2.1-or-later. The AC codes are
+MPEG-2's Table B.15 with some codewords moved, written least-significant bit first. Fields, the four
+slices per field with their 24-bit lengths, run-length and DCT alpha and the half-macroblock border
+column of a width that is a multiple of eight follow the decoder one for one. The inverse transform is
+FFmpeg's `simple_idct`, which this package already had for DV.
+
+Measured against FFmpeg's planes over pictures FFmpeg's own `speedhq` encoder writes at 4:2:0, 4:2:2
+and 4:4:4 — 210 pictures, every one identical — and against the Adler-32 checksums FATE records for its
+progressive (`0x9bb6dc6d`, 112x64) and single-field (`0x75de4109`, 112x32) samples, which this decoder's
+planes reproduce exactly.
+
+The encoder is this package's own around FFmpeg's `encode_dc` and `encode_block` from `speedhqenc.c`:
+progressive pictures, one quantiser scale for every slice (4 of the format's 1-100), each 8x8 block
+through MPEG's forward transform. FFmpeg's encoder writes only the three alpha-less forms at widths that
+are multiples of sixteen; this one writes all eight, the border column and both alpha codings included.
+A 64x48 gradient comes back at 38.5 dB in 4:2:0, 40.5 in 4:2:2 and 41.3 in 4:4:4 (RGB PSNR); run-length
+alpha comes back exactly, and so did DCT alpha on the test picture. FFmpeg decodes three-picture clips
+of every form, written into AVI at widths that are and are not multiples of sixteen, to exactly this
+decoder's YUV and alpha planes.
+
+### On2 VP7
+
+Converted from the VP7 paths of FFmpeg's `libavcodec/vp8.c` and `vp8dsp.c`, with its tables parsed out of
+`vp8data.h` mechanically, all LGPL-2.1-or-later. VP7 shares VP8's boolean coder, prediction modes, six-tap
+filter and coefficient tree, and those come from this package's own VP8 decoder, whose edge constants are
+now parameters because VP7 puts 128 where VP8 puts 127 and 129. What is VP7's own is converted: the frame
+header with its four macroblock features (read and, as by FFmpeg, not applied) and fading; the quantiser
+tables; a census over twelve neighbours, scored, with the reference decoder's wrap of a column offset
+across its padding column into the row before; Y2 DC prediction across inter macroblocks in sixteen-bit
+arithmetic; tokens that may end after a zero; a scan order the stream can restate; left coefficient
+contexts that carry from one macroblock row into the next; the transforms with their sixteen-bit
+intermediate rows and DC-only shortcuts; and the loop filter, whose limits, rounding and edge order
+differ from VP8's.
+
+Measured over `samples.ffmpeg.org/V-codecs/VP7/`, the FATE suite's one VP7 film among them: eight films,
+320x176 to 704x272, 17,518 pictures, every one identical to FFmpeg's `yuv420p` planes. They are all
+profile 0 and use neither fades, the simple filter nor the features; 2,784 of their frames restate the
+scan and 1,655 refresh the golden frame.
+
+The encoder is this package's own, FFmpeg having none. It reconstructs with the decoder's code —
+prediction, transforms, census and DC predictor — and takes the decoder's reading of each packet as its
+reference; with the loop filter off, its reconstruction is the decoder's picture byte for byte in both
+profiles. A key frame every twelfth picture; 16x16 and per-subblock intra modes chosen by sum of absolute
+differences; one vector a macroblock, whole-sample around zero and the census's nearest then half and
+quarter, against the previous or the golden frame; the golden frame refreshed every fourth interframe;
+and a change of mean brightness of two levels or more coded as a fade. Quantiser 24, normal filter at
+level 12. A 160x120 gradient key frame comes back at 43.2 dB luma.
+
+FFmpeg decodes what it writes — both profiles, both filters, fine and coarse quantisers, an odd size,
+fades — to exactly this decoder's pictures, with one exception that is FFmpeg's: when a frame fades a
+previous frame the golden frame is not, `vp7_fade_frame` fades that buffer in place, and that buffer is
+the picture it has just returned. Whether its caller sees the faded or the unfaded copy is then a race —
+three runs of the same `ffmpeg` command over the same file gave two different outputs. The pictures it
+predicts from are right either way, so the comparison skips only the pictures that race.
+
+### On2 VP6
+
+Converted from FFmpeg's `libavcodec/vp6.c` and `vp56.c` with the DSP they lean on — `vp6dsp.c`,
+VP3's IDCT and loop filter, H.264's bilinear chroma filter and `huffman.c`'s tree builder — all
+LGPL-2.1-or-later; the VP6 tables were parsed mechanically out of `vp6data.h`, and the tables VP6
+shares with VP5 are the VP5 decoder's. `codec-investigations.md` records how far a decoder built from
+On2's published specification got; converted from FFmpeg, it follows every film.
+
+Measured over thirteen films: `samples.ffmpeg.org/V-codecs/VP6/` (VP60 and VP61 `predator2`, VP61
+`vid.avi` and `Xmen-avc-500`, VP62 `harry3-40` and `wagner-700`, and the Huffman-coded VP6F
+`backcountry_bombshells`, of which the first 2,439 pictures are compared to keep the decode under
+.NET's two-gigabyte file limit) and the FATE suite's `vp6/interlaced32x32`, `interlaced32x64` and
+`flash-vp6/clip1024` and `300x180-Scr-f8-056alpha`. FFmpeg is asked for `yuv420p`, or `yuva420p` for
+VP6A, at each picture's own size, and the planes are compared byte for byte: all 15,194 pictures are
+identical. That covers the bottom-up AVI form and the top-down Flash form, sub-versions 0 to 8, field-
+coded macroblocks, both coefficient codings, the separate partition, the bicubic filter sets with the
+variance and vector-length switch, and the alpha bitstream. The NSV sample `size_change.nsv` is not
+read because this package has no NSV demuxer (a missing-format issue of its own).
+
+Two choices differ from FFmpeg where FFmpeg patches over damage: a frame whose coefficient data runs
+out is refused rather than concealed with copied macroblocks, and an inter frame with no reference
+picture is refused rather than decoded onto a blank one. Neither occurs in the corpus.
+
+The encoder is original. It writes a single range-coded partition with the default models, bilinear
+filtering and no loop filter: intra key frames every twelfth picture, and inter frames whose
+macroblocks are copied, moved by a whole-sample vector from a ±8-sample search — named by the
+neighbour that already carries it where one does — or intra-coded, by whichever leaves the least error.
+Its residuals are coded against the prediction the decoder will form, obtained from the decoder
+itself, and its reference is the decoder's reconstruction of what it has just written. A 48x32 textured
+gradient comes back at 35.8 dB at quantiser 56. FFmpeg decodes fourteen-picture clips it writes as
+VP6F and VP6A in FLV and as VP60 and VP62 in AVI to exactly the planes this decoder produces
+(`Vp6VideoCodecTests`).
+
+FLV carries a VP6 frame's crop byte between the tag header and the bitstream. The FLV reader now hands
+it over as the packet's container data rather than as the first byte of the frame, as FFmpeg's FLV
+demuxer moves it into extradata, and the writer puts it back.
 
 ### On2 VP5
 
@@ -1953,6 +2299,434 @@ one of which consumed exactly the bits it should, exercising all three escape fo
 
 What refuses, by name: version 1 and version 3, which are different bitstreams sharing this one's
 name.
+
+### Windows Media Video 7
+
+WMV1 is Microsoft MPEG-4 version 3 with differences, and the decoder is the version 3 one taught them
+from the WMV1 paths of FFmpeg's `libavcodec/msmpeg4dec.c`, `msmpeg4.c` and `h263dec.c`, with WMV1's DC
+steps, scans and inter-intra code from `msmpeg4data.c` and `msmpeg4_vc1_data.c`, all LGPL-2.1-or-later.
+The differences: the extension header — frame rate, bit rate, flip-flop rounding — sits inside the intra
+picture header rather than after the picture; above 50 kbit/s a picture may say that each coded macroblock
+restates its run-level table; below 320x240 at 128 kbit/s or less, an intra macroblock of a predicted
+picture states a prediction direction and takes the DC of its first luminance block and of its
+chrominance from the mean of the reconstructed samples beside or above it; DC and AC prediction cross
+slice boundaries; the gradient test is strict; the second escape's run is one short in intra blocks too;
+and the third escape states its level and run lengths at its first use in a picture. A block that runs
+past its sixty-fourth coefficient is ended at the sixty-third with the stray coefficient dropped, which
+is what FFmpeg does and what real files need. WMV1 is held to FFmpeg's integer `simple_idct`, which is
+what FFmpeg decodes it with — the version 1 to 3 decoder keeps the floating-point transform it was
+measured with.
+
+Measured against FFmpeg's `yuv420p` planes, decoded with `-flags +bitexact`: 4,216 pictures, every one
+identical. 3,886 are `samples.ffmpeg.org/V-codecs/WMV1/Damien.wmv`, an ASF film, about which FFmpeg logs
+a block overflow and a damaged macroblock while producing exactly the pictures decoded here. The rest are
+seven streams FFmpeg's own `wmv1` encoder wrote, at 64 kbit/s to 1 Mbit/s and quantisers 2 to 20, 160x120
+to 352x288 and the odd 200x150, between them covering inter-intra prediction and per-macroblock tables.
+The bit-exact flag matters: without it FFmpeg's x86 half-sample averaging without rounding is an
+approximation, which put two chrominance samples of one picture a level out and was traced to that
+rather than to the decode. The raw-picture comparisons against FFmpeg ask for it now.
+
+The encoder is the Microsoft MPEG-4 one writing WMV1's header, scans, DC steps and third escape, and
+reconstructing with `simple_idct`. It states 255 kbit/s in the extension header, which keeps inter-intra
+prediction off and per-macroblock tables unused. FFmpeg decodes what it writes, in AVI and Matroska and
+with noise pictures that force the escapes, to exactly this decoder's pictures.
+
+### Windows Media Video 8
+
+WMV2 keeps WMV1's block layer — the run-level tables, the three escapes, the DC prediction and steps,
+the scans — and the decoder takes it from the WMV1 one unchanged but for the transform. Everything
+around it is converted from FFmpeg's `libavcodec/wmv2dec.c`, `wmv2dsp.c`, `intrax8.c`, `intrax8dsp.c`
+and the H.263 loop filter in `h263.c` and `h263dsp.c`, with `wmv2data.c`'s scans, `msmpeg4data.c`'s
+three predicted-macroblock tables and `intrax8huf.h`'s Huffman tables transcribed by script, all
+LGPL-2.1-or-later. The four bytes after the `BITMAPINFOHEADER` say which tools the stream uses:
+quarter-sample motion, the loop filter, adaptive transforms, IntraX8 pictures, the chosen vector
+predictor, per-macroblock run-level tables, and how many slices a picture has.
+
+What differs from WMV1, and where it bites. Every 8x8 block goes through WMV2's own transform — rows
+shifted by eight, columns by fourteen, with a 181/256 rotation for the odd terms — intra and predicted
+alike; an adaptively split block goes through FFmpeg's `simple_idct` 8x4 or 4x8 halves instead, and a
+half that runs past its thirty-second coefficient lands on the DC, because FFmpeg's 64-entry scans are
+zero past the 32 they hold. The predicted macroblock's joint type and pattern comes from one of three
+tables picked by the quantiser band and a stated index. The skip map comes ahead of every macroblock in
+one of three layouts — a bit each, a bit a row or column then a bit each — and a row or column map that
+skips everything makes the picture no picture: FFmpeg returns nothing for it and does not flip the
+rounding, so neither does this decoder. The vector predictor is the left neighbour on a slice's first
+row and otherwise the median with nought standing in for a neighbour outside the picture, unless the
+left and upper neighbours disagree by eight half-samples and the stream lets the macroblock choose.
+Quarter-sample motion filters the luminance with (-1, 9, 9, -1)/16 and averages in an extra horizontal
+quarter step where the vector is odd; the source position is clipped to sixteen samples outside the
+picture's stated, not macroblock-aligned, size and its fraction dropped there, as FFmpeg does. The
+deblocking filter is H.263's Annex J one run in FFmpeg's order, a skipped macroblock filtered with a
+quantiser of nought. Rounding flips at every predicted picture and is set by every intra one.
+
+IntraX8 is a separate picture coder: 8x8 blocks predicted from the filtered samples above and beside
+them in one of twelve directions, chosen by the neighbours' history and a stated correction, with an
+AC compensation of the DC's own leakage, an optional quantisation matrix, its own DC, AC and orientation
+tables chosen once a picture, a flat-block shortcut, and its own loop filter applied as each block is
+placed. Its quirks are FFmpeg's and kept: the run estimate takes the upper-left neighbour into account
+wherever x and y share a bit, not only away from the edges.
+
+Measured against FFmpeg's `yuv420p` planes, decoded with `-flags +bitexact`: 30,209 pictures, every one
+identical. They are the eight films of `samples.ffmpeg.org/V-codecs/WMV8` and its `j-frames` directory —
+320x240, 640x360 and the 294x166 of `703.wmv`, which is not a whole number of macroblocks. Between them
+they hold 443 J-frames, 45,000 deblocked pictures, 19,000 with quarter-sample motion, every adaptive
+transform at every level it can be chosen at, all four skip-map layouts and both outcomes of the chosen
+predictor; FFmpeg's "ignoring overflow" over one of them is the WMV1 block overrun, read the same way here.
+What FFmpeg's own `wmv2` encoder writes — which states the quarter-sample, adaptive-transform, J-frame and
+per-macroblock-table flags and uses none of them — decodes to FFmpeg's pictures as well, with and without
+`+loop`, at sizes that are and are not whole macroblocks.
+
+The encoder is the Microsoft MPEG-4 one writing WMV2's picture header, skip map, macroblock tables and
+vector predictor, with every optional tool off in the extension header and one slice. It reconstructs
+with WMV2's transform and the alternating rounding the format makes compulsory, and avoids the row and
+column skip maps so that a picture of nothing but skipped macroblocks is still a picture. FFmpeg decodes
+what it writes, in AVI and Matroska and with noise pictures that force the escapes, to exactly this
+decoder's pictures.
+
+### Lagarith
+
+Converted from FFmpeg's `libavcodec/lagarith.c`, `lagarithrac.c` and `lagarithrac.h`, LGPL-2.1-or-later,
+with the probability header's variable-length code copied exactly. The probability table is rescaled to
+a power of two by FFmpeg's soft-float reciprocal and multiply, which reproduce in integers the x86 floating
+point the reference encoder rescaled with, the remainder handed out round the first 128 non-zero entries.
+The range decoder reads every byte one bit late, as the reference does. FFmpeg's hash table for finding a
+symbol is only a start for a linear search, so a binary search for the first cumulative probability above
+the code value gives the same symbol. Zero runs carry across lines and, as in FFmpeg, across planes. RGB
+planes run bottom-up, with red and blue coded as differences from green; YUY2 has its own first two rows.
+
+Measured against FFmpeg's planes, decoded with `-flags +bitexact`, over `samples.ffmpeg.org/V-codecs/lagarith/`
+and the FATE suite's `lagarith/`: ten films, every picture identical, in RGB24 (306 pictures compared),
+RGBA (136), YUY2 (67, up to 1920x1080) and YV12 (113, the comparison's byte budget reached). FATE's
+`lagarith-1.3.27-black-frames-and-off-by-ones.avi` is among them. Its empty packets are dropped frames and
+give no picture in either decoder. The measure is FFmpeg's decode, which FFmpeg's own tracker once
+recorded as not bit-exact with the reference. FATE now carries the sample from that report, but
+`lagarith.dll`, the reference decoder beside the samples, was not run.
+
+The encoder is this package's own: each plane is predicted with the decoder's predictors run forwards.
+The probability table is its residue counts, halved until the total fits 23 bits. The range encoder
+mirrors the decoder at twice its scale, so the decoder's one-bit offset becomes a byte boundary, and it
+carries into bytes already written. A plane of one value is coded as solid, and so is a picture of one
+colour. A plane the coder would enlarge has its residues stored. A 64x48 gradient codes to 985 bytes of
+4,608, and noise to eight bytes over the raw size. FFmpeg decodes what it writes, in all four layouts, in
+AVI and Matroska, to exactly the pictures given.
+
+### YUY2 Lossless Codec (YLC)
+
+Converted from FFmpeg's `libavcodec/ylc.c`, LGPL-2.1-or-later, with its four 225-entry residue tables parsed
+out mechanically. The Huffman tables are built from 256 counts a table in each packet by `build_vlc`'s own
+pairing — the two smallest non-zero counts, the second smallest on the left — and the codes are the
+complement of the path to each leaf. That pairing is followed exactly, its edge case included: with fewer than
+two non-zero counts the root is leaf 255. Both regions are read from byte-swapped 32-bit words, the picture's
+only where a word is whole. A group of four YUYV bytes is a flag and one first-table symbol — one of the
+residue quads, or a skip of two to thirty-two unchanged groups that may cross rows — or four literal codes,
+the second luminance coded as its sum with the first. Prediction is the gradient, left plus top minus top-left,
+with left and top-left carried from one row into the next.
+
+Measured: every one of the 100 pictures of `samples.ffmpeg.org/V-codecs/ylc0.avi` is identical to FFmpeg's
+`yuv422p` planes.
+
+The encoder is this package's own, FFmpeg having none. It takes residues from the predictor run forwards,
+skips a run of two or more all-zero groups, writes a group the residue tables hold as that symbol and any
+other as literals, and builds tables from its own counts through the decoder's construction. Counts are
+flattened until no code passes the thirty bits FFmpeg can read. A 320x240 gradient codes to 568 bytes of
+153,600. Noise grows by a twenty-fifth, since YLC has no stored form and a flag bit goes with every group.
+FFmpeg decodes what it writes to exactly the pictures given.
+
+### 8088flex TMV
+
+Container and codec converted from FFmpeg's `libavformat/tmv.c` and `libavcodec/tmv.c`, with the IBM CGA font
+from `libavutil/xga_font_data.c` and the CGA palette from `libavcodec/cga_data.c` parsed out mechanically, all
+LGPL-2.1-or-later. The file is a twelve-byte header — `TMAV`, sample rate, sound bytes a frame, compression
+method 0, the screen's columns and rows, and feature bits for 512-byte padding and stereo — and then, frame
+after frame, a screen of character and attribute bytes and a block of unsigned 8-bit sound. The frame rate
+is the sound's. A cell is drawn with the CGA font, the attribute's low nibble the foreground and its high
+nibble the background, all sixteen colours of it as FFmpeg draws it rather than blinking. The sound is
+handed out as WAVE format 1 with an 8-bit WAVEFORMATEX, so a remux into AVI carries it unchanged.
+
+Measured: all 110 pictures of the FATE suite's `tmv/pop-partial.tmv` — the only sample anywhere, truncated
+inside its last frame — are identical to FFmpeg's RGB, and its 40,480 sound bytes are FFmpeg's.
+
+The encoder is this package's own, FFmpeg having none. Each cell's pixels go to their nearest CGA colours.
+The two most frequent become background and foreground, and the glyph nearest the resulting mask is
+chosen, tried both ways round. A screen drawn from the font comes back exactly; any other picture is
+approximated. The writer pads a film with silence, four hundred samples a frame at the video's rate, when
+it is given no sound, because a TMV film is paced by its sound. FFmpeg reads both the container and the
+codec this writes, to exactly the pictures this decoder produces.
+
+### Chronomaster DFA
+
+Container and codec converted from FFmpeg's `libavformat/dfa.c` and `libavcodec/dfa.c`, LGPL-2.1-or-later.
+The film is a 128-byte `DFIA` header — version, frame count, width, height, milliseconds a frame, and 0x80
+at byte 16 in every known film — and then frame after frame a run of chunks, each a name, a size and a
+type, ended by `EOFR`. A frame is handed to the decoder as FFmpeg's demuxer hands it over: every chunk up
+to and including the `EOFR` header. The version travels to the decoder as two bytes of codec private data,
+as FFmpeg's extradata.
+
+The decoder keeps one eight-bit picture that each frame's chunks rewrite: `COPY` raw, `TSW1` and `DSW1`
+LZ77 over byte pairs (`DSW1` with skips), `BDLT` and `WDLT` line deltas of bytes and of words, `TDLT`
+copy-and-skip pairs, `BLCK` a clear, and `DDS1` the LZ77 again with every pixel doubled both ways. The
+palette is 6-bit, taken to eight bits by FFmpeg's shift of the whole 24-bit value, carries and all.
+Chunks are read through a cursor that yields zero past the end, as FFmpeg's `GetByteContext` does; a back
+reference of distance zero copies nothing, as `av_memcpy_backptr` does; and a damaged chunk leaves the
+picture as far as it got, so the next frame draws over that, as FFmpeg's does. Version 0x100 films store
+four quarter-width columns of lines and are drawn in display order.
+
+One departure. FFmpeg's `DDS1` skip tests `frame - frame_end < v`, which no skip inside the picture can
+pass, and a `DDS1` picture cannot be drawn without skips, so FFmpeg refuses all of them: the last 56
+frames of `0000.dfa` never appear. This decoder tests `frame_end - frame < v`. Its oracle for those frames is
+FFmpeg n9.1's own chunk decoders, compiled on their own behind a stand-in for `GetByteContext`: left as
+they are, they reproduce FFmpeg's output for all four films byte for byte, and with the one comparison
+turned round they draw every `DDS1` frame.
+
+Measured against FFmpeg n9.1 with `-flags +bitexact`: all 553 pictures it draws of `0000.dfa`, `0001.dfa`,
+`0002.dfa` and `LOGOS.DFA` are identical to this decoder's, and all 609 pictures of the four films are
+identical to the corrected chunk decoders'. The test keeps that build's SHA-256 for each film.
+
+The encoder is this package's own, FFmpeg having none. Each frame is a `PAL1` chunk when the palette
+changes, then the smallest of `COPY`, `BLCK`, `TSW1` from the first changed byte, and `DSW1`, which skips
+unchanged runs and otherwise copies back or writes pairs, both matching at even distances within
+`TSW1`'s reach of 16,382 bytes. Only the first picture is written whole, since DFA has no index to seek by.
+An `Indexed8` picture keeps its indices, its palette taken to six bits a component; anything else goes to
+a fixed six-seven-six colour cube. Re-encoding the decoded real films gives every picture back exactly, in
+803,442 bytes against `0001.dfa`'s 815,704, 973,210 against `0002.dfa`'s 958,832, and 3,905,854 against
+`LOGOS.DFA`'s 5,082,797. FFmpeg reads the container and the codec this writes, to exactly this decoder's
+pictures.
+
+### Deluxe Paint Animation
+
+Container and codec converted from FFmpeg's `libavformat/anm.c` and `libavcodec/anm.c`, LGPL-2.1-or-later.
+The film is Electronic Arts' large-page file: a 128-byte `LPF ` header naming `ANIM`, the picture size, the
+record count, the frame rate and a flag for a looping last delta; 128 bytes of colour-cycling ranges; a
+palette of 256 little-endian `0x00RRGGBB` entries; a table of 256 pages; and the pages, 64 KiB apart, each
+stating the first record it holds, how many and their bytes, then their sizes and the records. The cycling
+ranges and palette reach the decoder as codec private data, as FFmpeg's extradata.
+
+FFmpeg's demuxer is followed exactly where it is particular. A page is found by the number of the record
+after the last page's, so pages need not lie in order, and every record a page lists is read from its
+first. The header's record count, one less where there is a last delta, is consulted only when the next
+page is looked for, so a last delta is left out only where it opens a page of its own: `Vrs.anm` has one
+page and all 26 of its records are read.
+
+A record is `0x42`, a zero, two bytes nobody reads and RunSkipDump operations on one persistent picture: a
+count byte dumps or, with its top bit, skips; a zero byte is followed by a count and a pixel to fill; and
+`0x80` is followed by a word whose top two bits choose a skip, a skip of 0x4000 more, a dump or a fill, a
+zero count with type zero ending the record. Operations run line by line, and one that passes the end of
+the picture, or a dump the record cannot supply, ends the record where it stands. An empty record holds
+the last picture; FFmpeg yields no picture for it, and neither does this decoder. `Hyytel__in_space_by_MukaSmarts.anm` has
+2,194 of them among its 4,696 records.
+
+Measured against FFmpeg n9.1 with `-flags +bitexact`: all 2,848 pictures of `CINEOV2.ANM`, `INTRO1.ANM`,
+`SW.ANM`, `Vrs.anm` and `Hyytel__in_space_by_MukaSmarts.anm` are identical.
+
+The encoder is this package's own, FFmpeg having none. The film has one palette, in its header: the first
+picture's when that is `Indexed8`, a six-seven-six colour cube otherwise, and a later picture in other
+colours is taken to the nearest in it. The stream's description carries the palette once the first
+picture is encoded, which is when the Viewer and the tests ask for it. The first record writes every pixel;
+later ones skip what has not changed, fill runs of three or more and dump the rest. The writer packs the
+records in order into pages, padding every page but the last to its 64 KiB as Deluxe Paint does, and a
+record must fit one page, which bounds a picture at about 65,000 pixels. Re-encoding the decoded real
+films, picture for picture, gives every picture back exactly and comes out smaller than every original:
+642,724 bytes against `CINEOV2.ANM`'s 655,497, 428,293 against `INTRO1.ANM`'s 452,911, 411,361 against
+`SW.ANM`'s 418,832 and 27,233 against `Vrs.anm`'s 32,498. FFmpeg reads the container and the codec this
+writes, to exactly this decoder's pictures, a film of several pages included.
+
+### TechSmith Screen Codec 2
+
+Converted from FFmpeg's `libavcodec/tscc2.c`, LGPL-2.1-or-later, with the quantisers and the DC, count
+and AC code tables transcribed mechanically from `tscc2data.h` by a script that parsed the C initialisers.
+Codes are canonical, assigned from their lengths in listed order as `ff_vlc_init_from_lengths` assigns them,
+and read least-significant bit first, so the first bit read is a code's first bit.
+
+A frame is a type byte — 0 repeats the last frame and yields no picture, as in FFmpeg — two quantisers
+from 2 to 14, a byte nobody reads, a run-length map giving each sixteen-by-eight macroblock one of four
+properties (0 and 3 skip it; 1 and 2 choose a quantiser), and a row of macroblocks at a time, each row's
+length in one odd byte or a doubled 32-bit word. A coded macroblock carries each of its three full-size
+planes as a fill, 128 raw samples, or eight four-by-four blocks: a DC, the first raw and the rest
+differences, a count of AC coefficients, and run-and-level codes in zigzag order, each with an escape to
+raw bits. The inverse transform is FFmpeg's integer one, and it stores each sample's low eight bits
+without clamping, as FFmpeg's does.
+
+Measured against FFmpeg n9.1 with `-flags +bitexact`: all 24 whole pictures of the FATE suite's
+`tscc/tsc2_16bpp.avi`, the only sample found anywhere, are identical in `yuv444p`. The file is cut off at a
+million bytes inside the 25th, which both decoders refuse.
+
+The encoder is this package's own, FFmpeg having none, and lossless. A macroblock that has not changed is
+skipped. Each plane of the rest is the smallest of a fill, the transform, and raw samples, the transform
+taken only where it reproduces every sample: the coefficients are found by inverting the transform's
+integer matrix about the block, rounding to quantiser 2, the finest, and decoding to check. Re-encoding
+the sample's 24 pictures gives each back exactly in 884,465 bytes against TechSmith's 880,934. FFmpeg
+decodes what it writes to exactly this decoder's pictures.
+
+### Dxtory
+
+Converted from FFmpeg's `libavcodec/dxtory.c`, LGPL-2.1-or-later. A frame opens with sixteen bytes whose
+first four, big-endian, name the layout — BGR24, 4:2:0, 4:1:0 or 4:4:4 YUV, RGB565 or RGB555 —
+whether it is uncompressed (version 1) or coded (version 2), and in bit 0x20 whether it is stored bottom up.
+Version 1 is the samples in a fixed order, chroma offset by 0x80. Version 2 is a table of slices, each
+sixteen bytes of header and then symbols read least-significant bit first: per channel a list of eight
+recent values, a run of ones naming an entry and moving it to the front, or a zero and a new value pushing
+the list along. The 5- and 6-bit layouts keep shorter lists and widen each value to eight bits.
+
+The odd-size paths are FFmpeg's, and three of them are worth knowing. Version 2's margins read a symbol or
+two for samples past the right edge; they are decoded into padding, so the symbols line up and nothing
+shows. Version 1's 4:1:0 frame odd both ways copies its bottom-right samples to the start of the rows, and
+that is reproduced. Version 1's 4:2:0 frame of odd width stores each pair of rows' last luma sample one place
+past the edge and never fills the last column; FFmpeg's picture holds whatever its buffer held there, and
+this decoder stores the sample in the last column instead. Version 2's 4:2:0 frame of odd height reads only
+every other luma sample of its last row, so no encoder can carry the rest; FFmpeg leaves them unset and so
+does this decoder.
+
+Measured against FFmpeg n9.1 with `-flags +bitexact`: the FATE suite's `dxtory/dxtory_mic.avi`, the only
+sample found, is cut off after its first 4:2:0 picture, which is identical. Frames crafted from noise in every
+version 1 layout, upright and flipped, at even and odd sizes FFmpeg fills completely, and version 2 frames
+of the 5- and 6-bit layouts made of random symbols, all decode as FFmpeg decodes them.
+
+The encoder is this package's own, FFmpeg having none, and lossless: one slice of symbols a frame, each
+sample the list entry that holds it or a new value. A 4:2:0, 4:4:4 or 4:1:0 picture keeps its layout and
+anything else goes as BGR; the first picture decides for the film. A 4:2:0 picture of odd height goes as
+4:4:4, each chroma sample repeated over its block, because of the last row above. FFmpeg decodes what it
+writes, at even and odd sizes in every layout, to exactly this decoder's pictures.
+
+### FM Screen Capture
+
+Converted from FFmpeg's `libavcodec/fmvc.c`, LGPL-2.1-or-later. The picture is a bottom-up buffer of rows
+padded to 32-bit words, divided into blocks of 84 words by 112 rows, a remainder under 37 words or 49 rows
+joining the block before it and a larger one standing alone. A key frame unpacks a whole new buffer; any
+other frame lists the blocks it changes and unpacks each one's XOR. Two packers: type 2 is LZO1X, and type 1
+is FM Screen Capture's own LZ77, whose literal runs must each be followed by a back reference, whose raw
+blocks of 280 bytes or a power of two are reached only between back references, and whose long back
+reference of distance zero ends the stream. Both decompressors keep FFmpeg's control flow exactly, because
+they depend on exactly where a read past the end yields zero and where a back reference is clamped to the
+buffer's start. As in FFmpeg, block deltas are unpacked in the order a frame lists them and applied in
+block order.
+
+Measured against FFmpeg n9.1 with `-flags +bitexact`: all 718 pictures of the FATE suite's two films and
+`samples.ffmpeg.org`'s two, between them both packers, are identical.
+
+The encoder is this package's own, FFmpeg having none, and lossless at 24 bits a pixel: a key frame first,
+then only the blocks that changed, as XOR, all packed by type 1 with a hash-chain match finder. An unchanged
+frame is eight bytes. FFmpeg's block layout leaves a picture under 49 rows, or under 37 words a row, with no
+block at all, and it refuses such a stream; so does this encoder. Re-encoding the real films gives every
+picture back exactly, in 1,421,428 bytes against `6-methyl-5-hepten-2-one-CC-db.avi`'s 1,786,965 and
+1,646,987 against `skrzyzowanie4.avi`'s 2,227,139, but 154,474 against the LZO-packed
+`fmvcVirtualDub_small.avi`'s 131,694. FFmpeg decodes what it writes to exactly this decoder's pictures.
+
+### Brooktree ProSumer
+
+Converted from FFmpeg's `libavcodec/prosumer.c`, LGPL-2.1-or-later, its code table copied exactly. A frame is
+a 32-byte header — `BTIC`, a version of 2, and at byte 28 the payload's length — and a stream of nibbles,
+read from the top of each little-endian 32-bit word. The nibbles form a prefix code of one to three nibbles
+for pairs of residual bytes and for runs of zero words; two zero nibbles escape to a literal pair. FFmpeg
+decodes through a table of twelve-bit look-aheads that may hold up to three codes at once, and this decoder
+builds the same table the same way. The residuals predict each 32-bit word from the one above as
+`(((above >> 3) + (residual & 0x3F3F3F3F)) << 3) & 0xFCFCFCFC`, the shift carrying bits between bytes, the
+first row from a row of 0x80. The result is 4:1:1 YUV — each eight pixels U Y V Y U Y V Y Y Y Y Y — of six
+bits a sample, stored bottom up.
+
+Measured against FFmpeg n9.1 with `-flags +bitexact`: all 472 pictures of `samples.ffmpeg.org`'s `cnn1.avi`
+and `test7.avi` are identical.
+
+The encoder is this package's own, FFmpeg having none. ProSumer keeps six bits a sample, and because the
+predictor carries bits across a word's bytes not every combination of samples is reachable, so each residual
+byte is chosen in turn, from the lowest, to land its own sample and the next one's lowest bit as near as
+possible. Pairs the table holds take their code, runs of zero words take theirs, and the rest are escaped.
+FFmpeg decodes what it writes to exactly this decoder's pictures. Lossy, because ProSumer is.
+
+### Canopus HQ and HQA
+
+Converted from FFmpeg's `libavcodec/hq_hqa.c` and `hq_hqadsp.c`, LGPL-2.1-or-later, with the quantiser
+matrices, the quantiser map, the AC code, the 22 profiles and their macroblock orders of `hq_hqadata.h`
+transcribed mechanically by a script that parsed the C initialisers; the coded-block-pattern code is HQX's.
+An HQ frame is `UVC` and a profile number — a fixed size, a slice count and a table of macroblock positions —
+and the slices' offsets; each slice decodes its share of the table in order, a 16x16 macroblock at a time:
+a quantiser group, an interlace flag, and eight blocks, each a nine-bit DC, one of the group's four matrices
+for its plane, and run-and-level codes scaled by the matrix entry at their zigzag position. An HQA frame is
+`HQA1`, any size, one quantiser group, and eight slices, each taking every eighth macroblock along a
+diagonal; a macroblock opens with a coded-block pattern over alpha, luma and chroma, and reads its matrix
+choice before its DC. The inverse transform is FFmpeg's: rows then columns, products wrapping as unsigned
+32-bit values, sixteen-bit intermediates. A profile number past the table falls back to profile 0, and a
+slice that cannot be placed ends the frame there, as in FFmpeg.
+
+Measured against FFmpeg n9.1 with `-flags +bitexact`: the FATE suite's `canopus/hq.avi` (8 pictures, 720x576),
+the interlaced `hq25i.avi` (1920x1080) and `hqa.avi` (1920x1080, alpha) are identical in every plane.
+
+The encoder is this package's own, FFmpeg having none. HQ for a picture of a profile's size, HQA for any
+other or for a picture with alpha; progressive, quantiser group 0, the forward transform a projection onto
+the decoder's own basis, and each block at the finest of its four matrices that keeps every level within the
+code's 255. An HQA slice with no macroblock still gets a byte, because FFmpeg stops at an empty slice.
+FFmpeg decodes what it writes, HQ at two profiles and HQA at odd sizes, to exactly this decoder's planes.
+
+### Canopus HQX
+
+Converted from FFmpeg's `libavcodec/hqx.c` and `hqxdsp.c`, LGPL-2.1-or-later, with the DC, AC and
+coded-block-pattern code tables of `hqxvlc.h` and `hq_common.c` and the quantiser tables of `hqx.c`
+transcribed mechanically by a script that parsed the C initialisers. The DC codes are given outright; the
+AC codes are canonical from their lengths, assigned in listed order as `ff_vlc_init_from_lengths` assigns
+them, each symbol a level and a run.
+
+A frame is `HQ`, a byte naming the layout — 4:2:2 or 4:4:4, with or without alpha — and whether it is
+interlaced, the DC precision of 9, 10 or 11 bits, the size, and seventeen offsets bounding sixteen slices.
+Each slice holds a share of the 16x16 macroblocks dealt out tile by tile in a shuffled order, which this
+decoder follows exactly; every macroblock is visited once. A macroblock chooses one of sixteen sets of four
+quantisers, and each eight-by-eight block one of those four and so one of six AC tables. Alpha layouts open
+each macroblock with a coded-block pattern, and an uncoded block is transparent. The inverse transform is
+FFmpeg's: its column-pass products wrap as unsigned 32-bit values, both passes store sixteen-bit
+intermediates, and the twelve-bit result is widened to sixteen as `(v << 4) | (v >> 8)`. A slice whose
+offsets are out of order is skipped, as FFmpeg skips it.
+
+Measured against FFmpeg n9.1 with `-flags +bitexact`: the FATE suite's `canopus/hqx422.avi` (4:2:2, 720x576)
+and `hqx422a.avi` (4:2:2 with alpha, 1920x1080) are identical to FFmpeg's in every plane, alpha included.
+
+The encoder is this package's own, FFmpeg having none. The first picture chooses the layout: 4:2:2 YUV stays
+4:2:2, anything else goes as 4:4:4, with alpha where the picture has it; the 4:2:2-with-alpha layout is
+written too, though no input format chooses it. Progressive, 11-bit DC precision, quantiser set 2. The forward
+transform is a projection onto the basis of the decoder's own inverse transform, measured by running it on
+one coefficient at a time, and each block takes the finest of its four quantisers that keeps every level
+within the tables' 255. A run or level a table lacks is reached through its level-zero codes. A small picture
+leaves some slices no macroblock; FFmpeg complains of a slice with no bytes, so each gets one. FFmpeg decodes
+what it writes in all four layouts to exactly this decoder's planes.
+
+### Electronic Arts TQI, TGQ, Madcow and TGV
+
+Converted from FFmpeg's `libavcodec/eatqi.c`, `eatgq.c`, `eamad.c`, `eatgv.c` and the inverse DCT the first
+three share in `eaidct.c`, all LGPL-2.1-or-later, with `ff_inv_aanscales`, the MPEG-1 default intra matrix
+and the zigzag copied exactly. The container learned the chunks each arrives in from
+`libavformat/electronicarts.c`: `pIQT` for TQI, `TGQs`/`pQGT` for TGQ, `MADk`/`MADm`/`MADe` for MAD and
+`kVGT`/`fVGT` for TGV. A chunk's size may be big-endian, which is detected as FFmpeg does, by the size
+being larger than its own byte swap. After `1SNe`, `SCEl`, `SEND` or `SEEN` the reader skips to the next
+header chunk, as FFmpeg does, which is what makes the films that carry several sound headers read through to
+the end. TQI pictures are handed out without their chunk header, as FFmpeg's demuxer hands them to its
+decoder; the others keep theirs.
+
+TQI is MPEG-1 intra coding under a matrix derived from the chunk's quality byte, its bitstream byte-swapped
+in thirty-two-bit words. The DC sizes are read with the MPEG-2 tables, a superset of MPEG-1's. TGQ has a
+coefficient code of its own, read least-significant bit first, and a macroblock is a full block set, a
+DC-only one, or a copy from the last picture. MAD's bitstream is byte-swapped in sixteen-bit words, and its
+quantiser matrix, stored as sixteen-bit unsigned values, is read through a signed sixteen-bit pointer: an
+entry the header's scale takes past 32767 acts negative, and the real films depend on that. TGV's key
+pictures are packed by an LZ77 variant and its predicted pictures are four-by-four cells from a
+per-picture codebook or copied with motion from the last picture, the bitstream again
+least-significant bit first.
+
+Measured against FFmpeg n9.1 with `-flags +bitexact`: TQI, all 1,142 pictures of the real films found; TGQ,
+all 278; MAD, all 4,832 pictures of seven films; TGV, all 2,309 pictures of five films as RGB.
+
+The four encoders are this package's own, FFmpeg having none. The forward transform is a projection onto
+the basis of EA's own inverse DCT, so what the encoder rounds toward is what the decoder reconstructs. TQI
+writes every picture intra at quality 90. TGQ writes quality 90, a key picture every twelfth, copies
+macroblocks that have not changed, and writes a macroblock too busy for its one-byte length as its DC values
+alone. MAD writes quantiser scale 4, below which its matrix stays inside the sixteen bits FFmpeg reads it
+through, and codes a predicted macroblock as a copy with a DC offset where that is close and as intra
+where it is not. TGV keeps an `Indexed8` picture's own palette, a new palette starting a key picture, and
+takes anything else to a fixed six-seven-six colour cube; it copies unchanged cells and writes the rest raw,
+so a picture already in its palette comes back exactly. Each encoder's reference is its decoder's reading
+of the packet just written.
+
+The writer opens a silent TGQ or TQI film with an `SCHl` header that declares no sound and states the frame
+rate, without which FFmpeg's probe does not recognise the film. FFmpeg's header search reads up to five
+chunks for both a sound and a picture header, so a silent film shorter than five chunks is padded with
+`SCEl` end chunks, which it steps over. FFmpeg decodes what all four write to exactly the pictures this
+package's decoders produce.
 
 ### Ut Video
 
@@ -4769,6 +5543,97 @@ not a zlib stream, or that inflates past what its own frame size can account for
 not decode leaves that part of the canvas alone rather than failing the frame, an unknown cursor action
 leaves the cursor where it was, and a packet whose leading tag is neither `TDSF` nor `DTSM` hands back
 the canvas unchanged — each of which is what the reference decoder does.
+
+### BitJazz SheerVideo
+
+Converted from FFmpeg's `libavcodec/sheervideo.c` and `sheervideodata.h`, LGPL-2.1-or-later. A frame is twenty
+bytes — `Shir` or `Zwak`, and at byte 16 the layout's four-character code — then rows, each a bit choosing
+raw samples or Huffman-coded differences. The 29 layouts' 25 row decoders differ in small ways — which
+component reads which of two code tables, the start values, how 4:2:2 chroma and the second luma sample of a
+pair are predicted — so rather than restate them they were transcribed mechanically by a script: every
+pointer becomes an offset into a plane held as integers, and every store is masked to the plane's sample
+width as FFmpeg's stores narrow. The code tables are built as FFmpeg's `build_vlc` builds them, from counts of
+each length going up to sixteen and back down.
+
+No real SheerVideo file has been found. Any bits are a valid frame, though, so each of the 29 layouts is
+decoded from frames of random bits, here and by FFmpeg n9.1, at 40x12 and at the odd 37x9, and every plane
+agrees — RGB0's never-written fourth byte excepted.
+
+The encoder is this package's own, FFmpeg having none, and lossless at eight bits: 4:2:2 as `BYRY`, 4:4:4 as
+` YbR` and anything else as ` RGB`, every row predicted and each residual the one that lands on the sample
+given, in the order the decoder reads them. FFmpeg decodes what it writes, odd widths included, to exactly
+the pictures given.
+
+### HuffYUV MT
+
+The slice handling is converted from FFmpeg's `libavcodec/huffyuvdec.c`, LGPL-2.1-or-later; each slice is
+decoded by this package's HuffYUV decoder at the slice's height. A frame ends in sixteen bytes — zero, the
+slice count, the slice height and the offset of a table of each slice's offset and length — and a frame without
+them is plain HuffYUV. Where the frame carries its own code tables FFmpeg reads them once from its start, and
+each slice then starts that many bytes into its own data; so does this decoder. FFmpeg places slice `s` at row
+`height - (s + 1) * slice_height`, so slice 0 is the bottom one, except in its median-predicted 4:2:2 and
+version 3 row loops, which ignore the offset and stack every slice at the top; that is followed too. Rows above
+the last slice are left empty, as FFmpeg leaves them.
+
+No real file has been found. The encoder is this package's own and lossless: slices of equal height, the count
+the smallest from two up that divides the height so the slices cover the picture, each written by this
+package's HuffYUV encoder with left prediction, whose row loops honour the offset; a height no count divides
+goes as plain HuffYUV. FFmpeg n9.1 reads those films back to exactly the pictures given — 4:2:2 directly, packed
+colour with `-cpuflags 0`. With its vector routines on, FFmpeg's x86 BGR32 left prediction, given the
+`width - 1` pixels after a slice's first one, writes a whole block and so one pixel past the row; in plain
+HuffYUV that pixel is padding or a row about to be overwritten, but between slices, where FFmpeg's rows have
+no padding — widths whose four bytes a pixel fill a 64-byte multiple — it lands on the first pixel of the slice
+below, already decoded. The plain C routine the vector one stands in for writes exactly the row.
+
+### ScreenPressor
+
+Converted from FFmpeg's `libavcodec/scpr.c`, `scpr.h`, `scpr3.c` and `scpr3.h`, LGPL-2.1-or-later.
+A frame's first byte names it: 2, 18 and 34 are key frames of the first, second and third generations, 0
+and 1 inter frames of whichever generation the last key frame was (0 changing nothing, which yields no
+picture, as in FFmpeg), and 17 and 33 a picture of one colour. The two generations share their models and differ in
+their range coder: the second scales the range by each total, the first divides exactly and keeps a second
+code. A new colour is three components, each through one of 4096 adaptive frequency tables chosen by the
+components before it, each table keeping sixteen running sums to find a value quickly; every table halves
+once its total passes 65,536. A key frame codes runs of new colours until a row and a pixel are done, and
+from then on each run first names how it is made — a new colour, the last pixel, the one above, a gradient or
+the one above-left — through a table chosen by the run before. An inter frame names the range of 16x16 blocks
+it touches and fills each with a kind: left alone, recoded as runs (which may also copy the last picture),
+narrowed to a sub-rectangle, or moved from the last picture by a vector. FFmpeg's pixel models are allocated
+here only when first used, since most of the 12,288 never are.
+
+Measured against FFmpeg n9.1 with `-flags +bitexact`: all 105 pictures of `samples.ffmpeg.org`'s
+`V-codecs/SCPR.avi`, a second-generation film, are identical.
+
+The third generation keeps the frame layout — the same runs, the same block kinds and the same run
+operations — and replaces everything that codes it. Its coder is a byte-wise rANS over a 4096-wide code
+space: the state is a 32-bit word kept at or above 2^23 by reading bytes, each symbol takes its slot from
+the state's low twelve bits, and every 131,072 symbols a fresh state is read outright. Raw bytes for the
+colour models that take them come from the same stream between the coder's own. The fixed tables (runs,
+operations, block kinds, counts, rectangles, vectors) keep counts that grow by sixteen and halve past
+4096, with a 32-entry lookup by the slot's top bits. A colour model changes shape as it learns: it takes
+raw bytes while it collects the symbols seen (types 0 to 3), codes up to four and then sixteen symbols
+adaptively with the unseen ones spread evenly between them (4 and 5), keeps up to sixty-four in frequency
+order with scaled shares (6), and ends as a full 256-symbol table (7), each step taken when a symbol is
+seen again or a limit is reached. A moved block opens with an even binary choice between the last
+vector and a new one. The arithmetic is FFmpeg's to the bit, unsigned wrap-arounds and the 16-bit
+storage of every frequency included.
+
+No third-generation film is published — `samples.ffmpeg.org`, the FATE suite and FFmpeg's tracker were
+searched, and the tracker's ScreenPressor files are of a fourth generation FFmpeg does not read — so
+the generation is measured on streams the package writes with an internal third-generation encoder,
+which runs every symbol through the decoder's own models and codes the result backwards. FFmpeg n9.1
+decodes them to exactly this decoder's pictures, which are exactly the pictures given, at 16x16, 37x21,
+160x96 and 560x420. The films are built to reach what a real one would: every colour-model type and
+every transition between them, every intra and inter run operation, all four block kinds with the last
+vector both kept and replaced, and a key frame long enough to cross a fresh coder state. That encoder
+is not the one the package hands out: on `SCPR.avi` its output is a fifth larger and slower to make
+than the second generation's, so the public encoder stays on the second.
+
+The encoder is this package's own, FFmpeg having none, and lossless at 24 bits: the second generation's key
+frame, then inter frames that leave unchanged blocks alone and recode the rest. Each run is the longest any
+copy reproduces from where it starts, or else a run of one new colour. Its range coder propagates carries into
+what it has written, because FFmpeg's decoder renormalises without the carry-less trick. FFmpeg decodes what it
+writes, at odd sizes too, to exactly the pictures given.
 
 ### Smacker Video
 

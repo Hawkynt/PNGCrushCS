@@ -109,6 +109,9 @@ public sealed class MsMpeg4VideoEncoder : IVideoCodecEncoder<MsMpeg4VideoEncoder
 
   private Mpeg4Frame? _reference;
   private int _sinceKeyFrame;
+
+  /// <summary>WMV2's rounding, which every predicted picture flips and every intra one sets.</summary>
+  private int _rounding;
   private MediaStreamInfo? _stream;
 
   private MsMpeg4VideoEncoder(MediaStreamInfo stream, MsMpeg4Version version, CodecTag tag) {
@@ -172,6 +175,26 @@ public sealed class MsMpeg4VideoEncoder : IVideoCodecEncoder<MsMpeg4VideoEncoder
   }
 
   /// <summary>Codes one picture, either whole or against the one before it.</summary>
+  /// <summary>The same encoder writing Windows Media Video 7, which <see cref="Wmv1VideoEncoder"/> hands out.</summary>
+  internal static MsMpeg4VideoEncoder CreateWmv1(MediaStreamInfo stream) {
+    ArgumentNullException.ThrowIfNull(stream);
+    if (stream.Width <= 0 || stream.Height <= 0)
+      throw new NotSupportedException(
+        $"A WMV1 encoder needs the picture size up front; {stream.Width}x{stream.Height} was supplied. "
+        + "The bitstream states it nowhere, so the container's is the only one there is.");
+    return new(stream, MsMpeg4Version.Wmv1, CodecTag.FromCharacters("WMV1"));
+  }
+
+  /// <summary>The same encoder writing Windows Media Video 8, which <see cref="Wmv2VideoEncoder"/> hands out.</summary>
+  internal static MsMpeg4VideoEncoder CreateWmv2(MediaStreamInfo stream) {
+    ArgumentNullException.ThrowIfNull(stream);
+    if (stream.Width <= 0 || stream.Height <= 0)
+      throw new NotSupportedException(
+        $"A WMV2 encoder needs the picture size up front; {stream.Width}x{stream.Height} was supplied. "
+        + "The bitstream states it nowhere, so the container's is the only one there is.");
+    return new(stream, MsMpeg4Version.Wmv2, CodecTag.FromCharacters("WMV2"));
+  }
+
   public bool TryEncode(RawImage frame, long? presentationTimestamp, out CodedPacket packet) {
     ArgumentNullException.ThrowIfNull(frame);
 
@@ -184,9 +207,12 @@ public sealed class MsMpeg4VideoEncoder : IVideoCodecEncoder<MsMpeg4VideoEncoder
     var source = this._ToPlanes(frame);
     var target = new Mpeg4Frame(this._macroblockWidth, this._macroblockHeight);
 
+    if (this._version == MsMpeg4Version.Wmv2)
+      this._rounding = intra ? 1 : this._rounding ^ 1;
+
     var encoder = new MsMpeg4PictureEncoder(
       this._version, _QUANTISER, intra, this._frameRate, source, target, this._reference,
-      this._macroblockWidth, this._macroblockHeight, this._sliceHeight);
+      this._macroblockWidth, this._macroblockHeight, this._sliceHeight, this._rounding);
 
     var bytes = encoder.Encode();
     this._reference = target;
@@ -229,8 +255,12 @@ public sealed class MsMpeg4VideoEncoder : IVideoCodecEncoder<MsMpeg4VideoEncoder
       ColorsUsed: 0,
       ImportantColors: 0);
 
-    var format = new byte[BitmapInfoHeader.StructSize];
-    header.WriteTo(format);
+    // WMV2's four-byte extension header follows the BITMAPINFOHEADER, whose size counts it as FFmpeg's
+    // muxers count it.
+    var extension = this._version == MsMpeg4Version.Wmv2 ? MsMpeg4PictureEncoder.Wmv2ExtensionHeader(this._frameRate) : [];
+    var format = new byte[BitmapInfoHeader.StructSize + extension.Length];
+    (header with { HeaderSize = format.Length }).WriteTo(format);
+    extension.CopyTo(format, BitmapInfoHeader.StructSize);
 
     return this._stream = new() {
       Index = this._requested.Index,

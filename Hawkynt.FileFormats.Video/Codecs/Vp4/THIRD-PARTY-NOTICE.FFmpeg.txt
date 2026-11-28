@@ -1,0 +1,38 @@
+The VP4 decoder in this directory, and its tables, are converted from FFmpeg
+(https://ffmpeg.org), whose VP3 decoder is where VP4 was reverse-engineered.
+On2 published no specification for it.
+
+Files used, all from libavcodec:
+
+  vp3.c        the VP4 paths: the key frame header, vp4_unpack_macroblocks and
+               vp4_get_mb_count, unpack_modes, unpack_vectors and vp4_get_mv,
+               vp4_unpack_dct_coeffs, vp4_unpack_vlcs and the VP4 DC predictor,
+               init_dequantizer, render_slice and vp4_mc_loop_filter
+  vp3dsp.c     the inverse transform, the DC-only add, the loop filters and
+               their bounding table, and the no-rounding diagonal average
+  vp4data.h    every VP4 table: the dequantisation matrix and scale factors,
+               the filter limits, the block-pattern and motion-vector codes and
+               the eighty coefficient tables
+  vp3data.h    the mode code lengths, the end-of-block and zero-run tables and
+               the coefficient values of each token
+
+Copyright (C) 2003-2004 The FFmpeg project
+Copyright (C) 2019 Peter Ross
+
+FFmpeg is free software; you can redistribute it and/or modify it under the
+terms of the GNU Lesser General Public License as published by the Free
+Software Foundation; either version 2.1 of the License, or (at your option)
+any later version.
+
+FFmpeg is distributed in the hope that it will be useful, but WITHOUT ANY
+WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
+A PARTICULAR PURPOSE.  See the GNU Lesser General Public License for more
+details.
+
+You should have received a copy of the GNU Lesser General Public License along
+with FFmpeg; if not, write to the Free Software Foundation, Inc., 51 Franklin
+Street, Fifth Floor, Boston, MA 02110-1301 USA.
+
+This library is licensed LGPL-3.0-or-later, which is a permitted "any later
+version" of the LGPL-2.1 FFmpeg offers, so the two are compatible in this
+direction and in no other.
