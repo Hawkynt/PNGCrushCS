@@ -38,7 +38,18 @@ internal static class H265ConformanceDecoder {
 
     internal int OutputPictures { get; set; }
 
-    /// <summary>The range extension tools some parameter set of the stream switched on, by syntax element name.</summary>
+    /// <summary>
+    /// The same output with a 4:4:4 picture's planes in the order R, G, B — the coded G, B, R
+    /// reordered, which is the file the reference decoder writes when asked to convert GBR to RGB.
+    /// Some conformance archives state only that file's checksum.
+    /// </summary>
+    internal IncrementalHash OutputRgb { get; } = IncrementalHash.CreateHash(HashAlgorithmName.MD5);
+
+    internal string OutputRgbMd5 => this._rgbMd5 ??= Convert.ToHexString(this.OutputRgb.GetHashAndReset()).ToLowerInvariant();
+
+    private string? _rgbMd5;
+
+    /// <summary>The range extension and screen content tools the stream switched on, by syntax element name.</summary>
     internal SortedSet<string> Tools { get; } = new(StringComparer.Ordinal);
 
     internal H265SequenceParameterSet? Sequence { get; set; }
@@ -98,6 +109,12 @@ internal static class H265ConformanceDecoder {
         buffer.SetLength(0);
         WriteCropped(buffer, picture, sps);
         result.Output.AppendData(buffer.GetBuffer(), 0, (int)buffer.Length);
+        if (sps.ChromaArrayType == 3) {
+          var plane = (int)buffer.Length / 3;
+          result.OutputRgb.AppendData(buffer.GetBuffer(), 2 * plane, plane);
+          result.OutputRgb.AppendData(buffer.GetBuffer(), 0, 2 * plane);
+        }
+
         ++result.OutputPictures;
       }
     }
@@ -148,7 +165,7 @@ internal static class H265ConformanceDecoder {
     return result;
   }
 
-  /// <summary>Records which range extension tools a parameter set enables.</summary>
+  /// <summary>Records which range extension and screen content tools a parameter set or slice enables.</summary>
   private static void _NoteTools(
     H265NalUnit nal, SortedSet<string> tools, Dictionary<int, H265SequenceParameterSet> sequenceSets,
     Dictionary<int, H265PictureParameterSet> pictureSets, ref H265SliceHeader? lastIndependent) {
@@ -170,6 +187,12 @@ internal static class H265ConformanceDecoder {
 
       if (header.CuChromaQpOffsetEnabled)
         tools.Add("cu_chroma_qp_offset_enabled");
+      if (header.UseIntegerMv && !header.IsIntra)
+        tools.Add("use_integer_mv");
+      if (header.SliceActQpOffsetY != 0 || header.SliceActQpOffsetCb != 0 || header.SliceActQpOffsetCr != 0)
+        tools.Add("slice_act_qp_offsets_used");
+      if (header.Nal.IsRandomAccessPoint && !header.IsIntra)
+        tools.Add("predicted_random_access_point");
       return;
     }
 
@@ -195,6 +218,12 @@ internal static class H265ConformanceDecoder {
       Note(sps.BitDepthLuma != sps.BitDepthChroma && sps.ChromaArrayType != 0, "mixed_depth");
       Note(sps.PcmEnabled, "pcm");
       Note(sps.ScalingListEnabled, "scaling_list");
+      var screen = sps.ScreenContent;
+      Note(screen.CurrentPictureReferenceEnabled, "sps_curr_pic_ref");
+      Note(screen.PaletteModeEnabled, $"palette(max {screen.PaletteMaxSize}, predictor {screen.PaletteMaxPredictorSize})");
+      Note(screen.PalettePredictorInitializers != null, "sps_palette_predictor_initializers");
+      Note(screen.MotionVectorResolutionControlIdc != 0, $"mv_resolution_control_idc={screen.MotionVectorResolutionControlIdc}");
+      Note(screen.IntraBoundaryFilteringDisabled, "intra_boundary_filtering_disabled");
     } else if (nal.Type == H265NalUnitType.PictureParameterSet) {
       var pps = H265PictureParameterSet.Parse(nal.Payload);
       pictureSets[pps.Id] = pps;
@@ -214,6 +243,14 @@ internal static class H265ConformanceDecoder {
         tools.Add("wavefronts");
       if (pps.TransquantBypassEnabled)
         tools.Add("transquant_bypass");
+      if (pps.CurrentPictureReferenceEnabled)
+        tools.Add("pps_curr_pic_ref");
+      if (pps.AdaptiveColourTransformEnabled)
+        tools.Add("adaptive_colour_transform");
+      if (pps.SliceActQpOffsetsPresent)
+        tools.Add("slice_act_qp_offsets_present");
+      if (pps.PalettePredictorInitializers != null)
+        tools.Add("pps_palette_predictor_initializers");
     }
   }
 
