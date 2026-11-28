@@ -28511,6 +28511,7 @@ Implements `IEquatable<PdfPageRendering>`.
 | `MaximumPixels` | `long MaximumPixels { get; init; }` |  |
 | `RenderAnnotations` | `bool RenderAnnotations { get; init; }` |  |
 | `Resolution` | `double Resolution { get; init; }` |  |
+| `SimulateOverprint` | `bool SimulateOverprint { get; init; }` |  |
 
 #### `PdfWriter`
 
