@@ -83,6 +83,9 @@ internal sealed class CffFontProgram : IPdfFontProgram {
   /// <summary>Whether the font is CID-keyed: glyphs are found by CID rather than by name.</summary>
   public bool IsCidKeyed => this._glyphCids != null;
 
+  /// <summary>A CID-keyed font's character collection (the Top DICT's ROS), or null for a name-keyed one.</summary>
+  public (string Registry, string Ordering, int Supplement)? CharacterCollection { get; private init; }
+
   /// <inheritdoc/>
   public int GlyphCount => this._charStrings.Count;
 
@@ -190,7 +193,11 @@ internal sealed class CffFontProgram : IPdfFontProgram {
       encoding = _ReadEncoding(data, (int)_Number(top, _OpEncoding, 0), glyphNames, strings);
     }
 
-    return new(data, charStrings, globalSubrs, fonts, fdSelect, glyphNames, glyphCids, encoding, charstringType == 1);
+    (string, string, int)? collection = null;
+    if (isCid && top[_OpRos] is { Length: >= 3 } ros && ros[0] >= 0 && ros[1] >= 0)
+      collection = (_String((int)ros[0], strings), _String((int)ros[1], strings), (int)ros[2]);
+
+    return new(data, charStrings, globalSubrs, fonts, fdSelect, glyphNames, glyphCids, encoding, charstringType == 1) { CharacterCollection = collection };
   }
 
   /// <summary>Parses a DICT into its operators and their operands.</summary>

@@ -27,7 +27,7 @@ internal sealed class TrueTypeFontProgram : IPdfFontProgram {
   private readonly ushort[] _advances;
   private readonly short[] _sideBearings;
   private readonly Dictionary<(int Platform, int Encoding), int> _cmaps = [];
-  private readonly Dictionary<int, _Cmap?> _parsedCmaps = [];
+  private readonly Dictionary<int, SfntCmap?> _parsedCmaps = [];
   private readonly Dictionary<string, int> _gidByName = new(StringComparer.Ordinal);
   private readonly GlyphOutline?[] _outlines;
 
@@ -79,7 +79,7 @@ internal sealed class TrueTypeFontProgram : IPdfFontProgram {
   /// <exception cref="InvalidDataException">The data holds no table directory.</exception>
   public static TrueTypeFontProgram Parse(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
-    var tables = _ReadDirectory(data);
+    var tables = ReadDirectory(data);
     if (!tables.ContainsKey("glyf") && tables.ContainsKey("CFF "))
       throw new InvalidDataException("An OpenType font with CFF outlines is not a TrueType program; use ParseOpenType.");
 
@@ -89,12 +89,18 @@ internal sealed class TrueTypeFontProgram : IPdfFontProgram {
   /// <summary>Reads an sfnt font of either kind: TrueType outlines, or CFF ones in an OpenType wrapper.</summary>
   public static IPdfFontProgram ParseOpenType(byte[] data) {
     ArgumentNullException.ThrowIfNull(data);
-    var tables = _ReadDirectory(data);
+    var tables = ReadDirectory(data);
     if (!tables.ContainsKey("glyf") && tables.TryGetValue("CFF ", out var cff))
       return CffFontProgram.Parse(data.AsSpan(cff.Offset, cff.Length).ToArray());
 
     return new TrueTypeFontProgram(data, tables);
   }
+
+  /// <summary>
+  /// Reads the TrueType outlines of a face whose table directory has been read already, such as
+  /// one face of a collection.
+  /// </summary>
+  internal static TrueTypeFontProgram FromTables(byte[] data, Dictionary<string, (int Offset, int Length)> tables) => new(data, tables);
 
   /// <summary>Whether the font has a cmap subtable for a platform and encoding.</summary>
   public bool HasCmap(int platformId, int encodingId) => this._cmaps.ContainsKey((platformId, encodingId));
@@ -106,7 +112,7 @@ internal sealed class TrueTypeFontProgram : IPdfFontProgram {
 
     if (!this._parsedCmaps.TryGetValue(offset, out var cmap)) {
       try {
-        cmap = _Cmap.Read(this._data, offset);
+        cmap = SfntCmap.Read(this._data, offset);
       } catch (Exception ex) when (ex is IndexOutOfRangeException or ArgumentOutOfRangeException) {
         cmap = null;
       }
@@ -416,14 +422,18 @@ internal sealed class TrueTypeFontProgram : IPdfFontProgram {
   // Tables
   // ---------------------------------------------------------------------------------------------
 
-  private static Dictionary<string, (int Offset, int Length)> _ReadDirectory(byte[] data) {
-    if (data.Length < 12)
+  /// <summary>
+  /// Reads the table directory that starts at an offset into the data: 0 for a single font, a
+  /// face's offset in a collection. Table offsets count from the start of the data either way.
+  /// </summary>
+  internal static Dictionary<string, (int Offset, int Length)> ReadDirectory(byte[] data, int at = 0) {
+    if (at < 0 || data.Length - at < 12)
       throw new InvalidDataException("Data too small for a TrueType font.");
 
     var tables = new Dictionary<string, (int Offset, int Length)>(StringComparer.Ordinal);
-    var count = _U16(data, 4);
+    var count = _U16(data, at + 4);
     for (var i = 0; i < count; ++i) {
-      var record = 12 + i * 16;
+      var record = at + 12 + i * 16;
       if (record + 16 > data.Length)
         break;
 
@@ -561,112 +571,4 @@ internal sealed class TrueTypeFontProgram : IPdfFontProgram {
   private static ushort _U16(byte[] data, int at) => (ushort)((data[at] << 8) | data[at + 1]);
 
   private static uint _U32(byte[] data, int at) => (uint)((data[at] << 24) | (data[at + 1] << 16) | (data[at + 2] << 8) | data[at + 3]);
-
-  /// <summary>One parsed cmap subtable.</summary>
-  private sealed class _Cmap {
-
-    private readonly Dictionary<int, int>? _map;
-    private readonly (uint Start, uint End, uint Glyph)[]? _groups;
-
-    private _Cmap(Dictionary<int, int>? map, (uint, uint, uint)[]? groups) {
-      this._map = map;
-      this._groups = groups;
-    }
-
-    public int Lookup(int code) {
-      if (this._map != null)
-        return this._map.TryGetValue(code, out var gid) ? gid : -1;
-
-      if (this._groups == null || code < 0)
-        return -1;
-
-      var c = (uint)code;
-      int lo = 0, hi = this._groups.Length - 1;
-      while (lo <= hi) {
-        var mid = (lo + hi) >> 1;
-        var (start, end, glyph) = this._groups[mid];
-        if (c < start)
-          hi = mid - 1;
-        else if (c > end)
-          lo = mid + 1;
-        else
-          return (int)(glyph + (c - start));
-      }
-
-      return -1;
-    }
-
-    public static _Cmap? Read(byte[] data, int offset) {
-      var format = _U16(data, offset);
-      var map = new Dictionary<int, int>();
-      switch (format) {
-        case 0:
-          for (var code = 0; code < 256; ++code)
-            if (offset + 6 + code < data.Length && data[offset + 6 + code] != 0)
-              map[code] = data[offset + 6 + code];
-          return new(map, null);
-
-        case 4: {
-          var segments = _U16(data, offset + 6) / 2;
-          var endsAt = offset + 14;
-          var startsAt = endsAt + segments * 2 + 2;
-          var deltasAt = startsAt + segments * 2;
-          var rangesAt = deltasAt + segments * 2;
-          for (var s = 0; s < segments; ++s) {
-            int end = _U16(data, endsAt + s * 2);
-            int start = _U16(data, startsAt + s * 2);
-            var delta = _U16(data, deltasAt + s * 2);
-            var rangeOffset = _U16(data, rangesAt + s * 2);
-            if (start > end || (start == 0xFFFF && end == 0xFFFF))
-              continue;
-
-            for (var code = start; code <= end; ++code) {
-              int gid;
-              if (rangeOffset == 0)
-                gid = (code + delta) & 0xFFFF;
-              else {
-                var at = rangesAt + s * 2 + rangeOffset + (code - start) * 2;
-                if (at + 2 > data.Length)
-                  continue;
-                gid = _U16(data, at);
-                if (gid != 0)
-                  gid = (gid + delta) & 0xFFFF;
-              }
-
-              if (gid != 0)
-                map[code] = gid;
-            }
-          }
-          return new(map, null);
-        }
-
-        case 6: {
-          var first = _U16(data, offset + 6);
-          var count = _U16(data, offset + 8);
-          for (var k = 0; k < count; ++k) {
-            var gid = _U16(data, offset + 10 + k * 2);
-            if (gid != 0)
-              map[first + k] = gid;
-          }
-          return new(map, null);
-        }
-
-        case 12: {
-          var count = _U32(data, offset + 12);
-          if (count > (data.Length - offset) / 12)
-            count = (uint)((data.Length - offset) / 12);
-          var groups = new (uint, uint, uint)[count];
-          for (var k = 0; k < count; ++k) {
-            var at = offset + 16 + k * 12;
-            groups[k] = (_U32(data, at), _U32(data, at + 4), _U32(data, at + 8));
-          }
-          Array.Sort(groups, static (x, y) => x.Item1.CompareTo(y.Item1));
-          return new(null, groups);
-        }
-
-        default:
-          return null;
-      }
-    }
-  }
 }
