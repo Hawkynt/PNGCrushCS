@@ -31,6 +31,7 @@ internal sealed partial class PdfRenderer {
   private readonly List<string> _omissions;
   private readonly HashSet<object> _activeForms;
   private readonly Dictionary<object, PdfRasterImage> _imageCache = new(ReferenceEqualityComparer.Instance);
+  private readonly Dictionary<string, Dictionary<object, PdfRasterImage>> _intentImageCaches = [];
   private readonly PdfOptionalContent _optional;
 
   private PdfSurface _surface;
@@ -241,7 +242,11 @@ internal sealed partial class PdfRenderer {
           this._state.DashPhase = _N(o, 1);
         }
         break;
-      case "ri" or "i":
+      case "ri":
+        if (o.Count >= 1 && o[0] is string intent)
+          this._state.Intent = intent;
+        break;
+      case "i":
         break;
       case "gs":
         if (o.Count >= 1 && o[0] is string gsName)
@@ -485,6 +490,10 @@ internal sealed partial class PdfRenderer {
     foreach (var (key, raw) in gs) {
       var value = this._document.Resolve(raw);
       switch (key) {
+        case "RI":
+          if (value is string intent)
+            this._state.Intent = intent;
+          break;
         case "LW":
           this._state.LineWidth = Math.Abs(PdfValues.Number(value, this._state.LineWidth));
           break;
@@ -713,7 +722,7 @@ internal sealed partial class PdfRenderer {
 
   /// <summary>The paint and constant alpha for the current fill or stroke colour, or null to paint nothing.</summary>
   private PdfPaint? _PaintFor(bool stroke, out float alpha) {
-    var space = stroke ? this._state.StrokeSpace : this._state.FillSpace;
+    var space = (stroke ? this._state.StrokeSpace : this._state.FillSpace).ForIntent(this._state.Intent);
     alpha = (float)(stroke ? this._state.StrokeAlpha : this._state.FillAlpha);
     if (space.PaintsNothing)
       return null;
@@ -894,10 +903,13 @@ internal sealed partial class PdfRenderer {
   }
 
   private void _DrawImage(object cacheKey, PdfDict dict, byte[] data, bool inline) {
-    if (!this._imageCache.TryGetValue(cacheKey, out var image)) {
-      image = PdfImageDecoder.Decode(this._document, dict, data, this._resources, inline);
+    var imageCache = this._imageCache;
+    if (this._state.Intent is { } intent && !this._intentImageCaches.TryGetValue(intent, out imageCache))
+      this._intentImageCaches[intent] = imageCache = new(ReferenceEqualityComparer.Instance);
+    if (!imageCache.TryGetValue(cacheKey, out var image)) {
+      image = PdfImageDecoder.Decode(this._document, dict, data, this._resources, inline, intent: this._state.Intent);
       if (!inline)
-        this._imageCache[cacheKey] = image;
+        imageCache[cacheKey] = image;
     }
 
     PdfPaint? stencilPaint = null;

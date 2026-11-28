@@ -35,6 +35,9 @@ public sealed class PdfRenderTests {
   // Liberation, so their lines differ in glyph shape though not in placement.
   [TestCase("Render/text", 144, 2.0, 1.2)]
   [TestCase("Render/transparency", 72, 0.5, 0.2)]
+  // ICCBased fills under each rendering intent agree with poppler to the unit; the rest is the
+  // resampling of the two upscaled images.
+  [TestCase("Render/color", 72, 0.3, 0.1)]
   [Category("Unit")]
   public void Fixture_AgreesWithPoppler(string name, double resolution, double maxMeanError, double maxBadPercent) {
     var file = _Read(name + ".pdf");

@@ -34,6 +34,9 @@ internal sealed class PdfGraphicsState {
   public PdfSoftMask? SoftMask;
   public bool AlphaIsShape;
 
+  /// <summary>The rendering intent set by <c>ri</c> or /RI, or null for the default (relative colorimetric).</summary>
+  public string? Intent;
+
   public PdfFont? Font;
   public double FontSize;
   public double CharSpacing;

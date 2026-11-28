@@ -15,7 +15,7 @@ internal sealed partial class PdfRenderer {
     if (value == null)
       return;
 
-    var shading = PdfShading.Parse(this._document, value, this._resources);
+    var shading = PdfShading.Parse(this._document, value, this._resources, this._state.Intent);
     var area = this._surface.Box.Intersect(this._state.Clip?.Bounds ?? new PixelBox(0, 0, this._width, this._height));
     if (shading.Extent(this._state.Ctm, this._width, this._height) is { } extent)
       area = area.Intersect(extent);
@@ -42,7 +42,7 @@ internal sealed partial class PdfRenderer {
 
     switch (this._document.Integer(dict, "PatternType")) {
       case 2: {
-        var shading = PdfShading.Parse(this._document, dict.Raw("Shading"), this._resources);
+        var shading = PdfShading.Parse(this._document, dict.Raw("Shading"), this._resources, this._state.Intent);
         if (this._document.Dict(dict.Raw("ExtGState")) is { } gs)
           _ = gs; // An ExtGState in a shading pattern only carries parameters this renderer does not use.
         return shading.CreatePaint(toDevice, area, true);

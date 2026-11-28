@@ -24,7 +24,7 @@ internal abstract class PdfShading {
   protected double[]? BoundingBox;
 
   /// <summary>Reads a shading dictionary or stream.</summary>
-  public static PdfShading Parse(PdfDocument document, object? value, PdfDict? resources) {
+  public static PdfShading Parse(PdfDocument document, object? value, PdfDict? resources, string? intent = null) {
     var resolved = document.Resolve(value);
     var dict = document.Dict(resolved) ?? throw new NotSupportedException("A shading is neither a dictionary nor a stream.");
     var type = document.Integer(dict, "ShadingType");
@@ -36,7 +36,7 @@ internal abstract class PdfShading {
       _ => throw new NotSupportedException($"Shading type {type} is not supported."),
     };
 
-    shading.Space = PdfColorModel.Parse(document, dict.Raw("ColorSpace"), resources);
+    shading.Space = PdfColorModel.Parse(document, dict.Raw("ColorSpace"), resources).ForIntent(intent);
     if (shading.Space.IsPattern)
       throw new NotSupportedException("A shading in the Pattern colour space is not valid.");
     if (dict.Raw("Function") is { } function) {

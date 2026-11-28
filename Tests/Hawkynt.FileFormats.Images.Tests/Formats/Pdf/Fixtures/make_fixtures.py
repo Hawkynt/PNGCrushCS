@@ -338,9 +338,218 @@ def transparency():
     return page(bytes(c), resources, extra=extra)
 
 
+def _s15(v):
+    return int(round(v * 65536)).to_bytes(4, "big", signed=True)
+
+
+def _pad4(b):
+    return b + b"\0" * (-len(b) % 4)
+
+
+def icc_curv(table):
+    """curveType: [] identity, [g] a gamma, else a 16-bit table."""
+    if len(table) == 1:
+        return b"curv\0\0\0\0" + (1).to_bytes(4, "big") + int(round(table[0] * 256)).to_bytes(2, "big")
+    return b"curv\0\0\0\0" + len(table).to_bytes(4, "big") + b"".join(int(v).to_bytes(2, "big") for v in table)
+
+
+def icc_para(function, params):
+    return b"para\0\0\0\0" + function.to_bytes(2, "big") + b"\0\0" + b"".join(_s15(p) for p in params)
+
+
+def icc_xyz(x, y, z):
+    return b"XYZ \0\0\0\0" + _s15(x) + _s15(y) + _s15(z)
+
+
+def icc_grid(inputs, outputs, points, f, scale=65535):
+    """Grid values of f over [0,1]^inputs, first input varying slowest, as ICC orders them."""
+    values = []
+
+    def walk(prefix):
+        if len(prefix) == inputs:
+            values.extend(max(0, min(scale, int(round(v * scale)))) for v in f(prefix))
+            return
+        for i in range(points):
+            walk(prefix + [i / (points - 1)])
+    walk([])
+    return values
+
+
+def icc_mft(wide, inputs, outputs, points, f, in_curve=lambda v: v, out_curve=lambda v: v, entries=64):
+    """lut16Type (wide) or lut8Type with an identity matrix."""
+    body = bytearray(b"mft2" if wide else b"mft1") + b"\0\0\0\0" + bytes((inputs, outputs, points, 0))
+    for i in range(9):
+        body += _s15(1.0 if i % 4 == 0 else 0.0)
+    n = entries if wide else 256
+    if wide:
+        body += n.to_bytes(2, "big") + n.to_bytes(2, "big")
+    put = (lambda v: int(round(v * 65535)).to_bytes(2, "big")) if wide else (lambda v: bytes((int(round(v * 255)),)))
+    for _ in range(inputs):
+        body += b"".join(put(in_curve(i / (n - 1))) for i in range(n))
+    for v in icc_grid(inputs, outputs, points, f, 65535 if wide else 255):
+        body += v.to_bytes(2, "big") if wide else bytes((v,))
+    for _ in range(outputs):
+        body += b"".join(put(out_curve(i / (n - 1))) for i in range(n))
+    return bytes(body)
+
+
+def icc_mab(a_to_b, inputs, outputs, points, f, a_curves, m_curves=None, matrix=None, b_curves=None):
+    """lutAtoBType / lutBtoAType: element order A, CLUT, M, Matrix, B (reversed for BtoA)."""
+    header_len = 32
+    parts = []
+    offsets = {}
+    pos = header_len
+
+    def place(key, data):
+        nonlocal pos
+        offsets[key] = pos
+        data = _pad4(data)
+        parts.append(data)
+        pos += len(data)
+
+    order = ["B", "Matrix", "M", "CLUT", "A"] if not a_to_b else ["A", "CLUT", "M", "Matrix", "B"]
+    for key in order:
+        if key == "A" and a_curves:
+            place("A", b"".join(_pad4(c) for c in a_curves))
+        elif key == "CLUT" and f:
+            grid = bytes([points] * inputs + [0] * (16 - inputs)) + b"\x02\0\0\0"
+            place("CLUT", grid + b"".join(v.to_bytes(2, "big") for v in icc_grid(inputs, outputs, points, f)))
+        elif key == "M" and m_curves:
+            place("M", b"".join(_pad4(c) for c in m_curves))
+        elif key == "Matrix" and matrix:
+            place("Matrix", b"".join(_s15(v) for v in matrix))
+        elif key == "B" and b_curves:
+            place("B", b"".join(_pad4(c) for c in b_curves))
+    head = bytearray(b"mAB \0\0\0\0" if a_to_b else b"mBA \0\0\0\0") + bytes((inputs, outputs, 0, 0))
+    for key in ["B", "Matrix", "M", "CLUT", "A"]:
+        head += offsets.get(key, 0).to_bytes(4, "big")
+    return bytes(head) + b"".join(parts)
+
+
+def icc_profile(cls, space, pcs, version, tags):
+    """Assembles a profile from (signature, data) pairs; identical data is stored once."""
+    table = bytearray()
+    data = bytearray()
+    seen = {}
+    start = 128 + 4 + 12 * len(tags)
+    for sig, body in tags:
+        body = _pad4(body)
+        if body not in seen:
+            seen[body] = start + len(data)
+            data += body
+        table += sig + seen[body].to_bytes(4, "big") + len(body).to_bytes(4, "big")
+    size = start + len(data)
+    header = bytearray(128)
+    header[0:4] = size.to_bytes(4, "big")
+    header[8:12] = version.to_bytes(4, "big")
+    header[12:16], header[16:20], header[20:24] = cls, space, pcs
+    header[36:40] = b"acsp"
+    header[68:80] = _s15(0.9642) + _s15(1.0) + _s15(0.8249)
+    return bytes(header) + len(tags).to_bytes(4, "big") + bytes(table) + bytes(data)
+
+
+def _lab_encode(L, a, b, v2):
+    """Lab to ICC 16-bit grid fractions (v2 legacy or v4 encoding)."""
+    if v2:
+        return [L * 652.80 / 65535, (a + 128) * 256 / 65535, (b + 128) * 256 / 65535]
+    return [L / 100.0, (a + 128) / 255.0, (b + 128) / 255.0]
+
+
+def _cmyk_to_lab(c, m, y, k):
+    """A made-up press: subtractive inks with some cross-talk, a paper white and a dark but not black solid."""
+    r = (1 - c) * (1 - 0.1 * m) * (1 - 0.92 * k)
+    g = (1 - m) * (1 - 0.15 * c) * (1 - 0.92 * k)
+    b = (1 - y) * (1 - 0.1 * m) * (1 - 0.92 * k)
+    r, g, b = (0.15 + 0.82 * v for v in (r, g, b))
+    lin = [v ** 2.2 for v in (r, g, b)]
+    x = 0.4361 * lin[0] + 0.3851 * lin[1] + 0.1431 * lin[2]
+    yy = 0.2225 * lin[0] + 0.7169 * lin[1] + 0.0606 * lin[2]
+    z = 0.0139 * lin[0] + 0.0971 * lin[1] + 0.7141 * lin[2]
+    f = lambda t: t ** (1 / 3) if t > 0.008856 else 7.787 * t + 16 / 116
+    fx, fy, fz = f(x / 0.9642), f(yy), f(z / 0.8249)
+    return 116 * fy - 16, 500 * (fx - fy), 200 * (fy - fz)
+
+
+def _lab_to_cmyk(L, a, b):
+    """A rough inverse of _cmyk_to_lab, good enough for a black-point search."""
+    fy = (L + 16) / 116
+    finv = lambda t: t ** 3 if t > 0.2069 else (t - 16 / 116) / 7.787
+    x, yy, z = 0.9642 * finv(fy + a / 500), finv(fy), 0.8249 * finv(fy - b / 200)
+    r = 3.1339 * x - 1.6169 * yy - 0.4906 * z
+    g = -0.9788 * x + 1.9161 * yy + 0.0335 * z
+    bl = 0.0719 * x - 0.2290 * yy + 1.4052 * z
+    r, g, bl = (max(0.0, min(1.0, v)) ** (1 / 2.2) for v in (r, g, bl))
+    c, m, y = 1 - r, 1 - g, 1 - bl
+    k = min(c, m, y) * 0.8
+    return [max(0.0, min(1.0, (v - k) / (1 - k) if k < 1 else 0)) for v in (c, m, y)] + [k]
+
+
+def icc_profiles():
+    """Self-made profiles in each structure the evaluator reads."""
+    wtpt = (b"wtpt", icc_xyz(0.9642, 1.0, 0.8249))
+    paper = (b"wtpt", icc_xyz(0.93, 0.97, 0.80))
+    gray = icc_profile(b"mntr", b"GRAY", b"XYZ ", 0x02100000, [wtpt, (b"kTRC", icc_curv([int(65535 * (i / 16) ** 1.8) for i in range(17)]))])
+    srgbish = [(b"rXYZ", icc_xyz(0.4361, 0.2225, 0.0139)), (b"gXYZ", icc_xyz(0.3851, 0.7169, 0.0971)), (b"bXYZ", icc_xyz(0.1431, 0.0606, 0.7141))]
+    wide = [(b"rXYZ", icc_xyz(0.6097, 0.3111, 0.0195)), (b"gXYZ", icc_xyz(0.2053, 0.6257, 0.0609)), (b"bXYZ", icc_xyz(0.1492, 0.0632, 0.7446))]
+    trc3 = icc_para(3, [2.4, 1 / 1.055, 0.055 / 1.055, 1 / 12.92, 0.04045])
+    rgb_v4 = icc_profile(b"mntr", b"RGB ", b"XYZ ", 0x04300000, [wtpt] + wide + [(b"rTRC", trc3), (b"gTRC", icc_para(0, [1.8])), (b"bTRC", icc_para(2, [2.0, 1.0, 0.0, 0.02]))])
+    rgb_lut = icc_profile(b"scnr", b"RGB ", b"XYZ ", 0x04300000, [wtpt, (b"A2B0", icc_mab(
+        True, 3, 3, 5, lambda p: [p[0] * 0.9 + 0.05 * p[1], p[1] * 0.95, p[2] * 0.85 + 0.1 * p[0]],
+        [icc_curv([2.0]), icc_para(0, [1.5]), icc_curv([0, 30000, 50000, 65535])],
+        [icc_para(0, [1.2])] * 3,
+        [0.4361, 0.3851, 0.1431, 0.2225, 0.7169, 0.0606, 0.0139, 0.0971, 0.7141, 0.002, 0.0, -0.001],
+        [icc_curv([])] * 3))] + srgbish)
+    fwd = lambda v2: (lambda p: _lab_encode(*_cmyk_to_lab(*p), v2))
+    inv = lambda v2: (lambda p: _lab_to_cmyk(*([p[0] * 65535 / 652.80, p[1] * 65535 / 256 - 128, p[2] * 65535 / 256 - 128] if v2 else [p[0] * 100, p[1] * 255 - 128, p[2] * 255 - 128])))
+    cmyk_v2 = icc_profile(b"prtr", b"CMYK", b"Lab ", 0x02100000, [paper,
+        (b"A2B0", icc_mft(True, 4, 3, 5, fwd(True), entries=32)),
+        (b"A2B1", icc_mft(True, 4, 3, 5, lambda p: [v * 0.995 for v in fwd(True)(p)], entries=32)),
+        (b"B2A0", icc_mft(True, 3, 4, 7, inv(True), entries=32))])
+    cmyk_v4 = icc_profile(b"prtr", b"CMYK", b"Lab ", 0x04300000, [paper,
+        (b"A2B0", icc_mab(True, 4, 3, 5, fwd(False), [icc_curv([1.1])] * 4, None, None, [icc_curv([])] * 3)),
+        (b"B2A0", icc_mab(False, 3, 4, 7, inv(False), [icc_curv([])] * 4, None, None, [icc_curv([])] * 3))])
+    cmyk_8 = icc_profile(b"scnr", b"CMYK", b"Lab ", 0x02100000, [wtpt, (b"A2B0", icc_mft(False, 4, 3, 5, lambda p: [min(1, v * 65535 / 65280) for v in fwd(True)(p)]))])
+    return [(b"Gray", 1, gray), (b"RgbTrc", 3, rgb_v4), (b"RgbLut", 3, rgb_lut), (b"CmykV2", 4, cmyk_v2), (b"CmykV4", 4, cmyk_v4), (b"Cmyk8", 4, cmyk_8)]
+
+
+def color():
+    """ICCBased fills and an image through each self-made profile, under every rendering intent."""
+    extra = []
+
+    def add(body):
+        extra.append(body)
+        return 4 + len(extra)
+
+    spaces = []
+    for name, n, profile in icc_profiles():
+        ref = add(stream(b"/N %d /Alternate /%s" % (n, {1: b"DeviceGray", 3: b"DeviceRGB", 4: b"DeviceCMYK"}[n]), profile))
+        spaces.append((name, n, ref))
+    refs = {nm: r for nm, _, r in spaces}
+    pic = add(image_object(24, 16, b"[/ICCBased %d 0 R]" % refs[b"CmykV2"], 8, picture(24, 16, 4)))
+    pic_rgb = add(image_object(24, 16, b"[/ICCBased %d 0 R]" % refs[b"RgbLut"], 8, picture(24, 16, 3)))
+    resources = (b"<< /ColorSpace << " + b" ".join(b"/%s [/ICCBased %d 0 R]" % (nm, r) for nm, _, r in spaces) +
+                 b" >> /XObject << /Pic %d 0 R /PicRgb %d 0 R >> /ExtGState << /Per << /RI /Perceptual >> >> >>" % (pic, pic_rgb))
+    c = bytearray()
+    intents = [b"RelativeColorimetric", b"Perceptual", b"Saturation", b"AbsoluteColorimetric"]
+    for row, (name, n, _) in enumerate(spaces):
+        for column, intent in enumerate(intents):
+            c += b"/%s ri /%s cs\n" % (intent, name)
+            for i in range(9):
+                v = [((i * 37 + j * 71 + row * 13) % 9) / 8 for j in range(n)]
+                if i == 0:
+                    v = [1.0] * n if n == 4 else [0.0] * n
+                c += b"%s sc %d %d 5 8 re f\n" % (b" ".join(b"%.4f" % x for x in v), 4 + column * 48 + i * 5, 190 - row * 12)
+    c += b"/RelativeColorimetric ri q 60 0 0 40 10 80 cm /Pic Do Q q /Per gs 60 0 0 40 80 80 cm /Pic Do Q q 50 0 0 40 145 80 cm /PicRgb Do Q\n"
+    return page(bytes(c), resources, extra=extra)
+
+
 if __name__ == "__main__":
     target = sys.argv[1]
     os.makedirs(os.path.join(target, "Render"), exist_ok=True)
-    for name, maker in [("images", images), ("vector", vector), ("bilevel", bilevel), ("shading", shading), ("text", text), ("transparency", transparency)]:
+    for name, maker in [("images", images), ("vector", vector), ("bilevel", bilevel), ("shading", shading), ("text", text), ("transparency", transparency), ("color", color)]:
         with open(os.path.join(target, "Render", name + ".pdf"), "wb") as handle:
             handle.write(maker())
+    os.makedirs(os.path.join(target, "Color"), exist_ok=True)
+    for name, _, profile in icc_profiles():
+        with open(os.path.join(target, "Color", name.decode() + ".icc"), "wb") as handle:
+            handle.write(profile)

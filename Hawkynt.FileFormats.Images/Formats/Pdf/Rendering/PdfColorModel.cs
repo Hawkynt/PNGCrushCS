@@ -25,6 +25,12 @@ internal abstract class PdfColorModel {
   /// <summary>Converts a colour to RGB, each in 0..1.</summary>
   public abstract void ToRgb(ReadOnlySpan<double> components, Span<double> rgb);
 
+  /// <summary>
+  /// This space as it converts under a rendering intent (§8.6.5.8); only an ICC-based space, or one
+  /// built on it, converts differently.
+  /// </summary>
+  public virtual PdfColorModel ForIntent(string? intent) => this;
+
   /// <summary>Whether this is the special Pattern space.</summary>
   public virtual bool IsPattern => false;
 
@@ -95,8 +101,9 @@ internal abstract class PdfColorModel {
             _ => throw new NotSupportedException($"An ICCBased colour space with {n} components and no usable /Alternate is not supported."),
           };
 
-        var profiled = stream == null ? null : PdfIccProfile.TryCreate(document, stream, alternate.Components);
-        return profiled ?? (PdfColorModel)new IccSpace(alternate, document.Numbers(dict?.Raw("Range")));
+        var range = document.Numbers(dict?.Raw("Range"));
+        var profiled = stream == null ? null : PdfIccProfile.TryCreate(document, stream, alternate.Components, alternate, range);
+        return profiled ?? new IccSpace(alternate, range);
       }
       case "Indexed" or "I": {
         if (array.Count < 4)
@@ -373,6 +380,11 @@ internal abstract class PdfColorModel {
 
     public PdfColorModel Base => baseSpace;
 
+    public override PdfColorModel ForIntent(string? intent) {
+      var b = baseSpace.ForIntent(intent);
+      return ReferenceEquals(b, baseSpace) ? this : new IndexedSpace(b, hival, lookup);
+    }
+
     public override void ToRgb(ReadOnlySpan<double> c, Span<double> rgb) {
       var index = Math.Clamp((int)Math.Round(c[0]), 0, hival);
       var n = baseSpace.Components;
@@ -395,6 +407,11 @@ internal abstract class PdfColorModel {
     public override int Components => n;
     public override string Name => name;
     public override bool PaintsNothing => none;
+
+    public override PdfColorModel ForIntent(string? intent) {
+      var a = alternate.ForIntent(intent);
+      return ReferenceEquals(a, alternate) ? this : new TintSpace(n, a, transform, name, none);
+    }
 
     public override double[] InitialColor() {
       var c = new double[n];
@@ -438,6 +455,11 @@ internal abstract class PdfColorModel {
     public override int Components => underlying?.Components ?? 0;
     public override string Name => "Pattern";
     public override bool IsPattern => true;
+
+    public override PdfColorModel ForIntent(string? intent) {
+      var u = underlying?.ForIntent(intent);
+      return ReferenceEquals(u, underlying) ? this : new PatternSpace(u);
+    }
     public override void ToRgb(ReadOnlySpan<double> c, Span<double> rgb) {
       if (underlying != null)
         underlying.ToRgb(c, rgb);

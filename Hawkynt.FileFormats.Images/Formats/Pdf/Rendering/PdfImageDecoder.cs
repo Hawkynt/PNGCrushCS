@@ -48,7 +48,7 @@ internal static class PdfImageDecoder {
 
   /// <summary>Decodes an image from its dictionary and encoded bytes.</summary>
   /// <param name="inline">Whether this is an inline image, whose keys may be abbreviated.</param>
-  public static PdfRasterImage Decode(PdfDocument document, PdfDict dict, byte[] encoded, PdfDict? resources, bool inline, bool forSoftMask = false) {
+  public static PdfRasterImage Decode(PdfDocument document, PdfDict dict, byte[] encoded, PdfDict? resources, bool inline, bool forSoftMask = false, string? intent = null) {
     var width = document.Integer(dict, inline ? _Key(dict, "W", "Width") : "Width");
     var height = document.Integer(dict, inline ? _Key(dict, "H", "Height") : "Height");
     if (width <= 0 || height <= 0)
@@ -66,7 +66,7 @@ internal static class PdfImageDecoder {
     var csValue = dict.Raw(inline ? _Key(dict, "CS", "ColorSpace") : "ColorSpace");
     PdfColorModel? space = null;
     if (!isMask && csValue != null)
-      space = inline ? _InlineSpace(document, csValue, resources) : PdfColorModel.Parse(document, csValue, resources);
+      space = (inline ? _InlineSpace(document, csValue, resources) : PdfColorModel.Parse(document, csValue, resources)).ForIntent(intent);
 
     int components;
     switch (imageFilter) {
