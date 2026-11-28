@@ -110,8 +110,13 @@ internal sealed partial class PdfRenderer {
 
       if ((draws || clips) && font.MissingReason == null) {
         var textToDevice = this._textMatrix.Then(state.Ctm);
-        if (font.IsType3)
-          this._DrawType3Glyph(font, code, glyphToText.Then(this._textMatrix), draws, clips);
+        // ISO 32000-2 §9.3.6: a Type 3 glyph is drawn by its own description in every mode but 3
+        // and 7, and modes 4 to 7 add nothing to the clipping path — so a text object of Type 3
+        // glyphs alone does not clip at all (ISO 32000-1: the mode has no effect on Type 3 text).
+        if (font.IsType3) {
+          if (draws)
+            this._DrawType3Glyph(font, code, glyphToText.Then(this._textMatrix));
+        }
         else
           this._DrawGlyph(font.Outline(code), glyphToText.Then(textToDevice), draws, clips);
       }
@@ -190,7 +195,7 @@ internal sealed partial class PdfRenderer {
   }
 
   /// <summary>Runs a Type 3 glyph procedure with glyph space mapped onto the text position.</summary>
-  private void _DrawType3Glyph(PdfFont font, int code, Matrix2D glyphToUserOfText, bool draws, bool clips) {
+  private void _DrawType3Glyph(PdfFont font, int code, Matrix2D glyphToUserOfText) {
     if (this._type3Depth >= _MaxType3Depth)
       return;
 
@@ -198,10 +203,6 @@ internal sealed partial class PdfRenderer {
     if (proc == null || !this._activeForms.Add(proc))
       return;
 
-    if (clips && !draws) {
-      this._activeForms.Remove(proc);
-      throw new NotSupportedException("Type 3 glyphs as a clipping path (text render modes 4 to 7) are not supported.");
-    }
 
     ++this._type3Depth;
     var savedState = this._state;

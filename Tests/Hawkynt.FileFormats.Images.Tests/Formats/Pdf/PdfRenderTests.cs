@@ -175,6 +175,33 @@ public sealed class PdfRenderTests {
     });
   }
 
+  /// <remarks>
+  /// ISO 32000-2 §9.3.6: Type 3 text is drawn by its glyph descriptions in every rendering mode but
+  /// 3 and 7, and modes 4 to 7 add nothing to the clipping path. poppler agrees on the clip, but
+  /// paints the glyphs in mode 7 too; this follows the specification.
+  /// </remarks>
+  [TestCase(7, false)]
+  [TestCase(4, true)]
+  [TestCase(6, true)]
+  [Category("Unit")]
+  public void Type3TextInAClippingMode_IsDrawnButDoesNotClip(int mode, bool glyphVisible) {
+    var pdf = _Build(
+      "<< /Type /Catalog /Pages 2 0 R >>",
+      "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+      "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 100 50] /Resources << /Font << /T 5 0 R >> >> /Contents 4 0 R >>",
+      _Stream($"q BT /T 40 Tf {mode} Tr 0 0 1 rg 5 5 Td (a) Tj ET 0 1 0 rg 60 0 40 50 re f Q"),
+      "<< /Type /Font /Subtype /Type3 /FontBBox [0 0 1000 1000] /FontMatrix [0.001 0 0 0.001 0 0] /CharProcs << /sq 6 0 R >> /Encoding << /Type /Encoding /Differences [97 /sq] >> /FirstChar 97 /LastChar 97 /Widths [1000] /Resources << >> >>",
+      _Stream("1000 0 0 0 1000 1000 d1 100 100 800 800 re f"));
+    var rendering = PdfFile.RenderPage(PdfReader.FromBytes(pdf), 0);
+    var image = rendering.Image.Format == PixelFormat.Rgb24 ? rendering.Image : PixelConverter.Convert(rendering.Image, PixelFormat.Rgb24);
+    int[] Pixel(int x, int y) => [image.PixelData[(y * image.Width + x) * 3], image.PixelData[(y * image.Width + x) * 3 + 1], image.PixelData[(y * image.Width + x) * 3 + 2]];
+    Assert.Multiple(() => {
+      Assert.That(rendering.Omissions, Is.Empty);
+      Assert.That(Pixel(25, 25), Is.EqualTo(glyphVisible ? new[] { 0, 0, 255 } : new[] { 255, 255, 255 }), "the glyph");
+      Assert.That(Pixel(80, 25), Is.EqualTo(new[] { 0, 255, 0 }), "the fill after ET, outside every glyph: not clipped away");
+    });
+  }
+
   [Test]
   [Category("Unit")]
   public void UnknownCMapName_IsRefusedByName() {
