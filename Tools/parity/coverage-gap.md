@@ -945,7 +945,7 @@ Windows only, so nothing here has ever been able to compare against them either.
 | fbm | .cbm |  |
 | fff | .fff | read; its signature stands at 452 and its JPEG at 3272 |
 | fi | .fi | read; a zlib stream holding the palette and then the rows, or a JPEG at 598 |
-| fif | .fif | FTC 1.1, FTC 3.1-3.3 and FIF1 read, FTC 3.1 written; 33 of 34 real samples exact against Iterated's DECO_32.DLL |
+| fif | .fif | FTC 1.1, FTC 3.1-3.3 and FIF1 read at any output size, FTC 3.1 written; all 34 real samples exact against Iterated's DECO_32.DLL; the video profiles refused by name |
 | fre | .fre | read; a GE Genesis image, met as the Visible Human CT slices, and the Male MRI slices too |
 | frm | .frm |  |
 | frm2 | .frm |  |

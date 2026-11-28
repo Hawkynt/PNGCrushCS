@@ -32,7 +32,7 @@ issue quotes the recorded blocker and the route around it.
 
 | Category | Tracking issue | Images | Codecs | Containers | Encoders | Total |
 | --- | --- | ---: | ---: | ---: | ---: | ---: |
-| [Modern & standard still-image codecs](#modern--standard-still-image-codecs) | [#513](https://github.com/Hawkynt/PNGCrushCS/issues/513) | 54 | 0 | 0 | 0 | 54 |
+| [Modern & standard still-image codecs](#modern--standard-still-image-codecs) | [#513](https://github.com/Hawkynt/PNGCrushCS/issues/513) | 53 | 0 | 0 | 0 | 53 |
 | [Camera RAW & sensor data](#camera-raw--sensor-data) | [#514](https://github.com/Hawkynt/PNGCrushCS/issues/514) | 24 | 0 | 0 | 0 | 24 |
 | [Geospatial & remote sensing](#geospatial--remote-sensing) | [#515](https://github.com/Hawkynt/PNGCrushCS/issues/515) | 83 | 0 | 0 | 0 | 83 |
 | [Medical & scientific imaging](#medical--scientific-imaging) | [#516](https://github.com/Hawkynt/PNGCrushCS/issues/516) | 42 | 0 | 0 | 0 | 42 |
@@ -49,7 +49,7 @@ issue quotes the recorded blocker and the route around it.
 | [Lossless & uncompressed video](#lossless--uncompressed-video) | [#527](https://github.com/Hawkynt/PNGCrushCS/issues/527) | 0 | 11 | 0 | 2 | 13 |
 | [Cinema camera RAW video](#cinema-camera-raw-video) | [#528](https://github.com/Hawkynt/PNGCrushCS/issues/528) | 0 | 6 | 7 | 0 | 13 |
 | [Elementary streams & streaming manifests](#elementary-streams--streaming-manifests) | [#529](https://github.com/Hawkynt/PNGCrushCS/issues/529) | 0 | 0 | 18 | 0 | 18 |
-| **All** | | **564** | **147** | **274** | **19** | **1004** |
+| **All** | | **563** | **147** | **274** | **19** | **1003** |
 
 Each issue carries the labels `cat: <category>`, its kind (`image-format`, `video-codec`, `video-container`, `video-encoder`), `priority: high|medium|low`, and `documented-blocker` where that applies.
 
@@ -74,7 +74,6 @@ JPEG/JPEG 2000/HEIF variants, wavelet, HDR and research still-image codecs. Trac
 | DCT (Crash Barrier) | Image | `.dct` | read + write | missing | low | [#545](https://github.com/Hawkynt/PNGCrushCS/issues/545) |
 | Deep Zoom (DZI) and Zoomify (ZIF, PFF) tile pyramids | Image | `.dzi`, `.zif`, `.pff` | read + write | missing | low | [#546](https://github.com/Hawkynt/PNGCrushCS/issues/546) |
 | FIASCO - Fractal Image And Sequence Codec | Image | `.fco`, `.wfa` | read + write | missing | low | [#547](https://github.com/Hawkynt/PNGCrushCS/issues/547) |
-| Fractal Image Format (Iterated Systems FIF) | Image | `.fif`, `.fi` | read + write | blocked | low | [#548](https://github.com/Hawkynt/PNGCrushCS/issues/548) |
 | FUIF - Free Universal Image Format | Image | `.fuif` | read + write | missing | low | [#549](https://github.com/Hawkynt/PNGCrushCS/issues/549) |
 | GIFBLAST (GFB) | Image | `.gfb` | read + write | missing | low | [#550](https://github.com/Hawkynt/PNGCrushCS/issues/550) |
 | Gifpress compressed GIF (.gps) | Image | `.gps` | read + write | missing | low | [#551](https://github.com/Hawkynt/PNGCrushCS/issues/551) |
