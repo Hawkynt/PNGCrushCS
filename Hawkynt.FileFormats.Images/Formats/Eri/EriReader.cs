@@ -207,6 +207,8 @@ public static class EriReader {
     byte[]? palette = null;
     var frames = new List<byte[]>();
     byte[]? previous = null;
+    var lossy = info.Transformation != EriInfoHeader.LosslessTransformation;
+    var lossyFrames = new List<(byte[] Record, bool Difference)>();
 
     foreach (var record in Records(data, headers.StreamOffset, headers.StreamOffset + headers.StreamLength, strict: true)) {
       if (record.Id == PaletteId) {
@@ -225,17 +227,14 @@ public static class EriReader {
       if (record.Id != ImageFrameId && !difference)
         continue;
 
-      var samples = new byte[sampleCount];
-      if (info.Transformation != EriInfoHeader.LosslessTransformation) {
-        if (difference)
-          throw new NotSupportedException("Lossy ERI difference frames (motion-compensated MEI video) are not decoded by this reader.");
+      if (lossy) {
         if (colorType == EriColorType.Palette)
           throw new InvalidDataException("ERI lossy picture cannot be paletted.");
-        EriLossyDecoder.Decode(data.Slice(record.Offset, record.Length).ToArray(), info, samples, channels);
-        previous = samples;
-        frames.Add(_ToPixels(samples, info, colorType, channels));
+        lossyFrames.Add((data.Slice(record.Offset, record.Length).ToArray(), difference));
         continue;
       }
+
+      var samples = new byte[sampleCount];
 
       if (difference) {
         if (previous is null)
@@ -247,6 +246,9 @@ public static class EriReader {
       previous = samples;
       frames.Add(_ToPixels(samples, info, colorType, channels));
     }
+
+    if (lossy)
+      frames.AddRange(_DecodeLossy(lossyFrames, info, channels));
 
     if (frames.Count == 0)
       throw new InvalidDataException("ERI file's stream holds no image frame.");
@@ -262,6 +264,54 @@ public static class EriReader {
       Sequence = headers.Sequence,
       Frames = frames,
     };
+  }
+
+  /// <summary>
+  /// Decodes a lossy picture's frames in the order the Entis player does: a bidirectional frame
+  /// after the key or predicted frame that follows it, which it refers to as well as to the one
+  /// before. Each frame is shown as decoded, or smoothed when it asks for the whole-picture filter.
+  /// </summary>
+  private static List<byte[]> _DecodeLossy(List<(byte[] Record, bool Difference)> records, in EriInfoHeader info, int channels) {
+    var decoder = new EriLossyDecoder(info, channels);
+    var shown = new byte[records.Count][];
+    byte[]? older = null;
+    byte[]? newer = null;
+    var waiting = new List<int>();
+
+    for (var i = 0; i < records.Count; ++i) {
+      var (record, difference) = records[i];
+      if (difference && EriLossyDecoder.IsBidirectional(record)) {
+        waiting.Add(i);
+        continue;
+      }
+
+      if (difference && newer is null)
+        throw new InvalidDataException("ERI difference frame has no frame before it to apply to.");
+
+      var anchor = decoder.Decode(record, difference ? newer : null, null);
+      (older, newer) = (newer, anchor.Pixels);
+      shown[i] = anchor.Shown;
+
+      foreach (var b in waiting) {
+        if (older is null)
+          throw new InvalidDataException("ERI bidirectional frame has no frame before it to refer to.");
+        shown[b] = decoder.Decode(records[b].Record, older, newer).Shown;
+      }
+      waiting.Clear();
+    }
+
+    if (waiting.Count > 0)
+      throw new InvalidDataException("ERI bidirectional frames at the end of the film have no frame after them to refer to.");
+
+    var frames = new List<byte[]>(shown.Length);
+    var outChannels = channels == 4 ? 4 : 3;
+    foreach (var bgra in shown) {
+      var pixels = new byte[info.Width * info.Rows * outChannels];
+      for (int s = 0, t = 0; s < bgra.Length; s += 4, t += outChannels)
+        bgra.AsSpan(s, outChannels).CopyTo(pixels.AsSpan(t));
+      frames.Add(pixels);
+    }
+    return frames;
   }
 
   internal static EriColorType ColorTypeOf(in EriInfoHeader info) {

@@ -64,8 +64,18 @@ public readonly record struct EriFile
       var headers = EriReader.ReadHeaders(header, strict: false);
       var info = headers.Info!.Value;
       var colorType = EriReader.ColorTypeOf(info);
-      return new(info.Width, info.Rows, info.BitsPerPixel, colorType.ToString(), CompressionName(info),
-        (int)Math.Max(1, headers.FileHeader.FrameCount));
+
+      // The ERISA film writer counts one frame too many when it holds back bidirectional frames,
+      // so the frame records are counted when the whole stream is there.
+      var frames = (int)Math.Max(1, headers.FileHeader.FrameCount);
+      if (headers.StreamOffset >= 0 && headers.StreamOffset + headers.StreamLength <= header.Length) {
+        var records = EriReader.Records(header, headers.StreamOffset, headers.StreamOffset + headers.StreamLength, strict: false)
+          .Count(r => r.Id == EriReader.ImageFrameId || r.Id == EriReader.DifferenceFrameId);
+        if (records > 0)
+          frames = records;
+      }
+
+      return new(info.Width, info.Rows, info.BitsPerPixel, colorType.ToString(), CompressionName(info), frames);
     } catch (Exception e) when (e is System.IO.InvalidDataException or NotSupportedException or ArgumentException) {
       return null;
     }

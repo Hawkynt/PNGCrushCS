@@ -95,14 +95,7 @@ public sealed class EriTests {
         var expected = Pam(File.ReadAllBytes(path));
         var image = EriFile.ToRawImage(file, frame);
         Assert.That((image.Width, image.Height), Is.EqualTo((expected.Width, expected.Height)), $"frame {frame} size");
-        var samples = AsPamSamples(image);
-        if (name.Contains("lossy", StringComparison.Ordinal)) {
-          // The reference's float pipeline sums in another order; a rounding may land one off.
-          var worst = samples.Zip(expected.Samples, (a, b) => Math.Abs(a - b)).DefaultIfEmpty(0).Max();
-          Assert.That(samples.Length, Is.EqualTo(expected.Samples.Length), $"frame {frame} sample count");
-          Assert.That(worst, Is.LessThanOrEqualTo(1), $"frame {frame} pixels");
-        } else
-          Assert.That(samples, Is.EqualTo(expected.Samples), $"frame {frame} pixels");
+        Assert.That(AsPamSamples(image), Is.EqualTo(expected.Samples), $"frame {frame} pixels");
 
         var palette = Path.Combine(_FixtureDirectory, $"{stem}_{frame}.pal");
         if (File.Exists(palette)) {
@@ -193,9 +186,10 @@ public sealed class EriTests {
   }
 
   /// <summary>Variants the libraries wrote that no available decoder reads back faithfully, refused by name.</summary>
-  [TestCase("refused_lot.eri", "lapped transform")]
+  [TestCase("refused_lossy_gray.eri", "grey")]
+  [TestCase("refused_lossy_filter_one_pixel.mei", "one pixel wide")]
+  [TestCase("refused_lossy_filter_one_line.eri", "one line high")]
   [TestCase("refused_lossy_v9.eri", "version 9")]
-  [TestCase("refused_lossy_motion.mei", "difference frames")]
   [TestCase("refused_version8_gamma.eri", "cannot read them back")]
   [Category("Unit")]
   public void UnverifiableVariants_AreRefusedByName(string name, string reason) {
