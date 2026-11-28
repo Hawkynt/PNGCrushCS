@@ -84,9 +84,13 @@ internal static class H265CabacContexts {
   /// <summary>How many context variables one entropy coder holds.</summary>
   // The screen content coding extensions' own syntax elements, appended after the range
   // extensions' for the same reason.
-  internal const int TU_RESIDUAL_ACT_FLAG = CU_CHROMA_QP_OFFSET_IDX + 1;
+  internal const int PALETTE_MODE_FLAG = CU_CHROMA_QP_OFFSET_IDX + 1;
+  internal const int TU_RESIDUAL_ACT_FLAG = PALETTE_MODE_FLAG + 1;
+  internal const int PALETTE_RUN_PREFIX = TU_RESIDUAL_ACT_FLAG + 1;
+  internal const int COPY_ABOVE_PALETTE_INDICES_FLAG = PALETTE_RUN_PREFIX + 8;
+  internal const int PALETTE_TRANSPOSE_FLAG = COPY_ABOVE_PALETTE_INDICES_FLAG + 1;
 
-  internal const int COUNT = TU_RESIDUAL_ACT_FLAG + 1;
+  internal const int COUNT = PALETTE_TRANSPOSE_FLAG + 1;
 
   /// <summary>
   /// The initialisation values, one row per initialisation type: intra, predicted, bidirectional.
@@ -295,8 +299,17 @@ internal static class H265CabacContexts {
     _Set(tables, CU_CHROMA_QP_OFFSET_FLAG, [154], [154], [154]);
     _Set(tables, CU_CHROMA_QP_OFFSET_IDX, [154], [154], [154]);
 
-    // Table 9-39: the colour transform flag starts at even odds in every slice type.
+    // Tables 9-38 to 9-42: every screen content context starts at even odds in every slice type.
+    // palette_run_prefix has eight — three for the first bin of a run of one index, chosen by that
+    // index, two for its later bins, and three for a run copied from the row above.
+    // copy_above_palette_indices_flag and copy_above_indices_for_final_run_flag share one.
+    _Set(tables, PALETTE_MODE_FLAG, [154], [154], [154]);
     _Set(tables, TU_RESIDUAL_ACT_FLAG, [154], [154], [154]);
+    _Set(tables, PALETTE_RUN_PREFIX,
+      [154, 154, 154, 154, 154, 154, 154, 154], [154, 154, 154, 154, 154, 154, 154, 154],
+      [154, 154, 154, 154, 154, 154, 154, 154]);
+    _Set(tables, COPY_ABOVE_PALETTE_INDICES_FLAG, [154], [154], [154]);
+    _Set(tables, PALETTE_TRANSPOSE_FLAG, [154], [154], [154]);
 
     return tables;
   }

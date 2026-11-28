@@ -350,9 +350,12 @@ internal static class H265Deblocking {
     }
   }
 
+  // A palette coded unit keeps its samples too (clauses 8.7.2.5.7 and 8.7.2.5.8): its colours are
+  // exact, and smoothing an edge of text would only blur it.
   private static bool _KeepsItsSamples(H265FrameDecoder frame, H265SequenceParameterSet sps, int block)
     => frame.IsTransquantBypassAt(block)
-       || (sps.PcmLoopFilterDisabled && frame.IsPulseCodeModulatedAt(block));
+       || (sps.PcmLoopFilterDisabled && frame.IsPulseCodeModulatedAt(block))
+       || frame.IsPaletteCodedAt(block);
 
   private static ushort _Move(int from, int to, int limit, int maximum)
     => (ushort)Math.Clamp(Math.Clamp(to, from - limit, from + limit), 0, maximum);

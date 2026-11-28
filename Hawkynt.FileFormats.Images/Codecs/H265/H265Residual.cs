@@ -337,7 +337,7 @@ internal static class H265Residual {
 
         var level = baseLevel;
         if (baseLevel == threshold) {
-          var remaining = _DecodeRemaining(ref cabac, riceParam, limitedEscape, log2TransformRange);
+          var remaining = DecodeRemaining(ref cabac, riceParam, limitedEscape, log2TransformRange);
           level += remaining;
 
           // The Rice parameter adapts to what this sub-block has held so far, so a block of large
@@ -465,7 +465,7 @@ internal static class H265Residual {
   /// prefixes long enough to make a hardware decoder's worst case unbounded. The conversion follows
   /// the JCT-VC reference decoder's <c>xReadCoefRemainExGolomb</c> (see THIRD-PARTY-NOTICE.HM.txt).
   /// </remarks>
-  private static int _DecodeRemaining(
+  internal static int DecodeRemaining(
     ref H265CabacEngine cabac, int riceParam, bool limited, int log2TransformRange) {
     const int binReduction = 3;
 

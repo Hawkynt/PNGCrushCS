@@ -8,7 +8,7 @@ namespace FileFormat.Codecs.H265;
 /// Decodes one HEVC picture in coding-tree-block tile-scan order, reconstructing coding units,
 /// transform units and prediction units as their syntax is consumed.
 /// </summary>
-internal sealed class H265FrameDecoder : IH265MotionContext {
+internal sealed partial class H265FrameDecoder : IH265MotionContext {
 
   private const int _LOG2_MIN_BLOCK = 2;
   private const int _MIN_BLOCK = 1 << _LOG2_MIN_BLOCK;
@@ -164,6 +164,11 @@ internal sealed class H265FrameDecoder : IH265MotionContext {
     this._chromaModeDerived = new bool[blocks];
     this._blockQp = new sbyte[blocks];
 
+    if (sps.ScreenContent.PaletteModeEnabled) {
+      this._paletteCoded = new bool[blocks];
+      this._AllocatePaletteState();
+    }
+
     this._saoTypeIdx = new byte[sps.PicSizeInCtbsY * 3];
     this._saoOffsets = new short[sps.PicSizeInCtbsY * 3 * 5];
     this._saoBandOrClass = new byte[sps.PicSizeInCtbsY * 3];
@@ -234,6 +239,7 @@ internal sealed class H265FrameDecoder : IH265MotionContext {
           && column == this._tiles.TileColumnStart(ctb) + 1) {
         Array.Copy(this._contexts, this._wavefrontContexts, H265CabacContexts.COUNT);
         Array.Copy(this._statCoeff, this._wavefrontStatCoeff, 4);
+        this._StorePalettePredictorForWavefront();
         this._wavefrontContextsStored = true;
       }
 
@@ -301,6 +307,7 @@ internal sealed class H265FrameDecoder : IH265MotionContext {
       if (this._wavefrontContextsStored && (!first || header.DependentSliceSegment)) {
         Array.Copy(this._wavefrontContexts, this._contexts, H265CabacContexts.COUNT);
         Array.Copy(this._wavefrontStatCoeff, this._statCoeff, 4);
+        this._RestorePalettePredictorFromWavefront();
       } else
         this._InitializeContexts(initType, header.SliceQpY);
     } else if (!(first && header.DependentSliceSegment))
@@ -320,6 +327,7 @@ internal sealed class H265FrameDecoder : IH265MotionContext {
   private void _InitializeContexts(int initType, int sliceQpY) {
     H265CabacContexts.Initialize(this._contexts, initType, sliceQpY);
     Array.Clear(this._statCoeff);
+    this._InitializePalettePredictor();
   }
 
   private void _ResetQuantisationState(int sliceQp) {
@@ -554,6 +562,14 @@ internal sealed class H265FrameDecoder : IH265MotionContext {
         : H265PredictionMode.Inter;
 
     this._FillBlocks(this._predictionMode, x0, y0, size, size, (byte)this._cuPredictionMode);
+
+    if (this._paletteCoded != null
+        && this._cuPredictionMode == H265PredictionMode.Intra
+        && log2CbSize <= this._sps.MaxTbLog2SizeY
+        && this._cabac.DecodeBin(H265CabacContexts.PALETTE_MODE_FLAG) != 0) {
+      this._DecodePaletteCodingUnit(x0, y0, log2CbSize);
+      return;
+    }
 
     if (this._cuPredictionMode != H265PredictionMode.Intra || log2CbSize == this._sps.MinCbLog2SizeY)
       this._cuPartitionMode = this._DecodePartitionMode(log2CbSize);
@@ -1132,22 +1148,8 @@ internal sealed class H265FrameDecoder : IH265MotionContext {
 
     // cu_chroma_qp_offset_flag and cu_chroma_qp_offset_idx — clause 7.3.8.10. Sent once per chroma
     // quantisation group, at the first unit that codes chrominance it will dequantise.
-    if (anyChroma && this._header.CuChromaQpOffsetEnabled && !this._cuTransquantBypass
-        && !this._cuChromaQpOffsetCoded) {
-      this._cuChromaQpOffsetCoded = true;
-      if (this._cabac.DecodeBin(H265CabacContexts.CU_CHROMA_QP_OFFSET_FLAG) != 0) {
-        var index = 0;
-        var last = this._pps.CbQpOffsetList.Length - 1;
-        while (index < last && this._cabac.DecodeBin(H265CabacContexts.CU_CHROMA_QP_OFFSET_IDX) != 0)
-          ++index;
-
-        this._cuQpOffsetCb = this._pps.CbQpOffsetList[index];
-        this._cuQpOffsetCr = this._pps.CrQpOffsetList[index];
-      } else {
-        this._cuQpOffsetCb = 0;
-        this._cuQpOffsetCr = 0;
-      }
-    }
+    if (anyChroma && !this._cuTransquantBypass)
+      this._DecodeChromaQpOffset();
 
     var qp = this._QuantiserAt(x0, y0);
     this._lumaResidualPresent = false;
@@ -1193,6 +1195,29 @@ internal sealed class H265FrameDecoder : IH265MotionContext {
         else if (hasResidual || resScale != 0)
           this._AddChromaResidual(chromaX, y, log2TrafoSizeC, component, hasResidual, qp, resScale);
       }
+    }
+  }
+
+  /// <summary>
+  /// <c>chroma_qp_offset()</c> — clause 7.3.8.15: <c>cu_chroma_qp_offset_flag</c> and
+  /// <c>cu_chroma_qp_offset_idx</c>, sent once per chroma quantisation group.
+  /// </summary>
+  private void _DecodeChromaQpOffset() {
+    if (!this._header.CuChromaQpOffsetEnabled || this._cuChromaQpOffsetCoded)
+      return;
+
+    this._cuChromaQpOffsetCoded = true;
+    if (this._cabac.DecodeBin(H265CabacContexts.CU_CHROMA_QP_OFFSET_FLAG) != 0) {
+      var index = 0;
+      var last = this._pps.CbQpOffsetList.Length - 1;
+      while (index < last && this._cabac.DecodeBin(H265CabacContexts.CU_CHROMA_QP_OFFSET_IDX) != 0)
+        ++index;
+
+      this._cuQpOffsetCb = this._pps.CbQpOffsetList[index];
+      this._cuQpOffsetCr = this._pps.CrQpOffsetList[index];
+    } else {
+      this._cuQpOffsetCb = 0;
+      this._cuQpOffsetCr = 0;
     }
   }
 
@@ -1781,6 +1806,7 @@ internal sealed class H265FrameDecoder : IH265MotionContext {
   public bool IsIntraAt(int index) => this._predictionMode[index] == (byte)H265PredictionMode.Intra;
   internal bool IsPulseCodeModulatedAt(int index) => this._pulseCodeModulated[index];
   internal bool IsTransquantBypassAt(int index) => this._transquantBypass[index];
+  internal bool IsPaletteCodedAt(int index) => this._paletteCoded != null && this._paletteCoded[index];
   internal bool HasCodedResidualAt(int index) => this._hasCodedResidual[index];
   internal bool IsTransformEdgeVertical(int index) => this._transformEdgeVertical[index];
   internal bool IsTransformEdgeHorizontal(int index) => this._transformEdgeHorizontal[index];

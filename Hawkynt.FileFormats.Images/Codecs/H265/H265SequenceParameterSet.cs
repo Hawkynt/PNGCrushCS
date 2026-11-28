@@ -386,11 +386,6 @@ internal sealed class H265SequenceParameterSet {
   /// stream this decoder cannot read produces no picture at all.
   /// </remarks>
   private void _RefuseWhatIsNotDecodable() {
-    if (this.ScreenContent.PaletteModeEnabled)
-      throw new NotSupportedException(
-        "This H.265 sequence parameter set sets palette_mode_enabled_flag of the screen content coding extension "
-        + "(clause 7.3.2.2.3). Palette coded coding units are not implemented.");
-
     if (this.SeparateColourPlaneFlag)
       throw new NotSupportedException(
         "This H.265 stream sets separate_colour_plane_flag (clause 7.4.3.2.1): its three colour planes are coded as "

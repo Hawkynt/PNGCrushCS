@@ -161,13 +161,13 @@ public sealed class H265VideoDecoderTests {
 
   [Test]
   [Category("Unit")]
-  public void TheScreenContentExtensions_AreRefusedByName() {
-    var message = _Refusal(new H265TestStream()
+  public void TheScreenContentExtensions_AreAccepted() {
+    var failure = _Decode(new H265TestStream()
       .VideoParameterSet()
       .SequenceParameterSet(screenContentExtension: true, profileIdc: 9)
       .ToArray());
 
-    Assert.That(message, Does.Contain("screen content"));
+    Assert.That(failure, Is.Null, failure?.Message);
   }
 
   [Test]

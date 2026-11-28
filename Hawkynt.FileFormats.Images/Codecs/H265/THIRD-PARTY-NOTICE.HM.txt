@@ -2,7 +2,7 @@ Parts of the H.265 format range extensions support in this folder were converted
 HEVC reference software (HM), release HM-16.20, https://vcgit.hhi.fraunhofer.de/jvet/HM :
 
   - the limited exponential-Golomb escape binarization of extended precision processing
-    (H265Residual._DecodeRemaining, from TDecSbac::xReadCoefRemainExGolomb);
+    (H265Residual.DecodeRemaining, from TDecSbac::xReadCoefRemainExGolomb);
   - the combined shift of transform-skipped residuals and its clamp under extended precision
     (H265Transform.Skip, from TComTrQuant::xITransformSkip);
   - the rotation of losslessly coded intra 4x4 residuals and the gating of the intra boundary
@@ -18,7 +18,12 @@ normative text leaves to be read:
   - the size condition of the 8x8 bi-prediction restriction beside a current picture reference,
     taken as the prediction block's own width and height of at most eight
     (H265MotionPrediction.RestrictSmallBiprediction, from TComDataCU::isBipredRestriction and
-    TComDataCU::is8x8BipredRestriction).
+    TComDataCU::is8x8BipredRestriction);
+  - where a transposed palette coded unit in a subsampled chroma format reads its index map and
+    its escape values (H265FrameDecoder._ReconstructPalette and _DecodePaletteEscapes, from
+    TDecCu::xDecodePaletteTexture and TDecSbac::parsePaletteModeSyntax).
+
+The constants of the screen content CABAC contexts are those of ITU-T H.265 Tables 9-38 to 9-42.
 
 HM is distributed under the following licence:
 
