@@ -14,6 +14,39 @@ problem, not a missing table. There is no file, no signature entry in any public
 reference implementation that admits knowing the format. The search below was run on 2026-09-14 and
 2026-09-15 and is recorded because it was thorough enough to be worth not repeating.
 
+### Second search (2026-11-28)
+
+A second pass found primary-source evidence that the file exists, and evidence that it is not a
+format Paris itself reads. It found nothing to implement from.
+
+- **The file is real.** Two Paris Designer manuals survive on archive.org (XLPrint, 1998–2000,
+  all rights reserved, so reference only):
+  - User Manual: <https://archive.org/details/manualzilla-id-5804561>
+  - Reference Manual: <https://archive.org/details/manualzilla-id-5890906>
+  Page 411 of the Reference Manual shows the `PARIS\GRF` graphics folder holding `MS-LOGO.LPG`
+  beside `PHONEP.LGO`, the `.pcx` files above and extensionless resources. Windows shows the `.LPG`
+  with the generic icon for an unregistered type.
+- **Paris does not list it.** User Manual page 404 gives every graphic type Paris Designer imports
+  (ASCII, ATT, BMP, BRK, CALS, CLP, CUT, DCX, DIB, G3, G4, GIF, GX2, ICA, ICO, IFF, IMG, JPEG, KFX,
+  LV, MAC, MSP, PCD, PCX, PICT, PSD, RLE, SUN, TGA, TIFF, WMF, WPG, XBM, XPM, XWD), and LPG is not
+  among them. That list is ImageGear's filter set, which also has no LPG reader. The manual's
+  appendix of Paris file extensions does not name it either.
+- **Neither XnView nor NConvert ever listed it.** Neither the current XnView format list nor its
+  2005, 2009 and 2012 captures do; they have only "Xerox DIFF". NConvert 7.240's `Formats.txt` (493
+  formats) and binaries carry no LPG or Paris string, so NConvert can neither read nor write it.
+- **Xerox has no such type.** The LPS manuals on bitsavers define PDL, FDL, FNT, LGO, CME, LIB, FRM,
+  IMG, JSL, STK, FSL and PDE, but no LPG:
+  - PDL reference for the 4050/4090/4450/4650, 720P94090;
+  - Tape Formats manual, 600P86176.
+- **No converter names it.** Elixir, Documaker and Solimar XCHANGE handle Xerox IMG and LGO, but
+  not LPG.
+- **No sample turned up.** None of DiscMaster's 331 `.lpg` files is Xerox-related, and neither are
+  the Wayback captures of xlprint.com (867 entries) or paris-software.com (91).
+
+The likeliest reading, still a guess: `MS-LOGO.LPG` is a Xerox-side logo resource that the Paris
+Converter produced from LCDS, not a raster format of Paris's own. A real `.lpg` from a Paris
+installation, or documentation from XLPrint, would be needed to go further.
+
 What was being chased: `LPG`, a raster format attributed to the Xerox "Paris" publishing and
 print-stream product line, with AccuSoft's ImageGear named as the library most likely to still carry
 a reader for it. The plan was the usual one for this repository — obtain a sample, obtain an outside
