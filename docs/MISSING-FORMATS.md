@@ -156,7 +156,7 @@ GIS rasters, elevation models, SAR and planetary imagery. Tracked in [#515](http
 | ESRI BIL/BIP/BSQ (.hdr labelled raw) | Image | `.bil`, `.bip`, `.bsq`, `.hdr`, `.flt` | read + write | missing | medium | [#623](https://github.com/Hawkynt/PNGCrushCS/issues/623) |
 | GRIB 1 / GRIB 2 (WMO gridded binary) | Image | `.grb`, `.grib`, `.grb2`, `.grib2` | read + write | missing | medium | [#624](https://github.com/Hawkynt/PNGCrushCS/issues/624) |
 | HDF5 image datasets (incl. HDF5 Image & Palette spec, netCDF-4, HDF-EOS5) | Image | `.h5`, `.hdf5`, `.he5`, `.nc` | read + write | missing | medium | [#625](https://github.com/Hawkynt/PNGCrushCS/issues/625) |
-| MrSID (Multi-resolution Seamless Image Database) | Image | `.sid` | read + write | blocked | medium | [#626](https://github.com/Hawkynt/PNGCrushCS/issues/626) |
+| MrSID (Multi-resolution Seamless Image Database) pixel decoding; header, metadata and georeferencing are read | Image | `.sid` | read + write | blocked | medium | [#626](https://github.com/Hawkynt/PNGCrushCS/issues/626) |
 | NASA PDS4 (XML label + array) | Image | `.xml`, `.lblx`, `.img`, `.dat` | read + write | missing | medium | [#627](https://github.com/Hawkynt/PNGCrushCS/issues/627) |
 | netCDF raster (classic CDF-1/2/5) | Image | `.nc`, `.cdf`, `.nc4` | read + write | missing | medium | [#628](https://github.com/Hawkynt/PNGCrushCS/issues/628) |
 | NITF 2.0 / NSIF 1.0 and compressed image segments (C1/C3/C4/C5/C8/M3...) | Image | `.ntf`, `.nitf`, `.nsf` | read + write | missing | medium | [#629](https://github.com/Hawkynt/PNGCrushCS/issues/629) |

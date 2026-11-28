@@ -1045,7 +1045,7 @@ Windows only, so nothing here has ever been able to compare against them either.
 | sct | .ch | read by the Scitex CT reader |
 | sdg | .sdg |  |
 | sfax | .001 | read; FAX1D, the row length at 5, Group 3 from 16 with the bits the other way up |
-| sid | .sid | Windows only |
+| sid | .sid | header, metadata and georeferencing of MG2/MG3/MG4 read; pixels refused by name, the codestream being unpublished and the vendor SDK's licence ruling it out as source or oracle (Formats/MrSid/SPEC.md) |
 | skf | .skf |  |
 | skn | .skn | read; the 740-byte header, then Group 4 with the bits running from the bottom of each byte up |
 | smp | .smp | read; the 70-byte header, uncompressed, Group 3 and Group 4; its own run-length scheme refused |

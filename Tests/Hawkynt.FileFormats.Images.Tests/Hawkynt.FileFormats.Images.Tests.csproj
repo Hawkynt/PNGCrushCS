@@ -186,6 +186,14 @@
     </None>
   </ItemGroup>
 
+  <!-- MrSID MG2 and MG3 files from GDAL's own test suite. See Formats\MrSid\Fixtures\THIRD-PARTY-NOTICE.GDAL.txt. -->
+  <ItemGroup>
+    <None Include="Formats\MrSid\Fixtures\*">
+      <Link>Fixtures\MrSid\%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
   <!-- LuraDocument files written by LuraTech's own encoder and by this package's writer, each beside
        what LuraTech's own decoder (the IrfanView plug-in LDF.DLL 3.3.7) composed it to, plus
        jbig-kit streams for the mask decoder. See Formats\LuraDocument\LuraDocumentOracleTests.cs. -->

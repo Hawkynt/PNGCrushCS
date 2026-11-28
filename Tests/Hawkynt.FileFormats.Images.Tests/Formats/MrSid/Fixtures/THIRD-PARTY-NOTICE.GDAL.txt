@@ -1,0 +1,29 @@
+mercator.sid and mercator_new.sid are copied unchanged from GDAL's test suite,
+autotest/gdrivers/data/sid/ in https://github.com/OSGeo/gdal (at commit
+99b25bae0e130982a8a4e73adcf0731b8e8039f3). The expected size, geotransform and
+coordinate system asserted for them in MrSidTests.cs are the values GDAL's own
+autotest/gdrivers/mrsid.py asserts when GDAL is built against Extensis' MrSID
+Decode SDK.
+
+  mercator.sid      SHA-256 0768ff08090d157be981a941bf63007ffa6f7b899a081fc3f5e49ec137f2f326
+  mercator_new.sid  SHA-256 c121708b003bbde828a62e241adeeba0a6f93f5a5b6c42fa8118518b8b4d6f2a
+
+GDAL/OGR is licensed under an MIT style license:
+
+Permission is hereby granted, free of charge, to any person obtaining a
+copy of this software and associated documentation files (the "Software"),
+to deal in the Software without restriction, including without limitation
+the rights to use, copy, modify, merge, publish, distribute, sublicense,
+and/or sell copies of the Software, and to permit persons to whom the
+Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included
+in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
+THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+DEALINGS IN THE SOFTWARE.
