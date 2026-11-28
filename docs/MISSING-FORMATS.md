@@ -36,9 +36,9 @@ issue quotes the recorded blocker and the route around it.
 | [Camera RAW & sensor data](#camera-raw--sensor-data) | [#514](https://github.com/Hawkynt/PNGCrushCS/issues/514) | 24 | 0 | 0 | 0 | 24 |
 | [Geospatial & remote sensing](#geospatial--remote-sensing) | [#515](https://github.com/Hawkynt/PNGCrushCS/issues/515) | 83 | 0 | 0 | 0 | 83 |
 | [Medical & scientific imaging](#medical--scientific-imaging) | [#516](https://github.com/Hawkynt/PNGCrushCS/issues/516) | 42 | 0 | 0 | 0 | 42 |
-| [GPU textures & game assets](#gpu-textures--game-assets) | [#517](https://github.com/Hawkynt/PNGCrushCS/issues/517) | 39 | 0 | 0 | 0 | 39 |
+| [GPU textures & game assets](#gpu-textures--game-assets) | [#517](https://github.com/Hawkynt/PNGCrushCS/issues/517) | 38 | 0 | 0 | 0 | 38 |
 | [Retro computer & legacy platforms](#retro-computer--legacy-platforms) | [#518](https://github.com/Hawkynt/PNGCrushCS/issues/518) | 100 | 0 | 0 | 0 | 100 |
-| [Vector, document & print](#vector-document--print) | [#519](https://github.com/Hawkynt/PNGCrushCS/issues/519) | 90 | 0 | 0 | 0 | 90 |
+| [Vector, document & print](#vector-document--print) | [#519](https://github.com/Hawkynt/PNGCrushCS/issues/519) | 89 | 0 | 0 | 0 | 89 |
 | [Fonts, text-mode & teletext](#fonts-text-mode--teletext) | [#520](https://github.com/Hawkynt/PNGCrushCS/issues/520) | 61 | 0 | 0 | 0 | 61 |
 | [Editor & application native](#editor--application-native) | [#521](https://github.com/Hawkynt/PNGCrushCS/issues/521) | 49 | 0 | 0 | 0 | 49 |
 | [Embroidery & industrial](#embroidery--industrial) | [#522](https://github.com/Hawkynt/PNGCrushCS/issues/522) | 20 | 0 | 0 | 0 | 20 |
@@ -49,7 +49,7 @@ issue quotes the recorded blocker and the route around it.
 | [Lossless & uncompressed video](#lossless--uncompressed-video) | [#527](https://github.com/Hawkynt/PNGCrushCS/issues/527) | 0 | 11 | 0 | 2 | 13 |
 | [Cinema camera RAW video](#cinema-camera-raw-video) | [#528](https://github.com/Hawkynt/PNGCrushCS/issues/528) | 0 | 6 | 7 | 0 | 13 |
 | [Elementary streams & streaming manifests](#elementary-streams--streaming-manifests) | [#529](https://github.com/Hawkynt/PNGCrushCS/issues/529) | 0 | 0 | 18 | 0 | 18 |
-| **All** | | **560** | **147** | **274** | **19** | **1000** |
+| **All** | | **558** | **147** | **274** | **19** | **998** |
 
 Each issue carries the labels `cat: <category>`, its kind (`image-format`, `video-codec`, `video-container`, `video-encoder`), `priority: high|medium|low`, and `documented-blocker` where that applies.
 
@@ -291,7 +291,6 @@ GPU/console texture containers, game sprites and engine assets. Tracked in [#517
 | Basis Universal (.basis) | Image | `.basis` | read + write | missing | high | [#744](https://github.com/Hawkynt/PNGCrushCS/issues/744) |
 | KTX2 supercompression (BasisLZ, Zstandard, ZLIB) and UASTC payloads | Image | `.ktx2` | read + write | missing | high | [#745](https://github.com/Hawkynt/PNGCrushCS/issues/745) |
 | Crunch (.crn) | Image | `.crn` | read + write | missing | medium | [#746](https://github.com/Hawkynt/PNGCrushCS/issues/746) |
-| Entis Rasterized Image (ERI) | Image | `.eri`, `.mei` | read + write | blocked | medium | [#747](https://github.com/Hawkynt/PNGCrushCS/issues/747) |
 | Nintendo GameCube/Wii TPL | Image | `.tpl` | read + write | missing | medium | [#748](https://github.com/Hawkynt/PNGCrushCS/issues/748) |
 | RenderWare Texture Dictionary (TXD) | Image | `.txd` | read + write | missing | medium | [#749](https://github.com/Hawkynt/PNGCrushCS/issues/749) |
 | XNA / MonoGame XNB (Texture2D) | Image | `.xnb` | read + write | missing | medium | [#750](https://github.com/Hawkynt/PNGCrushCS/issues/750) |
@@ -488,7 +487,6 @@ Vector drawings, metafiles, page description, printer rasters, fax. Tracked in [
 | IRIS CMYK Front End Processor CT | Image | `.ct` | read + write | missing | low | [#932](https://github.com/Hawkynt/PNGCrushCS/issues/932) |
 | Legacy DOS/Windows/Amiga vector editors (KwikDraw, WinDraw, PWDraw, Professional Draw, ProShape, DrawStudio, Top Draw, Little Draw, LEONARD's Sketch, DeskMate Draw, ObjectGraphics, XVT-Draw, IntelliDraw, Mayura Draw, HiJaak PDW, DraftChoice-free formats) | Image | `.kwk`, `.pdw`, `.md`, `.idw`, `.fig`, `.tdr` | read + write | missing | low | [#933](https://github.com/Hawkynt/PNGCrushCS/issues/933) |
 | Lotus 1-2-3 graph (PIC) | Image | `.pic` | read + write | missing | low | [#934](https://github.com/Hawkynt/PNGCrushCS/issues/934) |
-| LuraDocument (LDF) | Image | `.ldf` | read + write | blocked | low | [#935](https://github.com/Hawkynt/PNGCrushCS/issues/935) |
 | MacDraw / MacDraw II / ClarisDraw | Image | `.drw`, `.pict` | read + write | missing | low | [#936](https://github.com/Hawkynt/PNGCrushCS/issues/936) |
 | Micrografx Draw / Designer (DRW, DSF, DS4) | Image | `.drw`, `.drt`, `.dsf`, `.ds4` | read + write | missing | low | [#937](https://github.com/Hawkynt/PNGCrushCS/issues/937) |
 | Microsoft Office Document Imaging (MDI) | Image | `.mdi` | read + write | missing | low | [#938](https://github.com/Hawkynt/PNGCrushCS/issues/938) |

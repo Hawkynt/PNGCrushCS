@@ -946,7 +946,7 @@ Windows only, so nothing here has ever been able to compare against them either.
 | ecc | .ecc |  |
 | eidi | .ei .eidi | read; eighteen samples, every pixel agreeing with XnView |
 | eif | .eif | read; the document's pages are whole TIFF streams |
-| eri | .eri | read and write: every lossless variant and the lossy DCT key frames, against both Entis libraries; LOT and motion-compensated MEI refused by name |
+| eri | .eri | read and write: every lossless variant, DCT and LOT lossy pictures and motion-compensated MEI films, bit for bit against the shipped ERISA build; withdrawn and unwritten variants refused by name |
 | fbm | .cbm |  |
 | fff | .fff | read; its signature stands at 452 and its JPEG at 3272 |
 | fi | .fi | read; a zlib stream holding the palette and then the rows, or a JPEG at 598 |
